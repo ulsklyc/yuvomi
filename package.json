@@ -101,7 +101,7 @@
     "test:shopping-ux": "node --loader ./test/test-browser-loader.mjs --test test/test-shopping-ux.js",
     "test:money-utils": "node --loader ./test/test-browser-loader.mjs --test test/test-money-utils.js",
     "test:shopping-routes": "node --experimental-sqlite --test test/test-shopping-routes.js",
-    "test:shopping-send": "node --experimental-sqlite --test test/test-shopping-send.js",
+    "test:shopping-send": "node --experimental-sqlite --experimental-test-module-mocks --test test/test-shopping-send.js",
     "test:shopping-order-migration": "node --experimental-sqlite --test test/test-shopping-order-migration.js",
     "test:meals": "node --loader ./test/test-browser-loader.mjs --experimental-sqlite test/test-meals.js",
     "test:meals-routes": "node --experimental-sqlite --test test/test-meals-routes.js",

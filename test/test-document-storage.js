@@ -1769,6 +1769,10 @@ test('failed WebDAV delete returns a stable error and preserves the database row
   const result = await routeCall(harness, 'DELETE', `/${documentId}`);
   assert.equal(result.response.status, 502);
   assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_DELETE_FAILED');
+  // #2622: the class in `detail` is for the admin's storage settings (test
+  // and config); a member deleting, uploading or previewing gets the case only.
+  assert.equal(result.body.reason, 'documents_storage_failed');
+  assert.equal(result.body.detail, undefined, JSON.stringify(result.body));
   assert.equal(
     get().prepare('SELECT id FROM family_documents WHERE id = ?').get(documentId).id,
     documentId

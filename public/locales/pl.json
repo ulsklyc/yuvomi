@@ -2760,6 +2760,8 @@
         "backupWebdavTestSuccess": "Połączenie udane - znaleziono {{files}} kopię(kopii).",
         "backupWebdavTestFailed": "Połączenie nieudane: {{error}}",
         "backupWebdavPasswordRequired": "Dla innego serwera lub nazwy użytkownika wpisz hasło ponownie.",
+        "backupWebdavConfigIncomplete": "Wpisz adres, nazwę użytkownika i hasło serwera WebDAV.",
+        "backupLocalFailed": "Nie udało się odczytać ani zapisać kopii zapasowej na tym serwerze. Szczegóły są w dzienniku serwera.",
         "backupWebdavLastUpload": "Ostatnie przesłanie",
         "backupWebdavLastError": "Ostatni błąd",
         "backupWebdavNeverUploaded": "Brak przesłanych kopii",

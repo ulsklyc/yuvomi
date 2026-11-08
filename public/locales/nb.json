@@ -2561,6 +2561,8 @@
         "backupWebdavTestSuccess": "Tilkobling vellykket - {{files}} sikkerhetskopi(er) funnet.",
         "backupWebdavTestFailed": "Tilkobling feilet: {{error}}",
         "backupWebdavPasswordRequired": "En annen server eller et annet brukernavn krever passordet på nytt.",
+        "backupWebdavConfigIncomplete": "Skriv inn adressen, brukernavnet og passordet til WebDAV-serveren.",
+        "backupLocalFailed": "Sikkerhetskopien kunne ikke leses eller skrives på denne serveren. Detaljene står i serverloggen.",
         "backupWebdavLastUpload": "Siste opplasting",
         "backupWebdavLastError": "Siste feil",
         "backupWebdavNeverUploaded": "Ingen opplasting ennå",

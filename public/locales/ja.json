@@ -2459,6 +2459,8 @@
         "backupWebdavTestSuccess": "接続に成功しました - バックアップが {{files}} 件見つかりました。",
         "backupWebdavTestFailed": "接続に失敗しました: {{error}}",
         "backupWebdavPasswordRequired": "別のサーバーまたはユーザー名にはパスワードを再入力してください。",
+        "backupWebdavConfigIncomplete": "WebDAV サーバーのアドレス、ユーザー名、パスワードを入力してください。",
+        "backupLocalFailed": "このサーバーでバックアップを読み書きできませんでした。詳細はサーバーログにあります。",
         "backupWebdavLastUpload": "最終アップロード",
         "backupWebdavLastError": "最終エラー",
         "backupWebdavNeverUploaded": "アップロードはまだありません",

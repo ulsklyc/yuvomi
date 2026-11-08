@@ -2459,6 +2459,8 @@
         "backupWebdavTestSuccess": "Conexión exitosa - {{files}} copia(s) encontrada(s).",
         "backupWebdavTestFailed": "Error de conexión: {{error}}",
         "backupWebdavPasswordRequired": "Para otro servidor u otro nombre de usuario, vuelve a introducir la contraseña.",
+        "backupWebdavConfigIncomplete": "Introduce la dirección, el usuario y la contraseña del servidor WebDAV.",
+        "backupLocalFailed": "No se pudo leer ni escribir la copia de seguridad en este servidor. Los detalles están en el registro del servidor.",
         "backupWebdavLastUpload": "Última subida",
         "backupWebdavLastError": "Último error",
         "backupWebdavNeverUploaded": "Sin subidas aún",

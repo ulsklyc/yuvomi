@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Storage and backup errors in settings say what happened, in your language** (#2622). When
+  document storage or a WebDAV backup failed without a technical class to show, settings put an
+  English server sentence ("WebDAV upload failed.") into the translated message instead of the
+  app's own sentence. A connection test without URL, username or password now says so. A backup
+  that fails on this server, for example because the local file is missing, is no longer
+  reported as a refusal of the WebDAV server. The technical class of a storage failure is shown
+  only to the administrator in the storage settings, not to members uploading or opening a
+  document. A malformed notification channel form answers with a general error instead of an
+  engine message.
+
 ### Security
 - **A demoted administrator loses admin rights on every device** (#2611). The role of a signed-in
   browser was taken from the stored session, and a demotion only updated the sessions that existed

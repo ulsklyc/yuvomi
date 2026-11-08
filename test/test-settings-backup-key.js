@@ -60,7 +60,8 @@ test('Gruende: Schluessel gefragt zeigt das Feld, bewiesener Schluessel behaelt 
 // Gruende, die nur beim ERSTELLEN eines Backups fallen und den Restore-Dialog
 // nie erreichen: `backup_verify_failed` wirft nur `backupToFile()` (#2520), und
 // das ruft der Restore nicht auf.
-const NOT_RESTORE_REASONS = ['backup_verify_failed'];
+// `backup_local_failed` answers only the WebDAV routes (#2622).
+const NOT_RESTORE_REASONS = ['backup_verify_failed', 'backup_local_failed'];
 
 test('jeder Grund, den der Server kennt, hat im Dialog eine Regel', () => {
   // Die Liste steht im Server; faellt dort ein neuer Grund dazu, muss er hier
@@ -443,6 +444,27 @@ test('WebDAV: password_required wird uebersetzt, andere Fehler behalten den Serv
   );
   assert.equal(webdavErrorMessage({ message: 'Authentication failed (401).', data: { code: 400 } }), 'common.errorGeneric');
   assert.equal(webdavErrorMessage({ message: 'url must start with http:// or https://.', data: { errorCode: 'url_invalid' } }), 'settings.backupWebdavUrlInvalid');
+});
+
+// #2622: the connection test names its own cases in ONE field, `errorCode`,
+// like saving does: a missing URL, username or password has its own sentence.
+test('WebDAV test: own cases in errorCode get their sentence, the rest the frame or the case sentence (#2622)', async () => {
+  const { webdavTestErrorMessage } = await import('../public/settings/pages/admin-backup.js');
+  assert.equal(
+    webdavTestErrorMessage({ status: 400, data: { error: 'URL, username and password are required.', code: 400, errorCode: 'config_incomplete' } }),
+    'settings.backupWebdavConfigIncomplete',
+  );
+  assert.equal(
+    webdavTestErrorMessage({ status: 400, data: { error: 'A new server or username needs the password again.', code: 400, errorCode: 'password_required' } }),
+    'settings.backupWebdavPasswordRequired',
+  );
+  const refused = webdavTestErrorMessage({ status: 502, data: { error: 'The WebDAV server refused the request or could not be reached.', code: 502, reason: 'remote_auth_failed', detail: 'HTTP 401' } });
+  assert.match(refused, /^settings\.backupWebdavTestFailed/);
+  assert.match(refused, /HTTP 401/);
+  assert.equal(
+    webdavTestErrorMessage({ status: 500, data: { error: 'Connection test failed.', code: 500, reason: 'backup_local_failed' } }),
+    'settings.backupLocalFailed',
+  );
 });
 
 // --------------------------------------------------------

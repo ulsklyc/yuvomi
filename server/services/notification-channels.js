@@ -38,6 +38,20 @@ function toJson(value) {
   return JSON.stringify(value && typeof value === 'object' ? value : {});
 }
 
+/**
+ * An input check of a channel refused the body (#2622): its sentence is the
+ * app's own and the route sends it as a 400 (`code`). Everything else thrown
+ * while writing a channel - a TypeError from a malformed body, the database -
+ * is not marked and goes out as a fixed 500.
+ */
+export class ChannelInputError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ChannelInputError';
+    this.code = 'notification_channel_invalid';
+  }
+}
+
 // `keepPath`: Gotify und ntfy bekommen eine BASIS, an die der Provider seinen
 // eigenen Pfad haengt - da ist ein abschliessender Slash Rauschen und wird
 // entfernt. Beim Webhook ist der Wert der vollstaendige Endpunkt, auf den
@@ -45,15 +59,15 @@ function toJson(value) {
 // bekaeme sonst still eine andere Adresse als die eingetragene.
 function normalizeBaseUrl(value, { keepPath = false } = {}) {
   const raw = String(value ?? '').trim();
-  if (!raw) throw new Error('A base URL is required.');
+  if (!raw) throw new ChannelInputError('A base URL is required.');
   let url;
   try {
     url = new URL(raw);
   } catch {
-    throw new Error('A valid base URL is required.');
+    throw new ChannelInputError('A valid base URL is required.');
   }
   if (!['http:', 'https:'].includes(url.protocol)) {
-    throw new Error('Notification channel URL scheme must be http or https.');
+    throw new ChannelInputError('Notification channel URL scheme must be http or https.');
   }
   // Was sich ohne DNS entscheiden laesst, faellt schon beim Speichern: localhost,
   // reservierte Suffixe und ein Literal aus einem privaten Netz. Die Antwort auf
@@ -62,7 +76,7 @@ function normalizeBaseUrl(value, { keepPath = false } = {}) {
   // guardedFetch beim Senden, je Verbindung (GHSA-f4w5-ggcc-7m5c).
   const host = normalizeHostname(url.hostname);
   if (!isPrivateNetworkAllowed() && (isBlockedHostname(host) || (isIP(host) && isBlockedAddress(host)))) {
-    throw new Error(`Notification channel URL must not point to a private or local network address (set ${ENV_ALLOW_PRIVATE_NETWORK}=true to allow it).`);
+    throw new ChannelInputError(`Notification channel URL must not point to a private or local network address (set ${ENV_ALLOW_PRIVATE_NETWORK}=true to allow it).`);
   }
   if (keepPath) return url.toString();
   url.pathname = url.pathname.replace(/\/+$/, '');
@@ -71,13 +85,13 @@ function normalizeBaseUrl(value, { keepPath = false } = {}) {
 
 function normalizeProvider(provider) {
   const value = String(provider ?? '').trim().toLowerCase();
-  if (!PROVIDER_IDS.has(value)) throw new Error('Unknown notification provider.');
+  if (!PROVIDER_IDS.has(value)) throw new ChannelInputError('Unknown notification provider.');
   return value;
 }
 
 function normalizeScope(scope) {
   const value = String(scope ?? 'household').trim() || 'household';
-  if (!['household', 'user'].includes(value)) throw new Error('Invalid notification channel scope.');
+  if (!['household', 'user'].includes(value)) throw new ChannelInputError('Invalid notification channel scope.');
   return value;
 }
 
@@ -96,16 +110,16 @@ function normalizeGotifySecrets(input = {}) {
 }
 
 function validateGotify({ secrets, requireSecrets }) {
-  if (requireSecrets && !secrets.appToken) throw new Error('Gotify app token is required.');
+  if (requireSecrets && !secrets.appToken) throw new ChannelInputError('Gotify app token is required.');
 }
 
 function normalizeNtfyConfig(input = {}) {
   const authType = String(input.authType ?? 'none').trim().toLowerCase();
   const priority = String(input.priority ?? 'default').trim().toLowerCase();
-  if (!NTFY_AUTH_TYPES.has(authType)) throw new Error('Invalid ntfy auth type.');
-  if (!NTFY_PRIORITIES.has(priority)) throw new Error('Invalid ntfy priority.');
+  if (!NTFY_AUTH_TYPES.has(authType)) throw new ChannelInputError('Invalid ntfy auth type.');
+  if (!NTFY_PRIORITIES.has(priority)) throw new ChannelInputError('Invalid ntfy priority.');
   const topic = String(input.topic ?? '').trim();
-  if (!topic) throw new Error('ntfy topic is required.');
+  if (!topic) throw new ChannelInputError('ntfy topic is required.');
   return {
     baseUrl: normalizeBaseUrl(input.baseUrl),
     topic,
@@ -124,10 +138,10 @@ function normalizeNtfySecrets(input = {}) {
 
 function validateNtfy({ config, secrets, requireSecrets }) {
   if (config.authType === 'token' && requireSecrets && !secrets.token) {
-    throw new Error('ntfy token is required for token authentication.');
+    throw new ChannelInputError('ntfy token is required for token authentication.');
   }
   if (config.authType === 'basic' && requireSecrets && (!secrets.username || !secrets.password)) {
-    throw new Error('ntfy username and password are required for basic authentication.');
+    throw new ChannelInputError('ntfy username and password are required for basic authentication.');
   }
 }
 
@@ -147,11 +161,11 @@ function normalizeWebhookConfig(input = {}) {
   const payloadTemplate = String(input.payloadTemplate ?? '').trim();
   if (payloadTemplate) {
     if (payloadTemplate.length > MAX_WEBHOOK_TEMPLATE_LENGTH) {
-      throw new Error(`Webhook payload template must be at most ${MAX_WEBHOOK_TEMPLATE_LENGTH} characters.`);
+      throw new ChannelInputError(`Webhook payload template must be at most ${MAX_WEBHOOK_TEMPLATE_LENGTH} characters.`);
     }
     const unknown = unknownTemplatePlaceholders(payloadTemplate);
     if (unknown.length) {
-      throw new Error(
+      throw new ChannelInputError(
         `Unknown webhook placeholder(s): ${unknown.map((k) => `{{${k}}}`).join(', ')}. `
         + `Available: ${WEBHOOK_TEMPLATE_PLACEHOLDERS.map((k) => `{{${k}}}`).join(', ')}.`,
       );
@@ -162,7 +176,7 @@ function normalizeWebhookConfig(input = {}) {
     try {
       JSON.parse(renderPayloadTemplate(payloadTemplate, WEBHOOK_TEMPLATE_SAMPLE));
     } catch {
-      throw new Error('Webhook payload template must produce valid JSON.');
+      throw new ChannelInputError('Webhook payload template must produce valid JSON.');
     }
   }
   return { baseUrl: normalizeBaseUrl(input.baseUrl, { keepPath: true }), payloadTemplate };
@@ -197,8 +211,8 @@ const MAX_EMAIL_LENGTH = 254; // RFC 5321: laenger ist ohnehin keine Adresse.
 
 function normalizeEmailAddress(value) {
   const raw = String(value ?? '').trim();
-  const invalid = () => new Error('A valid recipient email address is required.');
-  if (!raw) throw new Error('A recipient email address is required.');
+  const invalid = () => new ChannelInputError('A valid recipient email address is required.');
+  if (!raw) throw new ChannelInputError('A recipient email address is required.');
   // Die Laenge zuerst: was hier abprallt, durchlaeuft keine weitere Pruefung.
   if (raw.length > MAX_EMAIL_LENGTH) throw invalid();
   // Deckt Zeilenumbrueche mit ab - ein `\n` im Empfaenger-Header machte aus
@@ -299,20 +313,15 @@ export function publicChannel(channel) {
 }
 
 /**
- * Runs the input checks of a channel and marks what they throw with
- * `code: 'notification_channel_invalid'` (Phase 0 section H): those sentences
- * are the app's own and the route may send them as a 400. Anything thrown
- * later - the database - stays unmarked and goes out as a fixed 500.
+ * Runs the input checks of a channel (Phase 0 section H). Its own refusals are
+ * ChannelInputError (`code: 'notification_channel_invalid'`), which the route
+ * sends as a 400; anything else - a TypeError from a malformed body, the
+ * database - stays unmarked and goes out as a fixed 500 (#2622).
  */
 function checkedInput(input, existing = null) {
-  try {
-    const normalized = normalizeChannelInput(input, existing);
-    if (!normalized.name) throw new Error('Notification channel name is required.');
-    return normalized;
-  } catch (err) {
-    if (err instanceof Error && err.code === undefined) err.code = 'notification_channel_invalid';
-    throw err;
-  }
+  const normalized = normalizeChannelInput(input, existing);
+  if (!normalized.name) throw new ChannelInputError('Notification channel name is required.');
+  return normalized;
 }
 
 export function createNotificationChannelStore({ db } = {}) {
