@@ -3568,7 +3568,9 @@
         "backupRestoreErrorTooLarge": "Mas malaki ang file kaysa sa upload limit ng installation na ito ({{limit}}). Taasan ang BACKUP_UPLOAD_LIMIT, i-restart ang Yuvomi at i-restore muli. Walang binago rito.",
         "apiTokenErrorNameTooLong": "Hanggang 100 character lang ang pangalan.",
         "apiTokenErrorExpiryPast": "Nasa nakaraan ang petsa ng pag-expire. Pumili ng mas huling oras.",
-        "apiTokenErrorSubjectDeactivated": "Naka-deactivate ang account na ito at hindi mabibigyan ng token. Pumili ng ibang tao."
+        "apiTokenErrorSubjectDeactivated": "Naka-deactivate ang account na ito at hindi mabibigyan ng token. Pumili ng ibang tao.",
+        "dmsErrorUrlInvalid": "Dapat magsimula ang URL ng Server sa http:// o https://.",
+        "dmsErrorAccountExists": "May DMS nang nakakonekta sa URL ng server na ito."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",
@@ -4765,7 +4767,9 @@
         "colorTeal": "Teal",
         "colorOrange": "Kahel",
         "colorRed": "Pula",
-        "colorGrey": "Abo"
+        "colorGrey": "Abo",
+        "errorGone": "Wala na ang kategoryang ito.",
+        "errorSubGone": "Wala na ang subkategoryang ito."
     },
     "subscriptions": {
         "tabLabel": "Mga Subscription",
@@ -6401,7 +6405,10 @@
             "bag_one": "supot",
             "bag_other": "supot"
         },
-        "moreDetailsHint": "Pinakamababang stock, mga tala"
+        "moreDetailsHint": "Pinakamababang stock, mga tala",
+        "errorLocationGone": "Wala na ang lugar ng imbakang ito.",
+        "errorLocationExists": "Umiiral na ang lugar ng imbakang ito. Pumili ng ibang pangalan.",
+        "errorLocationLast": "Hindi mabubura ang huling lugar ng imbakan. Magdagdag muna ng iba."
     },
     "inventory": {
         "title": "Imbentaryo",

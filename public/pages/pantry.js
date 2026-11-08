@@ -2351,6 +2351,8 @@ async function openLocationManager() {
         // laesst die Artikel unzugeordnet zurueck (`orphaned` in der Antwort).
         deleteDetailKey: 'pantry.locationDeleteConfirmDetail',
         groups: [{ key: '', labelKey: '', addLabelKey: 'common.add' }],
+        // Schon geloescht ist ein Erfolg (#1909).
+        alreadyDeletedReason: 'pantry_location_not_found',
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem

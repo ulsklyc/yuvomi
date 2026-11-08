@@ -3568,7 +3568,9 @@
         "backupRestoreErrorTooLarge": "File lebih besar dari batas unggah instalasi ini ({{limit}}). Naikkan BACKUP_UPLOAD_LIMIT, mulai ulang Yuvomi, lalu pulihkan lagi. Tidak ada yang diubah di sini.",
         "apiTokenErrorNameTooLong": "Nama paling banyak 100 karakter.",
         "apiTokenErrorExpiryPast": "Tanggal kedaluwarsa sudah lewat. Pilih waktu yang lebih lambat.",
-        "apiTokenErrorSubjectDeactivated": "Akun ini dinonaktifkan dan tidak bisa mendapat token. Pilih orang lain."
+        "apiTokenErrorSubjectDeactivated": "Akun ini dinonaktifkan dan tidak bisa mendapat token. Pilih orang lain.",
+        "dmsErrorUrlInvalid": "URL Server harus diawali http:// atau https://.",
+        "dmsErrorAccountExists": "Sudah ada DMS yang terhubung dengan URL server ini."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
@@ -4765,7 +4767,9 @@
         "colorTeal": "Toska",
         "colorOrange": "Oranye",
         "colorRed": "Merah",
-        "colorGrey": "Abu-abu"
+        "colorGrey": "Abu-abu",
+        "errorGone": "Kategori ini sudah tidak ada.",
+        "errorSubGone": "Subkategori ini sudah tidak ada."
     },
     "subscriptions": {
         "tabLabel": "Langganan",
@@ -6401,7 +6405,10 @@
             "bag_one": "kantong",
             "bag_other": "kantong"
         },
-        "moreDetailsHint": "Stok minimum, catatan"
+        "moreDetailsHint": "Stok minimum, catatan",
+        "errorLocationGone": "Tempat penyimpanan ini sudah tidak ada.",
+        "errorLocationExists": "Tempat penyimpanan ini sudah ada. Pilih nama lain.",
+        "errorLocationLast": "Tempat penyimpanan terakhir tidak dapat dihapus. Tambahkan yang lain terlebih dahulu."
     },
     "inventory": {
         "title": "Inventaris",

@@ -135,14 +135,21 @@ function categoryErrorResponse(res, error) {
   return res.status(status).json({ error: error.message, code: status, ...(error.reason ? { reason: error.reason } : {}) });
 }
 
+function categoryRefusal(res, verdict) {
+  return res.status(verdict.status).json({
+    error: verdict.error, code: verdict.status, ...(verdict.reason ? { reason: verdict.reason } : {}),
+  });
+}
+
 function editableCategory(req, id) {
   if (!Number.isInteger(id) || id <= 0) {
     return { status: 400, error: 'Invalid category id.' };
   }
   const category = db.get().prepare('SELECT * FROM note_categories WHERE id = ?').get(id);
-  if (!category) return { status: 404, error: 'Category not found.' };
+  // Eine fremde persoenliche Kategorie sieht aus wie eine geloeschte (#1909).
+  if (!category) return { status: 404, error: 'Category not found.', reason: 'notes_category_not_found' };
   if (category.scope === 'personal' && Number(category.owner_user_id) !== Number(actorId(req))) {
-    return { status: 404, error: 'Category not found.' };
+    return { status: 404, error: 'Category not found.', reason: 'notes_category_not_found' };
   }
   if (category.scope === 'household' && !canManageHousehold(req)) {
     return { status: 403, error: 'Household category management is not allowed.' };
@@ -208,7 +215,7 @@ router.patch('/categories/reorder', (req, res) => {
     }
     const verdicts = ids.map((id) => editableCategory(req, id));
     for (const verdict of verdicts) {
-      if (!verdict.category) return res.status(verdict.status).json({ error: verdict.error, code: verdict.status });
+      if (!verdict.category) return categoryRefusal(res, verdict);
     }
     if (new Set(verdicts.map((verdict) => verdict.category.scope)).size > 1) {
       return res.status(400).json({ error: 'Categories can only be reordered within one scope.', code: 400 });
@@ -230,7 +237,7 @@ router.put('/categories/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     const verdict = editableCategory(req, id);
-    if (!verdict.category) return res.status(verdict.status).json({ error: verdict.error, code: verdict.status });
+    if (!verdict.category) return categoryRefusal(res, verdict);
     const name = validateCategoryName(req.body?.name);
     db.get().prepare(`
       UPDATE note_categories
@@ -252,7 +259,7 @@ router.delete('/categories/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     const verdict = editableCategory(req, id);
-    if (!verdict.category) return res.status(verdict.status).json({ error: verdict.error, code: verdict.status });
+    if (!verdict.category) return categoryRefusal(res, verdict);
     const database = db.get();
     const remove = database.transaction(() => {
       database.prepare('DELETE FROM note_categories WHERE id = ?').run(id);

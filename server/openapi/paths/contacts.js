@@ -92,6 +92,7 @@ const MULTI_CASES = 'for `phones`, `emails` and `addresses`, checked after the f
   + '`contacts_email_invalid` (400, an email `value` has no `@` with text on both sides), '
   + '`contacts_phone_entry_invalid`, `contacts_email_entry_invalid`, `contacts_address_entry_invalid` (400, the field is not '
   + 'a list, or an entry is not an object, lacks its `label` or `value`, carries one that is not text, or an `isPrimary` that is not a boolean)';
+const CAT_GONE_404 = '`contacts_category_not_found` (404, the category does not exist - deleted)';
 const CAT_EXISTS = '`category_exists` (409, a category with this name already exists)';
 const EMAIL_PROTECTED = '`contact_email_protected` (403, the contact is a household member and only that member or an admin, '
   + 'signed in or with a full-access token, may change its email addresses)';
@@ -99,8 +100,8 @@ const FAMILY_MEMBER = '`family_member_contact` (403, the contact is a household 
 const CASE_REASONS = {
   '/api/v1/contacts/categories': { post: CAT_EXISTS },
   '/api/v1/contacts/categories/{key}': {
-    put: CAT_EXISTS,
-    delete: '`category_in_use` (409, contacts still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)',
+    put: `${CAT_GONE_404}, ${CAT_EXISTS}`,
+    delete: `${CAT_GONE_404}, \`category_in_use\` (409, contacts still use the category; \`count\` carries how many), \`category_last\` (409, the last category cannot be deleted)`,
   },
   '/api/v1/contacts': { post: `${CATEGORY_GONE}, ${FIELD_CASES}; ${MULTI_CASES}` },
   '/api/v1/contacts/{id}': {

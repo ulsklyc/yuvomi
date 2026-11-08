@@ -184,6 +184,10 @@
   .kitchen-tabs-bar__trailing:empty {
     padding-inline-start: 0;
     box-shadow: none;
+    /* Leer deckt sie nichts ab: ein angeschnittener Tab an der Endkante
+     * bleibt sichtbar (Mahlzeiten, Einkauf). */
+    padding-inline-end: 0;
+    margin-inline-end: 0;
   }
 
   /* Symbol mit Trefferflaeche: die Breite des Schalters kommt aus der Shell,
@@ -201,6 +205,18 @@
   .kitchen-tabs-bar__trailing {
     padding-inline-start: 0;
     margin-inline-start: calc(-1 * var(--space-0h));
+    /* DIE ZONE REICHT BIS AN DIE KANTE (Release 2.86.0, Sonde 20). Ein
+     * Sticky-Kind haelt das Polster des Scrollers ein: mit `inset-inline-end: 0`
+     * klebte die Zone --page-inline-pad (16px) vor der Endkante, und durch
+     * diesen Streifen scrollten die Tabs rechts neben der Lupe weiter - der
+     * 12px-Fade der Leiste blendete dort Leere statt eines angeschnittenen
+     * Tabs (de: Rezepte, uk: Vorrat). Jetzt klebt sie an der echten Kante und
+     * traegt das Seitenpolster selbst: die Lupe bleibt auf der Seitenkante,
+     * der Hintergrund deckt den Streifen, und Rand plus Polster heben sich
+     * im Fluss auf - die Leiste wird keinen Pixel breiter. */
+    inset-inline-end: calc(-1 * var(--page-inline-pad));
+    padding-inline-end: var(--page-inline-pad);
+    margin-inline-end: calc(-1 * var(--page-inline-pad));
   }
   .kitchen-tabs-bar__trailing .btn--icon {
     position: relative;

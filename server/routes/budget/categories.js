@@ -67,7 +67,7 @@ router.get('/categories/:categoryKey/subcategories', (req, res) => {
       FROM budget_categories
       WHERE key = ?
     `).get(req.params.categoryKey);
-    if (!category) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!category) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'budget_category_not_found' });
 
     const subcategories = db.get().prepare(`
       SELECT key, category_key, name, sort_order
@@ -119,7 +119,7 @@ router.post('/categories', (req, res) => {
 router.put('/categories/:key', (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM budget_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'budget_category_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (vName.error) return refuse(res, refusals('category_name_invalid', [vName]));
@@ -141,7 +141,7 @@ router.put('/categories/:key', (req, res) => {
 router.delete('/categories/:key', (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM budget_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'budget_category_not_found' });
 
     const inUse = categoryInUseCount(db.get(), cat.key);
     if (inUse > 0) {
@@ -181,7 +181,7 @@ router.post('/categories/:categoryKey/subcategories', (req, res) => {
     const cat = db.get().prepare(`
       SELECT * FROM budget_categories WHERE key = ?
     `).get(req.params.categoryKey);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'budget_category_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (vName.error) return refuse(res, refusals('subcategory_name_invalid', [vName]));
@@ -213,7 +213,7 @@ router.post('/categories/:categoryKey/subcategories', (req, res) => {
 router.put('/categories/:key/subcategories/:subKey', (req, res) => {
   try {
     const sub = db.get().prepare('SELECT * FROM budget_subcategories WHERE key = ? AND category_key = ?').get(req.params.subKey, req.params.key);
-    if (!sub) return res.status(404).json({ error: 'Subcategory not found.', code: 404 });
+    if (!sub) return res.status(404).json({ error: 'Subcategory not found.', code: 404, reason: 'budget_subcategory_not_found' });
 
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
     if (vName.error) return refuse(res, refusals('subcategory_name_invalid', [vName]));
@@ -235,7 +235,7 @@ router.put('/categories/:key/subcategories/:subKey', (req, res) => {
 router.delete('/categories/:key/subcategories/:subKey', (req, res) => {
   try {
     const sub = db.get().prepare('SELECT * FROM budget_subcategories WHERE key = ? AND category_key = ?').get(req.params.subKey, req.params.key);
-    if (!sub) return res.status(404).json({ error: 'Subcategory not found.', code: 404 });
+    if (!sub) return res.status(404).json({ error: 'Subcategory not found.', code: 404, reason: 'budget_subcategory_not_found' });
 
     const inUse = subcategoryInUseCount(db.get(), sub.key);
     if (inUse > 0) {

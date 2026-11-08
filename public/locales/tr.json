@@ -3550,7 +3550,9 @@
         "backupRestoreErrorTooLarge": "Dosya bu kurulumun yükleme sınırından ({{limit}}) büyük. BACKUP_UPLOAD_LIMIT değerini artırın, Yuvomi'yi yeniden başlatın ve yeniden geri yükleyin. Burada hiçbir şey değişmedi.",
         "apiTokenErrorNameTooLong": "Ad en fazla 100 karakter olabilir.",
         "apiTokenErrorExpiryPast": "Son kullanma tarihi geçmişte. Daha sonraki bir zaman seç.",
-        "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç."
+        "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç.",
+        "dmsErrorUrlInvalid": "Sunucu URL'si http:// veya https:// ile başlamalıdır.",
+        "dmsErrorAccountExists": "Bu sunucu URL'siyle zaten bir DMS bağlı."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
@@ -4765,7 +4767,9 @@
         "colorTeal": "Turkuaz",
         "colorOrange": "Turuncu",
         "colorRed": "Kırmızı",
-        "colorGrey": "Gri"
+        "colorGrey": "Gri",
+        "errorGone": "Bu kategori artık yok.",
+        "errorSubGone": "Bu alt kategori artık yok."
     },
     "subscriptions": {
         "tabLabel": "Abonelikler",
@@ -6401,7 +6405,10 @@
             "bag_one": "poşet",
             "bag_other": "poşet"
         },
-        "moreDetailsHint": "Asgari stok, notlar"
+        "moreDetailsHint": "Asgari stok, notlar",
+        "errorLocationGone": "Bu saklama yeri artık yok.",
+        "errorLocationExists": "Bu saklama yeri zaten var. Başka bir ad seçin.",
+        "errorLocationLast": "Son saklama yeri silinemez. Önce başka bir tane ekleyin."
     },
     "inventory": {
         "title": "Envanter",

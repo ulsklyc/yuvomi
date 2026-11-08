@@ -23,7 +23,7 @@
 import { randomBytes } from 'node:crypto';
 import * as store from './waste-store.js';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
-import { escapeICSText, foldLine, findUserIdByFeedToken as sharedFindUserIdByFeedToken } from './ics-export.js';
+import { escapeICSText, foldLine, emptyFeed, findUserIdByFeedToken as sharedFindUserIdByFeedToken } from './ics-export.js';
 import { todayKey, shiftDateKey } from '../utils/timezone.js';
 
 const FEED_PAST_DAYS = 30;
@@ -63,6 +63,8 @@ function buildVEvent(occurrence, dtstamp, locale) {
   return lines.map(foldLine);
 }
 
+const PRODID = '-//Yuvomi//Waste Collection Feed//DE';
+
 /**
  * @param {object} conn
  * @param {number} userId whose feed to build (resolves the type selection)
@@ -84,7 +86,7 @@ function buildWasteFeed(conn, userId, now = new Date()) {
   const out = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Yuvomi//Waste Collection Feed//DE',
+    `PRODID:${PRODID}`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeICSText(translate(locale, 'waste.icsCalendarName'))}`,
@@ -136,8 +138,14 @@ function setFeedTypeIds(conn, userId, typeIds) {
   conn.prepare(`UPDATE users SET waste_feed_type_ids = ? WHERE id = ?`).run(value, userId);
 }
 
+/** The waste feed without its events, for a subscriber without `waste` (#2615). */
+function buildEmptyWasteFeed(conn) {
+  const { locale } = resolveHouseholdFormats(conn);
+  return emptyFeed({ prodId: PRODID, calendarName: translate(locale, 'waste.icsCalendarName') });
+}
+
 export {
-  buildWasteFeed,
+  buildWasteFeed, buildEmptyWasteFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
   getFeedTypeIds, setFeedTypeIds,
 };

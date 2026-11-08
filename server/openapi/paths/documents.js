@@ -565,6 +565,11 @@ const CASE_REASONS = {
   '/api/v1/documents/storage/test': { post: STORAGE_FAILED },
   '/api/v1/documents/{id}/preview': { get: STORAGE_FAILED },
   '/api/v1/documents/{id}/download': { get: STORAGE_FAILED },
+  '/api/v1/documents/dms/accounts': {
+    post: '`dms_field_required` (400, name, base URL, API token or - for Papra - the organization ID is empty), '
+      + '`dms_url_invalid` (400, the base URL does not start with http:// or https://), '
+      + '`dms_account_exists` (409, an account with this base URL already exists)',
+  },
   '/api/v1/documents/dms/accounts/{id}': { delete: '`dms_account_not_found` (404)' },
   '/api/v1/documents/dms/accounts/{id}/test': { post: '`dms_account_not_found` (404)' },
   '/api/v1/documents/dms/search': { get: '`dms_account_not_found` (404)' },

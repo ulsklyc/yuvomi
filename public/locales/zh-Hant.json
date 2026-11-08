@@ -1472,8 +1472,8 @@
         "selectAll": "全選",
         "selectCount": "已選擇 {{count}} 個",
         "selectNamed": "選擇 {{name}}",
-        "bulkDeleteConfirm": "刪除 {{count}} 個聯絡人?",
-        "bulkDeleteConfirm_one": "刪除 {{count}} 個聯絡人?",
+        "bulkDeleteConfirm": "刪除 {{count}} 個聯絡人？",
+        "bulkDeleteConfirm_one": "刪除 {{count}} 個聯絡人？",
         "bulkDeletedToast": "已刪除 {{count}} 個聯絡人",
         "errorContactGone": "這位聯絡人已不存在。",
         "errorSelectedCategoryGone": "所選類別已不存在。",
@@ -2535,9 +2535,9 @@
         "cycleFeedSubscribe": "在日曆應用中訂閱",
         "cycleFeedRegenerate": "生成新連結",
         "cycleFeedDisable": "停用訂閱源",
-        "cycleFeedRegenerateConfirm": "要生成新連結嗎?舊連結將停止工作。",
+        "cycleFeedRegenerateConfirm": "要生成新連結嗎？舊連結將停止工作。",
         "cycleFeedRegenerateConfirmDetail": "使用舊連結的裝置和服務將不再收到更新,具體取決於應用,它們要麼繼續顯示上次的狀態,要麼在輸入新地址前不顯示任何內容。",
-        "cycleFeedDisableConfirm": "要停用訂閱源嗎?現有訂閱將不再收到更新。",
+        "cycleFeedDisableConfirm": "要停用訂閱源嗎？現有訂閱將不再收到更新。",
         "cycleFeedDisableConfirmDetail": "連結會立即停止提供任何內容。之後重新啟用會生成一個新地址,每個訂閱者都需要手動重新輸入。",
         "cycleFeedHint": "任何知道此連結的人都能看到你的週期資料。請只與自己的裝置共享。",
         "scheduleFeedTitle": "匯出日程",
@@ -3432,7 +3432,7 @@
         "devicesNeverUsed": "尚未使用",
         "devicesCurrent": "此裝置",
         "devicesRevokeNamed": "登出「{{name}}」",
-        "devicesRevokeConfirm": "要登出「{{name}}」嗎?",
+        "devicesRevokeConfirm": "要登出「{{name}}」嗎？",
         "devicesRevokeDetail": "該裝置上的 App 將會登出。若要再次使用，請重新配對該裝置。",
         "devicesRevoke": "登出",
         "devicesRevokedToast": "「{{name}}」已登出。",
@@ -3550,7 +3550,9 @@
         "backupRestoreErrorTooLarge": "檔案超過此安裝的上傳上限（{{limit}}）。請提高 BACKUP_UPLOAD_LIMIT，重新啟動 Yuvomi 後再還原一次。這裡沒有做任何變更。",
         "apiTokenErrorNameTooLong": "名稱最多 100 個字元。",
         "apiTokenErrorExpiryPast": "到期日已經過去。請選擇較晚的時間。",
-        "apiTokenErrorSubjectDeactivated": "此帳號已停用，無法取得權杖。請選擇其他人。"
+        "apiTokenErrorSubjectDeactivated": "此帳號已停用，無法取得權杖。請選擇其他人。",
+        "dmsErrorUrlInvalid": "伺服器網址必須以 http:// 或 https:// 開頭。",
+        "dmsErrorAccountExists": "已有 DMS 以此伺服器網址連線。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",
@@ -4765,7 +4767,9 @@
         "colorTeal": "青色",
         "colorOrange": "橙色",
         "colorRed": "紅色",
-        "colorGrey": "灰色"
+        "colorGrey": "灰色",
+        "errorGone": "該類別已不存在。",
+        "errorSubGone": "該子類別已不存在。"
     },
     "subscriptions": {
         "tabLabel": "訂閱",
@@ -6401,7 +6405,10 @@
             "bag_one": "袋",
             "bag_other": "袋"
         },
-        "moreDetailsHint": "最低庫存、備註"
+        "moreDetailsHint": "最低庫存、備註",
+        "errorLocationGone": "該存放位置已不存在。",
+        "errorLocationExists": "已有同名存放位置。請換一個名稱。",
+        "errorLocationLast": "最後一個存放位置無法刪除。請先新增另一個。"
     },
     "inventory": {
         "title": "物品",
@@ -6732,7 +6739,7 @@
         "overlapWarning": "{{user}} 在 {{date}} 有重疊的排班週期；顯示較新的週期。",
         "overlapWarningShort": "排班週期重疊",
         "patternWinsBadge": "優先顯示",
-        "patternOverlapConfirmTitle": "要替換{{user}}當前的排班嗎?",
+        "patternOverlapConfirmTitle": "要替換{{user}}當前的排班嗎？",
         "patternOverlapConfirmDetail": "新排班在兩者重疊的範圍內優先生效。「{{name}}」仍會保留,但在重疊期間不再顯示。",
         "patternOverlapConfirmAction": "替換",
         "editOverride": "編輯例外",

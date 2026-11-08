@@ -930,6 +930,7 @@ const REASONS_PASSED_THROUGH = new Map([
   // Notizen (#1909): NoteCategoryInputError traegt den Grund einer gewaehlten
   // Kategorie; jeder Wurf dort ist eine 400.
   ['routes/notes.js: error.reason', { sites: 1, at403: [], why: 'categoryErrorResponse: NoteCategoryInputError, immer 400' }],
+  ['routes/notes.js: verdict.reason', { sites: 1, at403: [], why: 'categoryRefusal: nur die 404 von editableCategory traegt einen Grund (#1909), die 403 nie' }],
   ['routes/backup.js: err.reason', { sites: 1, at403: [], why: 'Restore: 409, 503 oder 400' }],
   // wasteErrorResponse (#1795, #1909): der Grund eines getypten Abfuhr-Fehlers
   // haengt an seinem Zweig - 400 (WasteValidationError), 409 (WasteConflictError:

@@ -122,8 +122,10 @@ function bindPwaInstall(container) {
       } else if (result.outcome === 'unavailable') {
         window.yuvomi?.showToast(t('settings.pwaInstallUnavailableToast'), 'warning');
       }
-    } catch (error) {
-      errorElement.textContent = error.message || t('common.errorGeneric');
+    } catch {
+      // Das Installationsangebot wirft nur einen Fehler des Browsers, englisch
+      // und ohne naechsten Schritt (#1909). Die Seite sagt, was der Nutzer davon hat.
+      errorElement.textContent = t('settings.pwaInstallUnavailableToast');
       errorElement.hidden = false;
     } finally {
       renderState();
