@@ -44,9 +44,13 @@ const PUSH_SERVICE = 'server/services/push.js';
 
 // What counts as sending. `sendNotification(` is web-push's own call and may
 // only live in push.js; `provider(s)[...].send(` is the channel providers'.
+// The provider call is matched by its SHAPE too (`.send({ channel`), so a
+// sender that names its provider differently (`const p = providers[x];
+// p.send({ channel, ... })`) is not invisible to the guard.
 const SEND_CALLS = [
   /\bsendPushToUser\s*\(/,
   /\bproviders?(?:\[[^\]\n]*\])?\.send\s*\(/,
+  /\.send\s*\(\s*\{\s*channel\b/,
   /\bsendNotification\s*\(/,
 ];
 

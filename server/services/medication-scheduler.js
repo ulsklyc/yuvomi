@@ -205,6 +205,15 @@ async function processDueMedicationsUntracked({
   // subscription, no channel), one with a device keeps getting their own
   // reminder - so the same rule holds for the five-year-old and the
   // fourteen-year-old.
+  //
+  // Once per recipient and run, not per dose, like withoutModulesDeniedToRecipient():
+  // every resolution is two queries, and the cache cannot go stale because no
+  // `await` lies between the first lookup and the last.
+  const mayHear = new Map();
+  const recipientMayHear = (userId) => {
+    if (!mayHear.has(userId)) mayHear.set(userId, mayHearAboutHealth(activeDb, userId));
+    return mayHear.get(userId);
+  };
   const deliveries = newlyDue.map((dose) => {
     const medBody = dose.medName || FALLBACK_BODY;
     const recipients = [{ userId: dose.ownerId, body: medBody }];
@@ -212,7 +221,7 @@ async function processDueMedicationsUntracked({
       if (caregiverId === dose.ownerId) continue;
       recipients.push({ userId: caregiverId, body: `${dose.ownerName}: ${medBody}` });
     }
-    return { dose, recipients: recipients.filter(({ userId }) => mayHearAboutHealth(activeDb, userId)) };
+    return { dose, recipients: recipients.filter(({ userId }) => recipientMayHear(userId)) };
   });
 
   for (const { dose, recipients } of deliveries) {
