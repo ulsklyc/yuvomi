@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Every release carries a signed tarball of the app.** Next to the container image, each
+  GitHub release now has `yuvomi-<version>-dist.tar.gz`, a `SHA256SUMS` file and a build
+  provenance attestation that proves GitHub built both from the release tag of this repository
+  (`gh attestation verify yuvomi-<version>-dist.tar.gz -R ulsklyc/yuvomi`; steps in the
+  installation guide). For now the tarball holds the same files as GitHub's source download.
+  The YunoHost package and the Proxmox script will install from it next, so that later
+  releases can ship a built web app there without changing how those installations update. A
+  release only becomes visible once the tarball is on it, so no channel picks up a release
+  without its file.
+
 ### Fixed
 - **Storage and backup errors in settings say what happened, in your language** (#2622). When
   document storage or a WebDAV backup failed without a technical class to show, settings put an

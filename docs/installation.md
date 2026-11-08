@@ -336,6 +336,25 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
 > image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.86.0 --format '{{ json .Provenance }}'`.
 
+> **Verify a release tarball.** Releases from November 2026 on also carry the app as a tarball,
+> `yuvomi-<version>-dist.tar.gz` (one top-level folder `yuvomi-<version>/`), next to a
+> `SHA256SUMS` file and a build provenance attestation over both, made by
+> `.github/workflows/release-assets.yml` from the release tag. YunoHost and the Proxmox script
+> install from it. If you install from the tarball yourself, check it before you unpack it:
+>
+> ```bash
+> gh release download v<version> --repo ulsklyc/yuvomi --pattern 'yuvomi-*-dist.tar.gz' --pattern SHA256SUMS
+> sha256sum -c SHA256SUMS
+> gh attestation verify yuvomi-<version>-dist.tar.gz -R ulsklyc/yuvomi \
+>   --signer-workflow ulsklyc/yuvomi/.github/workflows/release-assets.yml
+> ```
+>
+> `sha256sum -c` proves the download is complete and matches the published sum;
+> `gh attestation verify` proves GitHub built the file from this repository with that
+> workflow, which a checksum alone cannot. On macOS use `shasum -a 256 -c SHA256SUMS`. The
+> YunoHost package does not need either step from you: its manifest pins the sha256 of the
+> tarball it installs, and YunoHost refuses a download that does not match it.
+
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
 ---
