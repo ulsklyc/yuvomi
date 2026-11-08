@@ -1472,8 +1472,8 @@
         "selectAll": "全选",
         "selectCount": "已选择 {{count}} 个",
         "selectNamed": "选择 {{name}}",
-        "bulkDeleteConfirm": "删除 {{count}} 个联系人?",
-        "bulkDeleteConfirm_one": "删除 {{count}} 个联系人?",
+        "bulkDeleteConfirm": "删除 {{count}} 个联系人？",
+        "bulkDeleteConfirm_one": "删除 {{count}} 个联系人？",
         "bulkDeletedToast": "已删除 {{count}} 个联系人",
         "errorContactGone": "这个联系人已不存在。",
         "errorSelectedCategoryGone": "所选类别已不存在。",
@@ -2539,9 +2539,9 @@
         "cycleFeedSubscribe": "在日历应用中订阅",
         "cycleFeedRegenerate": "生成新链接",
         "cycleFeedDisable": "停用订阅源",
-        "cycleFeedRegenerateConfirm": "要生成新链接吗?旧链接将停止工作。",
+        "cycleFeedRegenerateConfirm": "要生成新链接吗？旧链接将停止工作。",
         "cycleFeedRegenerateConfirmDetail": "使用旧链接的设备和服务将不再收到更新,具体取决于应用,它们要么继续显示上次的状态,要么在输入新地址前不显示任何内容。",
-        "cycleFeedDisableConfirm": "要停用订阅源吗?现有订阅将不再收到更新。",
+        "cycleFeedDisableConfirm": "要停用订阅源吗？现有订阅将不再收到更新。",
         "cycleFeedDisableConfirmDetail": "链接会立即停止提供任何内容。之后重新启用会生成一个新地址,每个订阅者都需要手动重新输入。",
         "cycleFeedHint": "任何知道此链接的人都能看到你的周期数据。请只与自己的设备共享。",
         "scheduleFeedTitle": "导出日程",
@@ -3418,7 +3418,7 @@
         "otherSessionsTitle": "其他设备",
         "otherSessionsHint": "在所有其他设备和浏览器上退出你的账户。此设备保持登录。API 令牌和已配对的墙面显示屏不受影响。 已登录的设备也会退出。",
         "otherSessionsButton": "在其他设备上退出",
-        "otherSessionsConfirm": "要在所有其他设备上退出吗?",
+        "otherSessionsConfirm": "要在所有其他设备上退出吗？",
         "otherSessionsConfirmDetail": "在那里用你的账户登录的任何人都需要重新登录。此设备保持登录。",
         "otherSessionsEnded": "已结束 {{count}} 个其他会话。",
         "otherSessionsEnded_one": "已结束 {{count}} 个其他会话。",
@@ -3432,7 +3432,7 @@
         "devicesNeverUsed": "尚未使用",
         "devicesCurrent": "此设备",
         "devicesRevokeNamed": "退出“{{name}}”",
-        "devicesRevokeConfirm": "要退出“{{name}}”吗?",
+        "devicesRevokeConfirm": "要退出“{{name}}”吗？",
         "devicesRevokeDetail": "该设备上的应用将退出登录。要再次使用，请重新配对该设备。",
         "devicesRevoke": "退出",
         "devicesRevokedToast": "“{{name}}”已退出。",
@@ -3552,7 +3552,9 @@
         "backupRestoreErrorTooLarge": "文件超过此安装的上传上限（{{limit}}）。请提高 BACKUP_UPLOAD_LIMIT，重启 Yuvomi 后再恢复一次。这里没有做任何更改。",
         "apiTokenErrorNameTooLong": "名称最多 100 个字符。",
         "apiTokenErrorExpiryPast": "到期日期已经过去。请选择更晚的时间。",
-        "apiTokenErrorSubjectDeactivated": "此账户已停用，无法获得令牌。请选择其他人。"
+        "apiTokenErrorSubjectDeactivated": "此账户已停用，无法获得令牌。请选择其他人。",
+        "dmsErrorUrlInvalid": "服务器网址必须以 http:// 或 https:// 开头。",
+        "dmsErrorAccountExists": "已有 DMS 以此服务器网址连接。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",
@@ -4767,7 +4769,9 @@
         "colorTeal": "青色",
         "colorOrange": "橙色",
         "colorRed": "红色",
-        "colorGrey": "灰色"
+        "colorGrey": "灰色",
+        "errorGone": "该类别已不存在。",
+        "errorSubGone": "该子类别已不存在。"
     },
     "subscriptions": {
         "tabLabel": "订阅",
@@ -6403,7 +6407,10 @@
             "bag_one": "袋",
             "bag_other": "袋"
         },
-        "moreDetailsHint": "最低库存、备注"
+        "moreDetailsHint": "最低库存、备注",
+        "errorLocationGone": "该存放位置已不存在。",
+        "errorLocationExists": "已有同名存放位置。请换一个名称。",
+        "errorLocationLast": "最后一个存放位置无法删除。请先添加另一个。"
     },
     "inventory": {
         "title": "物品",
@@ -6734,7 +6741,7 @@
         "overlapWarning": "{{user}} 在 {{date}} 有重叠的排班周期；显示较新的周期。",
         "overlapWarningShort": "排班周期重叠",
         "patternWinsBadge": "优先显示",
-        "patternOverlapConfirmTitle": "要替换{{user}}当前的排班吗?",
+        "patternOverlapConfirmTitle": "要替换{{user}}当前的排班吗？",
         "patternOverlapConfirmDetail": "新排班在两者重叠的范围内优先生效。“{{name}}”仍会保留,但在重叠期间不再显示。",
         "patternOverlapConfirmAction": "替换",
         "editOverride": "编辑例外",

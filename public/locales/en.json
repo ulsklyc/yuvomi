@@ -3552,7 +3552,9 @@
         "backupRestoreErrorTooLarge": "The file is larger than this installation's upload limit ({{limit}}). Raise BACKUP_UPLOAD_LIMIT, restart Yuvomi and restore again. Nothing was changed here.",
         "apiTokenErrorNameTooLong": "The name can be at most 100 characters long.",
         "apiTokenErrorExpiryPast": "The expiration date is in the past. Choose a later time.",
-        "apiTokenErrorSubjectDeactivated": "This account is deactivated and cannot get a token. Choose another person."
+        "apiTokenErrorSubjectDeactivated": "This account is deactivated and cannot get a token. Choose another person.",
+        "dmsErrorUrlInvalid": "The server URL must start with http:// or https://.",
+        "dmsErrorAccountExists": "A DMS is already connected with this server URL."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",
@@ -4767,7 +4769,9 @@
         "colorTeal": "Teal",
         "colorOrange": "Orange",
         "colorRed": "Red",
-        "colorGrey": "Gray"
+        "colorGrey": "Gray",
+        "errorGone": "This category no longer exists.",
+        "errorSubGone": "This subcategory no longer exists."
     },
     "subscriptions": {
         "tabLabel": "Subscriptions",
@@ -6403,7 +6407,10 @@
             "bag_one": "bag",
             "bag_other": "bags"
         },
-        "moreDetailsHint": "Minimum stock, notes"
+        "moreDetailsHint": "Minimum stock, notes",
+        "errorLocationGone": "This storage location no longer exists.",
+        "errorLocationExists": "This storage location already exists. Choose a different name.",
+        "errorLocationLast": "The last storage location cannot be deleted. Add another one first."
     },
     "inventory": {
         "title": "Inventory",

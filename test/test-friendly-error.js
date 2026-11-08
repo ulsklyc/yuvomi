@@ -290,6 +290,9 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
     // test:sync-form-errors.
     '../server/routes/calendar/apple.js',
+    // Kategorien des Budgets im Kategorie-Verwalter (#1909); die echte Antwort
+    // misst test:budget-categories-routes.
+    '../server/routes/budget/categories.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -329,6 +332,9 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'inventory_booking_not_found', 'notes_note_not_found', 'notes_selected_category_not_found',
     'contacts_contact_not_found', 'birthdays_birthday_not_found', 'birthdays_selected_contact_not_found',
     'contacts_selected_category_not_found', 'inventory_location_not_found', 'inventory_category_not_found',
+    // Der Kategorie-Verwalter der uebrigen Module (#1909).
+    'budget_category_not_found', 'budget_subcategory_not_found', 'tasks_category_not_found',
+    'contacts_category_not_found', 'notes_category_not_found', 'pantry_location_not_found',
     'tasks_task_not_found', 'tasks_parent_not_found', 'tasks_comment_not_found', 'tasks_tag_not_found',
     'calendar_subscription_not_found', 'members_member_not_found',
     'schedule_shift_type_not_found', 'schedule_custom_field_not_found', 'schedule_pattern_not_found',

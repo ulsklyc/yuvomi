@@ -402,4 +402,27 @@ test('DELETE /categories/:key: letzte Kategorie eines Typs → 409', async () =>
   assert.equal(r.body.reason, 'category_last');
 });
 
+// #1909: der Kategorie-Verwalter zeigte bei einer Kategorie, die ein anderes
+// Haushaltsmitglied inzwischen geloescht hat, den englischen Text des Servers.
+// Jeder Weg auf eine verschwundene Kategorie oder Unterkategorie nennt den Fall.
+test('eine Kategorie oder Unterkategorie, die es nicht mehr gibt, nennt ihren Grund (#1909)', async () => {
+  for (const [method, path, body] of [
+    ['GET', '/categories/nope/subcategories', null],
+    ['PUT', '/categories/nope', { name: 'X' }],
+    ['DELETE', '/categories/nope', null],
+    ['POST', '/categories/nope/subcategories', { name: 'X' }],
+  ]) {
+    const r = await call(method, path, body);
+    assert.equal(r.status, 404, `${method} ${path}`);
+    assert.equal(r.body?.reason, 'budget_category_not_found', `${method} ${path}`);
+    assert.equal(r.body?.error, 'Category not found.', `${method} ${path}`);
+  }
+  const cat = await newCategory('GoneSubs');
+  for (const [method, body] of [['PUT', { name: 'X' }], ['DELETE', null]]) {
+    const r = await call(method, `/categories/${cat.key}/subcategories/nope`, body);
+    assert.equal(r.status, 404, method);
+    assert.equal(r.body?.reason, 'budget_subcategory_not_found', method);
+  }
+});
+
 test.after(() => server.close());

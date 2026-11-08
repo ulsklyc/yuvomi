@@ -3552,7 +3552,9 @@
         "backupRestoreErrorTooLarge": "Het bestand is groter dan de uploadlimiet van deze installatie ({{limit}}). Verhoog BACKUP_UPLOAD_LIMIT, start Yuvomi opnieuw en herstel opnieuw. Hier is niets gewijzigd.",
         "apiTokenErrorNameTooLong": "De naam mag maximaal 100 tekens lang zijn.",
         "apiTokenErrorExpiryPast": "De vervaldatum ligt in het verleden. Kies een later tijdstip.",
-        "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon."
+        "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon.",
+        "dmsErrorUrlInvalid": "De server-URL moet beginnen met http:// of https://.",
+        "dmsErrorAccountExists": "Met deze server-URL is al een DMS verbonden."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",
@@ -4767,7 +4769,9 @@
         "colorTeal": "Turkoois",
         "colorOrange": "Oranje",
         "colorRed": "Rood",
-        "colorGrey": "Grijs"
+        "colorGrey": "Grijs",
+        "errorGone": "Deze categorie bestaat niet meer.",
+        "errorSubGone": "Deze subcategorie bestaat niet meer."
     },
     "subscriptions": {
         "tabLabel": "Abonnementen",
@@ -6403,7 +6407,10 @@
             "bag_one": "zak",
             "bag_other": "zakken"
         },
-        "moreDetailsHint": "Minimumvoorraad, notities"
+        "moreDetailsHint": "Minimumvoorraad, notities",
+        "errorLocationGone": "Deze bewaarplaats bestaat niet meer.",
+        "errorLocationExists": "Deze bewaarplaats bestaat al. Kies een andere naam.",
+        "errorLocationLast": "De laatste bewaarplaats kan niet worden verwijderd. Voeg eerst een andere toe."
     },
     "inventory": {
         "title": "Inventaris",

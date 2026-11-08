@@ -3570,7 +3570,9 @@
         "backupRestoreErrorTooLarge": "فایل از سقف بارگذاری این نصب ({{limit}}) بزرگ‌تر است. BACKUP_UPLOAD_LIMIT را افزایش دهید، Yuvomi را دوباره راه‌اندازی کنید و سپس دوباره بازیابی کنید. اینجا چیزی تغییر نکرد.",
         "apiTokenErrorNameTooLong": "نام حداکثر می‌تواند ۱۰۰ نویسه باشد.",
         "apiTokenErrorExpiryPast": "تاریخ انقضا در گذشته است. زمان دیرتری انتخاب کنید.",
-        "apiTokenErrorSubjectDeactivated": "این حساب غیرفعال است و نمی‌تواند توکن بگیرد. شخص دیگری را انتخاب کنید."
+        "apiTokenErrorSubjectDeactivated": "این حساب غیرفعال است و نمی‌تواند توکن بگیرد. شخص دیگری را انتخاب کنید.",
+        "dmsErrorUrlInvalid": "آدرس سرور باید با http:// یا https:// شروع شود.",
+        "dmsErrorAccountExists": "یک DMS از قبل با این نشانی سرور متصل است."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",
@@ -4767,7 +4769,9 @@
         "colorTeal": "فیروزه‌ای",
         "colorOrange": "نارنجی",
         "colorRed": "قرمز",
-        "colorGrey": "خاکستری"
+        "colorGrey": "خاکستری",
+        "errorGone": "این دسته دیگر وجود ندارد.",
+        "errorSubGone": "این زیردسته دیگر وجود ندارد."
     },
     "subscriptions": {
         "tabLabel": "اشتراک‌ها",
@@ -6403,7 +6407,10 @@
             "bag_one": "کیسه",
             "bag_other": "کیسه"
         },
-        "moreDetailsHint": "حداقل موجودی، یادداشت"
+        "moreDetailsHint": "حداقل موجودی، یادداشت",
+        "errorLocationGone": "این محل نگهداری دیگر وجود ندارد.",
+        "errorLocationExists": "این محل نگهداری از قبل وجود دارد. نام دیگری انتخاب کنید.",
+        "errorLocationLast": "آخرین محل نگهداری را نمی‌توان حذف کرد. ابتدا محل دیگری اضافه کنید."
     },
     "inventory": {
         "title": "اموال",

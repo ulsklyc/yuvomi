@@ -128,6 +128,15 @@ test('Server: ein Stichwort, das es nicht mehr gibt, nennt tasks_tag_not_found (
   }
 });
 
+test('Server: eine Kategorie, die es nicht mehr gibt, nennt tasks_category_not_found (#1909)', async () => {
+  for (const [method, body] of [['PUT', { name: 'neu' }], ['DELETE', null]]) {
+    const r = await call(method, '/tasks/categories/gibt-es-nicht', body);
+    assert.equal(r.status, 404, JSON.stringify(r.body));
+    assert.equal(r.body?.reason, 'tasks_category_not_found');
+    assert.equal(r.body?.error, 'Category not found.');
+  }
+});
+
 test('Server: eine Aufgabe, die es gibt, bekommt keinen Grund untergeschoben', async () => {
   const created = await call('POST', '/tasks', { title: 'Blumen giessen' });
   assert.equal(created.status, 201, JSON.stringify(created.body));

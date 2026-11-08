@@ -3552,7 +3552,9 @@
         "backupRestoreErrorTooLarge": "Filen er større enn opplastingsgrensen for denne installasjonen ({{limit}}). Øk BACKUP_UPLOAD_LIMIT, start Yuvomi på nytt og gjenopprett igjen. Ingenting ble endret her.",
         "apiTokenErrorNameTooLong": "Navnet kan være på høyst 100 tegn.",
         "apiTokenErrorExpiryPast": "Utløpsdatoen er passert. Velg et senere tidspunkt.",
-        "apiTokenErrorSubjectDeactivated": "Denne kontoen er deaktivert og kan ikke få et token. Velg en annen person."
+        "apiTokenErrorSubjectDeactivated": "Denne kontoen er deaktivert og kan ikke få et token. Velg en annen person.",
+        "dmsErrorUrlInvalid": "Server-URL-en må begynne med http:// eller https://.",
+        "dmsErrorAccountExists": "Et DMS er allerede koblet til med denne server-URL-en."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
@@ -4767,7 +4769,9 @@
         "colorTeal": "Blågrønn",
         "colorOrange": "Oransje",
         "colorRed": "Rød",
-        "colorGrey": "Grå"
+        "colorGrey": "Grå",
+        "errorGone": "Denne kategorien eksisterer ikke lenger.",
+        "errorSubGone": "Denne underkategorien eksisterer ikke lenger."
     },
     "subscriptions": {
         "tabLabel": "Abonnementer",
@@ -6403,7 +6407,10 @@
             "bag_one": "pose",
             "bag_other": "poser"
         },
-        "moreDetailsHint": "Minimumsbeholdning, notater"
+        "moreDetailsHint": "Minimumsbeholdning, notater",
+        "errorLocationGone": "Dette lagringsstedet eksisterer ikke lenger.",
+        "errorLocationExists": "Dette lagringsstedet finnes allerede. Velg et annet navn.",
+        "errorLocationLast": "Det siste lagringsstedet kan ikke slettes. Legg til et annet først."
     },
     "inventory": {
         "title": "Inventar",

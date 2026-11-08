@@ -550,3 +550,73 @@ test('GET /database: der elfte Download eines Admins in der Stunde bekommt 429, 
     assert.equal(r.status, 200, `Download ${i + 1} des befoerderten Mitglieds`);
   }
 });
+
+// ── Integritaetspruefung vor Download und Upload (#2520) ────────────────────────
+// Die Backup-API kopiert die Seiten der Live-Datenbank, einen kaputten Index also
+// mit. Vor #2520 bekam der Admin diese Datei als gelungenes Backup, und WebDAV
+// lud sie hoch; der Fehler zeigte sich erst beim Restore.
+test('GET /database und POST /webdav/trigger: ein Backup ohne bestandene Integritaetspruefung geht nicht raus (#2520)', async () => {
+  const admin = { id: 51, role: 'admin' };
+  const live = database();
+  live.exec('CREATE TABLE probe_2520 (x INTEGER, y INTEGER); CREATE INDEX probe_2520_x ON probe_2520 (x);');
+  const insert = live.prepare('INSERT INTO probe_2520 VALUES (?, ?)');
+  for (let i = 0; i < 20; i++) insert.run(i, 1000 - i);
+  live.unsafeMode(true);
+  live.pragma('writable_schema = ON');
+  live.prepare("UPDATE sqlite_master SET sql = 'CREATE INDEX probe_2520_x ON probe_2520 (y)' WHERE name = 'probe_2520_x'").run();
+  live.pragma('writable_schema = OFF');
+  live.unsafeMode(false);
+
+  try {
+    const dl = await call('GET', '/database', { actor: admin });
+    assert.equal(dl.status, 500, 'ein kaputtes Backup wird nicht ausgeliefert');
+    assert.equal(dl.body?.reason, 'backup_verify_failed');
+    assert.equal(dl.body?.error, 'Database backup failed.', 'fester Satz, der Befund steht im Log');
+    assert.ok(!dl.buf.subarray(0, 16).toString('latin1').startsWith('SQLite format 3'), 'keine Datenbank im Body');
+
+    const localBefore = fs.readdirSync(BACKUP_DIR).sort();
+    const putsBefore = davSeen.filter((m) => m === 'PUT').length;
+    const up = await call('POST', '/webdav/trigger', { actor: admin });
+    assert.equal(up.status, 500, 'ein kaputtes Backup wird nicht hochgeladen');
+    assert.equal(davSeen.filter((m) => m === 'PUT').length, putsBefore, 'kein PUT an WebDAV');
+    assert.deepEqual(fs.readdirSync(BACKUP_DIR).sort(), localBefore, 'keine kaputte Datei im Backup-Ordner');
+  } finally {
+    live.exec('DROP INDEX probe_2520_x; DROP TABLE probe_2520;');
+  }
+  assert.equal((await call('GET', '/database', { actor: admin })).status, 200, 'heil wieder herunterladbar');
+  // Die Pruefung oeffnet die Kopie, und eine Kopie im WAL-Modus bekommt dabei
+  // `-wal` und `-shm` - die Rotation raeumt nur `.db`, sie blieben liegen.
+  assert.equal((await call('POST', '/trigger', { actor: admin })).body?.data?.success, true);
+  assert.deepEqual(fs.readdirSync(BACKUP_DIR).filter((f) => !f.endsWith('.db')), [],
+    'keine Begleitdateien der Pruefung im Backup-Ordner');
+});
+
+// ── Phase 0 section H: a foreign server's text stays out of the answer ────────
+// test:client-error-text-guard reads the routes; this runs one as a program. A
+// WebDAV server answers the connection test with a status line that names its
+// internal host and path - exactly what a misconfigured reverse proxy sends.
+// Decision E4 (08.11.2026): the admin gets a fixed sentence, a `reason` and the
+// error class in `detail` (here the HTTP status), never the raw text.
+const LEAKY_STATUS_TEXT = 'Backend dav-internal.lan:8443 failed for /srv/dav/private-backups';
+const leakyServer = http.createServer((req, res) => {
+  req.resume();
+  req.on('end', () => { res.writeHead(500, LEAKY_STATUS_TEXT); res.end(); });
+});
+const leakyBase = await new Promise((r) => leakyServer.listen(0, '127.0.0.1', () => {
+  r(`http://127.0.0.1:${leakyServer.address().port}`);
+}));
+test.after(() => leakyServer.close());
+
+test('POST /webdav/test: a failing server answers with reason and class, never its own text', { todo: 'fix pending, Phase 0 section H PR 3' }, async () => {
+  const r = await call('POST', '/webdav/test', {
+    actor: ADM,
+    body: { url: leakyBase, username: 'dav', password: 'other-secret', remotePath: '/backups/' },
+  });
+  const text = JSON.stringify(r.body);
+  assert.ok(!/dav-internal|\/srv\/dav|private-backups|Backend/.test(text), `no foreign text in the answer: ${text}`);
+  assert.ok(!text.includes(leakyBase), `the answer does not repeat the address: ${text}`);
+  assert.equal(r.status, 502);
+  assert.equal(r.body.reason, 'remote_http_status');
+  assert.equal(r.body.detail, 'HTTP 500');
+  assert.equal(typeof r.body.error, 'string');
+});

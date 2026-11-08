@@ -176,6 +176,48 @@ describe('Backup Scheduler', () => {
     }
   });
 
+  it('a backup that fails the integrity check is discarded, older backups are kept (#2520)', async () => {
+    // Die Backup-API kopiert die Seiten der Live-Datenbank, einen kaputten Index
+    // also mit: der Eintrag in sqlite_master zeigt auf eine andere Spalte als
+    // der Index-B-Baum, `integrity_check` meldet "row ... missing from index".
+    // Vor #2520 ging diese Datei als gelungenes Backup durch und rotierte das
+    // aelteste gute weg.
+    const { get } = await import('../server/db.js');
+    const live = get();
+    await backupScheduler.triggerBackup();
+    const before = (await fs.readdir(TEST_BACKUP_DIR)).sort();
+    assert.ok(before.length > 0, 'a good backup must exist before the damaged one');
+
+    live.exec('CREATE TABLE probe_2520 (x INTEGER, y INTEGER); CREATE INDEX probe_2520_x ON probe_2520 (x);');
+    const insert = live.prepare('INSERT INTO probe_2520 VALUES (?, ?)');
+    for (let i = 0; i < 20; i++) insert.run(i, 1000 - i);
+    live.unsafeMode(true);
+    live.pragma('writable_schema = ON');
+    live.prepare("UPDATE sqlite_master SET sql = 'CREATE INDEX probe_2520_x ON probe_2520 (y)' WHERE name = 'probe_2520_x'").run();
+    live.pragma('writable_schema = OFF');
+    live.unsafeMode(false);
+
+    try {
+      for (let i = 0; i < 4; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        const result = await backupScheduler.triggerBackup();
+        assert.strictEqual(result.success, false, 'a damaged backup must not count as a success');
+        assert.match(result.error, /integrity check/);
+      }
+      const status = backupScheduler.getStatus();
+      assert.ok(status.lastError, 'the failure must show in the scheduler status');
+      assert.match(status.lastError.message, /integrity check/);
+      assert.deepStrictEqual((await fs.readdir(TEST_BACKUP_DIR)).sort(), before,
+        'no damaged file left behind, no good backup rotated away');
+      await assert.rejects(backupScheduler.createLocalBackup(), { reason: 'backup_verify_failed' },
+        'createLocalBackup (WebDAV "upload now") must refuse before anything is uploaded');
+    } finally {
+      live.exec('DROP INDEX probe_2520_x; DROP TABLE probe_2520;');
+    }
+    assert.strictEqual((await backupScheduler.triggerBackup()).success, true,
+      'a repaired database backs up again');
+  });
+
   it('should cleanup test directory', async () => {
     await fs.rm(TEST_BACKUP_ROOT, { recursive: true, force: true });
   });

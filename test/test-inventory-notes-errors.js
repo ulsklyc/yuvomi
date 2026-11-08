@@ -241,6 +241,24 @@ test('Server/Inventar: Orte und Kategorien nennen "gibt es schon" und "gibt es n
   }
 });
 
+// #1909: der Kategorie-Verwalter von Notizen und Kontakten zeigte bei einer
+// Kategorie, die inzwischen geloescht ist, den englischen Text des Servers.
+test('Server/Notizen und Kontakte: eine Kategorie, die es nicht mehr gibt, nennt ihren Grund', async () => {
+  for (const [method, path, body] of [
+    ['PUT', `/notes/categories/${GONE}`, { name: 'x' }],
+    ['DELETE', `/notes/categories/${GONE}`, null],
+    ['PATCH', '/notes/categories/reorder', { order: [GONE] }],
+  ]) {
+    expectCase(await call(method, path, body), 404, 'notes_category_not_found', `${method} ${path}`);
+  }
+  for (const [method, path, body] of [
+    ['PUT', '/contacts/categories/weg', { name: 'x' }],
+    ['DELETE', '/contacts/categories/weg', null],
+  ]) {
+    expectCase(await call(method, path, body), 404, 'contacts_category_not_found', `${method} ${path}`);
+  }
+});
+
 test('Server/Kontakte: die gewaehlte Kategorie ist weg - ein Grund nur, wenn sie der einzige Befund ist', async () => {
   const r = await call('POST', '/contacts', { name: 'Ada', category: 'weg' });
   expectCase(r, 400, 'contacts_selected_category_not_found', 'POST /contacts');
@@ -261,8 +279,8 @@ const SERVER_REASONS = [
   'inventory_item_not_found', 'inventory_tracked_date_not_found', 'inventory_selected_location_not_found',
   'inventory_booking_not_found', 'inventory_booking_already_linked',
   'inventory_location_exists', 'inventory_location_not_found', 'inventory_category_not_found',
-  'notes_note_not_found', 'notes_selected_category_not_found',
-  'contacts_contact_not_found', 'contacts_selected_category_not_found', 'birthdays_birthday_not_found',
+  'notes_note_not_found', 'notes_selected_category_not_found', 'notes_category_not_found',
+  'contacts_contact_not_found', 'contacts_selected_category_not_found', 'contacts_category_not_found', 'birthdays_birthday_not_found',
   // Verknuepfen im Geburtstag-Dialog (R22, D7); die echte Antwort misst
   // test:birthday-import-rights.
   'birthdays_contact_linked', 'birthdays_selected_contact_not_found',

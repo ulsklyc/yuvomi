@@ -28,6 +28,7 @@ import { captureOpenContext, confirmModal, isModalContextCurrent } from '/compon
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
 import { createDisclosure, createRetryState, createStatusSummary, settingRowHtml } from '/settings/components.js';
 import { installErrorText } from '/settings/module-install-errors.js';
+import { loadErrorSentence } from '/utils/friendly-error.js';
 
 const ACTIVE_MODULES_PATH = '/settings/modules/active';
 const MODULES_GUIDE_URL = 'https://github.com/ulsklyc/yuvomi/blob/main/MODULES.md';
@@ -560,7 +561,7 @@ export async function render(container) {
     info = (await api.get('/modules/install/info'))?.data ?? {};
   } catch (error) {
     container.appendChild(createRetryState({
-      message: error?.message || t('settings.loadError'),
+      message: loadErrorSentence(error) ?? t('settings.loadError'),
       onRetry: () => render(container),
     }));
     return;

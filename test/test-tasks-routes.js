@@ -247,6 +247,32 @@ test('PUT /:id: ohne assigned_to bleiben bestehende Zuweisungen erhalten', async
   assert.equal(r.body.data.assigned_users.length, 2, 'Zuweisungen unverändert');
 });
 
+// #2569: die Primaerperson ist hier die HOEHERE ID. Der Primaerschluessel
+// (task_id, user_id) liefert die Zeilen nach user_id, ein PUT ohne
+// `assigned_to` machte so die niedrigste ID zur Primaerperson.
+test('PUT /:id: ohne assigned_to bleibt die Primaerperson, Liste fuehrt mit ihr (#2569)', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  assert.ok(BOB > ALICE, 'Vorbedingung: Bob hat die hoehere ID');
+  const created = await call('POST', '/', { as: admin, body: { title: 'Primaer-hoch', assigned_to: [BOB, ALICE] } });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+  assert.equal(created.body.data.assigned_to, BOB);
+  assert.deepEqual(created.body.data.assigned_users.map((u) => u.id), [BOB, ALICE], 'POST-Antwort: Primaerperson zuerst');
+
+  const r = await call('PUT', `/${id}`, { as: admin, body: { title: 'Primaer-hoch neu' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.assigned_to, BOB, 'Primaerperson unveraendert');
+  assert.deepEqual(r.body.data.assigned_users.map((u) => u.id), [BOB, ALICE], 'PUT-Antwort: Primaerperson zuerst');
+
+  const detail = await call('GET', `/${id}`, { as: admin });
+  assert.equal(detail.body.data.assigned_to, BOB);
+  assert.deepEqual(detail.body.data.assigned_users.map((u) => u.id), [BOB, ALICE], 'Detail: Primaerperson zuerst');
+
+  const list = await call('GET', '/', { as: admin });
+  const row = list.body.data.find((task) => task.id === id);
+  assert.deepEqual(row.assigned_users.map((u) => u.id), [BOB, ALICE], 'Liste: Primaerperson zuerst');
+});
+
 test('PUT /:id: unbekannte ID → 404, ungültiger Status → 400', async () => {
   const missing = await call('PUT', '/999999', { as: { id: ALICE, role: 'admin' }, body: { title: 'X' } });
   assert.equal(missing.status, 404);
