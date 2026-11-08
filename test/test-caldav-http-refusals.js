@@ -2321,3 +2321,28 @@ test('CardDAV-Konto anlegen: eine Absage des Servers kommt als Meldung an, nicht
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+// Phase 0, Abschnitt H (Review #2619): caldav-client schreibt den Status einer
+// Absage an den Fehler der Kontosuche - aber nur den der LETZTEN Anfrage. Eine
+// 404 auf /.well-known/ darf einen spaeteren Netzfehler nicht als "HTTP 404"
+// ausgeben.
+test('Kontosuche: eine fruehere 404 ueberdeckt keinen spaeteren Netzfehler', async () => {
+  const { createCalDAVClient } = await import('../server/utils/caldav-client.js');
+  const { remoteFailure } = await import('../server/utils/http.js');
+  const realFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls === 1) return new Response('', { status: 404, statusText: 'Not Found' });
+    throw new TypeError('fetch failed', { cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }) });
+  };
+  try {
+    const err = await createCalDAVClient({ caldav_url: 'https://dav.example.invalid/', username: 'u', password: 'p' })
+      .then(() => null, (e) => e);
+    assert.ok(err, 'die Kontosuche scheitert');
+    assert.ok(calls >= 2, `die zweite Anfrage lief (${calls})`);
+    assert.deepEqual(remoteFailure(err), { reason: 'remote_unreachable', detail: 'ECONNRESET' });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

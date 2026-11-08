@@ -25,11 +25,19 @@ import { sameCredentialOrigin } from './credential-origin.js';
  */
 async function discoverDAVAccount(params) {
   const { createDAVClient } = await import('tsdav');
+  // The status of the LAST request only: an earlier probe's 404 (a
+  // `/.well-known/` miss) must not dress up a later network error or a later
+  // success, so every answer overwrites it and a failed fetch clears it.
   let refused;
   const recording = async (...args) => {
-    const res = await globalThis.fetch(...args);
-    if (res?.status >= 400) refused = res.status;
-    return res;
+    try {
+      const res = await globalThis.fetch(...args);
+      refused = res?.status >= 400 ? res.status : undefined;
+      return res;
+    } catch (err) {
+      refused = undefined;
+      throw err;
+    }
   };
   try {
     return await createDAVClient({ ...params, fetch: recording });
