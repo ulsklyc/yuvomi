@@ -258,6 +258,21 @@ function sendRefusal(res, err) {
 }
 
 /**
+ * The answer of a write whose catch gets both our own refusals and whatever the
+ * database throws (Phase 0 section H). The old catches guessed the status from
+ * the text (`message.includes('Internal')`) and sent every message as a 400,
+ * SQLite's included - its text names tables and columns. Now: a Refusal with
+ * its status, the split rules' own input errors (SplitInputError) as 400 with
+ * their sentence, everything else as a fixed 500 and into the log.
+ */
+function sendWriteFailure(res, err, label) {
+  if (err instanceof Refusal) return sendRefusal(res, err);
+  if (err?.name === 'SplitInputError') return res.status(400).json({ error: err.message, code: 400 });
+  log.error(`${label} error:`, err);
+  return res.status(500).json({ error: 'Internal server error.', code: 500 });
+}
+
+/**
  * Die Abweisung fuer eine archivierte Gruppe (#1747), sonst null: die einzige
  * Stelle, die die Regel kennt. Archivieren (#574) sperrt jede Aenderung, nur
  * Wiederherstellen bleibt. Jede Schreibroute ruft sie NACH 404 und 403 auf -
@@ -526,7 +541,7 @@ function parseExpenseBody(body, fallbackCurrency) {
   const vDescription = str(body.description, 'Description', { max: MAX_TEXT, required: false });
   const vDate = validateDate(body.expense_date, 'Expense date');
   const errors = collectErrors([vTitle, vDescription, vDate]);
-  if (errors.length) throw new Error(errors.join(' '));
+  if (errors.length) throw new Refusal(400, errors.join(' '));
   return {
     title: vTitle.value,
     description: vDescription.value,
@@ -1193,9 +1208,7 @@ router.post('/groups/:id/expenses', (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    const message = err.message || 'Invalid expense.';
-    log.error('POST /groups/:id/expenses error:', err);
-    res.status(message.includes('Internal') ? 500 : 400).json({ error: message, code: message.includes('Internal') ? 500 : 400 });
+    sendWriteFailure(res, err, 'POST /groups/:id/expenses');
   }
 });
 
@@ -1243,8 +1256,7 @@ router.put('/expenses/:id', (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    log.error('PUT /expenses/:id error:', err);
-    res.status(400).json({ error: err.message || 'Invalid expense.', code: 400 });
+    sendWriteFailure(res, err, 'PUT /expenses/:id');
   }
 });
 
@@ -1463,8 +1475,7 @@ router.post('/groups/:id/settlements', (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    log.error('POST /groups/:id/settlements error:', err);
-    res.status(400).json({ error: err.message || 'Invalid settlement.', code: 400 });
+    sendWriteFailure(res, err, 'POST /groups/:id/settlements');
   }
 });
 
@@ -1853,9 +1864,7 @@ router.post('/groups/:id/recurring', (req, res) => {
     activity(groupId, userId(req), 'recurring_created', 'recurring_expense', result.lastInsertRowid, { title: parsed.title, frequency });
     res.status(201).json({ data: recurringResponse(result.lastInsertRowid, req) });
   } catch (err) {
-    if (err instanceof Refusal) return sendRefusal(res, err);
-    log.error('POST /groups/:id/recurring error:', err);
-    res.status(400).json({ error: err.message || 'Invalid recurring expense.', code: 400 });
+    sendWriteFailure(res, err, 'POST /groups/:id/recurring');
   }
 });
 
@@ -1961,9 +1970,7 @@ router.put('/recurring/:id', (req, res) => {
     });
     res.json({ data: recurringResponse(id, req) });
   } catch (err) {
-    if (err instanceof Refusal) return sendRefusal(res, err);
-    log.error('PUT /recurring/:id error:', err);
-    res.status(400).json({ error: err.message || 'Invalid recurring expense.', code: 400 });
+    sendWriteFailure(res, err, 'PUT /recurring/:id');
   }
 });
 
