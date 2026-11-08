@@ -1138,6 +1138,9 @@ test('reasons of a failed fetch: one per class - the status of the other side, t
       201, 'waste_source_fetch_unreachable', undefined,
     );
     assert.equal(typeof unreachable.body.data.source.id, 'number', 'the source is created either way, as before');
+    // Phase 0, section H: the stored message is a fixed sentence, never Node's
+    // text with the closed port in it.
+    assert.equal(unreachable.body.data.source.last_error, 'Fetch failed.', JSON.stringify(unreachable.body.data.source));
 
     // Without the opt-in a private address is refused before any connection.
     const localUrl = `https://127.0.0.1:${await closedPort()}/cal.ics`;
