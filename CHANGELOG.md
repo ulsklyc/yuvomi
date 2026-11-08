@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   medication's visibility - like every other health reminder, as SECURITY.md promises. Reading
   access and administrators are unaffected.
 
+### Fixed
+- **Status bar no longer blurs beside the Dynamic Island on iOS 26 (PWA).** (#2390)
+
 ## [2.86.0] - 2026-11-07
 
 ### Added
@@ -174,7 +177,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The app added to the iPhone Home Screen reaches the bottom edge again** (refs #2417). On iOS 27
   the installed app ended a status bar's height above the bottom of the screen, with an empty strip
   below the tab bar. It now takes the full screen height; Yuvomi in a Safari tab is unchanged.
-- **Status bar no longer blurs beside the Dynamic Island on iOS 26 (PWA).** (#2390)
 
 ### Security
 - **Database backup downloads are limited to ten per hour for each administrator** (#2524). Every
