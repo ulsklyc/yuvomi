@@ -280,6 +280,16 @@ function aliasesBefore(code, text, index) {
   return names;
 }
 
+/** Does `code` use the identifier `name` (not as a property, not inside a longer name)? */
+function usesName(code, name) {
+  for (let i = code.indexOf(name); i !== -1; i = code.indexOf(name, i + 1)) {
+    const before = code[i - 1] ?? '';
+    const after = code[i + name.length] ?? '';
+    if (!/[.\w$]/.test(before) && !/[\w$]/.test(after)) return true;
+  }
+  return false;
+}
+
 /**
  * Every place in `src` that hands an exception's text to a response.
  * @param {string} src
@@ -297,7 +307,7 @@ export function clientErrorTextHits(src) {
     let leak = leaks(args, text.slice(open, close + 1));
     if (!leak) {
       for (const alias of aliasesBefore(code, text, open)) {
-        if (new RegExp(String.raw`(?<![.\w$])${alias.replace(/\$/g, '\\$')}(?![\w$])`).test(args)) leak = true;
+        if (usesName(args, alias)) leak = true;
       }
     }
     if (!leak) continue;
