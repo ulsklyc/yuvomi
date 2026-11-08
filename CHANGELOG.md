@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Live-folder settings centrally control available tags and DMS authentication.** Administrators can choose allowed tags per Paperless connection and use either the shared connection token or personal tokens. Users save and remove their own write-only tokens in Documents settings. Personal mode never falls back to the shared token, and existing folder visibility still applies. Tags outside the allowed selection are preserved when editing Live-folder documents.
 - **Late completion decay (opt-in).** Households can have late completions pay less: administrators
   switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
   point less for each day it is past due, and always at least one point - finishing still pays. What a

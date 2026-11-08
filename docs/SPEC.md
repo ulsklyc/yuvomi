@@ -3454,6 +3454,37 @@ views. This is a core extension, not a scheduled import.
    Individually linked Paperless documents offer the same **Tags** action in
    their viewer (on mobile, in the actions menu).
 
+#### Live-folder settings
+
+Settings -> Modules -> Documents ends with **Live-folder settings**. Administrators
+choose authentication and available tags per Paperless connection. The defaults
+retain shared-token access and allow all tags. An explicit empty selection allows
+no tag changes. The tag allowlist limits additions and removals in Live folders;
+assignments outside it are preserved. Individually linked Documents keep their
+existing tag options and central connection credentials.
+
+In shared mode, authorized Yuvomi users use the centrally configured DMS token.
+In personal mode, each user saves their own token in this same settings section.
+Documents readers may manage their own credentials without Documents write
+access; only administrators with write access may change the central policy.
+Tokens are write-only, never returned to clients, and stored in the database like
+existing DMS credentials. Missing or unauthorized personal tokens fail closed,
+including for administrators; they never fall back to the shared token. The
+Paperless identity of that token must be allowed to read the delegated saved view
+and documents. Existing Yuvomi folder visibility is an additional requirement.
+Lists, media and folder tags resolve credentials per request and recheck policy
+and credentials after remote awaits, so changing mode or revoking a personal
+token prevents an in-flight response from disclosing content.
+
+Migration 284 appends account policy and per-user credential tables. Deleting a
+DMS account cascades both; deleting a user removes their personal tokens.
+Endpoints below `/api/v1/documents/dms/paperless`:
+
+- `GET /live-settings`: connection names, selected mode and the caller's token-presence flag; administrators also receive policy and revision.
+- `PUT /live-settings/:id`: administrator policy with `token_mode`, `allowed_tag_ids` (`null` for all) and `expected_revision`.
+- `GET /live-settings/:id/tags?page=...`: administrator catalogue, using the central connection token.
+- `PUT|DELETE /live-settings/:id/token`: set/remove only the caller's token; PUT accepts `api_token`.
+
 #### Document tags
 
 The Paperless token needs read permission for documents and tags, and change

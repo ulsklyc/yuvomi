@@ -7,6 +7,7 @@ import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { mayWriteModule } from '../permissions.js';
 import { documentVisibleSql, paperlessFolderVisibleSql } from '../services/document-access.js';
 import { getAdapter } from '../services/dms/index.js';
+import { liveAccount, liveIdentity, checkLiveTagChanges } from '../services/paperless-live-settings.js';
 import { positiveId } from '../services/dms/paperless-views.js';
 
 const router = express.Router();
@@ -38,7 +39,7 @@ async function remote(promise) {
 }
 function fail(res, err) {
   log.warn(`Paperless tag operation failed (status ${err.httpStatus || 500}).`);
-  if (err.httpStatus === 403) return res.status(403).json({ error: 'Permission denied.', code: 403 });
+  if (err.httpStatus === 403 && !['paperless_personal_token_required', 'paperless_dms_forbidden'].includes(err.reason)) return res.status(403).json({ error: 'Permission denied.', code: 403 });
   const status = err.httpStatus || 500;
   const reason = status === 500 ? 'internal_error' : err.reason;
   res.status(status).json({ error: reason, reason, code: status });
@@ -66,9 +67,9 @@ function resolve(req) {
     canEdit = writable(req);
     identity = [row.dms_account_id, row.storage_key, row.created_by, row.visibility];
   }
-  const source = account(row.account_id ?? row.dms_account_id);
+  const source = row.view_id === undefined ? account(row.dms_account_id) : liveAccount(row.account_id, actor(req));
   // Include credentials in the internal identity, never in a response.
-  identity.push(source.base_url, source.api_token);
+  identity.push(source.base_url, source.api_token, source.live_settings);
   return { row, source, documentId, canEdit, identity: JSON.stringify(identity) };
 }
 function recheck(req, before, write = false) {
@@ -93,11 +94,25 @@ router.get('/tags', refuseWhileRestoring, async (req, res) => {
     const accountId = positiveId(req.query.account_id);
     const page = positiveId(req.query.page ?? 1);
     if (!accountId || !page || page > 100000) throw problem(400, 'paperless_tags_invalid');
-    const source = account(accountId);
+    let context;
+    if (req.query.folder_id !== undefined) {
+      const folderId = positiveId(req.query.folder_id);
+      const folder = folderId && db.get().prepare(`SELECT f.* FROM paperless_view_folders f WHERE f.id = @id AND ${paperlessFolderVisibleSql()}`)
+        .get({ id: folderId, userId: actor(req) });
+      if (!folder || folder.account_id !== accountId || folder.created_by !== actor(req)) throw problem(404, 'paperless_folder_not_found');
+      context = folder;
+    }
+    const source = context ? liveAccount(accountId, actor(req)) : account(accountId);
     const result = await remote(adapterFactory(source).listTags({ page }));
-    const current = account(accountId);
-    if (current.api_token !== source.api_token || current.base_url !== source.base_url) throw problem(409, 'paperless_folder_changed');
-    res.json({ data: result.results, meta: { page, has_more: result.has_more, count: result.count } });
+    const current = context ? liveAccount(accountId, actor(req)) : account(accountId);
+    if (liveIdentity(current) !== liveIdentity(source)) throw problem(409, 'paperless_folder_changed');
+    if (context) {
+      const folder = db.get().prepare('SELECT * FROM paperless_view_folders WHERE id = ?').get(context.id);
+      if (!folder || folder.created_by !== actor(req) || folder.account_id !== accountId) throw problem(404, 'paperless_folder_not_found');
+    }
+    const allowed = source.live_settings?.allowed_tag_ids ?? null;
+    const results = allowed === null ? result.results : result.results.filter((tag) => allowed.includes(tag.id));
+    res.json({ data: results, meta: { page, has_more: result.has_more, count: result.count } });
   } catch (err) { fail(res, err); }
 });
 
@@ -118,7 +133,9 @@ async function readTags(req, res) {
       const tags = tagIds.map((id) => ({ id, name: names.get(id) ?? `#${id}` }));
       recheck(req, context);
       res.json({ data: { tags, tag_ids: tagIds, can_edit: context.canEdit,
-        ...(context.canEdit ? { account_id: context.source.id } : {}) } });
+        ...(context.canEdit ? { account_id: context.source.id,
+          ...(context.row.view_id !== undefined ? { catalogue_folder_id: context.row.id,
+            editable_tag_ids: context.source.live_settings.allowed_tag_ids } : {}) } : {}) } });
     } catch (err) { fail(res, err); }
 }
 async function writeTags(req, res) {
@@ -131,6 +148,9 @@ async function writeTags(req, res) {
       await inView(adapter, context);
       const document = await remote(adapter.getDocument(context.documentId));
       if (JSON.stringify(ids(document.tags)) !== JSON.stringify(expected)) throw problem(409, 'paperless_tags_changed');
+      if (context.row.view_id !== undefined) {
+        checkLiveTagChanges(ids(document.tags), wanted, context.source.live_settings.allowed_tag_ids);
+      }
       await inView(adapter, context);
       recheck(req, context, true);
       const updated = await remote(adapter.setDocumentTags(context.documentId, wanted));

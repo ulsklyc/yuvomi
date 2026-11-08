@@ -818,6 +818,8 @@ const publicSource = (rel) => readFileSync(new URL(`../public/${rel}`, import.me
 
 // Grund -> Datei unter public/, die ihn liest.
 const REASONS_READ_BY_A_PAGE = new Map([
+  ['paperless_personal_token_required', 'components/paperless-folders.js'],
+  ['paperless_dms_forbidden', 'components/paperless-folders.js'],
   ['ATTACHMENT_CHANGE_REFUSED', 'pages/calendar.js'],
   ['ATTACHMENT_UPLOAD_REFUSED', 'pages/calendar.js'],
   // Ein Mitglied loescht einen Kalender, den ein Admin exportiert (#1909): das
@@ -970,8 +972,9 @@ const REASONS_PASSED_THROUGH = new Map([
   ['services/recipe-providers/failure.js: failure?.reason ?? null', { sites: 1, at403: [], why: 'probeFailure: Feld im Ergebnis des Verbindungstests' }],
   ['services/recipe-providers/failure.js: probe.reason', { sites: 1, at403: [], why: 'classifyProbe: reicht den Fall des Adapters weiter' }],
   ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
-  ['routes/paperless-tags.js: reason (Kurzform)', { sites: 1, at403: [], why: 'Tag errors are sanitized; all 403 responses return generic Permission denied before this site.' }],
-  ['routes/paperless-folders.js: reason (Kurzform)', { sites: 1, at403: [], why: 'Finite Paperless folder validation/upstream errors; fail() returns generic Permission denied without a reason for every 403 before this site.' }],
+  ['routes/paperless-live-settings.js: reason (Kurzform)', { sites: 1, at403: [], why: 'Settings validation, conflicts and upstream failures; all permission refusals return a generic 403 before this response.' }],
+  ['routes/paperless-tags.js: reason (Kurzform)', { sites: 1, at403: [['paperless_personal_token_required', 'services/paperless-live-settings.js']], why: 'Missing personal credentials have a local UI explanation; other permission errors are generic.' }],
+  ['routes/paperless-folders.js: reason (Kurzform)', { sites: 1, at403: [['paperless_personal_token_required', 'services/paperless-live-settings.js'], ['paperless_dms_forbidden', 'routes/paperless-folders.js']], why: 'Personal-token absence and DMS permission failures are handled by the Live-folder UI; other permission errors are generic.' }],
   ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
   ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
   ['routes/weather.js: WEATHER_REASON.NOT_CONFIGURED', { sites: 1, at403: [], why: 'Antwort 200 ohne Daten' }],

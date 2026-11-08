@@ -12029,6 +12029,28 @@ const MIGRATIONS = [
       );
     `,
   },
+  {
+    version: 284,
+    description: 'Documents: Live-folder tag policy and personal DMS tokens',
+    up: `
+      CREATE TABLE paperless_live_settings (
+        account_id INTEGER PRIMARY KEY REFERENCES dms_accounts(id) ON DELETE CASCADE,
+        token_mode TEXT NOT NULL DEFAULT 'shared' CHECK(token_mode IN ('shared', 'personal')),
+        allowed_tag_ids TEXT CHECK(allowed_tag_ids IS NULL OR (json_valid(allowed_tag_ids) AND json_type(allowed_tag_ids) = 'array')),
+        revision INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      );
+      CREATE TABLE paperless_user_tokens (
+        account_id INTEGER NOT NULL REFERENCES dms_accounts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        api_token TEXT NOT NULL CHECK(length(api_token) BETWEEN 1 AND 500),
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        PRIMARY KEY (account_id, user_id)
+      );
+    `,
+  },
 ];
 
 /**

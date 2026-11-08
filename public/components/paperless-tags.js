@@ -10,8 +10,10 @@ const key = (name) => `documents.paperless.tags.${name}`;
 function message(err) {
   const reason = err?.data?.reason;
   if (reason === 'paperless_tags_changed') return t(key('changed'));
+  if (reason === 'paperless_personal_token_required') return t('settings.liveFolders.tokenRequired');
   if (err?.status === 403) return t(key('forbidden'));
   if (err?.status === 404 || reason === 'paperless_folder_changed') return t('documents.paperless.errors.gone');
+  if (reason === 'paperless_tags_restricted') return t('settings.liveFolders.tagsRestricted');
   if (reason === 'paperless_tags_invalid') return t(key('invalid'));
   return t('documents.paperless.errors.unavailable');
 }
@@ -49,6 +51,8 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
       let selected = new Set();
       let expected = [];
       let accountId;
+      let catalogueFolderId;
+      let editableTagIds = null;
       let page = 0;
       let canEdit = false;
       let busy = false;
@@ -65,11 +69,11 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
         const query = search.value.trim().toLocaleLowerCase();
         const rows = [...tags.values()].filter((tag) => String(tag.name).toLocaleLowerCase().includes(query));
         list.replaceChildren();
-        list.insertAdjacentHTML('beforeend', rows.map((tag) => `<label class="paperless-tags__choice"><input type="checkbox" value="${esc(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''}> <span>${esc(tag.name)}</span></label>`).join(''));
+        list.insertAdjacentHTML('beforeend', rows.map((tag) => `<label class="paperless-tags__choice"><input type="checkbox" value="${esc(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''} ${editableTagIds !== null && !editableTagIds.includes(tag.id) ? 'disabled' : ''}> <span>${esc(tag.name)}</span></label>`).join(''));
         status.textContent = t(key(selected.size ? 'selection' : 'empty'), { count: selected.size });
       }
       async function catalogue() {
-        const result = await api.get(`${ROOT}/tags?account_id=${accountId}&page=${page + 1}`, { signal });
+        const result = await api.get(`${ROOT}/tags?account_id=${accountId}&page=${page + 1}${catalogueFolderId ? `&folder_id=${catalogueFolderId}` : ''}`, { signal });
         if (!current()) return;
         page++;
         for (const tag of result.data) tags.set(tag.id, tag);
@@ -90,6 +94,8 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
           selected = new Set(expected);
           tags = new Map(result.data.tags.map((tag) => [tag.id, tag]));
           accountId = result.data.account_id;
+          catalogueFolderId = result.data.catalogue_folder_id;
+          editableTagIds = result.data.editable_tag_ids ?? null;
           canEdit = result.data.can_edit;
           page = 0;
           search.value = '';

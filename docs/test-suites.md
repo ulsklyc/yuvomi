@@ -496,7 +496,8 @@ npm run test:task-completion-writers   # Jeder Weg zu 'done' schreibt den Erledi
 npm run test:paperless-folders-browser # Full browser + loopback Paperless: creation, sharing, pages beyond 50, live filter change, download denial, mobile navigation and disconnect (browser chain)
 npm run test:paperless-tags-browser # Live tag editor in folders and individual links; off-page tags, conflict, explicit clearing and mobile layout (browser chain)
 npm run test:paperless-tags # Live tag names, catalogue pages, assignment, visibility/role/module gates, conflicts, revocation and guarded PATCH (test chain)
-npm run test:paperless-folders-upgrade # Real upgrades from stock 2.84, stock 2.85 and the published Paperless fork; preserved bindings/minimums, repeat start, atomic repair rollback and retry
+npm run test:paperless-folders-upgrade # Stock schema upgrades, preserved migration history and rewards columns, repeat start and cascaded folder access
+npm run test:paperless-live-settings # Central tag allowlist, personal credentials, default delegation, per-user isolation, permissions and mid-request revocation
 npm run test:paperless-folders  # Saved-view filters, live pagination, private/family delegation, consent, membership-checked media, mid-request revocation, safe MIME handling and disconnect without remote deletion
 npm run test:dms-adapter        # DMS-Adapter: Paperless-ngx
 npm run test:dms-routes         # DMS-Routen: account management, search, link, push

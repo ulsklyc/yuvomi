@@ -634,6 +634,16 @@ export const SETTINGS_SECTIONS = freezeEntries([
     loader: () => import('/settings/pages/documents-dms.js'),
   },
   {
+    id: 'documents-live-folders',
+    sheetId: 'module-documents',
+    scope: 'household',
+    labelKey: 'settings.liveFolders.title',
+    descriptionKey: 'settings.liveFolders.description',
+    options: ['settings.liveFolders.tags', 'settings.liveFolders.tokenMode'],
+    adminOnly: false,
+    loader: () => import('/settings/pages/documents-live-folders.js'),
+  },
+  {
     id: 'options-housekeeping',
     sheetId: 'module-housekeeping',
     scope: 'household',

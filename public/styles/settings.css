@@ -4225,3 +4225,21 @@
 .settings-page:not(.settings-page--leaf) .settings-shell__skip {
   display: none;
 }
+
+/* Centrally allowed Live-folder tags; the whole label is a touch target. */
+.live-folder-settings__tags {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.live-folder-settings__tag {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  overflow-wrap: anywhere;
+}
+.live-folder-settings__tag input {
+  flex-shrink: 0;
+}

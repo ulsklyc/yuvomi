@@ -20,6 +20,8 @@ const ERRORS = {
   paperless_preview_unsupported: 'preview',
 };
 function sentence(err) {
+  if (err?.data?.reason === 'paperless_personal_token_required') return t('settings.liveFolders.tokenRequired');
+  if (err?.data?.reason === 'paperless_dms_forbidden') return t('settings.liveFolders.dmsForbidden');
   if (err?.status === 500) return t('common.unknownError');
   return t(key(`errors.${ERRORS[err?.data?.reason] || (err?.status === 403 ? 'forbidden' : 'unavailable')}`));
 }

@@ -662,6 +662,7 @@ const PAGE_MODULES = [
   '/settings/pages/notifications.js',
   '/settings/pages/documents-storage.js',
   '/settings/pages/documents-dms.js',
+  '/settings/pages/documents-live-folders.js',
   '/settings/pages/admin-family.js',
   '/settings/pages/admin-api.js',
   '/settings/pages/admin-displays.js',

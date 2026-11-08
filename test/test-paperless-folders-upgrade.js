@@ -12,7 +12,7 @@ test('stock v282 gains folder/member tables while existing migration history and
   const before = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
   migrate(db);
   assert.deepEqual(db.prepare('SELECT * FROM schema_migrations WHERE version <= 282 ORDER BY version').all(), before);
-  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, 283);
+  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, MIGRATIONS.at(-1).version);
   assert.ok(db.prepare('PRAGMA table_info(reward_ledger)').all().some((c) => c.name === 'decay_days'));
   assert.ok(db.prepare('PRAGMA table_info(reward_ledger)').all().some((c) => c.name === 'base_points'));
   db.exec(`INSERT INTO users (id,username,display_name,password_hash,role) VALUES (1,'owner','Owner','x','admin'),(2,'reader','Reader','x','member');

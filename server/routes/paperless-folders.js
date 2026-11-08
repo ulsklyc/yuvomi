@@ -1,5 +1,7 @@
 /** Virtual folders with scoped media and tags. No local file copies. */
 import express from 'express';
+import liveSettingsRouter from './paperless-live-settings.js';
+import { liveAccount, recheckLiveAccount } from '../services/paperless-live-settings.js';
 import paperlessTagsRouter from './paperless-tags.js';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
@@ -10,6 +12,7 @@ import { getAdapter } from '../services/dms/index.js';
 import { PaperlessViewError, positiveId } from '../services/dms/paperless-views.js';
 
 const router = express.Router();
+router.use(liveSettingsRouter);
 router.use(paperlessTagsRouter);
 const log = createLogger('PaperlessFolders');
 const COLUMNS = 'id, name, account_id, view_id, visibility, created_by, created_at, updated_at';
@@ -28,7 +31,7 @@ function problem(status, reason) {
 
 function fail(res, err) {
   log.warn(`Paperless folder operation failed (status ${err.httpStatus || (err instanceof PaperlessViewError ? 422 : 500)}).`);
-  if (err.httpStatus === 403) return res.status(403).json({ error: 'Permission denied.', code: 403 });
+  if (err.httpStatus === 403 && !['paperless_personal_token_required', 'paperless_dms_forbidden'].includes(err.reason)) return res.status(403).json({ error: 'Permission denied.', code: 403 });
   const status = err.httpStatus || (err instanceof PaperlessViewError ? 422 : 500);
   if (status === 500) {
     return res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -43,6 +46,7 @@ async function remote(promise) {
   catch (err) {
     if (Number.isInteger(err.status)) log.warn(`Paperless folders upstream request failed (status ${err.status}).`);
     if (err instanceof PaperlessViewError) throw err;
+    if (err.status === 403 || err.status === 401) throw Object.assign(new Error('DMS permission denied.'), { httpStatus: 403, reason: 'paperless_dms_forbidden' });
     throw problem(502, 'paperless_unavailable');
   }
 }
@@ -68,7 +72,8 @@ function replaceAccess(id, memberIds) {
   for (const memberId of memberIds) insert.run(id, memberId);
 }
 
-function unchangedFolder(req, before) {
+function unchangedFolder(req, before, source) {
+  if (source) recheckLiveAccount(source, actor(req));
   const now = visibleFolder(req, before.id);
   if (now.account_id !== before.account_id || now.view_id !== before.view_id
     || now.visibility !== before.visibility || now.created_by !== before.created_by
@@ -78,11 +83,6 @@ function unchangedFolder(req, before) {
   return now;
 }
 
-function accountFor(id) {
-  const account = db.get().prepare("SELECT * FROM dms_accounts WHERE id = ? AND provider = 'paperless'").get(id);
-  if (!account) throw problem(404, 'paperless_account_not_found');
-  return account;
-}
 
 function admin(req) {
   if (!isAdminRequest(req)) throw problem(403, 'Permission denied.');
@@ -126,7 +126,9 @@ router.get('/saved-views', refuseWhileRestoring, async (req, res) => {
     const accountId = positiveId(req.query.account_id);
     const page = positiveId(req.query.page ?? 1);
     if (!accountId || !page || page > 100000) throw problem(400, 'paperless_folder_invalid');
-    const result = await remote(adapterFactory(accountFor(accountId)).listSavedViews({ page, pageSize: 50 }));
+    const source = liveAccount(accountId, actor(req));
+    const result = await remote(adapterFactory(source).listSavedViews({ page, pageSize: 50 }));
+    recheckLiveAccount(source, actor(req));
     res.json({ data: result.results.map((view) => ({ id: view.id, name: view.name })),
       meta: { page, count: result.count, has_more: result.has_more } });
   } catch (err) { fail(res, err); }
@@ -149,9 +151,9 @@ router.post('/folders', async (req, res) => {
     const accountId = positiveId(body.account_id);
     const viewId = positiveId(body.view_id);
     if (!accountId || !viewId) throw problem(400, 'paperless_folder_invalid');
-    const account = accountFor(accountId);
-    await remote(adapterFactory(account).getSavedView(viewId));
-    accountFor(accountId);
+    const source = liveAccount(accountId, actor(req));
+    await remote(adapterFactory(source).getSavedView(viewId));
+    recheckLiveAccount(source, actor(req));
     const result = db.get().transaction(() => {
       const result = db.get().prepare(`INSERT INTO paperless_view_folders
       (name, account_id, view_id, visibility, created_by) VALUES (?, ?, ?, ?, ?)`)
@@ -199,8 +201,9 @@ router.get('/folders/:id/documents', refuseWhileRestoring, async (req, res) => {
     const folder = visibleFolder(req, req.params.id);
     const page = positiveId(req.query.page ?? 1);
     if (!page || page > 100000) throw problem(400, 'paperless_folder_invalid');
-    const result = await remote(adapterFactory(accountFor(folder.account_id)).listViewDocuments(folder.view_id, { page, pageSize: 50 }));
-    unchangedFolder(req, folder);
+    const source = liveAccount(folder.account_id, actor(req));
+    const result = await remote(adapterFactory(source).listViewDocuments(folder.view_id, { page, pageSize: 50 }));
+    unchangedFolder(req, folder, source);
     res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more } });
   } catch (err) { fail(res, err); }
 });
@@ -212,16 +215,17 @@ router.get('/folders/:id/documents/:documentId/:action', refuseWhileRestoring, a
       throw problem(404, 'paperless_document_not_found');
     }
     const folder = visibleFolder(req, req.params.id);
-    const adapter = adapterFactory(accountFor(folder.account_id));
+    const source = liveAccount(folder.account_id, actor(req));
+    const adapter = adapterFactory(source);
     // Intersect the current view with the requested ID at Paperless. A
     // valid ID alone never authorizes media, even if an old page contained it.
     const result = await remote(adapter.listViewDocuments(folder.view_id, { documentId, pageSize: 1 }));
     const doc = result.results.find((row) => String(row.id) === documentId);
     if (!doc) throw problem(404, 'paperless_document_not_found');
-    unchangedFolder(req, folder);
+    unchangedFolder(req, folder, source);
     const file = await remote(action === 'thumbnail'
       ? adapter.fetchThumbnail(documentId) : adapter.fetchContent(documentId));
-    unchangedFolder(req, folder); // Sharing can be revoked while content loads.
+    unchangedFolder(req, folder, source); // Sharing can be revoked while content loads.
     const mime = String(file.mime || '').split(';')[0].trim().toLowerCase();
     if (action === 'thumbnail' && !THUMB_MIME.has(mime)) throw problem(415, 'paperless_preview_unsupported');
     if (action === 'preview' && !PREVIEW_MIME.has(mime)) throw problem(415, 'paperless_preview_unsupported');
