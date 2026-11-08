@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a shared expense or a notification channel went out as a 400 with SQL text. Own input errors
   keep their sentence; everything else now answers with a fixed sentence (500), and a refusing
   WebDAV or document storage server with its class (`HTTP 507`, `ECONNREFUSED`) in `detail`.
+- **Connection tests and stored error messages no longer carry foreign error texts.** The
+  connection test of a DMS or recipe provider, the SMTP test, a failed waste source refresh, the
+  last WebDAV backup and document storage error, a notification channel's last test and a module
+  that fails to load returned or stored the raw text of the network stack, the mail library or the
+  filesystem, with hosts, ports and server paths. They now carry a fixed sentence or the class of
+  the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
+  status or a manifest check, stay.
 
 ## [2.86.0] - 2026-11-07
 

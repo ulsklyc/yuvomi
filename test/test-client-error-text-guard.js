@@ -56,20 +56,13 @@
  *          err.message }`) and a route that hands that object on is not seen;
  *          neither is text stored in a `last_error` column and sent by a later
  *          status GET. An alias more than three lines above the call is not
- *          followed. The known indirect ways, measured on 08.11.2026, are
- *          fixed by hand in the follow-up PRs of Phase 0 section H:
- *            - routes/dms.js POST /accounts/:id/test <- dms/paperless.js,
- *              dms/papra.js (`error: err.message` in the probe result)
- *            - routes/recipe-providers.js (probe.error) <- recipe-providers/
- *              mealie.js, tandoor.js
- *            - services/email.js (SMTP test result), services/waste-url-source.js
- *              (`errorMessage` of a refresh)
- *            - services/modules.js (`error` of a module that fails to load,
- *              shown in the admin module list: fs/JSON text with paths)
- *            - stored text sent by a status GET: backup-webdav.js
- *              (`webdav_backup_last_error`), backup-scheduler.js
- *              (lastBackup.webdav.error), document-storage.js (`last_error`),
- *              routes/notifications.js (markChannelTestResult)
+ *          followed. The indirect ways known on 08.11.2026 were fixed by hand
+ *          in the last PR of Phase 0 section H, each with a behaviour test in
+ *          its own suite: DMS and recipe-provider probe results, the SMTP test
+ *          result, the waste refresh's stored message, the error of a module
+ *          that fails to load, and the stored WebDAV/document-storage/
+ *          notification-channel errors sent by status GETs. A new one of these
+ *          is invisible to this reader until Phase 1b.
  *
  *          The three behaviour tests carry the todo marker TODO_MARKER while
  *          their BASELINE key is open; the last test below couples the two, so
