@@ -538,6 +538,7 @@ async function readModule(folderName, disabledSet, { withInstaller = false } = {
       error: null,
     };
   } catch (err) {
+    log.warn(`Module ${folderName} could not be loaded:`, err);
     return {
       id: folderName,
       name: folderName,
@@ -551,7 +552,11 @@ async function readModule(folderName, disabledSet, { withInstaller = false } = {
       install,
       enabled: false,
       status: 'error',
-      error: err?.message || 'Module could not be loaded.',
+      // Phase 0 section H: the admin module list shows this. A manifest
+      // check's own sentence stays (it says what to fix); a filesystem error
+      // (it carries `path`/`syscall`) names absolute paths on the server and
+      // gets a fixed sentence - its text is in the server log.
+      error: err?.path || err?.syscall ? 'The module files could not be read.' : (err?.message || 'Module could not be loaded.'),
     };
   }
 }

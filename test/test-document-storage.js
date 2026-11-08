@@ -2593,6 +2593,8 @@ test('connection test: a refusing server answers with its class, never its text'
   assert.equal(result.body.detail, 'HTTP 507');
   assert.doesNotMatch(JSON.stringify(result.body), /dav-internal|\/srv\/dav|Quota|PUT failed/);
   assert.ok(!JSON.stringify(result.body).includes(webdav.url), 'the answer does not repeat the address');
+  // The stored last error, shown in the settings, carries the class as well.
+  assert.equal(storage.getStatus().lastError, 'WebDAV connection test failed: HTTP 507');
 });
 
 // The first request of the test is MKCOL, so a wrong password fails there. Its

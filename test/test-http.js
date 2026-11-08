@@ -532,6 +532,9 @@ test('remoteFailure: judged by status, network code and type, never by the messa
   const timeout = Object.assign(new Error('aborted'), { name: 'AbortError', cause: Object.assign(new Error('t'), { name: 'TimeoutError' }) });
   assert.deepEqual(remoteFailure(timeout), { reason: 'remote_unreachable', detail: 'timeout' });
   assert.deepEqual(remoteFailure(Object.assign(new Error('10.0.0.1 is private'), { name: 'BlockedAddressError' })), { reason: 'remote_unreachable', detail: 'blocked' });
+  // nodemailer swaps `code` for its own type and keeps the socket's code in `originalCode`.
+  const smtp = Object.assign(new Error('connect ECONNREFUSED 10.0.0.9:587'), { code: 'ESOCKET', originalCode: 'ECONNREFUSED' });
+  assert.deepEqual(remoteFailure(smtp), { reason: 'remote_unreachable', detail: 'ECONNREFUSED' });
   // The wording decides nothing: a message that names 401 is still unclassified.
   assert.deepEqual(remoteFailure(new Error('PROPFIND https://dav.lan/ returned 401 Unauthorized')), { reason: 'remote_failed' });
   // An own code in lower case is not a network code.

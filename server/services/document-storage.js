@@ -13,7 +13,7 @@ import * as db from '../db.js';
 import * as googleDriveStorage from './google-drive-storage.js';
 import { isBlockedAddress, isBlockedHostname, normalizeHostname } from '../utils/ssrf.js';
 import { isPathPersistent } from '../utils/container-persistence.js';
-import { safeRequest } from '../utils/http.js';
+import { remoteFailure, safeRequest } from '../utils/http.js';
 import { MAX_UPLOAD_BYTES } from '../utils/upload-limit.js';
 
 const CONFIG_PREFIX = 'document_storage_webdav_';
@@ -1187,7 +1187,14 @@ export async function testConnection(overrides = {}) {
       `WebDAV connection test failed: ${primaryError.message}`,
       { cause: primaryError }
     );
-    cfgSet('last_error', error.message);
+    // `last_error` is shown in the storage settings: a refusal or a network
+    // error as its class (`HTTP 507`, `ECONNREFUSED`), never the server's or
+    // fetch's text with its URL (Phase 0 section H); the test's own sentences
+    // (different bytes read back) stay. The full text stays on the thrown
+    // error for the log; the route answers with a fixed sentence.
+    const failure = remoteFailure(primaryError);
+    const shown = failure && failure.reason !== 'remote_failed' ? failure.detail : primaryError.message;
+    cfgSet('last_error', `WebDAV connection test failed: ${shown}`);
     throw error;
   }
   cfgSet('last_test', testedAt);

@@ -9,6 +9,8 @@ import { createLogger } from '../logger.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { createNotificationChannelStore, NOTIFICATION_PROVIDERS } from '../services/notification-channels.js';
 import { notificationService as defaultNotificationService } from '../services/notifications.js';
+import { NotificationProviderError } from '../services/notification-providers/provider-error.js';
+import { remoteFailure } from '../utils/http.js';
 
 const log = createLogger('NotificationRoutes');
 
@@ -23,6 +25,17 @@ function parseId(value) {
 // aus dem Body nur durch, was ein Haushaltskanal braucht: eine Allowlist, damit
 // keine Schreibweise von Besitzer oder Reichweite den Store erreicht. Die
 // Zustellung an persoenliche Kanaele bleibt davon unberuehrt.
+/**
+ * What a failed channel test stores as `last_error`: a provider's own sentence,
+ * the code of a network error, or a fixed sentence (Phase 0 section H).
+ */
+function storedTestError(err) {
+  if (err instanceof NotificationProviderError) return err.message;
+  const failure = remoteFailure(err);
+  if (failure?.reason === 'remote_unreachable') return failure.detail;
+  return 'The test notification could not be delivered.';
+}
+
 function householdChannelInput(body) {
   const { provider, name, enabled, config, secrets, clearSecrets } = body || {};
   return { provider, name, enabled, config, secrets, clearSecrets };
@@ -154,7 +167,12 @@ export function buildRouter({
     } catch (err) {
       log.error('Error testing notification channel:', err.message);
       const id = parseId(req.params.id);
-      if (id) store.markChannelTestResult(id, { ok: false, error: err.message });
+      // Stored as the channel's `last_error` and listed to the admin. The
+      // providers' own sentences ("Webhook authentication failed.") stay; a
+      // network error is stored as its code, anything else - nodemailer's
+      // "Invalid login: 535 ...", a TypeError - as a fixed sentence. Their text
+      // names host, port or the server's reply (Phase 0 section H).
+      if (id) store.markChannelTestResult(id, { ok: false, error: storedTestError(err) });
       res.status(500).json({ error: 'Internal error.', code: 500 });
     }
   });

@@ -2431,3 +2431,20 @@ test('asset route: a filesystem error answers with a fixed sentence, never the p
     }
   }
 });
+
+// Phase 0 section H: the admin module list shows why a module did not load. A
+// filesystem error names absolute paths on the server; the list gets a fixed
+// sentence instead (a manifest check's own sentence stays).
+test('module list: a filesystem error while loading never shows the path', async () => {
+  const dir = path.join(MODULES_DIR, 'fs-broken-mod');
+  fs.mkdirSync(path.join(dir, 'module.json'), { recursive: true });
+  try {
+    const listed = (await modulesSvc.listModules({ admin: true })).find((m) => m.id === 'fs-broken-mod');
+    assert.ok(listed, 'the broken folder is listed');
+    assert.equal(listed.status, 'error');
+    assert.equal(listed.error, 'The module files could not be read.');
+    assert.ok(!listed.error.includes(MODULES_DIR));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

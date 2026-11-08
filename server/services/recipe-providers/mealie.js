@@ -21,7 +21,7 @@ import { safeRequest } from '../../utils/http.js';
 import { createGuardedLookup } from '../../utils/ssrf.js';
 // Opt-in RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: eine Stelle fuer beide Adapter
 // und die Route, damit der Schalter in der Fehlermeldung derselbe ist wie hier.
-import { isPrivateNetworkAllowed } from './private-network.js';
+import { isPrivateNetworkAllowed, isPrivateNetworkRefusal } from './private-network.js';
 import { probeFailure, ProviderResponseError } from './failure.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -162,7 +162,12 @@ export class MealieAdapter {
       const user = await readJson(res);
       return { ok: true, status: res.status, linkContext: { groupSlug: user.groupSlug || null } };
     } catch (err) {
-      return { ok: false, status: 0, error: err.message, ...probeFailure(err) };
+      // Phase 0 section H: the result goes to the browser as it is, so it
+      // carries the class (probeFailure), never the network's text. The
+      // lookup hook's refusal is our own sentence and stays: the route reads
+      // it to name the private-network switch.
+      const error = isPrivateNetworkRefusal(err?.message) ? err.message : 'The recipe provider could not be reached.';
+      return { ok: false, status: 0, error, ...probeFailure(err) };
     }
   }
 

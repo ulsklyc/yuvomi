@@ -20,8 +20,8 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { getAdapter } from './recipe-providers/index.js';
 import { householdDisabledModules } from './household-modules.js';
-import { withPrivateNetworkHint } from './recipe-providers/private-network.js';
-import { classifyProviderFailure } from './recipe-providers/failure.js';
+import { isPrivateNetworkRefusal, withPrivateNetworkHint } from './recipe-providers/private-network.js';
+import { ProviderResponseError, classifyProviderFailure } from './recipe-providers/failure.js';
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 
 const log = createLogger('RecipeProviderSync');
@@ -71,10 +71,12 @@ async function syncAccount(account) {
   } catch (err) {
     log.error(`Account ${account.id} ("${account.name}"): fetch failed, skipping this pass:`, err.message);
     // Der Fall des Wurfs (#1909) geht mit: die Konto-Karte sagt ihn als Satz
-    // der App, `error` bleibt der rohe Text fuer Log und API.
+    // der App. The raw text stays in the log above: `error` is stored as
+    // `last_error` and sent with the account list (Phase 0 section H).
     const failure = classifyProviderFailure(err);
     return {
-      imported: 0, updated: 0, deleted: 0, failed: true, error: err.message,
+      imported: 0, updated: 0, deleted: 0, failed: true,
+      error: storedSyncError(err),
       reason: failure?.reason ?? null, ...(failure?.params && { params: failure.params }),
     };
   }
@@ -216,6 +218,18 @@ async function syncAccount(account) {
   return { imported, updated, deleted: stale.length, failed: false };
 }
 
+/**
+ * The text a failed sync stores as `last_error` and sends with the account list
+ * (Phase 0 section H): the adapter's own sentences - a refused status ("Mealie
+ * request failed (502)"), an unreadable answer - and the lookup hook's refusal
+ * keep their words; the network stack's text (host, port) and anything
+ * unexpected become a fixed sentence. The raw text is in the log.
+ */
+function storedSyncError(err) {
+  if (isPrivateNetworkRefusal(err?.message)) return err.message;
+  if (Number.isInteger(err?.status) || err instanceof ProviderResponseError) return err.message;
+  return 'Fetching the recipes failed.';
+}
 /**
  * Schreibt den letzten Fehlschlag auf ein Konto: Text, Fall und Zahlen gehen
  * immer ZUSAMMEN (#1909, Migration 255). Ein neuer Text ohne Fall raeumt den

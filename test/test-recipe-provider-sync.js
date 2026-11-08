@@ -305,7 +305,8 @@ test('sync(): SICHERHEIT - fehlgeschlagener Abruf löscht den lokalen Mirror nic
   assert.equal(mirroredRecipes(accountId).length, 1); // unverändert, NICHT geleert
 
   const account = conn.prepare('SELECT last_error FROM recipe_provider_accounts WHERE id = ?').get(accountId);
-  assert.match(account.last_error, /network down/);
+  // Phase 0, Abschnitt H: der Text des Netzes steht im Log, nicht am Konto.
+  assert.equal(account.last_error, 'Fetching the recipes failed.');
 });
 
 test('sync(): SICHERHEIT - fehlgeschlagener Abruf löscht den lokalen Mirror nicht und setzt last_error (Tandoor-Account)', async () => {
@@ -324,7 +325,8 @@ test('sync(): SICHERHEIT - fehlgeschlagener Abruf löscht den lokalen Mirror nic
   assert.equal(mirroredRecipes(accountId).length, 1); // unverändert, NICHT geleert
 
   const account = conn.prepare('SELECT last_error FROM recipe_provider_accounts WHERE id = ?').get(accountId);
-  assert.match(account.last_error, /network down/);
+  // Phase 0, Abschnitt H: der Text des Netzes steht im Log, nicht am Konto.
+  assert.equal(account.last_error, 'Fetching the recipes failed.');
 });
 
 test('sync(): SICHERHEIT - leere Rezeptliste bei bestehendem Mirror wird als Fehler behandelt, nicht als Leerung', async () => {
@@ -404,7 +406,7 @@ test('sync(): ein fehlschlagender Account blockiert einen zweiten, gesunden Acco
   assert.equal(mirroredRecipes(brokenId).length, 0);
 
   const broken = conn.prepare('SELECT last_error FROM recipe_provider_accounts WHERE id = ?').get(brokenId);
-  assert.match(broken.last_error, /kaputt/);
+  assert.equal(broken.last_error, 'Fetching the recipes failed.', 'ein unerwarteter Text bleibt im Log (Phase 0 H)');
 });
 
 test('syncOne(): synchronisiert nur den angegebenen Account', async () => {
@@ -454,7 +456,7 @@ test('sync(): eine Lookup-Ablehnung schreibt last_error MIT dem Schalter, ein an
   }));
   await sync.sync();
   const plain = conn.prepare('SELECT last_error FROM recipe_provider_accounts WHERE id = ?').get(accountId);
-  assert.equal(plain.last_error, 'network down', 'kein Hinweis, wo er nicht hingehoert');
+  assert.equal(plain.last_error, 'Fetching the recipes failed.', 'kein Hinweis, wo er nicht hingehoert, und kein Text des Netzes (Phase 0 H)');
 });
 
 // --------------------------------------------------------------------------
@@ -504,7 +506,11 @@ test('syncOne(): ein Fehlschlag speichert seinen Fall neben dem Text, getStatus 
     const row = failureRow(accountId);
     assert.equal(row.last_error_reason, reason, `${err.message}: gespeichert`);
     assert.equal(row.last_error_params, params ? JSON.stringify(params) : null);
-    assert.ok(row.last_error.startsWith(err.message), 'der rohe Text bleibt fuer Log und API');
+    // Phase 0, Abschnitt H: eigene Saetze (Status des Adapters, unlesbare
+    // Antwort, Ablehnung des Lookup-Hooks) bleiben, der Text des Netzes nicht.
+    const own = Number.isInteger(err.status) || err.name === 'ProviderResponseError' || /private IP address/.test(err.message);
+    if (own) assert.ok(row.last_error.startsWith(err.message), `${err.message}: eigener Satz bleibt`);
+    else assert.equal(row.last_error, 'Fetching the recipes failed.', `${err.message}: fester Satz`);
     const status = statusOf(accountId);
     assert.equal(status.lastError, row.last_error);
     assert.equal(status.lastErrorReason, reason);
@@ -523,7 +529,7 @@ test('syncOne(): ein Fehlschlag ohne bekannten Fall raeumt den alten Fall ab, ei
   _setAdapterFactory(failingAdapter(() => new TypeError('body.items is not iterable')));
   await sync.syncOne(accountId);
   let row = failureRow(accountId);
-  assert.equal(row.last_error, 'body.items is not iterable');
+  assert.equal(row.last_error, 'Fetching the recipes failed.', 'ein Fehler im Code bleibt im Log (Phase 0 H)');
   assert.equal(row.last_error_reason, null);
   assert.equal(row.last_error_params, null);
   assert.equal(statusOf(accountId).lastErrorReason, null);

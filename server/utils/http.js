@@ -332,6 +332,11 @@ export function remoteFailure(err) {
   for (const e of errorChain(err)) {
     if (e.name === 'BlockedAddressError') return { reason: 'remote_unreachable', detail: 'blocked' };
     if (typeof e.code === 'string' && REMOTE_NETWORK_CODES.has(e.code)) return { reason: 'remote_unreachable', detail: e.code };
+    // nodemailer replaces `code` with its own type (ESOCKET, EDNS) and keeps
+    // the socket's code in `originalCode`.
+    if (typeof e.originalCode === 'string' && REMOTE_NETWORK_CODES.has(e.originalCode)) {
+      return { reason: 'remote_unreachable', detail: e.originalCode };
+    }
   }
   return { reason: 'remote_failed' };
 }
