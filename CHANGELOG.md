@@ -454,6 +454,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Settings > Wall tablets offers each tablet's night window, idle delay, clock and photo
   fill. Online tablets pick up changes automatically; existing local choices stay in use
   until an administrator saves, and personal browser preferences are preserved (#2436).
+- **Each member can choose a custom accent colour for any module** (Refs #1115). Open
+  Settings > Appearance and pick a colour for the light and the dark design separately.
+  The sidebar icon, widget seal, and every element tied to that module's accent reflect
+  the chosen colour without affecting anyone else in the household. Any colour that falls
+  below a 3:1 contrast ratio on its background shows a note; the choice is saved either way.
+  The API accepts `module_colors` as a PATCH-semantic object of `{light, dark}` pairs; a
+  `null` value removes an entry; unknown module ids are silently ignored.
 - **Shopping: purchase price history** (part 1 of #1003). Ticking off or clearing a priced
   shopping item records the purchase: item name, price paid in cents, the shop, and the date.
   Purchases match by item name, case-insensitively, and remain after the item is cleared.

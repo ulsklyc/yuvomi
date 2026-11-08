@@ -497,6 +497,29 @@ function parseModuleOrder(raw) {
   }
 }
 
+// Modulfarben: ein Objekt { moduleId: { light, dark } }, hoechstens 30
+// Eintraege. Unbekannte Modul-IDs und ungueltige Farben werden still
+// verworfen.
+function parseModuleColors(raw) {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const result = {};
+    for (const [key, val] of Object.entries(parsed)) {
+      if (!MODULE_ORDER_RE.test(key)) continue;
+      if (typeof val === 'object' && val !== null && !Array.isArray(val)
+          && typeof val.light === 'string' && HEX_COLOR_RE.test(val.light)
+          && typeof val.dark === 'string' && HEX_COLOR_RE.test(val.dark)) {
+        result[key] = { light: val.light, dark: val.dark };
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 function normalizeMobileNavOrder(order) {
   const normalized = [];
 
@@ -622,6 +645,7 @@ router.get('/', (req, res) => {
     const hiddenModules = parseHiddenModules(cfgUserGet('hidden_modules', req.authUserId));
     const moduleOrder = parseModuleOrder(cfgUserGet('module_order', req.authUserId) ?? cfgGet('module_order'));
     const mobileNavOrder = parseMobileNavOrder(cfgUserGet('mobile_nav_order', req.authUserId));
+    const moduleColors = parseModuleColors(cfgUserGet('module_colors', req.authUserId));
 
     const data = {
         visible_meal_types: visibleMealTypes,
@@ -654,6 +678,7 @@ router.get('/', (req, res) => {
         disabled_modules: disabledModules,
         hidden_modules: hiddenModules,
         module_order: moduleOrder,
+        module_colors: moduleColors,
         mobile_nav_order: mobileNavOrder,
         housekeeping_payment_tasks: cfgGet('housekeeping_payment_tasks') === '1',
         budget_mode: VALID_BUDGET_MODES.includes(cfgGet('budget_mode')) ? cfgGet('budget_mode') : DEFAULT_BUDGET_MODE,
@@ -749,7 +774,7 @@ router.put('/', (req, res) => {
   try {
     database = db.get();
     database.exec('BEGIN');
-    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_phone, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, tasks_late_decay_enabled, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_phone, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, module_colors, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, tasks_late_decay_enabled, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
     // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
     // pro Nutzer: die Vorlagen legen geteilte Schichtarten an. Der Check steht
@@ -1082,6 +1107,36 @@ router.put('/', (req, res) => {
       }
       const unique = [...new Set(module_order.filter((id) => typeof id === 'string' && MODULE_ORDER_RE.test(id)))];
       cfgUserSet('module_order', req.authUserId, JSON.stringify(unique));
+    }
+
+    if (module_colors !== undefined) {
+      if (!module_colors || typeof module_colors !== 'object' || Array.isArray(module_colors)) {
+        return res.status(400).json({ error: 'module_colors must be an object.', code: 400 });
+      }
+      // PATCH-Semantik: die gespeicherte Karte mergen, null entfernt einen Eintrag.
+      const existing = parseModuleColors(cfgUserGet('module_colors', req.authUserId));
+      const merged = { ...existing };
+      for (const [key, val] of Object.entries(module_colors)) {
+        if (!MODULE_ORDER_RE.test(key)) continue;
+        if (val === null || val === undefined || val === '') {
+          delete merged[key];
+          continue;
+        }
+        if (typeof val !== 'object' || Array.isArray(val) || val === null) {
+          return res.status(400).json({ error: `module_colors: "${key}" must be {light, dark} or null.`, code: 400 });
+        }
+        if (typeof val.light !== 'string' || !HEX_COLOR_RE.test(val.light)) {
+          return res.status(400).json({ error: `module_colors: "${key}.light" must be a hex color (#RRGGBB).`, code: 400 });
+        }
+        if (typeof val.dark !== 'string' || !HEX_COLOR_RE.test(val.dark)) {
+          return res.status(400).json({ error: `module_colors: "${key}.dark" must be a hex color (#RRGGBB).`, code: 400 });
+        }
+        merged[key] = { light: val.light, dark: val.dark };
+      }
+      if (Object.keys(merged).length > 30) {
+        return res.status(400).json({ error: 'module_colors: at most 30 entries.', code: 400 });
+      }
+      cfgUserSet('module_colors', req.authUserId, JSON.stringify(merged));
     }
 
     if (mobile_nav_order !== undefined) {
@@ -1496,6 +1551,7 @@ router.put('/', (req, res) => {
     const savedDisabledModules = parseDisabledModules(cfgGet('disabled_modules'));
     const savedHiddenModules = parseHiddenModules(cfgUserGet('hidden_modules', req.authUserId));
     const savedModuleOrder = parseModuleOrder(cfgUserGet('module_order', req.authUserId) ?? cfgGet('module_order'));
+    const savedModuleColors = parseModuleColors(cfgUserGet('module_colors', req.authUserId));
     const savedMobileNavOrder = parseMobileNavOrder(cfgUserGet('mobile_nav_order', req.authUserId));
     const savedHousekeepingPaymentTasks = cfgGet('housekeeping_payment_tasks') === '1';
     // AUS DER DATENBANK ZURUECKLESEN, nicht aus dem Request: der Client sieht so
@@ -1523,6 +1579,7 @@ router.put('/', (req, res) => {
         disabled_modules: savedDisabledModules,
         hidden_modules: savedHiddenModules,
         module_order: savedModuleOrder,
+        module_colors: savedModuleColors,
         mobile_nav_order: savedMobileNavOrder,
         housekeeping_payment_tasks: savedHousekeepingPaymentTasks,
         budget_mode: VALID_BUDGET_MODES.includes(cfgGet('budget_mode')) ? cfgGet('budget_mode') : DEFAULT_BUDGET_MODE,

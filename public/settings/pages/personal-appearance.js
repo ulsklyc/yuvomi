@@ -13,6 +13,7 @@ import { currencyName, currencyShortLabel, persistCurrencySelection } from '/set
 import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { getPreferences, resetPreferencesCache, savePreferences } from '/settings/preferences-cache.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { applyModuleColorOverrides } from '/utils/module-color-overrides.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { isWallModeEnabled, setWallModeEnabled } from '/utils/wall-mode.js';
@@ -53,6 +54,52 @@ const THEME_OPTIONS = [
   { value: 'light', icon: 'sun', labelKey: 'settings.themeLight' },
   { value: 'dark', icon: 'moon', labelKey: 'settings.themeDark' },
 ];
+
+// Built-in modules that support per-user colour overrides (#1115).
+// Order matches the navigation sections; `navKey` is the i18n key for the label.
+// `light`/`dark` defaults mirror tokens.css `--_family-*` values and are used
+// only when no saved colour exists - they give the pickers a meaningful starting
+// point without reading computed styles.
+const BUILTIN_MODULES = [
+  { id: 'dashboard',    light: '#6C3AED', dark: '#A78BFA' },
+  { id: 'tasks',        light: '#157F3D', dark: '#4ADE80' },
+  { id: 'calendar',     light: '#00668F', dark: '#4CB8F0' },
+  { id: 'schedule',     light: '#00668F', dark: '#4CB8F0' },
+  { id: 'meals',        light: '#C2410C', dark: '#FB923C' },
+  { id: 'recipes',      light: '#C2410C', dark: '#FB923C' },
+  { id: 'shopping',     light: '#C2410C', dark: '#FB923C' },
+  { id: 'pantry',       light: '#C2410C', dark: '#FB923C' },
+  { id: 'notes',        light: '#42587E', dark: '#7E9BCC' },
+  { id: 'contacts',     light: '#CE2A63', dark: '#FB7185' },
+  { id: 'birthdays',    light: '#CE2A63', dark: '#FB7185' },
+  { id: 'budget',       light: '#0F766E', dark: '#2DD4BF' },
+  { id: 'documents',    light: '#42587E', dark: '#7E9BCC' },
+  { id: 'housekeeping', light: '#157F3D', dark: '#4ADE80' },
+  { id: 'waste',        light: '#157F3D', dark: '#4ADE80' },
+  { id: 'rewards',      light: '#157F3D', dark: '#4ADE80' },
+  { id: 'health',       light: '#9E1E88', dark: '#DB60CB' },
+  { id: 'inventory',    light: '#42587E', dark: '#7E9BCC' },
+];
+
+// WCAG relative luminance and contrast ratio for the contrast check (#1115).
+function _luminance(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function contrastRatio(hex1, hex2) {
+  const l1 = _luminance(hex1);
+  const l2 = _luminance(hex2);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+// Surfaces module colours appear on (icons / badge seals — 3:1 non-text minimum).
+const LIGHT_SURFACE = '#FFFFFF';
+const DARK_SURFACE  = '#191816';
+const MIN_CONTRAST  = 3.0;
 
 const DATE_FORMATS = [
   ['mdy', 'MM/DD/YYYY'],
@@ -618,6 +665,46 @@ function renderPage(container, preferences, isAdmin) {
       </div>
       <p class="form-hint settings-group__footer" id="formats-household-hint"${customHidden ? ' hidden' : ''}>${t('settings.formatsHouseholdHint')}</p>
     </section>
+
+    <section class="settings-section">
+      <h2 class="settings-section__title">${t('settings.sectionModuleColors')}</h2>
+      <p class="form-hint settings-group__footer">${esc(t('settings.moduleColorsHint'))}</p>
+      <div class="row-carrier settings-group" id="module-colors-group">
+        ${BUILTIN_MODULES.map(({ id, light: defLight, dark: defDark }) => {
+          const saved = preferences.module_colors?.[id];
+          const lVal = saved?.light || defLight;
+          const dVal = saved?.dark  || defDark;
+          const hasCustom = !!(saved?.light && saved?.dark);
+          return settingRowHtml({
+            label: t(`nav.${id}`),
+            labelId: `module-color-label-${id}`,
+            control: `<span class="form-composite" role="group" aria-labelledby="module-color-label-${id}">
+              <label class="settings-module-color__swatch">
+                <span class="settings-module-color__theme-label">${esc(t('settings.moduleColorsLightLabel'))}</span>
+                <input type="color" id="module-color-${id}-light"
+                  class="settings-module-color__input"
+                  value="${lVal}"
+                  ${!saved?.light ? 'data-unset="true"' : ''}>
+              </label>
+              <label class="settings-module-color__swatch">
+                <span class="settings-module-color__theme-label">${esc(t('settings.moduleColorsDarkLabel'))}</span>
+                <input type="color" id="module-color-${id}-dark"
+                  class="settings-module-color__input"
+                  value="${dVal}"
+                  ${!saved?.dark ? 'data-unset="true"' : ''}>
+              </label>
+              <button type="button" id="module-color-${id}-reset"
+                class="btn btn--ghost btn--sm"
+                aria-label="${esc(t('settings.moduleColorsReset') + ': ' + t(`nav.${id}`))}"
+                ${!hasCustom ? 'hidden' : ''}>
+                <i data-lucide="rotate-ccw" class="icon-sm" aria-hidden="true"></i>
+              </button>
+            </span>
+            <div id="module-color-${id}-warn" class="form-hint" role="alert" hidden></div>`,
+          });
+        }).join('')}
+      </div>
+    </section>
   `);
 }
 
@@ -924,6 +1011,77 @@ function bindDeviceDisplay(container) {
 
 }
 
+/**
+ * Verdrahtet die Farbwähler im Abschnitt "Modulfarben" (#1115).
+ * Jeder Wähler speichert sofort über savePreferences() und wendet die
+ * neuen Farben direkt via applyModuleColorOverrides() an.
+ * Ein unzureichender Kontrast (< 3:1 auf der jeweiligen Fläche) erzeugt
+ * einen Hinweis unterhalb der Zeile, verhindert das Speichern aber nicht.
+ */
+function bindModuleColors(container) {
+  for (const { id } of BUILTIN_MODULES) {
+    const lightInput = container.querySelector(`#module-color-${id}-light`);
+    const darkInput  = container.querySelector(`#module-color-${id}-dark`);
+    const resetBtn   = container.querySelector(`#module-color-${id}-reset`);
+    const warnEl     = container.querySelector(`#module-color-${id}-warn`);
+    if (!lightInput || !darkInput) continue;
+
+    function updateWarn() {
+      if (!warnEl) return;
+      const lRatio = contrastRatio(lightInput.value, LIGHT_SURFACE);
+      const dRatio = contrastRatio(darkInput.value,  DARK_SURFACE);
+      const parts = [];
+      if (lRatio < MIN_CONTRAST) parts.push(t('settings.moduleColorsLowContrastLight'));
+      if (dRatio < MIN_CONTRAST) parts.push(t('settings.moduleColorsLowContrastDark'));
+      warnEl.textContent = parts.join(' ');
+      warnEl.hidden = parts.length === 0;
+    }
+
+    async function saveColors() {
+      const lightVal = lightInput.value;
+      const darkVal  = darkInput.value;
+      try {
+        const saved = await savePreferences({ module_colors: { [id]: { light: lightVal, dark: darkVal } } });
+        if (resetBtn) resetBtn.hidden = false;
+        lightInput.removeAttribute('data-unset');
+        darkInput.removeAttribute('data-unset');
+        // Apply immediately so the sidebar and widgets reflect the new colour.
+        applyModuleColorOverrides(saved?.data?.module_colors);
+        updateWarn();
+        window.yuvomi?.showToast(t('settings.moduleColorsSaved'), 'success');
+      } catch {
+        window.yuvomi?.showToast(t('settings.preferenceSaveFailed'), 'danger');
+      }
+    }
+
+    lightInput.addEventListener('change', saveColors);
+    darkInput.addEventListener('change', saveColors);
+
+    lightInput.addEventListener('input', updateWarn);
+    darkInput.addEventListener('input', updateWarn);
+
+    resetBtn?.addEventListener('click', async () => {
+      try {
+        const saved = await savePreferences({ module_colors: { [id]: null } });
+        // Restore picker values to built-in defaults.
+        const def = BUILTIN_MODULES.find((m) => m.id === id);
+        if (def) { lightInput.value = def.light; darkInput.value = def.dark; }
+        lightInput.setAttribute('data-unset', 'true');
+        darkInput.setAttribute('data-unset', 'true');
+        resetBtn.hidden = true;
+        applyModuleColorOverrides(saved?.data?.module_colors);
+        if (warnEl) { warnEl.textContent = ''; warnEl.hidden = true; }
+        window.yuvomi?.showToast(t('settings.moduleColorsResetSaved'), 'success');
+      } catch {
+        window.yuvomi?.showToast(t('settings.preferenceSaveFailed'), 'danger');
+      }
+    });
+
+    // Show contrast warning for already-saved colours on initial render.
+    if (!lightInput.dataset.unset) updateWarn();
+  }
+}
+
 function bindEvents(container, user) {
   // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8).
   const themeToggle = container.querySelector('#theme-toggle');
@@ -936,6 +1094,7 @@ function bindEvents(container, user) {
   });
 
   bindDeviceDisplay(container);
+  bindModuleColors(container);
 
   const localeSelect = container.querySelector('#locale-select');
   // Die Auswahl, die wirklich gilt (auch "System") - dorthin geht ein
@@ -1194,6 +1353,7 @@ export async function render(container, { user }) {
       // die Zone WAR gesetzt, das Formular zeigte sie nur nicht.
       timezone: loaded.timezone || null,
       timezone_effective: loaded.timezone_effective || null,
+      module_colors: loaded.module_colors || {},
     };
 
     safeStorageSet('yuvomi-date-format', preferences.date_format);
