@@ -13,7 +13,7 @@ import * as db from '../db.js';
 import * as googleDriveStorage from './google-drive-storage.js';
 import { isBlockedAddress, isBlockedHostname, normalizeHostname } from '../utils/ssrf.js';
 import { isPathPersistent } from '../utils/container-persistence.js';
-import { safeRequest } from '../utils/http.js';
+import { remoteFailure, safeRequest } from '../utils/http.js';
 import { MAX_UPLOAD_BYTES } from '../utils/upload-limit.js';
 
 const CONFIG_PREFIX = 'document_storage_webdav_';
@@ -573,7 +573,7 @@ async function ensureCollections(config, extraSegments = []) {
   for (let index = 1; index <= segments.length; index += 1) {
     const response = await davFetch(config, 'MKCOL', segments.slice(0, index));
     if (!response.ok && response.status !== 405) {
-      throw new Error(`MKCOL failed with status ${response.status}.`);
+      throw Object.assign(new Error(`MKCOL failed with status ${response.status}.`), { status: response.status });
     }
   }
 }
@@ -891,7 +891,7 @@ export async function stageDocumentUpload({
       headers: { 'Content-Type': mime },
     });
     if (!response.ok) {
-      throw new Error(`PUT failed with status ${response.status}.`);
+      throw Object.assign(new Error(`PUT failed with status ${response.status}.`), { status: response.status });
     }
   } catch (error) {
     throw toStorageError(
@@ -923,7 +923,7 @@ export async function verifyExistingWebdavDocument(document, config) {
       ...normalizeStorageKey(document.storage_key).split('/'),
     ]);
     if (!response.ok) {
-      throw new Error(`GET failed with status ${response.status}.`);
+      throw Object.assign(new Error(`GET failed with status ${response.status}.`), { status: response.status });
     }
     await readResponseBuffer(response);
     return { ok: true };
@@ -1040,7 +1040,7 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
       ...normalizeStorageKey(document.storage_key).split('/'),
     ]);
     if (!response.ok) {
-      throw new Error(`GET failed with status ${response.status}.`);
+      throw Object.assign(new Error(`GET failed with status ${response.status}.`), { status: response.status });
     }
     return {
       buffer: await readResponseBuffer(response),
@@ -1080,7 +1080,7 @@ export async function deleteDocumentContent(document) {
         ...normalizeStorageKey(document.storage_key).split('/'),
       ]);
       if (!response.ok && response.status !== 404) {
-        throw new Error(`DELETE failed with status ${response.status}.`);
+        throw Object.assign(new Error(`DELETE failed with status ${response.status}.`), { status: response.status });
       }
     } catch (error) {
       throw toStorageError(
@@ -1145,7 +1145,7 @@ export async function testConnection(overrides = {}) {
       headers: { 'Content-Type': 'application/octet-stream' },
     });
     if (!putResponse.ok) {
-      throw new Error(`PUT failed with status ${putResponse.status}.`);
+      throw Object.assign(new Error(`PUT failed with status ${putResponse.status}.`), { status: putResponse.status });
     }
 
     const getResponse = await davFetch(config, 'GET', [
@@ -1153,7 +1153,7 @@ export async function testConnection(overrides = {}) {
       testKey,
     ]);
     if (!getResponse.ok) {
-      throw new Error(`GET failed with status ${getResponse.status}.`);
+      throw Object.assign(new Error(`GET failed with status ${getResponse.status}.`), { status: getResponse.status });
     }
     const actual = await readResponseBuffer(getResponse);
     if (!actual.equals(expected)) {
@@ -1169,7 +1169,7 @@ export async function testConnection(overrides = {}) {
           testKey,
         ]);
         if (!response.ok && response.status !== 404) {
-          throw new Error(`DELETE failed with status ${response.status}.`);
+          throw Object.assign(new Error(`DELETE failed with status ${response.status}.`), { status: response.status });
         }
       } catch (error) {
         primaryError ||= error;
@@ -1187,7 +1187,14 @@ export async function testConnection(overrides = {}) {
       `WebDAV connection test failed: ${primaryError.message}`,
       { cause: primaryError }
     );
-    cfgSet('last_error', error.message);
+    // `last_error` is shown in the storage settings: a refusal or a network
+    // error as its class (`HTTP 507`, `ECONNREFUSED`), never the server's or
+    // fetch's text with its URL (Phase 0 section H); the test's own sentences
+    // (different bytes read back) stay. The full text stays on the thrown
+    // error for the log; the route answers with a fixed sentence.
+    const failure = remoteFailure(primaryError);
+    const shown = failure && failure.reason !== 'remote_failed' ? failure.detail : primaryError.message;
+    cfgSet('last_error', `WebDAV connection test failed: ${shown}`);
     throw error;
   }
   cfgSet('last_test', testedAt);

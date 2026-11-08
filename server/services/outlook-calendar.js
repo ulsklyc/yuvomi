@@ -72,7 +72,8 @@ function isConfigured() {
 
 function requireConfig() {
   if (!isConfigured()) {
-    throw new Error('[Outlook] MS_CLIENT_ID, MS_CLIENT_SECRET, and MS_REDIRECT_URI must be set.');
+    // `code`: the routes answer this own case with their sentence (Phase 0 H).
+    throw Object.assign(new Error('[Outlook] MS_CLIENT_ID, MS_CLIENT_SECRET, and MS_REDIRECT_URI must be set.'), { code: 'outlook_not_configured' });
   }
   return envConfig();
 }

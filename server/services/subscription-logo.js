@@ -39,6 +39,15 @@ const REQUEST_HEADERS = {
   Accept: 'text/html,application/xhtml+xml,image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5',
 };
 
+/**
+ * A refusal the logo search words itself (Phase 0 section H): the route may
+ * answer it with its sentence. Everything else that reaches the route - DNS,
+ * TLS, sockets - is foreign text with hosts in it and goes out as its class.
+ */
+function logoRefusal(message) {
+  return Object.assign(new Error(message), { code: 'logo_search_refused' });
+}
+
 // Delegiert an den zentralen SSRF-Klassifizierer (server/utils/ssrf.js). Früher eine
 // eigene, schwächere Prüfung ohne IPv4-mapped-IPv6-Behandlung — jetzt deckungsgleich mit
 // ICS-Abos und WebDAV-Dokumentspeicher. Name bleibt für die Testsuite (test:subscriptions).
@@ -48,10 +57,10 @@ function privateAddress(address) {
 
 async function assertPublicHttps(url) {
   const parsed = new URL(url);
-  if (parsed.protocol !== 'https:') throw new Error('Logo search only supports HTTPS websites.');
+  if (parsed.protocol !== 'https:') throw logoRefusal('Logo search only supports HTTPS websites.');
   const addresses = await dns.lookup(parsed.hostname, { all: true });
   if (!addresses.length || addresses.some(({ address }) => privateAddress(address))) {
-    throw new Error('Logo search cannot access private or local network addresses.');
+    throw logoRefusal('Logo search cannot access private or local network addresses.');
   }
   return { parsed, addresses };
 }
@@ -118,9 +127,9 @@ async function fetchPublic(url, options = {}, redirectCount = 0) {
   const { parsed, addresses } = await assertPublicHttps(url);
   const response = await requestPinned(parsed, addresses, options);
   if (response.status >= 300 && response.status < 400) {
-    if (redirectCount >= MAX_REDIRECTS) throw new Error('Logo search followed too many redirects.');
+    if (redirectCount >= MAX_REDIRECTS) throw logoRefusal('Logo search followed too many redirects.');
     const location = response.headers.get('location');
-    if (!location) throw new Error('Website returned a redirect without a location.');
+    if (!location) throw logoRefusal('Website returned a redirect without a location.');
     return fetchPublic(new URL(location, parsed).href, options, redirectCount + 1);
   }
   return { response, finalUrl: parsed };
@@ -128,7 +137,7 @@ async function fetchPublic(url, options = {}, redirectCount = 0) {
 
 async function readLimited(response, limit) {
   const length = Number(response.headers.get('content-length') || 0);
-  if (length > limit) throw new Error('Remote response is too large.');
+  if (length > limit) throw logoRefusal('Remote response is too large.');
   const reader = response.body.getReader();
   const chunks = [];
   let size = 0;
@@ -136,7 +145,7 @@ async function readLimited(response, limit) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > limit) throw new Error('Remote response is too large.');
+    if (size > limit) throw logoRefusal('Remote response is too large.');
     chunks.push(value);
   }
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
@@ -278,14 +287,14 @@ function iconUrls(html, pageUrl) {
 
 function normalizedWebsiteUrl(value) {
   const raw = String(value || '').trim();
-  if (!raw) throw new Error('Website is required.');
+  if (!raw) throw logoRefusal('Website is required.');
   if (/^https?:\/\//i.test(raw)) {
     const parsed = new URL(raw);
     parsed.protocol = 'https:';
     return parsed.href;
   }
   if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/:?#].*)?$/i.test(raw)) return `https://${raw}`;
-  throw new Error('Website must be a public domain or HTTPS URL.');
+  throw logoRefusal('Website must be a public domain or HTTPS URL.');
 }
 
 function websiteImageUrls(html, pageUrl) {
@@ -333,9 +342,9 @@ async function logoDataFromUrl(url) {
     headers: { Accept: 'image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5' },
   });
   const imageResponse = imageResult.response;
-  if (!imageResponse.ok) throw new Error(`Logo returned HTTP ${imageResponse.status}.`);
+  if (!imageResponse.ok) throw logoRefusal(`Logo returned HTTP ${imageResponse.status}.`);
   const contentType = imageType(imageResponse, imageResult.finalUrl);
-  if (!ALLOWED_IMAGE_TYPES.has(contentType)) throw new Error('Website icon is not a supported image type.');
+  if (!ALLOWED_IMAGE_TYPES.has(contentType)) throw logoRefusal('Website icon is not a supported image type.');
   const image = await readLimited(imageResponse, MAX_IMAGE_BYTES);
   return {
     content_type: contentType,
@@ -474,7 +483,7 @@ async function findLogo(websiteUrl) {
     signal: AbortSignal.timeout(8000),
   });
   const pageResponse = pageResult.response;
-  if (!pageResponse.ok) throw new Error(`Website returned HTTP ${pageResponse.status}.`);
+  if (!pageResponse.ok) throw logoRefusal(`Website returned HTTP ${pageResponse.status}.`);
   const html = await readHtmlHead(pageResponse);
   for (const candidate of iconUrls(html, pageResult.finalUrl)) {
     try {
@@ -482,17 +491,17 @@ async function findLogo(websiteUrl) {
         signal: AbortSignal.timeout(8000),
       });
       const imageResponse = imageResult.response;
-      if (!imageResponse.ok) throw new Error(`Logo returned HTTP ${imageResponse.status}.`);
+      if (!imageResponse.ok) throw logoRefusal(`Logo returned HTTP ${imageResponse.status}.`);
       let contentType = (imageResponse.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
       if (contentType === 'application/octet-stream' && /\.ico(?:$|\?)/i.test(imageResult.finalUrl.pathname)) {
         contentType = 'image/x-icon';
       }
-      if (!ALLOWED_IMAGE_TYPES.has(contentType)) throw new Error('Website icon is not a supported image type.');
+      if (!ALLOWED_IMAGE_TYPES.has(contentType)) throw logoRefusal('Website icon is not a supported image type.');
       const image = await readLimited(imageResponse, MAX_IMAGE_BYTES);
       return `data:${contentType};base64,${image.toString('base64')}`;
     } catch {}
   }
-  throw new Error('No supported logo could be found.');
+  throw logoRefusal('No supported logo could be found.');
 }
 
 export { findLogo, findLogoOptions, iconUrls, privateAddress, serviceDomainCandidates, websiteImageUrls };

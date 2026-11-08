@@ -14,9 +14,29 @@ import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
 import * as outlookCalendar from '../../services/outlook-calendar.js';
 import { requireAdmin } from '../../auth.js';
+import { remoteFailure } from '../../utils/http.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
+
+/**
+ * The answer of a route that may ask Microsoft Graph, once its own named cases
+ * are handled (Phase 0 section H): missing configuration and an expired sign-in
+ * as own cases, a refusal of Graph as its class (502, `reason` + `detail`),
+ * anything local as a fixed 500. Never the text of Graph or of the token
+ * endpoint - it names request paths and account details.
+ */
+function sendOutlookFailure(res, err, sentence) {
+  if (err?.code === 'outlook_not_configured') {
+    return res.status(503).json({ error: 'Outlook is not configured on this server.', code: 503, reason: 'outlook_not_configured' });
+  }
+  if (err instanceof outlookCalendar.ReauthRequiredError) {
+    return res.status(409).json({ error: 'Outlook sign-in expired - reconnect required.', code: 409, reason: 'outlook_reauth_required' });
+  }
+  const failure = remoteFailure(err);
+  if (failure) return res.status(502).json({ error: 'Microsoft refused the request or could not be reached.', code: 502, ...failure });
+  return res.status(500).json({ error: sentence, code: 500 });
+}
 
 /**
  * GET /api/v1/calendar/outlook/auth
@@ -28,7 +48,10 @@ router.get('/outlook/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
     res.redirect(url);
   } catch (err) {
     log.error('', err);
-    res.status(503).json({ error: err.message, code: 503 });
+    if (err?.code === 'outlook_not_configured') {
+      return res.status(503).json({ error: 'Outlook is not configured on this server.', code: 503, reason: 'outlook_not_configured' });
+    }
+    res.status(503).json({ error: 'Outlook sign-in could not be started.', code: 503 });
   }
 });
 
@@ -76,7 +99,10 @@ router.get('/outlook/accounts', requireAdmin, (req, res) => {
     res.json({ data: outlookCalendar.listAccounts() });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: err.message || 'Failed to list Outlook accounts.', code: 500 });
+    if (err?.code === 'outlook_not_configured') {
+      return res.status(503).json({ error: 'Outlook is not configured on this server.', code: 503, reason: 'outlook_not_configured' });
+    }
+    res.status(500).json({ error: 'Failed to list Outlook accounts.', code: 500 });
   }
 });
 
@@ -107,7 +133,7 @@ router.put('/outlook/accounts/:id', requireAdmin, (req, res) => {
         linked_override_count: err.linkedOverrideCount,
       });
     }
-    res.status(500).json({ error: err.message || 'Failed to update Outlook account.', code: 500 });
+    res.status(500).json({ error: 'Failed to update Outlook account.', code: 500 });
   }
 });
 
@@ -123,7 +149,7 @@ router.delete('/outlook/accounts/:id', requireAdmin, (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('Outlook account deletion failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to delete Outlook account.', code: 500 });
+    res.status(500).json({ error: 'Failed to delete Outlook account.', code: 500 });
   }
 });
 
@@ -142,7 +168,7 @@ router.get('/outlook/accounts/:id/calendars', requireAdmin, refuseWhileRestoring
     res.json({ data: calendars });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: err.message || 'Failed to fetch calendars.', code: 500 });
+    sendOutlookFailure(res, err, 'Failed to fetch calendars.');
   }
 });
 
@@ -174,7 +200,7 @@ router.patch('/outlook/accounts/:id/calendars', requireAdmin, (req, res) => {
         linked_override_count: err.linkedOverrideCount,
       });
     }
-    res.status(500).json({ error: err.message || 'Failed to update calendar selection.', code: 500 });
+    res.status(500).json({ error: 'Failed to update calendar selection.', code: 500 });
   }
 });
 
@@ -190,7 +216,7 @@ router.post('/outlook/sync', requireAdmin, async (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: err.message || 'Outlook sync failed.', code: 500 });
+    sendOutlookFailure(res, err, 'Outlook sync failed.');
   }
 });
 

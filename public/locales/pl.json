@@ -2764,6 +2764,8 @@
         "backupWebdavTestSuccess": "Połączenie udane - znaleziono {{files}} kopię(kopii).",
         "backupWebdavTestFailed": "Połączenie nieudane: {{error}}",
         "backupWebdavPasswordRequired": "Dla innego serwera lub nazwy użytkownika wpisz hasło ponownie.",
+        "backupWebdavConfigIncomplete": "Wpisz adres, nazwę użytkownika i hasło serwera WebDAV.",
+        "backupLocalFailed": "Nie udało się odczytać ani zapisać kopii zapasowej na tym serwerze. Szczegóły są w dzienniku serwera.",
         "backupWebdavLastUpload": "Ostatnie przesłanie",
         "backupWebdavLastError": "Ostatni błąd",
         "backupWebdavNeverUploaded": "Brak przesłanych kopii",
@@ -3798,7 +3800,11 @@
         "apiTokenErrorExpiryPast": "Data wygaśnięcia jest w przeszłości. Wybierz późniejszy termin.",
         "apiTokenErrorSubjectDeactivated": "To konto jest dezaktywowane i nie może otrzymać tokenu. Wybierz inną osobę.",
         "dmsErrorUrlInvalid": "Adres URL serwera musi zaczynać się od http:// lub https://.",
-        "dmsErrorAccountExists": "Z tym adresem URL serwera jest już połączony DMS."
+        "dmsErrorAccountExists": "Z tym adresem URL serwera jest już połączony DMS.",
+        "remoteErrorAuthFailed": "Serwer odrzucił logowanie. Sprawdź nazwę użytkownika i hasło.",
+        "remoteErrorStatus": "Serwer odpowiedział statusem {{status}}.",
+        "remoteErrorUnreachable": "Serwer jest nieosiągalny. Sprawdź adres i czy serwer działa.",
+        "remoteErrorFailed": "Żądanie do serwera nie powiodło się."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

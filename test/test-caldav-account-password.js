@@ -118,8 +118,11 @@ test('Neuer Server MIT neuem Passwort: der Test geht mit dem NEUEN Passwort raus
   const id = seedAccount('move');
   seen.length = 0;
   const put = await admin('PUT', `/calendar/caldav/accounts/${id}`, { caldavUrl: FOREIGN_URL, password: 'new-secret' });
-  // Der fremde Host lehnt ab (401) - die Verbindung scheitert, gespeichert wird nichts.
-  assert.equal(put.status, 500);
+  // Der fremde Host lehnt ab (401) - die Verbindung scheitert, gespeichert wird
+  // nichts. Die Antwort nennt die Klasse, nie den Text des Servers (Phase 0 H).
+  assert.equal(put.status, 502);
+  assert.equal(put.body.reason, 'remote_auth_failed');
+  assert.equal(put.body.detail, 'HTTP 401');
   assert.ok(seen.length > 0, 'der Verbindungstest lief');
   assert.equal(leakedToForeignHost(), false, 'nur das neu eingegebene Passwort ging raus');
   assert.equal(accountRow(id).caldav_url, 'https://dav.example.invalid/move/');

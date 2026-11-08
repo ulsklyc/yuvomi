@@ -1769,6 +1769,10 @@ test('failed WebDAV delete returns a stable error and preserves the database row
   const result = await routeCall(harness, 'DELETE', `/${documentId}`);
   assert.equal(result.response.status, 502);
   assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_DELETE_FAILED');
+  // #2622: the class in `detail` is for the admin's storage settings (test
+  // and config); a member deleting, uploading or previewing gets the case only.
+  assert.equal(result.body.reason, 'documents_storage_failed');
+  assert.equal(result.body.detail, undefined, JSON.stringify(result.body));
   assert.equal(
     get().prepare('SELECT id FROM family_documents WHERE id = ?').get(documentId).id,
     documentId
@@ -2565,6 +2569,62 @@ test('connection test uses hybrid overrides without persisting connection fields
   assert.equal(config.password, 'stored-secret');
   assert.equal(config.basePath, 'stored/documents');
   assert.match(config.lastTest, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+// Phase 0, section H: the connection test wrote the server's answer into its
+// message ("WebDAV connection test failed: PUT failed with status 507 ...") and
+// the route sent that text. Now the answer carries the class in `detail`.
+test('connection test: a refusing server answers with its class, never its text', async (t) => {
+  clearWebdavDocuments();
+  const webdav = await createWebdavServer(t, {
+    handler: async (req, res) => {
+      if (req.method !== 'PUT') return false;
+      res.writeHead(507, 'Quota exceeded on dav-internal.lan:8443 for /srv/dav/documents');
+      res.end();
+      return true;
+    },
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const result = await routeCall(harness, 'POST', '/storage/test', {
+    url: webdav.url, username: 'alice', password: 'secret', path: 'test/documents',
+  });
+
+  assert.equal(result.response.status, 502, JSON.stringify(result.body));
+  assert.equal(result.body.reason, 'documents_storage_failed');
+  assert.equal(result.body.detail, 'HTTP 507');
+  assert.doesNotMatch(JSON.stringify(result.body), /dav-internal|\/srv\/dav|Quota|PUT failed/);
+  assert.ok(!JSON.stringify(result.body).includes(webdav.url), 'the answer does not repeat the address');
+  // The stored last error, shown in the settings, carries the class as well.
+  assert.equal(storage.getStatus().lastError, 'WebDAV connection test failed: HTTP 507');
+});
+
+// The first request of the test is MKCOL, so a wrong password fails there. Its
+// error carried no status, and the answer lost the class the admin needs most.
+test('connection test: a refused first request (MKCOL) still answers with its class', async (t) => {
+  clearWebdavDocuments();
+  const webdav = await createWebdavServer(t, {
+    handler: async (req, res) => {
+      if (req.method !== 'MKCOL') return false;
+      res.writeHead(401, 'Unauthorized for alice on dav-internal.lan');
+      res.end();
+      return true;
+    },
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const result = await routeCall(harness, 'POST', '/storage/test', {
+    url: webdav.url, username: 'alice', password: 'wrong', path: 'test/documents',
+  });
+
+  assert.equal(result.response.status, 502, JSON.stringify(result.body));
+  assert.equal(result.body.reason, 'documents_storage_failed');
+  assert.equal(result.body.detail, 'HTTP 401');
+  assert.doesNotMatch(JSON.stringify(result.body), /dav-internal|MKCOL failed/);
 });
 
 test('connection test returns stable storage codes for invalid overrides', async (t) => {

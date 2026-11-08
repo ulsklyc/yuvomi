@@ -487,7 +487,10 @@ async function testConnection(cardavUrl, username, password) {
     return { ok: true, addressbooks };
   } catch (err) {
     log.error('Connection test failed:', err.message);
-    throw new Error(`CardDAV connection failed: ${err.message}`);
+    // `cause` keeps status and network code for the route's answer (Phase 0 H).
+    const failed = new Error(`CardDAV connection failed: ${err.message}`, { cause: err });
+    failed.code = 'carddav_connection_failed';
+    throw failed;
   }
 }
 

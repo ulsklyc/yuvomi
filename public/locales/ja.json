@@ -2463,6 +2463,8 @@
         "backupWebdavTestSuccess": "接続に成功しました - バックアップが {{files}} 件見つかりました。",
         "backupWebdavTestFailed": "接続に失敗しました: {{error}}",
         "backupWebdavPasswordRequired": "別のサーバーまたはユーザー名にはパスワードを再入力してください。",
+        "backupWebdavConfigIncomplete": "WebDAV サーバーのアドレス、ユーザー名、パスワードを入力してください。",
+        "backupLocalFailed": "このサーバーでバックアップを読み書きできませんでした。詳細はサーバーログにあります。",
         "backupWebdavLastUpload": "最終アップロード",
         "backupWebdavLastError": "最終エラー",
         "backupWebdavNeverUploaded": "アップロードはまだありません",
@@ -3554,7 +3556,11 @@
         "apiTokenErrorExpiryPast": "有効期限が過去になっています。もっと後の日時を選んでください。",
         "apiTokenErrorSubjectDeactivated": "このアカウントは無効化されているため、トークンを発行できません。別の人を選んでください。",
         "dmsErrorUrlInvalid": "サーバーURLは http:// または https:// で始める必要があります。",
-        "dmsErrorAccountExists": "このサーバーURLの DMS はすでに接続されています。"
+        "dmsErrorAccountExists": "このサーバーURLの DMS はすでに接続されています。",
+        "remoteErrorAuthFailed": "サーバーがサインインを拒否しました。ユーザー名とパスワードを確認してください。",
+        "remoteErrorStatus": "サーバーはステータス {{status}} で応答しました。",
+        "remoteErrorUnreachable": "サーバーに接続できません。アドレスとサーバーが稼働しているかを確認してください。",
+        "remoteErrorFailed": "サーバーへのリクエストに失敗しました。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

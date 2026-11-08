@@ -2463,6 +2463,8 @@
         "backupWebdavTestSuccess": "Bağlantı başarılı - {{files}} yedek bulundu.",
         "backupWebdavTestFailed": "Bağlantı başarısız: {{error}}",
         "backupWebdavPasswordRequired": "Farklı bir sunucu veya kullanıcı adı için parolayı yeniden gir.",
+        "backupWebdavConfigIncomplete": "WebDAV sunucusunun adresini, kullanıcı adını ve parolasını gir.",
+        "backupLocalFailed": "Yedek bu sunucuda okunamadı veya yazılamadı. Ayrıntılar sunucu günlüğünde.",
         "backupWebdavLastUpload": "Son yükleme",
         "backupWebdavLastError": "Son hata",
         "backupWebdavNeverUploaded": "Henüz yükleme yapılmadı",
@@ -3554,7 +3556,11 @@
         "apiTokenErrorExpiryPast": "Son kullanma tarihi geçmişte. Daha sonraki bir zaman seç.",
         "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç.",
         "dmsErrorUrlInvalid": "Sunucu URL'si http:// veya https:// ile başlamalıdır.",
-        "dmsErrorAccountExists": "Bu sunucu URL'siyle zaten bir DMS bağlı."
+        "dmsErrorAccountExists": "Bu sunucu URL'siyle zaten bir DMS bağlı.",
+        "remoteErrorAuthFailed": "Sunucu oturum açmayı reddetti. Kullanıcı adını ve parolayı kontrol edin.",
+        "remoteErrorStatus": "Sunucu {{status}} durumuyla yanıt verdi.",
+        "remoteErrorUnreachable": "Sunucuya ulaşılamıyor. Adresi ve sunucunun çalışıp çalışmadığını kontrol edin.",
+        "remoteErrorFailed": "Sunucuya yapılan istek başarısız oldu."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

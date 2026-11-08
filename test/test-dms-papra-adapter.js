@@ -169,12 +169,15 @@ test('testConnection: ok=false bei 401', async () => {
 });
 
 test('testConnection: ok=false bei Netzwerkfehler', async () => {
-  mockFetch(() => { throw new Error('ECONNREFUSED'); });
+  mockFetch(() => { throw Object.assign(new Error('connect ECONNREFUSED 10.0.0.7:1221'), { code: 'ECONNREFUSED' }); });
   const adapter = new PapraAdapter(account);
   const out = await adapter.testConnection();
   assert.equal(out.ok, false);
   assert.equal(out.status, 0);
-  assert.match(out.error, /ECONNREFUSED/);
+  // Phase 0, Abschnitt H: die Klasse, nie der Text mit Adresse und Port.
+  assert.equal(out.reason, 'remote_unreachable');
+  assert.equal(out.detail, 'ECONNREFUSED');
+  assert.doesNotMatch(out.error, /10\.0\.0\.7/);
 });
 
 test('getAdapter: liefert PapraAdapter für provider=papra', () => {

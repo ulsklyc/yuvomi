@@ -2463,6 +2463,8 @@
         "backupWebdavTestSuccess": "Connexion réussie - {{files}} sauvegarde(s) trouvée(s).",
         "backupWebdavTestFailed": "Échec de la connexion : {{error}}",
         "backupWebdavPasswordRequired": "Pour un autre serveur ou un autre nom d’utilisateur, saisis à nouveau le mot de passe.",
+        "backupWebdavConfigIncomplete": "Saisis l'adresse, le nom d'utilisateur et le mot de passe du serveur WebDAV.",
+        "backupLocalFailed": "La sauvegarde n'a pas pu être lue ou écrite sur ce serveur. Les détails figurent dans le journal du serveur.",
         "backupWebdavLastUpload": "Dernier téléversement",
         "backupWebdavLastError": "Dernière erreur",
         "backupWebdavNeverUploaded": "Aucun téléversement pour l'instant",
@@ -3554,7 +3556,11 @@
         "apiTokenErrorExpiryPast": "La date d’expiration est dans le passé. Choisis un moment ultérieur.",
         "apiTokenErrorSubjectDeactivated": "Ce compte est désactivé et ne peut pas recevoir de jeton. Choisis une autre personne.",
         "dmsErrorUrlInvalid": "L’URL du serveur doit commencer par http:// ou https://.",
-        "dmsErrorAccountExists": "Un DMS est déjà connecté avec cette URL du serveur."
+        "dmsErrorAccountExists": "Un DMS est déjà connecté avec cette URL du serveur.",
+        "remoteErrorAuthFailed": "Le serveur a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe.",
+        "remoteErrorStatus": "Le serveur a répondu avec le statut {{status}}.",
+        "remoteErrorUnreachable": "Le serveur est injoignable. Vérifiez l’adresse et que le serveur est en marche.",
+        "remoteErrorFailed": "La requête vers le serveur a échoué."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

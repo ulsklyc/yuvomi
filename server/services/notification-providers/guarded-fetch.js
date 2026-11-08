@@ -26,6 +26,7 @@
 
 import { safeRequest } from '../../utils/http.js';
 import { createGuardedLookup, readPrivateNetworkOptIn } from '../../utils/ssrf.js';
+import { NotificationProviderError } from './provider-error.js';
 
 export const ENV_ALLOW_PRIVATE_NETWORK = 'NOTIFICATION_ALLOW_PRIVATE_NETWORK';
 
@@ -47,7 +48,7 @@ async function drainBody(body) {
     total += chunk.byteLength;
     if (total > MAX_RESPONSE_BYTES) {
       body.destroy();
-      throw new Error('Notification target response exceeds the 1 MB limit.');
+      throw new NotificationProviderError('Notification target response exceeds the 1 MB limit.');
     }
     chunks.push(chunk);
   }

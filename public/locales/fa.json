@@ -2572,6 +2572,8 @@
         "backupWebdavTestSuccess": "اتصال موفق - {{files}} پشتیبان یافت شد.",
         "backupWebdavTestFailed": "اتصال ناموفق: {{error}}",
         "backupWebdavPasswordRequired": "برای سرور یا نام کاربری دیگر، رمز عبور را دوباره وارد کنید.",
+        "backupWebdavConfigIncomplete": "نشانی، نام کاربری و گذرواژه سرور WebDAV را وارد کنید.",
+        "backupLocalFailed": "نسخه پشتیبان روی این سرور خوانده یا نوشته نشد. جزئیات در گزارش سرور است.",
         "backupWebdavLastUpload": "آخرین بارگذاری",
         "backupWebdavLastError": "آخرین خطا",
         "backupWebdavNeverUploaded": "هنوز بارگذاری نشده",
@@ -3572,7 +3574,11 @@
         "apiTokenErrorExpiryPast": "تاریخ انقضا در گذشته است. زمان دیرتری انتخاب کنید.",
         "apiTokenErrorSubjectDeactivated": "این حساب غیرفعال است و نمی‌تواند توکن بگیرد. شخص دیگری را انتخاب کنید.",
         "dmsErrorUrlInvalid": "آدرس سرور باید با http:// یا https:// شروع شود.",
-        "dmsErrorAccountExists": "یک DMS از قبل با این نشانی سرور متصل است."
+        "dmsErrorAccountExists": "یک DMS از قبل با این نشانی سرور متصل است.",
+        "remoteErrorAuthFailed": "سرور ورود را رد کرد. نام کاربری و رمز عبور را بررسی کنید.",
+        "remoteErrorStatus": "سرور با وضعیت {{status}} پاسخ داد.",
+        "remoteErrorUnreachable": "سرور در دسترس نیست. نشانی را بررسی کنید و اینکه سرور در حال اجراست.",
+        "remoteErrorFailed": "درخواست به سرور ناموفق بود."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",
