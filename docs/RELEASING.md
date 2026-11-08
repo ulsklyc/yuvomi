@@ -11,13 +11,14 @@ A release is a tag `vX.Y.Z` on this repository. Everything downstream hangs on t
 - `docker-publish.yml` runs on every `v*` tag, from any branch, and pushes the multi-arch image
   to `ghcr.io/ulsklyc/yuvomi` and to the legacy mirror `ghcr.io/ulsklyc/oikos` (the mirror must
   stay: installations from before the rename pull it and are updated through it).
-- `release-assets.yml` runs when the GitHub release is created, which happens as a **draft**. It
-  packs the tag into `yuvomi-X.Y.Z-dist.tar.gz` (top-level folder `yuvomi-X.Y.Z/`, for now the same
+- `release-assets.yml` is started by hand right after the GitHub release was created as a
+  **draft** (GitHub runs no workflow for a draft's `created` event, so there is no automatic
+  trigger that fires before the release is public). It packs the tag into `yuvomi-X.Y.Z-dist.tar.gz` (top-level folder `yuvomi-X.Y.Z/`, for now the same
   content as `git archive`), writes `SHA256SUMS`, attests both with a build provenance
   attestation, uploads them and only then publishes the release. YunoHost and the Proxmox script
   install from that asset, and neither sees a draft, so no channel ever sees a release without
-  its tarball. If the job fails, the release stays a draft; rerun it with
-  `gh workflow run release-assets.yml -f tag=vX.Y.Z`.
+  its tarball. If the job fails or was never started, the release stays a draft; start it with
+  `gh workflow run release-assets.yml --ref main -f tag=vX.Y.Z`.
 - `umbrel-publish.yml` runs when the GitHub release is published and opens, or renames, the
   store PR against `getumbrel/umbrel-apps`. A release that `release-assets.yml` publishes with
   the workflow token fires no `published` run of its own, so that job starts this one explicitly.
@@ -101,16 +102,17 @@ the last tag is an interface release.
     and the tag command fails before anything is pushed. Then `git push && git push --tags`.
 11. **GitHub release, as a draft.** Write the new changelog block to a file and pass it with
     `--notes-file`; a failed shell substitution yields an empty string that `gh` accepts without a
-    word. Create the release with `--draft`: `release-assets.yml` publishes it once the tarball is
-    on it.
+    word. Create the release with `--draft`, read the body back (a successful `create` reports the
+    URL either way), then start the asset job, which publishes the release once the tarball is on
+    it:
 
     ```bash
     gh release create vX.Y.Z --repo ulsklyc/yuvomi --title "vX.Y.Z" --notes-file <file> --draft
     gh release view vX.Y.Z --repo ulsklyc/yuvomi --json body --jq .body
+    gh workflow run release-assets.yml --repo ulsklyc/yuvomi --ref main -f tag=vX.Y.Z
     ```
 
-    Read the body back. A successful `create` reports the URL either way. Then wait for the asset
-    job and check that the release came out of draft with both files on it:
+    Wait for the job and check that the release came out of draft with both files on it:
 
     ```bash
     gh run list --repo ulsklyc/yuvomi --workflow=release-assets.yml --limit 1
@@ -119,8 +121,8 @@ the last tag is an interface release.
     ```
 
     Expected: `isDraft: false`, assets `yuvomi-X.Y.Z-dist.tar.gz` and `SHA256SUMS`. A release that
-    is still a draft is invisible to every channel; rerun the job with
-    `gh workflow run release-assets.yml --repo ulsklyc/yuvomi -f tag=vX.Y.Z`.
+    is still a draft is invisible to every channel; fix the cause and start the job again with
+    the same command. Never publish the draft by hand to get past it.
 12. **Downstream.** `gh run list --workflow=docker-publish.yml --limit 1` must show success (a
     failed image build silently stalls TrueNAS too). Check the tarball the way an operator would,
     from an empty directory:

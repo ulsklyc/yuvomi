@@ -8,7 +8,8 @@
  *          the asset is missing. So the order is the promise: a published
  *          release always carries its asset. This guard reads the workflow as
  *          text and holds trigger, permissions, pins, the attestation subjects,
- *          the publish-last order and the closing check.
+ *          the publish-last order and the closing check. It starts by
+ *          dispatch only: GitHub runs no workflow for a draft's `created`.
  * Ausführen: npm run test:release-assets-workflow
  */
 
@@ -57,13 +58,21 @@ function steps(source) {
 const allSteps = steps(workflow);
 const indexOf = (pattern) => allSteps.findIndex((s) => pattern.test(s.text));
 
-test('runs on a created release and on a manual dispatch with a tag', () => {
-  const on = topLevelBlock(workflow, 'on').join('\n');
-  assert.match(on, /^ {2}release:\n {4}types: \[created\]$/m,
-    'release: types: [created] - a draft fires "created", "published" would be too late');
-  assert.match(on, /^ {2}workflow_dispatch:\n {4}inputs:\n {6}tag:\n/m,
-    'workflow_dispatch needs a tag input for reruns of a release that stayed a draft');
-  assert.match(on, /^ {8}required: true$/m, 'the dispatch tag is required');
+test('starts only by dispatch with a tag, never on a release event', () => {
+  // GitHub fires no `created`/`edited`/`deleted` run for a DRAFT release, and
+  // `published` comes after the release is public. A release trigger would
+  // therefore only ever run once the window without asset is already open.
+  // release-prep dispatches the workflow right after creating the draft.
+  const on = topLevelBlock(workflow, 'on');
+  assert.deepEqual(
+    on.filter((l) => /^ {2}\S/.test(l)).map((l) => l.trim()),
+    ['workflow_dispatch:'],
+    'workflow_dispatch is the only trigger',
+  );
+  const block = on.join('\n');
+  assert.match(block, /^ {4}inputs:\n {6}tag:\n/m, 'the dispatch takes the tag');
+  assert.match(block, /^ {8}required: true$/m, 'the dispatch tag is required');
+  assert.match(workflow, /^ {6}TAG: \$\{\{ inputs\.tag \}\}$/m, 'TAG comes from the input alone');
 });
 
 test('asks for exactly the permissions it uses, at workflow level only', () => {

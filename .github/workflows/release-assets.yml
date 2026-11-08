@@ -7,13 +7,22 @@ name: Release Assets
 # GitHub's generated source tarball (phase 1a, section A of the roadmap).
 #
 # THE RELEASE STAYS A DRAFT UNTIL THE ASSET IS ON IT. release-prep creates the
-# release with `--draft`; this workflow builds, attests, uploads and only then
-# publishes it. Drafts are invisible to `releases/latest`, to the YunoHost
-# autoupdater (`latest_github_release`) and to Proxmox (`check_for_gh_release`),
-# so there is no window in which a release exists without its asset - Proxmox
+# release with `--draft` and then starts this workflow:
+#   gh workflow run release-assets.yml --ref main -f tag=vX.Y.Z
+# It builds, attests, uploads and only then publishes the release. Drafts are
+# invisible to `releases/latest`, to the YunoHost autoupdater
+# (`latest_github_release`) and to Proxmox (`check_for_gh_release`), so there
+# is no window in which a release exists without its asset - Proxmox
 # `prebuild` would silently fall back to the previous release in that window.
-# If a step fails, the release simply stays a draft; rerun with
-# `workflow_dispatch` and the tag.
+# If a step fails, the release simply stays a draft; run it again with the tag.
+#
+# WHY A DISPATCH AND NOT `release: created`. GitHub does not trigger workflows
+# for the `created`, `edited` or `deleted` activity of a DRAFT release
+# (docs: "Events that trigger workflows" > release). A `created` trigger would
+# only fire for a release that is already public, which is exactly the window
+# this workflow exists to close. `published` is too late for the same reason.
+# So the start is explicit, and a forgotten start leaves an invisible draft,
+# never a public release without its tarball.
 #
 # CONTENT FOR NOW: the tarball is byte-for-byte what `git archive` makes of the
 # tag, with the top-level folder `yuvomi-<version>/` (decision E2) - the same
@@ -26,16 +35,14 @@ name: Release Assets
 # repository_dispatch), so `umbrel-publish.yml`, which listens to
 # `release: published`, would not run for a release this job publishes. The
 # last step therefore dispatches it explicitly - only when this run took the
-# release out of draft; a release created non-draft by hand already fired
-# `published` with the person's token.
+# release out of draft; a release that was already public (a rerun after a
+# publish by hand) fired `published` with the person's token.
 
 on:
-  release:
-    types: [created]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to build the assets for, e.g. v2.87.0 (the release must exist)'
+        description: 'Release tag to build the assets for, e.g. v2.87.0 (the draft release must exist)'
         required: true
         type: string
 
@@ -46,7 +53,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: release-assets-${{ github.event.release.tag_name || inputs.tag }}
+  group: release-assets-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -58,7 +65,7 @@ jobs:
     # or upload round trip without hiding a hang for six hours.
     timeout-minutes: 15
     env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      TAG: ${{ inputs.tag }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
 
