@@ -4,11 +4,12 @@
  */
 
 import { guardedFetch } from './guarded-fetch.js';
+import { NotificationProviderError } from './provider-error.js';
 
 function httpError(status) {
-  if (status === 401 || status === 403) return new Error('Gotify authentication failed.');
-  if (status === 404) return new Error('Gotify endpoint was not found.');
-  return new Error(`Gotify returned HTTP ${status}`);
+  if (status === 401 || status === 403) return new NotificationProviderError('Gotify authentication failed.');
+  if (status === 404) return new NotificationProviderError('Gotify endpoint was not found.');
+  return new NotificationProviderError(`Gotify returned HTTP ${status}`);
 }
 
 export const gotifyProvider = {

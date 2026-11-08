@@ -4,11 +4,12 @@
  */
 
 import { guardedFetch } from './guarded-fetch.js';
+import { NotificationProviderError } from './provider-error.js';
 
 function httpError(status) {
-  if (status === 401 || status === 403) return new Error('ntfy authentication failed.');
-  if (status === 404) return new Error('ntfy topic or endpoint was not found.');
-  return new Error(`ntfy returned HTTP ${status}`);
+  if (status === 401 || status === 403) return new NotificationProviderError('ntfy authentication failed.');
+  if (status === 404) return new NotificationProviderError('ntfy topic or endpoint was not found.');
+  return new NotificationProviderError(`ntfy returned HTTP ${status}`);
 }
 
 function basicAuth(username, password) {

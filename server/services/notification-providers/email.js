@@ -5,6 +5,7 @@
  */
 import { emailService as defaultEmailService } from '../email.js';
 import { esc } from '../../../public/utils/html-escape.js';
+import { NotificationProviderError } from './provider-error.js';
 
 /**
  * KEINE EIGENEN ZUGANGSDATEN. Gotify, ntfy und Webhook bringen je Kanal ihren
@@ -94,11 +95,11 @@ export const emailProvider = {
     env = process.env,
   } = {}) {
     const to = String(channel?.config?.toAddress ?? '').trim();
-    if (!to) throw new Error('Email notification channel has no recipient address.');
+    if (!to) throw new NotificationProviderError('Email notification channel has no recipient address.');
     // Der Grund gehoert in die Meldung: „nicht konfiguriert" ist im
     // Kanal-Testknopf eine Handlungsanweisung, ein generischer Fehler nicht.
     if (!emailService.isConfigured()) {
-      throw new Error('Email is not configured. Set up SMTP in Settings before using an email channel.');
+      throw new NotificationProviderError('Email is not configured. Set up SMTP in Settings before using an email channel.');
     }
 
     const link = absoluteUrl(payload, env.BASE_URL);
@@ -124,11 +125,11 @@ export const emailProvider = {
     // waere ein Lauf, der an einem stummen Server haengt - und der haelt nicht
     // eine Meldung auf, sondern alle, fuer alle, bei jedem Weckruf erneut.
     if (!signal) return send.then(() => ({ ok: true }));
-    if (signal.aborted) throw new Error('Email delivery timed out.');
+    if (signal.aborted) throw new NotificationProviderError('Email delivery timed out.');
     return Promise.race([
       send.then(() => ({ ok: true })),
       new Promise((_, reject) => {
-        signal.addEventListener('abort', () => reject(new Error('Email delivery timed out.')), { once: true });
+        signal.addEventListener('abort', () => reject(new NotificationProviderError('Email delivery timed out.')), { once: true });
       }),
     ]);
   },

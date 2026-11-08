@@ -10,6 +10,7 @@
  */
 
 import { guardedFetch } from './guarded-fetch.js';
+import { NotificationProviderError } from './provider-error.js';
 
 export const WEBHOOK_TEMPLATE_PLACEHOLDERS = Object.freeze(['title', 'body', 'url', 'tag']);
 
@@ -54,9 +55,9 @@ export function unknownTemplatePlaceholders(template) {
 }
 
 function httpError(status) {
-  if (status === 401 || status === 403) return new Error('Webhook authentication failed.');
-  if (status === 404) return new Error('Webhook endpoint was not found.');
-  return new Error(`Webhook returned HTTP ${status}`);
+  if (status === 401 || status === 403) return new NotificationProviderError('Webhook authentication failed.');
+  if (status === 404) return new NotificationProviderError('Webhook endpoint was not found.');
+  return new NotificationProviderError(`Webhook returned HTTP ${status}`);
 }
 
 export const webhookProvider = {
