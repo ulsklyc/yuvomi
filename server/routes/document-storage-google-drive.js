@@ -3,6 +3,7 @@ import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { requireAdmin } from '../auth.js';
 import { createLogger } from '../logger.js';
 import * as googleDriveStorage from '../services/google-drive-storage.js';
+import { remoteFailure } from '../utils/http.js';
 
 const log = createLogger('GoogleDriveStorageRoutes');
 const router = express.Router();
@@ -19,10 +20,15 @@ function sendStorageError(res, error) {
       )
       ? 400
       : 502;
+  // Phase 0 section H: a misconfiguration (400/409) keeps the service's own
+  // sentence; anything else - googleapis, the network, the database - never
+  // carries its text, only its class in `detail` when it has one.
+  const detail = status === 502 ? remoteFailure(error)?.detail : undefined;
   return res.status(status).json({
-    error: error?.message || 'Google Drive document storage operation failed.',
+    error: status !== 502 && error?.message ? error.message : 'Google Drive document storage operation failed.',
     code: status,
     storage_code: storageCode || 'DOCUMENT_STORAGE_OPERATION_FAILED',
+    ...(detail ? { detail } : {}),
   });
 }
 

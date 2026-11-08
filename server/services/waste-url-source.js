@@ -306,7 +306,11 @@ function recordFetchFailure(d, source, err) {
   // (`last_error_reason`, `last_error_params`): the source dialog says the
   // same sentence later, never the message itself.
   const updated = store.recordUrlSourceAttempt(d, source.id, {
-    errorMessage: err.message || 'Fetch failed.',
+    // `last_error` goes to the browser with the source. An unreachable
+    // address is Node's text with host and port: a fixed sentence there, the
+    // text in the log below (Phase 0 section H). The classes the source wrote
+    // itself (a status, too large, a blocked address) keep their words.
+    errorMessage: failure.reason === 'waste_source_fetch_unreachable' ? 'Fetch failed.' : (err.message || 'Fetch failed.'),
     errorReason: failure.reason,
     errorParams: failure.params ?? null,
     consecutiveFailures: failures,

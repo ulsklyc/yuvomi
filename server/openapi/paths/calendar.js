@@ -537,6 +537,9 @@ const CALENDAR_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no w
 const ASSIGNEE_REASONS = '`calendar_assignee_invalid` (400, not a list of user ids), `calendar_assignee_unknown` (400, a user id names no account), `calendar_assignee_not_member` (400, a person who is not a household member; people already stored on the source stay valid)';
 
 const SUBSCRIPTION_GONE = '`calendar_subscription_not_found` (404)';
+const OUTLOOK_NOT_CONFIGURED = '`outlook_not_configured` (503, MS_CLIENT_ID, MS_CLIENT_SECRET or MS_REDIRECT_URI is not set)';
+const OUTLOOK_REAUTH = '`outlook_reauth_required` (409, Microsoft no longer accepts the stored sign-in)';
+const GOOGLE_NOT_CONNECTED = '`google_not_configured` (409, Google Calendar is not set up or not connected)';
 const OUTLOOK_OVERRIDES = '`outlook_auto_sync_overrides` (409, series with linked exceptions cannot sync to Outlook)';
 
 // Kalender-Sync und Kalender-Abos (#1909): was die Seiten beim Verbinden und
@@ -549,16 +552,23 @@ const ICS_FETCH = '`calendar_ics_private_address` (400, the address resolves to 
   + '`calendar_ics_too_large` (400, the feed is larger than the limit; `params.limit_mb`)';
 const ICS_NAME = '`calendar_subscription_name_invalid` (400, `name` is empty or longer than 100 characters)';
 
+// A refusal of the foreign server comes as its class, never its text (Phase 0
+// section H, remoteFailure in server/utils/http.js).
+const REMOTE_FAILURE = 'a refusal of the server answers 502 with `remote_auth_failed` (HTTP 401/403), '
+  + '`remote_http_status` (another HTTP status, `params.status`), `remote_unreachable` (network, TLS or timeout) '
+  + 'or `remote_failed`, the class in `detail` (`HTTP 401`, `ECONNREFUSED`, `timeout`), never the server\'s text';
+
 const CASE_REASONS = {
   '/api/v1/calendar/caldav/accounts': {
     post: '`caldav_account_exists` (409, an account with this URL and username is already connected), '
-      + '`caldav_no_calendars` (400, the server answered, but the account has no calendars); '
-      + 'any other failure of the CalDAV server answers 500 without `reason`, its text in `error`',
+      + `\`caldav_no_calendars\` (400, the server answered, but the account has no calendars); ${REMOTE_FAILURE}`,
   },
   '/api/v1/calendar/apple/connect': {
     post: '`apple_url_invalid` (400, `url` does not start with http(s)), '
-      + '`apple_no_calendars` (400, connected, but the account has no calendars); '
-      + 'any other failure of iCloud answers 400 without `reason`, its text in `error`',
+      + `\`apple_no_calendars\` (400, connected, but the account has no calendars); ${REMOTE_FAILURE}`,
+  },
+  '/api/v1/calendar/apple/sync': {
+    post: `\`apple_not_configured\` (409, no Apple calendar is connected); ${REMOTE_FAILURE}`,
   },
   '/api/v1/calendar/calendars': { post: CALENDAR_WRITE_REQUIRED },
   '/api/v1/calendar/calendars/reorder': { patch: CALENDAR_WRITE_REQUIRED },
@@ -574,8 +584,19 @@ const CASE_REASONS = {
   '/api/v1/calendar/outlook/accounts/{id}': {
     put: `${OUTLOOK_OVERRIDES}, \`calendar_assignee_not_member\` (400, the owner is not a household member)`,
   },
-  '/api/v1/calendar/outlook/accounts/{id}/calendars': { patch: OUTLOOK_OVERRIDES },
-  '/api/v1/calendar/import': { post: `${ASSIGNEE_REASONS}, ${SELECTED_CALENDAR_GONE}, ${ICS_URL}, ${ICS_FETCH}` },
+  '/api/v1/calendar/outlook/accounts/{id}/calendars': {
+    patch: OUTLOOK_OVERRIDES,
+    get: `${OUTLOOK_NOT_CONFIGURED}, ${OUTLOOK_REAUTH}; ${REMOTE_FAILURE}`,
+  },
+  '/api/v1/calendar/outlook/auth': { get: OUTLOOK_NOT_CONFIGURED },
+  '/api/v1/calendar/outlook/accounts': { get: OUTLOOK_NOT_CONFIGURED },
+  '/api/v1/calendar/outlook/sync': { post: `${OUTLOOK_NOT_CONFIGURED}, ${OUTLOOK_REAUTH}; ${REMOTE_FAILURE}` },
+  '/api/v1/calendar/google/sync': { post: `${GOOGLE_NOT_CONNECTED}; ${REMOTE_FAILURE}` },
+  '/api/v1/calendar/google/calendars': {
+    get: `${GOOGLE_NOT_CONNECTED}; ${REMOTE_FAILURE}`,
+    patch: `${GOOGLE_NOT_CONNECTED}; ${REMOTE_FAILURE}`,
+  },
+  '/api/v1/calendar/import': { post: `${ASSIGNEE_REASONS}, ${SELECTED_CALENDAR_GONE}, ${ICS_URL}, ${ICS_FETCH}; a feed that cannot be fetched otherwise: ${REMOTE_FAILURE}` },
   '/api/v1/calendar/caldav/accounts/{id}/reminder-lists': {
     patch: `${ASSIGNEE_REASONS}, \`reminder_list_assignee_not_tasks\` (400, default assignees for a list mapped to shopping)`,
   },

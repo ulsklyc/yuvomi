@@ -2561,6 +2561,8 @@
         "backupWebdavTestSuccess": "Connection successful - {{files}} backup(s) found.",
         "backupWebdavTestFailed": "Connection failed: {{error}}",
         "backupWebdavPasswordRequired": "A different server or username needs the password again.",
+        "backupWebdavConfigIncomplete": "Enter the address, username and password of the WebDAV server.",
+        "backupLocalFailed": "The backup could not be read or written on this server. The server log has the details.",
         "backupWebdavLastUpload": "Last upload",
         "backupWebdavLastError": "Last error",
         "backupWebdavNeverUploaded": "No upload yet",
@@ -3552,7 +3554,11 @@
         "apiTokenErrorExpiryPast": "The expiration date is in the past. Choose a later time.",
         "apiTokenErrorSubjectDeactivated": "This account is deactivated and cannot get a token. Choose another person.",
         "dmsErrorUrlInvalid": "The server URL must start with http:// or https://.",
-        "dmsErrorAccountExists": "A DMS is already connected with this server URL."
+        "dmsErrorAccountExists": "A DMS is already connected with this server URL.",
+        "remoteErrorAuthFailed": "The server rejected the sign-in. Check the username and password.",
+        "remoteErrorStatus": "The server answered with status {{status}}.",
+        "remoteErrorUnreachable": "The server cannot be reached. Check the address and whether the server is running.",
+        "remoteErrorFailed": "The request to the server failed."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

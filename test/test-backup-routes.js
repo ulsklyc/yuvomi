@@ -252,6 +252,10 @@ test('POST /webdav/test: unkonfiguriert → 400 (URL/Benutzer/Passwort fehlen)',
   const r = await call('POST', '/webdav/test', { actor: ADM, body: {} });
   assert.equal(r.status, 400);
   assert.match(r.body.error, /required/i);
+  // #2622: the route names its own cases in ONE field, `errorCode`, like
+  // password_required and url_invalid - not a second one in `reason`.
+  assert.equal(r.body.errorCode, 'config_incomplete', JSON.stringify(r.body));
+  assert.equal(r.body.reason, undefined, JSON.stringify(r.body));
 });
 
 // ── WebDAV-Konfig: valide Persistenz + Maskierung ───────────────────────────────
@@ -399,16 +403,47 @@ test('PUT /webdav/config: neuer Server MIT neuem Passwort wird gespeichert', asy
   assert.equal(back.status, 200);
 });
 
-test('GET /webdav/files: nicht erreichbares Ziel → 500', async () => {
-  // Konfig auf einen refused-Port umbiegen: listRemoteBackups wirft → catch → 500.
+test('GET /webdav/files: nicht erreichbares Ziel → 502 mit Klasse, ohne Adresse', async () => {
+  // Konfig auf einen refused-Port umbiegen: listRemoteBackups wirft. Seit
+  // Phase 0 (Abschnitt H) kommt die Klasse statt des Textes von fetch, der
+  // Adresse und Port nennt.
+  // Ein frei gewordener Port statt :1 - fetch sperrt :1 selbst ("bad port").
+  const closed = await new Promise((resolve) => {
+    const probe = http.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
   const put = await call('PUT', '/webdav/config', {
     actor: ADM,
-    body: { enabled: true, url: 'http://127.0.0.1:1', username: 'dav', password: 'x', remotePath: '/backups/', keep: 7 },
+    body: { enabled: true, url: `http://127.0.0.1:${closed}`, username: 'dav', password: 'x', remotePath: '/backups/', keep: 7 },
   });
   assert.equal(put.status, 200);
   const r = await call('GET', '/webdav/files', { actor: ADM });
-  assert.equal(r.status, 500);
-  assert.ok(typeof r.body.error === 'string' && r.body.error.length > 0);
+  assert.equal(r.status, 502, JSON.stringify(r.body));
+  assert.equal(r.body.reason, 'remote_unreachable');
+  assert.equal(r.body.detail, 'ECONNREFUSED');
+  assert.ok(!JSON.stringify(r.body).includes('127.0.0.1'), 'die Antwort nennt die Adresse nicht');
+});
+
+test('POST /webdav/trigger: ein nicht erreichbares Ziel hinterlaesst die Klasse als letzten Fehler, nie den Text', async () => {
+  // Phase 0, Abschnitt H: der gespeicherte Fehler geht mit dem Status an die
+  // Backup-Seite. Er nennt die Klasse (ECONNREFUSED), nicht den Text von fetch.
+  const closed = await new Promise((resolve) => {
+    const probe = http.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+  const put = await call('PUT', '/webdav/config', {
+    actor: ADM,
+    body: { enabled: true, url: `http://127.0.0.1:${closed}`, username: 'dav', password: 'x', remotePath: '/backups/', keep: 7 },
+  });
+  assert.equal(put.status, 200);
+  const r = await call('POST', '/webdav/trigger', { actor: ADM });
+  assert.equal(r.status, 502, JSON.stringify(r.body));
+  const status = await call('GET', '/webdav/config', { actor: ADM });
+  assert.equal(status.body.data.lastError, 'ECONNREFUSED', JSON.stringify(status.body.data));
 });
 
 // ── POST /restore: Größenlimit (413) ────────────────────────────────────────────
@@ -607,7 +642,7 @@ const leakyBase = await new Promise((r) => leakyServer.listen(0, '127.0.0.1', ()
 }));
 test.after(() => leakyServer.close());
 
-test('POST /webdav/test: a failing server answers with reason and class, never its own text', { todo: 'fix pending, Phase 0 section H PR 3' }, async () => {
+test('POST /webdav/test: a failing server answers with reason and class, never its own text', async () => {
   const r = await call('POST', '/webdav/test', {
     actor: ADM,
     body: { url: leakyBase, username: 'dav', password: 'other-secret', remotePath: '/backups/' },
@@ -619,4 +654,54 @@ test('POST /webdav/test: a failing server answers with reason and class, never i
   assert.equal(r.body.reason, 'remote_http_status');
   assert.equal(r.body.detail, 'HTTP 500');
   assert.equal(typeof r.body.error, 'string');
+});
+
+// ── #2622: a local failure is not the WebDAV server's ──────────────────────────
+// sendWebdavFailure counted every error that was not SQLite's as the remote
+// side: a local file that vanished before the upload answered 502
+// `remote_failed`, which sends the admin to check the WebDAV server. A stub
+// that removes the fresh local backup while it answers PROPFIND makes
+// uploadBackup's readFile fail with ENOENT.
+const vanishingServer = http.createServer((req, res) => {
+  req.resume();
+  req.on('end', () => {
+    if (req.method === 'PROPFIND') {
+      for (const name of fs.readdirSync(BACKUP_DIR)) fs.rmSync(path.join(BACKUP_DIR, name), { force: true });
+      res.writeHead(207, { 'Content-Type': 'application/xml; charset=utf-8' });
+      res.end('<?xml version="1.0"?><D:multistatus xmlns:D="DAV:"></D:multistatus>');
+      return;
+    }
+    res.writeHead(201); res.end();
+  });
+});
+const vanishingBase = await new Promise((r) => vanishingServer.listen(0, '127.0.0.1', () => {
+  r(`http://127.0.0.1:${vanishingServer.address().port}`);
+}));
+test.after(() => vanishingServer.close());
+
+test('POST /webdav/trigger: a local file error is a 500 of this server, not the WebDAV server (#2622)', async () => {
+  const put = await call('PUT', '/webdav/config', {
+    actor: ADM,
+    body: { enabled: true, url: vanishingBase, username: 'dav', password: 'x', remotePath: '/backups/', keep: 7 },
+  });
+  assert.equal(put.status, 200);
+  const r = await call('POST', '/webdav/trigger', { actor: ADM });
+  const text = JSON.stringify(r.body);
+  assert.equal(r.status, 500, text);
+  assert.equal(r.body.reason, 'backup_local_failed', text);
+  assert.equal(r.body.detail, undefined, text);
+  assert.ok(!text.includes(BACKUP_DIR) && !/ENOENT|no such file/.test(text), `no path or engine text: ${text}`);
+});
+
+test('localFailure: a system or crypto error without an HTTP status is local, a network code is not (#2622)', async () => {
+  const { isLocalFailure } = await import('../server/utils/http.js');
+  const enoent = Object.assign(new Error("ENOENT: no such file or directory, open '/data/backups/x.db'"), { errno: -2, code: 'ENOENT', syscall: 'open' });
+  assert.equal(isLocalFailure(enoent), true);
+  assert.equal(isLocalFailure(Object.assign(new Error('bad decrypt'), { code: 'ERR_OSSL_BAD_DECRYPT' })), true);
+  // undici wraps the socket error: syscall `connect`, but a network code.
+  const refused = new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED'), { errno: -61, code: 'ECONNREFUSED', syscall: 'connect' }) });
+  assert.equal(isLocalFailure(refused), false);
+  assert.equal(isLocalFailure(new TypeError('fetch failed', { cause: Object.assign(new Error('connect EADDRNOTAVAIL'), { errno: -49, code: 'EADDRNOTAVAIL', syscall: 'connect' }) })), false);
+  assert.equal(isLocalFailure(Object.assign(new Error('PUT failed'), { status: 507, errno: -2, syscall: 'open' })), false);
+  assert.equal(isLocalFailure(new Error('something else')), false);
 });

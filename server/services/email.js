@@ -187,9 +187,11 @@ export function createEmailService({ db, nodemailer = nodemailerDefault, env = p
       log.warn('SMTP test failed:', err?.message || err);
       // Der Grund als Fall, nicht als Satz (Re-Critique 2026-10-17): die Seite
       // zeigte den englischen Text von nodemailer ("Invalid login: 535 ...").
-      // `error` bleibt fuer Logs und API-Clients stehen, die Oberflaeche liest
-      // `reason` und sagt den Satz in der Sprache der Person.
-      return { ok: false, reason: smtpFailureReason(err), error: err?.message || String(err) };
+      // Die Oberflaeche liest `reason` und sagt den Satz in der Sprache der
+      // Person. `error` is a fixed sentence since Phase 0 (section H): the
+      // result goes to the browser as it is, and nodemailer's text names the
+      // SMTP host and the server's reply. The raw text is in the log above.
+      return { ok: false, reason: smtpFailureReason(err), error: 'The test email could not be sent.' };
     }
   }
 

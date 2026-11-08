@@ -1390,8 +1390,13 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
       });
     } catch (err) {
       // Eine leere Liste ist kein Serverfehler, sondern eine Eingabe, die
-      // nichts bewirken kann.
-      return res.status(422).json({ error: err.message || 'Nothing to send.', code: 422, reason: 'nothing_open' });
+      // nichts bewirken kann. Only that case keeps its sentence; a failure
+      // while rendering the mail is a fixed 500 (Phase 0 section H).
+      if (err?.code === 'nothing_open') {
+        return res.status(422).json({ error: err.message, code: 422, reason: 'nothing_open' });
+      }
+      log.error('POST /:listId/send: rendering the mail failed:', err);
+      return res.status(500).json({ error: 'Internal server error.', code: 500 });
     }
 
     await emailService.sendMail({

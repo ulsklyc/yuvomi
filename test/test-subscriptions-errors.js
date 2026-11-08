@@ -204,6 +204,28 @@ test('Server: die Logo-Suche findet nichts - 404 mit subscriptions_no_logo_found
   assert.deepEqual([r.status, r.body?.reason, r.body?.error], [404, 'subscriptions_no_logo_found', 'No supported logo could be found.']);
 });
 
+// Phase 0, Abschnitt H: ein eigener Satz der Logo-Suche bleibt (400); was DNS
+// oder der Socket sagen, nennt den Host und kommt als Klasse (502).
+test('Server: die Logo-Suche sagt ihre eigenen Saetze, fremde Fehler nur als Klasse', async () => {
+  routes._setLogoFinderForTest?.(async () => {
+    throw Object.assign(new Error('Logo search only supports HTTPS websites.'), { code: 'logo_search_refused' });
+  });
+  const own = await call('POST', '/logo-search', { query: 'http://example.com' });
+  assert.deepEqual([own.status, own.body?.error], [400, 'Logo search only supports HTTPS websites.']);
+  routes._setLogoFinderForTest?.(async () => {
+    throw Object.assign(new Error('getaddrinfo ENOTFOUND intranet.lan'), { code: 'ENOTFOUND' });
+  });
+  try {
+    const foreign = await call('POST', '/logo-search', { query: 'intranet.lan' });
+    assert.equal(foreign.status, 502, JSON.stringify(foreign.body));
+    assert.equal(foreign.body.reason, 'remote_unreachable');
+    assert.equal(foreign.body.detail, 'ENOTFOUND');
+    assert.doesNotMatch(foreign.body.error, /getaddrinfo|intranet/);
+  } finally {
+    routes._setLogoFinderForTest?.(null);
+  }
+});
+
 test('Server: das Abo verschwindet, waehrend seine Buchung den Kurs holt - 404 statt 500, und keine Buchung ohne Abo', async () => {
   for (const [label, path, method, body] of [
     ['aendern', (id) => `/${id}`, 'PUT', { amount: 20 }],

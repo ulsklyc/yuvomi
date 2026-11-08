@@ -56,7 +56,17 @@
  *          err.message }`) and a route that hands that object on is not seen;
  *          neither is text stored in a `last_error` column and sent by a later
  *          status GET. An alias more than three lines above the call is not
- *          followed. The follow-up PRs fix the known indirect ways by hand.
+ *          followed. The indirect ways known on 08.11.2026 were fixed by hand
+ *          in the last PR of Phase 0 section H, each with a behaviour test in
+ *          its own suite: DMS and recipe-provider probe results, the SMTP test
+ *          result, the waste refresh's stored message, the error of a module
+ *          that fails to load, and the stored WebDAV/document-storage/
+ *          notification-channel errors sent by status GETs. A new one of these
+ *          is invisible to this reader until Phase 1b.
+ *
+ *          The three behaviour tests carry the todo marker TODO_MARKER while
+ *          their BASELINE key is open; the last test below couples the two, so
+ *          a fix cannot leave a silently passing `# TODO` behind.
  *
  * Run: npm run test:client-error-text-guard
  */
@@ -90,9 +100,9 @@ const ALLOWED = new Map([
   ['server/routes/calendar/crud.js -> sendNonMemberAssignment', [1, 'every caller gates on instanceof NonMemberAssignmentError']],
   ['server/routes/calendar/outlook.js -> PUT /outlook/accounts/:id', [2, 'gated on err.code not_household_member / outlook_auto_sync_overrides, thrown by outlook-calendar.js']],
   ['server/routes/calendar/outlook.js -> PATCH /outlook/accounts/:id/calendars', [1, 'gated on err.code === outlook_auto_sync_overrides']],
-  ['server/routes/calendar/subscriptions.js -> POST /subscriptions', [2, 'only behind icsFetchCase(): a named fetch case whose text the service wrote']],
-  ['server/routes/calendar/subscriptions.js -> POST /subscriptions/:id/sync', [1, 'only behind icsFetchCase(): a named fetch case whose text the service wrote']],
-  ['server/routes/calendar/subscriptions.js -> POST /import', [1, 'only behind icsFetchCase(): a named fetch case whose text the service wrote']],
+  ['server/routes/calendar/subscriptions.js -> POST /subscriptions', [2, "only behind icsFetchCase(): a named fetch case (own sentence, Node's `Invalid URL`); accepted: a BlockedAddressError names the private address the member's own URL resolved to"]],
+  ['server/routes/calendar/subscriptions.js -> POST /subscriptions/:id/sync', [1, "only behind icsFetchCase(): a named fetch case (own sentence, Node's `Invalid URL`); accepted: a BlockedAddressError names the private address the member's own URL resolved to"]],
+  ['server/routes/calendar/subscriptions.js -> POST /import', [1, "only behind icsFetchCase(): a named fetch case (own sentence, Node's `Invalid URL`); accepted: a BlockedAddressError names the private address the member's own URL resolved to"]],
   ['server/routes/health/fasting.js -> sendError', [1, 'instanceof FastingError, everything else gets a fixed sentence']],
   ['server/routes/health/visibility-defaults.js -> allowFastingMutation', [1, 'instanceof FastingError, everything else is rethrown']],
   ['server/routes/modules.js -> sendInstallError', [1, 'callers gate on instanceof InstallError (reason + status set by module-install.js)']],
@@ -105,6 +115,15 @@ const ALLOWED = new Map([
   ['server/routes/schedule.js -> fail', [1, '`error` is the route\'s own sentence passed as a parameter; String(error) only picks the range reason']],
   ['server/routes/split-expenses.js -> sendRefusal', [1, 'callers gate on instanceof Refusal, the route\'s own refusal class']],
   ['server/routes/waste/helpers.js -> wasteErrorResponse', [2, 'instanceof WasteConflictError / WasteNotFoundError']],
+  ['server/routes/subscriptions.js -> POST /logo-search', [1, "gated on err.code === logo_search_refused, the logo search's own sentences (subscription-logo.js logoRefusal)"]],
+  ['server/routes/waste/sources.js -> icsTextForReimport', [1, 'only for the classes classifyFetchFailure() names from own errors (WasteFetchError status/size, BlockedAddressError); unreachable gets a fixed sentence']],
+  ['server/routes/waste/sources.js -> emptyFeedResponse', [1, 'emptyFeedAsFetchFailure() only returns its own fixed WasteFetchError behind instanceof WasteValidationError + reason']],
+  ['server/routes/document-storage-google-drive.js -> sendStorageError', [1, 'only for a misconfiguration (400/409, storage codes of the service); a failure of the store gets a fixed sentence']],
+  ['server/routes/documents.js -> sendStorageError', [1, 'instanceof StorageError, and only for a misconfiguration (400/409) with configText; a failure of the store gets a fixed sentence']],
+  ['server/routes/modules.js -> GET /assets/:id/{*assetPath}', [1, 'only for resolveAssetPath\'s own 4xx (status < 500); a raw filesystem error gets a fixed sentence']],
+  ['server/routes/notifications.js -> sendChannelWriteFailure', [1, 'gated on err.code === notification_channel_invalid, set only by ChannelInputError, the channel checks\' own class']],
+  ['server/routes/shopping.js -> POST /:listId/send', [1, 'gated on err.code === nothing_open, set by buildShoppingListMail']],
+  ['server/routes/split-expenses.js -> sendWriteFailure', [1, 'gated on err.name === SplitInputError, the split rules\' own input errors']],
   ['server/services/document-deletion-lock.js -> sendDocumentDeletionConflict', [1, 'instanceof DocumentDeletionInProgressError']],
   ['server/services/document-links.js -> sendDocumentLinkRefusal', [1, 'instanceof DocumentLinkRefusedError']],
 ]);
@@ -114,49 +133,6 @@ const ALLOWED = new Map([
  * section H. `file -> function` -> hits. ONLY LOWER, down to an empty map.
  */
 const BASELINE = new Map([
-  // Class B: text of a foreign server, library or the network stack.
-  ['server/routes/backup.js -> POST /webdav/test', 1],
-  ['server/routes/backup.js -> GET /webdav/files', 1],
-  ['server/routes/backup.js -> POST /webdav/trigger', 1],
-  ['server/routes/calendar/apple.js -> POST /apple/sync', 1],
-  ['server/routes/calendar/apple.js -> POST /apple/connect', 1],
-  ['server/routes/calendar/caldav.js -> POST /caldav/accounts', 1],
-  ['server/routes/calendar/caldav.js -> PUT /caldav/accounts/:id', 1],
-  ['server/routes/calendar/caldav.js -> DELETE /caldav/accounts/:id', 1],
-  ['server/routes/calendar/caldav.js -> GET /caldav/accounts/:id/calendars', 1],
-  ['server/routes/calendar/caldav.js -> PATCH /caldav/accounts/:id/calendars', 1],
-  ['server/routes/calendar/caldav.js -> GET /caldav/accounts/:id/reminder-lists', 1],
-  ['server/routes/calendar/caldav.js -> PATCH /caldav/accounts/:id/reminder-lists', 1],
-  ['server/routes/calendar/google.js -> sendGoogleError', 1],
-  ['server/routes/calendar/google.js -> GET /google/auth', 1],
-  ['server/routes/calendar/google.js -> PUT /google/readonly', 1],
-  ['server/routes/calendar/outlook.js -> GET /outlook/auth', 1],
-  ['server/routes/calendar/outlook.js -> GET /outlook/accounts', 1],
-  ['server/routes/calendar/outlook.js -> PUT /outlook/accounts/:id', 1],
-  ['server/routes/calendar/outlook.js -> DELETE /outlook/accounts/:id', 1],
-  ['server/routes/calendar/outlook.js -> GET /outlook/accounts/:id/calendars', 1],
-  ['server/routes/calendar/outlook.js -> PATCH /outlook/accounts/:id/calendars', 1],
-  ['server/routes/calendar/outlook.js -> POST /outlook/sync', 1],
-  ['server/routes/cardav.js -> failIfConnection', 1],
-  ['server/routes/preferences.js -> POST /holidays/sync', 1],
-  ['server/routes/subscriptions.js -> POST /logo-search', 1],
-  ['server/routes/waste/sources.js -> icsTextForReimport', 1],
-  ['server/routes/waste/sources.js -> emptyFeedResponse', 1],
-  // Class C: our own refusal and foreign text in the same catch.
-  ['server/routes/calendar/subscriptions.js -> POST /import', 1],
-  ['server/routes/document-storage-google-drive.js -> sendStorageError', 1],
-  ['server/routes/documents.js -> GET /storage/config', 1],
-  ['server/routes/documents.js -> PUT /storage/config', 1],
-  ['server/routes/documents.js -> POST /storage/test', 1],
-  ['server/routes/modules.js -> GET /assets/:id/{*assetPath}', 1],
-  ['server/routes/notifications.js -> POST /channels', 1],
-  ['server/routes/notifications.js -> PUT /channels/:id', 1],
-  ['server/routes/shopping.js -> POST /:listId/send', 1],
-  ['server/routes/split-expenses.js -> POST /groups/:id/expenses', 1],
-  ['server/routes/split-expenses.js -> PUT /expenses/:id', 1],
-  ['server/routes/split-expenses.js -> POST /groups/:id/settlements', 1],
-  ['server/routes/split-expenses.js -> POST /groups/:id/recurring', 1],
-  ['server/routes/split-expenses.js -> PUT /recurring/:id', 1],
 ]);
 
 // ── Scanner ──────────────────────────────────────────────────────────────────
@@ -418,5 +394,24 @@ test('every ALLOWED entry says why the text is our own', () => {
   for (const [key, [count, reason]] of ALLOWED) {
     assert.ok(Number.isInteger(count) && count > 0, `${key}: count`);
     assert.ok(typeof reason === 'string' && reason.length >= 20, `${key}: reason`);
+  }
+});
+
+// The behaviour tests of the three blind spots carry this todo marker while
+// their place is in BASELINE, and lose it with the fix (review of #2618).
+const TODO_MARKER = 'fix pending, Phase 0 section H PR 3';
+const BLIND_SPOTS = [
+  ['server/routes/modules.js -> GET /assets/:id/{*assetPath}', 'test/test-module-install.js'],
+  ['server/routes/split-expenses.js -> POST /groups/:id/expenses', 'test/test-split-expenses-routes.js'],
+  ['server/routes/backup.js -> POST /webdav/test', 'test/test-backup-routes.js'],
+];
+
+test('a blind-spot test is todo exactly while its place is open', () => {
+  for (const [key, file] of BLIND_SPOTS) {
+    const marked = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').includes(TODO_MARKER);
+    assert.equal(marked, BASELINE.has(key),
+      BASELINE.has(key)
+        ? `${file}: the test of ${key} must stay marked todo ('${TODO_MARKER}') while the place is in BASELINE`
+        : `${file}: ${key} is fixed - remove the todo marker so the test runs for real`);
   }
 });

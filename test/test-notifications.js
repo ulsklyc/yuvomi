@@ -1630,3 +1630,133 @@ test('ein haengender SMTP-Server blockiert den Erinnerungslauf nicht (#944)', { 
   controller.abort();
   await assert.rejects(() => pending, /timed out/i);
 });
+
+// Phase 0, Abschnitt H: Pruefung und Datenbank teilten einen catch, der jede
+// Meldung als 400 schickte - auch den Text von SQLite. Die Pruefung behaelt
+// ihren Satz, ein Fehler der Datenbank wird ein fester 500.
+test('Kanal anlegen: Pruefung bleibt 400 mit Satz, ein Datenbankfehler wird 500 ohne SQL-Text', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+
+  const invalid = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, config: { baseUrl: 'https://ntfy.test', topic: '' } });
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.json.error, 'ntfy topic is required.');
+
+  db.exec(`CREATE TRIGGER h_guard_channels AFTER INSERT ON notification_channels
+    BEGIN INSERT INTO h_guard_missing_channels (x) VALUES (1); END`);
+  const broken = await call(app, 'POST', '/notifications/channels', NTFY_CHANNEL);
+  assert.equal(broken.status, 500, JSON.stringify(broken.json));
+  assert.equal(broken.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(broken.json), /h_guard_missing_channels|no such table/);
+});
+
+// Phase 0, Abschnitt H: der Fehler eines Kanaltests wird gespeichert und mit
+// dem Kanal gelistet. Eigene Saetze der Anbieter bleiben, ein Netzfehler wird
+// als sein Code gespeichert - der Text von Node nennt Adresse und Port.
+test('Kanaltest: ein Netzfehler wird als Code gespeichert, ein eigener Satz bleibt', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  let thrown;
+  const router = buildRouter({ database: db, channelStore: store, notificationService: { providers: {}, testChannel: async () => { throw thrown; } } });
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
+  app.use('/notifications', router);
+  const channel = store.createChannel(NTFY_CHANNEL);
+
+  thrown = new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED 10.0.0.9:8080'), { code: 'ECONNREFUSED' }) });
+  assert.equal((await call(app, 'POST', `/notifications/channels/${channel.id}/test`)).status, 500);
+  assert.equal(db.prepare('SELECT last_error FROM notification_channels WHERE id = ?').get(channel.id).last_error, 'ECONNREFUSED');
+
+  const lastError = () => db.prepare('SELECT last_error FROM notification_channels WHERE id = ?').get(channel.id).last_error;
+  const { NotificationProviderError } = await import('../server/services/notification-providers/provider-error.js');
+  thrown = new NotificationProviderError('Webhook authentication failed.');
+  await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+  assert.equal(lastError(), 'Webhook authentication failed.');
+
+  // nodemailer: its own code in `code`, the socket's in `originalCode`.
+  thrown = Object.assign(new Error('connect ECONNREFUSED 10.0.0.9:587'), { code: 'ESOCKET', originalCode: 'ECONNREFUSED' });
+  await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+  assert.equal(lastError(), 'ECONNREFUSED');
+
+  // A refused SMTP login carries the server's reply; anything without a class
+  // is stored as a fixed sentence, whatever its wording.
+  for (const other of [
+    Object.assign(new Error('Invalid login: 535 5.7.8 user@smtp.internal.lan rejected'), { code: 'EAUTH' }),
+    new Error('Webhook authentication failed.'),
+    new TypeError("Cannot read properties of undefined (reading 'host')"),
+  ]) {
+    thrown = other;
+    await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+    assert.equal(lastError(), 'The test notification could not be delivered.', other.message);
+  }
+});
+
+test('Kanaltest: die Anbieter werfen ihre eigenen Saetze als NotificationProviderError', async () => {
+  const { NotificationProviderError } = await import('../server/services/notification-providers/provider-error.js');
+  const { gotifyProvider } = await import('../server/services/notification-providers/gotify.js');
+  const { ntfyProvider } = await import('../server/services/notification-providers/ntfy.js');
+  const { webhookProvider } = await import('../server/services/notification-providers/webhook.js');
+  const { emailProvider } = await import('../server/services/notification-providers/email.js');
+  const refused = async () => ({ ok: false, status: 401 });
+  const payload = { title: 'Yuvomi', body: 'Test', url: '/', tag: 't', priority: 'default' };
+  const cases = [
+    [gotifyProvider, { config: { baseUrl: 'https://gotify.test' }, secrets: { appToken: 'x' } }],
+    [ntfyProvider, { config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} }],
+    [webhookProvider, { config: { url: 'https://hook.test/in' }, secrets: {} }],
+  ];
+  for (const [provider, channel] of cases) {
+    await assert.rejects(provider.send({ channel, payload, fetchImpl: refused }), NotificationProviderError, provider.id);
+  }
+  await assert.rejects(
+    emailProvider.send({ channel: { config: { toAddress: 'a@b.test' } }, payload, emailService: { isConfigured: () => false } }),
+    NotificationProviderError,
+  );
+});
+
+// #2622: checkedInput marked EVERY error without `code` as invalid input, so a
+// TypeError from a malformed body went out as a 400 with the engine's text.
+// Only the channel checks' own errors are a 400; the rest is a fixed 500.
+test('Kanal anlegen: ein kaputter Rumpf ist kein 400 mit Engine-Text, sondern ein fester 500 (#2622)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+
+  const broken = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, clearSecrets: 5 });
+  assert.equal(broken.status, 500, JSON.stringify(broken.json));
+  assert.equal(broken.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(broken.json), /iterable|TypeError/);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM notification_channels').get().c, 0);
+});
+
+// #2622, test gap: PUT runs through the same sendChannelWriteFailure as POST.
+test('Kanal aendern: Pruefung bleibt 400 mit Satz, Datenbank und kaputter Rumpf werden 500 (#2622)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+  const channel = store.createChannel(NTFY_CHANNEL);
+
+  const invalid = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { config: { topic: '' } });
+  assert.equal(invalid.status, 400, JSON.stringify(invalid.json));
+  assert.equal(invalid.json.error, 'ntfy topic is required.');
+
+  const malformed = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { clearSecrets: 5 });
+  assert.equal(malformed.status, 500, JSON.stringify(malformed.json));
+  assert.equal(malformed.json.error, 'Internal error.');
+
+  db.exec(`CREATE TRIGGER h_guard_channels_update AFTER UPDATE ON notification_channels
+    BEGIN INSERT INTO h_guard_missing_update (x) VALUES (1); END`);
+  const failing = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { name: 'Neu' });
+  assert.equal(failing.status, 500, JSON.stringify(failing.json));
+  assert.equal(failing.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(failing.json), /h_guard_missing_update|no such table/);
+});
