@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   medication's visibility - like every other health reminder, as SECURITY.md promises. Reading
   access and administrators are unaffected.
 
+### Added
+- **A failed automatic backup now tells the administrators (#2519).** When the nightly backup
+  does not run, every administrator gets a push notification pointing at Settings > Household >
+  Backup and restore, where the reason is shown in full. Until now the failure was silent and only visible to
+  someone who happened to open that page. The notification carries no technical error text - that
+  belongs in the log and in the app - and two failed nights replace one notification instead of
+  stacking up. A successful run afterwards clears the warning by itself.
+
 ## [2.86.0] - 2026-11-07
 
 ### Added
@@ -41,12 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   completion earned stands with the booking: later changes of the due date, the point value or the
   setting never rewrite booked amounts, and for every late earning the ledger shows the base it came
   from and how many days it was late.
-- **A failed automatic backup now tells the administrators (#2519).** When the nightly backup
-  does not run, every administrator gets a push notification pointing at Settings > Household >
-  Backup and restore, where the reason is shown in full. Until now the failure was silent and only visible to
-  someone who happened to open that page. The notification carries no technical error text - that
-  belongs in the log and in the app - and two failed nights replace one notification instead of
-  stacking up. A successful run afterwards clears the warning by itself.
 - **Kitchen search is now in the tab bar on phones (#2043).** Recipes and Pantry show a search
   icon at the right end of the kitchen tab bar, keeping the second header row collapsed until you
   tap it. Meals and Shopping clear the zone so nothing appears there.
