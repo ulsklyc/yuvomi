@@ -573,7 +573,7 @@ async function ensureCollections(config, extraSegments = []) {
   for (let index = 1; index <= segments.length; index += 1) {
     const response = await davFetch(config, 'MKCOL', segments.slice(0, index));
     if (!response.ok && response.status !== 405) {
-      throw new Error(`MKCOL failed with status ${response.status}.`);
+      throw Object.assign(new Error(`MKCOL failed with status ${response.status}.`), { status: response.status });
     }
   }
 }
@@ -891,7 +891,7 @@ export async function stageDocumentUpload({
       headers: { 'Content-Type': mime },
     });
     if (!response.ok) {
-      throw new Error(`PUT failed with status ${response.status}.`);
+      throw Object.assign(new Error(`PUT failed with status ${response.status}.`), { status: response.status });
     }
   } catch (error) {
     throw toStorageError(
@@ -923,7 +923,7 @@ export async function verifyExistingWebdavDocument(document, config) {
       ...normalizeStorageKey(document.storage_key).split('/'),
     ]);
     if (!response.ok) {
-      throw new Error(`GET failed with status ${response.status}.`);
+      throw Object.assign(new Error(`GET failed with status ${response.status}.`), { status: response.status });
     }
     await readResponseBuffer(response);
     return { ok: true };
@@ -1040,7 +1040,7 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
       ...normalizeStorageKey(document.storage_key).split('/'),
     ]);
     if (!response.ok) {
-      throw new Error(`GET failed with status ${response.status}.`);
+      throw Object.assign(new Error(`GET failed with status ${response.status}.`), { status: response.status });
     }
     return {
       buffer: await readResponseBuffer(response),
@@ -1080,7 +1080,7 @@ export async function deleteDocumentContent(document) {
         ...normalizeStorageKey(document.storage_key).split('/'),
       ]);
       if (!response.ok && response.status !== 404) {
-        throw new Error(`DELETE failed with status ${response.status}.`);
+        throw Object.assign(new Error(`DELETE failed with status ${response.status}.`), { status: response.status });
       }
     } catch (error) {
       throw toStorageError(

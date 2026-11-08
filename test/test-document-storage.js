@@ -2595,6 +2595,32 @@ test('connection test: a refusing server answers with its class, never its text'
   assert.ok(!JSON.stringify(result.body).includes(webdav.url), 'the answer does not repeat the address');
 });
 
+// The first request of the test is MKCOL, so a wrong password fails there. Its
+// error carried no status, and the answer lost the class the admin needs most.
+test('connection test: a refused first request (MKCOL) still answers with its class', async (t) => {
+  clearWebdavDocuments();
+  const webdav = await createWebdavServer(t, {
+    handler: async (req, res) => {
+      if (req.method !== 'MKCOL') return false;
+      res.writeHead(401, 'Unauthorized for alice on dav-internal.lan');
+      res.end();
+      return true;
+    },
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const result = await routeCall(harness, 'POST', '/storage/test', {
+    url: webdav.url, username: 'alice', password: 'wrong', path: 'test/documents',
+  });
+
+  assert.equal(result.response.status, 502, JSON.stringify(result.body));
+  assert.equal(result.body.reason, 'documents_storage_failed');
+  assert.equal(result.body.detail, 'HTTP 401');
+  assert.doesNotMatch(JSON.stringify(result.body), /dav-internal|MKCOL failed/);
+});
+
 test('connection test returns stable storage codes for invalid overrides', async (t) => {
   clearWebdavDocuments();
   const userId = createRouteUser();
