@@ -2412,11 +2412,11 @@ test('Admin-Liste nennt, wer installiert hat (installedByName); geloeschtes Kont
 // path of modules/. The source reader cannot tell this catch from a gated one,
 // so it runs as a program: modules/ is replaced by a FILE, and the mkdir in
 // listModules() throws EEXIST with the path in its text.
-test('asset route: a filesystem error answers with a fixed sentence, never the path', { todo: 'fix pending, Phase 0 section H PR 3' }, async () => {
+test('asset route: a filesystem error answers with a fixed sentence, never the path', async () => {
   const aside = `${MODULES_DIR}.aside`;
-  fs.renameSync(MODULES_DIR, aside);
-  fs.writeFileSync(MODULES_DIR, 'not a directory');
   try {
+    fs.renameSync(MODULES_DIR, aside);
+    fs.writeFileSync(MODULES_DIR, 'not a directory');
     const r = await call('GET', '/assets/asset-mod/index.js', { actor: MEM });
     assert.equal(r.status, 500);
     const text = r.buf.toString('utf8');
@@ -2425,7 +2425,9 @@ test('asset route: a filesystem error answers with a fixed sentence, never the p
     assert.equal(r.body.error, 'Module asset failed.');
     assert.equal(r.body.code, 500);
   } finally {
-    fs.rmSync(MODULES_DIR, { force: true });
-    fs.renameSync(aside, MODULES_DIR);
+    if (fs.existsSync(aside)) {
+      fs.rmSync(MODULES_DIR, { force: true });
+      fs.renameSync(aside, MODULES_DIR);
+    }
   }
 });
