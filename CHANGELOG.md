@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only to the administrator in the storage settings, not to members uploading or opening a
   document. A malformed notification channel form answers with a general error instead of an
   engine message.
+- **Status bar no longer blurs beside the Dynamic Island on iOS 26 (PWA).** (#2390)
 
 ### Security
 - **Two administrators demoting each other no longer leave the household without one** (#2612).
@@ -74,9 +75,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filesystem, with hosts, ports and server paths. They now carry a fixed sentence or the class of
   the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
   status or a manifest check, stay.
-
-### Fixed
-- **Status bar no longer blurs beside the Dynamic Island on iOS 26 (PWA).** (#2390)
 
 ## [2.86.0] - 2026-11-07
 
