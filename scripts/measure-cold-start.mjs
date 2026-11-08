@@ -56,6 +56,7 @@ import { dirname, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import puppeteer, { PredefinedNetworkConditions } from 'puppeteer';
+import { launchBrowser } from './lib/chrome-executable.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const NETWORK_PRESET = 'Fast 4G';
@@ -284,7 +285,9 @@ function commitInfo() {
 async function main() {
   const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
   const workDir = mkdtempSync(join(tmpdir(), 'yuvomi-cold-start-'));
-  const browser = await puppeteer.launch({ headless: true, args: ['--no-proxy-server'] });
+  // Same Chrome resolution as every other Puppeteer start in the repo
+  // (PUPPETEER_EXECUTABLE_PATH, pinned Chrome, system fallback with warning).
+  const browser = await launchBrowser(puppeteer, { headless: true, args: ['--no-proxy-server'] });
   const browserName = await browser.version();
   const rounds = [];
   try {
