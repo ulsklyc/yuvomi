@@ -413,7 +413,8 @@ async function testConnection(caldavUrl, username, password, { createClient } = 
     return { ok: true, calendars };
   } catch (err) {
     log.error('Connection test failed:', err.message);
-    const failed = new Error(`CalDAV connection failed: ${err.message}`);
+    // `cause` keeps status and network code for the route's answer (Phase 0 H).
+    const failed = new Error(`CalDAV connection failed: ${err.message}`, { cause: err });
     // Der eine Fall, den die App selbst kennt (#1909): der Server hat
     // geantwortet, das Konto hat nur keine Kalender. Alles andere ist die
     // Angabe des fremden Servers und bleibt ohne Code.
