@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now carry a fixed sentence with the kind of failure (`reason`, and the class such as
   `HTTP 503` or `ECONNREFUSED` in `detail`); missing configuration and an expired Outlook sign-in
   are cases of their own.
+- **Database, filesystem and WebDAV texts no longer reach the browser from backups, documents,
+  modules, shared expenses, notification channels and shopping-list mail.** A failed WebDAV
+  backup test repeated the server's status line with its internal host and path, a broken
+  module folder answered with the absolute path on the server, and a database error while saving
+  a shared expense or a notification channel went out as a 400 with SQL text. Own input errors
+  keep their sentence; everything else now answers with a fixed sentence (500), and a refusing
+  WebDAV or document storage server with its class (`HTTP 507`, `ECONNREFUSED`) in `detail`.
 
 ## [2.86.0] - 2026-11-07
 
