@@ -75,6 +75,12 @@ const SENDERS = {
     why: 'the test push goes to the requester themself, with the text they sent.',
     checks: ['req.authUserId || req.session.userId'],
   },
+  'server/services/backup-scheduler.js': {
+    why: 'a failed scheduled backup notifies only admins who are real household members (#1207) - '
+      + 'a wall tablet, housekeeping staff or guest account with the admin role never gets the push, '
+      + 'and the push carries no technical error text, only a page to look at.',
+    checks: ["householdMemberSql('u')"],
+  },
 };
 
 function listSourceFiles(dir) {
