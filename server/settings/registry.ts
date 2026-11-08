@@ -80,6 +80,7 @@ import {
   parseHiddenModules,
   parseMealTypeNames,
   parseMobileNavOrder,
+  parseModuleColors,
   parseModuleOrder,
   parsePhoneWidgetConfig,
   parseScheduleHiddenTemplates,
@@ -711,6 +712,47 @@ const ENTRIES: readonly Entry[] = [
       return null;
     },
   },
+  // Per-module accent colour overrides, personal (#1115): any member picks
+  // their own, no admin check. PATCH semantics on the stored map - a key set
+  // to null removes that module's override, {} is a no-op; unknown module ids
+  // are silently dropped rather than refused, same as module_order.
+  {
+    field: 'module_colors',
+    storage: ['module_colors' + USER],
+    scope: 'personal',
+    write: 'member',
+    read: (ctx) => parseModuleColors(ctx.own('module_colors')),
+    apply(input, ctx) {
+      if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        return invalid('module_colors must be an object.');
+      }
+      const existing = parseModuleColors(ctx.own('module_colors'));
+      const merged = { ...existing };
+      for (const [key, val] of Object.entries(input as Record<string, unknown>)) {
+        if (!MODULE_ORDER_RE.test(key)) continue;
+        if (val === null || val === undefined || val === '') {
+          delete merged[key];
+          continue;
+        }
+        if (typeof val !== 'object' || Array.isArray(val) || val === null) {
+          return invalid(`module_colors: "${key}" must be {light, dark} or null.`);
+        }
+        const color = val as { light?: unknown, dark?: unknown };
+        if (typeof color.light !== 'string' || !HEX_COLOR_RE.test(color.light)) {
+          return invalid(`module_colors: "${key}.light" must be a hex color (#RRGGBB).`);
+        }
+        if (typeof color.dark !== 'string' || !HEX_COLOR_RE.test(color.dark)) {
+          return invalid(`module_colors: "${key}.dark" must be a hex color (#RRGGBB).`);
+        }
+        merged[key] = { light: color.light, dark: color.dark };
+      }
+      if (Object.keys(merged).length > 30) {
+        return invalid('module_colors: at most 30 entries.');
+      }
+      ctx.setOwn('module_colors', JSON.stringify(merged));
+      return null;
+    },
+  },
   {
     field: 'mobile_nav_order',
     storage: ['mobile_nav_order' + USER],
@@ -1198,7 +1240,7 @@ const ANSWER_ORDER = [
   'language', 'language_effective', 'language_auto', 'app_name',
   'dashboard_widgets', 'dashboard_today_glance', 'dashboard_widgets_default', 'dashboard_today_glance_default',
   'dashboard_follows_default', 'dashboard_widgets_phone', 'dashboard_follows_phone_default',
-  'disabled_modules', 'hidden_modules', 'module_order', 'mobile_nav_order',
+  'disabled_modules', 'hidden_modules', 'module_order', 'module_colors', 'mobile_nav_order',
   'housekeeping_payment_tasks', 'budget_mode', 'calendar_default_duration',
   'calendar_default_reminders', 'calendar_default_assign_me', 'calendar_default_target',
   'health_cycle_enabled', 'health_cycle_enabled_user', 'health_cycle_effective',
