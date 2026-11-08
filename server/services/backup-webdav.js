@@ -303,6 +303,15 @@ function parsePropfindXml(xml) {
 }
 
 /**
+ * A refusal of the WebDAV server as an error that carries its HTTP status: the
+ * route answers with that class (remoteFailure, Phase 0 section H) and never
+ * with this text, which names the server's URL and its status line.
+ */
+function refusedBy(message, status) {
+  return Object.assign(new Error(message), { status });
+}
+
+/**
  * PROPFIND Depth:1 — returns parsed file entries, or null if directory not found (404).
  */
 async function propfind(cfg) {
@@ -314,7 +323,7 @@ async function propfind(cfg) {
     body:     `<?xml version="1.0"?><D:propfind xmlns:D="DAV:"><D:prop><D:resourcetype/><D:getlastmodified/></D:prop></D:propfind>`,
   });
   if (res.status === 404) return null;
-  if (res.status !== 207) throw new Error(`PROPFIND ${url} failed: ${res.status} ${res.statusText}`);
+  if (res.status !== 207) throw refusedBy(`PROPFIND ${url} failed: ${res.status} ${res.statusText}`, res.status);
   return parsePropfindXml(await res.text());
 }
 
@@ -325,7 +334,7 @@ async function mkcol(cfg) {
   const url = joinUrl(cfg.url, cfg.remotePath);
   const res = await davFetch('MKCOL', url, { username: cfg.username, password: cfg.password });
   if (!res.ok && res.status !== 405) {
-    throw new Error(`MKCOL ${url} failed: ${res.status} ${res.statusText}`);
+    throw refusedBy(`MKCOL ${url} failed: ${res.status} ${res.statusText}`, res.status);
   }
 }
 
@@ -376,7 +385,7 @@ export async function uploadBackup(localFilePath) {
       headers:  { 'Content-Type': 'application/octet-stream' },
       body:     buffer,
     });
-    if (!putRes.ok) throw new Error(`PUT ${putUrl} failed: ${putRes.status} ${putRes.statusText}`);
+    if (!putRes.ok) throw refusedBy(`PUT ${putUrl} failed: ${putRes.status} ${putRes.statusText}`, putRes.status);
 
     log.info(`WebDAV upload successful: ${fileName}`);
     cfgSet('webdav_backup_last_upload', new Date().toISOString());
@@ -436,7 +445,7 @@ export async function testConnection(overrides = {}) {
   const cfg = { ...getConfig(), ...overrides };
 
   if (!cfg.url || !cfg.username || !cfg.password) {
-    throw new Error('URL, username and password are required.');
+    throw Object.assign(new Error('URL, username and password are required.'), { code: 'webdav_config_incomplete' });
   }
 
   // Quick auth test — PROPFIND Depth:0 on server root
@@ -448,9 +457,9 @@ export async function testConnection(overrides = {}) {
     body:     `<?xml version="1.0"?><D:propfind xmlns:D="DAV:"><D:prop><D:resourcetype/></D:prop></D:propfind>`,
   });
 
-  if (rootRes.status === 401) throw new Error('Authentication failed (401). Check username and password.');
+  if (rootRes.status === 401) throw refusedBy('Authentication failed (401). Check username and password.', 401);
   if (!rootRes.ok && rootRes.status !== 207) {
-    throw new Error(`WebDAV server not reachable: ${rootRes.status} ${rootRes.statusText}`);
+    throw refusedBy(`WebDAV server not reachable: ${rootRes.status} ${rootRes.statusText}`, rootRes.status);
   }
 
   let fileCount = 0;

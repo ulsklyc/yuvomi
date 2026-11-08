@@ -16,6 +16,7 @@ import { createLogger } from '../logger.js';
 import { secretOrigin, storedSecretPath } from '../utils/auto-secrets.js';
 import { createLocalBackup, getStatus as getSchedulerStatus, triggerBackup } from '../services/backup-scheduler.js';
 import * as webdavBackup from '../services/backup-webdav.js';
+import { remoteFailure } from '../utils/http.js';
 
 const router = express.Router();
 const log = createLogger('Backup');
@@ -303,6 +304,22 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
 });
 
 /**
+ * The answer of a WebDAV route once its own cases are handled (Phase 0 section
+ * H): a refusal of the server as its class (502, `reason` + `detail` such as
+ * `HTTP 401` or `ECONNREFUSED`, which the backup page shows the admin), a
+ * database error as a fixed 500. Any other error counts as the remote side
+ * (`remote_failed`, no `detail`). Never the text of the server, of fetch or of
+ * the filesystem - it names URLs, status lines and absolute paths.
+ */
+function sendWebdavFailure(res, err, sentence) {
+  const failure = remoteFailure(err);
+  if (failure) {
+    return res.status(502).json({ error: 'The WebDAV server refused the request or could not be reached.', code: 502, ...failure });
+  }
+  return res.status(500).json({ error: sentence, code: 500 });
+}
+
+/**
  * POST /api/v1/backup/webdav/test
  * Tests the WebDAV connection.
  * Body: { url?, username?, password?, remotePath? }  (optional overrides)
@@ -324,7 +341,10 @@ router.post('/webdav/test', requireAdmin, async (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('WebDAV connection test failed:', err);
-    res.status(400).json({ error: err.message ?? 'Connection test failed.', code: 400 });
+    if (err.code === 'webdav_config_incomplete') {
+      return res.status(400).json({ error: err.message, code: 400, reason: 'webdav_config_incomplete' });
+    }
+    sendWebdavFailure(res, err, 'Connection test failed.');
   }
 });
 
@@ -338,7 +358,7 @@ router.get('/webdav/files', requireAdmin, async (req, res) => {
     res.json({ data: files });
   } catch (err) {
     log.error('WebDAV file listing failed:', err);
-    res.status(500).json({ error: err.message ?? 'Failed to list remote files.', code: 500 });
+    sendWebdavFailure(res, err, 'Failed to list remote files.');
   }
 });
 
@@ -350,12 +370,20 @@ router.get('/webdav/files', requireAdmin, async (req, res) => {
  */
 router.post('/webdav/trigger', requireAdmin, async (req, res) => {
   try {
-    const filePath = await createLocalBackup();
+    // Two steps with two kinds of failure: the local snapshot (filesystem,
+    // a fixed 500) and the upload (the server's answer, its class).
+    let filePath;
+    try {
+      filePath = await createLocalBackup();
+    } catch (err) {
+      log.error('WebDAV manual upload: local snapshot failed:', err);
+      return res.status(500).json({ error: 'The local backup could not be created.', code: 500 });
+    }
     await webdavBackup.uploadBackup(filePath);
     res.json({ data: { file: path.basename(filePath), timestamp: new Date().toISOString() } });
   } catch (err) {
     log.error('WebDAV manual upload failed:', err);
-    res.status(500).json({ error: err.message ?? 'WebDAV upload failed.', code: 500 });
+    sendWebdavFailure(res, err, 'WebDAV upload failed.');
   }
 });
 

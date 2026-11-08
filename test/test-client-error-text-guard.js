@@ -125,6 +125,13 @@ const ALLOWED = new Map([
   ['server/routes/subscriptions.js -> POST /logo-search', [1, "gated on err.code === logo_search_refused, the logo search's own sentences (subscription-logo.js logoRefusal)"]],
   ['server/routes/waste/sources.js -> icsTextForReimport', [1, 'only for the classes classifyFetchFailure() names from own errors (WasteFetchError status/size, BlockedAddressError); unreachable gets a fixed sentence']],
   ['server/routes/waste/sources.js -> emptyFeedResponse', [1, 'emptyFeedAsFetchFailure() only returns its own fixed WasteFetchError behind instanceof WasteValidationError + reason']],
+  ['server/routes/backup.js -> POST /webdav/test', [1, 'gated on err.code === webdav_config_incomplete, the WebDAV service\'s own sentence']],
+  ['server/routes/document-storage-google-drive.js -> sendStorageError', [1, 'only for a misconfiguration (400/409, storage codes of the service); a failure of the store gets a fixed sentence']],
+  ['server/routes/documents.js -> sendStorageError', [1, 'instanceof StorageError, and only for a misconfiguration (400/409) with configText; a failure of the store gets a fixed sentence']],
+  ['server/routes/modules.js -> GET /assets/:id/{*assetPath}', [1, 'only for resolveAssetPath\'s own 4xx (status < 500); a raw filesystem error gets a fixed sentence']],
+  ['server/routes/notifications.js -> sendChannelWriteFailure', [1, 'gated on err.code === notification_channel_invalid, set by the channel checks (checkedInput)']],
+  ['server/routes/shopping.js -> POST /:listId/send', [1, 'gated on err.code === nothing_open, set by buildShoppingListMail']],
+  ['server/routes/split-expenses.js -> sendWriteFailure', [1, 'gated on err.name === SplitInputError, the split rules\' own input errors']],
   ['server/services/document-deletion-lock.js -> sendDocumentDeletionConflict', [1, 'instanceof DocumentDeletionInProgressError']],
   ['server/services/document-links.js -> sendDocumentLinkRefusal', [1, 'instanceof DocumentLinkRefusedError']],
 ]);
@@ -134,24 +141,6 @@ const ALLOWED = new Map([
  * section H. `file -> function` -> hits. ONLY LOWER, down to an empty map.
  */
 const BASELINE = new Map([
-  // Class B: text of a foreign server, library or the network stack.
-  ['server/routes/backup.js -> POST /webdav/test', 1],
-  ['server/routes/backup.js -> GET /webdav/files', 1],
-  ['server/routes/backup.js -> POST /webdav/trigger', 1],
-  // Class C: our own refusal and foreign text in the same catch.
-  ['server/routes/document-storage-google-drive.js -> sendStorageError', 1],
-  ['server/routes/documents.js -> GET /storage/config', 1],
-  ['server/routes/documents.js -> PUT /storage/config', 1],
-  ['server/routes/documents.js -> POST /storage/test', 1],
-  ['server/routes/modules.js -> GET /assets/:id/{*assetPath}', 1],
-  ['server/routes/notifications.js -> POST /channels', 1],
-  ['server/routes/notifications.js -> PUT /channels/:id', 1],
-  ['server/routes/shopping.js -> POST /:listId/send', 1],
-  ['server/routes/split-expenses.js -> POST /groups/:id/expenses', 1],
-  ['server/routes/split-expenses.js -> PUT /expenses/:id', 1],
-  ['server/routes/split-expenses.js -> POST /groups/:id/settlements', 1],
-  ['server/routes/split-expenses.js -> POST /groups/:id/recurring', 1],
-  ['server/routes/split-expenses.js -> PUT /recurring/:id', 1],
 ]);
 
 // ── Scanner ──────────────────────────────────────────────────────────────────
