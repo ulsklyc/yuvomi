@@ -113,7 +113,7 @@ export function backupPaths() {
         summary: 'Test WebDAV backup connection',
         tag: 'Backup',
         admin: true,
-        description: 'Optional overrides `url`, `username`, `password`, `remotePath`; missing fields fall back to the stored configuration. An override with a different server (scheme, host and port) or username but no new password is refused with 400 and `errorCode: password_required` before any request is made, so the stored password never reaches a server it was not entered for.',
+        description: 'Optional overrides `url`, `username`, `password`, `remotePath`; missing fields fall back to the stored configuration. An override with a different server (scheme, host and port) or username but no new password is refused with 400 and `errorCode: password_required` before any request is made, so the stored password never reaches a server it was not entered for. Missing `url`, `username` or `password` answers 400 with `webdav_config_incomplete`. A refusal of the server answers 502 with `remote_auth_failed`, `remote_http_status`, `remote_unreachable` or `remote_failed` and the class in `detail` (`HTTP 401`, `ECONNREFUSED`), never the server\'s text.',
         stateChanging: true,
         requestBody: jsonBody(null),
       }),
