@@ -1969,6 +1969,7 @@
     },
     "settings": {
         "liveFolders": {
+            "tagNamesUnavailable": "Einige Tag-Namen konnten mit dem verwendeten Paperless-Token nicht gelesen werden. Prüfe die Tag-Leserechte und ob die Tags in Paperless noch existieren.",
             "title": "Live-Ordner Einstellungen",
             "description": "Verfügbare Tags und DMS-Anmeldung für Live-Ordner je Paperless-Verbindung verwalten.",
             "tokenMode": "DMS-Anmeldung",

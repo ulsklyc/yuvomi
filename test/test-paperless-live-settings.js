@@ -241,3 +241,11 @@ test('an empty allowlist preserves all existing tag assignments', async () => {
   assert.equal((await call('PUT', tagPath(), { tags: [7, 150, 8], expected_tags: [7, 150] })).status, 400);
   assert.deepEqual(assigned, [7, 150]);
 });
+
+test('catalogue permission failures explain that the DMS tag names are unavailable', async () => {
+  adapter.listTags = async () => { throw Object.assign(new Error('PRIVATE_UPSTREAM_BODY'), { status: 403 }); };
+  const result = await call('GET', `/live-settings/${accountId}/tags`);
+  assert.equal(result.status, 502);
+  assert.equal(result.body.reason, 'paperless_tag_names_unavailable');
+  assert.ok(!JSON.stringify(result.body).includes('PRIVATE_UPSTREAM_BODY'));
+});

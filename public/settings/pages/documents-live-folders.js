@@ -9,6 +9,7 @@ const text = (name) => t(key(name));
 function message(err) {
   const reason = err?.data?.reason;
   if (reason === 'paperless_folder_changed') return t('documents.paperless.errors.changed');
+  if (reason === 'paperless_tag_names_unavailable') return text('tagNamesUnavailable');
   if (reason === 'paperless_unavailable') return t('documents.paperless.errors.unavailable');
   if (reason === 'paperless_personal_token_invalid') return text('invalidToken');
   return text('error');
@@ -85,14 +86,14 @@ function buildAccount(account, { canManage, signal }) {
         ${settingRowHtml({ label: text('tags'), labelFor: tagsId, description: text('tagsHint'),
           control: `<select class="form-input" id="${tagsId}"><option value="all">${esc(text('allTags'))}</option><option value="selected">${esc(text('selectedTags'))}</option></select>` })}
       </div>
-      <fieldset class="settings-group" data-tags-picker hidden><legend>${esc(text('tags'))}</legend>
+      <fieldset class="settings-group" data-tags-picker><legend>${esc(text('tags'))}</legend>
         <div class="live-folder-settings__tags" data-tags-list></div>
         <button type="button" class="btn btn--secondary btn--sm" data-more-tags>${esc(t('documents.paperless.tags.more'))}</button>
       </fieldset>
       <div data-policy-error role="alert"></div>
       <div class="settings-form-actions"><button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button></div>`);
     const mode = form.querySelector(`#${modeId}`), tagsMode = form.querySelector(`#${tagsId}`);
-    const picker = form.querySelector('[data-tags-picker]'), list = form.querySelector('[data-tags-list]');
+    const list = form.querySelector('[data-tags-list]');
     const more = form.querySelector('[data-more-tags]'), error = form.querySelector('[data-policy-error]');
     const selected = new Set(account.allowed_tag_ids || []), tags = new Map();
     let page = 0, loading = false;
@@ -104,7 +105,9 @@ function buildAccount(account, { canManage, signal }) {
         const label = document.createElement('label');
         label.className = 'live-folder-settings__tag';
         const input = document.createElement('input');
-        input.type = 'checkbox'; input.value = String(id); input.checked = selected.has(id);
+        input.type = 'checkbox'; input.value = String(id);
+        input.checked = tagsMode.value === 'all' || selected.has(id);
+        input.disabled = tagsMode.value === 'all';
         input.addEventListener('change', () => input.checked ? selected.add(id) : selected.delete(id), options);
         label.append(input, document.createTextNode(` ${tags.has(id) ? `${tags.get(id)} (#${id})` : `#${id}`}`));
         list.append(label);
@@ -124,8 +127,8 @@ function buildAccount(account, { canManage, signal }) {
       finally { loading = false; if (current()) more.disabled = false; }
     }
     tagsMode.addEventListener('change', () => {
-      picker.hidden = tagsMode.value !== 'selected';
-      if (!picker.hidden && !page) loadTags();
+      drawTags();
+      if (!page) loadTags();
     }, options);
     more.addEventListener('click', () => loadTags(), options);
     form.addEventListener('submit', async (event) => {
@@ -145,10 +148,9 @@ function buildAccount(account, { canManage, signal }) {
       finally { if (current()) submit.disabled = false; }
     }, options);
     section.append(form);
-    picker.hidden = tagsMode.value !== 'selected';
     drawTags();
     // Start loading after the account section has been attached by render().
-    section.loadInitialTags = () => { if (!picker.hidden) return loadTags(); };
+    section.loadInitialTags = () => loadTags();
   } else {
     const hint = document.createElement('p');
     hint.className = 'form-hint';

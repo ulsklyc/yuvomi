@@ -191,6 +191,7 @@ test('batched tag lookup ignores unassigned names and skips empty assignments', 
   let calls = 0;
   globalThis.fetch = async (url) => {
     calls++;
+    if (url.includes('/api/tags/150/')) return new Response('{}', { status: 403 });
     assert.equal(new URL(url).searchParams.get('id__in'), '7,150');
     return new Response(JSON.stringify({ results: [{ id: 7, name: 'House' }, { id: 900, name: 'Secret' }], count: 2, next: null }));
   };
@@ -198,7 +199,7 @@ test('batched tag lookup ignores unassigned names and skips empty assignments', 
   assert.deepEqual(await source.getTags([]), []);
   assert.equal(calls, 0);
   assert.deepEqual(await source.getTags([7, 150]), [{ id: 7, name: 'House' }]);
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
 });
 
 test('operator logs contain response and upstream status codes without upstream messages or URLs', async (t) => {
@@ -213,4 +214,43 @@ test('operator logs contain response and upstream status codes without upstream 
   assert.ok(logs.some((line) => line.includes('502')));
   assert.ok(logs.some((line) => line.includes('500')));
   assert.ok(logs.every((line) => !/SECRET|private.invalid|http:/.test(line)));
+});
+
+test('assigned tag names are resolved beyond the first Paperless page without following next URLs', async () => {
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(url); calls.push(parsed);
+    return new Response(JSON.stringify(parsed.searchParams.get('page') === '2'
+      ? { count: 2, next: null, results: [{ id: 150, name: 'Off-page name' }] }
+      : { count: 2, next: 'https://invalid.example/token', results: [{ id: 7, name: 'Unassigned' }] }));
+  };
+  const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/paged-tags', api_token: 'test' });
+  assert.deepEqual(await source.getTags([150]), [{ id: 150, name: 'Off-page name' }]);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((url) => url.origin === 'http://127.0.0.1:1234'));
+  assert.equal(calls[1].searchParams.get('id__in'), '150');
+});
+
+test('missing batch names fall back to the assigned tag detail using the same token', async () => {
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, token: options.headers.Authorization });
+    if (url.includes('/api/tags/150/')) return new Response(JSON.stringify({ id: 150, name: 'Insurance' }));
+    return new Response(JSON.stringify({ count: 0, next: null, results: [] }));
+  };
+  const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/detail-tags', api_token: 'personal' });
+  assert.deepEqual(await source.getTags([150]), [{ id: 150, name: 'Insurance' }]);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every((call) => call.token === 'Token personal'));
+});
+
+test('tag catalogues accept unpaginated responses and include nested named tags once', async () => {
+  globalThis.fetch = async () => new Response(JSON.stringify([
+    { id: 7, name: 'House', children: [{ id: 150, name: 'Insurance' }] },
+    { id: 150, name: 'Insurance' },
+  ]));
+  const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/nested-tags', api_token: 'test' });
+  const result = await source.listTags();
+  assert.deepEqual(result.results, [{ id: 7, name: 'House' }, { id: 150, name: 'Insurance' }]);
+  assert.equal(result.has_more, false);
 });

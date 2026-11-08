@@ -28,6 +28,7 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
       <input type="search" class="form-input" id="pl-tag-search" disabled>
       <fieldset class="paperless-tags__choices" disabled><legend>${esc(t(key('assigned')))}</legend><div data-pl-tag-list></div></fieldset>
       <button type="button" class="btn btn--ghost btn--sm" data-pl-tag-more hidden>${esc(t(key('more')))}</button>
+      <p class="form-hint" role="status" data-pl-tag-names-warning hidden>${esc(t('settings.liveFolders.tagNamesUnavailable'))}</p>
       <p class="form-error" role="alert" data-pl-tag-error hidden></p>
       <div class="modal-panel__footer">
         <button type="button" class="btn btn--secondary" data-pl-tag-reload>${esc(t('documents.paperless.refresh'))}</button>
@@ -44,12 +45,14 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
       const search = panel.querySelector('#pl-tag-search');
       const status = panel.querySelector('[data-pl-tag-status]');
       const error = panel.querySelector('[data-pl-tag-error]');
+      const namesWarning = panel.querySelector('[data-pl-tag-names-warning]');
       const more = panel.querySelector('[data-pl-tag-more]');
       const reload = panel.querySelector('[data-pl-tag-reload]');
       const save = panel.querySelector('[type="submit"]');
       let tags = new Map();
       let selected = new Set();
       let expected = [];
+      let unresolved = new Set();
       let accountId;
       let catalogueFolderId;
       let editableTagIds = null;
@@ -66,17 +69,18 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
         fieldset.disabled = value || !canEdit;
       }
       function draw() {
+        namesWarning.hidden = unresolved.size === 0;
         const query = search.value.trim().toLocaleLowerCase();
-        const rows = [...tags.values()].filter((tag) => String(tag.name).toLocaleLowerCase().includes(query));
+        const rows = [...tags.values()].filter((tag) => String(tag.name).toLocaleLowerCase().includes(query) || String(tag.id).includes(query));
         list.replaceChildren();
-        list.insertAdjacentHTML('beforeend', rows.map((tag) => `<label class="paperless-tags__choice"><input type="checkbox" value="${esc(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''} ${editableTagIds !== null && !editableTagIds.includes(tag.id) ? 'disabled' : ''}> <span>${esc(tag.name)}</span></label>`).join(''));
+        list.insertAdjacentHTML('beforeend', rows.map((tag) => `<label class="paperless-tags__choice"><input type="checkbox" value="${esc(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''} ${editableTagIds !== null && !editableTagIds.includes(tag.id) ? 'disabled' : ''}> <span>${esc(tag.name)}${tag.name === `#${tag.id}` ? '' : ` (#${esc(tag.id)})`}</span></label>`).join(''));
         status.textContent = t(key(selected.size ? 'selection' : 'empty'), { count: selected.size });
       }
       async function catalogue() {
         const result = await api.get(`${ROOT}/tags?account_id=${accountId}&page=${page + 1}${catalogueFolderId ? `&folder_id=${catalogueFolderId}` : ''}`, { signal });
         if (!current()) return;
         page++;
-        for (const tag of result.data) tags.set(tag.id, tag);
+        for (const tag of result.data) { tags.set(tag.id, tag); unresolved.delete(tag.id); }
         more.hidden = !result.meta.has_more;
         draw();
       }
@@ -91,6 +95,7 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
           const result = await api.get(path, { signal });
           if (!current()) return;
           expected = result.data.tag_ids;
+          unresolved = new Set(result.data.unresolved_tag_ids || []);
           selected = new Set(expected);
           tags = new Map(result.data.tags.map((tag) => [tag.id, tag]));
           accountId = result.data.account_id;

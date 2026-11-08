@@ -3457,7 +3457,9 @@ views. This is a core extension, not a scheduled import.
 #### Live-folder settings
 
 Settings -> Modules -> Documents ends with **Live-folder settings**. Administrators
-choose authentication and available tags per Paperless connection. The defaults
+choose authentication and available tags per Paperless connection. The central
+catalogue is visible in all-tags mode too, with names and IDs; selecting an
+explicit allowlist enables its checkboxes. The defaults
 retain shared-token access and allow all tags. An explicit empty selection allows
 no tag changes. The tag allowlist limits additions and removals in Live folders;
 assignments outside it are preserved. Individually linked Documents keep their
@@ -3502,8 +3504,13 @@ Search filters the loaded catalogue. Assigned tags on unloaded pages remain
 selected; unchecking every assigned tag explicitly removes all assignments.
 Cancel does not write. No file is copied and no database migration is needed.
 
-Tag names are fetched with one `tags/?id__in=` request; omitted names fall
-back to `#ID`. Reads check source membership once and recheck local visibility
+Tag names normally use a batched `tags/?id__in=` request. The adapter reads
+subsequent pages when needed (up to ten), reconstructing local relative paths
+rather than following `next` URLs. If a batch omits assigned IDs, only those
+IDs are resolved through tag detail endpoints, with at most four concurrent
+requests and the same token/target guard. Unreadable or deleted tags retain
+`#ID` with a visible explanation; other failures remain errors. Flat, nested and unpaginated catalogues
+are normalized to ID/name pairs. Reads check source membership once and recheck local visibility
 after remote operations.
 
 Before saving, Yuvomi rechecks visibility, account identity, current view

@@ -17,6 +17,22 @@ const REQUEST_TIMEOUT_MS = 8000;
 const VIEW_CACHE_MS = 5000;
 const viewCache = new Map();
 
+// Tags may be flat or contain nested child objects. Keep the public contract
+// flat, deduplicated and limited to IDs/names, never provider metadata.
+function namedTags(rows) {
+  const result = new Map(), pending = [...rows];
+  let cursor = 0;
+  while (cursor < pending.length) {
+    if (cursor >= 10000) throw new PaperlessViewError('Invalid tag catalogue.');
+    const tag = pending[cursor++];
+    if (!tag || typeof tag !== 'object') continue;
+    const id = positiveId(tag.id);
+    if (id && typeof tag.name === 'string' && tag.name.trim()) result.set(id, { id, name: tag.name });
+    if (Array.isArray(tag.children)) pending.push(...tag.children);
+  }
+  return [...result.values()];
+}
+
 // Paperless-ngx handelt seine REST-API über einen versionierten Accept-Header aus.
 // Fehlt die Version, antworten manche Instanzen/Reverse-Proxies mit 406 Not
 // Acceptable (Issue #438). Wir fordern daher explizit eine breit unterstützte
@@ -214,9 +230,16 @@ export class PaperlessAdapter {
   }
 
   async listTags({ page = 1 } = {}) {
-    const result = await this.#viewPage(`/api/tags/?page=${positiveId(page) || 1}&page_size=100&ordering=name`);
-    return { ...result, results: result.results.filter((tag) => positiveId(tag.id))
-      .map(({ id, name }) => ({ id: Number(id), name: String(name ?? `#${id}`) })) };
+    return this.#tagPage(`/api/tags/?page=${positiveId(page) || 1}&page_size=100&ordering=name`);
+  }
+
+  async #tagPage(path) {
+    const body = await (await this.#request(path)).json();
+    if (Array.isArray(body)) return { results: namedTags(body), count: body.length, has_more: false };
+    if (!body || !Array.isArray(body.results) || !Number.isSafeInteger(body.count) || body.count < 0) {
+      throw new PaperlessViewError('Invalid tag pagination.');
+    }
+    return { results: namedTags(body.results), count: body.count, has_more: Boolean(body.next) };
   }
 
   async getTags(ids) {
@@ -225,12 +248,37 @@ export class PaperlessAdapter {
     }
     const wanted = [...new Set(ids.map(Number))];
     if (!wanted.length) return [];
-    const result = await this.#viewPage(`/api/tags/?id__in=${wanted.join(',')}&page_size=${wanted.length}`);
     const allowed = new Set(wanted);
-    // Missing/object-protected names fall back to #ID in the route. Never
-    // expose unassigned names even if an upstream ignores the filter.
-    return result.results.filter((tag) => allowed.has(Number(tag.id)))
-      .map(({ id, name }) => ({ id: Number(id), name: String(name ?? `#${id}`) }));
+    const found = new Map();
+    // Some servers cap page_size or return an incomplete filtered list. Keep
+    // batching as the normal path, but do not mistake page one for all names.
+    for (let page = 1; page <= 10; page++) {
+      let result;
+      try {
+        result = await this.#tagPage(`/api/tags/?id__in=${wanted.join(',')}&page_size=100&page=${page}`);
+      } catch (err) {
+        if (![400, 403, 404].includes(err.status)) throw err;
+        break;
+      }
+      for (const tag of result.results) if (allowed.has(tag.id)) found.set(tag.id, tag);
+      if (found.size === wanted.length || !result.has_more) break;
+    }
+    // Resolve only assigned IDs, with the same credentials and target guard.
+    // Object-protected/deleted tags retain their ID in the route's fallback.
+    const missing = wanted.filter((id) => !found.has(id));
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(4, missing.length) }, async () => {
+      while (cursor < missing.length) {
+        const id = missing[cursor++];
+        try {
+          const tag = await (await this.#request(`/api/tags/${id}/`)).json();
+          if (positiveId(tag?.id) !== id) throw new PaperlessViewError('Invalid tag identity.');
+          const named = namedTags([tag]).find((entry) => entry.id === id);
+          if (named) found.set(id, named);
+        } catch (err) { if (![403, 404].includes(err.status)) throw err; }
+      }
+    }));
+    return wanted.flatMap((id) => found.has(id) ? [found.get(id)] : []);
   }
 
   async setDocumentTags(id, tags) {

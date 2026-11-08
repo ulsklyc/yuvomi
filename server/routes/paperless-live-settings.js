@@ -86,7 +86,7 @@ router.get('/live-settings/:id/tags', refuseWhileRestoring, async (req, res) => 
     try { result = await adapterFactory(source).listTags({ page }); }
     catch (err) {
       if (Number.isInteger(err.status)) log.warn(`Paperless settings upstream request failed (status ${err.status}).`);
-      throw problem(502, 'paperless_unavailable');
+      throw problem(502, [401, 403].includes(err.status) ? 'paperless_tag_names_unavailable' : 'paperless_unavailable');
     }
     const current = account(req);
     if (current.api_token !== source.api_token || current.base_url !== source.base_url) throw problem(409, 'paperless_folder_changed');

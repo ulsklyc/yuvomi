@@ -132,7 +132,7 @@ async function readTags(req, res) {
       const names = new Map(named.map((tag) => [tag.id, tag.name]));
       const tags = tagIds.map((id) => ({ id, name: names.get(id) ?? `#${id}` }));
       recheck(req, context);
-      res.json({ data: { tags, tag_ids: tagIds, can_edit: context.canEdit,
+      res.json({ data: { tags, tag_ids: tagIds, unresolved_tag_ids: tagIds.filter((id) => !names.has(id)), can_edit: context.canEdit,
         ...(context.canEdit ? { account_id: context.source.id,
           ...(context.row.view_id !== undefined ? { catalogue_folder_id: context.row.id,
             editable_tag_ids: context.source.live_settings.allowed_tag_ids } : {}) } : {}) } });

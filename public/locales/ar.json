@@ -2216,6 +2216,7 @@
     },
     "settings": {
         "liveFolders": {
+            "tagNamesUnavailable": "Some tag names could not be read with the current Paperless token. Check tag read permissions and whether those tags still exist in Paperless.",
             "title": "Live-folder settings",
             "description": "Manage the available tags and DMS authentication for Live folders per Paperless connection.",
             "tokenMode": "DMS authentication",
