@@ -12,6 +12,7 @@ import path from 'node:path';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { sameCredentialOrigin } from '../utils/credential-origin.js';
+import { remoteFailure } from '../utils/http.js';
 
 const log = createLogger('BackupWebDAV');
 
@@ -394,7 +395,10 @@ export async function uploadBackup(localFilePath) {
     await rotateRemoteBackups(cfg, { protect: fileName });
   } catch (err) {
     log.error('WebDAV upload failed:', err);
-    cfgSet('webdav_backup_last_error', err.message ?? String(err));
+    // Shown on the backup page: the class of the failure (`HTTP 507`,
+    // `ECONNREFUSED`), never the server's or fetch's text with its URL
+    // (Phase 0 section H). The text is in the log above.
+    cfgSet('webdav_backup_last_error', remoteFailure(err)?.detail ?? 'WebDAV upload failed.');
     throw err;
   }
 }

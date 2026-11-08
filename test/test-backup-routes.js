@@ -422,6 +422,26 @@ test('GET /webdav/files: nicht erreichbares Ziel → 502 mit Klasse, ohne Adress
   assert.ok(!JSON.stringify(r.body).includes('127.0.0.1'), 'die Antwort nennt die Adresse nicht');
 });
 
+test('POST /webdav/trigger: ein nicht erreichbares Ziel hinterlaesst die Klasse als letzten Fehler, nie den Text', async () => {
+  // Phase 0, Abschnitt H: der gespeicherte Fehler geht mit dem Status an die
+  // Backup-Seite. Er nennt die Klasse (ECONNREFUSED), nicht den Text von fetch.
+  const closed = await new Promise((resolve) => {
+    const probe = http.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+  const put = await call('PUT', '/webdav/config', {
+    actor: ADM,
+    body: { enabled: true, url: `http://127.0.0.1:${closed}`, username: 'dav', password: 'x', remotePath: '/backups/', keep: 7 },
+  });
+  assert.equal(put.status, 200);
+  const r = await call('POST', '/webdav/trigger', { actor: ADM });
+  assert.equal(r.status, 502, JSON.stringify(r.body));
+  const status = await call('GET', '/webdav/config', { actor: ADM });
+  assert.equal(status.body.data.lastError, 'ECONNREFUSED', JSON.stringify(status.body.data));
+});
+
 // ── POST /restore: Größenlimit (413) ────────────────────────────────────────────
 test('POST /restore: Upload über dem Limit → 413', async () => {
   const tooLarge = Buffer.alloc(5 * 1024 * 1024, 0); // > 4mb
