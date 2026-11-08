@@ -399,16 +399,27 @@ test('PUT /webdav/config: neuer Server MIT neuem Passwort wird gespeichert', asy
   assert.equal(back.status, 200);
 });
 
-test('GET /webdav/files: nicht erreichbares Ziel → 500', async () => {
-  // Konfig auf einen refused-Port umbiegen: listRemoteBackups wirft → catch → 500.
+test('GET /webdav/files: nicht erreichbares Ziel → 502 mit Klasse, ohne Adresse', async () => {
+  // Konfig auf einen refused-Port umbiegen: listRemoteBackups wirft. Seit
+  // Phase 0 (Abschnitt H) kommt die Klasse statt des Textes von fetch, der
+  // Adresse und Port nennt.
+  // Ein frei gewordener Port statt :1 - fetch sperrt :1 selbst ("bad port").
+  const closed = await new Promise((resolve) => {
+    const probe = http.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
   const put = await call('PUT', '/webdav/config', {
     actor: ADM,
-    body: { enabled: true, url: 'http://127.0.0.1:1', username: 'dav', password: 'x', remotePath: '/backups/', keep: 7 },
+    body: { enabled: true, url: `http://127.0.0.1:${closed}`, username: 'dav', password: 'x', remotePath: '/backups/', keep: 7 },
   });
   assert.equal(put.status, 200);
   const r = await call('GET', '/webdav/files', { actor: ADM });
-  assert.equal(r.status, 500);
-  assert.ok(typeof r.body.error === 'string' && r.body.error.length > 0);
+  assert.equal(r.status, 502, JSON.stringify(r.body));
+  assert.equal(r.body.reason, 'remote_unreachable');
+  assert.equal(r.body.detail, 'ECONNREFUSED');
+  assert.ok(!JSON.stringify(r.body).includes('127.0.0.1'), 'die Antwort nennt die Adresse nicht');
 });
 
 // ── POST /restore: Größenlimit (413) ────────────────────────────────────────────
@@ -607,7 +618,7 @@ const leakyBase = await new Promise((r) => leakyServer.listen(0, '127.0.0.1', ()
 }));
 test.after(() => leakyServer.close());
 
-test('POST /webdav/test: a failing server answers with reason and class, never its own text', { todo: 'fix pending, Phase 0 section H PR 3' }, async () => {
+test('POST /webdav/test: a failing server answers with reason and class, never its own text', async () => {
   const r = await call('POST', '/webdav/test', {
     actor: ADM,
     body: { url: leakyBase, username: 'dav', password: 'other-secret', remotePath: '/backups/' },
