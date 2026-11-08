@@ -44,7 +44,8 @@ async function apiFetch(path) {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // `status` for the route's answer: the class, never a text (Phase 0 H).
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     return await res.json();
   } finally {
     clearTimeout(timer);

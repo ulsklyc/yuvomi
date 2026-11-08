@@ -18,6 +18,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
 import { startFakeDavServer } from './caldav-fake-server.js';
@@ -139,6 +140,22 @@ test('Apple: eine Adresse ohne http(s) und ein Konto ohne Kalender nennen ihren 
   const empty = await admin('POST', '/calendar/apple/connect', { url: dav.url, username: 'a@b.c', password: 'p' });
   assert.equal(empty.status, 400, JSON.stringify(empty.body));
   assert.equal(empty.body.reason, 'apple_no_calendars');
+});
+
+// Phase 0, Abschnitt H: ein Feed, der nicht erreichbar ist, kam bisher ueber ein
+// Textmuster als 400 mit dem Text von Node (Adresse und Port) zurueck.
+test('Import: ein nicht erreichbarer Feed kommt als Klasse, nie als Text', async () => {
+  const closed = await new Promise((resolve) => {
+    const probe = net.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+  const res = await withPrivateNetwork(() => admin('POST', '/calendar/import', { url: `http://127.0.0.1:${closed}/feed.ics` }));
+  assert.equal(res.status, 502, JSON.stringify(res.body));
+  assert.equal(res.body.reason, 'remote_unreachable');
+  assert.equal(res.body.detail, 'ECONNREFUSED');
+  assert.ok(!JSON.stringify(res.body).includes(String(closed)), 'die Antwort nennt den Port nicht');
 });
 
 test('Abo anlegen: Name, Adresse und privates Netz nennen ihren Fall', async () => {

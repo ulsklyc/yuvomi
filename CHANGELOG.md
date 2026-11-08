@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer now names the kind of failure instead: rejected sign-in, an HTTP status, or an
   unreachable server with its network code. Settings show that class to the administrator in
   their own language.
+- **Google, Outlook, feed imports, holiday sync and the logo search no longer pass foreign error
+  texts to the browser.** Missing configuration answered with the names of server variables, a
+  failed Google or Microsoft request with the text of their libraries, and an unreachable feed,
+  website or waste collection source with the network error naming host and port. These answers
+  now carry a fixed sentence with the kind of failure (`reason`, and the class such as
+  `HTTP 503` or `ECONNREFUSED` in `detail`); missing configuration and an expired Outlook sign-in
+  are cases of their own.
 
 ## [2.86.0] - 2026-11-07
 
