@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **A demoted administrator loses admin rights on every device** (#2611). The role of a signed-in
+  browser was taken from the stored session, and a demotion only updated the sessions that existed
+  at that moment. A sign-in that was still checking the password, or a request starting the SSO
+  link, could save the session again with the old administrator role and keep it for up to 90
+  days, past module rights as well. The role now comes from the account on every request, so a
+  demotion applies to every session at once.
 - **Medication reminders reach only members who may see Health, and never a household
   notification channel** (#2602, #2598). The medication scheduler sends on its own instead of
   going through the regular reminder delivery, and checked neither filter that path has. A
