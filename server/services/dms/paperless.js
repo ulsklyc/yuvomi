@@ -8,7 +8,8 @@
  *          why testConnection() goes through #fetch() too.
  * Dependencies: global fetch (Node >=22), ./guard.js
  */
-import { assertDmsTargetAllowed } from './guard.js';
+import { assertDmsTargetAllowed, DmsTargetError } from './guard.js';
+import { remoteFailure } from '../../utils/http.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
 // Paperless-ngx handelt seine REST-API über einen versionierten Accept-Header aus.
@@ -191,7 +192,12 @@ export class PaperlessAdapter {
       const res = await this.#fetch('/api/documents/?page_size=1');
       return { ok: res.ok, status: res.status };
     } catch (err) {
-      return { ok: false, status: 0, error: err.message };
+      // Phase 0 section H: the class of the failure, never its text - the
+      // connection test result goes to the browser as it is.
+      // The guard's refusal is our own sentence (about the address the admin
+      // entered) and stays.
+      if (err instanceof DmsTargetError) return { ok: false, status: 0, error: err.message };
+      return { ok: false, status: 0, error: 'The DMS could not be reached.', ...(remoteFailure(err) ?? { reason: 'remote_failed' }) };
     }
   }
 }
