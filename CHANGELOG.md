@@ -19,6 +19,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
 - **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+### Foundation
+- **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
+  service worker takes its offline list from the build instead of a hand-kept one; pages,
+  offline reach and the module API for third-party modules (`/api.js`, `/i18n.js`,
+  `/utils/html.js`) stay the same, so nothing changes on screen.
+- **The release tarball carries the built app** in `dist/` next to the source, together with
+  `THIRD-PARTY-NOTICES.txt`; the server starts only from a build and says so when `dist/` is
+  missing.
+- **For module authors: only `/api.js`, `/i18n.js` and `/utils/html.js` stay importable.**
+  Until now a third-party module could import any app file, for example
+  `/utils/page-layout.js`; with this release every other file ships inside the bundle under a
+  hashed name, and such an import stops the module from loading. Import only these three paths
+  and build the page markup yourself (the example in MODULES.md shows how).
+- **Yuvomi now needs Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4 on iPhone and
+  iPad).** Until now it still started down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5);
+  on Chrome 87 to 98 and Safari or iOS 14.1 to 15.3 it no longer does. Update the browser or
+  the device's system, or use another browser. Those browsers, and Firefox before 97, now get
+  a short page in German or English that names the versions and the way out, instead of an
+  empty app; Chrome 99 to 104 and Firefox 97 to 114 still start, with single screens that can
+  stay empty. The offline page now speaks English as well as German, and the supported
+  browsers are documented as one list instead of two.
+- **Menus behind a button now open on Firefox ESR 115 and Safari 15.4 to 16** (and Chrome
+  105 to 113): every "more" menu, the account menu, filters and the date field's calendar
+  stayed closed there. Those browsers now load a small polyfill for the Popover API; newer
+  browsers load nothing extra.
+- **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
+  serving the API on 3000; `npm run build` makes the production build.
 
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`

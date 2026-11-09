@@ -3927,7 +3927,8 @@
         "staleData": "Offline - állapot: {{time}}",
         "pageTitle": "Offline vagy",
         "pageDescription": "Ehhez az oldalhoz kapcsolat kell. Amint az eszközöd újra online, magától betöltődik.",
-        "snapshot": "Nincs kapcsolat a szerverrel - mentett állapot, csak olvasható"
+        "snapshot": "Nincs kapcsolat a szerverrel - mentett állapot, csak olvasható",
+        "unreachableBody": "A Yuvomi most nem érhető el. Ellenőrizd, hogy az eszközöd csatlakozik-e a hálózathoz, és fut-e a szerver, majd próbáld újra."
     },
     "shortcuts": {
         "search": "Keresés megnyitása",
@@ -6959,5 +6960,12 @@
         "custom": "Saját szín",
         "chooseCustom": "Saját szín választása",
         "standard": "Alapértelmezett szín"
+    },
+    "browserTooOld": {
+        "pageTitle": "Túl régi böngésző",
+        "title": "Ez a böngésző túl régi a Yuvomihoz",
+        "body": "A Yuvominak szüksége van néhány funkcióra, amelyet ez a böngésző még nem ismer. Az adataidat ez nem érinti.",
+        "versions": "A Yuvomi Chrome és Edge {{chrome}}, Firefox {{firefox}} és Safari {{safari}} verziótól fut, iPhone-on és iPaden iOS {{ios}} verziótól.",
+        "action": "Frissítsd a böngészőt vagy az eszközt, majd próbáld újra. Ha ez nem lehetséges, nyisd meg a Yuvomit egy másik böngészőben."
     }
 }

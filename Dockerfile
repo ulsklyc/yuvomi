@@ -18,9 +18,24 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Abhängigkeiten zuerst (Docker-Layer-Caching)
-COPY package*.json ./
-RUN npm ci --omit=dev
+# Abhängigkeiten zuerst (Docker-Layer-Caching), MIT den devDependencies: der
+# Build (Vite, Phase 1a Abschnitt D) braucht sie. Puppeteer laedt hier keinen
+# Chrome - er ist nur fuer die Browser-Tests da, nie im Image.
+COPY package*.json .npmrc ./
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+RUN npm ci
+
+# Die App bauen: public/ ist die Quelle, dist/ das, was der Server ausliefert.
+# Die Revision (Git-Commit des Build-Jobs) setzt der Build in dist/sw.js ein.
+COPY vite.config.ts ./
+COPY scripts/build/ ./scripts/build/
+COPY scripts/build-third-party-notices.mjs ./scripts/
+COPY public/ ./public/
+ARG APP_BUILD_REVISION
+RUN APP_BUILD_REVISION="${APP_BUILD_REVISION}" npm run build
+
+# Danach nur noch, was zur Laufzeit gebraucht wird.
+RUN npm prune --omit=dev
 
 # Jede Laufzeit-Abhaengigkeit muss hier laden, auf jeder Plattform einzeln.
 # 2.77.1 ging auf linux/arm64 ohne googleapis raus: npm hatte das damals
@@ -41,11 +56,17 @@ RUN setpriv --version
 
 WORKDIR /app
 
-# Node modules aus Build-Stage kopieren
+# Node modules (ohne devDependencies) und die gebaute App aus der Build-Stage.
 COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
 
-# Anwendungscode (docs/ wird via .dockerignore ausgeschlossen)
-COPY . .
+# Laufzeitcode. public/ bleibt im Image: der Server importiert Module aus
+# public/utils/ und liest public/locales/ (geteilter Code, Phase 2 zieht ihn
+# nach shared/). Ausgeliefert wird an den Browser nur dist/.
+COPY package.json package-lock.json setup.js LICENSE CHANGELOG.md ./
+COPY server/ ./server/
+COPY public/ ./public/
+COPY scripts/check-runtime-deps.mjs ./scripts/
 
 # Daten-Volume-Verzeichnisse anlegen (Permissions werden zur Laufzeit gesetzt)
 RUN mkdir -p /data /backups /app/modules /documents

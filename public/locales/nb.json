@@ -3927,7 +3927,8 @@
         "staleData": "Uten nett - per: {{time}}",
         "pageTitle": "Du er frakoblet",
         "pageDescription": "Denne siden trenger tilkobling. Så snart enheten er tilkoblet igjen, lastes den av seg selv.",
-        "snapshot": "Ingen forbindelse til serveren - lagrede data, kun lesing"
+        "snapshot": "Ingen forbindelse til serveren - lagrede data, kun lesing",
+        "unreachableBody": "Yuvomi kan ikke nås akkurat nå. Sjekk at enheten er tilkoblet og at serveren kjører, og prøv igjen."
     },
     "shortcuts": {
         "search": "Åpne søk",
@@ -6959,5 +6960,12 @@
         "custom": "Egen farge",
         "chooseCustom": "Velg egen farge",
         "standard": "Standardfarge"
+    },
+    "browserTooOld": {
+        "pageTitle": "Nettleseren er for gammel",
+        "title": "Denne nettleseren er for gammel for Yuvomi",
+        "body": "Yuvomi trenger noen funksjoner som denne nettleseren ikke har ennå. Dataene dine berøres ikke.",
+        "versions": "Yuvomi fungerer fra Chrome og Edge {{chrome}}, Firefox {{firefox}} og Safari {{safari}}, og på iPhone og iPad fra iOS {{ios}}.",
+        "action": "Oppdater nettleseren eller enheten, og prøv igjen. Går ikke det, åpner du Yuvomi i en annen nettleser."
     }
 }

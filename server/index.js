@@ -5,6 +5,9 @@
  */
 
 import './utils/load-file-secrets.js';
+// Vor Sperre und Datenbank: ohne gebaute App (dist/) startet nichts
+// (utils/frontend-dir.js). Der Handschlag oben bleibt der erste Import.
+import { FRONTEND } from './utils/require-frontend.js';
 import './utils/claim-instance-lock.js';
 import express from 'express';
 import helmet from 'helmet';
@@ -122,19 +125,19 @@ const logYuvomi = createLogger('Yuvomi');
 const { version: APP_VERSION } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf-8')
 );
-const SERVICE_WORKER_PATH = new URL('../public/sw.js', import.meta.url);
+// Der gebaute Worker (dist/sw.js) traegt Version und Revision schon; der
+// Loader ersetzt nur noch, wo das Token steht (utils/service-worker.js).
 const SERVICE_WORKER_OPTIONS = {
   appVersion: APP_VERSION,
   buildRevision: process.env.APP_BUILD_REVISION,
 };
-const getServiceWorkerResponse = createServiceWorkerResponseLoader(
-  SERVICE_WORKER_PATH,
-  SERVICE_WORKER_OPTIONS,
-);
+const getServiceWorkerResponse = FRONTEND.serviceWorker
+  ? createServiceWorkerResponseLoader(FRONTEND.serviceWorker, SERVICE_WORKER_OPTIONS)
+  : null;
 
-// Das prüft die Build-Revision schon beim Start und liefert in der Entwicklung
-// nach einer sw.js-Änderung dennoch die neue Quelle ohne manuellen Neustart.
-getServiceWorkerResponse();
+// Das prüft die Build-Revision schon beim Start und liefert nach einem neuen
+// Build dennoch die neue Datei ohne manuellen Neustart.
+getServiceWorkerResponse?.();
 const DEFAULT_APP_NAME = 'Yuvomi';
 
 // Der Vertrag fuer native Clients, als eine Zahl, die jeder vor der Anmeldung
@@ -301,6 +304,9 @@ if (process.env.NODE_ENV === 'production' && process.env.ENABLE_API_DOCS !== 'tr
 // /sw.js wird direkt darunter als no-store-Antwort gerendert.
 // --------------------------------------------------------
 app.get('/sw.js', (_req, res) => {
+  // Unter `npm run dev` gibt es keinen Worker (sw-register.js registriert ihn
+  // dort nicht); die Quelle ohne Precache-Liste soll auch Vite nicht ausliefern.
+  if (!getServiceWorkerResponse) return res.status(404).type('text/plain').send('No service worker under npm run dev.');
   const response = getServiceWorkerResponse();
   res.type(response.contentType);
   res.setHeader('Cache-Control', response.cacheControl);
@@ -309,10 +315,16 @@ app.get('/sw.js', (_req, res) => {
   res.send(response.body);
 });
 
-const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
+// Die gebaute App (Phase 1a, Abschnitt D). public/ bleibt Quelle - und Code,
+// den der Server selbst importiert (public/utils/, public/locales/).
+// Unter `npm run dev` gibt es kein dist/ (oder ein altes): Vite liefert dann
+// das Frontend, und hier fragt jeder Abruf eine Datei, die es nicht gibt, ab -
+// beide Wege unten reichen ihn weiter, die Shell-Route antwortet mit dem Hinweis.
+const STATIC_DIR = FRONTEND.dir ?? path.join(import.meta.dirname, '..', 'dist', '.vite-dev-unused');
+const HASHED_DIR = path.join(STATIC_DIR, 'assets') + path.sep;
 
 /**
- * Header jeder Datei aus public/ - EINE Funktion fuer beide Wege, auf denen sie
+ * Header jeder Datei aus dist/ - EINE Funktion fuer beide Wege, auf denen sie
  * das Haus verlaesst: express.static und die Brotli-Fassung aus dem Speicher
  * (utils/static-assets.js). Sonst traegt dieselbe Adresse je nach Weg ein
  * anderes Cache-Control.
@@ -320,7 +332,12 @@ const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
 function setStaticHeaders(res, filePath, stat) {
   const ext = path.extname(filePath).toLowerCase();
   const isPwaIcon = /\/icons\/(icon-|apple-touch-icon|favicon)/.test(filePath);
-  if (isPwaIcon) {
+  if (filePath.startsWith(HASHED_DIR)) {
+    // Gehashte Chunks (und ihre Sourcemaps): der Name wechselt mit dem Inhalt,
+    // ein Jahr unveraenderlich. Fassaden (/api.js, /i18n.js, /utils/html.js),
+    // HTML, sw.js und die kopierten Dateien bleiben unten bei no-cache.
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  } else if (isPwaIcon) {
     // PWA-Icons müssen bei Deployments sofort aktualisiert werden
     res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   } else if (['.png', '.jpg', '.jpeg', '.ico', '.svg', '.webp', '.woff2', '.woff'].includes(ext)) {
@@ -349,7 +366,7 @@ function setStaticHeaders(res, filePath, stat) {
 
 // STATIC_BROTLI=off schaltet nur die vorkomprimierte Auslieferung ab; die
 // compression()-Middleware oben uebernimmt dann jede Anfrage wie vor R18.
-const staticAssets = createStaticAssets(PUBLIC_DIR, {
+const staticAssets = createStaticAssets(STATIC_DIR, {
   brotli: String(process.env.STATIC_BROTLI || '').trim().toLowerCase() !== 'off',
   setHeaders: setStaticHeaders,
 });
@@ -371,11 +388,11 @@ const staticStoreLimiter = rateLimit({
 Object.defineProperty(staticStoreLimiter, 'name', { value: 'staticStoreLimiter' });
 app.use(staticStoreLimiter, staticAssets.middleware);
 
-app.use(express.static(PUBLIC_DIR, {
+app.use(express.static(STATIC_DIR, {
   etag: true,
   lastModified: true,
   // Kein automatischer Trailing-Slash-Redirect für Verzeichnisse (z. B. /settings →
-  // /settings/), sonst kollidiert das public/settings/-Verzeichnis mit der SPA-Route
+  // /settings/), sonst kollidiert ein settings/-Verzeichnis mit der SPA-Route
   // /settings und der Client-Router landet beim Hard-Load auf dem Dashboard.
   redirect: false,
   setHeaders: setStaticHeaders,
@@ -919,7 +936,19 @@ app.get('/{*path}', spaLimiter, (req, res) => {
   // Segment des absoluten Pfads auf Dotfiles pruefen - liegt der Checkout unter
   // einem Dot-Verzeichnis (z. B. ~/.claude/...), liefert jede Deep-URL 500.
   // Mit root prueft `send` nur den relativen Teil ('index.html').
-  res.sendFile('index.html', { root: path.join(import.meta.dirname, '..', 'public') });
+  if (FRONTEND.mode === 'vite-dev') {
+    return res.status(404).type('text/plain').send('npm run dev: the app is served by Vite on http://localhost:5173');
+  }
+  // Die Shell nur fuer Routen der App: ohne Dateiendung und nicht unter
+  // /assets/. Eine fehlende Datei ist ein 404 - nach einem Release sind die
+  // Chunk-Adressen offener Tabs weg, und ein 200 mit index.html legte der
+  // Service Worker ueber die gute Precache-Kopie (Review auf #2631). Dieselbe
+  // Grenze zieht isAppRouteNavigation() in sw.js.
+  const lastSegment = req.path.slice(req.path.lastIndexOf('/') + 1);
+  if (req.path.startsWith('/assets/') || /\.[a-z0-9]+$/i.test(lastSegment)) {
+    return res.status(404).type('text/plain').send('Not found.');
+  }
+  res.sendFile('index.html', { root: STATIC_DIR });
 });
 
 // --------------------------------------------------------

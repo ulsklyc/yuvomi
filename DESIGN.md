@@ -30,6 +30,11 @@ colors:
   border-subtle: "#EDEAE3"
   border-strong: "#CFC9BC"
   ink-on-vivid: "#FFFFFF"
+  # Dark-Tinte auf den vividen Fuellungen und das dunkle Inset-Well (tokens.css
+  # --_color-ink-on-vivid, --_color-surface-3, Dark-Block): stehen hier, weil
+  # offline.html und browser-too-old.html sie als Literal spiegeln (Phase 1a E).
+  ink-on-vivid-dark: "#0A0A0C"
+  fill-well-dark: "#37332E"
   success: "#1E7B35"
   warning: "#A85D00"
   danger: "#D70015"

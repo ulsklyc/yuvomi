@@ -19,6 +19,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
+import { isPrecachedSource } from './dist-build.js';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -976,10 +977,10 @@ test('die Detailansicht ist in der Shell eingebunden', async () => {
   assert.match(html, /styles\/detail-view\.css/, 'geteilte Komponenten-CSS gehört in die Shell');
 });
 
-test('Komponente und Stil liegen im Precache', async () => {
-  const sw = await read('public/sw.js');
-  assert.match(sw, /'\/components\/detail-view\.js'/, 'sonst fehlt sie offline');
-  assert.match(sw, /'\/styles\/detail-view\.css'/);
+test('Komponente und Stil liegen im Precache', () => {
+  // Seit dem Build: gelesen am Artefakt (dist/sw.js + Chunk-Karte), nicht an einer Hand-Liste.
+  assert.ok(isPrecachedSource('/components/detail-view.js'), 'sonst fehlt sie offline');
+  assert.ok(isPrecachedSource('/styles/detail-view.css'));
 });
 
 // --------------------------------------------------------

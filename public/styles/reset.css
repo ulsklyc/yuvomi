@@ -127,10 +127,21 @@ img, svg, video {
  * Menue unsichtbar macht. Ergebnis: jedes Panel der Seite stand offen und fing
  * die Klicks darunter ab.
  *
- * Hier wird die UA-Regel genau dort nachgereicht, wo sie fehlt. Die Menues
- * sind in diesen Browsern NICHT verfuegbar, statt offen zu stehen
- * (docs/installation.md, "Browser Support"); einen Polyfill gibt es bewusst
- * nicht. `@supports selector()` kennt schon die Mindestversion der App.
+ * Hier wird die UA-Regel genau dort nachgereicht, wo sie fehlt.
+ * `@supports selector()` kennt schon die Mindestversion der App.
+ *
+ * SEIT PHASE 1a E OEFFNEN SIE AUCH DORT (Entscheidung Ulas 09.11.2026): wo die
+ * API fehlt, laedt der Router `@oddbird/popover-polyfill`
+ * (utils/popover-support.js). Der kennt `:popover-open` in CSS nicht und setzt
+ * am offenen Popover die Klasse `.\:popover-open`. Jede Regel der App, die ein
+ * offenes Popover erst zeigt (`display`, Blende, Zeiger), steht deshalb hier
+ * noch einmal als Zwilling an dieser Klasse - sonst stuende das Menue offen,
+ * aber unsichtbar. Die Zwillinge haben zwei Klassen Spezifitaet und schlagen
+ * damit die Grundregeln der Seitenblaetter, die spaeter laden. Der Polyfill
+ * hat keinen Top-Layer: der z-index hebt das offene Popover ueber Dialoge und
+ * Meldungen. test:old-browser-fallbacks verlangt fuer jede `:popover-open`-
+ * Regel ihren Zwilling hier. Laedt der Polyfill nicht, traegt kein Element die
+ * Klasse, und die Menues bleiben zu wie vorher.
  *
  * `[popover]` hat die Spezifitaet einer Klasse und steht im ersten Blatt nach
  * den Tokens: eine spaetere Regel, die `display` an einer Popover-Klasse setzt,
@@ -140,6 +151,24 @@ img, svg, video {
 @supports not selector(:popover-open) {
   [popover] {
     display: none;
+  }
+
+  [popover].\:popover-open {
+    display: block;
+    z-index: 2147483647;
+  }
+
+  .popover-menu.\:popover-open,
+  .documents-context-menu.\:popover-open {
+    display: flex;
+  }
+
+  .filter-popover.\:popover-open,
+  .ydp-popover.\:popover-open,
+  .documents-context-menu.\:popover-open {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
   }
 }
 

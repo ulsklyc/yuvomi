@@ -3927,7 +3927,8 @@
         "staleData": "Hors ligne - état : {{time}}",
         "pageTitle": "Tu es hors ligne",
         "pageDescription": "Cette page a besoin d’une connexion. Dès que ton appareil est de nouveau en ligne, elle se charge toute seule.",
-        "snapshot": "Pas de connexion au serveur - données enregistrées, lecture seule"
+        "snapshot": "Pas de connexion au serveur - données enregistrées, lecture seule",
+        "unreachableBody": "Yuvomi est injoignable pour le moment. Vérifie que ton appareil est connecté et que le serveur fonctionne, puis réessaie."
     },
     "emptyHint": {
         "recipes": "Une recette va directement au plan de repas ou sur la liste de courses.",
@@ -6959,5 +6960,12 @@
         "custom": "Couleur personnalisée",
         "chooseCustom": "Choisir une couleur personnalisée",
         "standard": "Couleur par défaut"
+    },
+    "browserTooOld": {
+        "pageTitle": "Navigateur trop ancien",
+        "title": "Ce navigateur est trop ancien pour Yuvomi",
+        "body": "Yuvomi a besoin de quelques fonctions que ce navigateur ne connaît pas encore. Tes données ne sont pas concernées.",
+        "versions": "Yuvomi fonctionne à partir de Chrome et Edge {{chrome}}, Firefox {{firefox}} et Safari {{safari}}, et sur iPhone et iPad à partir d’iOS {{ios}}.",
+        "action": "Mets à jour le navigateur ou l’appareil, puis réessaie. Si ce n’est pas possible, ouvre Yuvomi dans un autre navigateur."
     }
 }

@@ -19,13 +19,24 @@
  *           Startpfad also die App, sonst einen ganzen Bildschirm (#1369).
  *        4. GANZE BLOECKE. Kein Stylesheet nutzt ein Konstrukt, bei dem ein
  *           Browser an der Mindestversion einen ganzen Block verwirft
- *           (`@layer`, `@scope`, Nesting, Media-Bereichssyntax) (#1369).
+ *           (`@scope`, Nesting, Media-Bereichssyntax; `@layer` bis Phase 1a E) (#1369).
  *        5. POPOVER. Ohne Popover-API bleibt jedes Popover zu: reset.css reicht
  *           die UA-Regel `[popover] { display: none }` nach, und keine Regel
  *           schlaegt sie mit einem `display` an einer Popover-Klasse (#2107).
+ *           Seit Phase 1a E oeffnen sie dort trotzdem: der Router laedt den
+ *           Popover-Polyfill nur ohne die API, und jede Regel des offenen
+ *           Zustands hat ihren Zwilling an `.\:popover-open` (5b).
  *
  * DIE MINDESTVERSION steht in docs/installation.md, Abschnitt "Browser
- * Support", zweite Tabellenzeile - gemessen am 21.09.2026 (#1369). Die Suite
+ * Support", in der Zeile "Starts, every screen opens, scrolls" - erst
+ * gemessen am 21.09.2026 (#1369: Chrome 87, Firefox 79, Safari 14.1), seit
+ * Phase 1a E (09.11.2026) die eine Matrix = `build.target` (Chrome 105,
+ * Firefox 115, Safari/iOS 15.4). Mit der Anhebung fielen aus den Listen:
+ * `Object.hasOwn`, `.at()`, `findLast`/`findLastIndex`, `structuredClone`,
+ * `crypto.randomUUID`, private Klassenglieder und `@layer`. Die Rueckfaelle,
+ * die der Code fuer die alte Grenze traegt (pickLocale ohne hasOwn,
+ * formatUnit ohne findLastIndex), bleiben samt ihren Programm-Tests stehen;
+ * ihr Abbau ist ein eigenes Ticket. Die Suite
  * liest sie dort und prueft jeden Eintrag ihrer Verbotslisten dagegen: ein
  * Eintrag, den die Mindestversion schon kann, ist ueberfluessig. Hebt jemand
  * die Mindestversion, meldet die Suite genau die Eintraege, die dann fallen.
@@ -521,7 +532,7 @@ const newer = (a, b) => {
 const describeSince = (since) => ENGINES.map((e) => `${ENGINE_NAMES[e]} ${since[e]}`).join(', ');
 
 /**
- * Die zweite Zeile der Tabelle in docs/installation.md ("Starts, every screen
+ * Die Zeile der Tabelle in docs/installation.md ("Starts, every screen
  * opens, scrolls"): Chrome, Firefox, Safari (macOS), iOS. Gelesen und nicht
  * abgeschrieben - sonst stuende dieselbe Zahl an zwei Stellen, und nur eine
  * davon waere die gepruefte.
@@ -553,43 +564,12 @@ test('die Mindestversion steht lesbar in docs/installation.md', () => {
  * ────────────────────────────────────────────────────────────────────────── */
 
 // APIs, die neuer sind als die Mindestversion und die man leicht hinschreibt.
-// Versionen aus MDN browser-compat-data 8.1.2 (#1369). Eine Liste von Hand und
+// Versionen aus MDN browser-compat-data 8.1.2 (#1369). Seit der Anhebung auf
+// 105/115/15.4 (Phase 1a E) gestrichen, weil die Grenze sie kann: Object.hasOwn,
+// .at(), findLast/findLastIndex, structuredClone, crypto.randomUUID. Eine Liste von Hand und
 // keine vollstaendige Pruefung: sie haelt die haeufigen Griffe fest, nicht
 // jede denkbare API.
 const STARTUP_FORBIDDEN = [
-  {
-    api: 'Object.hasOwn',
-    since: { chrome: '93', firefox: '92', safari: '15.4' },
-    instead: 'Object.prototype.hasOwnProperty.call(obj, key)',
-    patterns: [
-      /\bObject\s*(?:\.\s*hasOwn|\[\s*(['"`])hasOwn\1\s*\])(?![\w$])/,
-      /\{[^{}]*\bhasOwn\b[^{}]*\}\s*=\s*Object\b/,
-    ],
-  },
-  {
-    api: 'Array.prototype.at / String.prototype.at',
-    since: { chrome: '92', firefox: '90', safari: '15.4' },
-    instead: 'list[list.length - 1]',
-    patterns: [/\.\s*at\s*\(/],
-  },
-  {
-    api: 'Array.prototype.findLast / findLastIndex',
-    since: { chrome: '97', firefox: '104', safari: '15.4' },
-    instead: 'eine Schleife von hinten',
-    patterns: [/\.\s*findLast(?:Index)?\s*\(/],
-  },
-  {
-    api: 'structuredClone',
-    since: { chrome: '98', firefox: '94', safari: '15.4' },
-    instead: 'JSON.parse(JSON.stringify(x)) oder eine gezielte Kopie',
-    patterns: [/\bstructuredClone\s*\(/],
-  },
-  {
-    api: 'crypto.randomUUID',
-    since: { chrome: '92', firefox: '95', safari: '15.4' },
-    instead: 'crypto.getRandomValues()',
-    patterns: [/\.\s*randomUUID\s*\(/],
-  },
   {
     api: 'Array.prototype.toSorted / toReversed / toSpliced',
     since: { chrome: '110', firefox: '115', safari: '16' },
@@ -692,29 +672,19 @@ test('Leser: auskommentierte Skripte zaehlen nicht, auch hinter einem offenen Ko
   ]);
 });
 
-test('Leser: findet Object.hasOwn in jeder Form, Kommentare und hasOwnProperty nicht (erfundene Faelle)', () => {
-  const hits = (source) => forbiddenCalls(source).map((hit) => hit.number);
-  assert.deepEqual(hits('if (Object.hasOwn(o, k)) {}'), [1]);
-  assert.deepEqual(hits("x = Object['hasOwn'](o, k);"), [1]);
-  assert.deepEqual(hits('const { hasOwn } = Object;'), [1]);
-  assert.deepEqual(hits('Object.prototype.hasOwnProperty.call(o, k);'), []);
-  assert.deepEqual(hits('// statt Object.hasOwn\n * Object.hasOwn im Kommentar\nok();'), []);
-});
-
 test('Leser: findet die neueren APIs, nicht ihre aelteren Namensvettern (erfundene Faelle)', () => {
   const apis = (source) => forbiddenCalls(source).map((hit) => hit.rule.api);
-  assert.deepEqual(apis('const last = parts.at(-1);'), ['Array.prototype.at / String.prototype.at']);
-  assert.deepEqual(apis('const i = parts.findLastIndex((p) => p);'), ['Array.prototype.findLast / findLastIndex']);
-  assert.deepEqual(apis('const copy = window.structuredClone(x);'), ['structuredClone']);
-  assert.deepEqual(apis('const id = crypto.randomUUID();'), ['crypto.randomUUID']);
   assert.deepEqual(apis('const s = list.toSorted();'), ['Array.prototype.toSorted / toReversed / toSpliced']);
   assert.deepEqual(apis('const g = Object.groupBy(xs, f);'), ['Object.groupBy / Map.groupBy']);
   assert.deepEqual(apis('const { promise } = Promise.withResolvers();'), ['Promise.withResolvers']);
   assert.deepEqual(apis('fetch(u, { signal: AbortSignal.timeout(5000) });'), ['AbortSignal.timeout']);
   assert.deepEqual(apis('const s = AbortSignal.any([a, b]);'), ['AbortSignal.any']);
   assert.deepEqual(apis('const xs = await Array.fromAsync(it);'), ['Array.fromAsync']);
-  // Die aelteren Nachbarn bleiben erlaubt.
+  // Die aelteren Nachbarn bleiben erlaubt, und was die Grenze seit 105/115/15.4
+  // kann, ebenso.
   assert.deepEqual(apis([
+    'if (Object.hasOwn(o, k)) {} const last = parts.at(-1);',
+    'const i = parts.findLastIndex((p) => p); const id = crypto.randomUUID();',
     'const i = parts.findIndex((p) => p);',
     'const d = new Date(at); const v = row.attr; const c = item.atTop;',
     'list.sort(); list.reverse(); list.splice(1, 1); list.toString();',
@@ -838,11 +808,6 @@ test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text'
  */
 const MODULE_SYNTAX_FORBIDDEN = [
   {
-    syntax: 'private Klassenglieder (#feld, #methode(), #x in obj)',
-    since: { chrome: '74', firefox: '90', safari: '14.1' },
-    patterns: [/\.\s*#[A-Za-z_$]/, /#[A-Za-z_$][\w$]*\s+in\s/],
-  },
-  {
     syntax: 'statischer Initialisierungsblock (static { ... })',
     since: { chrome: '94', firefox: '93', safari: '16.4' },
     patterns: [/\bstatic\s*\{/],
@@ -877,13 +842,13 @@ function appScripts() {
 
 test('Leser: erkennt neuere Syntax, nicht ihre Doppelgaenger in Strings (erfundene Faelle)', () => {
   const kinds = (source) => syntaxHits(source).map((hit) => hit.rule.syntax.split(' ')[0]);
-  assert.deepEqual(kinds('class A { #n = 0; get n() { return this.#n; } }'), ['private']);
-  assert.deepEqual(kinds('if (#brand in obj) {}'), ['private']);
   assert.deepEqual(kinds('class A { static { init(); } }'), ['statischer']);
   assert.deepEqual(kinds('const re = /(?<=\\$)\\d+/;'), ['Lookbehind']);
   assert.deepEqual(kinds("const re = new RegExp('(?<!a)b');"), ['Lookbehind']);
-  // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte Gruppen.
+  // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte
+  // Gruppen und private Klassenglieder (Safari 14.1, unter der Grenze seit Phase 1a E).
   assert.deepEqual(kinds([
+    'class A { #n = 0; get n() { return this.#n; } }',
     "el.style.color = '#fff'; const sel = '#main-content'; location.hash = '#top';",
     'const css = `.x { color: #1a1a18; }`;',
     'class B { static formAssociated = true; static get observedAttributes() { return []; } }',
@@ -925,7 +890,8 @@ test('kein Modul der App traegt Syntax, die neuer ist als die Mindestversion (#1
  * Eine unbekannte Eigenschaft kostet eine Zeile; diese Konstrukte kosten einen
  * ganzen Block, und darin kann die Hoehe der Shell, die Lage der Navigation
  * oder ein Dialog stehen. Heute nutzt kein Stylesheet der App eines davon.
- *   - `@layer` / `@scope`: der Block faellt weg, samt allem darin;
+ *   - `@scope`: der Block faellt weg, samt allem darin (`@layer` stand hier
+ *     bis zur Anhebung auf 105/115/15.4, die es kann);
  *   - Nesting: die verschachtelte Regel faellt weg;
  *   - Bereichssyntax in `@media` (`width >= 768px`): die Bedingung ist
  *     ungueltig, der Block greift nie - die responsive Regel ist weg.
@@ -933,7 +899,6 @@ test('kein Modul der App traegt Syntax, die neuer ist als die Mindestversion (#1
  * Verfeinerung oberhalb der Mindestversion (docs/installation.md).
  */
 const CSS_BLOCK_DROPPERS = [
-  { construct: '@layer', since: { chrome: '99', firefox: '97', safari: '15.4' } },
   { construct: '@scope', since: { chrome: '118', firefox: '146', safari: '26.4' } },
   { construct: 'CSS-Nesting', since: { chrome: '120', firefox: '117', safari: '17.2' } },
   { construct: 'Bereichssyntax in @media', since: { chrome: '104', firefox: '102', safari: '16.4' } },
@@ -947,7 +912,7 @@ const RANGE_FEATURE = /\([^():]*[<>=][^():]*\)/;
 function blockDropperFindings(css) {
   const findings = [];
   const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const match of plain.matchAll(/@(layer|scope)\b/gi)) {
+  for (const match of plain.matchAll(/@(scope)\b/gi)) {
     findings.push({ construct: `@${match[1].toLowerCase()}`, where: plain.slice(match.index, match.index + 60).split('\n')[0] });
   }
   for (const { selector, body, at } of eachRule(css)) {
@@ -969,16 +934,17 @@ function blockDropperFindings(css) {
 
 test('Leser: erkennt die Block-Konstrukte, nicht ihre harmlosen Nachbarn (erfundene Faelle)', () => {
   const kinds = (css) => blockDropperFindings(css).map((f) => f.construct);
-  assert.deepEqual(kinds('@layer base { .a { color: red } }'), ['@layer']);
-  assert.deepEqual(kinds('@layer base, theme;'), ['@layer']);
   assert.deepEqual(kinds('@scope (.card) { img { border: 0 } }'), ['@scope']);
   assert.deepEqual(kinds('.a { color: red; .b { color: blue } }'), ['CSS-Nesting']);
   assert.deepEqual(kinds('.a { &:hover { color: blue } }'), ['CSS-Nesting']);
   assert.deepEqual(kinds('@media (width >= 768px) { .a { display: flex } .b { gap: 0 } }'), ['Bereichssyntax in @media']);
   assert.deepEqual(kinds('@media (400px < width < 800px) { .a { display: flex } }'), ['Bereichssyntax in @media']);
   // Erlaubt: klassische Media-Merkmale, @supports und @container, @starting-style,
-  // @keyframes, ein Kommentar ueber @layer.
+  // @keyframes, und `@layer` (Chrome 99, Firefox 97, Safari 15.4 - unter der
+  // Grenze seit Phase 1a E; ob ein Blatt es nutzt, entscheidet DECISIONS 14).
   assert.deepEqual(kinds([
+    '@layer base { .a { color: red } }',
+    '@layer base, theme;',
     '/* frueher @layer base */',
     '@media (min-width: 768px) and (max-height: 499px) { .a { display: flex } }',
     '@supports (height: 100dvh) { :root { --h: 100dvh } }',
@@ -1035,8 +1001,8 @@ test('die Pille der Kapsel steht nur dort, wo translate gilt', () => {
 /**
  * Jedes Popover der App verlaesst sich fuer den geschlossenen Zustand auf das
  * UA-Blatt (`[popover] { display: none }`). Ein Browser ohne die API (Chrome
- * < 114, Firefox < 125, Safari < 17, also zwischen den beiden Zeilen der
- * Doku) hat diese Regel nicht und verwirft jede Autorenregel mit
+ * < 114, Firefox < 125, Safari < 17, also ueber der Untergrenze der Doku)
+ * hat diese Regel nicht und verwirft jede Autorenregel mit
  * `:popover-open`, auch `.popover-menu:not(:popover-open)`. In einer WebView
  * mit Chrome 106 stand deshalb jedes Menue der Seite offen und fing die Klicks
  * darunter ab. reset.css reicht die UA-Regel in
@@ -1191,6 +1157,169 @@ test('keine Regel setzt display an einem Popover ausserhalb von :popover-open (#
     'Diese Regel schlaegt in einem Browser ohne Popover-API den Rueckfall `[popover] { display: none }` '
     + '(reset.css) - das Panel stuende offen. `display` an einem Popover nur unter `:popover-open`:\n'
     + offenders.join('\n'));
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * (5b) Der Popover-Polyfill (Phase 1a E, Entscheidung Ulas 09.11.2026)
+ *
+ * Wo die API fehlt (Chrome 105-113, Firefox 115-124, Safari 15.4-16), laedt
+ * der Router `@oddbird/popover-polyfill` (utils/popover-support.js). Zwei
+ * Zusagen:
+ *   1. Der Polyfill kommt NUR per dynamischem Import hinter der Probe - nie
+ *      statisch, sonst laedt ihn jeder Browser (und Vite legte ihn in den
+ *      Start-Chunk).
+ *   2. Er kennt `:popover-open` in CSS nicht, sondern setzt die Klasse
+ *      `.\:popover-open`. Jede Regel, die ein offenes Popover erst zeigt
+ *      (`display`, `opacity`, `transform`, `pointer-events`), hat ihren
+ *      Zwilling an dieser Klasse im Rueckfall-Block von reset.css - sonst
+ *      stuende das Menue offen, aber unsichtbar.
+ * ────────────────────────────────────────────────────────────────────────── */
+const POLYFILL = '@oddbird/popover-polyfill';
+const OPEN_STATE_PROPS = ['display', 'opacity', 'transform', 'pointer-events'];
+
+/**
+ * Statische und dynamische Importe des Polyfills in einer Quelle.
+ * @param {string} source
+ */
+function polyfillImports(source) {
+  const { static: statics, dynamic } = moduleSpecifiers(source);
+  const ofPolyfill = (/** @type {string} */ spec) => spec === POLYFILL || spec.startsWith(`${POLYFILL}/`);
+  return { static: statics.filter(ofPolyfill), dynamic: dynamic.filter(ofPolyfill) };
+}
+
+/**
+ * Klasse -> Eigenschaften, die eine Grundebenen-Regel `.x:popover-open` setzt.
+ * @param {string} css
+ */
+function openStateRules(css) {
+  /** @type {Map<string, Set<string>>} */
+  const map = new Map();
+  for (const { selector, body, at } of eachRule(css)) {
+    if (at.length) continue;
+    for (const part of selectorParts(selector)) {
+      const cls = part.match(/^\.([\w-]+):popover-open$/)?.[1];
+      if (!cls) continue;
+      const props = declarations(body).map((d) => d.property).filter((p) => OPEN_STATE_PROPS.includes(p));
+      if (props.length) map.set(cls, new Set([...(map.get(cls) ?? []), ...props]));
+    }
+  }
+  return map;
+}
+
+/**
+ * Klasse -> Eigenschaften ihrer Zwillinge `.x.\:popover-open` im Rueckfall-Block.
+ * @param {string} css
+ */
+function polyfillTwins(css) {
+  /** @type {Map<string, Set<string>>} */
+  const map = new Map();
+  for (const { selector, body, at } of eachRule(css)) {
+    if (at.length !== 1 || !POPOVER_FALLBACK_AT.test(at[0])) continue;
+    for (const part of selectorParts(selector)) {
+      const cls = part.match(/^\.([\w-]+)\.\\:popover-open$/)?.[1];
+      if (!cls) continue;
+      map.set(cls, new Set([...(map.get(cls) ?? []), ...declarations(body).map((d) => d.property)]));
+    }
+  }
+  return map;
+}
+
+/**
+ * Was an den Zwillingen fehlt: `.x { prop }` je fehlender Eigenschaft.
+ * @param {Map<string, Set<string>>} open
+ * @param {Map<string, Set<string>>} twins
+ */
+function missingTwins(open, twins) {
+  const missing = [];
+  for (const [cls, props] of open) {
+    for (const prop of props) if (!twins.get(cls)?.has(prop)) missing.push(`.${cls}.\\:popover-open { ${prop} }`);
+  }
+  return missing.sort();
+}
+
+test('Leser: Polyfill-Importe und Zwillinge des offenen Zustands (erfundene Faelle)', () => {
+  assert.deepEqual(polyfillImports("import '@oddbird/popover-polyfill';"), { static: [POLYFILL], dynamic: [] });
+  assert.deepEqual(polyfillImports("const m = await import('@oddbird/popover-polyfill/fn');"), { static: [], dynamic: [`${POLYFILL}/fn`] });
+  assert.deepEqual(polyfillImports("// import '@oddbird/popover-polyfill';\nimport x from '/x.js';"), { static: [], dynamic: [] });
+  const open = openStateRules([
+    '.a:popover-open { display: flex; transition: none }',
+    '.b:popover-open, .c:popover-open { opacity: 1 }',
+    '.d:not(:popover-open) { opacity: 0 }',
+    '@media (max-width: 1px) { .e:popover-open { opacity: 1 } }',
+    '.f:popover-open { color: red }',
+  ].join('\n'));
+  assert.deepEqual([...open.keys()].sort(), ['a', 'b', 'c']);
+  const twins = polyfillTwins('@supports not selector(:popover-open) { .a.\\:popover-open, .b.\\:popover-open { display: flex; opacity: 1 } } .c.\\:popover-open { opacity: 1 }');
+  assert.deepEqual(missingTwins(open, twins), ['.c.\\:popover-open { opacity }'], 'ein Zwilling ausserhalb des Rueckfall-Blocks zaehlt nicht');
+});
+
+test('der Popover-Polyfill laedt nur dynamisch und nur hinter der Probe', () => {
+  const sites = [];
+  for (const file of appScripts()) {
+    const found = polyfillImports(read(file));
+    if (found.static.length || found.dynamic.length) sites.push({ file, ...found });
+  }
+  assert.deepEqual(sites.map((x) => x.file), ['public/utils/popover-support.js'], 'genau eine Stelle laedt den Polyfill');
+  assert.deepEqual(sites[0].static, [], 'statisch geladen, laedt ihn jeder Browser');
+  assert.deepEqual(sites[0].dynamic, [`${POLYFILL}/fn`]);
+  const source = read('public/utils/popover-support.js');
+  const fn = source.slice(source.indexOf('export async function ensurePopoverApi('));
+  const probe = fn.indexOf('if (!needsPopoverPolyfill()) return false;');
+  assert.ok(probe > 0 && probe < fn.indexOf(`import('${POLYFILL}/fn')`), 'der Import steht hinter der Probe');
+  // Der Router wartet vor dem ersten Seitenaufbau darauf.
+  const router = read('public/router.js');
+  const ready = router.indexOf('const popoverReady = ensurePopoverApi();');
+  const awaited = router.indexOf('await popoverReady;');
+  assert.ok(ready > 0 && awaited > ready && awaited < router.indexOf('navigate(location.pathname, false)', awaited),
+    'router.js setzt den Polyfill vor der ersten Navigation');
+});
+
+test('ensurePopoverApi() als Programm: laedt nur ohne die API, und ein Ladefehler haelt den Start nicht auf', async () => {
+  const { needsPopoverPolyfill, ensurePopoverApi } = await import('../public/utils/popover-support.js');
+  assert.equal(needsPopoverPolyfill({}), true, 'ohne popover und showPopover');
+  assert.equal(needsPopoverPolyfill({ popover: null }), true, 'ohne showPopover');
+  assert.equal(needsPopoverPolyfill({ popover: null, showPopover() {} }), false);
+  assert.equal(needsPopoverPolyfill(null), false, 'ohne DOM (Node) nichts');
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'HTMLElement');
+  /** @type {string[]} */
+  const calls = [];
+  const load = async () => { calls.push('load'); return { apply: () => calls.push('apply') }; };
+  try {
+    Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, writable: true, value: { prototype: { popover: null, showPopover() {} } } });
+    assert.equal(await ensurePopoverApi(load), false);
+    assert.deepEqual(calls, [], 'ein Browser mit der API laedt nichts');
+    Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, writable: true, value: { prototype: {} } });
+    assert.equal(await ensurePopoverApi(load), true);
+    assert.deepEqual(calls, ['load', 'apply']);
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      assert.equal(await ensurePopoverApi(async () => { throw new Error('offline'); }), false, 'ein Ladefehler wirft nicht');
+    } finally {
+      console.warn = warn;
+    }
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'HTMLElement', saved);
+    else delete (/** @type {any} */ (globalThis)).HTMLElement;
+  }
+});
+
+test('jede Regel des offenen Popovers hat ihren Zwilling fuer den Polyfill in reset.css', () => {
+  const open = new Map();
+  for (const file of appStylesheets()) {
+    for (const [cls, props] of openStateRules(read(file))) open.set(cls, new Set([...(open.get(cls) ?? []), ...props]));
+  }
+  for (const known of ['popover-menu', 'filter-popover', 'ydp-popover', 'documents-context-menu']) {
+    assert.ok(open.has(known), `Reichweite: keine Regel .${known}:popover-open gefunden`);
+  }
+  const twins = polyfillTwins(read('public/styles/reset.css'));
+  assert.deepEqual(missingTwins(open, twins), [],
+    'Mit dem Popover-Polyfill traegt ein offenes Popover die Klasse `.\\:popover-open`, `:popover-open` gilt dort nicht. '
+    + 'Diese Zwillinge fehlen im Block `@supports not selector(:popover-open)` in reset.css - das Menue stuende offen, aber unsichtbar');
+  const base = [...eachRule(read('public/styles/reset.css'))]
+    .find((r) => r.selector === '[popover].\\:popover-open' && r.at.length === 1 && POPOVER_FALLBACK_AT.test(r.at[0]));
+  assert.ok(base, 'reset.css: `[popover].\\:popover-open` im Rueckfall-Block fehlt');
+  assert.match(base.body, /z-index:\s*2147483647/, 'ohne Top-Layer hebt der z-index das offene Popover ueber Dialoge und Meldungen');
 });
 
 /* ──────────────────────────────────────────────────────────────────────────

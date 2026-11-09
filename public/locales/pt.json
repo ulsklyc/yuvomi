@@ -3927,7 +3927,8 @@
         "staleData": "Offline - dados de: {{time}}",
         "pageTitle": "Estás offline",
         "pageDescription": "Esta página precisa de ligação. Assim que o teu dispositivo voltar a estar online, carrega sozinha.",
-        "snapshot": "Sem ligação ao servidor - dados guardados, só de leitura"
+        "snapshot": "Sem ligação ao servidor - dados guardados, só de leitura",
+        "unreachableBody": "O Yuvomi não está acessível de momento. Verifica se o teu dispositivo tem ligação e se o servidor está a funcionar, e tenta novamente."
     },
     "emptyHint": {
         "recipes": "Uma receita vai diretamente para o plano de refeições ou para a lista de compras.",
@@ -6959,5 +6960,12 @@
         "custom": "Cor personalizada",
         "chooseCustom": "Escolher cor personalizada",
         "standard": "Cor predefinida"
+    },
+    "browserTooOld": {
+        "pageTitle": "Navegador demasiado antigo",
+        "title": "Este navegador é demasiado antigo para o Yuvomi",
+        "body": "O Yuvomi precisa de algumas funcionalidades que este navegador ainda não tem. Os teus dados não são afetados.",
+        "versions": "O Yuvomi funciona a partir do Chrome e do Edge {{chrome}}, Firefox {{firefox}} e Safari {{safari}}, e no iPhone e iPad a partir do iOS {{ios}}.",
+        "action": "Atualiza o navegador ou o dispositivo e tenta novamente. Se não for possível, abre o Yuvomi noutro navegador."
     }
 }

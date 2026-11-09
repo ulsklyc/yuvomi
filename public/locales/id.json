@@ -3927,7 +3927,8 @@
         "staleData": "Offline - per: {{time}}",
         "pageTitle": "Kamu sedang offline",
         "pageDescription": "Halaman ini memerlukan koneksi. Begitu perangkatmu online lagi, halaman dimuat dengan sendirinya.",
-        "snapshot": "Tidak ada koneksi ke server - data tersimpan, hanya baca"
+        "snapshot": "Tidak ada koneksi ke server - data tersimpan, hanya baca",
+        "unreachableBody": "Yuvomi sedang tidak dapat dijangkau. Periksa apakah perangkatmu terhubung ke jaringan dan server sedang berjalan, lalu coba lagi."
     },
     "emptyHint": {
         "tasks": "Ketuk + untuk membuat tugas pertama Anda. Geser kartu ke kiri untuk menyelesaikan, ke kanan untuk melihat.",
@@ -6959,5 +6960,12 @@
         "custom": "Warna sendiri",
         "chooseCustom": "Pilih warna sendiri",
         "standard": "Warna bawaan"
+    },
+    "browserTooOld": {
+        "pageTitle": "Browser terlalu lama",
+        "title": "Browser ini terlalu lama untuk Yuvomi",
+        "body": "Yuvomi memerlukan beberapa fitur yang belum dikenal browser ini. Datamu tidak terpengaruh.",
+        "versions": "Yuvomi berjalan mulai Chrome dan Edge {{chrome}}, Firefox {{firefox}}, dan Safari {{safari}}, serta di iPhone dan iPad mulai iOS {{ios}}.",
+        "action": "Perbarui browser atau perangkat, lalu coba lagi. Jika tidak bisa, buka Yuvomi di browser lain."
     }
 }

@@ -237,7 +237,7 @@ and the [installation guide](docs/installation.md).
 <details>
 <summary><b>Requirements, network and your data</b></summary>
 
-- **Browsers** - everything as designed from Chrome and Edge 117, Firefox 129 and Safari 17.5. Down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5) it still starts and scrolls, with a plainer look and some features missing ([measured 21 September 2026](docs/installation.md#browser-support)).
+- **Browsers** - Chrome and Edge 105, Firefox 115, Safari 15.4 and iOS 15.4 or newer. Older Safari and iOS, Chrome before 99 and Firefox before 97 get a page that names these versions; Chrome 99 to 104 and Firefox 97 to 114 start with gaps ([details](docs/installation.md#browser-support)).
 - **Writes** - four volumes you own: data, backups, modules, documents.
 - **Outbound** - on its own, one update check against the GitHub releases API. Block it and nothing breaks, only the hint about a newer version stays away. Everything else reaches out only when you use or switch on a feature that needs it:
   - **When you use it** - opening the calendar settings loads the list of holiday countries from openholidaysapi.org; finding a logo for a subscription looks up the service's website.

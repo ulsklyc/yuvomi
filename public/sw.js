@@ -5,7 +5,7 @@
  *
  * Caching-Strategien (der Dispatcher unten ist die Wahrheit; dieser Kopf
  * behauptete bis 2026-08-31 "Cache-First" für Shell und Seitenmodule):
- *   Navigation + APP_SHELL + PAGE_MODULES + Locales: Network-First mit dem
+ *   Navigation + APP_SHELL + Locales: Network-First mit dem
  *        Precache (install) als Offline-Fallback - frisch, solange Netz da ist.
  *        Antwortet das Netz nicht binnen NETWORK_FIRST_DEADLINE_MS, kommt der
  *        Cache-Treffer; die Netzantwort fuellt den Cache trotzdem nach.
@@ -21,18 +21,20 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.87.0';
+// Beide Werte setzt der Build (scripts/build/service-worker.ts): die Version
+// aus package.json und die Build-Revision (APP_BUILD_REVISION, sonst Git, sonst
+// die Version). Bis zum Build stand die Version hier von Hand.
+const APP_RELEASE        = '__YUVOMI_APP_RELEASE__';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
-const PAGES_CACHE        = `yuvomi-pages-${CACHE_RELEASE}`;
 const LOCALES_CACHE      = `yuvomi-locales-${CACHE_RELEASE}`;
 const ASSETS_CACHE       = `yuvomi-assets-${CACHE_RELEASE}`;
 // API-Cache bewusst NICHT in ALL_CACHES: er wird bei jedem SW-Update neu benannt
 // (Version im Namen) und bei Logout/Session-Ende gezielt geleert.
 const API_CACHE     = `yuvomi-api-${CACHE_RELEASE}`;
 const BYPASS_CACHE  = 'yuvomi-bypass-flag';
-const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
+const ALL_CACHES    = [SHELL_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 
 // GET-API-Pfade (nach /api/v1), die für Read-only-Offline gecacht werden dürfen.
 // NUR Lese-Endpunkte — niemals /auth/* oder Mutationen. Prefix-Match.
@@ -247,316 +249,41 @@ function apiSnapshotReducer(pathname) {
   return Object.prototype.hasOwnProperty.call(API_SNAPSHOTS, rest) ? API_SNAPSHOTS[rest] : null;
 }
 
-// App-Shell: sofort benötigt für ersten Render
-const APP_SHELL = [
-  '/',
-  '/index.html',
-  '/api.js',
-  '/lang-init.js',
-  '/boot-fetch.js',
-  '/router.js',
-  '/i18n.js',
-  '/rrule-ui.js',
-  '/reminders.js',
-  '/push.js',
-  '/sw-register.js',
-  '/lucide.min.js',
-  '/lucide-scope.js',
-  // Alles, was `index.html` als `<link rel="stylesheet">` eager lädt, gehört
-  // hierher - sonst rendert der allererste Offline-Start ungestylt. Die Regel
-  // hält `test:sw-precache`; sie ist keine Liste, die man von Hand nachträgt.
-  '/styles/tokens.css',
-  '/styles/reset.css',
-  '/styles/pwa.css',
-  '/styles/layout.css',
-  '/styles/glass.css',
-  '/styles/typography.css',
-  '/styles/filter-chip.css',
-  '/styles/sub-tabs.css',
-  '/styles/page-search.css',
-  '/styles/kitchen-tabs.css',
-  '/styles/list-row.css',
-  '/styles/panel.css',
-  '/styles/user-multi-select.css',
-  '/styles/datepicker.css',
-  '/styles/category-manager.css',
-  '/styles/icon-picker.css',
-  '/styles/document-attach.css',
-  '/styles/auth.css',
-  '/styles/reminders.css',
-  '/styles/dashboard.css',
-  '/styles/tasks.css',
-  '/styles/shopping.css',
-  '/styles/meals.css',
-  '/styles/calendar.css',
-  '/styles/schedule.css',
-  '/styles/time-grid.css',
-  '/styles/markdown-toolbar.css',
-  '/styles/notes.css',
-  '/styles/contacts.css',
-  '/styles/birthdays.css',
-  '/styles/budget.css',
-  '/styles/documents.css',
-  '/styles/settings.css',
-  '/styles/recipes.css',
-  '/styles/pantry.css',
-  '/styles/inventory.css',
-  '/styles/detail-view.css',
-  '/styles/screensaver.css',
-  '/components/yuvomi-install-prompt.js',
-  // Geteilte Module. Sie werden von Shell UND Seitenmodulen importiert und
-  // müssen deshalb zusammen mit der Shell erneuert werden: der Browser bindet
-  // ein einmal geladenes Modul für die Lebensdauer des Dokuments, ein neues
-  // Seitenmodul träfe sonst auf die alte Fassung (#616). Sortierung wie im
-  // Dateisystem; Fetch-Routing für diese Pfade → SHELL_CACHE (isMutableAppResource).
-  '/nav-icons.js',
-  '/utils/app-update.js',
-  '/permissions.js',
-  // Der Router laedt ihn als Seiteneffekt (`import '/components/datepicker.js'`),
-  // also gehoert er in die Shell, nicht zu den Seitenmodulen. Der
-  // Precache-Guard sah diese Import-Form bis #944 nicht.
-  '/components/budget-recurrence-fields.js',
-  '/components/datepicker.js',
-  '/components/detail-view.js',
-  '/components/document-attach.js',
-  '/components/paperless-folders.js',
-  '/components/paperless-tags.js',
-  '/components/health-fasting-insights.js',
-  '/components/modal.js',
-  '/components/photo-screensaver.js',
-  '/components/quick-links-manager.js',
-  '/components/task-detail.js',
-  '/components/user-multi-select.js',
-  '/components/wall-timer.js',
-  '/utils/birth-date.js',
-  '/utils/birthday-event.js',
-  '/utils/budget-chart-category.js',
-  '/utils/budget-recurrence.js',
-  '/utils/budget-category-colors.js',
-  '/utils/bulk-pill.js',
-  '/utils/category-labels.js',
-  '/utils/chart.js',
-  '/utils/color.js',
-  '/utils/contact-limits.js',
-  '/utils/contact-name.js',
-  '/utils/contrast.js',
-  '/utils/countdown.js',
-  '/utils/dashboard-event-limit.js',
-  '/utils/dashboard-layout-hint.js',
-  '/utils/dashboard-widgets.js',
-  '/utils/date-status.js',
-  '/utils/date.js',
-  '/utils/digits.js',
-  '/utils/day-label.js',
-  '/utils/date-format.js',
-  '/utils/interval-date.js',
-  '/utils/currency-codes.js',
-  '/utils/calendar-delete.js',
-  '/utils/document-expiry.js',
-  '/utils/document-facets.js',
-  '/utils/document-thumbs.js',
-  '/utils/document-folder-delete.js',
-  '/utils/document-preview.js',
-  '/utils/event-color.js',
-  '/utils/event-icon.js',
-  '/utils/empty-state.js',
-  '/utils/extension-i18n.js',
-  '/utils/extension-widgets.js',
-  '/utils/fab.js',
-  '/utils/flip.js',
-  '/utils/list-motion.js',
-  '/utils/component-style.js',
-  '/utils/content-swap.js',
-  '/utils/color-picker.js',
-  '/utils/interval-sentence.js',
-  '/utils/hint-fold.js',
-  '/utils/media-picker.js',
-  '/utils/filter-sheet.js',
-  '/utils/folder-upload.js',
-  '/utils/folder-tree.js',
-  '/utils/form-row.js',
-  '/utils/friendly-error.js',
-  '/utils/health-activity.js',
-  '/utils/health-cycle.js',
-  '/utils/health-fasting.js',
-  '/components/fasting-controls.js',
-  '/components/fasting-dial.js',
-  '/components/fasting-help.js',
-  '/styles/fasting-controls.css',
-  '/utils/health-hoist.js',
-  '/utils/health-labs.js',
-  '/utils/health-meds.js',
-  '/utils/health-nutrition.js',
-  '/utils/health-overview.js',
-  '/utils/health-person-switcher.js',
-  '/utils/health-person.js',
-  '/utils/health-prevention.js',
-  '/utils/health-tabs.js',
-  '/utils/health-vitals.js',
-  '/utils/vital-units.js',
-  '/utils/help.js',
-  '/utils/household-zone-hint.js',
-  '/utils/first-steps.js',
-  '/utils/household.js',
-  '/utils/html-escape.js',
-  '/utils/html.js',
-  '/utils/ingredient-match-key.js',
-  '/utils/ingredient-row.js',
-  '/utils/initials.js',
-  '/utils/inventory-warranty.js',
-  '/utils/kitchen-tabs.js',
-  '/utils/kitchen-transfer.js',
-  '/utils/korean-particles.js',
-  '/utils/leave-guard.js',
-  '/utils/live-feed.js',
-  '/utils/loan-order.js',
-  '/utils/ledger-order.js',
-  '/utils/markdown-checklist.js',
-  '/utils/markdown-toolbar.js',
-  '/utils/master-detail.js',
-  '/utils/meal-types.js',
-  '/utils/member-order.js',
-  '/utils/mentions.js',
-  '/utils/module-accent.js',
-  '/utils/module-access.js',
-  '/utils/metric-card.js',
-  '/utils/metric-glance.js',
-  '/utils/money.js',
-  '/utils/amount-field.js',
-  '/utils/nav-badges.js',
-  '/utils/sidebar-pinned.js',
-  '/utils/note-access.js',
-  '/utils/note-category-filter.js',
-  '/utils/note-category-name.js',
-  '/utils/note-category-overflow.js',
-  '/utils/note-category-picker.js',
-  '/utils/offline-session.js',
-  '/utils/overlay-history.js',
-  '/utils/overlay-host.js',
-  '/utils/dialog-surface.js',
-  '/utils/page-layout.js',
-  '/utils/page-lifecycle.js',
-  '/utils/page-search.js',
-  '/utils/search-sections.js',
-  '/utils/palette-combobox.js',
-  '/utils/period-stepper.js',
-  '/utils/pantry-locations.js',
-  '/utils/pantry-status.js',
-  '/utils/pantry-units.js',
-  '/utils/people-picker.js',
-  '/utils/period-swipe.js',
-  '/utils/permission-group.js',
-  '/utils/phone.js',
-  '/utils/popover-menu.js',
-  '/utils/quick-link-url.js',
-  '/utils/pwa-install.js',
-  '/utils/recipe-meal-types.js',
-  '/utils/read-row.js',
-  '/utils/recipe-thumb.js',
-  '/utils/recipe-to-meal.js',
-  '/utils/recurrence-scope.js',
-  '/utils/reminder-offset.js',
-  '/utils/reward-goal.js',
-  '/utils/router-navigate.js',
-  '/utils/roving-toolbar.js',
-  '/utils/row-action.js',
-  '/utils/row-fill.js',
-  '/utils/scale-quantity.js',
-  '/utils/schedule-tabs.js',
-  '/utils/schedule-reminder-offset.js',
-  '/utils/servings-stepper.js',
-  '/utils/screensaver-idle.js',
-  '/utils/display-device-settings.js',
-  '/utils/display-device-state.js',
-  '/utils/display-settings-sync.js',
-  '/utils/scroll-restore.js',
-  '/utils/seal-pair.js',
-  '/utils/session-unreachable.js',
-  '/utils/segment-indicator.js',
-  '/utils/sheet-drag.js',
-  '/utils/shopping-categories.js',
-  '/utils/skeleton.js',
-  '/utils/start-handoff.js',
-  '/utils/sub-tabs.js',
-  '/utils/swipe-row.js',
-  '/utils/sync-target.js',
-  '/utils/tablist.js',
-  '/utils/task-fields.js',
-  '/utils/timezone.js',
-  '/utils/toast-placement.js',
-  '/utils/toast-show.js',
-  '/utils/toast-surface.js',
-  '/utils/reload-after-save.js',
-  '/utils/background-inert.js',
-  '/utils/today-sheet.js',
-  '/utils/today-timeline.js',
-  '/utils/shift-label.js',
-  '/utils/time-grid.js',
-  '/utils/unknown-route.js',
-  '/utils/page-mount.js',
-  '/utils/ux.js',
-  '/utils/sidebar-glide.js',
-  '/utils/vcard.js',
-  '/utils/view-transition.js',
-  '/utils/version.js',
-  '/utils/upload-limit.js',
-  '/utils/wall-mode.js',
-  '/utils/night-hours.js',
-  '/utils/web-share.js',
-  '/utils/week-strip.js',
-  '/utils/overlap-lanes.js',
-  '/offline.html',
-  // offline.html laedt theme-init.js, damit die Huelle dieselbe Farbwelt
-  // trifft wie die App (gespeicherter Wunsch schlaegt Systemeinstellung).
-  // Ohne Precache waere die Wahl genau dann wirkungslos, wenn die Seite
-  // gebraucht wird - offline.
-  '/theme-init.js',
-  // theme-init.js fragt die Nachtstunden aus dieser Datei (#2234).
-  '/night-hours.js',
-  '/manifest.json',
-  '/favicon.ico',
-  '/icons/favicon-32.png',
-  '/icons/apple-touch-icon.png',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/icon-maskable-192.png',
-  '/icons/icon-maskable-512.png',
-];
+// --------------------------------------------------------
+// Precache-Listen: kommen aus dem Build (Phase 1a, Abschnitt D).
+//
+// Bis zum Build standen hier drei Listen von Hand (APP_SHELL, APP_LOCALES,
+// PAGE_MODULES, 368 Zeilen), gegen den Importgraphen nachgerechnet von
+// test:sw-precache - und in 90 Tagen 266 Commits auf dieser Datei, meist eine
+// Zeile fuer eine neue Datei. Jetzt schreibt scripts/build/service-worker.ts
+// beim Bauen zwei Zeilen an den Anfang von dist/sw.js:
+//   self.__PRECACHE__  jede Datei, die der Modulgraph ab index.html und den
+//                      Fassaden erreicht (statische UND dynamische Importe, die
+//                      Seiten muessen offline da sein), dazu die kopierten
+//                      Dateien mit `precache: true` (scripts/build/static-files.ts)
+//                      und genau eine Sprache: die Rueckfallsprache von i18n.js.
+//                      Was dort in OFFLINE_EXCLUDED steht, fehlt bewusst (Opt-in-
+//                      Module wie Muell, Haushaltshilfe, Dienstplan und die
+//                      Zugangsseiten ausser der Anmeldung - wie vor dem Build).
+//   self.__LOCALES__   jede Sprachdatei, die der Build kopiert.
+// Ungebaut (`vite dev`) registriert sich kein Worker; die Rueckfaelle unten
+// halten die Datei trotzdem lauffaehig (Tests fahren sie in einer Sandbox).
+// --------------------------------------------------------
+/** @type {string[]} */
+const PRECACHE = Array.isArray(self.__PRECACHE__) ? self.__PRECACHE__ : [];
+
+// App-Shell: alles ausser den Sprachdateien, vorab in SHELL_CACHE. Die gebauten
+// Seiten liegen gehasht unter /assets/ und gehen damit denselben Weg wie die
+// Shell (isMutableAppResource unten); einen eigenen Seiten-Cache braucht es
+// nicht mehr.
+const APP_SHELL = PRECACHE.filter((path) => !path.startsWith('/locales/'));
 
 // Jede Sprache, die die App kennt. NICHT die Precache-Liste: vorab gecacht
 // wird nur PRECACHED_LOCALES, der Rest kommt beim ersten Abruf in denselben
-// Cache (LOCALES_CACHE). Die Liste hier ist die Zulassung dafuer - der Worker
-// cacht auf Zuruf (CACHE_LOCALE) nur, was in ihr steht. Jede Datei unter
-// public/locales/ gehoert hinein (`test:sw-precache`).
-const APP_LOCALES = [
-  '/locales/ar.json',
-  '/locales/cs.json',
-  '/locales/de.json',
-  '/locales/el.json',
-  '/locales/en.json',
-  '/locales/es.json',
-  '/locales/fa.json',
-  '/locales/fil.json',
-  '/locales/fr.json',
-  '/locales/hi.json',
-  '/locales/hu.json',
-  '/locales/id.json',
-  '/locales/it.json',
-  '/locales/ja.json',
-  '/locales/ko.json',
-  '/locales/nb.json',
-  '/locales/nl.json',
-  '/locales/pl.json',
-  '/locales/pt-BR.json',
-  '/locales/pt.json',
-  '/locales/ru.json',
-  '/locales/sv.json',
-  '/locales/tr.json',
-  '/locales/uk.json',
-  '/locales/vi.json',
-  '/locales/zh.json',
-  '/locales/zh-Hant.json',
-];
+// Cache (LOCALES_CACHE). Die Liste ist die Zulassung dafuer - der Worker
+// cacht auf Zuruf (CACHE_LOCALE) nur, was in ihr steht.
+/** @type {string[]} */
+const APP_LOCALES = Array.isArray(self.__LOCALES__) ? self.__LOCALES__ : [];
 const APP_LOCALE_SET = new Set(APP_LOCALES);
 
 // VORAB NUR DIE RUECKFALLSPRACHE (Entscheidung 2026-10-07, Critique R18). Bis
@@ -566,115 +293,7 @@ const APP_LOCALE_SET = new Set(APP_LOCALES);
 // selbst - die Seite nennt sie ihm (CACHE_LOCALE, gesendet von i18n.js beim
 // Start, beim Sprachwechsel und wenn ein neuer Worker uebernimmt), und jeder
 // gewoehnliche Abruf legt sie ohnehin ab (networkFirst).
-const PRECACHED_LOCALES = ['/locales/de.json'];
-
-// Seiten-Module: lazy geladen, aber vorab gecacht für Offline.
-// waste.js fehlt hier BEWUSST (Round-3-Review, #1063): wie housekeeping.js
-// und schedule.js ist es ein Opt-in-Modul, das die meisten Installationen
-// nie laden - vorab gecacht würde es jede Installation Bytes kosten, und
-// die Seite selbst ist ohne Netz ohnehin nur eingeschränkt nützlich (die
-// Termine kommen aus /occurrences). Wer die drei offline will, hebt sie
-// zusammen hierher, nicht einzeln.
-const PAGE_MODULES = [
-  '/pages/dashboard.js',
-  '/pages/tasks.js',
-  '/pages/shopping.js',
-  '/pages/meals.js',
-  '/pages/calendar.js',
-  '/pages/notes.js',
-  '/pages/contacts.js',
-  '/pages/birthdays.js',
-  '/pages/budget.js',
-  '/pages/documents.js',
-  '/pages/rewards.js',
-  '/pages/health.js',
-  '/pages/health-fasting.js',
-  '/pages/settings.js',
-  '/pages/login.js',
-  '/pages/pair-display.js',
-  '/pages/recipes.js',
-  '/pages/pantry.js',
-  '/pages/inventory.js',
-  '/pages/budget-plans.js',
-  '/pages/budget-stats.js',
-  '/pages/split-expenses.js',
-  '/pages/subscriptions.js',
-  '/components/budget-transfer-dialog.js',
-  '/components/category-manager.js',
-  '/components/icon-picker.js',
-  '/components/tag-manager.js',
-  // Der Bildzuschnitt kommt per dynamischem import() aus mehreren Modulen
-  // (Avatare, Geburtstage, Vorrat, Rezepte, Haushaltshilfe, Schnellzugriff).
-  // Der Precache-Guard las dynamische Importe bis dahin nicht.
-  '/utils/auth-ui.js',
-  '/utils/brand-mark.js',
-  '/utils/avatar-crop.js',
-  '/utils/lucide-icons.js',
-  '/utils/sortable.js',
-  '/vendor/sortablejs/sortable.esm.min.js',
-  // libphonenumber-js: lazy im Kontaktmodul, aber vorab gecacht → Telefon-
-  // Formatierung funktioniert auch offline (Kernmodul). Versions-gecacht.
-  '/vendor/libphonenumber/core.min.mjs',
-  '/vendor/libphonenumber/metadata.min.json',
-  '/settings/registry.js',
-  '/settings/shell.js',
-  // Die Shell importiert ihn beim Laden. Fehlte er hier, brach die
-  // Einstellungsseite offline komplett - der Precache-Guard sah relative
-  // Specifier bis dahin nicht und blieb dabei gruen.
-  '/settings/dirty-guard.js',
-  '/settings/components.js',
-  '/settings/module-order.js',
-  '/settings/cron-label.js',
-  '/settings/backup-key.js',
-  '/settings/currency.js',
-  '/settings/preferences-cache.js',
-  '/settings/night-hour-options.js',
-  '/settings/region-presets.js',
-  '/settings/weather-location.js',
-  '/settings/family-users.js',
-  '/settings/assignee-menu.js',
-  '/settings/module-install-errors.js',
-  '/settings/signed-in-devices.js',
-  '/settings/pages/personal-account.js',
-  '/settings/pages/personal-schedule.js',
-  '/settings/pages/admin-email.js',
-  '/settings/pages/admin-permissions.js',
-  '/settings/pages/personal-calendar-subscriptions.js',
-  '/settings/pages/personal-feeds.js',
-  '/settings/pages/personal-health.js',
-  '/settings/pages/personal-weather.js',
-  '/settings/pages/personal-appearance.js',
-  '/settings/pages/personal-device.js',
-  '/settings/pages/personal-calendar.js',
-  '/settings/pages/personal-tasks.js',
-  '/settings/pages/modules-active.js',
-  '/settings/pages/modules-install.js',
-  '/settings/pages/modules-navigation.js',
-  '/settings/pages/modules-kitchen.js',
-  '/settings/pages/modules-calendar.js',
-  '/settings/pages/modules-options.js',
-  '/settings/pages/modules-rewards.js',
-  '/settings/pages/modules-health.js',
-  '/settings/pages/modules-countdowns.js',
-  '/settings/pages/sync-calendar.js',
-  '/settings/pages/sync-contacts.js',
-  '/settings/pages/sync-reminders.js',
-  '/settings/pages/notifications.js',
-  '/settings/pages/documents-storage.js',
-  '/settings/pages/documents-dms.js',
-  '/settings/pages/documents-live-folders.js',
-  '/settings/pages/admin-family.js',
-  '/settings/pages/admin-api.js',
-  '/settings/pages/admin-displays.js',
-  '/settings/pages/admin-backup.js',
-  '/settings/pages/admin-weather.js',
-  '/settings/pages/admin-immich.js',
-  '/settings/pages/admin-system.js',
-];
-
-// Routing-Nachschlag für den fetch-Handler: hält Precache-Liste und
-// Cache-Zuordnung an einer Quelle (siehe Kommentar im PAGES_CACHE-Zweig).
-const PAGE_MODULE_SET = new Set(PAGE_MODULES);
+const PRECACHED_LOCALES = PRECACHE.filter((path) => path.startsWith('/locales/'));
 
 // --------------------------------------------------------
 // Bypass-Flag: nach SW-Update einmalig alles frisch vom Netz laden.
@@ -718,12 +337,10 @@ const _bypassInit = (async () => {
 // --------------------------------------------------------
 self.addEventListener('install', (event) => {
   const freshShell   = APP_SHELL.map((url)    => new Request(url, { cache: 'no-cache' }));
-  const freshModules = PAGE_MODULES.map((url) => new Request(url, { cache: 'no-cache' }));
   const freshLocales = PRECACHED_LOCALES.map((url) => new Request(url, { cache: 'no-cache' }));
   event.waitUntil(
     Promise.all([
       caches.open(SHELL_CACHE).then((c) => c.addAll(freshShell)),
-      caches.open(PAGES_CACHE).then((c) => c.addAll(freshModules)),
       caches.open(LOCALES_CACHE).then((c) => c.addAll(freshLocales)),
     ]).then(() => self.skipWaiting())
   );
@@ -844,22 +461,11 @@ function dispatchFetch(request, url, event) {
     return networkFirst(request, LOCALES_CACHE, event);
   }
 
-  // Lazy geladene Seiten-Module liegen in PAGES_CACHE. Neben /pages/ gehören dazu
-  // die Settings-Leaves unter /settings/ sowie einzelne lazy nachgeladene Module
-  // (Kategorie-Manager, Sortable-Wrapper samt Vendor-Bundle, libphonenumber) -
-  // ohne diesen Zweig würden sie via SHELL_CACHE bedient und offline (vor dem
-  // ersten Online-Besuch) als index.html statt als JS-Modul ausgeliefert.
-  // Die Einzelfälle kommen aus PAGE_MODULES selbst statt aus einer zweiten,
-  // von Hand gepflegten Aufzählung: sonst driftet das Routing vom Precache ab
-  // und ein neu aufgenommenes Modul liegt im falschen Cache.
-  if (
-    url.pathname.startsWith('/pages/') ||
-    url.pathname.startsWith('/settings/') ||
-    PAGE_MODULE_SET.has(url.pathname)
-  ) {
-    return networkFirst(request, PAGES_CACHE, event);
-  }
-
+  // Seit dem Build gibt es keinen eigenen Seiten-Cache mehr: Seiten, Settings-
+  // Blaetter und lazy geladene Module liegen gehasht unter /assets/ und gehen
+  // wie die Shell durch isMutableAppResource in SHELL_CACHE - dort liegt auch
+  // ihr Precache. Bis dahin leitete hier ein Zweig /pages/, /settings/ und die
+  // Einzelfaelle aus PAGE_MODULES in einen PAGES_CACHE.
   if (url.origin === self.location.origin && isMutableAppResource(url.pathname)) {
     return networkFirst(request, SHELL_CACHE, event);
   }
@@ -919,6 +525,19 @@ const SLOW_NETWORK_WINDOW_MS = 10000;
 const DEADLINE_PASSED = Symbol('deadline');
 let slowNetworkUntil = 0;
 
+/**
+ * HTML als Antwort auf eine Datei (.js, .css, .json): der Server liefert fuer
+ * eine fehlende Datei ein 404 (server/index.js), ein aelterer Server oder ein
+ * Proxy aber die Shell. Abgelegt ersetzte sie die gute Kopie im Cache, und der
+ * naechste Offline-Start bekaeme index.html als Modul (Review auf #2631).
+ */
+/** @param {Request} request @param {Response} response */
+function isShellInsteadOfFile(request, response) {
+  const { pathname } = new URL(request.url);
+  if (!/\.(m?js|css|json)$/i.test(pathname)) return false;
+  return /text\/html/i.test(response.headers.get('content-type') || '');
+}
+
 async function networkFirst(request, cacheName, event) {
   const cache = await caches.open(cacheName);
 
@@ -926,7 +545,7 @@ async function networkFirst(request, cacheName, event) {
   // muss der Worker so lange leben, bis es durch ist.
   let stored = Promise.resolve();
   const network = fetch(request).then((response) => {
-    if (response.ok && response.type === 'basic') {
+    if (response.ok && response.type === 'basic' && !isShellInsteadOfFile(request, response)) {
       stored = Promise.resolve(cache.put(request, response.clone())).catch(() => {});
     }
     return response;
@@ -1134,7 +753,7 @@ function isMutableAppResource(pathname) {
     || pathname === '/index.html'
     || pathname === '/manifest.json'
     || pathname === '/manifest.webmanifest'
-    || /\.(css|js|json|html)$/i.test(pathname);
+    || /\.(css|m?js|json|html)$/i.test(pathname);
 }
 
 // --------------------------------------------------------

@@ -7,8 +7,9 @@
  *          Proxmox `prebuild` silently falls back to the previous release when
  *          the asset is missing. So the order is the promise: a published
  *          release always carries its asset. This guard reads the workflow as
- *          text and holds trigger, permissions, pins, the attestation subjects,
- *          the publish-last order and the closing check. It starts by
+ *          text and holds trigger, permissions, pins, the build with its
+ *          determinism check, the reproducible pack of tag tree plus dist/,
+ *          the attestation subjects, the publish-last order and the closing check. It starts by
  *          dispatch only: GitHub runs no workflow for a draft's `created`.
  * Ausführen: npm run test:release-assets-workflow
  */
@@ -39,7 +40,23 @@ function topLevelBlock(source, key) {
   return body;
 }
 
-/** Steps of the (single) job as `{ name, text }`, in file order. */
+/**
+ * The text of job `name` (from `  name:` up to the next job or the end).
+ * @param {string} source
+ * @param {string} name
+ */
+function jobBlock(source, name) {
+  const lines = source.split('\n');
+  const start = lines.indexOf(`  ${name}:`);
+  assert.notEqual(start, -1, `the workflow needs a job "${name}"`);
+  const jobsAt = lines.indexOf('jobs:');
+  assert.ok(jobsAt !== -1 && start > jobsAt, `${name} sits under jobs:`);
+  let end = start + 1;
+  while (end < lines.length && !/^ {2}\S/.test(lines[end])) end += 1;
+  return lines.slice(start, end).join('\n');
+}
+
+/** Steps of one job as `{ name, text }`, in file order. */
 function steps(source) {
   const lines = source.split('\n');
   const start = lines.findIndex((l) => l === '    steps:');
@@ -55,7 +72,13 @@ function steps(source) {
   return out;
 }
 
-const allSteps = steps(workflow);
+// Phase 1a, section D: two jobs. `build` runs npm and the Vite build with
+// read rights only; `publish` holds the write rights and runs no project code.
+const buildJob = jobBlock(workflow, 'build');
+const publishJob = jobBlock(workflow, 'publish');
+const buildSteps = steps(buildJob);
+const publishSteps = steps(publishJob);
+const allSteps = [...buildSteps, ...publishSteps];
 const indexOf = (pattern) => allSteps.findIndex((s) => pattern.test(s.text));
 
 test('starts only by dispatch with a tag, never on a release event', () => {
@@ -79,17 +102,25 @@ test('refuses to run anywhere but at the tag it packs', () => {
   // The attestation takes repository, ref and commit from the run's OIDC
   // token, not from the checkout. A run on main would sign "built from main"
   // for a tarball of the tag, and `--source-ref refs/tags/v...` would fail.
-  const resolve = allSteps[0].text;
+  const resolve = buildSteps[0].text;
   const refCheck = resolve.search(/if \[ "\$GITHUB_REF" != "refs\/tags\/\$TAG" \]; then\n.*\n {12}exit 1/);
   assert.notEqual(refCheck, -1, 'the first step exits unless GITHUB_REF is refs/tags/$TAG');
-  assert.ok(refCheck < resolve.indexOf('gh release'), 'before it touches the release');
+  assert.ok(refCheck !== -1 && !/gh release/.test(resolve), 'the build job never touches the release');
+  const check = publishSteps[0].text;
+  const again = check.search(/if \[ "\$GITHUB_REF" != "refs\/tags\/\$TAG" \]; then\n.*\n {12}exit 1/);
+  assert.ok(again !== -1 && again < check.indexOf('gh release view'), 'the publish job checks the ref again before it touches the release');
 });
 
-test('asks for exactly the permissions it uses, at workflow level only', () => {
-  const perms = topLevelBlock(workflow, 'permissions')
-    .map((l) => l.trim())
-    .sort();
-  assert.deepEqual(perms, [
+test('the workflow grants nothing; build reads, only publish writes', () => {
+  assert.match(workflow, /^permissions: \{\}$/m, 'top level grants nothing; each job names its own');
+  /** @param {string} job */
+  const jobPerms = (job) => {
+    const m = job.match(/^ {4}permissions:\n((?: {6}\S.*\n)+)/m);
+    assert.ok(m, 'every job names its permissions');
+    return m[1].trim().split('\n').map((l) => l.trim()).sort();
+  };
+  assert.deepEqual(jobPerms(buildJob), ['contents: read'], 'the build job (npm, Vite, plugins) can only read');
+  assert.deepEqual(jobPerms(publishJob), [
     // dispatch umbrel-publish.yml: the release this job publishes fires no event
     'actions: write',
     // the attestations API stores the signed provenance
@@ -99,12 +130,45 @@ test('asks for exactly the permissions it uses, at workflow level only', () => {
     // the OIDC token Sigstore turns into the short-lived signing certificate
     'id-token: write',
   ]);
-  assert.doesNotMatch(workflow, /^ {4}permissions:/m,
-    'no job-level permissions: they would replace the reviewed workflow-level set');
+  assert.match(publishJob, /^ {4}needs: build$/m, 'publish runs after build');
 });
 
-test('the job has a runtime cap', () => {
-  assert.match(workflow, /^ {4}timeout-minutes: \d+$/m);
+test('no foreign code next to a token: build holds none, publish runs no npm and no checkout', () => {
+  assert.doesNotMatch(buildJob, /GH_TOKEN|github\.token|secrets\./, 'no token in the build job');
+  assert.doesNotMatch(buildJob, /id-token|attest-build-provenance/, 'no signing in the build job');
+  assert.match(buildJob, /run: npm ci/);
+  const publishCode = publishJob.split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
+  assert.doesNotMatch(publishCode, /\bnpm\b|\bnode\b|actions\/checkout@|actions\/setup-node@/, 'publish runs no project code');
+  const jobEnv = publishJob.match(/^ {4}env:\n((?: {6}\S.*\n)+)/m)?.[1] ?? '';
+  assert.doesNotMatch(jobEnv, /GH_TOKEN/, 'GH_TOKEN on the steps that call gh, never on the job');
+  for (const step of publishSteps) {
+    if (/\bgh (?:release|workflow)\b/.test(step.text)) {
+      assert.match(step.text, /^ {10}GH_TOKEN: \$\{\{ github\.token \}\}$/m, `step "${step.name}" calls gh and names its token`);
+    } else {
+      assert.doesNotMatch(step.text, /GH_TOKEN/, `step "${step.name}" needs no token`);
+    }
+  }
+  // The handover: build uploads both files, publish takes them and checks the hashes before signing.
+  const up = buildSteps.findIndex((st) => /uses: actions\/upload-artifact@[0-9a-f]{40} # v/.test(st.text));
+  assert.ok(up > buildSteps.findIndex((st) => /> SHA256SUMS/.test(st.text)), 'uploaded after SHA256SUMS is written');
+  assert.match(buildSteps[up].text, /if-no-files-found: error/);
+  const down = publishSteps.findIndex((st) => /uses: actions\/download-artifact@[0-9a-f]{40} # v/.test(st.text));
+  const check = publishSteps.findIndex((st) => /sha256sum -c SHA256SUMS/.test(st.text));
+  const attest = publishSteps.findIndex((st) => /attest-build-provenance@/.test(st.text));
+  assert.ok(down !== -1 && check > down && attest > check, 'download, check the hashes, then attest');
+});
+
+test('the determinism builds run without any token in their environment', async () => {
+  const { SECRET_ENV, buildEnv } = await import('../scripts/check-build-determinism.mjs');
+  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'NPM_TOKEN', 'NODE_AUTH_TOKEN']) {
+    assert.ok(SECRET_ENV.includes(name), name);
+  }
+  const env = buildEnv({ GH_TOKEN: 'a', GITHUB_TOKEN: 'b', ACTIONS_ID_TOKEN_REQUEST_URL: 'c', ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'd', ACTIONS_RUNTIME_TOKEN: 'e', NPM_TOKEN: 'f', PATH: '/bin' });
+  assert.deepEqual(env, { PATH: '/bin' });
+});
+
+test('both jobs have a runtime cap', () => {
+  for (const job of [buildJob, publishJob]) assert.match(job, /^ {4}timeout-minutes: \d+$/m);
 });
 
 test('every action is pinned to a 40-character commit SHA with a version comment', () => {
@@ -127,9 +191,23 @@ test('no step interpolates an expression into a shell script', () => {
     'the first step rejects a tag that is not vX.Y.Z before anything uses it');
 });
 
-test('packs the tag with git archive under yuvomi-<version>/ and writes SHA256SUMS', () => {
-  const pack = indexOf(/git archive --format=tar --prefix="yuvomi-\$VERSION\/" "refs\/tags\/\$TAG" \| gzip -n > "\$TARBALL"/);
-  assert.notEqual(pack, -1, 'the tarball comes from git archive of the tag, gzip -n (no name, no time)');
+test('builds dist/ deterministically, then packs the tag tree plus dist/ under yuvomi-<version>/ and writes SHA256SUMS', () => {
+  // Phase 1a, section D: the asset is the git archive of the tag PLUS the built
+  // web app (the server refuses to start without dist/), packed reproducibly.
+  const build = indexOf(/npm run build\n\s+node scripts\/check-build-determinism\.mjs --ref "refs\/tags\/\$TAG"/);
+  assert.notEqual(build, -1, 'build, then two more builds of the tag compared file by file');
+  assert.match(allSteps[build].text, /APP_BUILD_REVISION: \$\{\{ github\.sha \}\}/, 'the revision is the tagged commit, as in the image');
+  assert.ok(indexOf(/run: npm ci/) < build, 'npm ci before the build');
+  const pack = indexOf(/git archive --format=tar --prefix="yuvomi-\$VERSION\/" "refs\/tags\/\$TAG" \| tar -x -C stage/);
+  assert.notEqual(pack, -1, 'the source part comes from git archive of the tag, under yuvomi-<version>/');
+  assert.ok(build < pack, 'packed only after the determinism check');
+  const packText = allSteps[pack].text;
+  assert.match(packText, /cp -R dist "stage\/yuvomi-\$VERSION\/dist"/, 'dist/ goes in under the same top-level folder');
+  assert.match(packText, /SOURCE_DATE_EPOCH="\$\(git log -1 --format=%ct "refs\/tags\/\$TAG"\)"/);
+  assert.match(packText, /tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@\$SOURCE_DATE_EPOCH"/, 'reproducible tar: order, owner, time');
+  assert.match(packText, /\| gzip -n > "\$TARBALL"/, 'gzip -n (no name, no time)');
+  assert.match(packText, /for NEED in index\.html sw\.js THIRD-PARTY-NOTICES\.txt; do/, 'the pack checks that the build is in it');
+  assert.match(packText, /sed -n "\\#\^yuvomi-\$VERSION\/#!p"/, 'and that nothing lies outside the top-level folder');
   assert.match(allSteps[0].text, /tarball=yuvomi-\$VERSION-dist\.tar\.gz/,
     'asset name yuvomi-<version>-dist.tar.gz (decision E2), version without the v');
   const sums = indexOf(/sha256sum "\$TARBALL" > SHA256SUMS/);
@@ -144,7 +222,7 @@ test('attests the tarball and SHA256SUMS before anything is uploaded', () => {
   assert.ok(subjects, 'subject-path lists the subjects one per line');
   assert.deepEqual(
     subjects[1].trim().split('\n').map((l) => l.trim()),
-    ['${{ steps.version.outputs.tarball }}', 'SHA256SUMS'],
+    ['${{ needs.build.outputs.tarball }}', 'SHA256SUMS'],
   );
   assert.ok(attest > indexOf(/> SHA256SUMS/), 'both subjects exist when the attestation runs');
   assert.ok(attest < indexOf(/gh release upload/), 'nothing reaches the release unattested');

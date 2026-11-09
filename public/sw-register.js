@@ -53,7 +53,14 @@ export const UPDATE_ORPHAN_RELOAD_MS = 10000;
  */
 export const UPDATE_RELOAD_DELAY_MS = 200;
 
-if ('serviceWorker' in navigator) {
+// Unter `npm run dev` (Vite, Phase 1a Abschnitt D) gibt es keinen gebauten
+// Worker: der Server antwortet auf /sw.js mit 404, und ein Worker aus einem
+// frueheren Build haelte Module fest, die Vite gerade neu ausliefert. Im Build
+// ersetzt Vite `import.meta.env.DEV` durch `false`; in Node (Tests) gibt es
+// `import.meta.env` nicht, dann gilt der gebaute Weg.
+const DEV_SERVER = Boolean(import.meta.env?.DEV);
+
+if ('serviceWorker' in navigator && !DEV_SERVER) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
       .then((registration) => registration.update())

@@ -46,6 +46,7 @@ import puppeteer from 'puppeteer';
 import { launchBrowser } from '../scripts/lib/chrome-executable.js';
 import { SETTINGS_LEAVES } from '../public/settings/registry.js';
 import { tempDir } from './tmp-dir.js';
+import { layoutOf } from '../server/utils/frontend-dir.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -222,6 +223,11 @@ function startServer(dbPath, port) {
       RATE_LIMIT_MAX_ATTEMPTS: '1000',
       // Hintergrundarbeit aus dem Messfenster halten.
       DISABLE_BACKUP_SCHEDULER: '1',
+      // Die Browser-Suiten laufen gegen die Testanordnung (npm run
+      // build:browser-tests); der Server liefert sie nur auf ausdruecklichen
+      // Wunsch (server/utils/frontend-dir.js). Die Smoke-Suite des
+      // ausgelieferten Builds (test:built-app-browser) laeuft gegen das Buendel.
+      YUVOMI_BUILD_LAYOUT: layoutOf(join(REPO, 'dist')) === 'modules' ? 'modules' : '',
     },
     stdio: 'ignore',
   });

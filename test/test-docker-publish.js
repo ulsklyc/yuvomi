@@ -141,3 +141,71 @@ test('the image workflow keeps read-only repository contents', () => {
   assert.match(permissions, /^ {2}contents: read$/m, 'docker-publish.yml must keep contents: read');
   assert.doesNotMatch(workflow, /^\s+contents: write$/m, 'no contents: write anywhere in docker-publish.yml');
 });
+
+test('the image builds the web app and ships dist/ from the build stage, plus the shared source', () => {
+  // Phase 1a, Abschnitt D: der Server liefert nur dist/ und bricht ohne ab.
+  // public/ bleibt im Image (der Server importiert public/utils/ und liest
+  // public/locales/), test/ nicht, und dist/ kommt nie aus dem Build-Kontext.
+  const buildStage = dockerfile.slice(0, dockerfile.lastIndexOf('\nFROM '));
+  const runtimeStage = dockerfile.slice(dockerfile.lastIndexOf('\nFROM ') + 1);
+  assert.match(buildStage, /\nARG APP_BUILD_REVISION\nRUN APP_BUILD_REVISION="\$\{APP_BUILD_REVISION\}" npm run build\n/, 'the build stage builds with the revision');
+  assert.match(buildStage, /\nENV PUPPETEER_SKIP_DOWNLOAD=true\n/, 'npm ci with devDependencies must not fetch a browser');
+  assert.match(runtimeStage, /\nCOPY --from=build \/app\/dist \.\/dist\n/);
+  assert.match(runtimeStage, /\nCOPY server\/ \.\/server\/\n/);
+  assert.match(runtimeStage, /\nCOPY public\/ \.\/public\/\n/);
+  assert.doesNotMatch(runtimeStage, /\nCOPY \. \.\n/, 'no blanket copy of the context into the runtime stage');
+  assert.doesNotMatch(runtimeStage, /COPY test\//);
+  const ignore = readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8').split('\n').map((l) => l.trim());
+  assert.ok(ignore.includes('test/'), '.dockerignore keeps test/ out');
+  assert.ok(!ignore.some((l) => /^\/?dist\/?$/.test(l)), '.dockerignore must not list dist/ - it is built in the image, never copied in');
+  for (const need of ['!scripts/build/', '!scripts/build-third-party-notices.mjs']) assert.ok(ignore.includes(need), `${need} missing in .dockerignore`);
+});
+
+test('the build stage copies every file the Vite config imports, before npm run build', async () => {
+  // Codex auf #2631: dev-proxy.ts importierte server/utils/bind-address.js,
+  // die Build-Stage kopiert kein server/, und `npm run build` im Image fiel
+  // mit ERR_MODULE_NOT_FOUND. Die CI baut das Image nur am Tag. Geprueft wird
+  // der Importgraph ab vite.config.ts, den der Config-Bundler aufloest
+  // (relative Importe, statisch und dynamisch mit festem Pfad; Pakete und node:
+  // liefert npm ci) gegen die COPY-Zeilen vor dem Build und gegen die
+  // Ausnahmen in .dockerignore.
+  const { existsSync } = await import('node:fs');
+  const { posix } = await import('node:path');
+  const { moduleSpecifiers } = await import('./source-text.js');
+  const root = new URL('../', import.meta.url);
+  const buildStage = dockerfile.slice(0, dockerfile.lastIndexOf('\nFROM '));
+  const beforeBuild = buildStage.slice(0, buildStage.indexOf('npm run build'));
+  assert.ok(beforeBuild.length < buildStage.length, 'the build stage runs npm run build');
+  const copied = [...beforeBuild.matchAll(/^COPY (?!--from)(.+) \S+$/gm)].flatMap((m) => m[1].trim().split(/\s+/));
+  const ignore = readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  /** @param {string} rel */
+  const copiedBy = (rel) => copied.some((src) => (src.endsWith('/') ? rel.startsWith(src) : src.includes('*') ? new RegExp(`^${src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '[^/]*')}$`).test(rel) : rel === src));
+  /** @param {string} rel */
+  const ignored = (rel) => {
+    let out = false;
+    for (const line of ignore) {
+      const neg = line.startsWith('!');
+      const pat = neg ? line.slice(1) : line;
+      const hit = pat.endsWith('/') ? rel.startsWith(pat) : rel === pat;
+      if (hit) out = !neg;
+    }
+    return out;
+  };
+  const seen = new Set(['vite.config.ts']);
+  const queue = ['vite.config.ts'];
+  while (queue.length) {
+    const rel = /** @type {string} */ (queue.shift());
+    // Vite buendelt die Konfiguration vor dem Laden (Rolldown): auch ein
+    // dynamischer Import mit festem Pfad wird dabei aufgeloest, ob er laeuft oder nicht.
+    const { static: statics, dynamic } = moduleSpecifiers(readFileSync(new URL(rel, root), 'utf8'));
+    for (const spec of [...statics, ...dynamic]) {
+      if (!spec.startsWith('.')) continue;
+      const dep = posix.normalize(posix.join(posix.dirname(rel), spec));
+      assert.ok(existsSync(new URL(dep, root)), `${rel} imports ${spec}, which does not exist`);
+      if (!seen.has(dep)) { seen.add(dep); queue.push(dep); }
+    }
+  }
+  assert.ok(seen.size >= 5, `only ${seen.size} files in the config graph - the reader does not follow imports`);
+  const missing = [...seen].filter((rel) => !copiedBy(rel) || ignored(rel));
+  assert.deepEqual(missing, [], 'npm run build in the image needs these files, the build stage does not copy them (or .dockerignore drops them)');
+});
