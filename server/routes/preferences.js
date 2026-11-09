@@ -500,11 +500,13 @@ function parseModuleOrder(raw) {
 // Modulfarben: ein Objekt { moduleId: { light, dark } }, hoechstens 30
 // Eintraege. Unbekannte Modul-IDs und ungueltige Farben werden still
 // verworfen.
+/** @param {string | null | undefined} raw */
 function parseModuleColors(raw) {
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    /** @type {Record<string, {light: string, dark: string}>} */
     const result = {};
     for (const [key, val] of Object.entries(parsed)) {
       if (!MODULE_ORDER_RE.test(key)) continue;
@@ -1115,6 +1117,7 @@ router.put('/', (req, res) => {
       }
       // PATCH-Semantik: die gespeicherte Karte mergen, null entfernt einen Eintrag.
       const existing = parseModuleColors(cfgUserGet('module_colors', req.authUserId));
+      /** @type {Record<string, {light: string, dark: string}>} */
       const merged = { ...existing };
       for (const [key, val] of Object.entries(module_colors)) {
         if (!MODULE_ORDER_RE.test(key)) continue;

@@ -83,14 +83,20 @@ const BUILTIN_MODULES = [
 ];
 
 // WCAG relative luminance and contrast ratio for the contrast check (#1115).
+/** @param {string} hex */
 function _luminance(hex) {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
+  /** @param {number} c */
   const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 }
 
+/**
+ * @param {string} hex1
+ * @param {string} hex2
+ */
 function contrastRatio(hex1, hex2) {
   const l1 = _luminance(hex1);
   const l2 = _luminance(hex2);
@@ -1013,6 +1019,7 @@ function bindDeviceDisplay(container) {
  * neuen Farben direkt via applyModuleColorOverrides() an.
  * Ein unzureichender Kontrast (< 3:1 auf der jeweiligen Fläche) erzeugt
  * einen Hinweis unterhalb der Zeile, verhindert das Speichern aber nicht.
+ * @param {HTMLElement} container
  */
 function bindModuleColors(container) {
   // Kanon: colorPickerHtml()/wireColorPicker() (utils/color-picker.js, E6) -
