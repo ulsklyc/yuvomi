@@ -20,7 +20,7 @@
  *           Token, Rolle des Token-Subjekts).
  *        2. Ein neuer Server (Schema, Host, Port) oder Benutzername braucht
  *           das Passwort neu - auch fuer den Admin.
- * Ausfuehren: node --experimental-sqlite --test test/test-carddav-admin-gate.js
+ * Ausfuehren: node --test test/test-carddav-admin-gate.js
  */
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';

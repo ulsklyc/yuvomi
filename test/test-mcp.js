@@ -8,7 +8,7 @@
  *        Dazu die Rechte-Durchsetzung der Tool-Schicht (#823): Modulrechte des
  *        Nutzers, Token-Scopes und Split-Guests — die Kern-Tools laufen an der
  *        /api/v1-Middleware vorbei und müssen dieselbe Grenze selbst ziehen.
- * Ausführen: node --experimental-sqlite --test test/test-mcp.js
+ * Ausführen: node --test test/test-mcp.js
  */
 
 import { test } from 'node:test';

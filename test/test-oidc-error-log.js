@@ -14,7 +14,7 @@
  * Nebenbei haelt der Test fest, was am Token-Endpunkt ankommt (Basic-Auth,
  * `redirect_uri` aus der Konfiguration statt aus dem Host-Header, PKCE).
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-oidc-error-log.js
+ * Ausfuehren: node --test test/test-oidc-error-log.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'oidc-error-log-test-secret';
 process.env.DB_PATH = ':memory:';

@@ -30,7 +30,7 @@
  * dann den Folgelauf, in dem der Schaden entstand, und zuletzt, dass der Weg
  * nach der Absage wieder frei ist.
  *
- * Ausführen: node --experimental-sqlite --test test/test-caldav-http-refusals.js
+ * Ausführen: node --test test/test-caldav-http-refusals.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

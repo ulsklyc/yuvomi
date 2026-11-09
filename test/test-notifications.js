@@ -1,7 +1,7 @@
 /**
  * Modul: Notification-Channel-Test
  * Zweck: Gotify/ntfy Kanalverwaltung, Provider-Mapping, Reminder-Fan-out und Admin-Routen.
- * Ausführen: node --experimental-sqlite test/test-notifications.js
+ * Ausführen: node test/test-notifications.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

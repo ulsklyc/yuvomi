@@ -46,35 +46,34 @@ const CHECK = 'server/utils/require-supported-runtime.js';
 // ---------------------------------------------------------------------------
 
 test('a runtime below the required Node-API gets one line that names what runs, what is needed and what helps', () => {
-  const message = runtimeProblem({ node: '22.12.0', napi: '9', range: '^22.14.0 || >=23.6.0' });
+  const message = runtimeProblem({ node: '24.0.0', napi: '9', range: '^24.12.0 || >=26.0.0' });
   assert.equal(typeof message, 'string');
   assert.ok(!message.includes('\n'), 'the message is a single line');
-  assert.match(message, /Node\.js 22\.12\.0/);
+  assert.match(message, /Node\.js 24\.0\.0/);
   assert.match(message, /Node-API 9\b/);
   assert.match(message, new RegExp(`Node-API ${REQUIRED_NAPI}\\b`));
-  assert.ok(message.includes('"^22.14.0 || >=23.6.0"'), message);
+  assert.ok(message.includes('"^24.12.0 || >=26.0.0"'), message);
   assert.match(message, /Update Node\.js/);
 });
 
 test('a runtime with the required Node-API or newer passes', () => {
-  assert.equal(runtimeProblem({ node: '22.14.0', napi: '10' }), null);
+  assert.equal(runtimeProblem({ node: '24.12.0', napi: '10' }), null);
   assert.equal(runtimeProblem({ node: '24.21.0', napi: 10 }), null);
   assert.equal(runtimeProblem({ node: '99.0.0', napi: String(REQUIRED_NAPI + 1) }), null);
 });
 
 test('the check hangs on the capability, not on the version number', () => {
-  // Node 23.0 bis 23.5 liegen ueber jeder 22er-Grenze und haben Node-API 9.
-  const odd = runtimeProblem({ node: '23.5.0', napi: '9', range: pkg.engines.node });
-  assert.match(odd, /Node\.js 23\.5\.0/);
-  // Die Meldung darf dort nicht behaupten, 23.5.0 sei zu alt fuer eine 22er-Grenze.
+  // Eine Versionsnummer allein rettet nichts: Node-API 9 wird abgelehnt, egal
+  // wie hoch die Nummer ist, und die Meldung nennt die Spanne aus package.json.
+  const odd = runtimeProblem({ node: '25.0.0', napi: '9', range: pkg.engines.node });
+  assert.match(odd, /Node\.js 25\.0\.0/);
   assert.ok(odd.includes(`matches "${pkg.engines.node}"`), odd);
-  // Und eine Versionsnummer allein rettet nichts.
-  assert.equal(typeof runtimeProblem({ node: '22.14.0', napi: '9' }), 'string');
+  assert.equal(typeof runtimeProblem({ node: '24.12.0', napi: '9' }), 'string');
 });
 
 test('a runtime that reports no Node-API version is refused, with or without a known range', () => {
   for (const napi of [undefined, null, '', 'abc']) {
-    const message = runtimeProblem({ node: '22.0.0', napi });
+    const message = runtimeProblem({ node: '24.0.0', napi });
     assert.equal(typeof message, 'string', `napi=${String(napi)}`);
     assert.ok(!message.includes('\n'));
     assert.ok(!/undefined|null|NaN/.test(message), message);
@@ -88,8 +87,18 @@ test('a runtime that reports no Node-API version is refused, with or without a k
 test('the message quotes engines.node from package.json, and package-lock.json mirrors it', () => {
   assert.equal(declaredNodeRange(), pkg.engines.node);
   assert.equal(lock.packages[''].engines.node, pkg.engines.node);
-  const message = runtimeProblem({ node: '22.12.0', napi: '9', range: declaredNodeRange() });
+  const message = runtimeProblem({ node: '24.0.0', napi: '9', range: declaredNodeRange() });
   assert.ok(message.includes(pkg.engines.node), message);
+});
+
+test('engines.node is the span Node 24.12 or newer', () => {
+  assert.equal(pkg.engines.node, '^24.12.0 || >=26.0.0');
+});
+
+test('no package.json script still passes --experimental-sqlite', () => {
+  // Seit Node 24 braucht niemand das Flag; Zaehleinheit: Skriptzeilen.
+  const flagged = Object.entries(pkg.scripts).filter(([, line]) => line.includes('--experimental-sqlite'));
+  assert.equal(flagged.length, 0, `${flagged.length} scripts still pass --experimental-sqlite, e.g. ${flagged.slice(0, 3).map(([k]) => k).join(', ')}`);
 });
 
 test('the runtime check carries no Node version of its own', () => {

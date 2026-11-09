@@ -7,7 +7,7 @@
  *        Spalte users.inventory_deadlines_feed_token (Migration 144), inklusive
  *        der Isolation, für die es sie gibt: ein Rückzug trifft ein Abo.
  *        (3) Der Verwaltungs-Router (/inventory/deadlines-feed) end-to-end.
- * Ausführen: node --experimental-sqlite --test test/test-inventory-deadlines-feed.js
+ * Ausführen: node --test test/test-inventory-deadlines-feed.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -8,7 +8,7 @@
  *        Teil-Update sowie beide Import-Richtungen inklusive Chargen-Regel
  *        (gleiches MHD addiert, abweichendes MHD legt eine neue Zeile an).
  *        Persistenz jeweils per DB-Assertion belegt.
- * Ausführen: node --experimental-sqlite --test test/test-pantry-routes.js
+ * Ausführen: node --test test/test-pantry-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

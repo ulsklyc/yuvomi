@@ -20,7 +20,7 @@
  * Die Maschinenzone spielt fuer die Aussagen keine Rolle - gegengeprueft unter
  * `TZ=UTC` und `TZ=America/Chicago`.
  *
- * Ausführen: node --experimental-sqlite --test test/test-api-offset-conversion.js
+ * Ausführen: node --test test/test-api-offset-conversion.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

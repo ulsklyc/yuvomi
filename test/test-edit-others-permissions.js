@@ -9,7 +9,7 @@
  *        Alle Anfragen laufen mit API-Tokens durch `requireAuth`: derselbe Weg,
  *        den eine Integration und die MCP-Bruecke (`call_api_operation`, per
  *        Loopback auf dieselben Routen) nehmen.
- * Ausfuehren: node --experimental-sqlite --test test/test-edit-others-permissions.js
+ * Ausfuehren: node --test test/test-edit-others-permissions.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'edit-others-test-secret';
 process.env.DB_PATH = ':memory:';

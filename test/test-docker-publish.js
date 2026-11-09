@@ -75,6 +75,13 @@ test('CI tests the Node major the image runs on', () => {
   assert.ok(majors.includes(imageMajor), `CI matrix [${matrix}] must include the image's Node ${imageMajor}`);
 });
 
+test('CI tests Node 24 and 26, the supported span of engines.node', () => {
+  const matrix = ci.match(/node-version:\s*\[([^\]]+)\]/)?.[1];
+  assert.ok(matrix, 'ci.yml must have a node-version matrix');
+  const majors = matrix.split(',').map((v) => v.trim().replace(/\.x$/, ''));
+  assert.deepEqual(majors, ['24', '26'], `CI matrix [${matrix}] must be [24.x, 26.x]`);
+});
+
 test('the image carries provenance and an SBOM, and is signed by digest under both names', () => {
   // Eine Signatur per TAG waere wertlos: das Tag kann nachtraeglich verschoben
   // werden, der Digest nennt genau den Index, der eben gepusht wurde. Beide
