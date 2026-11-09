@@ -588,6 +588,15 @@ test('without a build the server refuses to start, under npm run dev it serves n
     writeFileSync(path.join(root, 'dist', 'sw.js'), '');
     assert.deepEqual(resolveFrontendDir(root, {}), { mode: 'dist', dir: path.join(root, 'dist'), serviceWorker: path.join(root, 'dist', 'sw.js') });
     assert.deepEqual(resolveFrontendDir(root, { YUVOMI_DEV_FRONTEND: 'vite' }), { mode: 'vite-dev', dir: null, serviceWorker: null });
+    // Die Testanordnung der Browser-Suiten (YUVOMI_BUILD_LAYOUT=modules) liegt
+    // nach test:document-guards in dist/; `npm start` darf sie nicht still
+    // ausliefern. Nur wer sie ausdruecklich will (der Harness), bekommt sie.
+    mkdirSync(path.join(root, 'dist', '.vite'), { recursive: true });
+    writeFileSync(path.join(root, 'dist', '.vite', 'modules.json'), JSON.stringify({ layout: 'modules' }));
+    assert.throws(() => resolveFrontendDir(root, {}), (err) => err instanceof Error && /test layout/.test(err.message) && /npm run build/.test(err.message));
+    assert.equal(resolveFrontendDir(root, { YUVOMI_BUILD_LAYOUT: 'modules' }).mode, 'dist');
+    writeFileSync(path.join(root, 'dist', '.vite', 'modules.json'), JSON.stringify({ layout: 'bundle' }));
+    assert.equal(resolveFrontendDir(root, {}).mode, 'dist');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

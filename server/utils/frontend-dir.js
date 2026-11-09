@@ -12,13 +12,28 @@
  *        statischen Dateien und keine Shell.
  * Abhaengigkeiten: node:fs, node:path
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const DEV_FRONTEND_ENV = 'YUVOMI_DEV_FRONTEND';
 
 export const MISSING_BUILD_MESSAGE = 'The web app is not built: dist/ is missing or incomplete. '
   + 'Run `npm run build` (production) or `npm run dev` (development) first.';
+
+export const TEST_LAYOUT_MESSAGE = 'dist/ holds the test layout of the browser suites (npm run build:browser-tests), '
+  + 'not the app as it ships. Run `npm run build` first.';
+
+/**
+ * Die Anordnung eines Builds: 'modules' (Testanordnung) oder 'bundle'.
+ * @param {string} dir
+ */
+export function layoutOf(dir) {
+  try {
+    return JSON.parse(readFileSync(path.join(dir, '.vite', 'modules.json'), 'utf8')).layout === 'modules' ? 'modules' : 'bundle';
+  } catch {
+    return 'bundle';
+  }
+}
 
 /**
  * @param {string} repoRoot - Wurzel des Checkouts (dort liegen public/ und dist/)
@@ -33,6 +48,12 @@ export function resolveFrontendDir(repoRoot, env = process.env) {
   const serviceWorker = path.join(dir, 'sw.js');
   if (!existsSync(path.join(dir, 'index.html')) || !existsSync(serviceWorker)) {
     throw new Error(MISSING_BUILD_MESSAGE);
+  }
+  // Nach test:document-guards liegt die Testanordnung in dist/ (vite.config.ts,
+  // YUVOMI_BUILD_LAYOUT=modules). Ausgeliefert wird sie nur, wenn der Aufrufer
+  // sie ausdruecklich will - der Harness der Browser-Suiten.
+  if (layoutOf(dir) === 'modules' && String(env.YUVOMI_BUILD_LAYOUT ?? '').trim() !== 'modules') {
+    throw new Error(TEST_LAYOUT_MESSAGE);
   }
   return { mode: 'dist', dir, serviceWorker };
 }
