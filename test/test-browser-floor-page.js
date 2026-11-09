@@ -287,6 +287,19 @@ test('die Mindestversionen auf der Hinweisseite sind die von build.target', () =
   }
 });
 
+test('EINE Matrix: die Zeile in docs/installation.md und die READMEs nennen build.target', () => {
+  const floor = buildTarget();
+  const row = read('docs/installation.md').split('\n').find((line) => line.startsWith('| **Starts, every screen opens, scrolls** |'));
+  assert.equal(row, `| **Starts, every screen opens, scrolls** | ${floor.chrome} | ${floor.firefox} | ${floor.safari} | ${floor.ios} |`,
+    'die dokumentierte Untergrenze (test:old-browser-fallbacks misst gegen sie) ist build.target');
+  assert.doesNotMatch(read('docs/installation.md'), /\*\*Everything as designed\*\*/, 'keine zweite Zeile mehr');
+  for (const [file, label] of [['README.md', '- **Browsers** - '], ['README.de.md', '- **Browser** - ']]) {
+    const line = read(file).split('\n').find((l) => l.startsWith(label)) ?? '';
+    assert.ok(line.includes(`Chrome und Edge ${floor.chrome}`) || line.includes(`Chrome and Edge ${floor.chrome}`), `${file}: ${line}`);
+    assert.ok(line.includes(`Firefox ${floor.firefox}`) && line.includes(`Safari ${floor.safari}`) && line.includes(`iOS ${floor.ios}`), `${file}: ${line}`);
+  }
+});
+
 /**
  * Welcher Block sichtbar ist: das Stylesheet der Seite zeigt `.copy[lang=en]`,
  * ausser `<html>` steht auf Deutsch. Gelesen am Stylesheet selbst, nicht an

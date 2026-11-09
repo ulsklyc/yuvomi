@@ -171,30 +171,24 @@ git --version              # git version 2.x.x
 
 ### Browser Support
 
-Measured on 21 September 2026 (v2.68.0) from what the shipped code in `public/` uses, with the
-version data of MDN's [browser-compat-data](https://github.com/mdn/browser-compat-data) 8.1.2
-([#1369](https://github.com/ulsklyc/yuvomi/issues/1369)). Edge, Opera, Samsung Internet and
-other Chromium browsers follow the Chrome column. Every browser on iPhone and iPad uses Safari's
-engine, so there the iOS version counts, not the browser.
+Measured on 9 November 2026 against the browser floor the app is built for (`build.target` in
+`vite.config.ts`), with the version data of MDN's
+[browser-compat-data](https://github.com/mdn/browser-compat-data). Edge, Opera, Samsung
+Internet and other Chromium browsers follow the Chrome column. Every browser on iPhone and iPad
+uses Safari's engine, so there the iOS version counts, not the browser.
 
 | | Chrome / Edge | Firefox | Safari (macOS) | iOS / iPadOS |
 |---|---|---|---|---|
-| **Everything as designed** | 117 | 129 | 17.5 | 17.5 |
-| **Starts, every screen opens, scrolls** | 87 | 79 | 14.1 | 14.5 |
+| **Starts, every screen opens, scrolls** | 105 | 115 | 15.4 | 15.4 |
 
-**Below the second row Yuvomi does not work.** Four things set that floor:
+**Below this row Yuvomi shows a notice page instead of the app.** A small script that runs
+before anything else checks for two features that arrived at the floor (CSS cascade layers and
+`Object.hasOwn`); a browser without them is sent to a page in German or English that names
+these versions and suggests updating the browser or the device, or using another browser.
+Chrome 99 to 104 and Firefox 97 to 114 pass that check although they are below the row: there
+the app starts, but single screens can stay empty.
 
-- Every screen is drawn with `replaceChildren()` (Chrome 86, Firefox 78, Safari 14). Without it
-  the app shows only its error page.
-- The date field that the start loads declares a static class field (Safari 14.1, iOS 14.5).
-  An older Safari rejects the whole script, and nothing renders at all.
-- Dialogs are placed with the CSS property `inset` (Chrome 87, Safari 14.1). Without it every
-  dialog opens below the visible window, so nothing can be created or edited.
-- The calendar and fasting screens use `||=` and `??=` (Firefox 79). An older Firefox cannot
-  load those two screens.
-
-**Between the two rows Yuvomi works but looks or behaves differently.** What is missing up to
-which version:
+**Above the row Yuvomi works but looks or behaves differently up to these versions:**
 
 | Feature | Chrome | Firefox | Safari | Without it |
 |---|---|---|---|---|
@@ -203,11 +197,7 @@ which version:
 | Container queries | 105 | 110 | 16 | Cards and lists keep their narrow layout; split views stay in one column |
 | Popover | 114 | 125 | 17 | The menus behind a button are not available and stay hidden: every "more" menu (module tools, list rows, documents), the account menu at the foot of the sidebar, the Overview's New and tools menus, the calendar's view menu. Their buttons do nothing; Log out is also under Settings > Account. The date field's calendar does not open (typing a date works, touch devices get the system picker) |
 | `dvh` | 108 | 101 | 15.4 | Heights fall back to `vh`; on a phone the bottom edge can sit under the browser's toolbar |
-| `Object.hasOwn`, `Array.at()`, `findLastIndex()` | 97 | 104 | 15.4 | Single actions fail: note category filter, notification channel form, document storage settings, folder upload, fasting controls and durations, a birthday's custom reminder |
-| `<dialog>` `showModal()` | 37 | 98 | 15.4 | Icon picker and photo crop do not open |
 | `inert` | 102 | 112 | 15.5 | Behind an open dialog the page stays reachable with the keyboard |
-| `:focus-visible` | 86 | 85 | 15.4 | No focus ring; where a rule pairs it with hover, the hover state goes too |
-| Listener clean-up via `AbortSignal` | 90 | 86 | 15 | Event listeners outlive the screen that set them |
 | Subgrid, `text-wrap: balance`, `@starting-style` | 117 | 129 | 17.5 | Fasting week chart alignment, balanced headings, the date picker's fade-in |
 | Document preview (bundled PDF.js 4.10) | 94 | 93 | 16.4 | PDFs do not open in the viewer; PDF.js itself targets current browsers, so treat these as a lower bound |
 
@@ -216,14 +206,14 @@ Newer features that change nothing essential are not counted: `text-wrap: pretty
 (WebKit has its own scrollbar styling), masonry behind `@supports`. On iOS before 18.3 a popover
 menu does not close when you tap next to it.
 
-Firefox ESR 115 lies between the rows: it works, but without `:has()`, the popover menus and
-balanced headings.
-Firefox ESR 128 and later match the first row except for the date picker's fade-in.
+Firefox ESR 115 sits at the floor: it works, but without `:has()`, the popover menus and
+balanced headings. Firefox ESR 128 and later have everything except the date picker's fade-in.
 
-`npm run test:old-browser-fallbacks` keeps the second row true: the scripts that run before the
-first screen may not call APIs newer than it, no module may use syntax newer than it, and no
-stylesheet may use a construct that makes such a browser drop a whole block. The suite reads the
-second row from this table, so a change to the floor changes the guard with it.
+`npm run test:old-browser-fallbacks` keeps the row true: the scripts that run before the first
+screen may not call APIs newer than it, no module may use syntax newer than it, and no
+stylesheet may use a construct that makes such a browser drop a whole block. The suite reads
+the row from this table, so a change to the floor changes the guard with it;
+`npm run test:browser-floor-page` holds the notice page to `build.target`.
 
 ---
 

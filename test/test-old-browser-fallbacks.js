@@ -19,13 +19,21 @@
  *           Startpfad also die App, sonst einen ganzen Bildschirm (#1369).
  *        4. GANZE BLOECKE. Kein Stylesheet nutzt ein Konstrukt, bei dem ein
  *           Browser an der Mindestversion einen ganzen Block verwirft
- *           (`@layer`, `@scope`, Nesting, Media-Bereichssyntax) (#1369).
+ *           (`@scope`, Nesting, Media-Bereichssyntax; `@layer` bis Phase 1a E) (#1369).
  *        5. POPOVER. Ohne Popover-API bleibt jedes Popover zu: reset.css reicht
  *           die UA-Regel `[popover] { display: none }` nach, und keine Regel
  *           schlaegt sie mit einem `display` an einer Popover-Klasse (#2107).
  *
  * DIE MINDESTVERSION steht in docs/installation.md, Abschnitt "Browser
- * Support", zweite Tabellenzeile - gemessen am 21.09.2026 (#1369). Die Suite
+ * Support", in der Zeile "Starts, every screen opens, scrolls" - erst
+ * gemessen am 21.09.2026 (#1369: Chrome 87, Firefox 79, Safari 14.1), seit
+ * Phase 1a E (09.11.2026) die eine Matrix = `build.target` (Chrome 105,
+ * Firefox 115, Safari/iOS 15.4). Mit der Anhebung fielen aus den Listen:
+ * `Object.hasOwn`, `.at()`, `findLast`/`findLastIndex`, `structuredClone`,
+ * `crypto.randomUUID`, private Klassenglieder und `@layer`. Die Rueckfaelle,
+ * die der Code fuer die alte Grenze traegt (pickLocale ohne hasOwn,
+ * formatUnit ohne findLastIndex), bleiben samt ihren Programm-Tests stehen;
+ * ihr Abbau ist ein eigenes Ticket. Die Suite
  * liest sie dort und prueft jeden Eintrag ihrer Verbotslisten dagegen: ein
  * Eintrag, den die Mindestversion schon kann, ist ueberfluessig. Hebt jemand
  * die Mindestversion, meldet die Suite genau die Eintraege, die dann fallen.
@@ -521,7 +529,7 @@ const newer = (a, b) => {
 const describeSince = (since) => ENGINES.map((e) => `${ENGINE_NAMES[e]} ${since[e]}`).join(', ');
 
 /**
- * Die zweite Zeile der Tabelle in docs/installation.md ("Starts, every screen
+ * Die Zeile der Tabelle in docs/installation.md ("Starts, every screen
  * opens, scrolls"): Chrome, Firefox, Safari (macOS), iOS. Gelesen und nicht
  * abgeschrieben - sonst stuende dieselbe Zahl an zwei Stellen, und nur eine
  * davon waere die gepruefte.
@@ -553,43 +561,12 @@ test('die Mindestversion steht lesbar in docs/installation.md', () => {
  * ────────────────────────────────────────────────────────────────────────── */
 
 // APIs, die neuer sind als die Mindestversion und die man leicht hinschreibt.
-// Versionen aus MDN browser-compat-data 8.1.2 (#1369). Eine Liste von Hand und
+// Versionen aus MDN browser-compat-data 8.1.2 (#1369). Seit der Anhebung auf
+// 105/115/15.4 (Phase 1a E) gestrichen, weil die Grenze sie kann: Object.hasOwn,
+// .at(), findLast/findLastIndex, structuredClone, crypto.randomUUID. Eine Liste von Hand und
 // keine vollstaendige Pruefung: sie haelt die haeufigen Griffe fest, nicht
 // jede denkbare API.
 const STARTUP_FORBIDDEN = [
-  {
-    api: 'Object.hasOwn',
-    since: { chrome: '93', firefox: '92', safari: '15.4' },
-    instead: 'Object.prototype.hasOwnProperty.call(obj, key)',
-    patterns: [
-      /\bObject\s*(?:\.\s*hasOwn|\[\s*(['"`])hasOwn\1\s*\])(?![\w$])/,
-      /\{[^{}]*\bhasOwn\b[^{}]*\}\s*=\s*Object\b/,
-    ],
-  },
-  {
-    api: 'Array.prototype.at / String.prototype.at',
-    since: { chrome: '92', firefox: '90', safari: '15.4' },
-    instead: 'list[list.length - 1]',
-    patterns: [/\.\s*at\s*\(/],
-  },
-  {
-    api: 'Array.prototype.findLast / findLastIndex',
-    since: { chrome: '97', firefox: '104', safari: '15.4' },
-    instead: 'eine Schleife von hinten',
-    patterns: [/\.\s*findLast(?:Index)?\s*\(/],
-  },
-  {
-    api: 'structuredClone',
-    since: { chrome: '98', firefox: '94', safari: '15.4' },
-    instead: 'JSON.parse(JSON.stringify(x)) oder eine gezielte Kopie',
-    patterns: [/\bstructuredClone\s*\(/],
-  },
-  {
-    api: 'crypto.randomUUID',
-    since: { chrome: '92', firefox: '95', safari: '15.4' },
-    instead: 'crypto.getRandomValues()',
-    patterns: [/\.\s*randomUUID\s*\(/],
-  },
   {
     api: 'Array.prototype.toSorted / toReversed / toSpliced',
     since: { chrome: '110', firefox: '115', safari: '16' },
@@ -692,29 +669,19 @@ test('Leser: auskommentierte Skripte zaehlen nicht, auch hinter einem offenen Ko
   ]);
 });
 
-test('Leser: findet Object.hasOwn in jeder Form, Kommentare und hasOwnProperty nicht (erfundene Faelle)', () => {
-  const hits = (source) => forbiddenCalls(source).map((hit) => hit.number);
-  assert.deepEqual(hits('if (Object.hasOwn(o, k)) {}'), [1]);
-  assert.deepEqual(hits("x = Object['hasOwn'](o, k);"), [1]);
-  assert.deepEqual(hits('const { hasOwn } = Object;'), [1]);
-  assert.deepEqual(hits('Object.prototype.hasOwnProperty.call(o, k);'), []);
-  assert.deepEqual(hits('// statt Object.hasOwn\n * Object.hasOwn im Kommentar\nok();'), []);
-});
-
 test('Leser: findet die neueren APIs, nicht ihre aelteren Namensvettern (erfundene Faelle)', () => {
   const apis = (source) => forbiddenCalls(source).map((hit) => hit.rule.api);
-  assert.deepEqual(apis('const last = parts.at(-1);'), ['Array.prototype.at / String.prototype.at']);
-  assert.deepEqual(apis('const i = parts.findLastIndex((p) => p);'), ['Array.prototype.findLast / findLastIndex']);
-  assert.deepEqual(apis('const copy = window.structuredClone(x);'), ['structuredClone']);
-  assert.deepEqual(apis('const id = crypto.randomUUID();'), ['crypto.randomUUID']);
   assert.deepEqual(apis('const s = list.toSorted();'), ['Array.prototype.toSorted / toReversed / toSpliced']);
   assert.deepEqual(apis('const g = Object.groupBy(xs, f);'), ['Object.groupBy / Map.groupBy']);
   assert.deepEqual(apis('const { promise } = Promise.withResolvers();'), ['Promise.withResolvers']);
   assert.deepEqual(apis('fetch(u, { signal: AbortSignal.timeout(5000) });'), ['AbortSignal.timeout']);
   assert.deepEqual(apis('const s = AbortSignal.any([a, b]);'), ['AbortSignal.any']);
   assert.deepEqual(apis('const xs = await Array.fromAsync(it);'), ['Array.fromAsync']);
-  // Die aelteren Nachbarn bleiben erlaubt.
+  // Die aelteren Nachbarn bleiben erlaubt, und was die Grenze seit 105/115/15.4
+  // kann, ebenso.
   assert.deepEqual(apis([
+    'if (Object.hasOwn(o, k)) {} const last = parts.at(-1);',
+    'const i = parts.findLastIndex((p) => p); const id = crypto.randomUUID();',
     'const i = parts.findIndex((p) => p);',
     'const d = new Date(at); const v = row.attr; const c = item.atTop;',
     'list.sort(); list.reverse(); list.splice(1, 1); list.toString();',
@@ -838,11 +805,6 @@ test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text'
  */
 const MODULE_SYNTAX_FORBIDDEN = [
   {
-    syntax: 'private Klassenglieder (#feld, #methode(), #x in obj)',
-    since: { chrome: '74', firefox: '90', safari: '14.1' },
-    patterns: [/\.\s*#[A-Za-z_$]/, /#[A-Za-z_$][\w$]*\s+in\s/],
-  },
-  {
     syntax: 'statischer Initialisierungsblock (static { ... })',
     since: { chrome: '94', firefox: '93', safari: '16.4' },
     patterns: [/\bstatic\s*\{/],
@@ -877,13 +839,13 @@ function appScripts() {
 
 test('Leser: erkennt neuere Syntax, nicht ihre Doppelgaenger in Strings (erfundene Faelle)', () => {
   const kinds = (source) => syntaxHits(source).map((hit) => hit.rule.syntax.split(' ')[0]);
-  assert.deepEqual(kinds('class A { #n = 0; get n() { return this.#n; } }'), ['private']);
-  assert.deepEqual(kinds('if (#brand in obj) {}'), ['private']);
   assert.deepEqual(kinds('class A { static { init(); } }'), ['statischer']);
   assert.deepEqual(kinds('const re = /(?<=\\$)\\d+/;'), ['Lookbehind']);
   assert.deepEqual(kinds("const re = new RegExp('(?<!a)b');"), ['Lookbehind']);
-  // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte Gruppen.
+  // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte
+  // Gruppen und private Klassenglieder (Safari 14.1, unter der Grenze seit Phase 1a E).
   assert.deepEqual(kinds([
+    'class A { #n = 0; get n() { return this.#n; } }',
     "el.style.color = '#fff'; const sel = '#main-content'; location.hash = '#top';",
     'const css = `.x { color: #1a1a18; }`;',
     'class B { static formAssociated = true; static get observedAttributes() { return []; } }',
@@ -925,7 +887,8 @@ test('kein Modul der App traegt Syntax, die neuer ist als die Mindestversion (#1
  * Eine unbekannte Eigenschaft kostet eine Zeile; diese Konstrukte kosten einen
  * ganzen Block, und darin kann die Hoehe der Shell, die Lage der Navigation
  * oder ein Dialog stehen. Heute nutzt kein Stylesheet der App eines davon.
- *   - `@layer` / `@scope`: der Block faellt weg, samt allem darin;
+ *   - `@scope`: der Block faellt weg, samt allem darin (`@layer` stand hier
+ *     bis zur Anhebung auf 105/115/15.4, die es kann);
  *   - Nesting: die verschachtelte Regel faellt weg;
  *   - Bereichssyntax in `@media` (`width >= 768px`): die Bedingung ist
  *     ungueltig, der Block greift nie - die responsive Regel ist weg.
@@ -933,7 +896,6 @@ test('kein Modul der App traegt Syntax, die neuer ist als die Mindestversion (#1
  * Verfeinerung oberhalb der Mindestversion (docs/installation.md).
  */
 const CSS_BLOCK_DROPPERS = [
-  { construct: '@layer', since: { chrome: '99', firefox: '97', safari: '15.4' } },
   { construct: '@scope', since: { chrome: '118', firefox: '146', safari: '26.4' } },
   { construct: 'CSS-Nesting', since: { chrome: '120', firefox: '117', safari: '17.2' } },
   { construct: 'Bereichssyntax in @media', since: { chrome: '104', firefox: '102', safari: '16.4' } },
@@ -947,7 +909,7 @@ const RANGE_FEATURE = /\([^():]*[<>=][^():]*\)/;
 function blockDropperFindings(css) {
   const findings = [];
   const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const match of plain.matchAll(/@(layer|scope)\b/gi)) {
+  for (const match of plain.matchAll(/@(scope)\b/gi)) {
     findings.push({ construct: `@${match[1].toLowerCase()}`, where: plain.slice(match.index, match.index + 60).split('\n')[0] });
   }
   for (const { selector, body, at } of eachRule(css)) {
@@ -969,16 +931,17 @@ function blockDropperFindings(css) {
 
 test('Leser: erkennt die Block-Konstrukte, nicht ihre harmlosen Nachbarn (erfundene Faelle)', () => {
   const kinds = (css) => blockDropperFindings(css).map((f) => f.construct);
-  assert.deepEqual(kinds('@layer base { .a { color: red } }'), ['@layer']);
-  assert.deepEqual(kinds('@layer base, theme;'), ['@layer']);
   assert.deepEqual(kinds('@scope (.card) { img { border: 0 } }'), ['@scope']);
   assert.deepEqual(kinds('.a { color: red; .b { color: blue } }'), ['CSS-Nesting']);
   assert.deepEqual(kinds('.a { &:hover { color: blue } }'), ['CSS-Nesting']);
   assert.deepEqual(kinds('@media (width >= 768px) { .a { display: flex } .b { gap: 0 } }'), ['Bereichssyntax in @media']);
   assert.deepEqual(kinds('@media (400px < width < 800px) { .a { display: flex } }'), ['Bereichssyntax in @media']);
   // Erlaubt: klassische Media-Merkmale, @supports und @container, @starting-style,
-  // @keyframes, ein Kommentar ueber @layer.
+  // @keyframes, und `@layer` (Chrome 99, Firefox 97, Safari 15.4 - unter der
+  // Grenze seit Phase 1a E; ob ein Blatt es nutzt, entscheidet DECISIONS 14).
   assert.deepEqual(kinds([
+    '@layer base { .a { color: red } }',
+    '@layer base, theme;',
     '/* frueher @layer base */',
     '@media (min-width: 768px) and (max-height: 499px) { .a { display: flex } }',
     '@supports (height: 100dvh) { :root { --h: 100dvh } }',
