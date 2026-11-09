@@ -8,6 +8,7 @@
  */
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
+/** @param {Record<string, {light: string, dark: string}> | null | undefined} colors */
 export function applyModuleColorOverrides(colors) {
   const existing = document.getElementById('module-color-overrides');
   if (!colors || typeof colors !== 'object' || !Object.keys(colors).length) {
