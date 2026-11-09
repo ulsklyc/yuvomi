@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A failed automatic backup now tells the administrators (#2519).** When the nightly backup
+  does not run, every administrator gets a push notification pointing at Settings > Household >
+  Backup and restore, where the reason is shown in full. Until now the failure was silent and only visible to
+  someone who happened to open that page. The notification carries no technical error text - that
+  belongs in the log and in the app - and two failed nights replace one notification instead of
+  stacking up. A successful run afterwards clears the warning by itself.
+
 ### Foundation
 - **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
   service worker takes its offline list from the build instead of a hand-kept one; pages,
@@ -110,14 +118,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filesystem, with hosts, ports and server paths. They now carry a fixed sentence or the class of
   the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
   status or a manifest check, stay.
-
-### Added
-- **A failed automatic backup now tells the administrators (#2519).** When the nightly backup
-  does not run, every administrator gets a push notification pointing at Settings > Household >
-  Backup and restore, where the reason is shown in full. Until now the failure was silent and only visible to
-  someone who happened to open that page. The notification carries no technical error text - that
-  belongs in the log and in the app - and two failed nights replace one notification instead of
-  stacking up. A successful run afterwards clears the warning by itself.
 
 ## [2.86.0] - 2026-11-07
 
