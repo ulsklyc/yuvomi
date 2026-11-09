@@ -2,26 +2,35 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPasskey, usePasskey, decodeBase64url, encodeBase64url, passkeysSupported } from '../public/utils/passkeys.js';
 
+// These tests deliberately install partial browser and modal doubles at this boundary.
+/** @type {Record<string, any>} */
+const browser = /** @type {any} */ (globalThis);
+
 const bytes = new Uint8Array([0, 255, 250, 1, 2, 3]);
 const encoded = 'AP_6AQID';
-globalThis.window = { isSecureContext: true };
-globalThis.PublicKeyCredential = class {};
+browser.window = { isSecureContext: true };
+browser.PublicKeyCredential = class {};
+/** @type {any} */
 let received;
+/** @type {any} Partial native credential returned by the browser double. */
 const credential = {
   id: encoded, rawId: bytes.buffer, type: 'public-key',
   response: { clientDataJSON: bytes.buffer, attestationObject: bytes.buffer, getTransports: () => ['internal'] },
   getClientExtensionResults: () => ({}),
 };
 Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {
-  credentials: { create: async value => { received = value; return credential; }, get: async value => { received = value; return credential; } },
+  credentials: { create: async (/** @type {any} */ value) => { received = value; return credential; }, get: async (/** @type {any} */ value) => { received = value; return credential; } },
 } });
+/** @type {{credentials:{create:(options?:any)=>Promise<any>,get:(options?:any)=>Promise<any>}}} */
+const testNavigator = navigator;
+
 
 test('base64url bytes round-trip without losing zero or high bytes', () => {
   assert.equal(encodeBase64url(bytes), encoded);
   assert.deepEqual(decodeBase64url(encoded), bytes);
 });
 test('registration converts challenge, handle and exclusion IDs and serializes the result', async () => {
-  const response = await createPasskey({ challenge: encoded, user: { id: encoded, name: 'name' }, excludeCredentials: [{ id: encoded, type: 'public-key' }] });
+  const response = await createPasskey({ rp:{name:'Test household'}, pubKeyCredParams:[{type:'public-key',alg:-7}], challenge: encoded, user: { id: encoded, name: 'name', displayName:'Member' }, excludeCredentials: [{ id: encoded, type: 'public-key' }] });
   assert.deepEqual(received.publicKey.challenge, bytes);
   assert.deepEqual(received.publicKey.user.id, bytes);
   assert.deepEqual(received.publicKey.excludeCredentials[0].id, bytes);
@@ -39,37 +48,41 @@ test('sign-in keeps discoverable credentials and serializes nullable handles', a
 test('insecure or unsupported browsers do not advertise passkey support', () => {
   assert.equal(passkeysSupported(), true);
   window.isSecureContext = false; assert.equal(passkeysSupported(), false);
-  window.isSecureContext = true; delete globalThis.PublicKeyCredential;
+  window.isSecureContext = true; delete browser.PublicKeyCredential;
   assert.equal(passkeysSupported(), false);
 });
 
 // Exercise the real account-card handlers and dialog with controlled DOM/API
 // boundaries. No authenticator is created when confirmation is cancelled.
+/** @param {Record<string,any>} [extra]
+ * @returns {Record<string,any>}
+ */
 function node(extra = {}) {
-  return { disabled:false, value:'', handlers:{}, addEventListener(type, fn) { this.handlers[type] = fn; }, ...extra };
+  return { disabled:false, value:'', handlers:{}, addEventListener(/** @type {string} */ type, /** @type {any} */ fn) { this.handlers[type] = fn; }, ...extra };
 }
 async function inlineFixture() {
-  globalThis.HTMLElement ??= class {};
-  globalThis.customElements ??= { define() {}, get() {} };
-  globalThis.localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
+  browser.HTMLElement ??= class {};
+  browser.customElements ??= { define() {}, get() {} };
+  browser.localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
   const { installMiniDom } = await import('./mini-dom.js'); installMiniDom();
-  window.isSecureContext = true; globalThis.PublicKeyCredential = class {};
+  window.isSecureContext = true; browser.PublicKeyCredential = class {};
   const { renderPasskeyCard } = await import('../public/settings/passkeys.js');
   const name = node({ value:'My Bitwarden key' }); const button = node(); const status = node();
-  const form = node({ querySelector: selector => selector === 'button' ? button : name });
+  const form = node({ querySelector: /** @param {string} selector */ selector => selector === 'button' ? button : name });
   const container = { replaceChildren() {}, insertAdjacentHTML() {}, querySelectorAll: () => [],
-    querySelector: selector => selector === '#passkey-add-form' ? form : status };
+    querySelector: /** @param {string} selector */ selector => selector === '#passkey-add-form' ? form : status };
+  /** @type {any} */
   let modal;
-  globalThis.__openModal = options => {
+  browser.__openModal = /** @param {any} options */ options => {
     const password = node({ required:true }); const code = node(); const modalStatus = node();
     const modalForm = node(); const confirm = node(); const passkey = node();
-    const fields = { '#passkey-reauth-form':modalForm, '#passkey-reauth-password':password,
+    /** @type {Record<string,any>} */ const fields = { '#passkey-reauth-form':modalForm, '#passkey-reauth-password':password,
       '#passkey-reauth-code':code, '#passkey-reauth-status':modalStatus, '#passkey-reauth-use':passkey };
     modal = { ...options, password, code, status:modalStatus, form:modalForm, passkey };
-    options.onSave({ querySelector: key => fields[key], querySelectorAll: () => [confirm, passkey] });
+    options.onSave({ querySelector: /** @param {string} key */ key => fields[key], querySelectorAll: () => [confirm, passkey] });
   };
-  globalThis.__closeModal = () => modal.onClose();
-  await renderPasskeyCard(container);
+  browser.__closeModal = () => modal.onClose();
+  await renderPasskeyCard(/** @type {HTMLElement} */ (/** @type {unknown} */ (container)));
   const submit = () => form.handlers.submit({ preventDefault() {}, currentTarget:form });
   const settle = async () => { for (let n=0; n<10; n++) await new Promise(resolve => setImmediate(resolve)); };
   return { name, button, status, submit, settle, get modal() { return modal; } };
@@ -78,11 +91,11 @@ const stale = () => Object.assign(new Error('stale'), { data:{reason:'passkey_re
 const ownState = { enabled:true, enrollment_allowed:true, passkeys:[], second_factor_required:false };
 
 test('inline password confirmation retains the name and resumes registration once', async () => {
-  let confirmed = false; const requests = []; let creations = 0;
-  navigator.credentials.create = async () => { creations++; return credential; };
-  globalThis.__apiStub = {
+  let confirmed = false; const requests = /** @type {any[]} */ ([]); let creations = 0;
+  testNavigator.credentials.create = async () => { creations++; return credential; };
+  browser.__apiStub = {
     get: async () => ({ data:ownState }),
-    post: async (path, body) => {
+    post: async (/** @type {string} */ path, /** @type {any} */ body) => {
       requests.push({ path, body });
       if (path.endsWith('/reauth/verify')) { assert.equal(body.password, 'test-only'); confirmed = true; return {data:{ok:true}}; }
       if (path.endsWith('/register/options')) { if (!confirmed) throw stale(); return {data:{challenge:encoded, user:{id:encoded}}}; }
@@ -100,9 +113,9 @@ test('inline password confirmation retains the name and resumes registration onc
 });
 
 test('cancelling inline confirmation keeps input and never creates a credential', async () => {
-  let creations = 0; navigator.credentials.create = async () => { creations++; return credential; };
-  const paths = [];
-  globalThis.__apiStub = { get:async () => ({data:ownState}), post:async path => { paths.push(path); throw stale(); } };
+  let creations = 0; testNavigator.credentials.create = async () => { creations++; return credential; };
+  /** @type {string[]} */ const paths = /** @type {any[]} */ ([]);
+  browser.__apiStub = { get:async () => ({data:ownState}), post:async (/** @type {string} */ path) => { paths.push(path); throw stale(); } };
   const ui = await inlineFixture(); const pending = ui.submit(); await ui.settle();
   ui.modal.onClose(); await pending;
   assert.equal(creations, 0); assert.equal(paths.length, 1);
@@ -110,11 +123,12 @@ test('cancelling inline confirmation keeps input and never creates a credential'
 });
 
 test('wrong confirmation stays in the dialog; closing during verification does not resume the change', async () => {
-  let resolveProof; let creations = 0;
-  navigator.credentials.create = async () => { creations++; return credential; };
-  globalThis.__apiStub = {
+  /** @type {(value:any)=>void} */
+  let resolveProof = (/** @type {any} */ _value) => { throw new Error('Proof request has not started'); }; let creations = 0;
+  testNavigator.credentials.create = async () => { creations++; return credential; };
+  browser.__apiStub = {
     get:async () => ({data:ownState}),
-    post:async path => {
+    post:async (/** @type {string} */ path) => {
       if (path.endsWith('/reauth/verify')) throw Object.assign(new Error(), {data:{reason:'passkey_failed'},status:400});
       throw stale();
     },
@@ -122,19 +136,19 @@ test('wrong confirmation stays in the dialog; closing during verification does n
   const ui = await inlineFixture(); const pending = ui.submit(); await ui.settle();
   ui.modal.password.value = 'wrong'; ui.modal.form.handlers.submit({preventDefault(){}}); await ui.settle();
   assert.equal(ui.modal.status.textContent, 'passkeys.reauthFailed'); assert.equal(creations, 0);
-  globalThis.__apiStub.post = async () => new Promise(resolve => { resolveProof = resolve; });
+  browser.__apiStub.post = async () => new Promise(resolve => { resolveProof = resolve; });
   ui.modal.password.value = 'correct'; ui.modal.form.handlers.submit({preventDefault(){}}); await ui.settle();
   ui.modal.onClose(); resolveProof({data:{ok:true}}); await pending; await ui.settle();
   assert.equal(creations, 0); assert.equal(ui.name.value, 'My Bitwarden key');
 });
 
 test('existing UV passkey confirmation sends its assertion without a second-factor code', async () => {
-  let confirmed = false; let assertionProof; let creations = 0;
-  navigator.credentials.create = async () => { creations++; return credential; };
-  navigator.credentials.get = async () => credential;
-  globalThis.__apiStub = {
+  let confirmed = false; /** @type {any} */ let assertionProof = /** @type {any} */ (undefined); let creations = 0;
+  testNavigator.credentials.create = async () => { creations++; return credential; };
+  testNavigator.credentials.get = async () => credential;
+  browser.__apiStub = {
     get:async () => ({data:{...ownState, passkeys:[{id:7,name:'Existing key'}], second_factor_required:true}}),
-    post:async (path, body) => {
+    post:async (/** @type {string} */ path, /** @type {any} */ body) => {
       if (path.endsWith('/reauth/options')) return {data:{challenge:encoded,allowCredentials:[{id:encoded}]}};
       if (path.endsWith('/reauth/verify')) { assertionProof = body; confirmed = true; return {data:{ok:true}}; }
       if (path.endsWith('/register/options')) { if (!confirmed) throw stale(); return {data:{challenge:encoded,user:{id:encoded}}}; }
@@ -144,7 +158,7 @@ test('existing UV passkey confirmation sends its assertion without a second-fact
   const ui = await inlineFixture(); const pending = ui.submit(); await ui.settle();
   assert.match(ui.modal.content, /passkeys.confirmWithPasskey/);
   ui.modal.code.value = '';
-  globalThis.__constraintErrors = form => {
+  browser.__constraintErrors = /** @param {any} form */ form => {
     if (form === ui.modal.form) {
       assert.equal(ui.modal.code.required, false, 'the TOTP field is optional for UV passkey proof');
       assert.equal(ui.modal.password.required, false);
@@ -152,7 +166,7 @@ test('existing UV passkey confirmation sends its assertion without a second-fact
     return [];
   };
   try { ui.modal.passkey.handlers.click(); await pending; }
-  finally { delete globalThis.__constraintErrors; }
+  finally { delete browser.__constraintErrors; }
   assert.equal(assertionProof.method, 'passkey'); assert.equal(assertionProof.code, undefined, 'UV confirmation does not send a TOTP code');
   assert.equal(assertionProof.credential.id, encoded); assert.equal(assertionProof.password, undefined);
   assert.equal(creations, 1);
@@ -161,10 +175,11 @@ test('existing UV passkey confirmation sends its assertion without a second-fact
 
 test('password submission works while passkey config is pending and the late button stays after the form', async () => {
   const { render } = await import('../public/pages/login.js');
+  /** @returns {Record<string,any>} */
   const element = () => ({
     handlers:{}, value:'', hidden:true, disabled:false, isConnected:true,
     classList:{toggle(){}, remove(){}, add(){}},
-    addEventListener(name, handler) { this.handlers[name] = handler; },
+    addEventListener(/** @type {string} */ name, /** @type {any} */ handler) { this.handlers[name] = handler; },
     setAttribute(){}, removeAttribute(){}, focus(){}, select(){}, remove(){},
     closest() { return {classList:this.classList}; },
     insertBefore(){}, querySelectorAll(){ return []; },
@@ -173,30 +188,31 @@ test('password submission works while passkey config is pending and the late but
   const password = element(); password.value = 'private-password';
   const label = element(); const submit = element(); submit.querySelector = () => label;
   const form = element(); form.username = username; form.password = password;
-  form.querySelector = key => ({'#username':username, '#password':password}[key] ?? null);
+  form.querySelector = /** @param {string} key */ key => (/** @type {Record<string,any>} */ ({'#username':username, '#password':password}))[key] ?? null;
   const error = element(); const caps = element(); const button = element(); const passkeyError = element();
   const card = element(); let visible = false;
-  card.classList.remove = name => { if (name === 'auth-passkeys--pending') visible = true; };
-  card.querySelector = key => ({'#passkey-login':button, '#passkey-login-error':passkeyError}[key]);
+  card.classList.remove = /** @param {string} name */ name => { if (name === 'auth-passkeys--pending') visible = true; };
+  card.querySelector = /** @param {string} key */ key => (/** @type {Record<string,any>} */ ({'#passkey-login':button, '#passkey-login-error':passkeyError}))[key];
   const container = element();
   let markup = '';
-  container.replaceChildren = () => {}; container.insertAdjacentHTML = (_position, html) => { markup = html; };
-  container.querySelector = key => ({'#auth-form':form, '#auth-btn':submit, '#form-error':error, '#auth-capslock':caps, '#username':username, '.auth-card':card, '#passkey-login-slot':card}[key] ?? null);
-  globalThis.localStorage = {getItem:()=>null};
-  globalThis.location = {search:'', pathname:'/login'};
-  globalThis.document = {querySelector:()=>null, createElement:element};
+  container.replaceChildren = () => {}; container.insertAdjacentHTML = (/** @type {string} */ _position, /** @type {string} */ html) => { markup = html; };
+  container.querySelector = /** @param {string} key */ key => (/** @type {Record<string,any>} */ ({'#auth-form':form, '#auth-btn':submit, '#form-error':error, '#auth-capslock':caps, '#username':username, '.auth-card':card, '#passkey-login-slot':card}))[key] ?? null;
+  browser.localStorage = {getItem:()=>null};
+  browser.location = {search:'', pathname:'/login'};
+  browser.document = {querySelector:()=>null, createElement:element};
   let navigated = false;
-  globalThis.window = {isSecureContext:true, location:globalThis.location, yuvomi:{navigate:()=>{navigated=true;}}};
-  globalThis.PublicKeyCredential = class {};
-  globalThis.fetch = async () => ({json:async()=>({enabled:false})});
-  let resolveConfig; let loginArgs;
-  globalThis.__apiStub = {
+  browser.window = {isSecureContext:true, location:browser.location, yuvomi:{navigate:()=>{navigated=true;}}};
+  browser.PublicKeyCredential = class {};
+  browser.fetch = async () => ({json:async()=>({enabled:false})});
+  /** @type {(value:any)=>void} */ let resolveConfig = (/** @type {any} */ _value) => { throw new Error('Configuration request has not started'); }; /** @type {any[]} */ let loginArgs;
+  browser.__apiStub = {
     get:()=>new Promise(resolve=>{resolveConfig=resolve;}),
+    /** @param {...any} args */
     login:async (...args)=>{loginArgs=args; return {user:{id:1}};},
   };
-  let timer;
+  /** @type {ReturnType<typeof setTimeout>|undefined} */ let timer;
   try {
-    await Promise.race([render(container), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('render waited for passkey config')), 500); })]);
+    await Promise.race([render(/** @type {HTMLElement} */ (/** @type {unknown} */ (container))), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('render waited for passkey config')), 500); })]);
   } finally { clearTimeout(timer); }
   assert.equal(typeof form.handlers.submit, 'function', 'the handler is attached without waiting for config');
   let prevented = false;
@@ -210,28 +226,28 @@ test('password submission works while passkey config is pending and the late but
   assert.equal(visible, true);
   assert.equal(button.disabled, false);
   assert.equal(typeof button.handlers.click, 'function');
-  delete globalThis.__apiStub;
+  delete browser.__apiStub;
 });
 
 
 async function removalFixture(confirm = true) {
-  globalThis.HTMLElement ??= class {};
-  globalThis.customElements ??= {define(){},get(){}};
+  browser.HTMLElement ??= class {};
+  browser.customElements ??= {define(){},get(){}};
   const {installMiniDom}=await import('./mini-dom.js');installMiniDom();
   const {renderPasskeyCard}=await import('../public/settings/passkeys.js');
-  let keys=[{id:7,name:'Lost phone'}]; const requests=[]; const events=[]; const status=node(); const button=node({dataset:{removePasskey:'7'}});
-  const container={replaceChildren(){},insertAdjacentHTML(){},dispatchEvent(event){events.push(event);},
-    querySelector:selector=>selector==='#passkey-status'?status:null,
+  /** @type {{id:number,name:string}[]} */ let keys=[{id:7,name:'Lost phone'}]; const requests = /** @type {any[]} */ ([]); const events = /** @type {CustomEvent[]} */ ([]); const status=node(); const button=node({dataset:{removePasskey:'7'}});
+  const container={replaceChildren(){},insertAdjacentHTML(){},dispatchEvent(/** @type {any} */ event){events.push(event);},
+    querySelector:/** @param {string} selector */ selector =>selector==='#passkey-status'?status:null,
     querySelectorAll:()=>keys.length?[button]:[]};
-  globalThis.__confirmModal=async(message,options)=>{
+  browser.__confirmModal=async(/** @type {any} */ message,/** @type {any} */ options)=>{
     assert.equal(message,'passkeys.remove');
     assert.equal(options.detail,'passkeys.removeConfirm');
     assert.equal(options.danger,true);
     return confirm;
   };
-  globalThis.__apiStub={get:async()=>({data:{enabled:true,enrollment_allowed:false,passkeys:keys}}),
-    delete:async path=>{requests.push(path);keys=[];return {data:{ok:true,ended:3}};}};
-  await renderPasskeyCard(container);
+  browser.__apiStub={get:async()=>({data:{enabled:true,enrollment_allowed:false,passkeys:keys}}),
+    delete:async (/** @type {string} */ path)=>{requests.push(path);keys=[];return {data:{ok:true,ended:3}};}};
+  await renderPasskeyCard(/** @type {HTMLElement} */ (/** @type {unknown} */ (container)));
   await button.handlers.click();
   return {requests,events,status};
 }
@@ -254,17 +270,17 @@ test('cancelling passkey removal does not delete or notify other device cards', 
 async function passwordFixture(fail = false) {
   const {installMiniDom}=await import('./mini-dom.js');installMiniDom();
   const {__test:account}=await import('../public/settings/pages/personal-account.js');
-  const form=node({reset(){this.wasReset=true;},dispatchEvent(event){this.event=event;}});const button=node();
+  const form=node({reset(){this.wasReset=true;},dispatchEvent(/** @type {any} */ event){this.event=event;}});const button=node();
   form.querySelector=()=>button;
   const current=node({value:'Current-password!',select(){}});const next=node({value:'Replacement-password!'});const confirm=node({value:next.value});
   const error=node({hidden:true,replaceChildren(){},classList:{remove(){},add(){}},querySelector:()=>null});
   const cardStatus=node();let markup='Stale deleted passkey';let refreshed=0;
-  const card={replaceChildren(){markup='';},insertAdjacentHTML(_where,html){markup+=html;},querySelector:selector=>selector==='#passkey-status'?cardStatus:null,querySelectorAll:()=>[]};
-  const fields={'#password-form':form,'#password-error':error,'#current-password':current,'#new-password':next,'#confirm-password':confirm,'#passkeys-card':card};
-  const container={querySelector:selector=>fields[selector]??null,querySelectorAll:()=>[]};
-  globalThis.__apiStub={patch:async()=>{if(fail)throw Object.assign(new Error('wrong'),{status:400,data:{reason:'wrong_password'}});return {ok:true};},
+  const card={replaceChildren(){markup='';},insertAdjacentHTML(/** @type {string} */ _where,/** @type {string} */ html){markup+=html;},querySelector:/** @param {string} selector */ selector =>selector==='#passkey-status'?cardStatus:null,querySelectorAll:()=>[]};
+  /** @type {Record<string,any>} */ const fields={'#password-form':form,'#password-error':error,'#current-password':current,'#new-password':next,'#confirm-password':confirm,'#passkeys-card':card};
+  const container={querySelector:/** @param {string} selector */ selector =>fields[selector]??null,querySelectorAll:()=>[]};
+  browser.__apiStub={patch:async()=>{if(fail)throw Object.assign(new Error('wrong'),{status:400,data:{reason:'wrong_password'}});return {ok:true};},
     get:async()=>{refreshed++;assert.equal(markup,'','stale keys are cleared before the refresh');return {data:{enabled:true,enrollment_allowed:false,passkeys:[]}};}};
-  window.yuvomi={showToast(){}};
+  browser.window.yuvomi={showToast(){}};
   account.bindEvents(container,{}, {avatarData:null});
   await form.handlers.submit({preventDefault(){}});
   return {form,markup,refreshed,html:account.passwordCardHtml({sso_only:false})};
