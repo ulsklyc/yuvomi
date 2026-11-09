@@ -226,7 +226,10 @@ test('Token mit meals:read + shopping:read bleibt draussen', async () => {
 
 test('READ_LEVEL_WRITES: jeder Eintrag mit Methodenliste nennt genau die Methoden des Routers', async () => {
   const { READ_LEVEL_WRITES } = await import('../server/scopes.js');
-  const routers = { recipes: (await import('../server/routes/recipes.js')).default };
+  const routers = {
+    recipes: { router: (await import('../server/routes/recipes.js')).default, prefix: '/recipes' },
+    documents: { router: (await import('../server/routes/paperless-live-settings.js')).default, prefix: '/documents/dms/paperless' },
+  };
   const mitMethoden = READ_LEVEL_WRITES.filter((e) => e.methods !== null);
   assert.ok(mitMethoden.length > 0, 'Gegenprobe: es gibt Eintraege mit Methodenliste');
   for (const entry of mitMethoden) {
@@ -234,9 +237,9 @@ test('READ_LEVEL_WRITES: jeder Eintrag mit Methodenliste nennt genau die Methode
     const praefix = entry.pattern.match(/^\^\\\/([a-z-]+)\\\//)?.[1];
     assert.ok(routers[praefix], `${entry.id}: den Router fuer /${praefix} hier eintragen`);
     const methoden = new Set();
-    for (const layer of routers[praefix].stack) {
+    for (const layer of routers[praefix].router.stack) {
       if (!layer.route) continue;
-      const beispiel = `/${praefix}${String(layer.route.path).replace(/:[A-Za-z_]+/g, '1')}`;
+      const beispiel = `${routers[praefix].prefix}${String(layer.route.path).replace(/:[A-Za-z_]+/g, '1')}`;
       if (!re.test(beispiel)) continue;
       for (const [m, an] of Object.entries(layer.route.methods)) if (an) methoden.add(m.toUpperCase());
     }

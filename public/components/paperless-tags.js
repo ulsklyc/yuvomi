@@ -3,6 +3,7 @@ import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
+import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { openModal, closeModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 
 const ROOT = '/documents/dms/paperless';
@@ -21,11 +22,10 @@ function message(err) {
 export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
   openModal({
     title: t(key('title'), { name: title }), size: 'sm',
-    content: `<form class="document-form" id="paperless-tags-form">
+    content: `<form class="document-form" id="paperless-tags-form" novalidate>
       <p class="form-hint">${esc(t(key('hint')))}</p>
       <p role="status" data-pl-tag-status>${esc(t('common.loading'))}</p>
-      <label class="form-label" for="pl-tag-search">${esc(t(key('search')))}</label>
-      <input type="search" class="form-input" id="pl-tag-search" disabled>
+      ${renderPageSearch({ id: 'pl-tag-search', label: t(key('search')), clearLabel: t('common.searchClear') })}
       <fieldset class="paperless-tags__choices" disabled><legend>${esc(t(key('assigned')))}</legend><div data-pl-tag-list></div></fieldset>
       <button type="button" class="btn btn--ghost btn--sm" data-pl-tag-more hidden>${esc(t(key('more')))}</button>
       <p class="form-hint" role="status" data-pl-tag-names-warning hidden>${esc(t('settings.liveFolders.tagNamesUnavailable'))}</p>
@@ -63,10 +63,13 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
       const showError = (err) => { error.textContent = message(err); error.hidden = false; };
       function lock(value) {
         busy = value;
-        save.disabled = value || !ready;
+        // Only an in-flight operation locks Save. Readiness is checked on
+        // submit so a failed load remains retryable with an explicit message.
+        if (value) save.disabled = true;
+        else save.disabled = false;
         reload.disabled = value;
         more.disabled = value;
-        fieldset.disabled = value || !canEdit;
+        fieldset.disabled = value || !canEdit || !ready;
       }
       function draw() {
         namesWarning.hidden = unresolved.size === 0;
@@ -103,7 +106,7 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
           editableTagIds = result.data.editable_tag_ids ?? null;
           canEdit = result.data.can_edit;
           page = 0;
-          search.value = '';
+          searchControl.setValue('');
           search.disabled = false;
           save.hidden = !canEdit;
           draw();
@@ -113,7 +116,7 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
         } catch (err) { if (current()) showError(err); }
         finally { if (current()) lock(false); }
       }
-      search.addEventListener('input', draw);
+      const searchControl = wirePageSearch(panel, { id: 'pl-tag-search', onQuery: draw, delay: 0 });
       list.addEventListener('change', (event) => {
         if (busy || !canEdit || !event.target.matches('input[type="checkbox"]')) return;
         const id = Number(event.target.value);
@@ -129,7 +132,8 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
       });
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        if (busy || !ready || !canEdit || !current()) return;
+        if (busy || !canEdit || !current()) return;
+        if (!ready) { await load(); return; }
         lock(true); error.hidden = true;
         try {
           await api.put(path, { tags: [...selected], expected_tags: expected });

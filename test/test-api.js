@@ -35,6 +35,22 @@ function mockResponse(status, body = {}, headers = {}) {
 const { api, auth, ApiError, isAbortError } = await import('../public/api.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
 
+test('Paperless API documents personal credentials and all three folder audiences', () => {
+  const root = '/api/v1/documents/dms/paperless';
+  const { paths } = buildOpenApiSpec();
+  const folder = paths[`${root}/folders`].post.requestBody.content['application/json'].schema;
+  assert.deepEqual(folder.properties.visibility.enum, ['private', 'restricted', 'family']);
+  assert.ok(folder.properties.allowed_member_ids);
+  for (const [path, methods] of [
+    ['/live-settings', ['get']], ['/live-settings/{id}', ['put']],
+    ['/live-settings/{id}/tags', ['get']], ['/live-settings/{id}/token', ['put', 'delete']],
+  ]) for (const method of methods) assert.ok(paths[root + path]?.[method], `${method} ${path}`);
+  const credential = paths[`${root}/live-settings/{id}/token`].put;
+  assert.equal(credential.requestBody.content['application/json'].schema.properties.api_token.writeOnly, true);
+  assert.match(credential.description, /Documents readers using a session/);
+  assert.ok(paths[`${root}/tags`].get.parameters.some((p) => p.name === 'folder_id'));
+});
+
 function setup() {
   dispatchedEvents = [];
   document.cookie = '';

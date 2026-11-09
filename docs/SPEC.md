@@ -3479,7 +3479,10 @@ and credentials after remote awaits, so changing mode or revoking a personal
 token prevents an in-flight response from disclosing content.
 
 Migration 284 appends account policy and per-user credential tables. Deleting a
-DMS account cascades both; deleting a user removes their personal tokens.
+DMS account cascades both. Deleting or deactivating a user removes their
+personal tokens and received Live-folder grants. These personal records alone
+do not prevent deletion of an otherwise unused account; folders created by
+that user remain shared records and can require deactivation instead.
 Endpoints below `/api/v1/documents/dms/paperless`:
 
 - `GET /live-settings`: connection names, selected mode and the caller's token-presence flag; administrators also receive policy and revision.

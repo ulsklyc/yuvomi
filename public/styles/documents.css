@@ -2708,5 +2708,15 @@
 
 .paperless-tags__choices { min-width: 0; margin: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
 .paperless-tags__choices [data-pl-tag-list] { display: grid; gap: var(--space-2); max-height: 40vh; overflow-y: auto; }
-.paperless-tags__choice { display: flex; align-items: center; gap: var(--space-2); min-height: var(--target-base); overflow-wrap: anywhere; }
+.paperless-tags__choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+}
 .paperless-tags__choice input { flex-shrink: 0; }

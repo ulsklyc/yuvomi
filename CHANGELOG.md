@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
 
 ### Fixed
+- **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
 - **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
 - **Backup, system and API settings say what went wrong in your language** (#1909). Restoring an
   empty file, a database that is not from Yuvomi or a backup from a newer version showed the

@@ -4239,6 +4239,10 @@
   gap: var(--space-2);
   min-height: var(--target-base);
   overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 .live-folder-settings__tag input {
   flex-shrink: 0;

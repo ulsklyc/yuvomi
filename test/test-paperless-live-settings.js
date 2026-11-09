@@ -13,6 +13,8 @@ const folders = await import('../server/routes/paperless-folders.js');
 const tags = await import('../server/routes/paperless-tags.js');
 const settings = await import('../server/routes/paperless-live-settings.js');
 const database = buildMigratedDatabase(Database, MIGRATIONS);
+database.exec('CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired_at INTEGER NOT NULL)');
+const { removeUser } = await import('../server/services/user-removal.js');
 _setTestDatabase(database);
 const user = (name, role) => database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'test', ?)")
   .run(name, name, role).lastInsertRowid;
@@ -210,6 +212,37 @@ test('deleting a DMS account cascades its policy and personal tokens', async () 
   for (const table of ['paperless_live_settings', 'paperless_user_tokens']) {
     assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n, 0);
   }
+  assert.deepEqual(database.pragma('foreign_key_check'), []);
+});
+
+test('personal tokens and received folder grants do not prevent deletion of an otherwise empty account', () => {
+  const departing = user('live-empty-departing', 'member');
+  database.prepare('INSERT INTO paperless_user_tokens(account_id,user_id,api_token) VALUES (?,?,?)')
+    .run(accountId, departing, 'DEPARTING_SECRET');
+  database.prepare('INSERT INTO paperless_view_folder_access(folder_id,user_id) VALUES (?,?)').run(folderId, departing);
+  const result = removeUser(database, departing);
+  assert.equal(result.outcome, 'deleted');
+  assert.deepEqual(result.traces, []);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_user_tokens WHERE user_id=?').get(departing).n, 0);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access WHERE user_id=?').get(departing).n, 0);
+  assert.ok(database.prepare('SELECT 1 FROM paperless_view_folders WHERE id=?').get(folderId));
+  assert.deepEqual(database.pragma('foreign_key_check'), []);
+});
+
+test('deactivation ends only the departing user credentials and grants while shared folders survive', () => {
+  const departing = user('live-shared-departing', 'member');
+  const created = database.prepare("INSERT INTO paperless_view_folders(name,account_id,view_id,visibility,created_by) VALUES ('Retained',?,5,'family',?)")
+    .run(accountId, departing).lastInsertRowid;
+  const insert = database.prepare('INSERT INTO paperless_user_tokens(account_id,user_id,api_token) VALUES (?,?,?)');
+  insert.run(accountId, departing, 'DEPARTING_SECRET');
+  insert.run(accountId, reader, 'READER_SECRET');
+  database.prepare('INSERT INTO paperless_view_folder_access(folder_id,user_id) VALUES (?,?)').run(folderId, departing);
+  assert.equal(removeUser(database, departing).outcome, 'deactivated');
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_user_tokens WHERE user_id=?').get(departing).n, 0);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access WHERE user_id=?').get(departing).n, 0);
+  assert.equal(database.prepare('SELECT api_token FROM paperless_user_tokens WHERE user_id=?').get(reader).api_token, 'READER_SECRET');
+  assert.ok(database.prepare('SELECT 1 FROM paperless_view_folders WHERE id=?').get(created));
+  assert.equal(database.prepare('SELECT api_token FROM dms_accounts WHERE id=?').get(accountId).api_token, 'CENTRAL_SECRET');
   assert.deepEqual(database.pragma('foreign_key_check'), []);
 });
 

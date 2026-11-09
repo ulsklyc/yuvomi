@@ -76,6 +76,8 @@ export const PRIVATE_USER_COLUMNS = new Set([
   'idempotency_keys.user_id',
   'notification_channels.user_id',
   'family_document_access.user_id',
+  'paperless_view_folder_access.user_id',
+  'paperless_user_tokens.user_id',
   'invites.accepted_user_id',
   // Was das Konto zu der Art Zeile macht, die es ist.
   'housekeeping_workers.user_id',
@@ -322,6 +324,10 @@ function deactivate(database, userId) {
   closeFormerMoney(database, userId);
   database.prepare('DELETE FROM password_resets WHERE user_id = ?').run(userId);
   database.prepare('DELETE FROM idempotency_keys WHERE user_id = ?').run(userId);
+  // Personal DMS credentials belong to the departing user, unlike household
+  // dms_accounts. Drop them on deactivation too, not only via DELETE CASCADE.
+  database.prepare('DELETE FROM paperless_user_tokens WHERE user_id = ?').run(userId);
+  database.prepare('DELETE FROM paperless_view_folder_access WHERE user_id = ?').run(userId);
   // Wiederherstellungscodes sind Einmal-Geheimnisse auf Papier, die den zweiten
   // Faktor ERSETZEN. Sie enden; wer je zurueckkaeme, stellt neue aus.
   database.prepare('DELETE FROM user_recovery_codes WHERE user_id = ?').run(userId);

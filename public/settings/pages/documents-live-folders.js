@@ -2,6 +2,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { settingRowHtml, createInlineError, createRetryState } from '/settings/components.js';
+import { reportFieldErrors, constraintErrors } from '/components/modal.js';
 
 const ROOT = '/documents/dms/paperless';
 const key = (name) => `settings.liveFolders.${name}`;
@@ -22,6 +23,7 @@ function buildAccount(account, { canManage, signal }) {
   const current = () => !signal?.aborted && section.isConnected;
   const options = signal ? { signal } : {};
   const own = document.createElement('form');
+  own.noValidate = true;
   own.className = 'settings-form settings-form--compact';
   own.autocomplete = 'off';
   const tokenId = `live-token-${account.id}`;
@@ -48,7 +50,7 @@ function buildAccount(account, { canManage, signal }) {
   };
   own.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!current() || !own.reportValidity()) return;
+    if (!current() || reportFieldErrors(constraintErrors(own))) return;
     const submit = own.querySelector('[type="submit"]');
     submit.disabled = true;
     tokenError.replaceChildren();
@@ -77,13 +79,14 @@ function buildAccount(account, { canManage, signal }) {
 
   if (canManage) {
     const form = document.createElement('form');
+    form.noValidate = true;
     form.className = 'settings-form settings-form--compact';
     const modeId = `live-mode-${account.id}`, tagsId = `live-tags-mode-${account.id}`;
     form.insertAdjacentHTML('beforeend', `
       <div class="row-carrier settings-group">
-        ${settingRowHtml({ label: text('tokenMode'), labelFor: modeId, description: text('tokenModeHint'),
+        ${settingRowHtml({ label: t('settings.liveFolders.tokenMode'), labelFor: modeId, description: text('tokenModeHint'),
           control: `<select class="form-input" id="${modeId}"><option value="shared">${esc(text('shared'))}</option><option value="personal">${esc(text('personal'))}</option></select>` })}
-        ${settingRowHtml({ label: text('tags'), labelFor: tagsId, description: text('tagsHint'),
+        ${settingRowHtml({ label: t('settings.liveFolders.tags'), labelFor: tagsId, description: text('tagsHint'),
           control: `<select class="form-input" id="${tagsId}"><option value="all">${esc(text('allTags'))}</option><option value="selected">${esc(text('selectedTags'))}</option></select>` })}
       </div>
       <fieldset class="settings-group" data-tags-picker><legend>${esc(text('tags'))}</legend>

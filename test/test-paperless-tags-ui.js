@@ -17,6 +17,7 @@ class Node {
     if (!this.controls.has(selector)) this.controls.set(selector, new Node());
     return this.controls.get(selector);
   }
+  closest() { return null; }
   replaceChildren(...children) { this.children = [...children]; this.markup = ''; }
   append(...children) { this.children.push(...children); }
   addEventListener(type, listener) { this.events.set(type, listener); }
@@ -85,4 +86,30 @@ test('unreadable tag names keep the assigned ID and show an actionable explanati
   await flush();
   assert.equal(panel.querySelector('[data-pl-tag-names-warning]').hidden, false);
   assert.ok(panel.querySelector('[data-pl-tag-list]').markup.includes('#150'));
+});
+
+test('Save retries an incomplete tag load without writing an unverified selection', async () => {
+  const panel = new Node();
+  let catalogues = 0, writes = 0;
+  globalThis.__openModal = ({ onSave }) => onSave(panel);
+  globalThis.__apiStub = {
+    get: async (path) => {
+      if (path.includes('/tags?account_id=')) {
+        if (++catalogues === 1) throw new Error('catalogue unavailable');
+        return { data: [{ id: 7, name: 'House' }], meta: { has_more: false } };
+      }
+      return { data: { tags: [{ id: 7, name: 'House' }], tag_ids: [7], can_edit: true, account_id: 1 } };
+    },
+    put: async () => { writes++; },
+  };
+  openPaperlessTags({ path: '/documents/dms/paperless/documents/1/tags', title: 'Receipt' });
+  await flush();
+  assert.equal(panel.querySelector('[data-pl-tag-error]').hidden, false);
+  assert.equal(panel.querySelector('fieldset').disabled, true);
+  assert.equal(panel.querySelector('[type="submit"]').disabled, false);
+  await panel.querySelector('form').fire('submit');
+  assert.equal(catalogues, 2);
+  assert.equal(writes, 0);
+  assert.equal(panel.querySelector('[data-pl-tag-error]').hidden, true);
+  assert.equal(panel.querySelector('fieldset').disabled, false);
 });
