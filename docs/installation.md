@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 22.14+ or 23.6+ on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 24.12 or newer on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### CLI Installer (Linux / macOS)
 
@@ -235,7 +235,7 @@ There are nine ways to get Yuvomi running. **Option A** (web installer) is recom
 
 ### Option A — Web Installer (Recommended)
 
-Requires Node.js 22.14+ or 23.6+ and Docker on the host.
+Requires Node.js 24.12 or newer and Docker on the host.
 
 #### 1. Clone the Repository
 
@@ -314,9 +314,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.86.0` (exact version), `2.86` (latest patch of that minor), plus a moving `main`
+> `2.87.0` (exact version), `2.87` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.86.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.87.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -325,7 +325,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.86.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.87.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -334,7 +334,27 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.86.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.87.0 --format '{{ json .Provenance }}'`.
+
+> **Verify a release tarball.** Releases from November 2026 on also carry the app as a tarball,
+> `yuvomi-<version>-dist.tar.gz` (one top-level folder `yuvomi-<version>/`), next to a
+> `SHA256SUMS` file and a build provenance attestation over both, made by
+> `.github/workflows/release-assets.yml` from the release tag. YunoHost and the Proxmox script
+> install from it. If you install from the tarball yourself, check it before you unpack it:
+>
+> ```bash
+> gh release download v<version> --repo ulsklyc/yuvomi --pattern 'yuvomi-*-dist.tar.gz' --pattern SHA256SUMS
+> sha256sum -c SHA256SUMS
+> gh attestation verify yuvomi-<version>-dist.tar.gz -R ulsklyc/yuvomi \
+>   --signer-workflow ulsklyc/yuvomi/.github/workflows/release-assets.yml \
+>   --source-ref refs/tags/v<version>
+> ```
+>
+> `sha256sum -c` proves the download is complete and matches the published sum;
+> `gh attestation verify` proves GitHub built the file from this repository with that
+> workflow, from that release tag, which a checksum alone cannot. On macOS use `shasum -a 256 -c SHA256SUMS`. The
+> YunoHost package does not need either step from you: its manifest pins the sha256 of the
+> tarball it installs, and YunoHost refuses a download that does not match it.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -379,7 +399,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.86.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.87.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```

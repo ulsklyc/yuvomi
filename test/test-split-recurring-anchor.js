@@ -24,7 +24,7 @@
  * KEINE UHR: der Lauf bekommt seinen Tag als Argument, und wo "heute" aus der
  * Zone kommt (Fortsetzen, Migration), stehen Uhr UND Haushaltszone fest.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-split-recurring-anchor.js
+ * Ausfuehren: node --test test/test-split-recurring-anchor.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

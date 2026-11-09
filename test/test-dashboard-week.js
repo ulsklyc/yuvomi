@@ -22,7 +22,7 @@
  * test-calendar-timezone-window.js). Tokio liegt sieben Stunden oestlich von
  * Berlin: ein Termin um 23:30 Berliner Zeit ist dort schon der Folgetag.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-dashboard-week.js
+ * Ausfuehren: node --test test/test-dashboard-week.js
  */
 process.env.TZ = 'Asia/Tokyo';
 process.env.DB_PATH = ':memory:';

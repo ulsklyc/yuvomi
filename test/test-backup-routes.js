@@ -14,7 +14,7 @@
  *          - WebDAV-Ziele sind ein IN-PROCESS Loopback-Stub (kein externes Netz),
  *            der PROPFIND->207 / PUT->201 beantwortet; die Fehlerpfade (unkonfiguriert)
  *            decken die catch-Zweige ohne Netz ab.
- * Ausführen: node --experimental-sqlite --test test/test-backup-routes.js
+ * Ausführen: node --test test/test-backup-routes.js
  */
 
 import os from 'node:os';

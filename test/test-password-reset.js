@@ -1,7 +1,7 @@
 /**
  * Modul: Password-Reset-Test
  * Zweck: Token-Lebenszyklus (create/verify/consume/cleanup) + Forgot/Reset-Routen.
- * Ausführen: node --experimental-sqlite test/test-password-reset.js
+ * Ausführen: node test/test-password-reset.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

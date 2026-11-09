@@ -10,7 +10,7 @@
  * Gemessen ueber den echten Router auf einer In-Memory-DB: wer verlaengern
  * darf, und dass eine Absage NICHTS geschrieben hat.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-subscription-renew-permission.js
+ * Ausfuehren: node --test test/test-subscription-renew-permission.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

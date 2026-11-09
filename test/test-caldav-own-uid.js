@@ -32,7 +32,7 @@
  * echtes HTTP gegen test/caldav-fake-server.js. Eine Attrappe am Client kann
  * "gespeichert, aber mit 500 beantwortet" nicht darstellen.
  *
- * Ausführen: node --experimental-sqlite --test test/test-caldav-own-uid.js
+ * Ausführen: node --test test/test-caldav-own-uid.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

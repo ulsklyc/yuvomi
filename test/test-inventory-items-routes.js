@@ -6,7 +6,7 @@
  *        hier eine echte verwaltbare Tabelle sind, kein fester Code-Vorrat), Ort muss
  *        existieren, Waehrung faellt auf die Haushaltswaehrung zurueck, Filter,
  *        Volltextsuche, Ortspfad-Anzeige.
- * Ausfuehren: node --experimental-sqlite --test test/test-inventory-items-routes.js
+ * Ausfuehren: node --test test/test-inventory-items-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -4,7 +4,7 @@
  *        Aenderungswegen, Suche und Uebersicht - auch fuer Admins. Eine
  *        gesperrte Notiz aendern nur Ersteller:in und Admins, und zwar GANZ:
  *        Bearbeiten, Anpinnen, Loeschen, Kategorien UND Abhaken.
- * Ausführen: node --experimental-sqlite --test test/test-notes-access.js
+ * Ausführen: node --test test/test-notes-access.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

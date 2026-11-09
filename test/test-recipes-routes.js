@@ -8,7 +8,7 @@
  *        'Sonstiges', quantity leer→null, Längen-Slicing), meal_types-Normalisierung
  *        (Default alle-4, Dedup, Invalides verworfen), Replace-Set der Zutaten bei
  *        PUT und CASCADE-Löschung. Persistenz jeweils per DB-Assertion belegt.
- * Ausführen: node --experimental-sqlite --test test/test-recipes-routes.js
+ * Ausführen: node --test test/test-recipes-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

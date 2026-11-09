@@ -12,7 +12,7 @@
  *   4. Personen-Codes und Display-Codes taugen nie fuer den anderen Weg.
  *   5. Was ein Konto beendet oder seine Sitzungen abraeumt, entwertet offene Codes.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-device-pairing.js
+ * Ausfuehren: node --test test/test-device-pairing.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

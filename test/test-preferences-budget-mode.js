@@ -2,7 +2,7 @@
  * Test: Budget-Modus in der Preferences-API (#476/#505)
  * Zweck: GET liefert budget_mode mit Default 'shared'; PUT speichert shared/
  *        personal — aber NUR für Admins (Nicht-Admin → 403), Ungültiges → 400.
- * Ausführen: node --experimental-sqlite --test test/test-preferences-budget-mode.js
+ * Ausführen: node --test test/test-preferences-budget-mode.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

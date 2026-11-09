@@ -3,7 +3,7 @@
  * Zweck: Prüft assignDefaultToEvent — neue Sync-Termine erhalten die konfigurierte
  *        Standard-Person; No-op bei fehlender/verwaister Person; überschreibt keine
  *        bestehende Zuweisung.
- * Ausführen: node --experimental-sqlite test/test-sync-default-assignee.js
+ * Ausführen: node test/test-sync-default-assignee.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

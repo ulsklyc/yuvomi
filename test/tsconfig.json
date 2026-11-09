@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "nodenext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "types": ["node"],
+    "allowJs": true, "checkJs": true, "strict": true, "noEmit": true, "incremental": false, "erasableSyntaxOnly": true, "verbatimModuleSyntax": true, "allowImportingTsExtensions": true, "skipLibCheck": true
+  },
+  "include": ["./**/*", "../types/**/*.d.ts"]
+}

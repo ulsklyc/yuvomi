@@ -4,7 +4,7 @@
  *        + Filterung in GET /calendar (expandRecurringEvents). Prüft: Ausnahme
  *        blendet genau eine Instanz aus, andere bleiben; nicht-wiederkehrend → 400;
  *        externe Serie → 400; Serien-Löschung entfernt Ausnahmen (CASCADE).
- * Ausführen: node --experimental-sqlite --test test/test-calendar-exceptions.js
+ * Ausführen: node --test test/test-calendar-exceptions.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

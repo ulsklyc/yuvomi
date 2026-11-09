@@ -18,7 +18,7 @@
  *          - der Import aus der Einkaufsliste legt sie für beide Wege an
  *            (neue Zeile UND aufgefüllte Charge)
  *          - GET /reminders/pending löst den Titel über den Join auf
- * Ausführen: node --experimental-sqlite --test test/test-pantry-expiry-reminders.js
+ * Ausführen: node --test test/test-pantry-expiry-reminders.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

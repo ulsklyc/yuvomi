@@ -62,7 +62,7 @@
  *        createGithubInstaller({ request })). MODULES_DIR zeigt auf einen
  *        Temp-Ordner, die DB ist In-Memory. Der Schalter steht fuer die Suite auf
  *        true (vor dem Import gesetzt); der Aus-Fall nimmt den Test-Hook.
- * Ausführen: node --experimental-sqlite --test test/test-module-install.js
+ * Ausführen: node --test test/test-module-install.js
  */
 
 import path from 'node:path';

@@ -7,7 +7,7 @@
  *        (Template/Exceptions/Instanzen), Zutaten-CRUD und die Transfer-Semantik
  *        „Zutaten → Einkaufsliste" (nur offene übertragen, Idempotenz, Wochen-Scope).
  *        Meals sind haushaltsweit (kein owner/visibility), daher kein Auth-Gate-Teil.
- * Ausführen: node --experimental-sqlite --test test/test-meals-routes.js
+ * Ausführen: node --test test/test-meals-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
+  accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run
+  on 24 and 26 and no longer need the SQLite flag. Anyone who still runs a bare-metal
+  install on Node 22 sees a one-line message at start that names the supported range; update
+  Node, then start again. The container image is unchanged and already runs on Node 24.
+
+## [2.87.0] - 2026-11-08
+
+### Added
+- **Every release carries a signed tarball of the app.** Next to the container image, each
+  GitHub release now has `yuvomi-<version>-dist.tar.gz`, a `SHA256SUMS` file and a build
+  provenance attestation that proves GitHub built both from the release tag of this repository
+  (`gh attestation verify yuvomi-<version>-dist.tar.gz -R ulsklyc/yuvomi`; steps in the
+  installation guide). For now the tarball holds the same files as GitHub's source download.
+  The YunoHost package and the Proxmox script will install from it next, so that later
+  releases can ship a built web app there without changing how those installations update. A
+  release only becomes visible once the tarball is on it, so no channel picks up a release
+  without its file.
+
 ### Fixed
 - **Storage and backup errors in settings say what happened, in your language** (#2622). When
   document storage or a WebDAV backup failed without a technical class to show, settings put an

@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "dom", "dom.iterable", "webworker"],
+    "types": [],
+    "allowJs": true, "checkJs": true, "strict": true, "noEmit": true, "incremental": false, "erasableSyntaxOnly": true, "verbatimModuleSyntax": true, "allowImportingTsExtensions": true, "skipLibCheck": true,
+    "paths": { "/*": ["./*"] }
+  },
+  "include": ["./**/*", "../types/**/*.d.ts"],
+  "exclude": ["./vendor/**"]
+}

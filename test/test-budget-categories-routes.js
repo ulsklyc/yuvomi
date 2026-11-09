@@ -7,7 +7,7 @@
  *        budget_entries, 409 letzte Kategorie/Subkategorie), Reihenfolge, sowie die
  *        Lese-Endpunkte (meta, lokalisierte Liste mit genesteten Subkategorien).
  *        Migration 88 legte KEINE visibility auf Kategorien → kein Auth-Gate-Teil.
- * Ausführen: node --experimental-sqlite --test test/test-budget-categories-routes.js
+ * Ausführen: node --test test/test-budget-categories-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -6,7 +6,7 @@
  *        FK-Kaskade mitnimmt, und dass POST /accounts einen fehlenden/ungültigen
  *        provider-Wert auf 'mealie' zurückfallen lässt (SUPPORTED_PROVIDERS-Guard,
  *        analog zu server/routes/dms.js).
- * Ausführen: node --experimental-sqlite --test test/test-recipe-provider-routes.js
+ * Ausführen: node --test test/test-recipe-provider-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
