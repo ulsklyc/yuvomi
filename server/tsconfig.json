@@ -6,5 +6,6 @@
     "types": ["node"],
     "allowJs": true, "checkJs": true, "strict": true, "noEmit": true, "incremental": false, "erasableSyntaxOnly": true, "verbatimModuleSyntax": true, "allowImportingTsExtensions": true, "skipLibCheck": true
   },
-  "include": ["./**/*", "../scripts/**/*", "../types/**/*.d.ts"]
+  "include": ["./**/*", "../scripts/**/*", "../types/**/*.d.ts"],
+  "exclude": ["../scripts/take-screenshots.mjs", "../scripts/build-screenshot-crops.mjs", "../scripts/build-screenshot-webp.mjs"]
 }
