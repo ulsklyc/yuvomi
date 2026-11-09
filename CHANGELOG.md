@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A synced contact's photo now shows in the list and on its card** (#2128). Both vCard 3
+  (`PHOTO;ENCODING=BASE64;TYPE=JPEG:...`) and vCard 4 (`PHOTO:data:image/jpeg;base64,...`) forms
+  are read from CardDAV, and a photo synced before this change is normalized on the next sync
+  instead of staying unreadable. The list answer never carries the image itself - only a
+  `has_photo` flag - and the card fetches it lazily from its own endpoint, so megabytes of base64
+  no longer travel through every list response. There is no control yet to add a photo to a
+  contact created directly in Yuvomi; the API accepts one, but the dialog does not offer a picker.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation
@@ -1712,15 +1721,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The way back stays open.** The release does not change the database, so pinning the
   previous image tag `2.87.0` returns to this version with your data untouched (installation
   guide, "Pinning a version"). That way is tried once before the release is tagged.
-
-### Added
-- **A synced contact's photo now shows in the list and on its card** (#2128). Both vCard 3
-  (`PHOTO;ENCODING=BASE64;TYPE=JPEG:...`) and vCard 4 (`PHOTO:data:image/jpeg;base64,...`) forms
-  are read from CardDAV, and a photo synced before this change is normalized on the next sync
-  instead of staying unreadable. The list answer never carries the image itself - only a
-  `has_photo` flag - and the card fetches it lazily from its own endpoint, so megabytes of base64
-  no longer travel through every list response. There is no control yet to add a photo to a
-  contact created directly in Yuvomi; the API accepts one, but the dialog does not offer a picker.
 
 ## [2.86.0] - 2026-11-07
 
