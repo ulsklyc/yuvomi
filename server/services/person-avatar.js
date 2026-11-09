@@ -59,6 +59,7 @@ export function isPersonAvatarRead(method, path) {
 // (test:sw-api-cache haelt beide gleich).
 export const AVATAR_FIELDS = new Set([
   'assigned_avatar', 'avatar_data', 'creator_avatar', 'worker_avatar_data', 'user_avatar', 'person_avatar',
+  'created_by_avatar',
 ]);
 
 const AVATAR_URL_RE = /^\/api\/v1\/people\/(\d+)\/avatar\?v=[0-9a-f]{32}$/;
