@@ -54,10 +54,13 @@ export function sourceFiles(dir: string): string[] {
     .sort();
 }
 
-/** Files of public/ the copy list ships, sorted. */
-export function copiedFiles(publicDir: string): string[] {
-  const skip = new Set(NOT_COPIED.map((entry) => entry.path));
-  return sourceFiles(publicDir).filter((rel) => !skip.has(rel) && copyEntryFor(rel) !== null);
+/**
+ * Files of public/ the copy list ships, sorted. `also` adds files the default
+ * layout does not copy (the test layout copies index.html as it is).
+ */
+export function copiedFiles(publicDir: string, also: readonly string[] = []): string[] {
+  const skip = new Set(NOT_COPIED.map((entry) => entry.path).filter((rel) => !also.includes(rel)));
+  return sourceFiles(publicDir).filter((rel) => !skip.has(rel) && (copyEntryFor(rel) !== null || also.includes(rel)));
 }
 
 /**
@@ -79,13 +82,13 @@ export function facadesPlugin(publicDir: string): Plugin {
 }
 
 /** Copies COPY_LIST into the output directory; stylesheets are minified file by file. */
-export function staticCopyPlugin(publicDir: string): Plugin {
+export function staticCopyPlugin(publicDir: string, also: readonly string[] = []): Plugin {
   return {
     name: 'yuvomi:static-copy',
     apply: 'build',
     writeBundle(options) {
       const outDir = String(options.dir);
-      for (const rel of copiedFiles(publicDir)) {
+      for (const rel of copiedFiles(publicDir, also)) {
         const target = join(outDir, rel);
         mkdirSync(dirname(target), { recursive: true });
         const source = readFileSync(join(publicDir, rel));
@@ -249,7 +252,7 @@ export function moduleListPlugin(repoRoot: string): Plugin {
       this.emitFile({
         type: 'asset',
         fileName: '.vite/modules.json',
-        source: `${JSON.stringify({ graph: [...graph].sort(), rendered: [...rendered].sort(), external: [...external].sort(), chunks: byFile }, null, 2)}\n`,
+        source: `${JSON.stringify({ layout: process.env.YUVOMI_BUILD_LAYOUT === 'modules' ? 'modules' : 'bundle', graph: [...graph].sort(), rendered: [...rendered].sort(), external: [...external].sort(), chunks: byFile }, null, 2)}\n`,
       });
     },
   };

@@ -17,6 +17,12 @@ export function requireDist(root = DIST) {
   if (!existsSync(`${root}.vite/manifest.json`)) {
     throw new Error(`${root} hat keinen Build (.vite/manifest.json fehlt) - zuerst \`npm run build\``);
   }
+  // Die Browser-Suiten bauen die Testanordnung (YUVOMI_BUILD_LAYOUT=modules,
+  // vite.config.ts); Suiten zum Artefakt pruefen nur die ausgelieferte.
+  const modules = `${root}.vite/modules.json`;
+  if (existsSync(modules) && JSON.parse(readFileSync(modules, 'utf8')).layout === 'modules') {
+    throw new Error(`${root} ist die Testanordnung der Browser-Suiten - zuerst \`npm run build\``);
+  }
   return root;
 }
 

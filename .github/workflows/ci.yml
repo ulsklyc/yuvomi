@@ -151,9 +151,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Der Harness startet den Server, und der liefert nur das gebaute dist/.
-      - name: Build the web app
-        run: npm run build
+      # Der Harness startet den Server, und der liefert nur das gebaute dist/ -
+      # hier in der Testanordnung (jedes Modul unter seinem Quellpfad, siehe
+      # vite.config.ts), weil die Suiten Module der laufenden App importieren.
+      - name: Build the web app (browser test layout)
+        run: npm run build:browser-tests
 
       - name: Run the fasting browser suite
         run: npm run test:fasting-browser
