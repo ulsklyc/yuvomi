@@ -10,7 +10,7 @@
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, type UserConfig } from 'vite';
 import {
   facadesPlugin,
   moduleListPlugin,
@@ -21,7 +21,6 @@ import {
   staticCopyPlugin,
 } from './scripts/build/vite-plugins.ts';
 import { serviceWorkerPlugin } from './scripts/build/service-worker.ts';
-import { devProxy } from './scripts/build/dev-proxy.ts';
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url));
 
@@ -29,6 +28,7 @@ const repoRoot = fileURLToPath(new URL('.', import.meta.url));
 // Express server answers itself goes through to it (scripts/build/dev-proxy.ts).
 // PORT and BIND_ADDRESS come from scripts/dev.mjs, which reads .env for both processes.
 const backendPort = process.env.PORT || 3000;
+const DEV_PROXY = './scripts/build/dev-proxy.ts';
 const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 
 // TEST LAYOUT for the browser suites (test:document-guards, test:fasting-browser):
@@ -44,19 +44,25 @@ const modulesLayout = process.env.YUVOMI_BUILD_LAYOUT === 'modules';
 const moduleScripts = [...readFileSync(`${publicDir}/index.html`, 'utf8').matchAll(/<script type="module" src="\/([^"]+)"/g)]
   .map((m) => String(m[1]));
 
-export default defineConfig({
+export default defineConfig(async ({ command }): Promise<UserConfig> => ({
   root: publicDir,
   // Off: with root public/ the default would be public/public. The named copy
   // list in static-files.ts replaces it.
   publicDir: false,
   appType: 'spa',
-  server: {
+  // Only `vite` (npm run dev) loads the proxy: it is development tooling, and
+  // it imports server/utils/bind-address.js, which the build stage of the image
+  // does not copy. Vite bundles this config before it runs it and resolves even
+  // a dynamic import with a fixed path, so the path is computed: Node loads
+  // dev-proxy.ts itself, only under `serve` (test:docker-publish follows every
+  // import the config bundler would resolve).
+  server: command === 'serve' ? {
     port: 5173,
     strictPort: true,
     // Host stays localhost:5173 (no changeOrigin): the session cookie and the
     // CSRF origin check see the address the browser uses.
-    proxy: devProxy(backendPort, process.env.BIND_ADDRESS),
-  },
+    proxy: (await import(/* @vite-ignore */ new URL(DEV_PROXY, import.meta.url).href)).devProxy(backendPort, process.env.BIND_ADDRESS),
+  } : {},
   plugins: modulesLayout ? [
     staticCopyPlugin(publicDir, ['index.html']),
     moduleListPlugin(repoRoot),
@@ -94,4 +100,4 @@ export default defineConfig({
       external: isExternal,
     },
   },
-});
+}));
