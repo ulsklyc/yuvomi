@@ -763,6 +763,11 @@
         "importMeals": "Öğün planından",
         "sendList": "Listeyi gönder",
         "sendListTitle": "Alışveriş listesini gönder",
+        "sendWebhook": "Kalan ürünleri gönder",
+        "sendWebhookSent": "{{count}} ürün gönderildi.",
+        "sendWebhookSent_one": "{{count}} ürün gönderildi.",
+        "sendWebhookUnconfigured": "Webhook hedefi ayarlanmadı.",
+        "sendWebhookError": "Webhook'a gönderilemedi.",
         "sendListDescription": "{{count}} açık ürün seçtiğin kişiye gidecek.",
         "sendListDescription_one": "{{count}} açık ürün seçtiğin kişiye gidecek.",
         "sendListRecipient": "Alıcı",
@@ -844,7 +849,8 @@
             "waited": "„{{item}}”, „{{target}}” listesine taşınmadı: „{{back}}” listesinin eşitlemesi bir haftadan uzun süredir kapalı. Liste açıldığında ürün „{{back}}” listesinde yeniden görünecek."
         },
         "moreDetailsHint": "Fiyat, mağaza, bağlantı, not",
-        "toPantryAllToPlaceholder": "Bir yer seç …"
+        "toPantryAllToPlaceholder": "Bir yer seç …",
+        "sendWebhookPrivateNetwork": "Hedef yerel ağınızda. Sunucunun buna izin vermesi gerekir (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} malzeme",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "Hane varsayılanına sıfırlandı",
         "pushDeviceDescription": "Web Push yalnızca bu cihaz ve bu tarayıcı için geçerlidir.",
         "notificationChannelsTitle": "Ev kanalları",
+        "shoppingWebhookTitle": "Alışveriş listesi webhook'u",
+        "shoppingWebhookDescription": "Bir listedeki kalan ürünleri JSON olarak bu adrese gönderir. Hedefi yalnızca yöneticiler ayarlayabilir; sonrasında evdeki herkes liste menüsünden gönderebilir.",
+        "shoppingWebhookUrl": "Webhook adresi",
+        "shoppingWebhookSaved": "Kaydedildi.",
         "notificationChannelsDescription": "Yöneticiler, Web Push'a ek olarak hatırlatıcı alan kanallar ekleyebilir.",
         "notificationChannelAdd": "Kanal ekle",
         "notificationChannelProvider": "Sağlayıcı",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "Bu üye artık yok.",
         "memberErrorSsoEmailRequired": "Yalnızca SSO kullanan bir hesabın, ilk SSO girişinin onu bulabilmesi için bir e-posta adresine ihtiyacı var.",
         "memberErrorSsoEmailAmbiguous": "Bu e-posta adresi zaten başka bir üyede. SSO hesapları birbirinden ayıramaz.",
+        "shoppingWebhookPrivateNetworkHint": "Kendi ağınızdaki bir hedef (Home Assistant, yerel bir n8n) yalnızca sunucu NOTIFICATION_ALLOW_PRIVATE_NETWORK=true ile başlatıldıysa çalışır.",
+        "shoppingWebhookUrlInvalid": "Bu geçerli bir web adresi değil. http:// veya https:// ile başlamalı.",
         "twoFactorAlreadyEnabled": "İki adımlı doğrulama zaten etkin. Güncel durumu görmek için sayfayı yeniden yükle.",
         "twoFactorSetupExpired": "Kurulumun süresi doldu. İptal et ve yeniden başla.",
         "oidcLinkErrorNotConfigured": "SSO bu sunucuda artık kurulu değil.",

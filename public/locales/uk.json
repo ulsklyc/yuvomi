@@ -892,6 +892,13 @@
         "importMeals": "З плану харчування",
         "sendList": "Надіслати список",
         "sendListTitle": "Надіслати список покупок",
+        "sendWebhook": "Надіслати решту товарів",
+        "sendWebhookSent": "Надіслано {{count}} товарів.",
+        "sendWebhookSent_one": "Надіслано {{count}} товар.",
+        "sendWebhookSent_few": "Надіслано {{count}} товари.",
+        "sendWebhookSent_many": "Надіслано {{count}} товарів.",
+        "sendWebhookUnconfigured": "Адресу webhook не налаштовано.",
+        "sendWebhookError": "Не вдалося надіслати на webhook.",
         "sendListDescription": "{{count}} невиконаних пунктів підуть обраному учаснику.",
         "sendListDescription_one": "{{count}} невиконаний пункт піде обраному учаснику.",
         "sendListDescription_few": "{{count}} невиконані пункти підуть обраному учаснику.",
@@ -984,7 +991,8 @@
             "waited": "«{{item}}» не переміщено до списку «{{target}}»: синхронізація списку «{{back}}» вимкнена понад тиждень. Товар знову з’явиться у списку «{{back}}», щойно ви його увімкнете."
         },
         "moreDetailsHint": "Ціна, магазин, посилання, нотатка",
-        "toPantryAllToPlaceholder": "Виберіть місце …"
+        "toPantryAllToPlaceholder": "Виберіть місце …",
+        "sendWebhookPrivateNetwork": "Адреса у вашій локальній мережі. Сервер має це дозволяти (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "randomizeSuccess_few": "Заплановано {{count}} прийоми їжі.",
@@ -3335,6 +3343,10 @@
         "personalWeatherReset": "Скинуто до типового місця дому",
         "pushDeviceDescription": "Web Push застосовується лише до цього пристрою та браузера.",
         "notificationChannelsTitle": "Канали домогосподарства",
+        "shoppingWebhookTitle": "Webhook списку покупок",
+        "shoppingWebhookDescription": "Надсилає решту товарів списку у вигляді JSON на цю адресу. Задати адресу може лише адміністратор; після цього надіслати може будь-хто з родини з меню списку.",
+        "shoppingWebhookUrl": "Адреса webhook",
+        "shoppingWebhookSaved": "Збережено.",
         "notificationChannelsDescription": "Адміністратори можуть додавати канали, які отримують нагадування на додачу до Web Push.",
         "notificationChannelAdd": "Додати канал",
         "notificationChannelProvider": "Постачальник",
@@ -3809,6 +3821,8 @@
         "memberErrorGone": "Цього учасника більше немає.",
         "memberErrorSsoEmailRequired": "Обліковому запису лише з SSO потрібна адреса електронної пошти, щоб перший вхід через SSO міг його знайти.",
         "memberErrorSsoEmailAmbiguous": "Ця адреса електронної пошти вже є в іншого учасника. SSO не зможе розрізнити облікові записи.",
+        "shoppingWebhookPrivateNetworkHint": "Адреса у вашій власній мережі (Home Assistant, локальний n8n) працює лише якщо сервер запущено з NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "Це некоректна вебадреса. Вона має починатися з http:// або https://.",
         "twoFactorAlreadyEnabled": "Двофакторна автентифікація вже увімкнена. Перезавантажте сторінку, щоб побачити поточний стан.",
         "twoFactorSetupExpired": "Термін налаштування минув. Скасуйте його й почніть знову.",
         "oidcLinkErrorNotConfigured": "SSO більше не налаштовано на цьому сервері.",

@@ -781,6 +781,11 @@
         "importMeals": "Mula sa plano ng pagkain",
         "sendList": "Ipadala ang listahan",
         "sendListTitle": "Ipadala ang listahan ng bilihin",
+        "sendWebhook": "Ipadala ang mga bukas na item",
+        "sendWebhookSent": "{{count}} item ang naipadala.",
+        "sendWebhookSent_one": "{{count}} item ang naipadala.",
+        "sendWebhookUnconfigured": "Walang nakatakdang webhook na destinasyon.",
+        "sendWebhookError": "Hindi naipadala sa webhook.",
         "sendListDescription": "{{count}} na bukas na item ang mapupunta sa piniling miyembro.",
         "sendListDescription_one": "{{count}} bukas na item ang mapupunta sa piniling miyembro.",
         "sendListRecipient": "Tatanggap",
@@ -862,7 +867,8 @@
             "waited": "Hindi nailipat ang \"{{item}}\" sa \"{{target}}\": mahigit isang linggo nang naka-off ang pag-sync ng \"{{back}}\". Lalabas ulit ang item sa \"{{back}}\" kapag binuksan ang listahang iyon."
         },
         "moreDetailsHint": "Presyo, tindahan, link, tala",
-        "toPantryAllToPlaceholder": "Pumili ng lugar …"
+        "toPantryAllToPlaceholder": "Pumili ng lugar …",
+        "sendWebhookPrivateNetwork": "Ang destinasyon ay nasa lokal na network mo. Kailangang payagan ito ng server (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} sangkap",
@@ -3184,6 +3190,10 @@
         "personalWeatherReset": "Ibalik sa default ng sambahayan",
         "pushDeviceDescription": "Naaangkop lamang ang Web Push sa device at browser na ito.",
         "notificationChannelsTitle": "Mga channel ng sambahayan",
+        "shoppingWebhookTitle": "Webhook ng listahan ng pamimili",
+        "shoppingWebhookDescription": "Ipinapadala ang mga bukas na item ng isang listahan bilang JSON sa URL na ito. Tanging mga admin ang makakatakda ng destinasyon; pagkatapos, kahit sinong miyembro ng sambahayan ay makakapagpadala mula sa menu ng listahan.",
+        "shoppingWebhookUrl": "URL ng webhook",
+        "shoppingWebhookSaved": "Na-save.",
         "notificationChannelsDescription": "Makakapagdagdag ang mga admin ng mga channel na tumatanggap ng paalala bukod sa Web Push.",
         "notificationChannelAdd": "Magdagdag ng channel",
         "notificationChannelProvider": "Provider",
@@ -3601,6 +3611,8 @@
         "memberErrorGone": "Wala na ang miyembrong ito.",
         "memberErrorSsoEmailRequired": "Kailangan ng email address ang account na SSO lang para mahanap ito ng unang pag-sign in gamit ang SSO.",
         "memberErrorSsoEmailAmbiguous": "May ibang miyembro nang may ganitong email address. Hindi mapaghihiwalay ng SSO ang mga account.",
+        "shoppingWebhookPrivateNetworkHint": "Ang destinasyon sa sarili mong network (Home Assistant, lokal na n8n) ay gumagana lamang kung ang server ay sinimulan nang may NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "Hindi iyon balidong web address. Kailangang magsimula sa http:// o https://.",
         "twoFactorAlreadyEnabled": "Naka-on na ang two-factor authentication. I-reload ang page para makita ang kasalukuyang estado.",
         "twoFactorSetupExpired": "Nag-expire na ang setup. Kanselahin ito at magsimula ulit.",
         "oidcLinkErrorNotConfigured": "Hindi na naka-set up ang SSO sa server na ito.",

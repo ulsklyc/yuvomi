@@ -910,6 +910,13 @@
         "importMeals": "Z planu posiłków",
         "sendList": "Wyślij listę",
         "sendListTitle": "Wyślij listę zakupów",
+        "sendWebhook": "Wyślij pozostałe produkty",
+        "sendWebhookSent": "Wysłano {{count}} produktów.",
+        "sendWebhookSent_one": "Wysłano {{count}} produkt.",
+        "sendWebhookSent_few": "Wysłano {{count}} produkty.",
+        "sendWebhookSent_many": "Wysłano {{count}} produktów.",
+        "sendWebhookUnconfigured": "Nie ustawiono celu webhooka.",
+        "sendWebhookError": "Nie udało się wysłać do webhooka.",
         "sendListDescription": "{{count}} niezałatwionych pozycji trafi do wybranej osoby.",
         "sendListDescription_one": "{{count}} niezałatwiona pozycja trafi do wybranej osoby.",
         "sendListDescription_few": "{{count}} niezałatwione pozycje trafią do wybranej osoby.",
@@ -1002,7 +1009,8 @@
             "waited": "„{{item}}” nie został przeniesiony na listę „{{target}}”: synchronizacja listy „{{back}}” jest wyłączona od ponad tygodnia. Produkt pojawi się znowu na liście „{{back}}”, gdy ją włączysz."
         },
         "moreDetailsHint": "Cena, sklep, link, notatka",
-        "toPantryAllToPlaceholder": "Wybierz miejsce …"
+        "toPantryAllToPlaceholder": "Wybierz miejsce …",
+        "sendWebhookPrivateNetwork": "Cel znajduje się w Twojej sieci lokalnej. Serwer musi na to pozwolić (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",
@@ -3353,6 +3361,10 @@
         "personalWeatherReset": "Przywrócono domyślną lokalizację domu",
         "pushDeviceDescription": "Web Push dotyczy tylko tego urządzenia i tej przeglądarki.",
         "notificationChannelsTitle": "Kanały domowe",
+        "shoppingWebhookTitle": "Webhook listy zakupów",
+        "shoppingWebhookDescription": "Wysyła pozostałe produkty z listy jako JSON na ten adres. Cel może ustawić tylko administrator; potem każdy domownik może wysłać z menu listy.",
+        "shoppingWebhookUrl": "Adres webhooka",
+        "shoppingWebhookSaved": "Zapisano.",
         "notificationChannelsDescription": "Administratorzy mogą dodawać kanały, które otrzymują przypomnienia oprócz Web Push.",
         "notificationChannelAdd": "Dodaj kanał",
         "notificationChannelProvider": "Dostawca",
@@ -3827,6 +3839,8 @@
         "memberErrorGone": "Ten członek już nie istnieje.",
         "memberErrorSsoEmailRequired": "Konto tylko z SSO potrzebuje adresu e-mail, aby pierwsze logowanie przez SSO mogło je znaleźć.",
         "memberErrorSsoEmailAmbiguous": "Inny członek ma już ten adres e-mail. SSO nie rozróżniłoby kont.",
+        "shoppingWebhookPrivateNetworkHint": "Cel w Twojej własnej sieci (Home Assistant, lokalny n8n) działa tylko wtedy, gdy serwer uruchomiono z NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "To nie jest prawidłowy adres internetowy. Musi zaczynać się od http:// lub https://.",
         "twoFactorAlreadyEnabled": "Uwierzytelnianie dwuskładnikowe jest już włączone. Odśwież stronę, aby zobaczyć aktualny stan.",
         "twoFactorSetupExpired": "Konfiguracja wygasła. Anuluj ją i zacznij od nowa.",
         "oidcLinkErrorNotConfigured": "SSO nie jest już skonfigurowane na tym serwerze.",

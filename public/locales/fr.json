@@ -763,6 +763,11 @@
         "importMeals": "Depuis le plan de repas",
         "sendList": "Envoyer la liste",
         "sendListTitle": "Envoyer la liste de courses",
+        "sendWebhook": "Envoyer les articles restants",
+        "sendWebhookSent": "{{count}} articles envoyés.",
+        "sendWebhookSent_one": "{{count}} article envoyé.",
+        "sendWebhookUnconfigured": "Aucune cible de webhook configurée.",
+        "sendWebhookError": "L’envoi vers le webhook a échoué.",
         "sendListDescription": "{{count}} articles en attente iront au membre choisi.",
         "sendListDescription_one": "{{count}} article en attente ira au membre choisi.",
         "sendListRecipient": "Destinataire",
@@ -844,7 +849,8 @@
             "waited": "« {{item}} » n’a pas été déplacé vers « {{target}} » : la synchronisation de « {{back}} » est désactivée depuis plus d’une semaine. L’article réapparaîtra dans « {{back}} » dès que cette liste sera réactivée."
         },
         "moreDetailsHint": "Prix, magasin, lien, note",
-        "toPantryAllToPlaceholder": "Choisir un lieu …"
+        "toPantryAllToPlaceholder": "Choisir un lieu …",
+        "sendWebhookPrivateNetwork": "La cible se trouve sur votre réseau local. Le serveur doit l’autoriser (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrédient",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "Réinitialisé au défaut du foyer",
         "pushDeviceDescription": "Web Push s’applique uniquement à cet appareil et à ce navigateur.",
         "notificationChannelsTitle": "Canaux du foyer",
+        "shoppingWebhookTitle": "Webhook de la liste de courses",
+        "shoppingWebhookDescription": "Envoie les articles restants d’une liste au format JSON vers cette URL. Seuls les administrateurs définissent la cible ; ensuite, chaque membre du foyer peut envoyer depuis le menu de la liste.",
+        "shoppingWebhookUrl": "URL du webhook",
+        "shoppingWebhookSaved": "Enregistré.",
         "notificationChannelsDescription": "Les administrateurs peuvent ajouter des canaux qui reçoivent les rappels en plus des notifications Web Push.",
         "notificationChannelAdd": "Ajouter un canal",
         "notificationChannelProvider": "Fournisseur",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "Ce membre n'existe plus.",
         "memberErrorSsoEmailRequired": "Un compte uniquement SSO a besoin d'une adresse e-mail pour que la première connexion SSO le trouve.",
         "memberErrorSsoEmailAmbiguous": "Un autre membre utilise déjà cette adresse e-mail. Le SSO ne pourrait pas distinguer les comptes.",
+        "shoppingWebhookPrivateNetworkHint": "Une cible sur votre propre réseau (Home Assistant, un n8n local) ne fonctionne que si le serveur a été démarré avec NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "Ce n’est pas une adresse web valide. Elle doit commencer par http:// ou https://.",
         "twoFactorAlreadyEnabled": "L'authentification à deux facteurs est déjà activée. Rechargez la page pour voir l'état actuel.",
         "twoFactorSetupExpired": "La configuration a expiré. Annulez-la et recommencez.",
         "oidcLinkErrorNotConfigured": "Le SSO n'est plus configuré sur ce serveur.",

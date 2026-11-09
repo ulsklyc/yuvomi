@@ -763,6 +763,11 @@
         "importMeals": "Fra måltidsplanen",
         "sendList": "Send liste",
         "sendListTitle": "Send handleliste",
+        "sendWebhook": "Send gjenstående varer",
+        "sendWebhookSent": "{{count}} varer sendt.",
+        "sendWebhookSent_one": "{{count}} vare sendt.",
+        "sendWebhookUnconfigured": "Ingen webhook-mottaker er satt opp.",
+        "sendWebhookError": "Kunne ikke sende til webhooken.",
         "sendListDescription": "{{count}} åpne elementer vil bli sendt til medlemmet du velger.",
         "sendListDescription_one": "{{count}} åpent element vil bli sendt til medlemmet du velger.",
         "sendListRecipient": "Mottaker",
@@ -844,7 +849,8 @@
             "waited": "«{{item}}» ble ikke flyttet til «{{target}}»: synkroniseringen av «{{back}}» har vært slått av i over en uke. Varen dukker opp igjen på «{{back}}» når listen slås på."
         },
         "moreDetailsHint": "Pris, butikk, lenke, notat",
-        "toPantryAllToPlaceholder": "Velg et sted …"
+        "toPantryAllToPlaceholder": "Velg et sted …",
+        "sendWebhookPrivateNetwork": "Målet ligger på ditt lokale nettverk. Serveren må tillate det (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",
@@ -3166,6 +3172,10 @@
         "personalWeatherReset": "Tilbakestill til husstandens standard",
         "pushDeviceDescription": "Web Push gjelder kun for denne enheten og nettleseren.",
         "notificationChannelsTitle": "Husstandskanaler",
+        "shoppingWebhookTitle": "Webhook for handlelisten",
+        "shoppingWebhookDescription": "Sender de gjenstående varene i en liste som JSON til denne adressen. Bare administratorer kan sette målet; deretter kan alle i husstanden sende fra listemenyen.",
+        "shoppingWebhookUrl": "Webhook-adresse",
+        "shoppingWebhookSaved": "Lagret.",
         "notificationChannelsDescription": "Administratorer kan legge til kanaler som mottar påminnelser i tillegg til Web Push.",
         "notificationChannelAdd": "Legg til kanal",
         "notificationChannelProvider": "Leverandør",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "Dette medlemmet finnes ikke lenger.",
         "memberErrorSsoEmailRequired": "En konto med bare SSO trenger en e-postadresse, slik at den første SSO-påloggingen finner den.",
         "memberErrorSsoEmailAmbiguous": "Et annet medlem har allerede denne e-postadressen. SSO kunne ikke skilt kontoene fra hverandre.",
+        "shoppingWebhookPrivateNetworkHint": "Et mål på ditt eget nettverk (Home Assistant, en lokal n8n) virker bare hvis serveren ble startet med NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "Det er ikke en gyldig nettadresse. Den må begynne med http:// eller https://.",
         "twoFactorAlreadyEnabled": "Tofaktorautentisering er allerede aktivert. Last inn siden på nytt for å se gjeldende status.",
         "twoFactorSetupExpired": "Oppsettet har utløpt. Avbryt og start på nytt.",
         "oidcLinkErrorNotConfigured": "SSO er ikke lenger satt opp på denne serveren.",
