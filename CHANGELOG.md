@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   browsers load nothing extra.
 - **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
   serving the API on 3000; `npm run build` makes the production build.
+- **The contributor rules now state what the project guarantees instead of which tools it
+  avoids.** CONTRIBUTING.md replaces "no frameworks, no build tools" with five guarantees (no
+  runtime CDN, no telemetry, third-party code pinned and listed, markup built as DOM, a
+  reproducible build with two attested release artifacts), describes the build and the type
+  check, and docs/DECISIONS.md records the build step, the Node floor and the position on
+  hosting as entries 20 to 22.
 
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`

@@ -303,13 +303,20 @@ That prints **two** values: paste one as `SESSION_SECRET` and the other as `DB_E
 docker compose up -d
 ```
 
-Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
+Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. Nothing to build or install on the host, not even Node.js; the image carries the built app.
 
 > **Pinning a version.** Every release is also published under immutable tags:
 > `2.87.0` (exact version), `2.87` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
 > set `image: ghcr.io/ulsklyc/yuvomi:2.87.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
+>
+> **Going back to an earlier release** is the same move in reverse: pin the previous tag and
+> restart. Whether your database can follow depends on whether the newer release ran a
+> migration, see [Going back](#going-back). A foundation release (its CHANGELOG block starts
+> with "Foundation") changes the toolchain and not the database, so it rolls back this way with
+> your data untouched.
+
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
 > time with [cosign](https://github.com/sigstore/cosign), keyless, under the identity of
