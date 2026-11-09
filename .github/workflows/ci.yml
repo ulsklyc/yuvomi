@@ -31,11 +31,13 @@ jobs:
 
     strategy:
       matrix:
-        # 22.x ist die Entwicklungs-Baseline (package.json engines), 24.x ist die
-        # Laufzeit des Images (Dockerfile). Bis zum 4.9.2026 lief hier nur 22.x,
-        # und kein Test hatte je die Node-Version gesehen, die bei den Nutzern
-        # laeuft. test:docker-publish haelt beide Zeilen zusammen.
-        node-version: [22.x, 24.x]
+        # 24.x ist die Laufzeit des Images (Dockerfile) und die Untergrenze von
+        # package.json engines, 26.x die naechste Linie, die engines zulaesst
+        # (`^24.12.0 || >=26.0.0`; 25 ist eine ungerade Linie ohne LTS). Bis zum
+        # 4.9.2026 lief hier nur 22.x, und kein Test hatte je die Node-Version
+        # gesehen, die bei den Nutzern laeuft. test:docker-publish haelt die
+        # Zeile und das Image zusammen.
+        node-version: [24.x, 26.x]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

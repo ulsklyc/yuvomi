@@ -15,7 +15,7 @@
  * der echte Code. Das Personal-Konto legt die echte Housekeeping-Route an, so wie
  * der Admin es tut; nur dessen eigene Anmeldung ist hier vorgeschaltet.
  *
- * Ausfuehren: node --experimental-sqlite --experimental-test-module-mocks --test test/test-staff-sign-in.js
+ * Ausfuehren: node --experimental-test-module-mocks --test test/test-staff-sign-in.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'staff-sign-in-test-secret';
 process.env.DB_PATH = ':memory:';

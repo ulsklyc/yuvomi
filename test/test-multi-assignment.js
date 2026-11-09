@@ -1,7 +1,7 @@
 /**
  * Modul: Multi-Assignment-Test
  * Zweck: Validiert Multi-Personen-Zuweisung für Tasks und Kalendereinträge
- * Ausführen: node --experimental-sqlite test-multi-assignment.js
+ * Ausführen: node test-multi-assignment.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

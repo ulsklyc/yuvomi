@@ -15,7 +15,7 @@
  * Cache-Busting-Query), da DB_PATH und DB_ENCRYPTION_KEY beim Modul-Load aus
  * der Env gelesen werden.
  *
- * Lauf: node --experimental-sqlite test/test-db-encryption.js
+ * Lauf: node test/test-db-encryption.js
  *   (bzw. npm run test:db-encryption)
  */
 

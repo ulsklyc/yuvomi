@@ -11,7 +11,7 @@
  *          - PUT ohne das Feld lässt Belege unangetastet
  *          - Serien-PUT fasst Belege nicht an (Beleg gehört zur Buchung)
  *          - Cascade in beide Richtungen (Buchung weg / Dokument weg)
- * Ausführen: node --experimental-sqlite --test test/test-budget-attachments.js
+ * Ausführen: node --test test/test-budget-attachments.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -8,7 +8,7 @@
  *        Listen-/Artikel-CRUD inkl. Gang-Sortierung, sowie der Essensplan-Import
  *        (Aggregation, on_shopping_list-Markierung, Datumsbereich).
  *        Shopping ist haushaltsweit (kein owner/visibility) → kein Auth-Gate-Teil.
- * Ausführen: node --experimental-sqlite --test test/test-shopping-routes.js
+ * Ausführen: node --test test/test-shopping-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

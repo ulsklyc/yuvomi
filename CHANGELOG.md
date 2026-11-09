@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
+  accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run
+  on 24 and 26 and no longer need the SQLite flag. Anyone who still runs a bare-metal
+  install on Node 22 sees a one-line message at start that names the supported range; update
+  Node, then start again. The container image is unchanged and already runs on Node 24.
+
 ## [2.87.0] - 2026-11-08
 
 ### Added

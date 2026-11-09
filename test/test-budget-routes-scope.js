@@ -2,7 +2,7 @@
  * Test: Budget-Routen im Personal-Modus (#476/#505)
  * Zweck: End-to-End über den echten Router — Default-Sichtbarkeit, Lese-Scope
  *        (mine/household), 403-Gates für fremde Einträge. Kein Admin-Bypass.
- * Ausführen: node --experimental-sqlite --test test/test-budget-routes-scope.js
+ * Ausführen: node --test test/test-budget-routes-scope.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

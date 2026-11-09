@@ -6,7 +6,7 @@
  *        (2) Token-Lebenszyklus (get/regenerate/clear) gegen die per-Nutzer-
  *        Spalte users.schedule_feed_token (Migration 183).
  *        (3) Der Verwaltungs-Router (/schedule/feed) end-to-end.
- * Ausführen: node --experimental-sqlite --test test/test-schedule-feed.js
+ * Ausführen: node --test test/test-schedule-feed.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

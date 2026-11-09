@@ -1,6 +1,6 @@
 /**
  * Test: Extension module permissions
- * Run: node --experimental-sqlite --test test/test-extension-permissions.js
+ * Run: node --test test/test-extension-permissions.js
  */
 
 import os from 'node:os';

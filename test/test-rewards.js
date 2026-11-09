@@ -2,7 +2,7 @@
  * Modul: Rewards-Test (Belohnungen)
  * Zweck: Punkte-Service (Vergabe/Storno/Idempotenz) + REST-API (Teilnehmer,
  *        Katalog, Einlösen mit Freigabe, Bonus, Ledger).
- * Ausführen: node --experimental-sqlite test/test-rewards.js
+ * Ausführen: node test/test-rewards.js
  */
 
 import assert from 'node:assert/strict';

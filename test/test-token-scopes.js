@@ -8,7 +8,7 @@
  *      verweigert Tools außerhalb der Scopes; null-Scopes = voller Zugriff.
  * Hintergrund: Discussion #455 — an LLM-/MCP-Clients ausgegebene Tokens sollen
  *   per Modul und Lese-/Schreibrecht eingeschränkt werden können.
- * Ausführen: node --experimental-sqlite --test test/test-token-scopes.js
+ * Ausführen: node --test test/test-token-scopes.js
  */
 
 import { test } from 'node:test';

@@ -20,7 +20,7 @@
  * Ein Fall verschiebt die Zone, damit "heute" nachweislich der Haushaltszone
  * folgt und nicht dem UTC-Tag.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-subscription-budget-projection.js
+ * Ausfuehren: node --test test/test-subscription-budget-projection.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

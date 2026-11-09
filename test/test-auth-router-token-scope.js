@@ -14,7 +14,7 @@
  * kein scopebares Modul, das globale Gate wuerde jedes gescopte Token ohnehin
  * verwerfen - diese Sperre zieht dieselbe Grenze schon am Router-Eingang.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-auth-router-token-scope.js
+ * Ausfuehren: node --test test/test-auth-router-token-scope.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'auth-router-scope-test-secret';
 process.env.DB_PATH = ':memory:';

@@ -30,7 +30,7 @@
  *        Zonen denselben Tag zeigen, statt ohne Messung grün zu sein.
  *        Die sicherheitskritische Sichtbarkeits-Propagation ist datumsunabhängig
  *        und wird separat geprüft.
- * Ausführen: node --experimental-sqlite --test test/test-budget-entries-routes.js
+ * Ausführen: node --test test/test-budget-entries-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

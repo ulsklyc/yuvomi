@@ -7,7 +7,7 @@
  *          - Ausschluss von Housekeeping-Workern (NOT EXISTS)
  *          - Sortierung display_name COLLATE NOCASE ASC
  *          - Response-Shape { data: Member[] } inkl. family_role/avatar_color
- * Ausführen: node --experimental-sqlite --test test/test-family-routes.js
+ * Ausführen: node --test test/test-family-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

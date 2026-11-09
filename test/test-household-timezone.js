@@ -22,7 +22,7 @@
  *        Die Zeitzone wird explizit gesetzt. In der UTC-CI faellt kein
  *        Kalendertag um, ein Test ohne Vorgabe waere gruen und blind - dieselbe
  *        Falle wie bei test-calendar-timezone-window.js (#824).
- * Ausfuehren: node --experimental-sqlite --test test/test-household-timezone.js
+ * Ausfuehren: node --test test/test-household-timezone.js
  */
 process.env.TZ = 'America/Toronto';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

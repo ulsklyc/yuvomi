@@ -2,7 +2,7 @@
  * Modul: Such-Test (FTS5)
  * Zweck: Validiert die FTS5-Volltextsuche (Migration 44) und runSearch().
  *        Baut das Schema mit node:sqlite, prüft Migration + Trigger + Suchlogik.
- * Ausführen: node --experimental-sqlite test/test-search.js
+ * Ausführen: node test/test-search.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

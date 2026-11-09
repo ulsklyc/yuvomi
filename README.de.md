@@ -233,7 +233,7 @@ und die [Installationsanleitung im Repository](docs/installation.md).
 
   Öffnet **http://localhost:8090** auf dem Server selbst; woanders antwortet der Assistent nicht.
   Von einem anderen Gerät aus öffnet ihr zuerst einen Tunnel, `ssh -L 8090:localhost:8090 user@server`,
-  und dann dort dieselbe Adresse. Braucht Node.js 22.14+ oder 23.6+ auf dem Host; der Container
+  und dann dort dieselbe Adresse. Braucht Node.js 24.12 oder neuer auf dem Host; der Container
   bringt sein eigenes Node 24 mit.
 
 </details>

@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 22.14+ or 23.6+ on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 24.12 or newer on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### CLI Installer (Linux / macOS)
 
@@ -235,7 +235,7 @@ There are nine ways to get Yuvomi running. **Option A** (web installer) is recom
 
 ### Option A — Web Installer (Recommended)
 
-Requires Node.js 22.14+ or 23.6+ and Docker on the host.
+Requires Node.js 24.12 or newer and Docker on the host.
 
 #### 1. Clone the Repository
 

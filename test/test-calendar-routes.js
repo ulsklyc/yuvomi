@@ -35,7 +35,7 @@
  *        Zukunftsdaten (2098/2099) + relativer Ordnung; keine Kopplung an "heute".
  *        Geteilte :memory:-DB (pro Testdatei ein Prozess): Aggregat-Routen nutzen
  *        eindeutige Titel-/Suchmarker + Enthaltensein statt Gesamtzahl.
- * Ausführen: node --experimental-sqlite --test test/test-calendar-routes.js
+ * Ausführen: node --test test/test-calendar-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
