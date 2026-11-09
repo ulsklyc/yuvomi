@@ -14,13 +14,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { devProxy } from '../scripts/build/dev-proxy.ts';
 import { devEnvironment } from '../scripts/dev.mjs';
 import { sourceFiles } from '../scripts/build/vite-plugins.ts';
+import { tempDir } from './tmp-dir.js';
 
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
 
@@ -55,7 +55,7 @@ test('der Proxy zielt auf den PORT des Servers', () => {
 });
 
 test('PORT aus .env erreicht beide Prozesse, eine gesetzte Umgebung gewinnt', () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'yuvomi-dev-env-'));
+  const dir = tempDir('yuvomi-dev-env-');
   try {
     writeFileSync(path.join(dir, '.env'), 'PORT=4321\nOTHER=x\n');
     assert.equal(devEnvironment(dir, {}).PORT, '4321');
