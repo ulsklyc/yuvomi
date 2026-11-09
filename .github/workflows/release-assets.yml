@@ -21,6 +21,17 @@ name: Release Assets
 # `prebuild` would silently fall back to the previous release in that window.
 # If a step fails, the release simply stays a draft; run it again with the tag.
 #
+# TWO JOBS: BUILD WITHOUT WRITE RIGHTS, PUBLISH WITHOUT FOREIGN CODE. Since
+# section D the build runs `npm ci` with the devDependencies (Vite, its
+# plugins, every install script they pull in) and `npm run build`. None of that
+# code may hold a token that can overwrite release assets, start workflows or
+# sign an attestation. So the job `build` runs with `contents: read` only, no
+# GH_TOKEN and no OIDC token, and hands the tarball and SHA256SUMS over as a
+# workflow artifact. The job `publish` holds the write rights and the OIDC
+# token, runs no npm and no project code (no checkout at all): it checks the
+# hashes, attests, uploads, publishes and hands over to Umbrel. GH_TOKEN sits
+# on the steps that call `gh`, never on the job.
+#
 # WHY A DISPATCH AND NOT `release: created`. GitHub does not trigger workflows
 # for the `created`, `edited` or `deleted` activity of a DRAFT release
 # (docs: "Events that trigger workflows" > release). A `created` trigger would
@@ -65,29 +76,28 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
-  id-token: write
-  attestations: write
-  actions: write
+permissions: {}
 
 concurrency:
   group: release-assets-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
-  assets:
-    name: Build, attest and publish the release tarball
+  build:
+    name: Build and pack the release tarball (read-only)
     runs-on: ubuntu-latest
+    # Read-only: this job runs npm install scripts and the Vite build.
+    permissions:
+      contents: read
     # Measured steps are seconds (npm ci about a minute, three builds of about
-    # one second each, archive, hash, one attestation, one upload); nothing in
-    # the job waits on purpose. 20 leaves room for a slow npm registry, Sigstore
-    # or upload round trip without hiding a hang for six hours.
+    # one second each, archive, hash); nothing waits on purpose. 20 leaves room
+    # for a slow npm registry without hiding a hang for six hours.
     timeout-minutes: 20
     env:
       TAG: ${{ inputs.tag }}
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tarball: ${{ steps.version.outputs.tarball }}
 
     steps:
       - name: Resolve the version
@@ -103,8 +113,6 @@ jobs:
             exit 1
           fi
           VERSION="${TAG#v}"
-          # Fails here, before any work, when there is no release for the tag.
-          gh release view "$TAG" --json isDraft --jq '"draft: \(.isDraft)"'
           {
             echo "version=$VERSION"
             echo "tarball=yuvomi-$VERSION-dist.tar.gz"
@@ -178,16 +186,78 @@ jobs:
           sha256sum "$TARBALL" > SHA256SUMS
           cat SHA256SUMS
 
+      - name: Hand the tarball and SHA256SUMS to the publish job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets
+          path: |
+            ${{ steps.version.outputs.tarball }}
+            SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Attest and publish the release tarball
+    needs: build
+    runs-on: ubuntu-latest
+    # The only rights in this workflow, for a job that runs no npm and no
+    # project code: release upload/edit, the OIDC token for Sigstore, the
+    # attestations API, and the Umbrel dispatch (a release published with the
+    # workflow token fires no `release: published`).
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      actions: write
+    # Seconds of work (download, hash check, one attestation, one upload); 15
+    # leaves room for a slow Sigstore or upload round trip.
+    timeout-minutes: 15
+    env:
+      TAG: ${{ inputs.tag }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Check the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag '$TAG' is not of the form vX.Y.Z"
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "::error::Run this workflow at the tag (this run is on $GITHUB_REF)"
+            exit 1
+          fi
+          # Fails here, before anything is signed, when there is no release for the tag.
+          gh release view "$TAG" --json isDraft --jq '"draft: \(.isDraft)"'
+
+      - name: Take over the tarball and SHA256SUMS
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+
+      - name: Check the tarball against SHA256SUMS
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          test -f "$TARBALL"
+          grep -qF "  $TARBALL" SHA256SUMS
+          sha256sum -c SHA256SUMS
+
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
-            ${{ steps.version.outputs.tarball }}
+            ${{ needs.build.outputs.tarball }}
             SHA256SUMS
 
       - name: Upload the assets
         env:
-          TARBALL: ${{ steps.version.outputs.tarball }}
+          GH_TOKEN: ${{ github.token }}
+          TARBALL: ${{ needs.build.outputs.tarball }}
         run: |
           set -euo pipefail
           # Replace only on a draft. `--clobber` deletes an existing asset
@@ -209,13 +279,16 @@ jobs:
           fi
 
       - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh release edit "$TAG" --draft=false
 
       - name: Verify the published release
         env:
-          TARBALL: ${{ steps.version.outputs.tarball }}
+          GH_TOKEN: ${{ github.token }}
+          TARBALL: ${{ needs.build.outputs.tarball }}
         run: |
           set -euo pipefail
           STATE="$(gh release view "$TAG" --json assets,isDraft)"
@@ -233,7 +306,8 @@ jobs:
 
       - name: Start the Umbrel catalog publish
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
           NEWEST="$(gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' \

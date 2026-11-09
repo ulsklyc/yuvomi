@@ -43,70 +43,90 @@ function run(cmd, argv, o = {}) {
   return r;
 }
 
-const revision = String(process.env.APP_BUILD_REVISION ?? '').trim()
-  || (fromDir ? 'determinism-check' : String(run('git', ['rev-parse', ref], { cwd: REPO }).stdout).trim());
-
 /**
- * Every file under dir, relative, sorted, with its sha256.
- * @param {string} dir
+ * Tokens a build never needs. The release workflow runs this script in a job
+ * without write rights, but a build spawned from here should not hold a token
+ * even where one is present (a local shell, another workflow): an install
+ * script or a Vite plugin could otherwise write releases or request an OIDC
+ * token. Removed before APP_BUILD_REVISION and NODE_ENV are set.
  */
-function hashes(dir) {
-  /** @type {Map<string, string>} */
-  const out = new Map();
-  const walk = (/** @type {string} */ current) => {
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      const full = path.join(current, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else out.set(path.relative(dir, full).split(path.sep).join('/'), createHash('sha256').update(readFileSync(full)).digest('hex'));
+export const SECRET_ENV = ['GH_TOKEN', 'GITHUB_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'NPM_TOKEN'];
+
+/** @param {NodeJS.ProcessEnv} env */
+export function buildEnv(env) {
+  const clean = { ...env };
+  for (const name of SECRET_ENV) delete clean[name];
+  return clean;
+}
+
+function main() {
+  const revision = String(process.env.APP_BUILD_REVISION ?? '').trim()
+    || (fromDir ? 'determinism-check' : String(run('git', ['rev-parse', ref], { cwd: REPO }).stdout).trim());
+
+  /**
+   * Every file under dir, relative, sorted, with its sha256.
+   * @param {string} dir
+   */
+  function hashes(dir) {
+    /** @type {Map<string, string>} */
+    const out = new Map();
+    const walk = (/** @type {string} */ current) => {
+      for (const entry of readdirSync(current, { withFileTypes: true })) {
+        const full = path.join(current, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else out.set(path.relative(dir, full).split(path.sep).join('/'), createHash('sha256').update(readFileSync(full)).digest('hex'));
+      }
+    };
+    walk(dir);
+    return new Map([...out].sort(([a], [b]) => a.localeCompare(b)));
+  }
+
+  /**
+   * Source tree into a fresh directory, node_modules linked, one build.
+   * @param {string} label
+   */
+  function buildOnce(label) {
+    const dir = mkdtempSync(path.join(tmpdir(), `yuvomi-determinism-${label}-`));
+    if (fromDir) {
+      const src = path.resolve(fromDir);
+      cpSync(src, dir, {
+        recursive: true,
+        filter: (p) => !/(?:^|[\\/])(?:\.git|node_modules|dist)(?:[\\/]|$)/.test(path.relative(src, p)),
+      });
+    } else {
+      const archive = run('git', ['archive', '--format=tar', ref], { cwd: REPO, encoding: 'buffer' });
+      run('tar', ['-x', '-C', dir], { input: archive.stdout, encoding: 'buffer' });
     }
-  };
-  walk(dir);
-  return new Map([...out].sort(([a], [b]) => a.localeCompare(b)));
-}
-
-/**
- * Source tree into a fresh directory, node_modules linked, one build.
- * @param {string} label
- */
-function buildOnce(label) {
-  const dir = mkdtempSync(path.join(tmpdir(), `yuvomi-determinism-${label}-`));
-  if (fromDir) {
-    const src = path.resolve(fromDir);
-    cpSync(src, dir, {
-      recursive: true,
-      filter: (p) => !/(?:^|[\\/])(?:\.git|node_modules|dist)(?:[\\/]|$)/.test(path.relative(src, p)),
+    symlinkSync(path.join(REPO, 'node_modules'), path.join(dir, 'node_modules'), 'dir');
+    const started = Date.now();
+    run(process.execPath, [path.join(dir, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--logLevel', 'warn'], {
+      cwd: dir,
+      env: { ...buildEnv(process.env), APP_BUILD_REVISION: revision, NODE_ENV: 'production' },
     });
-  } else {
-    const archive = run('git', ['archive', '--format=tar', ref], { cwd: REPO, encoding: 'buffer' });
-    run('tar', ['-x', '-C', dir], { input: archive.stdout, encoding: 'buffer' });
+    if (!existsSync(path.join(dir, 'dist', 'sw.js'))) {
+      console.error(`${label}: the build wrote no dist/sw.js`);
+      process.exit(2);
+    }
+    return { dir, ms: Date.now() - started };
   }
-  symlinkSync(path.join(REPO, 'node_modules'), path.join(dir, 'node_modules'), 'dir');
-  const started = Date.now();
-  run(process.execPath, [path.join(dir, 'node_modules', 'vite', 'bin', 'vite.js'), 'build', '--logLevel', 'warn'], {
-    cwd: dir,
-    env: { ...process.env, APP_BUILD_REVISION: revision, NODE_ENV: 'production' },
-  });
-  if (!existsSync(path.join(dir, 'dist', 'sw.js'))) {
-    console.error(`${label}: the build wrote no dist/sw.js`);
-    process.exit(2);
+
+  const a = buildOnce('a');
+  const b = buildOnce('b');
+  const ha = hashes(path.join(a.dir, 'dist'));
+  const hb = hashes(path.join(b.dir, 'dist'));
+  const differ = [...new Set([...ha.keys(), ...hb.keys()])].sort()
+    .filter((file) => ha.get(file) !== hb.get(file))
+    .map((file) => `${file}${!ha.has(file) ? ' (only in b)' : !hb.has(file) ? ' (only in a)' : ''}`);
+
+  if (keep) console.log(`kept: ${a.dir} ${b.dir}`);
+  else for (const d of [a.dir, b.dir]) rmSync(d, { recursive: true, force: true });
+
+  console.log(`builds: ${a.ms} ms, ${b.ms} ms; ${ha.size} files in dist/ (revision ${revision})`);
+  if (differ.length) {
+    console.error(`The build is not deterministic: ${differ.length} file(s) differ between two builds of the same source:\n  ${differ.join('\n  ')}`);
+    process.exit(1);
   }
-  return { dir, ms: Date.now() - started };
+  console.log('Deterministic: every file in dist/ has the same sha256 in both builds.');
 }
 
-const a = buildOnce('a');
-const b = buildOnce('b');
-const ha = hashes(path.join(a.dir, 'dist'));
-const hb = hashes(path.join(b.dir, 'dist'));
-const differ = [...new Set([...ha.keys(), ...hb.keys()])].sort()
-  .filter((file) => ha.get(file) !== hb.get(file))
-  .map((file) => `${file}${!ha.has(file) ? ' (only in b)' : !hb.has(file) ? ' (only in a)' : ''}`);
-
-if (keep) console.log(`kept: ${a.dir} ${b.dir}`);
-else for (const d of [a.dir, b.dir]) rmSync(d, { recursive: true, force: true });
-
-console.log(`builds: ${a.ms} ms, ${b.ms} ms; ${ha.size} files in dist/ (revision ${revision})`);
-if (differ.length) {
-  console.error(`The build is not deterministic: ${differ.length} file(s) differ between two builds of the same source:\n  ${differ.join('\n  ')}`);
-  process.exit(1);
-}
-console.log('Deterministic: every file in dist/ has the same sha256 in both builds.');
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
