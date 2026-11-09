@@ -288,6 +288,7 @@ import m0281 from './0281.ts';
 import m0282 from './0282.ts';
 import m0283 from './0283.ts';
 import m0284 from './0284.ts';
+import m0285 from './0285.ts';
 
 export const MIGRATIONS = [
   m0001,
@@ -574,4 +575,5 @@ export const MIGRATIONS = [
   m0282,
   m0283,
   m0284,
+  m0285,
 ];

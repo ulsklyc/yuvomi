@@ -23,6 +23,8 @@ import { MIGRATIONS } from '../server/db.js';
 const SERIES_MIGRATION = MIGRATIONS.find((m) => m.description.includes('(#1035)'));
 // Der eigene Starttag der Definition (#1545) legt die Trigger neu an.
 const START_DATE_MIGRATION = MIGRATIONS.find((m) => m.description.includes('(#1545)'));
+// Optional end date on a series (#1742).
+const END_DATE_MIGRATION = MIGRATIONS.find((m) => m.description.includes('(#1742)'));
 
 let passed = 0;
 let failed = 0;
@@ -92,6 +94,7 @@ function freshDb() {
   `);
   db.exec(SERIES_MIGRATION.up);
   START_DATE_MIGRATION.up(db);
+  END_DATE_MIGRATION.up(db);
   return db;
 }
 
@@ -504,6 +507,53 @@ test('Virtuelle Serie vererbt das Konto NICHT', () => {
   // Das Original behaelt seines: es ist die von Hand angelegte Buchung.
   const orig = db.prepare('SELECT account_id FROM budget_entries WHERE id = ?').get(pid);
   assert(orig.account_id === 4, 'die Serie selbst behaelt ihr Konto');
+});
+
+// --------------------------------------------------------
+// #1742: optional end date on a series
+// --------------------------------------------------------
+
+test('#1742: kein Vorkommen nach dem Enddatum', () => {
+  const db = freshDb();
+  // Serie startet am 2026-01-15, Enddatum 2026-03-14 → März erzeugt keinen Eintrag
+  const pid = insertParent(db, { amount: -50, date: '2026-01-15', interval: 'monthly' });
+  db.prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?').run('2026-03-14', pid);
+  generateRecurringInstances(db, '2026-02');
+  generateRecurringInstances(db, '2026-03');
+  generateRecurringInstances(db, '2026-04');
+  const rows = db.prepare('SELECT date FROM budget_entries WHERE recurrence_parent_id = ? ORDER BY date').all(pid);
+  assert(rows.some((r) => r.date === '2026-02-15'), 'Februar vorhanden');
+  assert(!rows.some((r) => r.date === '2026-03-15'), 'März fehlt: Datum liegt nach Enddatum');
+  assert(!rows.some((r) => r.date.startsWith('2026-04')), 'April fehlt: Monat liegt nach Enddatum');
+});
+
+test('#1742: Vorkommen am Enddatum selbst wird noch erzeugt', () => {
+  const db = freshDb();
+  const pid = insertParent(db, { amount: -50, date: '2026-01-15', interval: 'monthly' });
+  db.prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?').run('2026-03-15', pid);
+  generateRecurringInstances(db, '2026-03');
+  const inst = instanceIn(db, pid, '2026-03');
+  assert(inst, 'Vorkommen am Enddatum selbst vorhanden');
+  assert(inst.date === '2026-03-15');
+});
+
+test('#1742: ohne Enddatum laeuft die Serie wie gehabt', () => {
+  const db = freshDb();
+  const pid = insertParent(db, { amount: -50, date: '2026-01-15', interval: 'monthly' });
+  generateRecurringInstances(db, '2026-04');
+  const inst = instanceIn(db, pid, '2026-04');
+  assert(inst, 'April vorhanden wenn kein Enddatum gesetzt');
+});
+
+test('#1742: Wochenserie filtert Termine im Enddatums-Monat korrekt', () => {
+  const db = freshDb();
+  // Startet Freitag 2026-01-02; vier Freitage im März; Enddatum 2026-03-20 → nur 06, 13, 20
+  const pid = insertParent(db, { amount: -10, date: '2026-01-02', interval: 'weekly' });
+  db.prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?').run('2026-03-20', pid);
+  generateRecurringInstances(db, '2026-03');
+  const rows = db.prepare('SELECT date FROM budget_entries WHERE recurrence_parent_id = ? AND date LIKE ?').all(pid, '2026-03-%');
+  assert(rows.length === 3, `3 Termine erwartet, ${rows.length} erhalten: ${rows.map((r) => r.date).join(', ')}`);
+  assert(!rows.some((r) => r.date === '2026-03-27'), '27. März liegt nach Enddatum');
 });
 
 // --------------------------------------------------------
