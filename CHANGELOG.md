@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Status bar no longer blurs beside the Dynamic Island on iOS 26 (PWA).** (#2390)
+
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
   accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run
@@ -37,7 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only to the administrator in the storage settings, not to members uploading or opening a
   document. A malformed notification channel form answers with a general error instead of an
   engine message.
-- **Status bar no longer blurs beside the Dynamic Island on iOS 26 (PWA).** (#2390)
 
 ### Security
 - **Two administrators demoting each other no longer leave the household without one** (#2612).
