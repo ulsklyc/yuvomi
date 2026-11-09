@@ -525,6 +525,19 @@ const SLOW_NETWORK_WINDOW_MS = 10000;
 const DEADLINE_PASSED = Symbol('deadline');
 let slowNetworkUntil = 0;
 
+/**
+ * HTML als Antwort auf eine Datei (.js, .css, .json): der Server liefert fuer
+ * eine fehlende Datei ein 404 (server/index.js), ein aelterer Server oder ein
+ * Proxy aber die Shell. Abgelegt ersetzte sie die gute Kopie im Cache, und der
+ * naechste Offline-Start bekaeme index.html als Modul (Review auf #2631).
+ */
+/** @param {Request} request @param {Response} response */
+function isShellInsteadOfFile(request, response) {
+  const { pathname } = new URL(request.url);
+  if (!/\.(m?js|css|json)$/i.test(pathname)) return false;
+  return /text\/html/i.test(response.headers.get('content-type') || '');
+}
+
 async function networkFirst(request, cacheName, event) {
   const cache = await caches.open(cacheName);
 
@@ -532,7 +545,7 @@ async function networkFirst(request, cacheName, event) {
   // muss der Worker so lange leben, bis es durch ist.
   let stored = Promise.resolve();
   const network = fetch(request).then((response) => {
-    if (response.ok && response.type === 'basic') {
+    if (response.ok && response.type === 'basic' && !isShellInsteadOfFile(request, response)) {
       stored = Promise.resolve(cache.put(request, response.clone())).catch(() => {});
     }
     return response;

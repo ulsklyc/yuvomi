@@ -34,14 +34,16 @@ const ORIGIN = 'https://app.test';
 const RELEASE = SRC.match(/const APP_RELEASE\s*=\s*'([^']+)'/)[1];
 
 class MockResponse {
-  constructor(body, { status = 200, type = 'basic' } = {}) {
+  /** @param {any} body @param {{ status?: number, type?: string, contentType?: string | null }} [init] */
+  constructor(body, { status = 200, type = 'basic', contentType = null } = {}) {
     this.body = body;
     this.status = status;
     this.ok = status >= 200 && status < 300;
     this.type = type;
-    this.headers = { get: () => null };
+    this.contentType = contentType;
+    this.headers = { get: (/** @type {string} */ name) => (String(name).toLowerCase() === 'content-type' ? this.contentType : null) };
   }
-  clone() { return new MockResponse(this.body, { status: this.status, type: this.type }); }
+  clone() { return new MockResponse(this.body, { status: this.status, type: this.type, contentType: this.contentType }); }
 }
 
 class MockRequest {
@@ -459,4 +461,31 @@ test('a locale request while offline and never cached gets the offline page, not
   const response = await within(result);
   assert.equal(response.body, 'offline-page');
   assert.equal(response.ok, true);
+});
+
+// Guertel zum 404 des Servers (Review auf #2631): bekommt eine Datei-Anfrage
+// HTML zurueck (ein alter Server, ein Proxy, der auf die Shell umleitet), darf
+// das nie die gute Kopie im Cache ersetzen - der naechste Offline-Start bekaeme
+// sonst index.html als Modul.
+test('an HTML answer to a .js, .css or .json request never replaces the cached file', async () => {
+  for (const [path, cacheName] of [['/assets/tasks-test.js', SHELL], ['/styles/layout.css', SHELL], ['/locales/de.json', 'yuvomi-locales-']]) {
+    const env = loadSw(async () => new MockResponse('<!DOCTYPE html><html></html>', { contentType: 'text/html; charset=utf-8' }));
+    await seed(env, cacheName, path, 'good');
+    const { result, waited } = env.fetchEvent(path);
+    await result;
+    await Promise.all(waited);
+    await settle();
+    const name = (await env.caches.keys()).find((n) => n.startsWith(cacheName));
+    const cached = await (await env.caches.open(name)).match(`${ORIGIN}${path}`);
+    assert.equal(cached.body, 'good', `${path}: die HTML-Antwort hat die Kopie im Cache ersetzt`);
+  }
+  // Eine echte Datei wird weiter abgelegt.
+  const env = loadSw(async () => new MockResponse('fresh', { contentType: 'text/javascript' }));
+  await seed(env, SHELL, '/assets/tasks-test.js', 'old');
+  const { result, waited } = env.fetchEvent('/assets/tasks-test.js');
+  await result;
+  await Promise.all(waited);
+  await settle();
+  const name = (await env.caches.keys()).find((n) => n.startsWith(SHELL));
+  assert.equal((await (await env.caches.open(name)).match(`${ORIGIN}/assets/tasks-test.js`)).body, 'fresh');
 });

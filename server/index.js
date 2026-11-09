@@ -939,6 +939,15 @@ app.get('/{*path}', spaLimiter, (req, res) => {
   if (FRONTEND.mode === 'vite-dev') {
     return res.status(404).type('text/plain').send('npm run dev: the app is served by Vite on http://localhost:5173');
   }
+  // Die Shell nur fuer Routen der App: ohne Dateiendung und nicht unter
+  // /assets/. Eine fehlende Datei ist ein 404 - nach einem Release sind die
+  // Chunk-Adressen offener Tabs weg, und ein 200 mit index.html legte der
+  // Service Worker ueber die gute Precache-Kopie (Review auf #2631). Dieselbe
+  // Grenze zieht isAppRouteNavigation() in sw.js.
+  const lastSegment = req.path.slice(req.path.lastIndexOf('/') + 1);
+  if (req.path.startsWith('/assets/') || /\.[a-z0-9]+$/i.test(lastSegment)) {
+    return res.status(404).type('text/plain').send('Not found.');
+  }
   res.sendFile('index.html', { root: STATIC_DIR });
 });
 
