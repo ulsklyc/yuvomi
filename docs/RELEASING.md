@@ -48,10 +48,11 @@ the last tag is an interface release.
    `Changed`, `Fixed`, `Removed`, `Security`), one bullet per user-facing change, in English. Do
    not touch the file header; `npm run test:changelog` checks the structure, and that no section
    released earlier differs from its tag.
-3. **Service worker.** Set `APP_RELEASE` in `public/sw.js` to exactly that number. `npm version`
-   does not touch this file, and `test:frontend-audit` fails the build if it disagrees with
-   `package.json`. If a file was added under `public/`, `test:sw-precache` also has to be green:
-   the precache list is explicit.
+3. **Service worker.** Nothing to set by hand any more: `npm run build` writes `APP_RELEASE` from
+   `package.json`, the build revision and the precache list into `dist/sw.js`
+   (`scripts/build/service-worker.ts`). If a file was added under `public/`, `test:static-copy-list`
+   and `test:sw-precache` have to be green: a file the module graph does not reach must be on the
+   copy list in `scripts/build/static-files.ts`.
 4. **Version literals in the docs.** The landing pages and the installation guide carry the
    version and the release date as text: `docs/index.html` (hero bar and footer, with
    `data-released`), `docs/install.html` (footer, with `data-released`), and `docs/installation.md`

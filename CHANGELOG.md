@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Foundation
+- **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
+  service worker takes its offline list from the build instead of a hand-kept one; pages,
+  offline reach and the module API for third-party modules (`/api.js`, `/i18n.js`,
+  `/utils/html.js`) stay the same, so nothing changes on screen.
+- **The release tarball carries the built app** in `dist/` next to the source, together with
+  `THIRD-PARTY-NOTICES.txt`; the server starts only from a build and says so when `dist/` is
+  missing.
+- **For module authors: only `/api.js`, `/i18n.js` and `/utils/html.js` stay importable.**
+  Until now a third-party module could import any app file, for example
+  `/utils/page-layout.js`; with this release every other file ships inside the bundle under a
+  hashed name, and such an import stops the module from loading. Import only these three paths
+  and build the page markup yourself (the example in MODULES.md shows how).
+- **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
+  serving the API on 3000; `npm run build` makes the production build.
+
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
   accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run
