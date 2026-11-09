@@ -1545,6 +1545,7 @@
         "intervalMonthly": "Monthly",
         "intervalWeekly": "Weekly",
         "intervalYearly": "Yearly",
+        "seriesEndDateLabel": "End on (optional)",
         "confirmFirstLabel": "Book only after confirmation",
         "confirmFirstHint": "Every generated booking waits for your confirmation. Until then it shows in the list but counts towards no total - you can adjust amount and date when confirming.",
         "pendingBadge": "Expected",

@@ -1564,6 +1564,7 @@
         "intervalMonthly": "ماهانه",
         "intervalWeekly": "هفتگی",
         "intervalYearly": "سالانه",
+        "seriesEndDateLabel": "پایان در (اختیاری)",
         "confirmFirstLabel": "ثبت فقط پس از تأیید",
         "confirmFirstHint": "هر تراکنش ساخته‌شده منتظر تأیید شماست. تا آن زمان در فهرست دیده می‌شود ولی در هیچ جمعی حساب نمی‌شود - هنگام تأیید می‌توانید مبلغ و تاریخ را اصلاح کنید.",
         "pendingBadge": "در انتظار",

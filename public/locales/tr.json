@@ -1545,6 +1545,7 @@
         "intervalMonthly": "Aylık",
         "intervalWeekly": "Haftalık",
         "intervalYearly": "Yıllık",
+        "seriesEndDateLabel": "Bitiş tarihi (isteğe bağlı)",
         "confirmFirstLabel": "Yalnızca onaydan sonra işle",
         "confirmFirstHint": "Oluşturulan her kayıt onayınızı bekler. O ana kadar listede görünür ama hiçbir toplama girmez - onaylarken tutarı ve tarihi düzeltebilirsiniz.",
         "pendingBadge": "Bekleniyor",

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A recurring budget series can now have an end date.** The recurring-entry dialog
+  has a new "End on (optional)" date field. Once the end date passes, the series stops
+  generating new occurrences; occurrences already booked before that date are kept.
+  The end date is also accepted by `PUT /api/v1/budget/{id}/series` and
+  `POST /api/v1/budget` for new recurring entries. An empty string clears the date.
+  (Refs #1742)
+
 ## [2.87.0] - 2026-11-08
 
 ### Added
