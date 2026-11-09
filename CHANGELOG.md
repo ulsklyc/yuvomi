@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A shopping list can send its open items to a webhook.** An admin sets a household-wide
+  webhook URL under Settings > Notifications. Once a URL is set, the list menu shows "Send open
+  items": a single tap posts the list name and all unchecked items - name, quantity and
+  category - as JSON to that URL. Useful for n8n, Home Assistant and any other consumer that
+  accepts a JSON POST. A target on your own network only works if the server was started with
+  `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true`; without it the list says so instead of reporting a
+  failure. Only admins can see or set the URL. (#2502)
 - **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
   system information there is a section with what the installation runs on: version and build,
   whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema

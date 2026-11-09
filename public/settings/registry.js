@@ -195,6 +195,9 @@ export const SETTINGS_SECTIONS = freezeEntries([
     options: [
       { key: 'settings.pushToggleTitle', synonyms: 'settingsSynonyms.push' },
       { key: 'settings.notificationChannelsTitle', terms: ['ntfy', 'Gotify', 'Webhook'] },
+      // Die Einkaufsliste an einen Webhook (#2502): die Suche muss den Weg
+      // dorthin kennen, die Einstellung steht auf dieser Seite.
+      { key: 'settings.shoppingWebhookUrl', terms: ['Webhook', 'n8n', 'Home Assistant'] },
     ],
     adminOnly: false,
     loader: () => import('/settings/pages/notifications.js'),

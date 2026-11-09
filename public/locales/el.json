@@ -763,6 +763,11 @@
         "importMeals": "Από το πρόγραμμα γευμάτων",
         "sendList": "Αποστολή λίστας",
         "sendListTitle": "Αποστολή λίστας αγορών",
+        "sendWebhook": "Αποστολή ανοιχτών ειδών",
+        "sendWebhookSent": "Στάλθηκαν {{count}} είδη.",
+        "sendWebhookSent_one": "Στάλθηκε {{count}} είδος.",
+        "sendWebhookUnconfigured": "Δεν έχει ρυθμιστεί προορισμός webhook.",
+        "sendWebhookError": "Η αποστολή στο webhook απέτυχε.",
         "sendListDescription": "{{count}} εκκρεμή είδη θα σταλούν στο μέλος που θα επιλέξεις.",
         "sendListDescription_one": "{{count}} εκκρεμές είδος θα σταλεί στο μέλος που θα επιλέξεις.",
         "sendListRecipient": "Παραλήπτης",
@@ -844,7 +849,8 @@
             "waited": "Το «{{item}}» δεν μεταφέρθηκε στη λίστα «{{target}}»: ο συγχρονισμός της λίστας «{{back}}» είναι απενεργοποιημένος πάνω από μία εβδομάδα. Το είδος θα εμφανιστεί ξανά στη λίστα «{{back}}» μόλις την ενεργοποιήσετε."
         },
         "moreDetailsHint": "Τιμή, κατάστημα, σύνδεσμος, σημείωση",
-        "toPantryAllToPlaceholder": "Επιλέξτε θέση …"
+        "toPantryAllToPlaceholder": "Επιλέξτε θέση …",
+        "sendWebhookPrivateNetwork": "Ο προορισμός βρίσκεται στο τοπικό σας δίκτυο. Ο διακομιστής πρέπει να το επιτρέπει (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} υλικό",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "Έγινε επαναφορά στην προεπιλογή νοικοκυριού",
         "pushDeviceDescription": "Το Web Push ισχύει μόνο για αυτήν τη συσκευή και αυτό το πρόγραμμα περιήγησης.",
         "notificationChannelsTitle": "Κανάλια νοικοκυριού",
+        "shoppingWebhookTitle": "Webhook λίστας αγορών",
+        "shoppingWebhookDescription": "Στέλνει τα ανοιχτά είδη μιας λίστας ως JSON σε αυτή τη διεύθυνση. Μόνο οι διαχειριστές ορίζουν τον προορισμό· στη συνέχεια κάθε μέλος του σπιτιού μπορεί να στείλει από το μενού της λίστας.",
+        "shoppingWebhookUrl": "Διεύθυνση webhook",
+        "shoppingWebhookSaved": "Αποθηκεύτηκε.",
         "notificationChannelsDescription": "Οι διαχειριστές μπορούν να προσθέσουν κανάλια που λαμβάνουν υπενθυμίσεις επιπλέον των Web Push.",
         "notificationChannelAdd": "Προσθήκη καναλιού",
         "notificationChannelProvider": "Πάροχος",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "Αυτό το μέλος δεν υπάρχει πια.",
         "memberErrorSsoEmailRequired": "Ένας λογαριασμός μόνο με SSO χρειάζεται διεύθυνση email, ώστε να τον βρει η πρώτη σύνδεση μέσω SSO.",
         "memberErrorSsoEmailAmbiguous": "Αυτή τη διεύθυνση email την έχει ήδη άλλο μέλος. Το SSO δεν θα μπορούσε να ξεχωρίσει τους λογαριασμούς.",
+        "shoppingWebhookPrivateNetworkHint": "Ένας προορισμός στο δικό σας δίκτυο (Home Assistant, τοπικό n8n) λειτουργεί μόνο αν ο διακομιστής ξεκίνησε με NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "Αυτή δεν είναι έγκυρη διεύθυνση web. Πρέπει να ξεκινά με http:// ή https://.",
         "twoFactorAlreadyEnabled": "Ο έλεγχος ταυτότητας δύο παραγόντων είναι ήδη ενεργός. Φόρτωσε ξανά τη σελίδα για να δεις την τρέχουσα κατάσταση.",
         "twoFactorSetupExpired": "Η ρύθμιση έληξε. Ακύρωσέ την και ξεκίνα ξανά.",
         "oidcLinkErrorNotConfigured": "Το SSO δεν είναι πλέον ρυθμισμένο σε αυτόν τον διακομιστή.",

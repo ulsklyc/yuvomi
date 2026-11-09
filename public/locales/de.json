@@ -781,6 +781,11 @@
         "importMeals": "Aus dem Essensplan",
         "sendList": "Liste senden",
         "sendListTitle": "Einkaufsliste senden",
+        "sendWebhook": "Offene Artikel senden",
+        "sendWebhookSent": "{{count}} Artikel gesendet.",
+        "sendWebhookSent_one": "{{count}} Artikel gesendet.",
+        "sendWebhookUnconfigured": "Kein Webhook-Ziel eingerichtet.",
+        "sendWebhookError": "Konnte nicht gesendet werden.",
         "sendListDescription": "{{count}} offene Artikel gehen an das gewählte Mitglied.",
         "sendListDescription_one": "{{count}} offener Artikel geht an das gewählte Mitglied.",
         "sendListRecipient": "Empfänger",
@@ -862,7 +867,8 @@
             "waited": "„{{item}}“ wurde nicht nach „{{target}}“ verschoben: Der Abgleich von „{{back}}“ ist seit über einer Woche aus. Der Artikel erscheint wieder auf „{{back}}“, sobald die Liste eingeschaltet wird."
         },
         "moreDetailsHint": "Preis, Laden, Link, Notiz",
-        "toPantryAllToPlaceholder": "Ort wählen …"
+        "toPantryAllToPlaceholder": "Ort wählen …",
+        "sendWebhookPrivateNetwork": "Das Ziel liegt im eigenen Netz. Der Server muss das erlauben (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} Zutat",
@@ -3184,6 +3190,10 @@
         "personalWeatherReset": "Auf Haushalts-Standard zurückgesetzt",
         "pushDeviceDescription": "Web Push gilt nur für dieses Gerät und diesen Browser.",
         "notificationChannelsTitle": "Haushaltskanäle",
+        "shoppingWebhookTitle": "Einkaufslisten-Webhook",
+        "shoppingWebhookDescription": "Sendet die offenen Artikel einer Liste als JSON an diese URL. Nur Admins können das Ziel setzen; jedes Mitglied kann dann über das Listenmenü senden.",
+        "shoppingWebhookUrl": "Webhook-URL",
+        "shoppingWebhookSaved": "Webhook gespeichert.",
         "notificationChannelsDescription": "Admins können Kanäle hinzufügen, die Erinnerungen zusätzlich zu Web Push erhalten.",
         "notificationChannelAdd": "Kanal hinzufügen",
         "notificationChannelProvider": "Anbieter",
@@ -3601,6 +3611,8 @@
         "memberErrorGone": "Dieses Mitglied gibt es nicht mehr.",
         "memberErrorSsoEmailRequired": "Ein Konto nur mit SSO braucht eine E-Mail-Adresse, damit die erste SSO-Anmeldung es findet.",
         "memberErrorSsoEmailAmbiguous": "Diese E-Mail-Adresse hat schon ein anderes Mitglied. SSO könnte die Konten nicht auseinanderhalten.",
+        "shoppingWebhookPrivateNetworkHint": "Ein Ziel im eigenen Netz (Home Assistant, ein lokales n8n) funktioniert nur, wenn der Server mit NOTIFICATION_ALLOW_PRIVATE_NETWORK=true gestartet wurde.",
+        "shoppingWebhookUrlInvalid": "Das ist keine gültige Webadresse. Sie muss mit http:// oder https:// beginnen.",
         "twoFactorAlreadyEnabled": "Die Zwei-Faktor-Anmeldung ist schon eingeschaltet. Lade die Seite neu, um den aktuellen Stand zu sehen.",
         "twoFactorSetupExpired": "Die Einrichtung ist abgelaufen. Brich ab und starte sie neu.",
         "oidcLinkErrorNotConfigured": "SSO ist auf diesem Server nicht mehr eingerichtet.",

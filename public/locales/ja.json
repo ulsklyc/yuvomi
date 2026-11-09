@@ -763,6 +763,11 @@
         "importMeals": "献立から",
         "sendList": "リストを送る",
         "sendListTitle": "買い物リストを送る",
+        "sendWebhook": "未購入のアイテムを送信",
+        "sendWebhookSent": "{{count}} 件のアイテムを送信しました。",
+        "sendWebhookSent_one": "{{count}} 件のアイテムを送信しました。",
+        "sendWebhookUnconfigured": "Webhook の送信先が設定されていません。",
+        "sendWebhookError": "Webhook に送信できませんでした。",
         "sendListDescription": "未購入の {{count}} 件が選んだメンバーに送られます。",
         "sendListDescription_one": "未購入の {{count}} 件が選んだメンバーに送られます。",
         "sendListRecipient": "宛先",
@@ -844,7 +849,8 @@
             "waited": "「{{item}}」は「{{target}}」に移動されませんでした。「{{back}}」の同期が1週間以上オフになっています。リストをオンにすると、「{{back}}」に再び表示されます。"
         },
         "moreDetailsHint": "価格・店舗・リンク・メモ",
-        "toPantryAllToPlaceholder": "場所を選択 …"
+        "toPantryAllToPlaceholder": "場所を選択 …",
+        "sendWebhookPrivateNetwork": "送信先はローカルネットワーク内です。サーバー側で許可する必要があります（NOTIFICATION_ALLOW_PRIVATE_NETWORK）。"
     },
     "meals": {
         "ingredientCount_one": "{{count}} 品の材料",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "世帯の既定にリセットしました",
         "pushDeviceDescription": "Web Push はこのデバイスとこのブラウザーにのみ適用されます。",
         "notificationChannelsTitle": "世帯チャンネル",
+        "shoppingWebhookTitle": "買い物リストの Webhook",
+        "shoppingWebhookDescription": "リストの未購入アイテムを JSON でこの URL に送信します。送信先を設定できるのは管理者だけで、その後は世帯の誰でもリストのメニューから送信できます。",
+        "shoppingWebhookUrl": "Webhook の URL",
+        "shoppingWebhookSaved": "保存しました。",
         "notificationChannelsDescription": "管理者は、Web プッシュに加えてリマインダーを受け取るチャンネルを追加できます。",
         "notificationChannelAdd": "チャンネルを追加",
         "notificationChannelProvider": "プロバイダー",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "このメンバーはもう存在しません。",
         "memberErrorSsoEmailRequired": "SSOのみのアカウントには、最初のSSOサインインで見つけられるようにメールアドレスが必要です。",
         "memberErrorSsoEmailAmbiguous": "このメールアドレスは別のメンバーが使用しています。SSOではアカウントを区別できません。",
+        "shoppingWebhookPrivateNetworkHint": "自宅ネットワーク内の送信先（Home Assistant やローカルの n8n）は、サーバーが NOTIFICATION_ALLOW_PRIVATE_NETWORK=true で起動されている場合にのみ動作します。",
+        "shoppingWebhookUrlInvalid": "有効なウェブアドレスではありません。http:// または https:// で始まる必要があります。",
         "twoFactorAlreadyEnabled": "二要素認証はすでに有効です。ページを再読み込みして現在の状態を確認してください。",
         "twoFactorSetupExpired": "設定の有効期限が切れました。キャンセルしてやり直してください。",
         "oidcLinkErrorNotConfigured": "このサーバーでは SSO が設定されていません。",

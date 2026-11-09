@@ -763,6 +763,11 @@
         "importMeals": "From the meal plan",
         "sendList": "Send list",
         "sendListTitle": "Send shopping list",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook.",
         "sendListDescription": "{{count}} open items will go to the member you pick.",
         "sendListDescription_one": "{{count}} open item will go to the member you pick.",
         "sendListRecipient": "Recipient",
@@ -844,7 +849,8 @@
             "waited": "\"{{item}}\" was not moved to \"{{target}}\": syncing for \"{{back}}\" has been off for over a week. The item will show up on \"{{back}}\" again once that list is switched on."
         },
         "moreDetailsHint": "Price, store, link, note",
-        "toPantryAllToPlaceholder": "Choose a place …"
+        "toPantryAllToPlaceholder": "Choose a place …",
+        "sendWebhookPrivateNetwork": "The target is on your local network. The server must allow that (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingredient",
@@ -3166,6 +3172,10 @@
         "personalWeatherReset": "Reset to household default",
         "pushDeviceDescription": "Web Push applies only to this device and browser.",
         "notificationChannelsTitle": "Household channels",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved.",
         "notificationChannelsDescription": "Admins can add channels that receive reminders in addition to Web Push.",
         "notificationChannelAdd": "Add channel",
         "notificationChannelProvider": "Provider",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "This member no longer exists.",
         "memberErrorSsoEmailRequired": "An SSO-only account needs an email address so the first SSO sign-in can find it.",
         "memberErrorSsoEmailAmbiguous": "Another member already has this email address. SSO could not tell the accounts apart.",
+        "shoppingWebhookPrivateNetworkHint": "A target on your own network (Home Assistant, a local n8n) only works if the server was started with NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "That is not a valid web address. It must start with http:// or https://.",
         "twoFactorAlreadyEnabled": "Two-factor authentication is already enabled. Reload the page to see the current state.",
         "twoFactorSetupExpired": "The setup has expired. Cancel and start it again.",
         "oidcLinkErrorNotConfigured": "SSO is no longer set up on this server.",

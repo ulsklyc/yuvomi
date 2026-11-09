@@ -211,6 +211,26 @@ export function shoppingPaths() {
         requestBody: jsonBody(null),
       }),
     },
+    '/api/v1/shopping/{listId}/send-webhook': {
+      post: op({
+        summary: 'Send the open items of a list to the household webhook',
+        description: 'Posts all unchecked items of the list as JSON to the webhook URL set in household preferences. '
+          + 'The URL is set by an admin under Settings → Notifications; any household member may trigger a send. '
+          + 'Payload: `{ list: { id, name }, items: [{ name, quantity, category }], sentAt }`. '
+          + '`quantity` is the free-text amount as entered ("2 l"); the table carries no separate unit. '
+          + 'Rate limited to 10 requests per minute per IP. '
+          + 'Fails with 422 when no webhook URL is configured, the list has no open items, or the target '
+          + 'resolves to a private address while `NOTIFICATION_ALLOW_PRIVATE_NETWORK` is not set '
+          + '(reason `shopping_webhook_private_network`) - a target in your own network, such as Home '
+          + 'Assistant or a local n8n, needs that opt-in. '
+          + 'The request is given up after 8 seconds. '
+          + 'Fails with 502 when the webhook returns a non-2xx status or is unreachable.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
     '/api/v1/shopping/{listId}/items/checked': {
       delete: op({
         summary: 'Delete checked shopping items',
@@ -264,6 +284,12 @@ const CASE_REASONS = {
     post: `${LIST_GONE}, \`nothing_open\` (422, the list has no open item to send), `
       + '`recipient_no_email` (422, the chosen member has no email address on their contact), '
       + '`smtp_unconfigured` (422, email is not set up for this instance)',
+  },
+  '/api/v1/shopping/{listId}/send-webhook': {
+    post: `${LIST_GONE}, \`nothing_open\` (422, the list has no open items), `
+      + '`shopping_webhook_unconfigured` (422, no webhook URL set in household preferences), '
+      + '`shopping_webhook_private_network` (422, the target is on a private network and '
+      + '`NOTIFICATION_ALLOW_PRIVATE_NETWORK` is not set)',
   },
   '/api/v1/shopping/items/{itemId}': { delete: '`shopping_item_not_found` (404, the item does not exist - deleted)' },
   '/api/v1/shopping/items/undo-transfer': { post: `${MEALS_WRITE_REQUIRED}, when the undo touches meal ingredients` },

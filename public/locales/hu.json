@@ -763,6 +763,11 @@
         "importMeals": "Az étkezési tervből",
         "sendList": "Lista küldése",
         "sendListTitle": "Bevásárlólista küldése",
+        "sendWebhook": "Nyitott tételek elküldése",
+        "sendWebhookSent": "{{count}} tétel elküldve.",
+        "sendWebhookSent_one": "{{count}} tétel elküldve.",
+        "sendWebhookUnconfigured": "Nincs beállítva webhook cél.",
+        "sendWebhookError": "A webhookra küldés nem sikerült.",
         "sendListDescription": "{{count}} nyitott tétel megy a kiválasztott tagnak.",
         "sendListDescription_one": "{{count}} nyitott tétel megy a kiválasztott tagnak.",
         "sendListRecipient": "Címzett",
@@ -844,7 +849,8 @@
             "waited": "„{{item}}” nem került át ide: „{{target}}”. A(z) „{{back}}” szinkronizálása több mint egy hete ki van kapcsolva. A tétel újra megjelenik itt: „{{back}}”, amint bekapcsolod a listát."
         },
         "moreDetailsHint": "Ár, bolt, hivatkozás, jegyzet",
-        "toPantryAllToPlaceholder": "Válassz helyet …"
+        "toPantryAllToPlaceholder": "Válassz helyet …",
+        "sendWebhookPrivateNetwork": "A cél a helyi hálózatán van. A kiszolgálónak ezt engedélyeznie kell (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} hozzávaló",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "Háztartás alapértelmezett hely visszaállítva",
         "pushDeviceDescription": "A Web push értesítések csak ezen az eszközön és böngészőben érvényesek.",
         "notificationChannelsTitle": "Háztartási csatornák",
+        "shoppingWebhookTitle": "Bevásárlólista webhook",
+        "shoppingWebhookDescription": "Egy lista nyitott tételeit JSON formában erre a címre küldi. A célt csak rendszergazda állíthatja be; utána a háztartás bármely tagja küldhet a lista menüjéből.",
+        "shoppingWebhookUrl": "Webhook címe",
+        "shoppingWebhookSaved": "Mentve.",
         "notificationChannelsDescription": "Az adminok olyan csatornákat adhatnak hozzá, amelyek a Web Push mellett kapják az emlékeztetőket.",
         "notificationChannelAdd": "Csatorna hozzáadása",
         "notificationChannelProvider": "Szolgáltató",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "Ez a tag már nem létezik.",
         "memberErrorSsoEmailRequired": "A csak SSO-s fióknak e-mail-cím kell, hogy az első SSO-bejelentkezés megtalálja.",
         "memberErrorSsoEmailAmbiguous": "Ez az e-mail-cím már egy másik tagé. Az SSO nem tudná megkülönböztetni a fiókokat.",
+        "shoppingWebhookPrivateNetworkHint": "A saját hálózatán lévő cél (Home Assistant, helyi n8n) csak akkor működik, ha a kiszolgáló NOTIFICATION_ALLOW_PRIVATE_NETWORK=true beállítással indult.",
+        "shoppingWebhookUrlInvalid": "Ez nem érvényes webcím. http:// vagy https:// előtaggal kell kezdődnie.",
         "twoFactorAlreadyEnabled": "A kétlépcsős azonosítás már be van kapcsolva. Töltsd újra az oldalt az aktuális állapotért.",
         "twoFactorSetupExpired": "A beállítás lejárt. Szakítsd meg, és kezdd újra.",
         "oidcLinkErrorNotConfigured": "Az SSO már nincs beállítva ezen a szerveren.",

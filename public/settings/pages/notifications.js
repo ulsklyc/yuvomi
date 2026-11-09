@@ -6,9 +6,11 @@ import { pushSupported, pushStatus, enablePush, disablePush, repairPush } from '
 import { api, notifications } from '/api.js';
 import { confirmModal, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { esc } from '/utils/html.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { getPwaInstallState } from '/utils/pwa-install.js';
 import { toggleRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
 const DEFAULT_PROVIDERS = [
   { id: 'gotify', name: 'Gotify' },
@@ -103,6 +105,27 @@ function renderPage(container, user) {
       </div>
     </section>
     <section class="settings-section" id="notification-channels-section"></section>
+    ${user?.role === 'admin' ? `
+    <section class="settings-section" id="shopping-webhook-section">
+      <h2 class="settings-section__title">${t('settings.shoppingWebhookTitle')}</h2>
+      <p class="form-hint">${t('settings.shoppingWebhookDescription')}</p>
+      <!-- DER HAEUFIGSTE FALL STEHT HIER, NICHT ERST IM FEHLER-TOAST (Review zu
+           #2502): Home Assistant und ein eigenes n8n stehen im eigenen Netz, und
+           der SSRF-Schutz weist sie ohne NOTIFICATION_ALLOW_PRIVATE_NETWORK ab.
+           Das ist ein Deploy-Schalter, keine App-Einstellung - also eine
+           Vorbedingung, die der Admin VOR dem Eintragen wissen muss. -->
+      <p class="form-hint">${t('settings.shoppingWebhookPrivateNetworkHint')}</p>
+      <form id="shopping-webhook-form" novalidate>
+        <div class="settings-setting-row settings-setting-row--stacked">
+          <label class="settings-setting-row__label form-label" for="shopping-webhook-url">${t('settings.shoppingWebhookUrl')}</label>
+          <div class="settings-setting-row__control settings-form-actions">
+            <input type="url" id="shopping-webhook-url" class="form-input" placeholder="https://n8n.example.com/webhook/…" autocomplete="off">
+            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
+          </div>
+          <p class="form-hint" id="shopping-webhook-status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+    </section>` : ''}
   `);
   renderChannelShell(container, user);
 }
@@ -556,6 +579,33 @@ export async function render(container, { user } = {}) {
         testBtn.disabled = false;
       }
     });
+    // Shopping webhook (admin only)
+    const webhookForm = container.querySelector('#shopping-webhook-form');
+    if (webhookForm) {
+      try {
+        const prefs = await getPreferences();
+        const urlInput = webhookForm.querySelector('#shopping-webhook-url');
+        const statusEl = webhookForm.querySelector('#shopping-webhook-status');
+        urlInput.value = prefs?.shopping_webhook_url ?? '';
+        webhookForm.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          statusEl.textContent = '';
+          try {
+            await savePreferences({ shopping_webhook_url: urlInput.value.trim() || null });
+            statusEl.textContent = t('settings.shoppingWebhookSaved');
+          } catch (err) {
+            // Hier stand `err?.body?.error`, was immer undefined ist: ApiError
+            // legt die Antwort unter `data` ab (public/api.js). Der Ausweg ist
+            // aber NICHT `err.data.error` - das waere der Text des Servers in
+            // der Oberflaeche (#1909, test:frontend-audit haelt diese Datei auf
+            // 0). Der Server benennt den Fall seit diesem Change mit
+            // `shopping_webhook_url_invalid`, und errorSentence() macht daraus
+            // den Satz der App.
+            statusEl.textContent = errorSentence(err, 'common.errorGeneric');
+          }
+        });
+      } catch { /* non-critical */ }
+    }
   } catch (error) {
     container.replaceChildren();
     throw error;

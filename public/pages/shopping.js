@@ -952,6 +952,9 @@ function listToolsItems() {
       ? [{ action: 'import-meals', label: t('shopping.importMeals'), icon: 'utensils' }]
       : []),
     { action: 'send-list', label: t('shopping.sendList'), icon: 'mail' },
+    ...(state.shoppingWebhookConfigured
+      ? [{ action: 'send-webhook', label: t('shopping.sendWebhook'), icon: 'webhook' }]
+      : []),
     { separator: true },
     // Nur am Finger (layout.css): holt die Griffe der Handsortierung zurueck,
     // die dort sonst neben dem Mehr-Knopf an der Daumenkante lagen (R23, D13,
@@ -3973,7 +3976,13 @@ async function loadStores({ keepOnError = false } = {}) {
   const [stores, prefs] = await Promise.allSettled([api.get('/shopping/stores'), api.get('/preferences')]);
   if (stores.status === 'fulfilled') state.stores = stores.value.data ?? [];
   else if (!keepOnError) state.stores = [];
-  if (prefs.status === 'fulfilled') state.currency = prefs.value.data?.currency ?? 'EUR';
+  if (prefs.status === 'fulfilled') {
+    state.currency = prefs.value.data?.currency ?? 'EUR';
+    // Die ADRESSE bekommt nur die Adminperson (routes/preferences.js). Hier
+    // zaehlt ohnehin nur, OB eine da ist: der Menuepunkt unten haengt an
+    // nichts anderem, und die Route liest die Adresse selbst.
+    state.shoppingWebhookConfigured = prefs.value.data?.shopping_webhook_configured === true;
+  }
 }
 
 /**
@@ -4648,6 +4657,25 @@ function wireListContentEvents(container) {
 
     if (action === 'send-list') {
       await openSendListDialog(container);
+    }
+
+    if (action === 'send-webhook') {
+      try {
+        const result = await api.post(`/shopping/${state.activeListId}/send-webhook`, {});
+        window.yuvomi.showToast(t('shopping.sendWebhookSent', { count: result.data?.items ?? 0 }), 'info');
+      } catch (err) {
+        // `err.data`, NICHT `err.body` (Review zu #2502): ApiError legt die
+        // Antwort unter `data` ab (public/api.js). Ueber `body` gelesen war der
+        // Grund immer undefined, und "nichts offen" wie "nicht eingerichtet"
+        // bekamen beide den allgemeinen Satz. Gleiche Form wie der
+        // Mail-Versand oben.
+        const byReason = {
+          nothing_open: 'shopping.sendListEmpty',
+          shopping_webhook_unconfigured: 'shopping.sendWebhookUnconfigured',
+          shopping_webhook_private_network: 'shopping.sendWebhookPrivateNetwork',
+        }[err.data?.reason];
+        window.yuvomi.showToast(t(byReason ?? 'shopping.sendWebhookError'), 'warning');
+      }
     }
 
     // ---- Liste duplizieren (#1103) ----

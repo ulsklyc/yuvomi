@@ -706,6 +706,16 @@ router.get('/', (req, res) => {
         // A derived flag (#1766): true when Immich is configured and, for a
         // paired display, when an admin has switched the screensaver on for it.
         screensaver_enabled: isScreensaverEnabled() && (req.authMethod !== 'display' || req.displayShowsScreensaver === true),
+        // DIE WEBHOOK-ADRESSE IST SELBST DAS GEHEIMNIS (Review zu #2502).
+        // Eine Home-Assistant-Webhook-Id oder ein n8n-Pfad ist der ganze
+        // Zugang, und oft steht ein Token im Query. Damit gehoert sie zu den
+        // Benachrichtigungskanaelen: nur die Adminperson bekommt die Adresse,
+        // alle anderen die TATSACHE - und mehr brauchen sie nicht, die
+        // Einkaufsseite schaltet damit nur ihren Menuepunkt frei
+        // (public/pages/shopping.js). Dasselbe Muster wie
+        // `password_configured` in routes/documents.js.
+        shopping_webhook_configured: !!cfgGet('shopping_webhook_url'),
+        ...(isAdminRequest(req) ? { shopping_webhook_url: cfgGet('shopping_webhook_url') || null } : {}),
     };
     // EIN WANDTABLETT BEKOMMT NUR DEN DARSTELLUNGSTEIL (#1208). Diese Antwort
     // ist die Sammelstelle des ganzen Haushalts - Wohnkoordinaten,
@@ -749,7 +759,7 @@ router.put('/', (req, res) => {
   try {
     database = db.get();
     database.exec('BEGIN');
-    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_phone, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, tasks_late_decay_enabled, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_phone, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, tasks_late_decay_enabled, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color, shopping_webhook_url } = req.body;
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
     // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
     // pro Nutzer: die Vorlagen legen geteilte Schichtarten an. Der Check steht
@@ -1479,6 +1489,28 @@ router.put('/', (req, res) => {
       }
     }
 
+    if (shopping_webhook_url !== undefined) {
+      if (!isAdminRequest(req)) {
+        return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      }
+      if (shopping_webhook_url === null || shopping_webhook_url === '') {
+        cfgSet('shopping_webhook_url', '');
+      } else {
+        let parsed;
+        try { parsed = new URL(String(shopping_webhook_url)); } catch {
+          // DER SERVER BENENNT DEN FALL, DIE APP BESITZT DEN SATZ (#1909):
+          // ohne `reason` bliebe der Oberflaeche nur der Allgemeinsatz, und
+          // der haeufigste Tippfehler (fehlendes https://) waere nicht mehr
+          // zu erkennen.
+          return res.status(400).json({ error: 'shopping_webhook_url must be a valid URL.', code: 400, reason: 'shopping_webhook_url_invalid' });
+        }
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return res.status(400).json({ error: 'shopping_webhook_url must use http or https.', code: 400, reason: 'shopping_webhook_url_invalid' });
+        }
+        cfgSet('shopping_webhook_url', parsed.toString());
+      }
+    }
+
     // DIE ANTWORT WIRD NOCH IN DER TRANSAKTION GEBAUT (#1622, Review zu #1627).
     // Sie liest aus der Datenbank zurueck, und manche dieser Lesewege fragen
     // weitere Tabellen ab (dashboardPersonalViews den Kategorien-Katalog). Wirft
@@ -1568,6 +1600,8 @@ router.put('/', (req, res) => {
         holiday_public_color:  cfgGet('holiday_public_color')  ?? '#FF3B30',
         holiday_school_color:  cfgGet('holiday_school_color')  ?? '#34C759',
         holiday_last_sync:     cfgGet('holiday_last_sync')     ?? null,
+        shopping_webhook_configured: !!cfgGet('shopping_webhook_url'),
+        ...(isAdminRequest(req) ? { shopping_webhook_url: cfgGet('shopping_webhook_url') || null } : {}),
       },
     };
 
