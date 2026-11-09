@@ -30,7 +30,12 @@ name: Release Assets
 # workflow artifact. The job `publish` holds the write rights and the OIDC
 # token, runs no npm and no project code (no checkout at all): it checks the
 # hashes, attests, uploads, publishes and hands over to Umbrel. GH_TOKEN sits
-# on the steps that call `gh`, never on the job.
+# on the steps that call `gh`, never on the job. The `sha256sum -c` there is a
+# TRANSPORT check against a file from the same, deliberately rights-less build
+# job (did the artifact arrive intact), not a guard against a manipulated
+# build: whoever controls the build writes both files. What protects the build
+# is that it holds no token; what lets anyone check it is the determinism check
+# and the attestation.
 #
 # WHY A DISPATCH AND NOT `release: created`. GitHub does not trigger workflows
 # for the `created`, `edited` or `deleted` activity of a DRAFT release

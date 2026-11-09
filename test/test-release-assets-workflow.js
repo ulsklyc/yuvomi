@@ -160,7 +160,7 @@ test('no foreign code next to a token: build holds none, publish runs no npm and
 
 test('the determinism builds run without any token in their environment', async () => {
   const { SECRET_ENV, buildEnv } = await import('../scripts/check-build-determinism.mjs');
-  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'NPM_TOKEN']) {
+  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'NPM_TOKEN', 'NODE_AUTH_TOKEN']) {
     assert.ok(SECRET_ENV.includes(name), name);
   }
   const env = buildEnv({ GH_TOKEN: 'a', GITHUB_TOKEN: 'b', ACTIONS_ID_TOKEN_REQUEST_URL: 'c', ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'd', ACTIONS_RUNTIME_TOKEN: 'e', NPM_TOKEN: 'f', PATH: '/bin' });

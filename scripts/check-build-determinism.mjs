@@ -16,7 +16,9 @@
  * node_modules wird aus dem Checkout verlinkt, nicht neu installiert (dasselbe
  * Lockfile, und der Lauf braucht kein Netz). APP_BUILD_REVISION ist fuer beide
  * Builds gleich: die Umgebung, sonst der Commit von <ref>.
- * Aufruf: node scripts/check-build-determinism.mjs [--ref REF | --from-dir DIR] [--keep]
+ * Dazu wird Build a mit dem dist/ des Checkouts verglichen (dem, das gepackt
+ * wird: anderer Pfad, echtes node_modules, .git): gleiche Quelle, gleiche Bytes.
+ * Aufruf: node scripts/check-build-determinism.mjs [--ref REF | --from-dir DIR] [--keep] [--no-checkout-dist]
  * Abhaengigkeiten: git, tar (fuer --ref), node:crypto, node:fs
  */
 import { spawnSync } from 'node:child_process';
@@ -32,6 +34,10 @@ const opt = (/** @type {string} */ name) => { const i = args.indexOf(name); retu
 const ref = opt('--ref') ?? 'HEAD';
 const fromDir = opt('--from-dir');
 const keep = args.includes('--keep');
+// The dist/ that ships (the build in the checkout, with its own node_modules,
+// .git and depth) is compared too, not only the two harness builds with each
+// other (review on #2631). Missing -> said and skipped; `--no-checkout-dist` skips.
+const checkoutDist = args.includes('--no-checkout-dist') ? null : path.join(REPO, 'dist');
 
 /** @param {string} cmd @param {string[]} argv @param {import('node:child_process').SpawnSyncOptions} [o] */
 function run(cmd, argv, o = {}) {
@@ -50,7 +56,7 @@ function run(cmd, argv, o = {}) {
  * script or a Vite plugin could otherwise write releases or request an OIDC
  * token. Removed before APP_BUILD_REVISION and NODE_ENV are set.
  */
-export const SECRET_ENV = ['GH_TOKEN', 'GITHUB_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'NPM_TOKEN'];
+export const SECRET_ENV = ['GH_TOKEN', 'GITHUB_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'NPM_TOKEN', 'NODE_AUTH_TOKEN'];
 
 /** @param {NodeJS.ProcessEnv} env */
 export function buildEnv(env) {
@@ -61,7 +67,10 @@ export function buildEnv(env) {
 
 function main() {
   const revision = String(process.env.APP_BUILD_REVISION ?? '').trim()
-    || (fromDir ? 'determinism-check' : String(run('git', ['rev-parse', ref], { cwd: REPO }).stdout).trim());
+    // Same rule as the build (scripts/build/service-worker.ts): the env, else the
+    // commit - with --from-dir the checkout's HEAD, so the checkout dist/ compares.
+    || String(spawnSync('git', ['rev-parse', fromDir ? 'HEAD' : ref], { cwd: REPO, encoding: 'utf8' }).stdout ?? '').trim()
+    || 'determinism-check';
 
   /**
    * Every file under dir, relative, sorted, with its sha256.
@@ -114,16 +123,29 @@ function main() {
   const b = buildOnce('b');
   const ha = hashes(path.join(a.dir, 'dist'));
   const hb = hashes(path.join(b.dir, 'dist'));
-  const differ = [...new Set([...ha.keys(), ...hb.keys()])].sort()
-    .filter((file) => ha.get(file) !== hb.get(file))
-    .map((file) => `${file}${!ha.has(file) ? ' (only in b)' : !hb.has(file) ? ' (only in a)' : ''}`);
+  /** @param {Map<string, string>} x @param {Map<string, string>} y @param {string} nx @param {string} ny */
+  const compare = (x, y, nx, ny) => [...new Set([...x.keys(), ...y.keys()])].sort()
+    .filter((file) => x.get(file) !== y.get(file))
+    .map((file) => `${file}${!x.has(file) ? ` (only in ${ny})` : !y.has(file) ? ` (only in ${nx})` : ` (${nx} != ${ny})`}`);
+  const differ = compare(ha, hb, 'a', 'b');
+  if (checkoutDist && existsSync(path.join(checkoutDist, '.vite', 'modules.json'))) {
+    const layout = JSON.parse(readFileSync(path.join(checkoutDist, '.vite', 'modules.json'), 'utf8')).layout;
+    if (layout === 'modules') {
+      console.error('dist/ in the checkout is the browser test layout - run `npm run build` first, or pass --no-checkout-dist');
+      process.exit(2);
+    }
+    differ.push(...compare(ha, hashes(checkoutDist), 'a', 'checkout dist/'));
+    console.log(`compared with ${checkoutDist}`);
+  } else if (checkoutDist) {
+    console.log(`no build in ${checkoutDist} - only the two builds were compared`);
+  }
 
   if (keep) console.log(`kept: ${a.dir} ${b.dir}`);
   else for (const d of [a.dir, b.dir]) rmSync(d, { recursive: true, force: true });
 
   console.log(`builds: ${a.ms} ms, ${b.ms} ms; ${ha.size} files in dist/ (revision ${revision})`);
   if (differ.length) {
-    console.error(`The build is not deterministic: ${differ.length} file(s) differ between two builds of the same source:\n  ${differ.join('\n  ')}`);
+    console.error(`The build is not deterministic: ${differ.length} file(s) differ between builds of the same source:\n  ${differ.join('\n  ')}`);
     process.exit(1);
   }
   console.log('Deterministic: every file in dist/ has the same sha256 in both builds.');
