@@ -8,10 +8,9 @@ import { runExternalJob } from '../utils/restore-state.js';
 import cron from 'node-cron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { backupToFile } from '../db.js';
+import { backupToFile, get as getDb } from '../db.js';
 import { createLogger } from '../logger.js';
 import * as webdav from './backup-webdav.js';
-import { get as getDb } from '../db.js';
 import { pushService as defaultPushService } from './push.js';
 import { householdMemberSql } from './household-members.js';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
@@ -150,9 +149,6 @@ export async function createLocalBackup() {
 }
 
 /**
- * Perform automated backup
- */
-/**
  * EIN FEHLGESCHLAGENES SICHERUNGSLAUF MELDET SICH BEI DEN ADMINS (#2519).
  *
  * Ohne diese Meldung faellt die naechtliche Sicherung still aus: gesehen wird
@@ -176,7 +172,9 @@ export async function createLocalBackup() {
  * @param {Object} [opts]
  * @param {import('better-sqlite3-multiple-ciphers').Database} [opts.database]
  * @param {Object} [opts.pushService] - { sendPushToUser }
- * @returns {Promise<number>} Zahl der benachrichtigten Admins
+ * @returns {Promise<number>} Zahl der Admins, bei denen tatsaechlich eine
+ *   Push-Mitteilung zugestellt wurde (sendPushToUser liefert 0 ohne
+ *   Abonnement, nicht nur die Zahl der erfuellten Promises)
  */
 async function notifyAdminsOfBackupFailure({ database, pushService = defaultPushService } = {}) {
   try {
@@ -206,13 +204,16 @@ async function notifyAdminsOfBackupFailure({ database, pushService = defaultPush
     const results = await Promise.allSettled(
       admins.map((u) => pushService.sendPushToUser(u.id, payload)),
     );
-    return results.filter((r) => r.status === 'fulfilled').length;
+    return results.reduce((sum, r) => sum + (r.status === 'fulfilled' ? r.value : 0), 0);
   } catch (err) {
     log.error('Could not notify the administrators about the failed backup:', err);
     return 0;
   }
 }
 
+/**
+ * Perform automated backup
+ */
 async function performBackup(opts = {}) {
   try {
     log.info('Starting scheduled backup...');
@@ -292,12 +293,12 @@ export function stopScheduler() {
   }
 }
 
-/**
- * Get scheduler status
- */
 /** Nur fuer die Tests: der Melder allein, ohne einen Sicherungslauf. */
 export const _notifyAdminsOfBackupFailure = notifyAdminsOfBackupFailure;
 
+/**
+ * Get scheduler status
+ */
 export function getStatus() {
   return {
     enabled: BACKUP_ENABLED,
