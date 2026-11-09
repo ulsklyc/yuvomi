@@ -15,14 +15,18 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
-import { renderServiceWorkerSource } from '../server/utils/service-worker.js';
+import { renderServiceWorker } from '../scripts/build/service-worker.ts';
 
-const SRC = renderServiceWorkerSource(
-  readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'),
-  'sw-network-first-test',
-);
+// Wie der Build ihn schreibt (scripts/build/service-worker.ts): Listen vorne,
+// Version und Revision eingesetzt. Die Seiten liegen gebaut unter /assets/.
+const SRC = renderServiceWorker(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), {
+  precache: ['/', '/index.html', '/router.js', '/assets/tasks-test.js', '/locales/de.json'],
+  locales: readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json')).map((f) => `/locales/${f}`),
+  release: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version,
+  revision: 'sw-network-first-test',
+});
 const ORIGIN = 'https://app.test';
 // Die Version kommt aus dem Worker selbst: ein festes Literal hier brach die
 // Suite bei jedem Versionssprung, weil die Saat dann im Cache der alten
@@ -163,12 +167,13 @@ async function seed(env, cacheName, path, body) {
 }
 
 const SHELL = 'yuvomi-shell-';
-const PAGES = 'yuvomi-pages-';
+// Seit dem Build liegen die Seiten gehasht unter /assets/ und im Shell-Cache.
+const PAGES = SHELL;
 
 for (const [label, path, cacheName, mode] of [
   ['navigation', '/', SHELL, 'navigate'],
   ['shell module', '/router.js', SHELL, 'cors'],
-  ['page module', '/pages/tasks.js', PAGES, 'cors'],
+  ['page module', '/assets/tasks-test.js', PAGES, 'cors'],
   ['stylesheet', '/styles/layout.css', SHELL, 'cors'],
 ]) {
   test(`${label}: a network that never answers gets the cached copy after the deadline`, async () => {
@@ -254,7 +259,7 @@ test('one missed deadline covers the whole start: the next cached files come at 
   const env = loadSw(net.impl);
   await seed(env, SHELL, '/router.js', 'router');
   await seed(env, SHELL, '/api.js', 'api');
-  await seed(env, PAGES, '/pages/tasks.js', 'tasks');
+  await seed(env, PAGES, '/assets/tasks-test.js', 'tasks');
 
   const first = env.fetchEvent('/router.js');
   await settle();
@@ -264,7 +269,7 @@ test('one missed deadline covers the whole start: the next cached files come at 
   // Die naechste Ebene des Modulgraphen: ohne die Regel wartete jede Ebene
   // erneut 1,5 s auf ein Netz, das eben nicht geantwortet hat.
   const second = env.fetchEvent('/api.js');
-  const third = env.fetchEvent('/pages/tasks.js');
+  const third = env.fetchEvent('/assets/tasks-test.js');
   assert.equal((await within(second.result)).body, 'api');
   assert.equal((await within(third.result)).body, 'tasks');
   assert.equal(env.timers.length, 0, 'keine neue Frist im Langsam-Fenster');
@@ -272,7 +277,7 @@ test('one missed deadline covers the whole start: the next cached files come at 
   assert.equal(second.waited.length, 1);
 
   // Was nicht im Cache liegt, wartet auch im Fenster aufs Netz.
-  const uncached = env.fetchEvent('/pages/never-seen.js');
+  const uncached = env.fetchEvent('/assets/never-seen.js');
   await settle();
   let answered = false;
   uncached.result.then(() => { answered = true; });
@@ -302,7 +307,7 @@ test('without a cached copy the deadline changes nothing: the request keeps wait
   const net = heldFetch();
   const env = loadSw(net.impl);
 
-  const { result } = env.fetchEvent('/pages/tasks.js');
+  const { result } = env.fetchEvent('/assets/tasks-test.js');
   await settle();
   env.expireDeadlines();
   await settle();
@@ -353,9 +358,9 @@ test('what is not an app route never gets the shell before the network has actua
 
 test('a failing network still falls back at once, without waiting for the deadline', async () => {
   const env = loadSw(() => Promise.reject(new TypeError('Failed to fetch')));
-  await seed(env, PAGES, '/pages/tasks.js', 'cached');
+  await seed(env, PAGES, '/assets/tasks-test.js', 'cached');
 
-  const { result } = env.fetchEvent('/pages/tasks.js');
+  const { result } = env.fetchEvent('/assets/tasks-test.js');
   assert.equal((await within(result)).body, 'cached');
 });
 

@@ -26,7 +26,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { posix } from 'node:path';
 import { moduleSpecifiers, withoutHtmlComments, withoutCommentsKeepingLines } from './source-text.js';
 import { eachRule } from './css-rules.js';
-import { distManifest, readDist } from './dist-build.js';
+import { distManifest, isPrecachedSource, readDist } from './dist-build.js';
 
 const PUBLIC = new URL('../public/', import.meta.url);
 const read = (rel) => readFileSync(new URL(rel.replace(/^\//, ''), PUBLIC), 'utf8');
@@ -244,9 +244,8 @@ test('auth.css ist das Seitenblatt jeder Zugangsseite', () => {
 });
 
 test('der Service Worker haelt jedes nachgeladene Blatt offline bereit', () => {
-  const sw = read('sw.js');
-  for (const name of [...Object.keys(LAZY), 'auth']) assert.ok(sw.includes(`'/styles/${name}.css'`), `${name}.css fehlt im Precache`);
-  assert.ok(sw.includes("'/utils/component-style.js'"));
+  for (const name of [...Object.keys(LAZY), 'auth']) assert.ok(isPrecachedSource(`/styles/${name}.css`), `${name}.css fehlt im Precache`);
+  assert.ok(isPrecachedSource('/utils/component-style.js'));
 });
 
 // Ein kleines Dokument: genau das, was component-style.js anfasst.

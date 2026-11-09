@@ -3,7 +3,8 @@
  * public/ stays the source (E9), dist/ is the output the server serves.
  * What is bundled: index.html with its module scripts, the pages behind
  * `import.meta.glob` in router.js and everything they import, plus the three
- * facades. What is copied by name: scripts/build/static-files.ts.
+ * facades. What is copied by name: scripts/build/static-files.ts. The service
+ * worker is copied with its precache list filled in: scripts/build/service-worker.ts.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,7 @@ import {
   isExternal,
   staticCopyPlugin,
 } from './scripts/build/vite-plugins.ts';
+import { serviceWorkerPlugin } from './scripts/build/service-worker.ts';
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url));
 const publicDir = fileURLToPath(new URL('./public', import.meta.url));
@@ -32,6 +34,7 @@ export default defineConfig({
     staticCopyPlugin(publicDir),
     indexHtmlPlugin(publicDir, 'pages/dashboard.js'),
     moduleListPlugin(repoRoot),
+    serviceWorkerPlugin(repoRoot, publicDir),
   ],
   build: {
     outDir: fileURLToPath(new URL('./dist', import.meta.url)),

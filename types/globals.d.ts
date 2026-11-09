@@ -31,6 +31,10 @@ interface Window {
   /** Legacy-Alias fuer Drittanbieter-Module (public/router.js). */
   oikos: YuvomiApi;
   lucide?: any;
+  /** Nur im Service Worker: vom Build vorangestellt (scripts/build/service-worker.ts). */
+  __PRECACHE__?: string[];
+  /** Nur im Service Worker: vom Build vorangestellt (scripts/build/service-worker.ts). */
+  __LOCALES__?: string[];
 }
 
 /** Definition: public/night-hours.js (klassisches Skript, legt das Objekt auf globalThis). */

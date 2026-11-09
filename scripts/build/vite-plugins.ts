@@ -221,7 +221,9 @@ function repoPath(repoRoot: string, id: string): string {
  *     no module behind in a chunk) - the copy-list guard reads this;
  *   - `rendered`: the modules whose code is in a chunk - the third-party notices
  *     read this, it is what ships;
- *   - `external`: runtime imports left as they are (the hand copies in vendor/).
+ *   - `external`: runtime imports left as they are (the hand copies in vendor/);
+ *   - `chunks`: which modules each output chunk carries (guards that ask "is
+ *     this source module in the precache" read it).
  */
 export function moduleListPlugin(repoRoot: string): Plugin {
   return {
@@ -229,10 +231,14 @@ export function moduleListPlugin(repoRoot: string): Plugin {
     apply: 'build',
     generateBundle(_options, bundle) {
       const rendered = new Set<string>();
+      const chunks: Record<string, string[]> = {};
       for (const chunk of Object.values(bundle)) {
         if (chunk.type !== 'chunk') continue;
-        for (const id of chunk.moduleIds) rendered.add(repoPath(repoRoot, id));
+        const ids = chunk.moduleIds.map((id) => repoPath(repoRoot, id)).sort();
+        ids.forEach((id) => rendered.add(id));
+        chunks[chunk.fileName] = ids;
       }
+      const byFile = Object.fromEntries(Object.entries(chunks).sort(([x], [y]) => x.localeCompare(y)));
       const graph = new Set<string>();
       const external = new Set<string>();
       for (const id of this.getModuleIds()) {
@@ -242,7 +248,7 @@ export function moduleListPlugin(repoRoot: string): Plugin {
       this.emitFile({
         type: 'asset',
         fileName: '.vite/modules.json',
-        source: `${JSON.stringify({ graph: [...graph].sort(), rendered: [...rendered].sort(), external: [...external].sort() }, null, 2)}\n`,
+        source: `${JSON.stringify({ graph: [...graph].sort(), rendered: [...rendered].sort(), external: [...external].sort(), chunks: byFile }, null, 2)}\n`,
       });
     },
   };

@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { isPrecachedSource } from './dist-build.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -111,35 +112,21 @@ test('server KITCHEN_NAV_IDS enthält jedes Kitchen-Kind des Clients', () => {
 // Service Worker: jedes Modul mit eigenem Stylesheet gehört in die App-Shell,
 // sonst rendert die Seite offline unformatiert
 // --------------------------------------------------------------------------
-// Auf die Deklarationen ankern, nicht auf den ersten Namenstreffer: beide
-// Konstanten werden im Kopfkommentar der Datei erwähnt.
-function swArray(sw, name) {
-  const start = sw.indexOf(`const ${name} = [`);
-  assert.notEqual(start, -1, `const ${name} = [ nicht gefunden`);
-  const end = sw.indexOf('];', start);
-  assert.notEqual(end, -1, `Ende von ${name} nicht gefunden`);
-  return sw.slice(start, end);
-}
+// Seit dem Build (Phase 1a, Abschnitt D) schreibt Vite die Precache-Liste in
+// dist/sw.js; gefragt wird das Artefakt, nicht mehr eine Hand-Liste.
 
-test('sw.js APP_SHELL cacht das Stylesheet jedes Kitchen-Moduls', () => {
-  const shell = swArray(read('../public/sw.js'), 'APP_SHELL');
-
+test('der gebaute Worker cacht das Stylesheet jedes Kitchen-Moduls', () => {
   for (const id of KITCHEN_CHILD_IDS) {
     assert.ok(
-      shell.includes(`'/styles/${id}.css'`),
-      `/styles/${id}.css fehlt in APP_SHELL - die Seite rendert offline ungestylt`
+      isPrecachedSource(`/styles/${id}.css`),
+      `/styles/${id}.css fehlt im Precache - die Seite rendert offline ungestylt`
     );
   }
 });
 
-test('sw.js PAGE_MODULES cacht die Seite jedes Kitchen-Moduls', () => {
-  const modules = swArray(read('../public/sw.js'), 'PAGE_MODULES');
-
+test('der gebaute Worker cacht die Seite jedes Kitchen-Moduls', () => {
   for (const id of KITCHEN_CHILD_IDS) {
-    assert.ok(
-      modules.includes(`'/pages/${id}.js'`),
-      `/pages/${id}.js fehlt in PAGE_MODULES`
-    );
+    assert.ok(isPrecachedSource(`/pages/${id}.js`), `/pages/${id}.js liegt in keinem precachten Chunk`);
   }
 });
 

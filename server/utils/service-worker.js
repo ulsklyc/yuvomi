@@ -1,6 +1,11 @@
 /**
  * Modul: Service-Worker-Antwort erzeugen
  * Zweck: Eine deployment-spezifische, scriptsichere Cache-Revision in sw.js einsetzen.
+ *        Seit dem Build (Phase 1a, Abschnitt D) setzt scripts/build/service-worker.ts
+ *        Revision und Version schon in dist/sw.js ein; dann steht das Token nicht
+ *        mehr in der Datei und hier wird nichts ersetzt. Der Ersatz zur Laufzeit
+ *        bleibt nur fuer eine Datei, die das Token noch traegt (Uebergang, Abbau
+ *        in Phase 5).
  */
 
 import { readFileSync, statSync } from 'node:fs';
@@ -19,9 +24,10 @@ export function renderServiceWorkerSource(source, buildRevision) {
 }
 
 export function buildServiceWorkerResponse(source, { appVersion, buildRevision } = {}) {
+  const text = String(source);
   const revision = String(buildRevision || '').trim() || appVersion;
   return {
-    body: renderServiceWorkerSource(source, revision),
+    body: text.includes(BUILD_REVISION_TOKEN) ? renderServiceWorkerSource(text, revision) : text,
     contentType: 'text/javascript; charset=utf-8',
     cacheControl: 'no-store, max-age=0',
     cdnCacheControl: 'no-store',
