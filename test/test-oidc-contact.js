@@ -13,7 +13,7 @@
  * also das, was der Callback nach der kryptografischen Pruefung sieht (Claims und
  * UserInfo) - wie in test/test-staff-sign-in.js.
  *
- * Ausfuehren: node --experimental-sqlite --experimental-test-module-mocks --test test/test-oidc-contact.js
+ * Ausfuehren: node --experimental-test-module-mocks --test test/test-oidc-contact.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'oidc-contact-test-secret';
 process.env.DB_PATH = ':memory:';

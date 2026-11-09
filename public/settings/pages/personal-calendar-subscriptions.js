@@ -393,7 +393,10 @@ function bindIcsEvents(container, subs, user) {
       formWrapper.hidden = true;
       addBtn.hidden = false;
       if (res.syncError) {
-        showToast(`${t('settings.ics.status.syncError')}: ${res.syncError}`, 'danger');
+        // Das Abo steht, der erste Abruf ist gescheitert (#2566): der Fall des
+        // Servers in der Sprache der Seite, nie sein englischer Text.
+        const sentence = errorSentence({ data: { reason: res.syncReason, params: res.syncParams } });
+        showToast(`${t('settings.ics.status.syncError')}: ${sentence}`, 'danger');
       } else {
         showToast(t('settings.ics.addedToast'), 'success');
       }

@@ -29,7 +29,15 @@
  * dann gilt gar nichts mehr. Der Grund ist Pflicht, damit die Ausnahme in der
  * Release-Ausgabe steht statt im Kopf des Ausfuehrenden.
  *
- * Aufruf:  node scripts/check-release-cadence.mjs [--hotfix "Grund"]
+ * Zweiter Ausstieg: `--foundation "<Phase>"` fuer ein Fundament-Release des
+ * Umbaufahrplans (docs/plans, Entscheidung E13 der Phase 1a): es aendert Build,
+ * Laufzeit und Regelwerk, aber keine Fach-Oberflaeche, und es faehrt an dem
+ * Tag, an dem die Phase fertig ist. Wie beim Hotfix ist die Kennung Pflicht und
+ * steht in der Ausgabe ("Fundament-Release <Phase>"), damit spaeter
+ * nachvollziehbar bleibt, warum dieses Release ausserhalb der Spur lief.
+ * Beide Ausstiege zugleich sind ein Fehler: welcher Grund gilt, waere offen.
+ *
+ * Aufruf:  node scripts/check-release-cadence.mjs [--hotfix "Grund" | --foundation "Phase"]
  * Exit 0 = darf raus, Exit 1 = falsche Spur oder falscher Tag.
  *
  * `--day N` und `--since <ref>` sind Pruefnaehte: sie setzen Wochentag und
@@ -63,9 +71,10 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const out = { hotfix: null, day: null, since: null };
+  const out = { hotfix: null, foundation: null, day: null, since: null };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--hotfix') out.hotfix = argv[i + 1] ?? '';
+    if (argv[i] === '--foundation') out.foundation = argv[i + 1] ?? '';
     if (argv[i] === '--day') out.day = Number(argv[i + 1]);
     if (argv[i] === '--since') out.since = argv[i + 1];
   }
@@ -121,6 +130,24 @@ const tagsToday = git('for-each-ref', '--format=%(creatordate:short) %(refname:s
 
 console.log(`Release-Kadenz: ${changed.length} Datei(en) seit ${previousTag}, `
   + `davon ${uiFiles.length} an der Oberflaeche. Heute ist ${DAY_NAMES[weekday]}.`);
+
+if (args.hotfix !== null && args.foundation !== null) {
+  fail('--hotfix und --foundation schliessen sich aus. Ein Release hat genau einen\n'
+    + 'Grund, ausserhalb der Spur zu fahren - nenne den, der zutrifft.');
+}
+
+if (args.foundation !== null) {
+  // Die Phase ist die Kennung aus dem Fahrplan ("1a toolchain"). Ein Wert, der
+  // mit "-" beginnt, ist das naechste Flag, nicht eine Phase: ohne diese
+  // Pruefung machte `--foundation --day 3` aus "--day" die Begruendung.
+  const phase = args.foundation.trim();
+  if (phase.length < 2 || phase.startsWith('-')) {
+    fail('--foundation braucht die Phase aus dem Umbaufahrplan, z. B. --foundation "1a toolchain".\n'
+      + 'Ein Fundament-Release ohne Kennung ist von einem uebergangenen Guard nicht zu unterscheiden.');
+  }
+  console.log(`Release-Kadenz: Fundament-Release ${phase}`);
+  process.exit(0);
+}
 
 if (args.hotfix !== null) {
   if (!args.hotfix || args.hotfix.trim().length < 10) {

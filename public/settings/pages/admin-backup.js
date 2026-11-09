@@ -538,7 +538,19 @@ async function loadWebdavConfig(container) {
 export function webdavErrorMessage(err) {
   if (err?.data?.errorCode === 'password_required') return t('settings.backupWebdavPasswordRequired');
   if (err?.data?.errorCode === 'url_invalid') return t('settings.backupWebdavUrlInvalid');
+  if (err?.data?.errorCode === 'config_incomplete') return t('settings.backupWebdavConfigIncomplete');
   return errorSentence(err);
+}
+
+/**
+ * Message of the connection test (#2622): the route's own cases come in
+ * `errorCode` and get their sentence; a refusal of the server its class in the
+ * frame, a local failure its case sentence (errorSentenceWithDetail).
+ * Exported for test/test-settings-backup-key.js.
+ */
+export function webdavTestErrorMessage(err) {
+  if (typeof err?.data?.errorCode === 'string') return webdavErrorMessage(err);
+  return errorSentenceWithDetail(err, 'settings.backupWebdavTestFailed');
 }
 
 function bindWebdavBackupEvents(container) {
@@ -574,9 +586,7 @@ function bindWebdavBackupEvents(container) {
       }
     } catch (err) {
       if (resultEl) {
-        resultEl.textContent = err?.data?.errorCode === 'password_required'
-          ? webdavErrorMessage(err)
-          : errorSentenceWithDetail(err, 'settings.backupWebdavTestFailed');
+        resultEl.textContent = webdavTestErrorMessage(err);
         resultEl.className = 'form-hint form-hint--danger';
       }
     } finally {

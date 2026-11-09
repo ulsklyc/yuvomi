@@ -2,7 +2,7 @@
  * Modul: Kalender-Test
  * Zweck: Validiert alle Calendar-API-Abfragen, Datumsbereichs-Filter,
  *        Constraints, CRUD-Logik
- * Ausführen: node --experimental-sqlite test-calendar.js
+ * Ausführen: node test-calendar.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

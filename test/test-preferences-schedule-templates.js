@@ -5,7 +5,7 @@
  *        (Nicht-Admin → 403), unbekannte Werte fallen heraus, Ungültiges → 400.
  *        Haushaltweit wie disabled_modules, nicht pro Nutzer wie hidden_modules -
  *        die Vorlagen legen geteilte Schichtarten an.
- * Ausführen: node --experimental-sqlite --test test/test-preferences-schedule-templates.js
+ * Ausführen: node --test test/test-preferences-schedule-templates.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

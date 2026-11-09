@@ -9,6 +9,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Live-folder settings centrally control available tags and DMS authentication.** Administrators can choose allowed tags per Paperless connection and use either the shared connection token or personal tokens. Users save and remove their own write-only tokens in Documents settings. Personal mode never falls back to the shared token, and existing folder visibility still applies. Tags outside the allowed selection are preserved when editing Live-folder documents.
+- **Saved Paperless views can be opened as live document folders.** Connect a
+  view in Documents, keep it private or explicitly share its current and future
+  matches with selected members or the family. Source filters, ordering and pagination are read on
+  demand; preview and download recheck membership. Disconnecting only removes
+  the binding. Migration 283 adds the folder and member-access tables.
+- **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
+
+### Fixed
+- **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
+- **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+
+### Changed
+- **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
+  accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run
+  on 24 and 26 and no longer need the SQLite flag. Anyone who still runs a bare-metal
+  install on Node 22 sees a one-line message at start that names the supported range; update
+  Node, then start again. The container image is unchanged and already runs on Node 24.
+
+## [2.87.0] - 2026-11-08
+
+### Added
+- **Every release carries a signed tarball of the app.** Next to the container image, each
+  GitHub release now has `yuvomi-<version>-dist.tar.gz`, a `SHA256SUMS` file and a build
+  provenance attestation that proves GitHub built both from the release tag of this repository
+  (`gh attestation verify yuvomi-<version>-dist.tar.gz -R ulsklyc/yuvomi`; steps in the
+  installation guide). For now the tarball holds the same files as GitHub's source download.
+  The YunoHost package and the Proxmox script will install from it next, so that later
+  releases can ship a built web app there without changing how those installations update. A
+  release only becomes visible once the tarball is on it, so no channel picks up a release
+  without its file.
+
+### Fixed
+- **Storage and backup errors in settings say what happened, in your language** (#2622). When
+  document storage or a WebDAV backup failed without a technical class to show, settings put an
+  English server sentence ("WebDAV upload failed.") into the translated message instead of the
+  app's own sentence. A connection test without URL, username or password now says so. A backup
+  that fails on this server, for example because the local file is missing, is no longer
+  reported as a refusal of the WebDAV server. The technical class of a storage failure is shown
+  only to the administrator in the storage settings, not to members uploading or opening a
+  document. A malformed notification channel form answers with a general error instead of an
+  engine message.
+
+### Security
+- **Two administrators demoting each other no longer leave the household without one** (#2612).
+  When two administrators removed each other's admin role at the same moment and each also set a
+  new password, both changes could pass the "at least one administrator must remain" check and
+  both went through, so nobody could open the administration any more. The check and the change
+  now happen in one step: one of the two demotions is refused, and one administrator stays.
+- **A demoted administrator loses admin rights on every device** (#2611). The role of a signed-in
+  browser was taken from the stored session, and a demotion only updated the sessions that existed
+  at that moment. A sign-in that was still checking the password, or a request starting the SSO
+  link, could save the session again with the old administrator role and keep it for up to 90
+  days, past module rights as well. The role now comes from the account on every request, so a
+  demotion applies to every session at once.
+- **A calendar feed no longer serves a member whose module was taken away** (#2615). The six
+  subscription links (calendar, birthdays, inventory deadlines, cycle, schedule, waste) never asked
+  the member's module permission, so somebody set to "no access" for the calendar kept receiving
+  every household event in their calendar app, other members' private ones included. Such a feed
+  now stays empty instead. The subscription itself stays valid and fills again once access is given
+  back; "read only" keeps delivering, and administrators are not affected.
+- **Medication reminders reach only members who may see Health, and never a household
+  notification channel** (#2602, #2598). The medication scheduler sends on its own instead of
+  going through the regular reminder delivery, and checked neither filter that path has. A
+  member whose Health permission was set to none still got "Ibuprofen" by push and on their
+  channels, and a caregiver kept getting another person's doses ("Anna: Ibuprofen") after their
+  access to Health was taken away. And every dose went to the household's shared channels (ntfy,
+  Gotify, webhook or e-mail), private medications included, plus one copy per caregiver with the
+  person's name in front. Now a recipient with Health set to none is skipped (the dose is still
+  logged), and a dose goes out only by push and to channels the recipient owns, whatever the
+  medication's visibility - like every other health reminder, as SECURITY.md promises. Reading
+  access and administrators are unaffected.
+- **Error texts of CalDAV, CardDAV and iCloud servers no longer reach the browser.** When a
+  calendar or contacts server refused a connection test, a sync or a calendar listing, the answer
+  carried the raw text of the server or the DAV library, with its address, port and path. The
+  answer now names the kind of failure instead: rejected sign-in, an HTTP status, or an
+  unreachable server with its network code. Settings show that class to the administrator in
+  their own language.
+- **Google, Outlook, feed imports, holiday sync and the logo search no longer pass foreign error
+  texts to the browser.** Missing configuration answered with the names of server variables, a
+  failed Google or Microsoft request with the text of their libraries, and an unreachable feed,
+  website or waste collection source with the network error naming host and port. These answers
+  now carry a fixed sentence with the kind of failure (`reason`, and the class such as
+  `HTTP 503` or `ECONNREFUSED` in `detail`); missing configuration and an expired Outlook sign-in
+  are cases of their own.
+- **Database, filesystem and WebDAV texts no longer reach the browser from backups, documents,
+  modules, shared expenses, notification channels and shopping-list mail.** A failed WebDAV
+  backup test repeated the server's status line with its internal host and path, a broken
+  module folder answered with the absolute path on the server, and a database error while saving
+  a shared expense or a notification channel went out as a 400 with SQL text. Own input errors
+  keep their sentence; everything else now answers with a fixed sentence (500), and a refusing
+  WebDAV or document storage server with its class (`HTTP 507`, `ECONNREFUSED`) in `detail`.
+- **Connection tests and stored error messages no longer carry foreign error texts.** The
+  connection test of a DMS or recipe provider, the SMTP test, a failed waste source refresh, the
+  last WebDAV backup and document storage error, a notification channel's last test and a module
+  that fails to load returned or stored the raw text of the network stack, the mail library or the
+  filesystem, with hosts, ports and server paths. They now carry a fixed sentence or the class of
+  the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
+  status or a manifest check, stay.
+
+## [2.86.0] - 2026-11-07
+
+### Added
 - **Late completion decay (opt-in).** Households can have late completions pay less: administrators
   switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
   point less for each day it is past due, and always at least one point - finishing still pays. What a
@@ -27,16 +129,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Purchases match by item name, case-insensitively, and remain after the item is cleared.
   The item details sheet displays the last purchase for known items. CalDAV completion sync
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
-- **Saved Paperless views can be opened as live document folders.** Connect a
-  view in Documents, keep it private or explicitly share its current and future
-  matches with selected members or the family. Source filters, ordering and pagination are read on
-  demand; preview and download recheck membership. Disconnecting only removes
-  the binding. Migration 283 adds the folder and member-access tables.
-- **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
 
 ### Fixed
-- **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
-- **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+- **The container image starts with just a `/data` volume.** Started without `DB_PATH`, for
+  example with a plain `docker run -v yuvomi:/data`, the container stopped right away: the
+  database and the secrets generated on first start would have gone under `/app`, where the app
+  may not write. The image now defaults to `/data/yuvomi.db`. Setups that set `DB_PATH`
+  themselves, such as the compose files and the app catalogs, are unchanged.
+- **CardDAV accepts long app passwords and tokens** (#2575). Saving a CardDAV account refused
+  any password over 200 characters, and the password field cut longer input off without a word, so
+  app tokens such as JWTs could not be used. Passwords for CardDAV, CalDAV and Apple Calendar now
+  share one limit of 4096 characters and are kept exactly as typed, including spaces at the start
+  or end.
+- **Editing a task through the API keeps its primary assignee (#2569).** A `PUT /api/v1/tasks/:id`
+  that left out `assigned_to` made the person with the lowest user id the primary assignee. It now
+  stays who it was, as it already did for calendar events. `assigned_users` lists the primary
+  assignee first, as the API reference says, in task lists, details and the dashboard.
+- **The last settings and managers that showed server text speak your language** (#1909). Managing
+  the categories of budget, tasks, contacts and notes, or the storage locations of the pantry,
+  showed English server text when someone else had deleted the entry meanwhile, when a storage
+  location name was taken or when you tried to delete the last one; each case now has its own
+  sentence, and deleting an entry that is already gone simply counts as done. Connecting a DMS
+  explains an empty field, an address without http:// or https:// and an address that is
+  already connected. Load errors on the DMS, document storage, module install and calendar feed
+  pages, a failed app install on the device page and failed steps of a folder upload say what
+  happened in your language. API clients get the cases as `reason`.
+- **Chinese and Japanese questions end in the full-width question mark.** Confirmations such as
+  signing out other devices or replacing a link used the narrow "?", which ran straight into the next
+  sentence.
+- **A damaged backup is no longer handed out as a good one (#2520).** Every backup is now checked
+  for integrity right after it is written. One that fails is discarded: the download answers with
+  an error instead of the file, a scheduled backup is reported as failed and does not push the
+  oldest good backup out of rotation, and nothing is uploaded to WebDAV. Before, a damaged backup
+  only showed up when you tried to restore it.
+- **Mirrored Mealie recipes show their preparation steps as readable text (#2558).** A step with
+  an inserted image showed the raw `<img>` tag, and formatting or HTML entities appeared as
+  symbols. Steps now arrive as plain text with their lists and links; images in steps are left
+  out, because they live on the Mealie server. Recipes mirrored from Mealie or Tandoor also bring
+  their serving count, so the servings stepper starts from the right base (#2355). Already
+  mirrored recipes are corrected on the next sync.
+- **A new event in a synced calendar reaches CalDAV, iCloud and Google when you save it (#2565).**
+  Edits, moves and deletions were sent right away, but a newly created event waited for the next
+  sync run, up to `SYNC_INTERVAL_MINUTES` later, although the documentation promised an attempt on
+  save. Creating an event with a sync target, or giving an existing local event one, now tries the
+  upload immediately. If the server cannot be reached the event is still saved and the next sync
+  run uploads it, as before.
+- **A calendar subscription that does not deliver says so** (#2566). Adding a subscription whose
+  address answered with an error (not found, too large, a private address) reported "Subscription
+  added", and the refresh button reported "Subscription synced", while no event ever arrived. Adding
+  now warns that the first fetch failed and why, in your language, and the refresh button shows the
+  reason instead of success. Scheduled refreshes stay quiet. API clients get the case as
+  `syncReason` when adding and as `reason` with a `400` when syncing.
 - **Backup, system and API settings say what went wrong in your language** (#1909). Restoring an
   empty file, a database that is not from Yuvomi or a backup from a newer version showed the
   server's English text; it now says what to do next. Creating an API token with a past expiry
@@ -107,11 +250,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The app added to the iPhone Home Screen reaches the bottom edge again** (refs #2417). On iOS 27
   the installed app ended a status bar's height above the bottom of the screen, with an empty strip
   below the tab bar. It now takes the full screen height; Yuvomi in a Safari tab is unchanged.
+
 ### Security
 - **Database backup downloads are limited to ten per hour for each administrator** (#2524). Every
   download builds a full copy of the database on the server, so a hijacked admin session could
   keep it busy by requesting one after another. Further downloads in the same hour are refused;
   other administrators are not affected, and members still get no download at all.
+
+### Changed
+- **The app stores and catalogs no longer ask for a session secret.** Since 2.85.0 a new
+  installation generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` on its first start, but four
+  deploy descriptors still demanded one: the Portainer stack stopped the deploy outright
+  (`${SESSION_SECRET:?...}`), the Portainer app template and the Unraid template labelled the
+  field "required", and the TrueNAS form refused to install without it. All four now offer both
+  secrets as optional fields with an empty default, and say that Yuvomi generates them and keeps
+  them in `.secrets/` next to the database; setting your own still wins. A Portainer stack, an
+  Unraid container and a TrueNAS app can therefore be installed without running `openssl` first,
+  which is what the 2.85.0 note already promised. Umbrel keeps `${APP_SEED}` for both: it asks
+  nobody for anything, and an existing database is encrypted with that value
+  (`deploy/umbrel/README.md` records the decision). The TrueNAS change needs a pull request
+  upstream before it reaches the catalog (`deploy/truenas/MAINTAINING.md`). (#2507)
 
 ## [2.85.0] - 2026-11-04
 

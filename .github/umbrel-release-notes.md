@@ -1,12 +1,12 @@
-<!-- version: 2.85.0 -->
-This update lets recurring tasks rotate through the household, reads stock per product and closes a gap in the guest access for shared expenses.
+<!-- version: 2.87.0 -->
+This update closes several gaps in who may see and receive what, and it makes error messages speak your language.
 
-A recurring task like taking out the bin can now hand itself to the next person in a fixed order with every new occurrence. In Stock, the minimum belongs to the product, so running low is read over all its batches together and the shopping list gets the real shortfall. The Overview can have its own tile arrangement on the phone, and Settings, Account lists the phones signed in with the native app and pairs a new one with a short code or QR code.
+A member whose access to a module was taken away no longer keeps receiving it through the back door. Calendar subscription links, including birthdays, inventory deadlines, cycle, schedule and waste collection, stay empty for somebody set to "no access"; the link itself remains valid and fills again once access is given back. Medication reminders reach only people who may see Health, and they go out by push and to the recipient's own notification channels, never to a channel the whole household shares. A demoted administrator loses the admin role on every device at once, and two administrators demoting each other at the same moment can no longer leave the household without one.
 
-The weather tile no longer shows your coordinates when no place name is set, deleting the first occurrence of a recurring event also stops its reminder, and renaming a shopping category now carries over to recipes, meals and stock. A birthday keeps the color you give it in the calendar. Page titles stand in full next to search and the month on narrow phones, and stopping the app no longer waits for a hard kill.
+Settings no longer show raw text from calendar, contact, storage, mail or backup servers. When a connection test or a sync fails, the message names the kind of failure in your language, and technical details stay with the administrator.
 
-A guest invited to shared expenses could read the household's account list; guests now reach only shared expenses and their own account.
+Every release now also carries a signed copy of the app as a file next to the container image. For an Umbrel installation nothing changes; the image updates as before.
 
-This update changes the database. The changes are applied automatically on the first start and need no action from you; as always, a backup before updating is a good idea.
+This update does not change the database. No action is needed from you.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.85.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.87.0

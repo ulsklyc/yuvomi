@@ -94,6 +94,28 @@ test('ein Konto, das es nicht mehr gibt, nennt dms_account_not_found (#1909)', a
   }
 });
 
+// #1909: das Formular "DMS verbinden" zeigte die Absagen als englischen Text
+// des Servers (das Formular prueft selbst nichts). Jeder Fall, den es
+// erreicht, nennt seinen Grund; der Text bleibt fuer API-Aufrufer englisch.
+test('POST /accounts: die Absagen des Formulars nennen ihren Fall (#1909)', async () => {
+  session = { userId: adminId, role: 'admin' };
+  const valid = { provider: 'paperless', name: 'Zweit-DMS', base_url: 'https://other.example.com', api_token: 't' };
+  for (const [body, status, reason] of [
+    [{ ...valid, name: '' }, 400, 'dms_field_required'],
+    [{ ...valid, name: '   ' }, 400, 'dms_field_required'],
+    [{ ...valid, base_url: '' }, 400, 'dms_field_required'],
+    [{ ...valid, api_token: '' }, 400, 'dms_field_required'],
+    [{ ...valid, provider: 'papra', org_id: '' }, 400, 'dms_field_required'],
+    [{ ...valid, base_url: 'dms.example.com' }, 400, 'dms_url_invalid'],
+    [{ ...valid, base_url: 'https://dms.example.com/' }, 409, 'dms_account_exists'],
+  ]) {
+    const res = await call('POST', '/accounts', body);
+    assert.equal(res.status, status, JSON.stringify(body));
+    assert.equal(res.body.reason, reason, JSON.stringify(res.body));
+    assert.doesNotMatch(res.body.error, /[äöüß]/i, 'englisch');
+  }
+});
+
 test('GET /accounts: listet ohne Token', async () => {
   const res = await call('GET', '/accounts');
   assert.equal(res.status, 200);

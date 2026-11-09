@@ -7,7 +7,7 @@
  *        des FEED-INHALTS (nicht nur des Tokens, anders als der Inventar-Feed).
  *        (2) Token-Lebenszyklus gegen users.cycle_feed_token (Migration 180).
  *        (3) Der Verwaltungs-Router (/health/cycle/feed) end-to-end.
- * Ausführen: node --experimental-sqlite --test test/test-cycle-ics.js
+ * Ausführen: node --test test/test-cycle-ics.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

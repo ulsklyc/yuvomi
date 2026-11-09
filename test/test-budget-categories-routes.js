@@ -7,7 +7,7 @@
  *        budget_entries, 409 letzte Kategorie/Subkategorie), Reihenfolge, sowie die
  *        Lese-Endpunkte (meta, lokalisierte Liste mit genesteten Subkategorien).
  *        Migration 88 legte KEINE visibility auf Kategorien → kein Auth-Gate-Teil.
- * Ausführen: node --experimental-sqlite --test test/test-budget-categories-routes.js
+ * Ausführen: node --test test/test-budget-categories-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -400,6 +400,29 @@ test('DELETE /categories/:key: letzte Kategorie eines Typs → 409', async () =>
   const r = await call('DELETE', `/categories/${income[0].key}`);
   assert.equal(r.status, 409);
   assert.equal(r.body.reason, 'category_last');
+});
+
+// #1909: der Kategorie-Verwalter zeigte bei einer Kategorie, die ein anderes
+// Haushaltsmitglied inzwischen geloescht hat, den englischen Text des Servers.
+// Jeder Weg auf eine verschwundene Kategorie oder Unterkategorie nennt den Fall.
+test('eine Kategorie oder Unterkategorie, die es nicht mehr gibt, nennt ihren Grund (#1909)', async () => {
+  for (const [method, path, body] of [
+    ['GET', '/categories/nope/subcategories', null],
+    ['PUT', '/categories/nope', { name: 'X' }],
+    ['DELETE', '/categories/nope', null],
+    ['POST', '/categories/nope/subcategories', { name: 'X' }],
+  ]) {
+    const r = await call(method, path, body);
+    assert.equal(r.status, 404, `${method} ${path}`);
+    assert.equal(r.body?.reason, 'budget_category_not_found', `${method} ${path}`);
+    assert.equal(r.body?.error, 'Category not found.', `${method} ${path}`);
+  }
+  const cat = await newCategory('GoneSubs');
+  for (const [method, body] of [['PUT', { name: 'X' }], ['DELETE', null]]) {
+    const r = await call(method, `/categories/${cat.key}/subcategories/nope`, body);
+    assert.equal(r.status, 404, method);
+    assert.equal(r.body?.reason, 'budget_subcategory_not_found', method);
+  }
 });
 
 test.after(() => server.close());

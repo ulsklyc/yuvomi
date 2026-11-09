@@ -318,6 +318,8 @@ function buildVEvent(
   return lines.map(foldLine);
 }
 
+const CALENDAR_FEED_PRODID = '-//Yuvomi//Calendar Feed//DE';
+
 function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn), options = {}) {
   const windowStart = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
     .toISOString().slice(0, 10);
@@ -328,8 +330,11 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
   const calendarFilterParams = options.localCalendarId ? [options.localCalendarId] : [];
   const calendarName = options.calendarName || 'Yuvomi';
 
-  // Identische Sichtbarkeitslogik wie GET /api/v1/calendar:
-  // alle Events außer fremden, nicht-geteilten ICS-Abos.
+  // Not the visibility rule of GET /api/v1/calendar: this feed only drops other
+  // members' unshared ICS subscriptions (icsSubscriptionVisibleWhere() below)
+  // and deliberately does not filter by `visibility` - private and
+  // assignee-only events are exported too, visibility being an in-app control
+  // (#474, docs/SPEC.md "deliberately not filtered", test-ics-export.js).
   const showAssignees = options.showAssignees ?? !!conn.prepare(
     `SELECT calendar_feed_show_assignees AS v FROM users WHERE id = ?`
   ).get(userId)?.v;
@@ -447,7 +452,7 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
   const out = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Yuvomi//Calendar Feed//DE',
+    `PRODID:${CALENDAR_FEED_PRODID}`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeICSText(calendarName)}`,
@@ -471,6 +476,37 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
   }
   out.push('END:VCALENDAR');
   return out.join('\r\n') + '\r\n';
+}
+
+/**
+ * A calendar without events, for a subscriber whose module is `none` (#2615).
+ *
+ * The header lines are the ones the full feed opens with, so a calendar app
+ * keeps the subscription as it is (name, zone) and only sees it empty; once the
+ * permission is given back, the next poll fills it again - skip, do not delete,
+ * as in the delivery of reminders (#1289). No VTIMEZONE: the full feeds only
+ * write one for the events that use it.
+ *
+ * @param {{ prodId: string, calendarName: string, timeZone?: string|null }} head
+ * @returns {string}
+ */
+function emptyFeed({ prodId, calendarName, timeZone = null }) {
+  const out = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    `PRODID:${prodId}`,
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${escapeICSText(calendarName)}`,
+  ];
+  if (timeZone) out.push(`X-WR-TIMEZONE:${timeZone}`);
+  out.push('END:VCALENDAR');
+  return out.map(foldLine).join('\r\n') + '\r\n';
+}
+
+/** The personal feed of `buildFeed()` without its events (#2615). */
+function buildEmptyFeed(conn, tz = householdTimeZone(conn)) {
+  return emptyFeed({ prodId: CALENDAR_FEED_PRODID, calendarName: 'Yuvomi', timeZone: resolveFeedZone(tz) });
 }
 
 function buildCalendarFeed(conn, calendarId, now = new Date(), tz = householdTimeZone(conn)) {
@@ -551,7 +587,7 @@ function setFeedShowAssignees(conn, userId, value) {
 }
 
 export {
-  escapeICSText, foldLine, buildFeed, buildCalendarFeed,
+  escapeICSText, foldLine, buildFeed, buildCalendarFeed, emptyFeed, buildEmptyFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
   getFeedShowAssignees, setFeedShowAssignees,
   getFeedIncludeBirthdays, setFeedIncludeBirthdays,

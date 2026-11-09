@@ -2676,6 +2676,8 @@
         "backupWebdavTestSuccess": "Соединение успешно - найдено {{files}} копий.",
         "backupWebdavTestFailed": "Ошибка соединения: {{error}}",
         "backupWebdavPasswordRequired": "Для другого сервера или имени пользователя введите пароль ещё раз.",
+        "backupWebdavConfigIncomplete": "Введи адрес, имя пользователя и пароль сервера WebDAV.",
+        "backupLocalFailed": "Не удалось прочитать или записать резервную копию на этом сервере. Подробности в журнале сервера.",
         "backupWebdavLastUpload": "Последняя загрузка",
         "backupWebdavLastError": "Последняя ошибка",
         "backupWebdavNeverUploaded": "Загрузок ещё не было",
@@ -3801,7 +3803,13 @@
         "backupRestoreErrorTooLarge": "Файл больше лимита загрузки этой установки ({{limit}}). Увеличьте BACKUP_UPLOAD_LIMIT, перезапустите Yuvomi и восстановите снова. Здесь ничего не изменилось.",
         "apiTokenErrorNameTooLong": "Название может содержать не более 100 символов.",
         "apiTokenErrorExpiryPast": "Срок действия уже прошёл. Выбери более позднее время.",
-        "apiTokenErrorSubjectDeactivated": "Этот аккаунт деактивирован и не может получить токен. Выбери другого человека."
+        "apiTokenErrorSubjectDeactivated": "Этот аккаунт деактивирован и не может получить токен. Выбери другого человека.",
+        "dmsErrorUrlInvalid": "URL сервера должен начинаться с http:// или https://.",
+        "dmsErrorAccountExists": "С этим URL сервера уже подключена DMS.",
+        "remoteErrorAuthFailed": "Сервер отклонил вход. Проверьте имя пользователя и пароль.",
+        "remoteErrorStatus": "Сервер ответил со статусом {{status}}.",
+        "remoteErrorUnreachable": "Сервер недоступен. Проверьте адрес и работает ли сервер.",
+        "remoteErrorFailed": "Запрос к серверу не удался."
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",
@@ -5101,7 +5109,9 @@
         "colorTeal": "Бирюзовый",
         "colorOrange": "Оранжевый",
         "colorRed": "Красный",
-        "colorGrey": "Серый"
+        "colorGrey": "Серый",
+        "errorGone": "Этой категории больше нет.",
+        "errorSubGone": "Этой подкатегории больше нет."
     },
     "subscriptions": {
         "tabLabel": "Подписки",
@@ -6799,7 +6809,10 @@
             "bag_many": "пакетов",
             "bag_other": "пакета"
         },
-        "moreDetailsHint": "Минимальный запас, заметки"
+        "moreDetailsHint": "Минимальный запас, заметки",
+        "errorLocationGone": "Этого места хранения больше нет.",
+        "errorLocationExists": "Такое место хранения уже есть. Выберите другое название.",
+        "errorLocationLast": "Последнее место хранения нельзя удалить. Сначала добавьте другое."
     },
     "inventory": {
         "title": "Инвентарь",

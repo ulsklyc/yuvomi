@@ -171,6 +171,13 @@ search for Yuvomi in the catalog and install, no terminal.
 [ulsklyc/yuvomi-home-assistant](https://github.com/ulsklyc/yuvomi-home-assistant) under Settings → Apps
 and install Yuvomi as an app ([steps](https://yuvomi.cloud/install.html#homeassistant)).
 
+**On YunoHost** 12.1.17 or newer: `sudo yunohost app install https://github.com/ulsklyc/yuvomi_ynh`
+installs the [YunoHost package](https://github.com/ulsklyc/yuvomi_ynh), not in the catalog yet
+([steps](https://yuvomi.cloud/install.html#yunohost)).
+
+**On Proxmox** a [community helper script](https://community-scripts.org/scripts/yuvomi) sets up a
+Debian LXC with Yuvomi in one command ([steps](https://yuvomi.cloud/install.html#proxmox)).
+
 **With Docker** on any server. The image `ghcr.io/ulsklyc/yuvomi:latest` is about 500 MB and runs
 on amd64 and arm64 (Raspberry Pi 4/5); Yuvomi needs one port, 3000 by default.
 
@@ -205,7 +212,8 @@ and the [installation guide](docs/installation.md).
 - **Page does not load** - `docker compose logs` (on Podman,
   `podman compose -f podman-compose.yml logs`) usually names the reason, and the
   [troubleshooting guide](docs/installation.md#troubleshooting) covers the common ones.
-- **Proxmox** - the same steps run inside a small Debian LXC: see the
+- **Proxmox** - the community helper script installs Yuvomi without Docker; to keep the Docker
+  setup, the same steps run inside a small Debian LXC: see the
   [Proxmox guide on yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
 - **Encryption key** - optional, but there is no way back. Left unset, a new installation
   generates one on its first start; an admin finds it under Settings → Household → Backup and
@@ -221,7 +229,7 @@ and the [installation guide](docs/installation.md).
 
   Open **http://localhost:8090** on the server itself; the wizard answers nowhere else. From
   another device, open a tunnel first, `ssh -L 8090:localhost:8090 user@server`, then open the
-  same address there. Needs Node.js 22.14+ or 23.6+ on the host; the container ships its own
+  same address there. Needs Node.js 24.12 or newer on the host; the container ships its own
   Node 24.
 
 </details>

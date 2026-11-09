@@ -175,6 +175,9 @@ export function budgetPaths() {
 const SUBSCRIPTION_GONE = '`subscriptions_subscription_not_found` (404, the subscription does not exist)';
 const SELECTED_META_GONE = '`subscriptions_selected_category_not_found`, `subscriptions_selected_payment_method_not_found` (400, the chosen category or payment method does not exist), `subscriptions_account_not_found` (400, the chosen budget account does not exist)';
 const SUBSCRIPTION_CHECKS = '`subscriptions_end_before_next_payment`, `subscriptions_occurrence_count_too_low`, `subscriptions_logo_content_mismatch` (400, only when it is the single finding)';
+// #1909: der Kategorie-Verwalter sagt "gibt es nicht mehr" in der Sprache der Oberflaeche.
+const BUDGET_CAT_GONE = '`budget_category_not_found` (404, the category does not exist - deleted)';
+const BUDGET_SUB_GONE = '`budget_subcategory_not_found` (404, the subcategory does not exist - deleted)';
 const CASE_REASONS = {
   // Anlegen nennt den Fall auch: wird das neue Abo geloescht, waehrend seine
   // Buchung den Kurs holt, antwortet es 404 statt eine Buchung ohne Abo zu hinterlassen.
@@ -198,12 +201,15 @@ const CASE_REASONS = {
   '/api/v1/budget/subscriptions/logo-search': { post: '`subscriptions_no_logo_found` (404, no supported logo was found)' },
   '/api/v1/budget/categories': { post: '`category_exists` (409, a category with this name already exists)' },
   '/api/v1/budget/categories/{key}': {
-    put: '`category_exists` (409, a category with this name already exists)',
-    delete: '`category_in_use` (409, budget entries or split expenses and their recurring series still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)',
+    put: `${BUDGET_CAT_GONE}, \`category_exists\` (409, a category with this name already exists)`,
+    delete: `${BUDGET_CAT_GONE}, \`category_in_use\` (409, budget entries or split expenses and their recurring series still use the category; \`count\` carries how many), \`category_last\` (409, the last category cannot be deleted)`,
   },
-  '/api/v1/budget/categories/{categoryKey}/subcategories': { post: '`subcategory_exists` (409, a subcategory with this name already exists)' },
+  '/api/v1/budget/categories/{categoryKey}/subcategories': {
+    get: BUDGET_CAT_GONE,
+    post: `${BUDGET_CAT_GONE}, \`subcategory_exists\` (409, a subcategory with this name already exists)`,
+  },
   '/api/v1/budget/categories/{key}/subcategories/{subKey}': {
-    put: '`subcategory_exists` (409, a subcategory with this name already exists)',
-    delete: '`subcategory_in_use` (409, entries still use the subcategory; `count` carries how many), `subcategory_last` (409, the last subcategory cannot be deleted)',
+    put: `${BUDGET_SUB_GONE}, \`subcategory_exists\` (409, a subcategory with this name already exists)`,
+    delete: `${BUDGET_SUB_GONE}, \`subcategory_in_use\` (409, entries still use the subcategory; \`count\` carries how many), \`subcategory_last\` (409, the last subcategory cannot be deleted)`,
   },
 };

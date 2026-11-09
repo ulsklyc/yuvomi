@@ -6,7 +6,7 @@
  *        Erbung von owner_id/visibility. Der budget-visibility-Service ist in
  *        test-budget-visibility.js abgedeckt; hier zählt die Route-Durchsetzung.
  *        Kontrast: im shared-Modus sind alle Loans offen und editierbar.
- * Ausführen: node --experimental-sqlite --test test/test-budget-loans-routes.js
+ * Ausführen: node --test test/test-budget-loans-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

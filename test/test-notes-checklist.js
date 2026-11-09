@@ -10,7 +10,7 @@
  *    einer den anderen ueberschreibt (der Grund, warum die Route existiert)
  *  - das Dashboard bekommt die interaktive Fassung ausdruecklich NICHT
  *  - i18n: die neuen Keys in allen Locales
- * Ausfuehren: node --experimental-sqlite --test test/test-notes-checklist.js
+ * Ausfuehren: node --test test/test-notes-checklist.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

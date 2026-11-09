@@ -75,6 +75,13 @@ test('CI tests the Node major the image runs on', () => {
   assert.ok(majors.includes(imageMajor), `CI matrix [${matrix}] must include the image's Node ${imageMajor}`);
 });
 
+test('CI tests Node 24 and 26, the supported span of engines.node', () => {
+  const matrix = ci.match(/node-version:\s*\[([^\]]+)\]/)?.[1];
+  assert.ok(matrix, 'ci.yml must have a node-version matrix');
+  const majors = matrix.split(',').map((v) => v.trim().replace(/\.x$/, ''));
+  assert.deepEqual(majors, ['24', '26'], `CI matrix [${matrix}] must be [24.x, 26.x]`);
+});
+
 test('the image carries provenance and an SBOM, and is signed by digest under both names', () => {
   // Eine Signatur per TAG waere wertlos: das Tag kann nachtraeglich verschoben
   // werden, der Digest nennt genau den Index, der eben gepusht wurde. Beide
@@ -124,4 +131,13 @@ test('the installation guide verifies against this workflow identity', () => {
   assert.match(block[0], /--certificate-oidc-issuer https:\/\/token\.actions\.githubusercontent\.com/);
   assert.match(block[0], /--certificate-identity-regexp '\^https:\/\/github\.com\/ulsklyc\/yuvomi\/\.github\/workflows\/docker-publish\.yml@refs\/tags\/v'/);
   assert.match(workflow, /^name: Docker Publish$/m);
+});
+
+test('the image workflow keeps read-only repository contents', () => {
+  // Writing to releases belongs to release-assets.yml alone (phase 1a, A1):
+  // that workflow uploads the tarball and publishes the release. The image
+  // build runs on every push to main and needs packages, not the repository.
+  const permissions = workflow.slice(workflow.indexOf('\npermissions:'), workflow.indexOf('\nenv:'));
+  assert.match(permissions, /^ {2}contents: read$/m, 'docker-publish.yml must keep contents: read');
+  assert.doesNotMatch(workflow, /^\s+contents: write$/m, 'no contents: write anywhere in docker-publish.yml');
 });

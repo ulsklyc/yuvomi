@@ -2551,6 +2551,8 @@
         "backupWebdavTestSuccess": "Verbinding geslaagd - {{files}} back-up(s) gevonden.",
         "backupWebdavTestFailed": "Verbinding mislukt: {{error}}",
         "backupWebdavPasswordRequired": "Voor een andere server of gebruikersnaam moet je het wachtwoord opnieuw invoeren.",
+        "backupWebdavConfigIncomplete": "Voer het adres, de gebruikersnaam en het wachtwoord van de WebDAV-server in.",
+        "backupLocalFailed": "De back-up kon op deze server niet worden gelezen of geschreven. De details staan in het serverlogboek.",
         "backupWebdavLastUpload": "Laatste upload",
         "backupWebdavLastError": "Laatste fout",
         "backupWebdavNeverUploaded": "Nog geen upload",
@@ -3575,7 +3577,13 @@
         "backupRestoreErrorTooLarge": "Het bestand is groter dan de uploadlimiet van deze installatie ({{limit}}). Verhoog BACKUP_UPLOAD_LIMIT, start Yuvomi opnieuw en herstel opnieuw. Hier is niets gewijzigd.",
         "apiTokenErrorNameTooLong": "De naam mag maximaal 100 tekens lang zijn.",
         "apiTokenErrorExpiryPast": "De vervaldatum ligt in het verleden. Kies een later tijdstip.",
-        "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon."
+        "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon.",
+        "dmsErrorUrlInvalid": "De server-URL moet beginnen met http:// of https://.",
+        "dmsErrorAccountExists": "Met deze server-URL is al een DMS verbonden.",
+        "remoteErrorAuthFailed": "De server heeft de aanmelding geweigerd. Controleer gebruikersnaam en wachtwoord.",
+        "remoteErrorStatus": "De server antwoordde met status {{status}}.",
+        "remoteErrorUnreachable": "De server is niet bereikbaar. Controleer het adres en of de server draait.",
+        "remoteErrorFailed": "Het verzoek aan de server is mislukt."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",
@@ -4841,7 +4849,9 @@
         "colorTeal": "Turkoois",
         "colorOrange": "Oranje",
         "colorRed": "Rood",
-        "colorGrey": "Grijs"
+        "colorGrey": "Grijs",
+        "errorGone": "Deze categorie bestaat niet meer.",
+        "errorSubGone": "Deze subcategorie bestaat niet meer."
     },
     "subscriptions": {
         "tabLabel": "Abonnementen",
@@ -6477,7 +6487,10 @@
             "bag_one": "zak",
             "bag_other": "zakken"
         },
-        "moreDetailsHint": "Minimumvoorraad, notities"
+        "moreDetailsHint": "Minimumvoorraad, notities",
+        "errorLocationGone": "Deze bewaarplaats bestaat niet meer.",
+        "errorLocationExists": "Deze bewaarplaats bestaat al. Kies een andere naam.",
+        "errorLocationLast": "De laatste bewaarplaats kan niet worden verwijderd. Voeg eerst een andere toe."
     },
     "inventory": {
         "title": "Inventaris",

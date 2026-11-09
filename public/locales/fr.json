@@ -2486,6 +2486,8 @@
         "backupWebdavTestSuccess": "Connexion réussie - {{files}} sauvegarde(s) trouvée(s).",
         "backupWebdavTestFailed": "Échec de la connexion : {{error}}",
         "backupWebdavPasswordRequired": "Pour un autre serveur ou un autre nom d’utilisateur, saisis à nouveau le mot de passe.",
+        "backupWebdavConfigIncomplete": "Saisis l'adresse, le nom d'utilisateur et le mot de passe du serveur WebDAV.",
+        "backupLocalFailed": "La sauvegarde n'a pas pu être lue ou écrite sur ce serveur. Les détails figurent dans le journal du serveur.",
         "backupWebdavLastUpload": "Dernier téléversement",
         "backupWebdavLastError": "Dernière erreur",
         "backupWebdavNeverUploaded": "Aucun téléversement pour l'instant",
@@ -3575,7 +3577,13 @@
         "backupRestoreErrorTooLarge": "Le fichier dépasse la limite d'envoi de cette installation ({{limit}}). Augmentez BACKUP_UPLOAD_LIMIT, redémarrez Yuvomi puis relancez la restauration. Rien n'a été modifié ici.",
         "apiTokenErrorNameTooLong": "Le nom peut comporter au maximum 100 caractères.",
         "apiTokenErrorExpiryPast": "La date d’expiration est dans le passé. Choisis un moment ultérieur.",
-        "apiTokenErrorSubjectDeactivated": "Ce compte est désactivé et ne peut pas recevoir de jeton. Choisis une autre personne."
+        "apiTokenErrorSubjectDeactivated": "Ce compte est désactivé et ne peut pas recevoir de jeton. Choisis une autre personne.",
+        "dmsErrorUrlInvalid": "L’URL du serveur doit commencer par http:// ou https://.",
+        "dmsErrorAccountExists": "Un DMS est déjà connecté avec cette URL du serveur.",
+        "remoteErrorAuthFailed": "Le serveur a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe.",
+        "remoteErrorStatus": "Le serveur a répondu avec le statut {{status}}.",
+        "remoteErrorUnreachable": "Le serveur est injoignable. Vérifiez l’adresse et que le serveur est en marche.",
+        "remoteErrorFailed": "La requête vers le serveur a échoué."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",
@@ -4841,7 +4849,9 @@
         "colorTeal": "Sarcelle",
         "colorOrange": "Orange",
         "colorRed": "Rouge",
-        "colorGrey": "Gris"
+        "colorGrey": "Gris",
+        "errorGone": "Cette catégorie n’existe plus.",
+        "errorSubGone": "Cette sous-catégorie n’existe plus."
     },
     "subscriptions": {
         "tabLabel": "Abonnements",
@@ -6477,7 +6487,10 @@
             "bag_one": "sachet",
             "bag_other": "sachets"
         },
-        "moreDetailsHint": "Stock minimum, notes"
+        "moreDetailsHint": "Stock minimum, notes",
+        "errorLocationGone": "Ce lieu de stockage n’existe plus.",
+        "errorLocationExists": "Ce lieu de stockage existe déjà. Choisissez un autre nom.",
+        "errorLocationLast": "Le dernier lieu de stockage ne peut pas être supprimé. Ajoutez-en d’abord un autre."
     },
     "inventory": {
         "title": "Inventaire",

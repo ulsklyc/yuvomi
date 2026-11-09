@@ -2498,6 +2498,8 @@
         "backupWebdavTestSuccess": "Ligação bem-sucedida - {{files}} backup(s) encontrado(s).",
         "backupWebdavTestFailed": "Falha na ligação: {{error}}",
         "backupWebdavPasswordRequired": "Para outro servidor ou nome de utilizador, introduz a palavra-passe novamente.",
+        "backupWebdavConfigIncomplete": "Introduz o endereço, o nome de utilizador e a palavra-passe do servidor WebDAV.",
+        "backupLocalFailed": "Não foi possível ler ou gravar a cópia de segurança neste servidor. Os detalhes estão no registo do servidor.",
         "backupWebdavLastUpload": "Último carregamento",
         "backupWebdavLastError": "Último erro",
         "backupWebdavNeverUploaded": "Sem carregamentos ainda",
@@ -3575,7 +3577,13 @@
         "backupRestoreErrorTooLarge": "O ficheiro é maior do que o limite de envio desta instalação ({{limit}}). Aumente BACKUP_UPLOAD_LIMIT, reinicie o Yuvomi e restaure novamente. Nada foi alterado aqui.",
         "apiTokenErrorNameTooLong": "O nome pode ter no máximo 100 caracteres.",
         "apiTokenErrorExpiryPast": "A data de expiração está no passado. Escolhe um momento posterior.",
-        "apiTokenErrorSubjectDeactivated": "Esta conta está desativada e não pode receber um token. Escolhe outra pessoa."
+        "apiTokenErrorSubjectDeactivated": "Esta conta está desativada e não pode receber um token. Escolhe outra pessoa.",
+        "dmsErrorUrlInvalid": "O URL do servidor tem de começar por http:// ou https://.",
+        "dmsErrorAccountExists": "Já existe um DMS ligado com este URL do servidor.",
+        "remoteErrorAuthFailed": "O servidor recusou o início de sessão. Verifique o nome de utilizador e a palavra-passe.",
+        "remoteErrorStatus": "O servidor respondeu com o estado {{status}}.",
+        "remoteErrorUnreachable": "Não é possível aceder ao servidor. Verifique o endereço e se o servidor está em funcionamento.",
+        "remoteErrorFailed": "O pedido ao servidor falhou."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",
@@ -4841,7 +4849,9 @@
         "colorTeal": "Verde-azulado",
         "colorOrange": "Laranja",
         "colorRed": "Vermelho",
-        "colorGrey": "Cinza"
+        "colorGrey": "Cinza",
+        "errorGone": "Esta categoria já não existe.",
+        "errorSubGone": "Esta subcategoria já não existe."
     },
     "subscriptions": {
         "tabLabel": "Assinaturas",
@@ -6477,7 +6487,10 @@
             "bag_one": "saco",
             "bag_other": "sacos"
         },
-        "moreDetailsHint": "Stock mínimo, notas"
+        "moreDetailsHint": "Stock mínimo, notas",
+        "errorLocationGone": "Este local de armazenamento já não existe.",
+        "errorLocationExists": "Este local de armazenamento já existe. Escolha outro nome.",
+        "errorLocationLast": "O último local de armazenamento não pode ser eliminado. Adicione outro primeiro."
     },
     "inventory": {
         "title": "Inventário",

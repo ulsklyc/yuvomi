@@ -20,7 +20,7 @@
  * Fall ist hier kein Gedankenspiel: das erste Gate durchzulassen und am zweiten
  * zu scheitern sah im Browser aus wie „das Tablett hakt nicht ab".
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-display-actions.js
+ * Ausfuehren: node --test test/test-display-actions.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

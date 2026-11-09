@@ -8,7 +8,7 @@
  *        Teil-Update sowie beide Import-Richtungen inklusive Chargen-Regel
  *        (gleiches MHD addiert, abweichendes MHD legt eine neue Zeile an).
  *        Persistenz jeweils per DB-Assertion belegt.
- * Ausführen: node --experimental-sqlite --test test/test-pantry-routes.js
+ * Ausführen: node --test test/test-pantry-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -802,4 +802,22 @@ test('#2118: a move takes the minimum along: a product it creates takes it over,
   // A product without a minimum hands on none.
   await call('PATCH', `/pantry/${milk.id}`, { name: 'Heumilch' });
   assert.equal(productMin(milk.id), null);
+});
+
+// #1909: der Lagerort-Verwalter zeigte den englischen Text des Servers. Die
+// Faelle, die er erreicht, nennen ihren Grund.
+test('Lagerorte nennen "gibt es schon", "gibt es nicht mehr" und "letzter Ort" (#1909)', async () => {
+  const dup = await call('POST', '/pantry/locations', { name: 'kühlschrank' });
+  assert.deepEqual([dup.status, dup.body?.reason], [409, 'pantry_location_exists']);
+  const a = await call('POST', '/pantry/locations', { name: 'Dachboden' });
+  const renamed = await call('PUT', `/pantry/locations/${a.body.data.id}`, { name: 'kühlschrank' });
+  assert.deepEqual([renamed.status, renamed.body?.reason], [409, 'pantry_location_exists']);
+  for (const [method, body] of [['PUT', { name: 'X' }], ['DELETE', null]]) {
+    const r = await call(method, '/pantry/locations/999999', body);
+    assert.deepEqual([r.status, r.body?.reason], [404, 'pantry_location_not_found'], method);
+  }
+  const ids = db.prepare('SELECT id FROM pantry_locations ORDER BY id').all().map((row) => row.id);
+  for (const id of ids.slice(1)) assert.equal((await call('DELETE', `/pantry/locations/${id}`)).status, 200);
+  const last = await call('DELETE', `/pantry/locations/${ids[0]}`);
+  assert.deepEqual([last.status, last.body?.reason], [400, 'pantry_location_last']);
 });

@@ -121,7 +121,9 @@ test('testConnection: Netzwerkfehler → ok=false, status=0, error gesetzt', asy
   const out = await adapter.testConnection();
   assert.equal(out.ok, false);
   assert.equal(out.status, 0);
-  assert.match(out.error, /ECONNREFUSED/);
+  // Phase 0, Abschnitt H: der Fall, nie der Text des Netzes (Adresse, Port).
+  assert.equal(out.error, 'The recipe provider could not be reached.');
+  assert.equal(out.reason, 'recipe_providers_sync_unreachable');
 });
 
 // --------------------------------------------------------------------------
@@ -233,6 +235,20 @@ test('getRecipe: null-Menge bei no_amount=true oder falsy amount', async () => {
   assert.equal(byName.Salt, null); // no_amount=true
   assert.equal(byName.Pepper, null); // amount=0 ist falsy
   assert.equal(byName.Oil, '2 tbsp');
+});
+
+// #2355: Tandoors `servings` ist die Basis des Portions-Reglers; ein neues
+// mirrorFormat holt Bestandsspiegel einmal nach.
+test('getRecipe: servings wird uebernommen, nur als ganze Zahl 1-99; mirrorFormat gesetzt (#2355)', async () => {
+  const servingsOf = async (servings) => {
+    mockHandler((req, res) => sendJson(res, { id: 7, updated_at: 't7', name: 'Stew', description: null, image: null, steps: [], servings }));
+    return (await new TandoorAdapter(account).getRecipe('7')).servings;
+  };
+  assert.equal(await servingsOf(4), 4);
+  assert.equal(await servingsOf(0), null);
+  assert.equal(await servingsOf(1.5), null);
+  assert.equal(await servingsOf(undefined), null);
+  assert.ok(Number.isInteger(new TandoorAdapter(account).mirrorFormat) && new TandoorAdapter(account).mirrorFormat >= 1);
 });
 
 test('getRecipe: HTTP-Fehler wirft mit Statuscode', async () => {

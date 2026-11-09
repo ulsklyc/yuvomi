@@ -2787,6 +2787,8 @@
         "backupWebdavTestSuccess": "Połączenie udane - znaleziono {{files}} kopię(kopii).",
         "backupWebdavTestFailed": "Połączenie nieudane: {{error}}",
         "backupWebdavPasswordRequired": "Dla innego serwera lub nazwy użytkownika wpisz hasło ponownie.",
+        "backupWebdavConfigIncomplete": "Wpisz adres, nazwę użytkownika i hasło serwera WebDAV.",
+        "backupLocalFailed": "Nie udało się odczytać ani zapisać kopii zapasowej na tym serwerze. Szczegóły są w dzienniku serwera.",
         "backupWebdavLastUpload": "Ostatnie przesłanie",
         "backupWebdavLastError": "Ostatni błąd",
         "backupWebdavNeverUploaded": "Brak przesłanych kopii",
@@ -3819,7 +3821,13 @@
         "backupRestoreErrorTooLarge": "Plik jest większy niż limit przesyłania tej instalacji ({{limit}}). Zwiększ BACKUP_UPLOAD_LIMIT, uruchom ponownie Yuvomi i przywróć kopię jeszcze raz. Nic tu nie zostało zmienione.",
         "apiTokenErrorNameTooLong": "Nazwa może mieć najwyżej 100 znaków.",
         "apiTokenErrorExpiryPast": "Data wygaśnięcia jest w przeszłości. Wybierz późniejszy termin.",
-        "apiTokenErrorSubjectDeactivated": "To konto jest dezaktywowane i nie może otrzymać tokenu. Wybierz inną osobę."
+        "apiTokenErrorSubjectDeactivated": "To konto jest dezaktywowane i nie może otrzymać tokenu. Wybierz inną osobę.",
+        "dmsErrorUrlInvalid": "Adres URL serwera musi zaczynać się od http:// lub https://.",
+        "dmsErrorAccountExists": "Z tym adresem URL serwera jest już połączony DMS.",
+        "remoteErrorAuthFailed": "Serwer odrzucił logowanie. Sprawdź nazwę użytkownika i hasło.",
+        "remoteErrorStatus": "Serwer odpowiedział statusem {{status}}.",
+        "remoteErrorUnreachable": "Serwer jest nieosiągalny. Sprawdź adres i czy serwer działa.",
+        "remoteErrorFailed": "Żądanie do serwera nie powiodło się."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
@@ -5101,7 +5109,9 @@
         "colorTeal": "Morski",
         "colorOrange": "Pomarańczowy",
         "colorRed": "Czerwony",
-        "colorGrey": "Szary"
+        "colorGrey": "Szary",
+        "errorGone": "Ta kategoria już nie istnieje.",
+        "errorSubGone": "Ta podkategoria już nie istnieje."
     },
     "subscriptions": {
         "tabLabel": "Subskrypcje",
@@ -6799,7 +6809,10 @@
             "bag_many": "torebek",
             "bag_other": "torebki"
         },
-        "moreDetailsHint": "Minimalny zapas, notatki"
+        "moreDetailsHint": "Minimalny zapas, notatki",
+        "errorLocationGone": "To miejsce przechowywania już nie istnieje.",
+        "errorLocationExists": "To miejsce przechowywania już istnieje. Wybierz inną nazwę.",
+        "errorLocationLast": "Ostatniego miejsca przechowywania nie można usunąć. Najpierw dodaj inne."
     },
     "inventory": {
         "title": "Inwentarz",

@@ -17,11 +17,12 @@
  *               server/utils/ssrf.js, ./categorize.js
  */
 import { categorizeIngredient } from './categorize.js';
+import { servingsFrom } from './markup-text.js';
 import { safeRequest } from '../../utils/http.js';
 import { createGuardedLookup } from '../../utils/ssrf.js';
 // Opt-in RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: one place for both adapters and
 // the route, so the switch named in the error message is the one read here.
-import { isPrivateNetworkAllowed } from './private-network.js';
+import { isPrivateNetworkAllowed, isPrivateNetworkRefusal } from './private-network.js';
 import { probeFailure, ProviderResponseError } from './failure.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -87,6 +88,9 @@ function flattenIngredient(ing) {
 export class TandoorAdapter {
   constructor(account) {
     this.provider = 'tandoor';
+    // Stand der Abbildung getRecipe() -> recipes (siehe MealieAdapter): 1 =
+    // Portionen aus `servings` (#2355). Bestandsspiegel holen sie einmal nach.
+    this.mirrorFormat = 1;
     this.base = String(account.base_url || '').replace(/\/+$/, '');
     this.token = account.api_token;
     this.linkBase = String(account.external_url || account.base_url || '').replace(/\/+$/, '');
@@ -117,7 +121,12 @@ export class TandoorAdapter {
       if (!res.ok) return { ok: false, status: res.status };
       return { ok: true, status: res.status };
     } catch (err) {
-      return { ok: false, status: 0, error: err.message, ...probeFailure(err) };
+      // Phase 0 section H: the result goes to the browser as it is, so it
+      // carries the class (probeFailure), never the network's text. The
+      // lookup hook's refusal is our own sentence and stays: the route reads
+      // it to name the private-network switch.
+      const error = isPrivateNetworkRefusal(err?.message) ? err.message : 'The recipe provider could not be reached.';
+      return { ok: false, status: 0, error, ...probeFailure(err) };
     }
   }
 
@@ -161,6 +170,7 @@ export class TandoorAdapter {
       title: detail.name,
       notes: detail.description || null,
       hasImage: Boolean(detail.image),
+      servings: servingsFrom(detail.servings),
       ingredients,
     };
   }

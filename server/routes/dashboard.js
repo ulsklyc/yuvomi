@@ -186,7 +186,7 @@ const ASSIGNED_USERS_SQL = `(
   SELECT json_group_array(json_object(
     'id', u.id, 'display_name', u.display_name, 'color', u.avatar_color,
     'avatar_data', ${personAvatarUrlSql('u')}
-  ))
+  ) ORDER BY ta.user_id IS NOT t.assigned_to, ta.rowid)
   FROM task_assignments ta JOIN users u ON u.id = ta.user_id
   WHERE ta.task_id = t.id
 ) AS assigned_users_json`;

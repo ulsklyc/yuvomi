@@ -2486,6 +2486,8 @@
         "backupWebdavTestSuccess": "Connessione riuscita - trovati {{files}} backup.",
         "backupWebdavTestFailed": "Connessione fallita: {{error}}",
         "backupWebdavPasswordRequired": "Per un altro server o un altro nome utente inserisci di nuovo la password.",
+        "backupWebdavConfigIncomplete": "Inserisci indirizzo, nome utente e password del server WebDAV.",
+        "backupLocalFailed": "Non è stato possibile leggere o scrivere il backup su questo server. I dettagli sono nel log del server.",
         "backupWebdavLastUpload": "Ultimo caricamento",
         "backupWebdavLastError": "Ultimo errore",
         "backupWebdavNeverUploaded": "Nessun caricamento ancora",
@@ -3575,7 +3577,13 @@
         "backupRestoreErrorTooLarge": "Il file supera il limite di caricamento di questa installazione ({{limit}}). Aumenta BACKUP_UPLOAD_LIMIT, riavvia Yuvomi e ripristina di nuovo. Qui non è stato modificato nulla.",
         "apiTokenErrorNameTooLong": "Il nome può contenere al massimo 100 caratteri.",
         "apiTokenErrorExpiryPast": "La data di scadenza è nel passato. Scegli un momento successivo.",
-        "apiTokenErrorSubjectDeactivated": "Questo account è disattivato e non può ricevere un token. Scegli un’altra persona."
+        "apiTokenErrorSubjectDeactivated": "Questo account è disattivato e non può ricevere un token. Scegli un’altra persona.",
+        "dmsErrorUrlInvalid": "L’URL del server deve iniziare con http:// o https://.",
+        "dmsErrorAccountExists": "Con questo URL del server è già collegato un DMS.",
+        "remoteErrorAuthFailed": "Il server ha rifiutato l’accesso. Controlla nome utente e password.",
+        "remoteErrorStatus": "Il server ha risposto con lo stato {{status}}.",
+        "remoteErrorUnreachable": "Il server non è raggiungibile. Controlla l’indirizzo e che il server sia in funzione.",
+        "remoteErrorFailed": "La richiesta al server non è riuscita."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",
@@ -4841,7 +4849,9 @@
         "colorTeal": "Verde acqua",
         "colorOrange": "Arancione",
         "colorRed": "Rosso",
-        "colorGrey": "Grigio"
+        "colorGrey": "Grigio",
+        "errorGone": "Questa categoria non esiste più.",
+        "errorSubGone": "Questa sottocategoria non esiste più."
     },
     "subscriptions": {
         "tabLabel": "Abbonamenti",
@@ -6477,7 +6487,10 @@
             "bag_one": "sacchetto",
             "bag_other": "sacchetti"
         },
-        "moreDetailsHint": "Scorta minima, note"
+        "moreDetailsHint": "Scorta minima, note",
+        "errorLocationGone": "Questo luogo di conservazione non esiste più.",
+        "errorLocationExists": "Questo luogo di conservazione esiste già. Scegli un altro nome.",
+        "errorLocationLast": "L’ultimo luogo di conservazione non può essere eliminato. Aggiungine prima un altro."
     },
     "inventory": {
         "title": "Inventario",

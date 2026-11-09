@@ -18,7 +18,7 @@
  *        laengst tun. Diese Suite haelt die drei Zusagen fest, die daran
  *        haengen: der Schluessel EXISTIERT in den Locales, er REIST mit
  *        (Metadaten, Abo-Zeile, Aufschluesselung), und Umbenennen LOESCHT ihn.
- * Ausfuehren: node --experimental-sqlite --test test/test-subscription-meta-labels.js
+ * Ausfuehren: node --test test/test-subscription-meta-labels.js
  */
 
 import { test } from 'node:test';

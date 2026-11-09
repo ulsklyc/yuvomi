@@ -5,7 +5,7 @@
  *        weist Unfug mit 400 ab und speichert PRO NUTZER, nicht haushaltweit.
  *        Der Wert muss auch in der PUT-Antwort stehen, sonst verliert der
  *        Frontend-Cache ihn nach dem ersten Speichern eines anderen Feldes.
- * Ausführen: node --experimental-sqlite --test test/test-preferences-calendar-target.js
+ * Ausführen: node --test test/test-preferences-calendar-target.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

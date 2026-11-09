@@ -130,10 +130,10 @@ test('der Runner findet jeden Schritt der test-Kette, so wie sh ihn ausfuehrt', 
  * Sonderformen (Direktaufruf mit Flag, Env-Praefix, `npm run`).
  */
 const TRICKY_STEPS = [
-  'node --experimental-sqlite test/test-db.js',
+  'node test/test-db.js',
   'npm run test:schema-reconcile',
-  'DB_PATH=:memory: node --experimental-sqlite test/test-notes-contacts-budget.js',
-  'TZ=Europe/Berlin DB_PATH=:memory: node --experimental-sqlite test/test-caldav-reminders.js',
+  'DB_PATH=:memory: node test/test-notes-contacts-budget.js',
+  'TZ=Europe/Berlin DB_PATH=:memory: node test/test-caldav-reminders.js',
   'node -e "console.log(\'a && b\')"',
   'node -e \'process.exit(0) && 1\'',
   'node --test "test/with space.js"',

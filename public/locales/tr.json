@@ -2486,6 +2486,8 @@
         "backupWebdavTestSuccess": "Bağlantı başarılı - {{files}} yedek bulundu.",
         "backupWebdavTestFailed": "Bağlantı başarısız: {{error}}",
         "backupWebdavPasswordRequired": "Farklı bir sunucu veya kullanıcı adı için parolayı yeniden gir.",
+        "backupWebdavConfigIncomplete": "WebDAV sunucusunun adresini, kullanıcı adını ve parolasını gir.",
+        "backupLocalFailed": "Yedek bu sunucuda okunamadı veya yazılamadı. Ayrıntılar sunucu günlüğünde.",
         "backupWebdavLastUpload": "Son yükleme",
         "backupWebdavLastError": "Son hata",
         "backupWebdavNeverUploaded": "Henüz yükleme yapılmadı",
@@ -3575,7 +3577,13 @@
         "backupRestoreErrorTooLarge": "Dosya bu kurulumun yükleme sınırından ({{limit}}) büyük. BACKUP_UPLOAD_LIMIT değerini artırın, Yuvomi'yi yeniden başlatın ve yeniden geri yükleyin. Burada hiçbir şey değişmedi.",
         "apiTokenErrorNameTooLong": "Ad en fazla 100 karakter olabilir.",
         "apiTokenErrorExpiryPast": "Son kullanma tarihi geçmişte. Daha sonraki bir zaman seç.",
-        "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç."
+        "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç.",
+        "dmsErrorUrlInvalid": "Sunucu URL'si http:// veya https:// ile başlamalıdır.",
+        "dmsErrorAccountExists": "Bu sunucu URL'siyle zaten bir DMS bağlı.",
+        "remoteErrorAuthFailed": "Sunucu oturum açmayı reddetti. Kullanıcı adını ve parolayı kontrol edin.",
+        "remoteErrorStatus": "Sunucu {{status}} durumuyla yanıt verdi.",
+        "remoteErrorUnreachable": "Sunucuya ulaşılamıyor. Adresi ve sunucunun çalışıp çalışmadığını kontrol edin.",
+        "remoteErrorFailed": "Sunucuya yapılan istek başarısız oldu."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
@@ -4841,7 +4849,9 @@
         "colorTeal": "Turkuaz",
         "colorOrange": "Turuncu",
         "colorRed": "Kırmızı",
-        "colorGrey": "Gri"
+        "colorGrey": "Gri",
+        "errorGone": "Bu kategori artık yok.",
+        "errorSubGone": "Bu alt kategori artık yok."
     },
     "subscriptions": {
         "tabLabel": "Abonelikler",
@@ -6477,7 +6487,10 @@
             "bag_one": "poşet",
             "bag_other": "poşet"
         },
-        "moreDetailsHint": "Asgari stok, notlar"
+        "moreDetailsHint": "Asgari stok, notlar",
+        "errorLocationGone": "Bu saklama yeri artık yok.",
+        "errorLocationExists": "Bu saklama yeri zaten var. Başka bir ad seçin.",
+        "errorLocationLast": "Son saklama yeri silinemez. Önce başka bir tane ekleyin."
     },
     "inventory": {
         "title": "Envanter",

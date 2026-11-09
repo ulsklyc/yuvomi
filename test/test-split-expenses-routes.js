@@ -5,7 +5,7 @@
  *        (Ausgabe -> Salden, Settlement, Edit/Delete-Ledger-Konsistenz). Die
  *        reine Split-Mathematik liegt bereits in test-split-expenses.js; hier
  *        geht es um die Route-/Zugriffs-Schicht, die zuvor ungetestet war.
- * Ausführen: node --experimental-sqlite --test test/test-split-expenses-routes.js
+ * Ausführen: node --test test/test-split-expenses-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -2462,6 +2462,30 @@ test('ein unveraenderter, inzwischen geloeschter Kategorie-Schluessel bricht das
   const other = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, title: 'Zweite', budget_category: 'food' } });
   const moved = await call('PUT', `/expenses/${other.body.data.id}`, { actor: OWNER_A, body: { ...base, budget_category: 'split_gone' } });
   assert.equal(moved.status, 400, 'den geloeschten Schluessel neu waehlen bleibt verboten');
+});
+
+// Phase 0 section H (test:client-error-text-guard): the create catch takes our
+// own refusals AND every SQLite error, and guessed the status from the text
+// (`message.includes('Internal')`). A database error therefore went out as a
+// 400 carrying SQL text. A trigger that writes into a missing table breaks the
+// insert the way a damaged schema would; the answer must be a 500 with a fixed
+// sentence, never a 400 and never the table name.
+test('POST expense: a database error is a 500 with a fixed sentence, never a 400 with SQL text', async () => {
+  db.exec(`CREATE TRIGGER h_guard_broken AFTER INSERT ON expenses
+    BEGIN INSERT INTO h_guard_missing_table (x) VALUES (1); END`);
+  try {
+    const r = await call('POST', `/groups/${GROUP}/expenses`, {
+      actor: { id: OWNER, role: 'member' },
+      body: { title: 'Broken', amount: '9.00', currency: 'EUR', split_method: 'equal', payer_id: OWNER, participants: [OWNER, MGR], expense_date: '2026-05-11' },
+    });
+    const text = JSON.stringify(r.body);
+    assert.ok(!/h_guard_missing_table|no such table|SQLITE/i.test(text), `no SQL text in the answer: ${text}`);
+    assert.equal(r.status, 500, `a database error is not the client's fault: ${text}`);
+    assert.equal(r.body.code, 500);
+    assert.equal(r.body.error, 'Internal server error.');
+  } finally {
+    db.exec('DROP TRIGGER IF EXISTS h_guard_broken');
+  }
 });
 
 test('teardown: Server schließen', async () => {

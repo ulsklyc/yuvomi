@@ -2595,6 +2595,8 @@
         "backupWebdavTestSuccess": "연결 성공 - 백업 {{files}}개 발견.",
         "backupWebdavTestFailed": "연결 실패: {{error}}",
         "backupWebdavPasswordRequired": "다른 서버나 사용자 이름에는 비밀번호를 다시 입력해야 합니다.",
+        "backupWebdavConfigIncomplete": "WebDAV 서버의 주소, 사용자 이름, 비밀번호를 입력하세요.",
+        "backupLocalFailed": "이 서버에서 백업을 읽거나 쓸 수 없었습니다. 자세한 내용은 서버 로그에 있습니다.",
         "backupWebdavLastUpload": "마지막 업로드",
         "backupWebdavLastError": "마지막 오류",
         "backupWebdavNeverUploaded": "아직 업로드 안 됨",
@@ -3593,7 +3595,13 @@
         "backupRestoreErrorTooLarge": "파일이 이 설치의 업로드 한도({{limit}})보다 큽니다. BACKUP_UPLOAD_LIMIT을 늘리고 Yuvomi를 다시 시작한 뒤 다시 복원하세요. 여기서는 아무것도 변경되지 않았습니다.",
         "apiTokenErrorNameTooLong": "이름은 최대 100자까지 입력할 수 있습니다.",
         "apiTokenErrorExpiryPast": "만료 날짜가 과거입니다. 더 나중 시각을 선택하세요.",
-        "apiTokenErrorSubjectDeactivated": "이 계정은 비활성화되어 토큰을 받을 수 없습니다. 다른 사람을 선택하세요."
+        "apiTokenErrorSubjectDeactivated": "이 계정은 비활성화되어 토큰을 받을 수 없습니다. 다른 사람을 선택하세요.",
+        "dmsErrorUrlInvalid": "서버 URL은 http:// 또는 https://로 시작해야 합니다.",
+        "dmsErrorAccountExists": "이 서버 URL로 이미 DMS가 연결되어 있습니다.",
+        "remoteErrorAuthFailed": "서버가 로그인을 거부했습니다. 사용자 이름과 비밀번호를 확인하세요.",
+        "remoteErrorStatus": "서버가 상태 {{status}}(으)로 응답했습니다.",
+        "remoteErrorUnreachable": "서버에 연결할 수 없습니다. 주소와 서버가 실행 중인지 확인하세요.",
+        "remoteErrorFailed": "서버 요청이 실패했습니다."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",
@@ -4841,7 +4849,9 @@
         "colorTeal": "청록색",
         "colorOrange": "주황",
         "colorRed": "빨강",
-        "colorGrey": "회색"
+        "colorGrey": "회색",
+        "errorGone": "이 카테고리는 더 이상 없습니다.",
+        "errorSubGone": "이 하위 카테고리는 더 이상 없습니다."
     },
     "subscriptions": {
         "tabLabel": "구독",
@@ -6477,7 +6487,10 @@
             "bag_one": "봉지",
             "bag_other": "봉지"
         },
-        "moreDetailsHint": "최소 재고, 메모"
+        "moreDetailsHint": "최소 재고, 메모",
+        "errorLocationGone": "이 보관 장소는 더 이상 없습니다.",
+        "errorLocationExists": "이 보관 장소는 이미 있습니다. 다른 이름을 선택하세요.",
+        "errorLocationLast": "마지막 보관 장소는 삭제할 수 없습니다. 먼저 다른 장소를 추가하세요."
     },
     "inventory": {
         "title": "소지품",

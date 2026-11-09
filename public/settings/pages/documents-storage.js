@@ -13,7 +13,7 @@ import {
   settingSwitchRowHtml
 } from "/settings/components.js";
 import { reloadAfterSave } from '/utils/reload-after-save.js';
-import { errorSentenceWithDetail } from "/utils/friendly-error.js";
+import { errorSentenceWithDetail, loadErrorSentence } from "/utils/friendly-error.js";
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -570,7 +570,7 @@ async function loadDocumentStorageConfig(container) {
   } catch (err) {
     statusHost.replaceChildren(
       createRetryState({
-        message: err.message || t("common.errorGeneric"),
+        message: loadErrorSentence(err) ?? t("common.errorGeneric"),
         onRetry: reload
       })
     );

@@ -8,8 +8,9 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import * as CardDAVSync from '../services/cardav-sync.js';
-import { str, bool, collectErrors, MAX_TITLE } from '../middleware/validate.js';
+import { str, secret, bool, collectErrors, MAX_TITLE } from '../middleware/validate.js';
 import { requireAdmin } from '../middleware/require-admin.js';
+import { remoteFailure } from '../utils/http.js';
 
 const log = createLogger('CardDAV');
 const MAX_URL = 500;
@@ -46,18 +47,26 @@ function fail(res, status, errorCode, devMessage) {
 }
 
 /**
- * Der Server des Nutzers hat abgelehnt oder war nicht erreichbar - das ist kein
- * interner Fehler, und "Internal error" sagt dem Nutzer nichts über ein falsches
- * Passwort oder ein nur lesbares Konto. `testConnection` stellt genau diesen
- * Fällen `CardDAV connection failed:` voran; die Meldung wird durchgereicht,
- * wie es die CalDAV- und iCloud-Routen tun. Alles andere bleibt ein 500.
+ * The user's server refused or could not be reached - not an internal error,
+ * and "Internal error" tells nobody about a wrong password or a read-only
+ * account. `testConnection` marks exactly these cases with the code
+ * `carddav_connection_failed`; the answer carries their class in `reason` and
+ * `detail` (`HTTP 401`, `ECONNREFUSED`), which the page shows the admin.
+ * Everything else stays a 500.
  *
  * @returns {boolean} true, wenn geantwortet wurde
  */
 function failIfConnection(res, err) {
-  const message = String(err?.message ?? '');
-  if (!message.startsWith('CardDAV connection failed')) return false;
-  fail(res, 502, 'connection_failed', message);
+  if (err?.code !== 'carddav_connection_failed') return false;
+  // Phase 0 section H: the class of the failure (status, network code), never
+  // the server's or the library's text - it names hosts and paths.
+  const failure = remoteFailure(err) ?? { reason: 'remote_failed' };
+  res.status(502).json({
+    error: 'The CardDAV server refused the request or could not be reached.',
+    errorCode: 'connection_failed',
+    code: 502,
+    ...failure,
+  });
   return true;
 }
 
@@ -87,7 +96,7 @@ router.post('/accounts', async (req, res) => {
     const vName     = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl      = str(req.body.cardavUrl, 'CardDAV URL', { max: MAX_URL });
     const vUsername = str(req.body.username, 'Username', { max: MAX_TITLE });
-    const vPassword = str(req.body.password, 'Password', { max: MAX_TITLE });
+    const vPassword = secret(req.body.password, 'Password');
     const errors = collectErrors([vName, vUrl, vUsername, vPassword]);
     if (errors.length) return fail(res, 400, 'validation', errors.join(' '));
 
@@ -130,7 +139,7 @@ router.put('/accounts/:id', async (req, res) => {
     const rawPassword = typeof req.body.password === 'string' ? req.body.password : '';
     let password = null;
     if (rawPassword.trim().length > 0) {
-      const vPassword = str(rawPassword, 'Password', { max: MAX_TITLE });
+      const vPassword = secret(rawPassword, 'Password');
       const pwErrors = collectErrors([vPassword]);
       if (pwErrors.length) return fail(res, 400, 'validation', pwErrors.join(' '));
       password = vPassword.value;

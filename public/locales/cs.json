@@ -2676,6 +2676,8 @@
         "backupWebdavTestSuccess": "Připojení úspěšné - nalezeno {{files}} záloha(zálohy).",
         "backupWebdavTestFailed": "Připojení selhalo: {{error}}",
         "backupWebdavPasswordRequired": "Pro jiný server nebo uživatelské jméno zadej heslo znovu.",
+        "backupWebdavConfigIncomplete": "Zadej adresu, uživatelské jméno a heslo serveru WebDAV.",
+        "backupLocalFailed": "Zálohu nebylo možné na tomto serveru přečíst ani zapsat. Podrobnosti jsou v protokolu serveru.",
         "backupWebdavLastUpload": "Poslední nahrání",
         "backupWebdavLastError": "Poslední chyba",
         "backupWebdavNeverUploaded": "Zatím žádné nahrání",
@@ -3693,7 +3695,13 @@
         "backupRestoreErrorTooLarge": "Soubor je větší než limit nahrávání této instalace ({{limit}}). Zvyšte BACKUP_UPLOAD_LIMIT, restartujte Yuvomi a obnovte zálohu znovu. Nic se zde nezměnilo.",
         "apiTokenErrorNameTooLong": "Název smí mít nejvýše 100 znaků.",
         "apiTokenErrorExpiryPast": "Datum vypršení je v minulosti. Vyber pozdější čas.",
-        "apiTokenErrorSubjectDeactivated": "Tento účet je deaktivovaný a nemůže dostat token. Vyber jinou osobu."
+        "apiTokenErrorSubjectDeactivated": "Tento účet je deaktivovaný a nemůže dostat token. Vyber jinou osobu.",
+        "dmsErrorUrlInvalid": "URL serveru musí začínat http:// nebo https://.",
+        "dmsErrorAccountExists": "S touto URL serveru je už připojen DMS.",
+        "remoteErrorAuthFailed": "Server odmítl přihlášení. Zkontrolujte uživatelské jméno a heslo.",
+        "remoteErrorStatus": "Server odpověděl stavem {{status}}.",
+        "remoteErrorUnreachable": "Server není dostupný. Zkontrolujte adresu a zda server běží.",
+        "remoteErrorFailed": "Požadavek na server selhal."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
@@ -4977,7 +4985,9 @@
         "colorTeal": "Tyrkysová",
         "colorOrange": "Oranžová",
         "colorRed": "Červená",
-        "colorGrey": "Šedá"
+        "colorGrey": "Šedá",
+        "errorGone": "Tato kategorie už neexistuje.",
+        "errorSubGone": "Tato podkategorie už neexistuje."
     },
     "subscriptions": {
         "tabLabel": "Předplatná",
@@ -6649,7 +6659,10 @@
             "bag_many": "sáčku",
             "bag_other": "sáčků"
         },
-        "moreDetailsHint": "Minimální zásoba, poznámky"
+        "moreDetailsHint": "Minimální zásoba, poznámky",
+        "errorLocationGone": "Toto místo uložení už neexistuje.",
+        "errorLocationExists": "Toto místo uložení již existuje. Zvolte jiný název.",
+        "errorLocationLast": "Poslední místo uložení nelze smazat. Nejdříve přidejte jiné."
     },
     "inventory": {
         "title": "Inventář",

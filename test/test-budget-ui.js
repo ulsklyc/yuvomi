@@ -4907,7 +4907,14 @@ test('#1668: jeder Grund der Budget-Routen ist eingeordnet, jedes Feld gibt es, 
     assert.ok(atServer.has(reason), `${reason} schickt der Server nicht mehr`);
     assert.ok(manager.includes(`'${reason}'`), `${reason} liest die Kategorien-Verwaltung nicht mehr`);
   }
-  const elsewhere = new Set([...loanForm, ...READ_BY_CATEGORY_MANAGER]);
+  // "Gibt es nicht mehr" sagt die Verwaltung ueber CASE_MESSAGES (#1909).
+  const READ_VIA_CASE_MESSAGES = ['budget_category_not_found', 'budget_subcategory_not_found'];
+  const caseMessages = read('../public/utils/friendly-error.js');
+  for (const reason of READ_VIA_CASE_MESSAGES) {
+    assert.ok(atServer.has(reason), `${reason} schickt der Server nicht mehr`);
+    assert.ok(caseMessages.includes(`['${reason}',`), `${reason} hat keinen Satz in CASE_MESSAGES`);
+  }
+  const elsewhere = new Set([...loanForm, ...READ_BY_CATEGORY_MANAGER, ...READ_VIA_CASE_MESSAGES]);
   const known = new Set(budgetUi.BUDGET_REFUSALS.keys());
   assert.deepEqual(
     [...atServer].filter((r) => !known.has(r) && !elsewhere.has(r)), [],

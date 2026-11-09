@@ -970,6 +970,11 @@ function assertSsoAdminWouldRemain(targetUserId, nextRole) {
     + 'login back on for the whole household. Link another administrator first.';
 }
 
+// Keeps the stored sessions in step with `users.role`. No permission decision
+// depends on it any more - `requireAuth` reads the role from `users` per
+// request (#2611). It stays so a stored session does not contradict the
+// account it belongs to; it cannot reach a session saved after it ran, which
+// is why it is not the guard.
 function updateUserRoleSessions(userId, role) {
   const allSessions = db.get().prepare('SELECT sid, sess FROM sessions').all();
   const updateSession = db.get().prepare('UPDATE sessions SET sess = ? WHERE sid = ?');
@@ -1103,6 +1108,9 @@ function applyRoleModuleAccess(req) {
   // Admins: null = Vollzugriff. Token-Scopes bleiben eine zusätzliche
   // Least-Privilege-Grenze und können diese Rechte niemals erweitern.
   req.sessionModuleAccess = null;
+  // Safe to skip the lookup: for every path `authRole` comes from the database
+  // or is fixed to `member` (session and token read `users`, devices and
+  // displays are members), never from a stored session (#2611).
   if (req.authRole === 'admin') return;
   try {
     const user = db.get()
@@ -1211,20 +1219,31 @@ function requireAuth(req, res, next) {
   // noch gibt - und waere bis zu ihrem Ablauf ein Zugang. Deshalb die eine
   // Abfrage je Request, auf dem Primaerschluessel.
   //
-  // UND DIE SITZUNG EINES GELOESCHTEN KONTOS GILT EBENSO WENIG. "Zeigt ins
-  // Leere" stimmt nur fuer Routen, die die Zeile nachschlagen: die Sitzung
-  // traegt Konto-Id UND Rolle, und `requireAdmin` liest die Rolle aus ihr. Die
-  // zurueckgeschriebene Sitzung eines geloeschten Administrators kaeme sonst
-  // weiter an jede Admin-Route. Gefragt wird deshalb "ist dieses Konto aktiv",
-  // nicht "ist es deaktiviert" - ein Konto, das es nicht gibt, ist es nicht.
-  if (req.session && req.session.userId && !isActiveAccount(req.session.userId, { db: db.get() })) {
+  // A DELETED ACCOUNT'S SESSION DOES NOT COUNT EITHER. The question is "is this
+  // account active", not "is it deactivated": an account that does not exist
+  // is not active.
+  //
+  // THE ROLE COMES FROM `users`, NOT FROM THE SESSION (#2611). A demotion
+  // rewrites the session rows that exist at that moment
+  // (`updateUserRoleSessions`), but a row can still carry `role: 'admin'`
+  // afterwards: a login whose `await verifyPassword` spans the demotion writes
+  // the role of the user row it loaded before, and `POST /auth/oidc/link/start`
+  // saves the whole session back via `INSERT OR REPLACE` after its own
+  // `await`. So the one lookup per request, on the primary key, returns the
+  // role as well - the same query as the active-account check, not a second
+  // one. `req.authRole` stays the one address every role check reads;
+  // `req.session.role` is still written, but no permission decision reads it.
+  const sessionAccount = req.session && req.session.userId
+    ? db.get().prepare(`SELECT u.role FROM users u WHERE u.id = ? AND ${activeAccountSql('u')}`).get(req.session.userId)
+    : null;
+  if (req.session && req.session.userId && !sessionAccount) {
     return res.status(401).json({ error: 'Not authenticated.', code: 401 });
   }
 
-  if (req.session && req.session.userId) {
+  if (sessionAccount) {
     req.authMethod = 'session';
     req.authUserId = req.session.userId;
-    req.authRole = req.session.role;
+    req.authRole = sessionAccount.role;
     // Interaktive Sessions kennen kein Token-Scoping.
     req.authScopes = null;
     refreshSessionCookieIfDue(req, res);
@@ -4052,6 +4071,19 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const userId = parseInt(req.params.id, 10);
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
 
+    // HASH FIRST, THEN NOTHING ELSE AWAITS (#2612). `hashPassword` is the only
+    // `await` in this handler. It used to sit between the last-admin check and
+    // the write of `role`: two admins demoting each other with a password
+    // change both passed the check while the other still counted, both writes
+    // landed, and the household had no administrator left. Hashing here, before
+    // anything is read, leaves the rest of the handler synchronous, so the
+    // checks and the write below see the same `users` table. The length rule
+    // is still enforced further down; a too-short password is never hashed.
+    const newPassword = req.body.password !== undefined ? String(req.body.password) : '';
+    const hashedNewPassword = newPassword && normalizePassword(newPassword).length >= 8
+      ? await hashPassword(newPassword)
+      : null;
+
     const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
     if (!existing) return res.status(404).json({ error: 'User not found.', code: 404, reason: 'members_member_not_found' });
     // EIN DISPLAY IST KEIN MITGLIED, ALSO AUCH HIER NICHT (#1208). Die Liste
@@ -4100,7 +4132,6 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       return res.status(400).json({ error: memberFields.errors.join(' '), code: 400 });
     }
 
-    const newPassword = req.body.password !== undefined ? String(req.body.password) : '';
     if (newPassword && normalizePassword(newPassword).length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
     }
@@ -4138,16 +4169,6 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       });
     }
 
-    // Dieselben Gruende wie beim Entfernen (#1909): die Verwaltung sagt den
-    // Satz dazu, auch wenn ein Admin sich selbst herabstuft.
-    const adminError = assertAdminWouldRemain(userId, nextRole);
-    if (adminError) return res.status(400).json({ error: adminError, code: 400, reason: 'last_admin' });
-
-    // Dieselbe Frage fuer den SSO-Zustand: eine Herabstufung darf den Riegel
-    // des Haushalts nicht nebenbei aufmachen (#847).
-    const ssoAdminError = assertSsoAdminWouldRemain(userId, nextRole);
-    if (ssoAdminError) return res.status(400).json({ error: ssoAdminError, code: 400, reason: 'last_sso_admin' });
-
     // Nur ein echter UEBERGANG schreibt und meldet ab. Die Verwaltung schickt
     // den Umschalter bei JEDER Speicherung mit, also auch beim Aendern des
     // Namens oder der Farbe eines laengst SSO-gefuehrten Kontos - der Zweig
@@ -4157,9 +4178,22 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const alreadySsoOnly = isSsoOnlyAccount(existingHash);
     const newPasswordHash = (ssoOnly === true && !alreadySsoOnly)
       ? OIDC_PASSWORD_SENTINEL
-      : (newPassword ? await hashPassword(newPassword) : null);
+      : hashedNewPassword;
 
-    db.transaction(() => {
+    // The last-admin checks run inside the same transaction as the write
+    // (#2612). A better-sqlite3 transaction is synchronous and cannot hold an
+    // `await`, so check and write can never be split again by a yield point.
+    const refusal = db.transaction(() => {
+      // Dieselben Gruende wie beim Entfernen (#1909): die Verwaltung sagt den
+      // Satz dazu, auch wenn ein Admin sich selbst herabstuft.
+      const adminError = assertAdminWouldRemain(userId, nextRole);
+      if (adminError) return { error: adminError, code: 400, reason: 'last_admin' };
+
+      // Dieselbe Frage fuer den SSO-Zustand: eine Herabstufung darf den Riegel
+      // des Haushalts nicht nebenbei aufmachen (#847).
+      const ssoAdminError = assertSsoAdminWouldRemain(userId, nextRole);
+      if (ssoAdminError) return { error: ssoAdminError, code: 400, reason: 'last_sso_admin' };
+
       db.get().prepare(`
         UPDATE users
         SET username = ?, display_name = ?, avatar_color = ?, avatar_data = ?, role = ?, family_role = ?
@@ -4185,7 +4219,9 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
         // aufgaben dieses Kontos gelten neu (services/payment-task-audience.js).
         revokePaymentTasksForUsers(db.get(), [userId]);
       }
+      return null;
     });
+    if (refusal) return res.status(400).json(refusal);
 
     if (newPasswordHash) {
       invalidateUserSessions(userId, req.sessionID);

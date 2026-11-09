@@ -4,7 +4,7 @@
  *        Namenskonflikt je Ebene getrennt, Loeschen ist nie blockiert und macht
  *        Gegenstaende/Unterorte eltern-/ortlos statt sie zu verschieben, Umsortieren
  *        je Ebene getrennt.
- * Ausfuehren: node --experimental-sqlite --test test/test-inventory-locations-routes.js
+ * Ausfuehren: node --test test/test-inventory-locations-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

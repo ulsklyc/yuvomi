@@ -4,7 +4,7 @@
  *        Zurücknehmen räumt es ab, die Serie einer wiederkehrenden Aufgabe
  *        bleibt als eine Historie lesbar - und keiner der Lesepfade zeigt eine
  *        Aufgabe, die die fragende Person nicht sehen darf.
- * Ausführen: node --experimental-sqlite test/test-task-completions.js
+ * Ausführen: node test/test-task-completions.js
  */
 
 import assert from 'node:assert/strict';

@@ -17,7 +17,7 @@
  *        Abweichung vom :memory:-DB-Standard nur beim Dateisystem: MODULES_DIR zeigt
  *        auf einen isolierten Temp-Ordner (der Service liest echte Ordner/Manifeste),
  *        die DB bleibt In-Memory (sync_config genügt). Kein Netz, keine Mocks.
- * Ausführen: node --experimental-sqlite --test test/test-modules.js
+ * Ausführen: node --test test/test-modules.js
  */
 
 import os from 'node:os';

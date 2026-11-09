@@ -2486,6 +2486,8 @@
         "backupWebdavTestSuccess": "Conexión exitosa - {{files}} copia(s) encontrada(s).",
         "backupWebdavTestFailed": "Error de conexión: {{error}}",
         "backupWebdavPasswordRequired": "Para otro servidor u otro nombre de usuario, vuelve a introducir la contraseña.",
+        "backupWebdavConfigIncomplete": "Introduce la dirección, el usuario y la contraseña del servidor WebDAV.",
+        "backupLocalFailed": "No se pudo leer ni escribir la copia de seguridad en este servidor. Los detalles están en el registro del servidor.",
         "backupWebdavLastUpload": "Última subida",
         "backupWebdavLastError": "Último error",
         "backupWebdavNeverUploaded": "Sin subidas aún",
@@ -3575,7 +3577,13 @@
         "backupRestoreErrorTooLarge": "El archivo supera el límite de subida de esta instalación ({{limit}}). Aumenta BACKUP_UPLOAD_LIMIT, reinicia Yuvomi y vuelve a restaurar. Aquí no se ha cambiado nada.",
         "apiTokenErrorNameTooLong": "El nombre puede tener como máximo 100 caracteres.",
         "apiTokenErrorExpiryPast": "La fecha de caducidad está en el pasado. Elige un momento posterior.",
-        "apiTokenErrorSubjectDeactivated": "Esta cuenta está desactivada y no puede recibir un token. Elige otra persona."
+        "apiTokenErrorSubjectDeactivated": "Esta cuenta está desactivada y no puede recibir un token. Elige otra persona.",
+        "dmsErrorUrlInvalid": "La URL del servidor debe empezar por http:// o https://.",
+        "dmsErrorAccountExists": "Ya hay un DMS conectado con esta URL del servidor.",
+        "remoteErrorAuthFailed": "El servidor rechazó el inicio de sesión. Comprueba el nombre de usuario y la contraseña.",
+        "remoteErrorStatus": "El servidor respondió con el estado {{status}}.",
+        "remoteErrorUnreachable": "No se puede acceder al servidor. Comprueba la dirección y si el servidor está en marcha.",
+        "remoteErrorFailed": "La solicitud al servidor ha fallado."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",
@@ -4841,7 +4849,9 @@
         "colorTeal": "Verde azulado",
         "colorOrange": "Naranja",
         "colorRed": "Rojo",
-        "colorGrey": "Gris"
+        "colorGrey": "Gris",
+        "errorGone": "Esta categoría ya no existe.",
+        "errorSubGone": "Esta subcategoría ya no existe."
     },
     "subscriptions": {
         "tabLabel": "Suscripciones",
@@ -6477,7 +6487,10 @@
             "bag_one": "bolsa",
             "bag_other": "bolsas"
         },
-        "moreDetailsHint": "Existencias mínimas, notas"
+        "moreDetailsHint": "Existencias mínimas, notas",
+        "errorLocationGone": "Este lugar de almacenamiento ya no existe.",
+        "errorLocationExists": "Este lugar de almacenamiento ya existe. Elige otro nombre.",
+        "errorLocationLast": "No se puede eliminar el último lugar de almacenamiento. Añade otro primero."
     },
     "inventory": {
         "title": "Inventario",

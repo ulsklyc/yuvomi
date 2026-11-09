@@ -1,7 +1,7 @@
 /**
  * Modul: Email-Test
  * Zweck: SMTP-Config-Auflösung (DB + env-Override), Maskierung, Versand, Testmail.
- * Ausführen: node --experimental-sqlite test/test-email.js
+ * Ausführen: node test/test-email.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -157,7 +157,11 @@ test('sendTest reports failure reason without throwing', async () => {
   const svc = createEmailService({ db, nodemailer: nm, env: {} });
   const res = await svc.sendTest('admin@test');
   assert.equal(res.ok, false);
-  assert.match(res.error, /verify-failed/);
+  // Phase 0, Abschnitt H: das Ergebnis geht so in den Browser - ein fester
+  // Satz und der Fall, nie der Text von nodemailer (Host, Antwort des Servers).
+  assert.equal(res.error, 'The test email could not be sent.');
+  assert.doesNotMatch(JSON.stringify(res), /verify-failed/);
+  assert.equal(typeof res.reason, 'string');
 });
 
 // --- Routes ---------------------------------------------------------------

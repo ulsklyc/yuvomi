@@ -13,11 +13,12 @@
  *        CalDAV und Apple, das echte tsdav gegen test/caldav-fake-server.js:
  *        ob "keine Kalender" ein eigener Fall ist, entscheidet die Antwort des
  *        Servers auf PROPFIND, keine Attrappe am Client.
- * Ausfuehren: node --experimental-sqlite --test test/test-sync-form-errors.js
+ * Ausfuehren: node --test test/test-sync-form-errors.js
  */
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
 import { startFakeDavServer } from './caldav-fake-server.js';
@@ -100,14 +101,33 @@ test('CalDAV: dasselbe Konto ein zweites Mal ist ein eigener Fall', async () => 
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_accounts').get().n, 1);
 });
 
-test('CalDAV: eine Absage des fremden Servers bleibt seine Angabe, ohne Grund', async () => {
+// Phase 0, Abschnitt H: die Absage kommt als Klasse (`detail`), die die Seite
+// dem Admin im Rahmen zeigt - nie der Text des Servers oder von tsdav, der
+// Adresse und Pfad nennt ("PROPFIND <url> returned 401"). Die 401 kommt hier
+// schon bei der Kontosuche von tsdav, die ihren Status nur im Text traegt:
+// gemessen wird also auch, dass caldav-client ihn an der Anfrage mitschreibt.
+test('CalDAV: eine Absage des fremden Servers kommt als ihre Klasse, nie als ihr Text', async () => {
   dav.reset();
   dav.refuse({ method: 'PROPFIND', status: 401 });
   try {
     const res = await caldav({ caldavUrl: dav.url, username: 'other' });
-    assert.equal(res.status, 500);
-    assert.equal(res.body.reason, undefined, 'die Seite zeigt den Text des fremden Servers');
-    assert.match(res.body.error, /^CalDAV connection failed/);
+    assert.equal(res.status, 502, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'remote_auth_failed');
+    assert.equal(res.body.detail, 'HTTP 401');
+    assert.ok(!JSON.stringify(res.body).includes(dav.url), 'die Antwort nennt die Adresse nicht');
+    assert.ok(!/PROPFIND|Invalid credentials/.test(res.body.error), 'kein Text von tsdav');
+  } finally { dav.allowAll(); }
+});
+
+test('Apple: eine Absage von iCloud kommt als ihre Klasse, nie als ihr Text', async () => {
+  dav.reset();
+  dav.refuse({ method: 'PROPFIND', status: 401 });
+  try {
+    const res = await admin('POST', '/calendar/apple/connect', { url: dav.url, username: 'a@b.c', password: 'p' });
+    assert.equal(res.status, 502, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'remote_auth_failed');
+    assert.equal(res.body.detail, 'HTTP 401');
+    assert.ok(!JSON.stringify(res.body).includes(dav.url), 'die Antwort nennt die Adresse nicht');
   } finally { dav.allowAll(); }
 });
 
@@ -120,6 +140,22 @@ test('Apple: eine Adresse ohne http(s) und ein Konto ohne Kalender nennen ihren 
   const empty = await admin('POST', '/calendar/apple/connect', { url: dav.url, username: 'a@b.c', password: 'p' });
   assert.equal(empty.status, 400, JSON.stringify(empty.body));
   assert.equal(empty.body.reason, 'apple_no_calendars');
+});
+
+// Phase 0, Abschnitt H: ein Feed, der nicht erreichbar ist, kam bisher ueber ein
+// Textmuster als 400 mit dem Text von Node (Adresse und Port) zurueck.
+test('Import: ein nicht erreichbarer Feed kommt als Klasse, nie als Text', async () => {
+  const closed = await new Promise((resolve) => {
+    const probe = net.createServer().listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+  const res = await withPrivateNetwork(() => admin('POST', '/calendar/import', { url: `http://127.0.0.1:${closed}/feed.ics` }));
+  assert.equal(res.status, 502, JSON.stringify(res.body));
+  assert.equal(res.body.reason, 'remote_unreachable');
+  assert.equal(res.body.detail, 'ECONNREFUSED');
+  assert.ok(!JSON.stringify(res.body).includes(String(closed)), 'die Antwort nennt den Port nicht');
 });
 
 test('Abo anlegen: Name, Adresse und privates Netz nennen ihren Fall', async () => {

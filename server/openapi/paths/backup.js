@@ -15,6 +15,7 @@ export function backupPaths() {
         summary: 'Download database backup',
         tag: 'Backup',
         admin: true,
+        description: 'The backup is checked for integrity before it is sent. A backup that fails the check is discarded and answered with 500 and reason `backup_verify_failed`.',
         responses: {
           200: {
             description: 'Database backup file',
@@ -112,7 +113,7 @@ export function backupPaths() {
         summary: 'Test WebDAV backup connection',
         tag: 'Backup',
         admin: true,
-        description: 'Optional overrides `url`, `username`, `password`, `remotePath`; missing fields fall back to the stored configuration. An override with a different server (scheme, host and port) or username but no new password is refused with 400 and `errorCode: password_required` before any request is made, so the stored password never reaches a server it was not entered for.',
+        description: 'Optional overrides `url`, `username`, `password`, `remotePath`; missing fields fall back to the stored configuration. An override with a different server (scheme, host and port) or username but no new password is refused with 400 and `errorCode: password_required` before any request is made, so the stored password never reaches a server it was not entered for. Missing `url`, `username` or `password` answers 400 with `errorCode: config_incomplete`. A refusal of the server answers 502 with `remote_auth_failed`, `remote_http_status`, `remote_unreachable` or `remote_failed` and the class in `detail` (`HTTP 401`, `ECONNREFUSED`), never the server\'s text. A failure on this server (the database, the local file, a filesystem error) answers 500 with `backup_local_failed`.',
         stateChanging: true,
         requestBody: jsonBody(null),
       }),
@@ -122,6 +123,7 @@ export function backupPaths() {
         summary: 'List remote WebDAV backup files',
         tag: 'Backup',
         admin: true,
+        description: 'A refusal of the server answers 502 with `remote_auth_failed`, `remote_http_status`, `remote_unreachable` or `remote_failed` and the class in `detail` (`HTTP 401`, `ECONNREFUSED`), never the server\'s text. A failure on this server (the database, the local file, a filesystem error) answers 500 with `backup_local_failed`.',
       }),
     },
     '/api/v1/backup/webdav/trigger': {
@@ -129,6 +131,7 @@ export function backupPaths() {
         summary: 'Create and upload a WebDAV backup',
         tag: 'Backup',
         admin: true,
+        description: 'A failed local snapshot, or a failure on this server while uploading (the database, the local file, a filesystem error), answers 500 with `backup_local_failed`. A refused upload answers 502 with `remote_auth_failed`, `remote_http_status`, `remote_unreachable` or `remote_failed` and the class in `detail` (`HTTP 507`, `ECONNREFUSED`), never the server\'s text.',
         stateChanging: true,
       }),
     },

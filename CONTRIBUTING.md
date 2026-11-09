@@ -25,7 +25,7 @@ Backend dependencies are evaluated case-by-case but must remain minimal. When in
 
 ### Prerequisites
 
-- Node.js 22.14 or newer, on Node 23 at least 23.6 (the database driver needs Node-API 10; tests also use `--experimental-sqlite`)
+- Node.js 24.12 or newer (the database driver needs Node-API 10; `engines.node` in `package.json` is the single source)
 - Git
 
 ### Getting started
@@ -93,7 +93,7 @@ npm run test:docker-publish
 This is a representative selection - run `npm run` to see the full list of suites.
 Which suite guards which invariant is catalogued in [docs/test-suites.md](docs/test-suites.md).
 
-Tests run with plain Node against real SQLite (`--experimental-sqlite`), in memory or in a
+Tests run with plain Node against real SQLite, in memory or in a
 temp file - newer suites use the built-in `node --test` runner, older ones are plain
 assertion scripts. Nothing has to be running beforehand: a suite that exercises routes over
 HTTP starts its own server on a free local port and stops it again.
@@ -359,9 +359,13 @@ without this repository's private tooling.
 
 - Web Component prefix: `yuvomi-` (one component per file). Not every file in `public/components/` is a Web Component: most are ES modules that export functions, such as `openModal`, `openDetailView` or `renderUserMultiSelect`.
 - All UI text via i18n keys (`t('key')`) - never hardcode text in components. German (`de`) is the reference locale.
-- **Adding a new i18n key:** add it to **all** files in `public/locales/` (27 languages; a
-  non-German value may start as the English text). The JSON files are 4-space indented
-  and nested - edit them in place, never reserialize a whole file. A key interpolating a
+- **Adding a new i18n key:** add it to **all** files in `public/locales/` (27 languages),
+  each with a real translation. `npm run test:i18n-translated` counts values that are a
+  word-for-word copy of the English text and fails when that number grows, so an English
+  placeholder does not pass. The JSON files are 4-space indented
+  and nested - edit them in place, never reserialize a whole file. Save them as UTF-8: an
+  editor or script writing another encoding turns every non-ASCII character into `?`, and
+  `npm run test:i18n` rejects values like "Gesch??tzte" or "????". A key interpolating a
   numeric `count` needs an `_one` singular variant (`{{count}}` placeholder), otherwise
   the UI shows "1 Aufgaben". `npm run test:i18n` and `npm run test:i18n-plural` guard all
   of this and run in CI - a UI change without complete locales will not pass.

@@ -5,7 +5,7 @@
  *        werden der geteilte Helper (public/utils/contact-name.js) und die
  *        HTTP-Schicht: POST/PUT leiten `name` aus Vor-/Nachname ab, GET / sortiert
  *        nach Nachname, der vCard-Export gibt echte N-Komponenten aus.
- * Ausführen: node --experimental-sqlite test/test-contact-names.js
+ * Ausführen: node test/test-contact-names.js
  */
 
 import os from 'node:os';

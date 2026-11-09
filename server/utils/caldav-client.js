@@ -14,9 +14,41 @@ import { sameCredentialOrigin } from './credential-origin.js';
  * @param {{caldav_url: string, username: string, password: string}} account
  * @returns {Promise<object>} tsdav-Client
  */
-export async function createCalDAVClient(account) {
+/**
+ * tsdav's account discovery throws a plain Error for a refused request
+ * ("Invalid credentials: PROPFIND <url> returned 401 Unauthorized"): the status
+ * lives only in its text. The refusal is recorded at the fetch instead and set
+ * as `status` on what createDAVClient throws, so a route can answer with the
+ * class (remoteFailure in server/utils/http.js, Phase 0 section H) without
+ * reading the message. The fetch reads `globalThis.fetch` at call time, so a
+ * test that replaces it still reaches every request.
+ */
+async function discoverDAVAccount(params) {
   const { createDAVClient } = await import('tsdav');
-  const client = await createDAVClient({
+  // The status of the LAST request only: an earlier probe's 404 (a
+  // `/.well-known/` miss) must not dress up a later network error or a later
+  // success, so every answer overwrites it and a failed fetch clears it.
+  let refused;
+  const recording = async (...args) => {
+    try {
+      const res = await globalThis.fetch(...args);
+      refused = res?.status >= 400 ? res.status : undefined;
+      return res;
+    } catch (err) {
+      refused = undefined;
+      throw err;
+    }
+  };
+  try {
+    return await createDAVClient({ ...params, fetch: recording });
+  } catch (err) {
+    if (refused && err instanceof Error && err.status === undefined) err.status = refused;
+    throw err;
+  }
+}
+
+export async function createCalDAVClient(account) {
+  const client = await discoverDAVAccount({
     serverUrl:          account.caldav_url,
     credentials:        { username: account.username, password: account.password },
     authMethod:         'Basic',
@@ -125,8 +157,7 @@ export function writableFromColumn(value) {
  * @returns {Promise<object>} tsdav-Client
  */
 export async function createCardDAVClient(account) {
-  const { createDAVClient } = await import('tsdav');
-  const client = await createDAVClient({
+  const client = await discoverDAVAccount({
     serverUrl:          account.carddav_url,
     credentials:        { username: account.username, password: account.password },
     authMethod:         'Basic',

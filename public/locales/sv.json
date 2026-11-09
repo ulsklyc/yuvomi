@@ -2486,6 +2486,8 @@
         "backupWebdavTestSuccess": "Anslutning lyckades - {{files}} säkerhetskopia(or) hittades.",
         "backupWebdavTestFailed": "Anslutning misslyckades: {{error}}",
         "backupWebdavPasswordRequired": "En annan server eller ett annat användarnamn kräver lösenordet igen.",
+        "backupWebdavConfigIncomplete": "Ange adress, användarnamn och lösenord för WebDAV-servern.",
+        "backupLocalFailed": "Säkerhetskopian kunde inte läsas eller skrivas på den här servern. Detaljerna finns i serverloggen.",
         "backupWebdavLastUpload": "Senaste uppladdning",
         "backupWebdavLastError": "Senaste fel",
         "backupWebdavNeverUploaded": "Ingen uppladdning ännu",
@@ -3575,7 +3577,13 @@
         "backupRestoreErrorTooLarge": "Filen är större än uppladdningsgränsen för den här installationen ({{limit}}). Höj BACKUP_UPLOAD_LIMIT, starta om Yuvomi och återställ igen. Inget ändrades här.",
         "apiTokenErrorNameTooLong": "Namnet får vara högst 100 tecken långt.",
         "apiTokenErrorExpiryPast": "Utgångsdatumet har redan passerat. Välj en senare tidpunkt.",
-        "apiTokenErrorSubjectDeactivated": "Det här kontot är inaktiverat och kan inte få en token. Välj en annan person."
+        "apiTokenErrorSubjectDeactivated": "Det här kontot är inaktiverat och kan inte få en token. Välj en annan person.",
+        "dmsErrorUrlInvalid": "Server-URL:en måste börja med http:// eller https://.",
+        "dmsErrorAccountExists": "Ett DMS är redan anslutet med den här server-URL:en.",
+        "remoteErrorAuthFailed": "Servern avvisade inloggningen. Kontrollera användarnamn och lösenord.",
+        "remoteErrorStatus": "Servern svarade med status {{status}}.",
+        "remoteErrorUnreachable": "Servern kan inte nås. Kontrollera adressen och att servern är igång.",
+        "remoteErrorFailed": "Begäran till servern misslyckades."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
@@ -4841,7 +4849,9 @@
         "colorTeal": "Blågrön",
         "colorOrange": "Orange",
         "colorRed": "Röd",
-        "colorGrey": "Grå"
+        "colorGrey": "Grå",
+        "errorGone": "Kategorin finns inte längre.",
+        "errorSubGone": "Underkategorin finns inte längre."
     },
     "subscriptions": {
         "tabLabel": "Prenumerationer",
@@ -6477,7 +6487,10 @@
             "bag_one": "påse",
             "bag_other": "påsar"
         },
-        "moreDetailsHint": "Minsta lager, anteckningar"
+        "moreDetailsHint": "Minsta lager, anteckningar",
+        "errorLocationGone": "Förvaringsplatsen finns inte längre.",
+        "errorLocationExists": "Den här förvaringsplatsen finns redan. Välj ett annat namn.",
+        "errorLocationLast": "Den sista förvaringsplatsen kan inte tas bort. Lägg till en annan först."
     },
     "inventory": {
         "title": "Inventarier",

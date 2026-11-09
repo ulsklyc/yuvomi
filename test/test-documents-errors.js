@@ -298,6 +298,8 @@ const SERVER_REASONS = [
   'documents_file_type_not_allowed', 'documents_file_content_mismatch', 'documents_file_empty',
   'documents_storage_failed', 'dms_account_not_found', 'dms_document_already_linked',
   'dms_document_not_found', 'dms_unreachable', 'dms_document_already_stored',
+  // Formular "DMS verbinden" (#1909); die echte Antwort misst test:dms-routes.
+  'dms_field_required', 'dms_url_invalid', 'dms_account_exists',
 ];
 
 test('Server: jeder Grund der Dokumente hat einen Satz, und jeder "gibt es nicht mehr" laedt nach', () => {

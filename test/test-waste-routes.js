@@ -1127,13 +1127,20 @@ test('reasons of a failed fetch: one per class - the status of the other side, t
     // Nothing answers: a refused connection, and a connection cut mid-answer.
     standIn.handler = (req) => { req.socket.destroy(); };
     await expectFetchFailure(refresh(), 200, 'waste_source_fetch_unreachable', undefined);
-    await expectReason(reimport('preview'), 502, 'waste_source_fetch_unreachable');
+    const cut = await reimport('preview');
+    await expectReason(cut, 502, 'waste_source_fetch_unreachable');
+    // Phase 0, section H: an unreachable source is Node's text (socket, host,
+    // port); the answer carries the fixed sentence, the text stays in the log.
+    assert.equal(cut.body.error, 'Fetching the source URL failed.', JSON.stringify(cut.body));
     const dead = `http://127.0.0.1:${await closedPort()}/cal.ics`;
     const unreachable = await expectFetchFailure(
       withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: 'Dead', url: dead } })),
       201, 'waste_source_fetch_unreachable', undefined,
     );
     assert.equal(typeof unreachable.body.data.source.id, 'number', 'the source is created either way, as before');
+    // Phase 0, section H: the stored message is a fixed sentence, never Node's
+    // text with the closed port in it.
+    assert.equal(unreachable.body.data.source.last_error, 'Fetch failed.', JSON.stringify(unreachable.body.data.source));
 
     // Without the opt-in a private address is refused before any connection.
     const localUrl = `https://127.0.0.1:${await closedPort()}/cal.ics`;

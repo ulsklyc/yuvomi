@@ -312,7 +312,10 @@ router.get('/assets/:id/{*assetPath}', async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) log.error('Module asset failed:', err);
-    res.status(status).json({ error: err.message || 'Module asset failed.', code: status });
+    // Like PATCH /:id: only resolveAssetPath's own 4xx keep their sentence; a
+    // raw filesystem error (no status) names the absolute path of modules/ and
+    // gets a fixed sentence (Phase 0 section H).
+    res.status(status).json({ error: status < 500 && err.message ? err.message : 'Module asset failed.', code: status });
   }
 });
 

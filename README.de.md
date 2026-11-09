@@ -173,6 +173,13 @@ im Katalog nach Yuvomi suchen und installieren, ganz ohne Terminal.
 [ulsklyc/yuvomi-home-assistant](https://github.com/ulsklyc/yuvomi-home-assistant) unter Einstellungen → Apps
 hinzufügen und Yuvomi als App installieren ([Schritte](https://yuvomi.cloud/install.html#homeassistant)).
 
+**Auf YunoHost** ab 12.1.17: `sudo yunohost app install https://github.com/ulsklyc/yuvomi_ynh`
+installiert das [YunoHost-Paket](https://github.com/ulsklyc/yuvomi_ynh), das noch nicht im Katalog
+steht ([Schritte](https://yuvomi.cloud/install.html#yunohost)).
+
+**Auf Proxmox** richtet ein [Community-Helferskript](https://community-scripts.org/scripts/yuvomi)
+mit einem Befehl einen Debian-LXC mit Yuvomi ein ([Schritte](https://yuvomi.cloud/install.html#proxmox)).
+
 **Mit Docker** auf jedem Server. Das Image `ghcr.io/ulsklyc/yuvomi:latest` ist rund 500 MB groß und
 läuft auf amd64 und arm64 (Raspberry Pi 4/5); Yuvomi braucht einen Port, standardmäßig 3000.
 
@@ -208,7 +215,8 @@ und die [Installationsanleitung im Repository](docs/installation.md).
 - **Seite lädt nicht** - `docker compose logs` (unter Podman
   `podman compose -f podman-compose.yml logs`) nennt meist den Grund, und die
   [Fehlersuche](docs/installation.md#troubleshooting) deckt die häufigen Fälle ab.
-- **Proxmox** - dieselben Schritte laufen in einem kleinen Debian-LXC: siehe die
+- **Proxmox** - das Community-Helferskript installiert Yuvomi ohne Docker; wer beim Docker-Setup
+  bleibt, fährt dieselben Schritte in einem kleinen Debian-LXC: siehe die
   [Proxmox-Anleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
 - **Schlüssel** - optional, aber ohne Weg zurück. Bleibt er leer, erzeugt eine neue Installation
   ihn beim ersten Start; ein Admin findet ihn unter Einstellungen → Haushalt → Backup und
@@ -225,7 +233,7 @@ und die [Installationsanleitung im Repository](docs/installation.md).
 
   Öffnet **http://localhost:8090** auf dem Server selbst; woanders antwortet der Assistent nicht.
   Von einem anderen Gerät aus öffnet ihr zuerst einen Tunnel, `ssh -L 8090:localhost:8090 user@server`,
-  und dann dort dieselbe Adresse. Braucht Node.js 22.14+ oder 23.6+ auf dem Host; der Container
+  und dann dort dieselbe Adresse. Braucht Node.js 24.12 oder neuer auf dem Host; der Container
   bringt sein eigenes Node 24 mit.
 
 </details>

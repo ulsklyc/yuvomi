@@ -62,7 +62,7 @@
  *        createGithubInstaller({ request })). MODULES_DIR zeigt auf einen
  *        Temp-Ordner, die DB ist In-Memory. Der Schalter steht fuer die Suite auf
  *        true (vor dem Import gesetzt); der Aus-Fall nimmt den Test-Hook.
- * Ausführen: node --experimental-sqlite --test test/test-module-install.js
+ * Ausführen: node --test test/test-module-install.js
  */
 
 import path from 'node:path';
@@ -2405,4 +2405,46 @@ test('Admin-Liste nennt, wer installiert hat (installedByName); geloeschtes Kont
   const anon = await install.installFromZip(makeZip(moduleFiles('anon-mod')));
   assert.equal(anon.module.install.installedByName, null);
   assert.equal(recordOf('anon-mod').installedBy, null);
+});
+
+// Phase 0 section H (test:client-error-text-guard): a filesystem error without
+// `status` must not reach the browser with its message - it names the absolute
+// path of modules/. The source reader cannot tell this catch from a gated one,
+// so it runs as a program: modules/ is replaced by a FILE, and the mkdir in
+// listModules() throws EEXIST with the path in its text.
+test('asset route: a filesystem error answers with a fixed sentence, never the path', async () => {
+  const aside = `${MODULES_DIR}.aside`;
+  try {
+    fs.renameSync(MODULES_DIR, aside);
+    fs.writeFileSync(MODULES_DIR, 'not a directory');
+    const r = await call('GET', '/assets/asset-mod/index.js', { actor: MEM });
+    assert.equal(r.status, 500);
+    const text = r.buf.toString('utf8');
+    assert.ok(!text.includes(TMP_ROOT) && !text.includes('modules'), `no path in the answer: ${text}`);
+    assert.ok(!/EEXIST|ENOTDIR|mkdir/.test(text), `no error class text in the answer: ${text}`);
+    assert.equal(r.body.error, 'Module asset failed.');
+    assert.equal(r.body.code, 500);
+  } finally {
+    if (fs.existsSync(aside)) {
+      fs.rmSync(MODULES_DIR, { force: true });
+      fs.renameSync(aside, MODULES_DIR);
+    }
+  }
+});
+
+// Phase 0 section H: the admin module list shows why a module did not load. A
+// filesystem error names absolute paths on the server; the list gets a fixed
+// sentence instead (a manifest check's own sentence stays).
+test('module list: a filesystem error while loading never shows the path', async () => {
+  const dir = path.join(MODULES_DIR, 'fs-broken-mod');
+  fs.mkdirSync(path.join(dir, 'module.json'), { recursive: true });
+  try {
+    const listed = (await modulesSvc.listModules({ admin: true })).find((m) => m.id === 'fs-broken-mod');
+    assert.ok(listed, 'the broken folder is listed');
+    assert.equal(listed.status, 'error');
+    assert.equal(listed.error, 'The module files could not be read.');
+    assert.ok(!listed.error.includes(MODULES_DIR));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

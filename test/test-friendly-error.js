@@ -290,6 +290,16 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
     // test:sync-form-errors.
     '../server/routes/calendar/apple.js',
+    // Kategorien des Budgets im Kategorie-Verwalter (#1909); die echte Antwort
+    // misst test:budget-categories-routes.
+    '../server/routes/budget/categories.js',
+    // Ein fremder Server hat abgelehnt oder war nicht erreichbar (Phase 0,
+    // Abschnitt H): die Klasse bestimmt remoteFailure, je Klasse misst sie
+    // test:http, die echte Antwort test:caldav-http-refusals.
+    '../server/utils/http.js',
+    // A WebDAV backup route failed on this server (#2622); the real answer
+    // measures test:backup-routes.
+    '../server/routes/backup.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -329,6 +339,9 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'inventory_booking_not_found', 'notes_note_not_found', 'notes_selected_category_not_found',
     'contacts_contact_not_found', 'birthdays_birthday_not_found', 'birthdays_selected_contact_not_found',
     'contacts_selected_category_not_found', 'inventory_location_not_found', 'inventory_category_not_found',
+    // Der Kategorie-Verwalter der uebrigen Module (#1909).
+    'budget_category_not_found', 'budget_subcategory_not_found', 'tasks_category_not_found',
+    'contacts_category_not_found', 'notes_category_not_found', 'pantry_location_not_found',
     'tasks_task_not_found', 'tasks_parent_not_found', 'tasks_comment_not_found', 'tasks_tag_not_found',
     'calendar_subscription_not_found', 'members_member_not_found',
     'schedule_shift_type_not_found', 'schedule_custom_field_not_found', 'schedule_pattern_not_found',
@@ -561,10 +574,14 @@ test('errorSentenceWithDetail: der Text des Servers nur im Rahmen, und nur als A
   assert.match(sentence, /^settings\.connectionFailedDetail/);
   assert.match(sentence, /401 Unauthorized/);
 
-  // Ein Fall ohne eigene Angabe bleibt beim Rahmen, wenn der Dienst etwas sagt.
+  // A case with its own sentence keeps it when no class comes along, whatever
+  // `error` says (#2622); with a class in `detail` the class is framed.
   const storage = answer(502, 'WebDAV 507', 'documents_storage_failed');
   storage.data.error = 'WebDAV 507';
-  assert.match(errorSentenceWithDetail(storage, FRAME), /WebDAV 507/);
+  assert.equal(errorSentenceWithDetail(storage, FRAME), 'documents.errorStorageFailed');
+  storage.data.detail = 'HTTP 507';
+  assert.match(errorSentenceWithDetail(storage, FRAME), /HTTP 507/);
+  delete storage.data.detail;
   storage.data.error = '';
   assert.equal(errorSentenceWithDetail(storage, FRAME), 'documents.errorStorageFailed');
 
@@ -580,6 +597,62 @@ test('errorSentenceWithDetail: der Text des Servers nur im Rahmen, und nur als A
   assert.equal(errorSentenceWithDetail(answer(429, 'Too many requests.'), FRAME), 'common.errorRateLimited');
   assert.equal(errorSentenceWithDetail(Object.assign(new Error('x'), { status: 0 }), FRAME), 'common.errorOfflineMutation');
   assert.equal(errorSentenceWithDetail({ status: 503, data: { error: 'offline' } }, FRAME), 'common.errorOffline');
+});
+
+// Phase 0, Abschnitt H: ein fremder Dienst kommt als Klasse (`detail`) und mit
+// einem festen englischen Satz in `error`. Im Rahmen steht die Klasse, nie der
+// englische Satz; ohne Klasse sagt der `remote_*`-Grund seinen eigenen Satz.
+test('errorSentenceWithDetail: die Klasse eines fremden Dienstes im Rahmen, nie der englische Satz', async () => {
+  const { errorSentenceWithDetail, errorSentence } = await load();
+  const FRAME = 'settings.connectionFailedDetail';
+  const ENGLISH = 'The CalDAV server refused the request or could not be reached.';
+  const remote = (reason, detail, params) => Object.assign(answer(502, ENGLISH, reason), {}, {
+    data: { error: ENGLISH, code: 502, reason, ...(detail === undefined ? {} : { detail }), ...(params ? { params } : {}) },
+  });
+  for (const [reason, detail] of [
+    ['remote_auth_failed', 'HTTP 401'], ['remote_unreachable', 'ECONNREFUSED'], ['remote_unreachable', 'timeout'],
+    ['remote_unreachable', 'blocked'], ['remote_http_status', 'HTTP 503'],
+  ]) {
+    const sentence = errorSentenceWithDetail(remote(reason, detail, reason === 'remote_http_status' ? { status: 503 } : undefined), FRAME);
+    assert.match(sentence, /^settings\.connectionFailedDetail/, `${reason}: im Rahmen`);
+    assert.ok(sentence.includes(detail), `${reason}: die Klasse steht drin`);
+    assert.ok(!sentence.includes('CalDAV server'), `${reason}: nie der englische Satz`);
+  }
+  // Ohne Klasse: der Satz des Grundes, nie der englische Satz im Rahmen.
+  assert.equal(errorSentenceWithDetail(remote('remote_failed'), FRAME), 'settings.remoteErrorFailed');
+  assert.equal(errorSentenceWithDetail(remote('remote_auth_failed'), FRAME), 'settings.remoteErrorAuthFailed');
+  // Freier Text in `detail` ist keine Klasse und kommt nicht in den Rahmen.
+  const smuggled = remote('remote_unreachable', 'connect ECONNREFUSED 10.0.0.5:8443');
+  assert.equal(errorSentenceWithDetail(smuggled, FRAME), 'settings.remoteErrorUnreachable');
+  // Die Stellen ohne Angabe sagen den Satz des Grundes, der Status als Zahl.
+  assert.match(errorSentence(remote('remote_http_status', 'HTTP 503', { status: 503 })), /^settings\.remoteErrorStatus/);
+  assert.equal(errorSentence(remote('remote_unreachable', 'ECONNREFUSED')), 'settings.remoteErrorUnreachable');
+});
+
+// #2622: since section H the server sends fixed English sentences in `error`
+// ("The document storage refused the request or could not be reached.",
+// "WebDAV upload failed."). A case the app knows says its translated sentence;
+// the English one never lands in the translated frame.
+test('errorSentenceWithDetail: a known case without a class says its sentence, never the fixed English one (#2622)', async () => {
+  const { errorSentenceWithDetail } = await load();
+  const FRAME = 'settings.documentStorageTestFailed';
+  const fixed = (status, error, reason) => answer(status, error, reason);
+  assert.equal(
+    errorSentenceWithDetail(fixed(502, 'The document storage refused the request or could not be reached.', 'documents_storage_failed'), FRAME),
+    'documents.errorStorageFailed',
+  );
+  for (const sentence of ['Connection test failed.', 'WebDAV upload failed.', 'The local backup could not be created.', 'Failed to list remote files.']) {
+    const result = errorSentenceWithDetail(fixed(500, sentence, 'backup_local_failed'), 'settings.connectionFailedDetail');
+    assert.equal(result, 'settings.backupLocalFailed', sentence);
+  }
+  // A `remote_http_status` without its number has no sentence: the sentence of
+  // the place, not the English text in the frame.
+  assert.equal(
+    errorSentenceWithDetail(fixed(502, 'The WebDAV server refused the request or could not be reached.', 'remote_http_status'), FRAME, 'settings.backupWebdavTestFailed'),
+    'settings.backupWebdavTestFailed',
+  );
+  // An answer without a known case still frames the service's own sentence.
+  assert.match(errorSentenceWithDetail(fixed(400, 'Bad gateway config', undefined), FRAME), /Bad gateway config/);
 });
 
 test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#1909)', async () => {

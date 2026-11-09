@@ -7,9 +7,25 @@ import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
 import * as appleCalendar from '../../services/apple-calendar.js';
 import { requireAdmin } from '../../auth.js';
+import { secret } from '../../middleware/validate.js';
+import { remoteFailure } from '../../utils/http.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
+
+/**
+ * The answer once the route's own named cases are handled (Phase 0 section H):
+ * a refusal of iCloud or the network as its class (502, `reason` + `detail`
+ * such as `HTTP 401`, which the settings page shows the admin), anything local
+ * as a fixed sentence. Never the text of iCloud or tsdav.
+ */
+function sendAppleFailure(res, err, status, sentence) {
+  const failure = remoteFailure(err);
+  if (failure) {
+    return res.status(502).json({ error: 'iCloud refused the request or could not be reached.', code: 502, ...failure });
+  }
+  return res.status(status).json({ error: sentence, code: status });
+}
 
 // --------------------------------------------------------
 // Apple Calendar Sync-Routen
@@ -47,7 +63,10 @@ router.post('/apple/sync', requireAdmin, async (req, res) => {
     res.json({ ok: true, lastSync });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: err.message, code: 500 });
+    if (err.code === 'apple_not_configured') {
+      return res.status(409).json({ error: 'No Apple calendar is connected.', code: 409, reason: 'apple_not_configured' });
+    }
+    sendAppleFailure(res, err, 500, 'Apple calendar sync failed.');
   }
 });
 
@@ -68,6 +87,9 @@ router.post('/apple/connect', requireAdmin, async (req, res) => {
   if (!password || typeof password !== 'string' || password.length < 1) {
     return res.status(400).json({ error: 'password is missing.', code: 400 });
   }
+  // Dieselbe Grenze wie CardDAV und CalDAV, ungetrimmt (#2575).
+  const vPassword = secret(password, 'password');
+  if (vPassword.error) return res.status(400).json({ error: vPassword.error, code: 400 });
 
   try {
     // Zuerst temporär setzen, damit testConnection() sie findet
@@ -79,12 +101,12 @@ router.post('/apple/connect', requireAdmin, async (req, res) => {
     appleCalendar.clearCredentials();
     log.error('', err);
     // Verbunden, aber ohne Kalender, ist der eine Fall, den die App kennt
-    // (#1909); sonst steht hier die Antwort von iCloud, die die Seite dem
-    // Admin als Angabe zeigt.
+    // (#1909); sonst ist es eine Absage von iCloud, deren Klasse die Seite dem
+    // Admin zeigt.
     if (err.code === 'apple_no_calendars') {
       return res.status(400).json({ error: err.message.replace('[Apple] ', ''), code: 400, reason: 'apple_no_calendars' });
     }
-    res.status(400).json({ error: err.message.replace('[Apple] ', ''), code: 400 });
+    sendAppleFailure(res, err, 500, 'Connecting the Apple calendar failed.');
   }
 });
 
