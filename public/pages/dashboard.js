@@ -9572,7 +9572,8 @@ function wireLinks(container, refresh, { editing = false, user = null, signal = 
   // Eigene Familien-Kachel-Zeile: Klick oeffnet den Status-Dialog (#1591).
   // Nur die Zeile der eingeloggten Person - die anderen sind nur lesbar.
   if (!editing && user) {
-    const selfRow = container.querySelector(`[data-avail-set="${CSS.escape(String(user.id))}"]`);
+    const escId = globalThis.CSS?.escape ? CSS.escape(String(user.id)) : String(user.id).replace(/["\\]/g, '\\$&');
+    const selfRow = container.querySelector(`[data-avail-set="${escId}"]`);
     if (selfRow) {
       const currentAvail = selfRow.querySelector('.family-widget-avatar[data-avail]')
         ? { state: selfRow.querySelector('.family-widget-avatar[data-avail]').dataset.avail }
