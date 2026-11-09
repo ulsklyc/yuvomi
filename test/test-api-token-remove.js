@@ -17,7 +17,7 @@
  * des Auth-Routers Teil der Zusage sind - ein selbst eingehaengter Router
  * waere eine Kopie der Kette.
  *
- * Ausfuehren: node --loader ./test/test-browser-loader.mjs --experimental-sqlite --test test/test-api-token-remove.js
+ * Ausfuehren: node --loader ./test/test-browser-loader.mjs --test test/test-api-token-remove.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

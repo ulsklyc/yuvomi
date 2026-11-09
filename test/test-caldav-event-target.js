@@ -7,7 +7,7 @@
  *        Zweite Invariante (Issue #618): GET /calendar/sync-targets liefert die
  *        Auswahlliste des Dropdowns auch Nicht-Admins - vorher hing sie an den
  *        admin-only Verwaltungsrouten und blieb fuer Familienmitglieder leer.
- * Ausführen: node --experimental-sqlite test/test-caldav-event-target.js
+ * Ausführen: node test/test-caldav-event-target.js
  */
 
 // Env vor dem Import der Route setzen (auth.js erwartet SESSION_SECRET,

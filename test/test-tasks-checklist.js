@@ -14,7 +14,7 @@
  *  - die Detailansicht schaltet die Kaestchen frei, Dashboard und Kalender nicht
  *  - i18n: die neuen Keys in allen Locales
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-tasks-checklist.js
+ * Ausfuehren: node --test test/test-tasks-checklist.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

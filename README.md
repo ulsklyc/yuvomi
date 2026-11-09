@@ -229,7 +229,7 @@ and the [installation guide](docs/installation.md).
 
   Open **http://localhost:8090** on the server itself; the wizard answers nowhere else. From
   another device, open a tunnel first, `ssh -L 8090:localhost:8090 user@server`, then open the
-  same address there. Needs Node.js 22.14+ or 23.6+ on the host; the container ships its own
+  same address there. Needs Node.js 24.12 or newer on the host; the container ships its own
   Node 24.
 
 </details>

@@ -17,7 +17,7 @@
  *        Orakel geprüft; Balance-kritische Fälle nutzen je einen frischen Nutzer, um
  *        Akkumulation in der geteilten :memory:-DB auszuschließen. Keine Systemuhr-
  *        Kopplung (rewards filtert nichts nach "heute").
- * Ausführen: node --experimental-sqlite --test test/test-rewards-routes.js
+ * Ausführen: node --test test/test-rewards-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

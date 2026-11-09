@@ -54,7 +54,8 @@ export function setExtensionSettingsModules(modules) {
     sheetId: `extension-${module.id}`,
     scope,
     adminOnly: scope === 'household',
-    loader: () => import(module.settings.entry),
+    // Ein Drittmodul unter /api/v1/modules/assets/: zur Laufzeit, nicht im Build.
+    loader: () => import(/* @vite-ignore */ module.settings.entry),
   })));
 }
 

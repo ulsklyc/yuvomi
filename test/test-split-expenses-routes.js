@@ -5,7 +5,7 @@
  *        (Ausgabe -> Salden, Settlement, Edit/Delete-Ledger-Konsistenz). Die
  *        reine Split-Mathematik liegt bereits in test-split-expenses.js; hier
  *        geht es um die Route-/Zugriffs-Schicht, die zuvor ungetestet war.
- * Ausführen: node --experimental-sqlite --test test/test-split-expenses-routes.js
+ * Ausführen: node --test test/test-split-expenses-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

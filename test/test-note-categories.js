@@ -2,7 +2,7 @@
  * Test: Notiz-Kategorien
  * Zweck: Schema- und Sichtbarkeitsinvarianten fuer persoenliche und
  *        haushaltsweite Kategorien absichern.
- * Ausfuehren: node --experimental-sqlite --test test/test-note-categories.js
+ * Ausfuehren: node --test test/test-note-categories.js
  */
 
 import test from 'node:test';

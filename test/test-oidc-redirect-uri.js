@@ -20,7 +20,7 @@
  * beide Seiten per Bauart gleich. Hier stehen die Faelle, in denen sie es nicht
  * sind.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-oidc-redirect-uri.js
+ * Ausfuehren: node --test test/test-oidc-redirect-uri.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'oidc-redirect-uri-test-secret';
 process.env.DB_PATH = ':memory:';

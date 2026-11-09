@@ -8,7 +8,7 @@
  *        (2) Bestandshaushalt: der Wert ist ein JSON-Array in einer
  *            sync_config-Zeile und muss gemergt werden - ein blindes Ersetzen
  *            wuerde bereits abgeschaltete Module wieder einschalten.
- * Ausführen: node --experimental-sqlite --test test/test-inventory-default-off-migration.js
+ * Ausführen: node --test test/test-inventory-default-off-migration.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

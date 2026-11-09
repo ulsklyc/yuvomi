@@ -2,7 +2,7 @@
  * Test: Wochenstart in der Preferences-API (#484, #465)
  * Zweck: GET liefert week_start mit Default 'monday'; PUT speichert monday/
  *        sunday/saturday (haushaltweit, von jedem Mitglied), weist Ungültiges ab.
- * Ausführen: node --experimental-sqlite --test test/test-preferences-weekstart.js
+ * Ausführen: node --test test/test-preferences-weekstart.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

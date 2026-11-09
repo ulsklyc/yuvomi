@@ -4,7 +4,7 @@
  *        findet diakritikbehaftete Treffer auch bei asciifizierter Eingabe
  *        („muller" → „Müller", „strasse"/„strase" → „Straße") und umgekehrt.
  *        Deckt Termine (Titel/Ort) und Kontakte ab; prüft den index-weiten Rebuild.
- * Ausführen: node --experimental-sqlite test/test-search-diacritics.js
+ * Ausführen: node test/test-search-diacritics.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

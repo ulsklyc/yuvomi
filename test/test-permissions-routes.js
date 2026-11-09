@@ -5,7 +5,7 @@
  *        test-permissions.js abgedeckt; hier geht es um die Route-Schicht:
  *        das requireAdmin-Gate (Privilege-Escalation-Schutz), Payload-Validierung,
  *        Round-Trip-Persistenz und die Admin-Ziel-Sonderregel.
- * Ausführen: node --experimental-sqlite --test test/test-permissions-routes.js
+ * Ausführen: node --test test/test-permissions-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -31,7 +31,7 @@
  * ein Datum oder null erwartet, stellt deshalb Uhr und Zone, und zwei tun es
  * am Monatswechsel, einmal mit dem Haushalt vor UTC, einmal dahinter.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-budget-loan-due-day.js
+ * Ausfuehren: node --test test/test-budget-loan-due-day.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

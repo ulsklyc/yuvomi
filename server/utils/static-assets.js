@@ -1,9 +1,9 @@
 /**
- * Modul: Statische Dateien - Inhalts-ETag, Kommentare und Brotli aus dem Speicher
- * Zweck: Drei Transportfragen der Dateien unter public/. Der Quelltext bleibt,
- *        wie er ist (R18: Kommentare bleiben im Code); was das Haus verlaesst,
- *        traegt sie seit R19 nicht mehr (Punkt 4, docs/DECISIONS.md #13).
- * Abhaengigkeiten: node:crypto, node:fs, node:zlib, ./strip-comments.js - keine Pakete
+ * Modul: Statische Dateien - Inhalts-ETag und Brotli aus dem Speicher
+ * Zweck: Zwei Transportfragen der gebauten Dateien unter dist/ (Phase 1a,
+ *        Abschnitt D). Kommentare schneidet seit dem Build der Minifier, nicht
+ *        mehr dieser Weg (Punkt 4).
+ * Abhaengigkeiten: node:crypto, node:fs, node:zlib - keine Pakete
  *
  * 1. ETAG AUS DEM INHALT. express.static bildet ihn aus Groesse und
  *    Aenderungszeit. Die Aenderungszeit ist aber eine Eigenschaft der
@@ -24,19 +24,14 @@
  *    rechnet im Threadpool, eine Datei nach der anderen), und jede weitere
  *    bekommt die fertige Fassung.
  *
- * 4. KOMMENTARE BLEIBEN IM REPO, NICHT AUF DER LEITUNG (Critique R19). Eigene
- *    .js/.mjs- und .css-Dateien werden beim ersten Abruf von Kommentaren
- *    befreit (strip-comments.js, Zeilen bleiben stehen) und so im Speicher
- *    gehalten; Brotli rechnet auf DIESER Fassung. Gemessen ueber public/: JS
- *    nach Brotli 2,0 -> 0,9 MB, CSS 621 -> 129 KB. Nicht angefasst werden
- *    /vendor/ und *.min.js (fremder Code samt Lizenzkopf). Der ETag gehoert zu
- *    den Bytes, die tatsaechlich gehen: die geschnittene Fassung traegt den
- *    Hash der geschnittenen Bytes, der Weg ueber express.static (nur noch hinter
- *    der Bremse) den der Datei - gleicher ETag heisst weiter gleicher Inhalt.
- *    Eine geschnittene Datei ohne Brotli-Fassung liefert dieser Weg selbst aus;
- *    gzip uebernimmt dabei compression() wie bisher. Ein `Range` wird fuer
- *    geschnittene Dateien uebergangen (200 statt 206 - erlaubt, und kein
- *    Browser fragt Skripte stueckweise).
+ * 4. KOMMENTARE: SEIT DEM BUILD NICHT MEHR HIER. Von R19 bis Phase 1a schnitt
+ *    dieser Weg Kommentare aus eigenem JS und CSS beim ersten Abruf
+ *    (strip-comments.js, docs/DECISIONS.md #13). Seit `npm run build` minifiziert
+ *    Vite das JS (Oxc) und das Kopier-Plugin die Blaetter (lightningcss); die
+ *    Zeilentreue, fuer die der Schnitt die Zeilen stehen liess, geben die
+ *    ausgelieferten Sourcemaps. Gemessen ueber dist/: eigenes JS nach Brotli
+ *    0,82 MB (geschnitten aus public/ 0,9), CSS 0,14 MB (0,129). Der ETag ist
+ *    wieder einer fuer beide Wege: der Hash der Datei.
  *
  * Alles haengt an (Aenderungszeit, Groesse) der Datei: aendert sie sich im
  * laufenden Betrieb, werden Hash, Schnitt und Fassung neu gebildet.
@@ -70,7 +65,6 @@ import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { brotliCompress, constants as zlib } from 'node:zlib';
-import { stripCssComments, stripJsComments } from './strip-comments.js';
 
 /** Was sich zu komprimieren lohnt. Bilder und Schriften sind es schon. */
 export const COMPRESSIBLE_EXTENSIONS = new Set([
@@ -105,11 +99,9 @@ const BYPASS = Symbol('static-assets.bypass');
  *   fuer Tests austauschbar
  * @param {number} [options.maxBytes] - Summe der Brotli-Fassungen im Speicher
  * @param {number} [options.maxEntries] - Zahl der gemerkten Dateien
- * @param {boolean} [options.strip=true] - Kommentare aus eigenem JS/CSS schneiden
  */
 export function createStaticAssets(root, {
   brotli = true,
-  strip = true,
   setHeaders = () => {},
   compress = brotliCompress,
   maxBytes = MAX_STORED_BYTES,
@@ -121,9 +113,8 @@ export function createStaticAssets(root, {
   const rootReal = realPath(rootDir) ?? rootDir;
   /**
    * Schluessel: der aufgeloeste Pfad der Datei, nie der aus der Adresse.
-   * `etag` gehoert zu den Bytes, die dieser Weg sendet (geschnitten, wenn es
-   * `body` gibt), `fileEtag` zur Datei, wie express.static sie sendet.
-   * @type {Map<string, { mtimeMs: number, size: number, etag: string, fileEtag: string, body: Buffer|null, br: Buffer|null, queued: boolean, declined: boolean }>}
+   * `etag` ist der Hash der Datei - beide Wege senden dieselben Bytes.
+   * @type {Map<string, { mtimeMs: number, size: number, etag: string, br: Buffer|null, queued: boolean, declined: boolean }>}
    */
   const entries = new Map();
   const queue = [];
@@ -151,22 +142,10 @@ export function createStaticAssets(root, {
   const hashBytes = (bytes) => `W/"${createHash('sha1').update(bytes).digest('base64url')}"`;
   const hashOf = (filePath) => hashBytes(readFileSync(filePath));
 
-  /** Der Schnitt fuer diese Datei, oder null (fremder Code, anderes Format). */
-  function stripperFor(key) {
-    if (!strip) return null;
-    const rel = path.relative(rootReal, key).split(path.sep);
-    if (rel[0] === 'vendor' || key.endsWith('.min.js')) return null;
-    const ext = path.extname(key).toLowerCase();
-    if (ext === '.js' || ext === '.mjs') return stripJsComments;
-    if (ext === '.css') return stripCssComments;
-    return null;
-  }
-
   function forget(key) {
     const entry = entries.get(key);
     if (!entry) return;
     if (entry.br) storedBytes -= entry.br.length;
-    if (entry.body) storedBytes -= entry.body.length;
     entries.delete(key);
   }
 
@@ -179,21 +158,9 @@ export function createStaticAssets(root, {
     if (known && known.mtimeMs === stat.mtimeMs && known.size === stat.size) return known;
     // Die Datei hat sich geaendert: die alte Fassung zaehlt nicht weiter.
     forget(key);
-    const source = readFileSync(key);
-    const fileEtag = hashBytes(source);
-    let body = null;
-    const stripper = stripperFor(key);
-    if (stripper) {
-      try {
-        const cut = Buffer.from(stripper(source.toString('utf8')), 'utf8');
-        // Nur wenn es etwas spart und Platz ist; sonst geht die Datei wie sie ist.
-        if (cut.length < source.length && storedBytes + cut.length <= maxBytes) body = cut;
-      } catch { /* ein Fehler im Schnitt liefert die Datei unveraendert */ }
-    }
-    if (body) storedBytes += body.length;
     const entry = {
-      mtimeMs: stat.mtimeMs, size: stat.size, etag: body ? hashBytes(body) : fileEtag, fileEtag,
-      body, br: null, queued: false, declined: false,
+      mtimeMs: stat.mtimeMs, size: stat.size, etag: hashOf(key),
+      br: null, queued: false, declined: false,
     };
     entries.set(key, entry);
     // Eine Map haelt die Einfuegereihenfolge: der erste Schluessel ist der
@@ -209,16 +176,14 @@ export function createStaticAssets(root, {
     if (!job) return;
     working = true;
     const { filePath, entry } = job;
-    let source = entry.body;
-    if (!source) {
-      try {
-        source = readFileSync(filePath);
-      } catch {
-        working = false;
-        entry.queued = false;
-        compressNext();
-        return;
-      }
+    let source;
+    try {
+      source = readFileSync(filePath);
+    } catch {
+      working = false;
+      entry.queued = false;
+      compressNext();
+      return;
     }
     compress(source, {
       params: {
@@ -231,7 +196,7 @@ export function createStaticAssets(root, {
       entry.queued = false;
       // Nur uebernehmen, wenn es noch der Stand ist, der gelesen wurde, und
       // wenn es sich lohnt. Ein Fehler laesst die Datei bei compression().
-      if (!err && entries.get(filePath) === entry && source.length === (entry.body ? entry.body.length : entry.size) && result.length < source.length) {
+      if (!err && entries.get(filePath) === entry && source.length === entry.size && result.length < source.length) {
         if (storedBytes + result.length <= maxBytes) {
           entry.br = result;
           storedBytes += result.length;
@@ -279,10 +244,9 @@ export function createStaticAssets(root, {
     etagFor(filePath, stat) {
       const key = canonical(filePath);
       // Ein Link nach draussen (express.static folgt ihm) bekommt seinen
-      // Inhalts-ETag, wird aber nicht gemerkt: der Speicher gehoert public/.
+      // Inhalts-ETag, wird aber nicht gemerkt: der Speicher gehoert dist/.
       if (!key) return hashOf(filePath);
-      // express.static sendet die Datei, wie sie ist: also deren Hash.
-      return entryFor(key, stat ?? statSync(key)).fileEtag;
+      return entryFor(key, stat ?? statSync(key)).etag;
     },
 
     /**
@@ -308,12 +272,11 @@ export function createStaticAssets(root, {
       const key = canonical(filePath);
       if (!key) return next();
       const entry = entryFor(key, stat);
-      const length = entry.body ? entry.body.length : stat.size;
       // Teilabrufe rechnen in Bytes der unkomprimierten Datei - Brotli gibt es
-      // dafuer nicht. Eine geschnittene Datei geht trotzdem ganz (Kopf, Punkt 4).
-      const wantsBr = brotli && !req.headers.range && length >= MIN_BYTES && req.acceptsEncodings('br');
+      // dafuer nicht.
+      const wantsBr = brotli && !req.headers.range && stat.size >= MIN_BYTES && req.acceptsEncodings('br');
       if (wantsBr && !entry.br) schedule(key, entry);
-      if (!(wantsBr && entry.br) && !entry.body) return next();
+      if (!(wantsBr && entry.br)) return next();
 
       res.type(path.extname(filePath));
       setHeaders(res, filePath, stat);
@@ -321,17 +284,10 @@ export function createStaticAssets(root, {
       res.setHeader('Last-Modified', stat.mtime.toUTCString());
       res.vary('Accept-Encoding');
       if (req.fresh) return res.status(304).end();
-      if (wantsBr && entry.br) {
-        res.setHeader('Content-Encoding', 'br');
-        res.setHeader('Content-Length', entry.br.length);
-        if (req.method === 'HEAD') return res.end();
-        return res.end(entry.br);
-      }
-      // Geschnitten, ohne Brotli-Fassung: compression() oben packt gzip, wenn
-      // der Browser es annimmt, sonst geht die Fassung unkomprimiert.
-      res.setHeader('Content-Length', entry.body.length);
+      res.setHeader('Content-Encoding', 'br');
+      res.setHeader('Content-Length', entry.br.length);
       if (req.method === 'HEAD') return res.end();
-      return res.end(entry.body);
+      return res.end(entry.br);
     },
 
     /**

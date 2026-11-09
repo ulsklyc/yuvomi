@@ -1,7 +1,7 @@
 /**
  * Modul: Category-Manager-Test
  * Zweck: Sichert Struktur und API-Nutzung der generischen Komponente + Budget-Verdrahtung
- * Ausführen: node --experimental-sqlite test/test-category-manager.js
+ * Ausführen: node test/test-category-manager.js
  */
 import { readFileSync } from 'node:fs';
 import { eachRule } from './css-rules.js';

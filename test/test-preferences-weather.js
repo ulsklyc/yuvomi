@@ -2,7 +2,7 @@
  * Test: Wetter-Konfiguration in der Preferences-API
  * Zweck: GET liefert die 5 weather_*-Felder mit Defaults; PUT speichert sie
  *        (admin-only) und validiert lat/lon/provider.
- * Ausführen: node --experimental-sqlite --test test/test-preferences-weather.js
+ * Ausführen: node --test test/test-preferences-weather.js
  */
 
 // Env vor dem Import der Route setzen — db.js initialisiert mit DB_PATH=:memory:

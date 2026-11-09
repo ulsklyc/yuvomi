@@ -151,12 +151,18 @@ test('the check script fails the build when googleapis is missing from node_modu
 });
 
 test('the Dockerfile runs the check in the build stage right after the production install', () => {
+  // Seit dem Build (Phase 1a, Abschnitt D): `npm ci` mit devDependencies, `npm run
+  // build`, dann `npm prune --omit=dev` - erst danach steht der Produktionsstand,
+  // den die Runtime-Stage uebernimmt, und genau den prueft das Skript.
   const dockerfile = readFileSync(join(ROOT, 'Dockerfile'), 'utf8');
   const buildStage = dockerfile.slice(0, dockerfile.lastIndexOf('\nFROM '));
-  const install = buildStage.indexOf('\nRUN npm ci --omit=dev\n');
+  const build = buildStage.indexOf('npm run build\n');
+  const install = buildStage.indexOf('\nRUN npm prune --omit=dev\n');
   const copy = buildStage.indexOf('\nCOPY scripts/check-runtime-deps.mjs ./scripts/\n');
   const check = buildStage.indexOf('\nRUN node scripts/check-runtime-deps.mjs\n');
-  assert.notEqual(install, -1, 'the build stage installs with npm ci --omit=dev');
+  assert.ok(buildStage.indexOf('\nRUN npm ci\n') !== -1 && build !== -1, 'the build stage installs everything and builds the web app');
+  assert.notEqual(install, -1, 'the build stage drops the devDependencies with npm prune --omit=dev');
+  assert.ok(install > build, 'pruned after the build, which needs Vite');
   assert.notEqual(copy, -1, 'the build stage copies the check script');
   assert.notEqual(check, -1, 'the build stage runs the check script');
   assert.ok(check > install && check > copy, 'the check runs after the install and the copy');

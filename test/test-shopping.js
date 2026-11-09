@@ -1,7 +1,7 @@
 /**
  * Modul: Einkaufslisten-Test
  * Zweck: Validiert alle Shopping-API-Abfragen, Sortierung, Constraints
- * Ausführen: node --experimental-sqlite test-shopping.js
+ * Ausführen: node test-shopping.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

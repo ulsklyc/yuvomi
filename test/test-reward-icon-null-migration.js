@@ -14,7 +14,7 @@
  *            dem Katalog nicht mehr nachgezogen - er braucht denselben Griff.
  *        (4) Getroffen wird NUR der exakte Wert: eine Beschreibung, die "null"
  *            enthaelt oder umgibt, ist echter Text und bleibt stehen.
- * Ausführen: node --experimental-sqlite --test test/test-reward-icon-null-migration.js
+ * Ausführen: node --test test/test-reward-icon-null-migration.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -1,7 +1,7 @@
 /**
  * Modul: Aufgaben-Test
  * Zweck: Validiert alle Tasks-API-Abfragen und Constraints
- * Ausführen: node --experimental-sqlite test-tasks.js
+ * Ausführen: node test-tasks.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

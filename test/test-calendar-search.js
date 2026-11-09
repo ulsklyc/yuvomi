@@ -4,7 +4,7 @@
  *        im FTS5-Index `search_index` auffindbar, inkl. Backfill bestehender
  *        Zeilen und Reindex bei UPDATE/DELETE. Spiegelt die FTS-Query, auf der
  *        GET /api/v1/calendar/search aufsetzt.
- * Ausführen: node --experimental-sqlite test/test-calendar-search.js
+ * Ausführen: node test/test-calendar-search.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

@@ -18,7 +18,7 @@
  *
  * Geprüft wird der echte Vertrag über Birthdays-, Kalender- und
  * Preferences-Router auf der migrierten DB, plus buildFeed() für den ICS-Export.
- * Ausführen: node --experimental-sqlite --test test/test-birthday-localization.js
+ * Ausführen: node --test test/test-birthday-localization.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

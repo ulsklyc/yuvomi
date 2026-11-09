@@ -21,7 +21,7 @@
  *        einen Gleichstand-Tiebreak (gleiche MM-DD → Name) und Cross-Checks
  *        (/upcoming = erste N von /) belegt; days_until/next_age werden gegen die
  *        importierten Service-Helfer als Orakel geprüft.
- * Ausführen: node --experimental-sqlite --test test/test-birthdays-routes.js
+ * Ausführen: node --test test/test-birthdays-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -24,7 +24,7 @@
  * Jeder Fall läuft ohne Client-Attrappe: echte Dienste, echter Client, echtes
  * HTTP auf 127.0.0.1.
  *
- * Ausführen: node --experimental-sqlite --test test/test-caldav-deselected-deletions.js
+ * Ausführen: node --test test/test-caldav-deselected-deletions.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

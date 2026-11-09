@@ -5,7 +5,7 @@
  *        die Handler nach, ruft sie nicht auf). Fokus: Validierung (400: Inhalt-
  *        Pflicht, HEX-Farbe), 404, CRUD, Pin-Toggle, Pinned-zuerst-Sortierung,
  *        Titel-Leerung. Notizen sind haushaltsweit → kein Auth-Gate-Teil.
- * Ausführen: node --experimental-sqlite --test test/test-notes-routes.js
+ * Ausführen: node --test test/test-notes-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

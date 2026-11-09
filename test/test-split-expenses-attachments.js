@@ -9,7 +9,7 @@
  *          - ein privater Beleg bleibt für die Gruppe unsichtbar
  *          - PUT ohne das Feld lässt Belege stehen
  *          - proof_document_id einer Zahlung wird gegen die Sichtbarkeit geprüft
- * Ausführen: node --experimental-sqlite --test test/test-split-expenses-attachments.js
+ * Ausführen: node --test test/test-split-expenses-attachments.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

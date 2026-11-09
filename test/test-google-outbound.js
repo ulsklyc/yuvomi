@@ -25,7 +25,7 @@
  *        Netz-frei: der Google-Client wird als Fake injiziert; GOOGLE_CLIENT_ID &
  *        Co. bleiben ungesetzt, damit der Sofortversuch der Routen beim Client-Bau
  *        abbricht statt zu funken.
- * Ausführen: node --experimental-sqlite --test test/test-google-outbound.js
+ * Ausführen: node --test test/test-google-outbound.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

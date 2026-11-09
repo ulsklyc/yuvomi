@@ -16,7 +16,7 @@
  *        getrennt geprueft: ein Renderer, der nur die eigene Zeile zeigt,
  *        waehrend die Antwort alle Kinder mitliefert, waere eine Rangliste im
  *        Netzwerk-Tab.
- * Ausfuehren: node --experimental-sqlite --test test/test-dashboard-rewards.js
+ * Ausfuehren: node --test test/test-dashboard-rewards.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
