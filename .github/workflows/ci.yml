@@ -141,3 +141,27 @@ jobs:
 
       - name: Run the fasting browser suite
         run: npm run test:fasting-browser
+
+  # Typpruefung (Phase 1a, Abschnitt C): `tsc --build` ueber server/, public/ und
+  # test/ mit checkJs und strict, verglichen mit tsc-baseline.json, die nur sinken
+  # darf. Eigener Job, parallel zu den Tests; eine Node-Version reicht, 24.x ist
+  # die des Images und traegt das Type Stripping fuer scripts/check-tsc-baseline.ts.
+  typecheck:
+    name: Typecheck (Node.js 24.x)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24.x
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check against the baseline
+        run: npm run typecheck
