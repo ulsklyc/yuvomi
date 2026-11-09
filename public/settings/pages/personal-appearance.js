@@ -1019,7 +1019,6 @@ function bindDeviceDisplay(container) {
  * neuen Farben direkt via applyModuleColorOverrides() an.
  * Ein unzureichender Kontrast (< 3:1 auf der jeweiligen Fläche) erzeugt
  * einen Hinweis unterhalb der Zeile, verhindert das Speichern aber nicht.
- * @param {HTMLElement} container
  */
 function bindModuleColors(container) {
   // Kanon: colorPickerHtml()/wireColorPicker() (utils/color-picker.js, E6) -
