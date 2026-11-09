@@ -110,6 +110,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Der Server verlangt dist/ (Phase 1a, Abschnitt D), und die Suiten zum
+      # Artefakt lesen es. `npm test` baut ueber `pretest` noch einmal (eine
+      # Sekunde); der eigene Schritt hier zeigt die Bauzeit getrennt.
+      - name: Build the web app
+        run: npm run build
+
+      # Zwei Builds desselben Commits in zwei Verzeichnissen, sha256 jeder Datei
+      # unter dist/ (Fertig-Kriterium F5). Rot heisst: der Release-Tarball liesse
+      # sich aus dem Quelltarball nicht nachbauen.
+      - name: Check that the build is deterministic
+        run: node scripts/check-build-determinism.mjs
+
       - name: Run tests
         run: npm test
 
@@ -138,6 +150,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Der Harness startet den Server, und der liefert nur das gebaute dist/.
+      - name: Build the web app
+        run: npm run build
 
       - name: Run the fasting browser suite
         run: npm run test:fasting-browser

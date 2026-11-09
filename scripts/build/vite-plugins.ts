@@ -16,7 +16,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join, relative, sep } from 'node:path';
 import { transform as transformCss } from 'lightningcss';
 import type { Plugin } from 'vite';
-import { COPY_LIST, FACADES, NOT_COPIED, copyEntryFor } from './static-files.ts';
+import { writeNotices } from '../build-third-party-notices.mjs';
+import { FACADES, NOT_COPIED, copyEntryFor } from './static-files.ts';
 
 const toPosix = (p: string): string => p.split(sep).join('/');
 
@@ -250,6 +251,17 @@ export function moduleListPlugin(repoRoot: string): Plugin {
         fileName: '.vite/modules.json',
         source: `${JSON.stringify({ graph: [...graph].sort(), rendered: [...rendered].sort(), external: [...external].sort(), chunks: byFile }, null, 2)}\n`,
       });
+    },
+  };
+}
+
+/** dist/THIRD-PARTY-NOTICES.txt from the module list (scripts/build-third-party-notices.mjs). */
+export function noticesPlugin(repoRoot: string): Plugin {
+  return {
+    name: 'yuvomi:third-party-notices',
+    apply: 'build',
+    writeBundle(options) {
+      writeNotices(String(options.dir), repoRoot);
     },
   };
 }

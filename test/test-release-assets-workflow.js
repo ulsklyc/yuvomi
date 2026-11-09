@@ -7,8 +7,9 @@
  *          Proxmox `prebuild` silently falls back to the previous release when
  *          the asset is missing. So the order is the promise: a published
  *          release always carries its asset. This guard reads the workflow as
- *          text and holds trigger, permissions, pins, the attestation subjects,
- *          the publish-last order and the closing check. It starts by
+ *          text and holds trigger, permissions, pins, the build with its
+ *          determinism check, the reproducible pack of tag tree plus dist/,
+ *          the attestation subjects, the publish-last order and the closing check. It starts by
  *          dispatch only: GitHub runs no workflow for a draft's `created`.
  * Ausführen: npm run test:release-assets-workflow
  */
@@ -127,9 +128,23 @@ test('no step interpolates an expression into a shell script', () => {
     'the first step rejects a tag that is not vX.Y.Z before anything uses it');
 });
 
-test('packs the tag with git archive under yuvomi-<version>/ and writes SHA256SUMS', () => {
-  const pack = indexOf(/git archive --format=tar --prefix="yuvomi-\$VERSION\/" "refs\/tags\/\$TAG" \| gzip -n > "\$TARBALL"/);
-  assert.notEqual(pack, -1, 'the tarball comes from git archive of the tag, gzip -n (no name, no time)');
+test('builds dist/ deterministically, then packs the tag tree plus dist/ under yuvomi-<version>/ and writes SHA256SUMS', () => {
+  // Phase 1a, section D: the asset is the git archive of the tag PLUS the built
+  // web app (the server refuses to start without dist/), packed reproducibly.
+  const build = indexOf(/npm run build\n\s+node scripts\/check-build-determinism\.mjs --ref "refs\/tags\/\$TAG"/);
+  assert.notEqual(build, -1, 'build, then two more builds of the tag compared file by file');
+  assert.match(allSteps[build].text, /APP_BUILD_REVISION: \$\{\{ github\.sha \}\}/, 'the revision is the tagged commit, as in the image');
+  assert.ok(indexOf(/run: npm ci/) < build, 'npm ci before the build');
+  const pack = indexOf(/git archive --format=tar --prefix="yuvomi-\$VERSION\/" "refs\/tags\/\$TAG" \| tar -x -C stage/);
+  assert.notEqual(pack, -1, 'the source part comes from git archive of the tag, under yuvomi-<version>/');
+  assert.ok(build < pack, 'packed only after the determinism check');
+  const packText = allSteps[pack].text;
+  assert.match(packText, /cp -R dist "stage\/yuvomi-\$VERSION\/dist"/, 'dist/ goes in under the same top-level folder');
+  assert.match(packText, /SOURCE_DATE_EPOCH="\$\(git log -1 --format=%ct "refs\/tags\/\$TAG"\)"/);
+  assert.match(packText, /tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@\$SOURCE_DATE_EPOCH"/, 'reproducible tar: order, owner, time');
+  assert.match(packText, /\| gzip -n > "\$TARBALL"/, 'gzip -n (no name, no time)');
+  assert.match(packText, /for NEED in index\.html sw\.js THIRD-PARTY-NOTICES\.txt; do/, 'the pack checks that the build is in it');
+  assert.match(packText, /sed -n "\\#\^yuvomi-\$VERSION\/#!p"/, 'and that nothing lies outside the top-level folder');
   assert.match(allSteps[0].text, /tarball=yuvomi-\$VERSION-dist\.tar\.gz/,
     'asset name yuvomi-<version>-dist.tar.gz (decision E2), version without the v');
   const sums = indexOf(/sha256sum "\$TARBALL" > SHA256SUMS/);

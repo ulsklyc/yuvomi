@@ -829,7 +829,7 @@ async function mountExtensionWidgets(shell, cfg, user) {
     try {
       let mod = _extensionWidgetModules.get(meta.entry);
       if (!mod) {
-        mod = await import(/* webpackIgnore: true */ meta.entry);
+        mod = await import(/* @vite-ignore */ meta.entry);
         _extensionWidgetModules.set(meta.entry, mod);
       }
       mount.replaceChildren();

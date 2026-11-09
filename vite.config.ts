@@ -13,6 +13,7 @@ import {
   facadesPlugin,
   moduleListPlugin,
   nonModuleTagsPlugin,
+  noticesPlugin,
   indexHtmlPlugin,
   isExternal,
   staticCopyPlugin,
@@ -20,6 +21,12 @@ import {
 import { serviceWorkerPlugin } from './scripts/build/service-worker.ts';
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url));
+
+// `npm run dev` (scripts/dev.mjs): Vite serves public/ on 5173, everything the
+// Express server answers itself goes through to it. Not /health: without an
+// HTML Accept it is the container probe, with one it is the health module page.
+const backend = `http://localhost:${process.env.PORT || 3000}`;
+const PROXIED = ['/api', '/auth', '/sw.js', '/openapi.json', '/docs', '/modules', '/feed', '/mcp', '/manifest.webmanifest'];
 const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 
 export default defineConfig({
@@ -28,6 +35,13 @@ export default defineConfig({
   // list in static-files.ts replaces it.
   publicDir: false,
   appType: 'spa',
+  server: {
+    port: 5173,
+    strictPort: true,
+    // Host stays localhost:5173 (no changeOrigin): the session cookie and the
+    // CSRF origin check see the address the browser uses.
+    proxy: Object.fromEntries(PROXIED.map((prefix) => [prefix, { target: backend }])),
+  },
   plugins: [
     nonModuleTagsPlugin(),
     facadesPlugin(publicDir),
@@ -35,6 +49,7 @@ export default defineConfig({
     indexHtmlPlugin(publicDir, 'pages/dashboard.js'),
     moduleListPlugin(repoRoot),
     serviceWorkerPlugin(repoRoot, publicDir),
+    noticesPlugin(repoRoot),
   ],
   build: {
     outDir: fileURLToPath(new URL('./dist', import.meta.url)),

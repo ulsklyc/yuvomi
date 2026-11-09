@@ -141,3 +141,22 @@ test('the image workflow keeps read-only repository contents', () => {
   assert.match(permissions, /^ {2}contents: read$/m, 'docker-publish.yml must keep contents: read');
   assert.doesNotMatch(workflow, /^\s+contents: write$/m, 'no contents: write anywhere in docker-publish.yml');
 });
+
+test('the image builds the web app and ships dist/ from the build stage, plus the shared source', () => {
+  // Phase 1a, Abschnitt D: der Server liefert nur dist/ und bricht ohne ab.
+  // public/ bleibt im Image (der Server importiert public/utils/ und liest
+  // public/locales/), test/ nicht, und dist/ kommt nie aus dem Build-Kontext.
+  const buildStage = dockerfile.slice(0, dockerfile.lastIndexOf('\nFROM '));
+  const runtimeStage = dockerfile.slice(dockerfile.lastIndexOf('\nFROM ') + 1);
+  assert.match(buildStage, /\nARG APP_BUILD_REVISION\nRUN APP_BUILD_REVISION="\$\{APP_BUILD_REVISION\}" npm run build\n/, 'the build stage builds with the revision');
+  assert.match(buildStage, /\nENV PUPPETEER_SKIP_DOWNLOAD=true\n/, 'npm ci with devDependencies must not fetch a browser');
+  assert.match(runtimeStage, /\nCOPY --from=build \/app\/dist \.\/dist\n/);
+  assert.match(runtimeStage, /\nCOPY server\/ \.\/server\/\n/);
+  assert.match(runtimeStage, /\nCOPY public\/ \.\/public\/\n/);
+  assert.doesNotMatch(runtimeStage, /\nCOPY \. \.\n/, 'no blanket copy of the context into the runtime stage');
+  assert.doesNotMatch(runtimeStage, /COPY test\//);
+  const ignore = readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8').split('\n').map((l) => l.trim());
+  assert.ok(ignore.includes('test/'), '.dockerignore keeps test/ out');
+  assert.ok(!ignore.some((l) => /^\/?dist\/?$/.test(l)), '.dockerignore must not list dist/ - it is built in the image, never copied in');
+  for (const need of ['!scripts/build/', '!scripts/build-third-party-notices.mjs']) assert.ok(ignore.includes(need), `${need} missing in .dockerignore`);
+});

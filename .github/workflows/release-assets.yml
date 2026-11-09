@@ -29,11 +29,17 @@ name: Release Assets
 # So the start is explicit, and a forgotten start leaves an invisible draft,
 # never a public release without its tarball.
 #
-# CONTENT FOR NOW: the tarball is byte-for-byte what `git archive` makes of the
-# tag, with the top-level folder `yuvomi-<version>/` (decision E2) - the same
-# content as the source tarball, so the channels can switch over before the
-# content changes. Section D (Vite build) replaces the archive step with
-# `npm ci && npm run build` and packs `dist/` instead.
+# CONTENT (phase 1a, section D): the `git archive` tree of the tag PLUS the
+# built web app `dist/` (with `dist/THIRD-PARTY-NOTICES.txt`), under the one
+# top-level folder `yuvomi-<version>/` (decision E2). The source stays in the
+# tarball: the server imports shared code from public/utils/ and reads
+# public/locales/, and YunoHost (`in_subdir`) and Proxmox (`prebuild`) strip
+# exactly one folder, run `npm ci --omit=dev` and start `node server/index.js`,
+# which refuses to start without dist/. Before packing, the build runs twice
+# more in two fresh directories (scripts/check-build-determinism.mjs): the
+# attestation is worth something only if the tarball can be rebuilt from the
+# source. The pack itself is reproducible too: sorted entries, owner 0,
+# mtime of the tagged commit, `gzip -n`.
 #
 # PUBLISHING WITH GITHUB_TOKEN TRIGGERS NOTHING. Events caused by the workflow
 # token never start other workflows (except workflow_dispatch and
@@ -73,10 +79,11 @@ jobs:
   assets:
     name: Build, attest and publish the release tarball
     runs-on: ubuntu-latest
-    # Measured steps are seconds (archive, hash, one attestation, one upload);
-    # nothing in the job waits on purpose. 15 leaves room for a slow Sigstore
+    # Measured steps are seconds (npm ci about a minute, three builds of about
+    # one second each, archive, hash, one attestation, one upload); nothing in
+    # the job waits on purpose. 20 leaves room for a slow npm registry, Sigstore
     # or upload round trip without hiding a hang for six hours.
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       TAG: ${{ inputs.tag }}
       GH_TOKEN: ${{ github.token }}
@@ -109,14 +116,51 @@ jobs:
           ref: refs/tags/${{ env.TAG }}
           persist-credentials: false
 
+      - name: Set up Node.js 24.x
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+
+      # The build needs the devDependencies (Vite); Puppeteer's browser is for
+      # the test suites only and stays undownloaded.
+      - name: Install dependencies
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+        run: npm ci
+
+      # The revision is the tagged commit - the same value docker-publish.yml
+      # bakes into the image, so both artifacts name the same service worker cache.
+      - name: Build the web app and check that the build is deterministic
+        env:
+          APP_BUILD_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/check-build-determinism.mjs --ref "refs/tags/$TAG"
+          test -f dist/index.html && test -f dist/sw.js && test -f dist/THIRD-PARTY-NOTICES.txt
+
       - name: Pack the tarball
         env:
           VERSION: ${{ steps.version.outputs.version }}
           TARBALL: ${{ steps.version.outputs.tarball }}
         run: |
           set -euo pipefail
-          git archive --format=tar --prefix="yuvomi-$VERSION/" "refs/tags/$TAG" | gzip -n > "$TARBALL"
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct "refs/tags/$TAG")"
+          rm -rf stage && mkdir stage
+          git archive --format=tar --prefix="yuvomi-$VERSION/" "refs/tags/$TAG" | tar -x -C stage
+          cp -R dist "stage/yuvomi-$VERSION/dist"
+          tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$SOURCE_DATE_EPOCH" \
+            -C stage -cf - "yuvomi-$VERSION" | gzip -n > "$TARBALL"
           gzip -t "$TARBALL"
+          # The server refuses to start without the build: it must be in the asset.
+          # The listing goes in once; `grep -q` on a pipe would SIGPIPE tar.
+          LISTING="$(tar -tzf "$TARBALL")"
+          for NEED in index.html sw.js THIRD-PARTY-NOTICES.txt; do
+            if ! grep -qxF "yuvomi-$VERSION/dist/$NEED" <<< "$LISTING"; then
+              echo "::error::$TARBALL has no yuvomi-$VERSION/dist/$NEED"
+              exit 1
+            fi
+          done
           # Every entry sits under the one top-level folder (YunoHost
           # `in_subdir`, Proxmox `_deploy_source_tarball`). sed reads the whole
           # listing, so pipefail never sees a SIGPIPE from tar.

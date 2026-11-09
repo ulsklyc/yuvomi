@@ -9,13 +9,14 @@
  *   2. BROTLI IST NUR TRANSPORT. Die Fassung aus dem Speicher ist bytegleich
  *      zum Original, traegt denselben ETag und dasselbe Cache-Control, und
  *      wer `br` nicht annimmt, bekommt sie nicht.
- *   3. DIE ECHTE APP: jede Precache-Datei kommt mit dem ETag der Bytes, die
- *      tatsaechlich gehen, und bleibt ueber einen Neustart gleich.
- *   4. KOMMENTARE NUR IM REPO (R19): eigenes JS/CSS geht ohne Kommentare, auf
- *      jedem Weg dieselben Bytes unter demselben ETag; fremder Code bleibt.
- *      Die Abschnitte 1 und 2 pruefen den Transport und laufen deshalb mit
- *      `strip: false` - sonst verglichen sie mit einer Datei, die nie geht.
- *      Ob der Schnitt selbst korrekt ist, haelt test:strip-comments.
+ *   3. DIE ECHTE APP (seit Phase 1a: dist/, gebaut): jede Precache-Datei aus
+ *      dist/sw.js kommt mit dem ETag ihrer Bytes und bleibt ueber einen
+ *      Neustart gleich; gehashte Chunks sind unveraenderlich, alles andere
+ *      revalidiert; ohne Build startet der Server nicht.
+ *   4. KEIN SCHNITT MEHR AUF DER LEITUNG. Von R19 bis Phase 1a schnitt dieser
+ *      Weg Kommentare aus eigenem JS/CSS (strip-comments.js, entfernt mit dem
+ *      Build): seit `npm run build` minifiziert Vite, und was geht, ist die
+ *      gebaute Datei, Byte fuer Byte.
  * Ausfuehren: node --test test/test-static-assets.js
  *
  * Roh ueber node:http: `fetch` packt Brotli von selbst aus und versteckt damit
@@ -28,26 +29,26 @@ import { mkdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, wri
 import http from 'node:http';
 import path from 'node:path';
 import { brotliDecompressSync, gunzipSync } from 'node:zlib';
-import { createContext, runInContext } from 'node:vm';
 import express from 'express';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { createStaticAssets, COMPRESSIBLE_EXTENSIONS } from '../server/utils/static-assets.js';
-import { stripCssComments, stripJsComments } from '../server/utils/strip-comments.js';
+import { MISSING_BUILD_MESSAGE, resolveFrontendDir } from '../server/utils/frontend-dir.js';
+import { DIST, distPrecache } from './dist-build.js';
 import { tempDir } from './tmp-dir.js';
 
 const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
 const FIXED_TIME = new Date('2026-01-01T00:00:00Z');
 
 /** Ein Server wie in server/index.js: compression(), die Speicher-Fassung, express.static. */
-async function serve(root, { brotli = true, strip = false, compress, limits } = {}) {
+async function serve(root, { brotli = true, compress, limits } = {}) {
   const app = express();
   app.use(compression());
   const setHeaders = (res, filePath, stat) => {
     res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     res.setHeader('ETag', assets.etagFor(filePath, stat));
   };
-  const assets = createStaticAssets(root, { brotli, strip, setHeaders, ...(compress ? { compress } : {}), ...(limits ?? {}) });
+  const assets = createStaticAssets(root, { brotli, setHeaders, ...(compress ? { compress } : {}), ...(limits ?? {}) });
   // Wie in server/index.js: eine Bremse VOR dem Speicher, die ueber der Grenze
   // nicht abweist, sondern nur am Speicher vorbeifuehrt.
   app.use(rateLimit({
@@ -501,45 +502,21 @@ test('the path from the address never leaves the folder, however it is spelled',
 });
 
 // --------------------------------------------------------
-// 3. Die echte App: jede Precache-Datei, und die Verdrahtung
+// 3. Die echte App (dist/): jede Precache-Datei, und die Verdrahtung
 // --------------------------------------------------------
 
-function precacheList() {
-  const noop = () => {};
-  const sandbox = {
-    self: { addEventListener: noop, location: { origin: 'https://app.test' } },
-    caches: { open: async () => ({ match: async () => undefined, delete: async () => {} }), keys: async () => [] },
-    fetch: async () => ({ ok: false }),
-    Request: class {}, Response: class {}, Headers: class {},
-    URL, console, Date, Promise, parseInt, Symbol, Set, Map, setTimeout, clearTimeout,
-  };
-  const src = readFileSync(path.join(PUBLIC_DIR, 'sw.js'), 'utf8');
-  const lists = runInContext(`${src}\n;({ APP_SHELL, PAGE_MODULES, PRECACHED_LOCALES })`, createContext(sandbox));
-  return [...Array.from(lists.APP_SHELL), ...Array.from(lists.PAGE_MODULES), ...Array.from(lists.PRECACHED_LOCALES)];
-}
-
-/** Was der Server fuer eine Datei der App sendet: eigenes JS/CSS geschnitten. */
-function shippedBytes(file) {
-  const raw = readFileSync(file);
-  const rel = path.relative(PUBLIC_DIR, file);
-  if (rel.startsWith(`vendor${path.sep}`) || file.endsWith('.min.js')) return raw;
-  if (/\.m?js$/.test(file)) return Buffer.from(stripJsComments(raw.toString('utf8')));
-  if (file.endsWith('.css')) return Buffer.from(stripCssComments(raw.toString('utf8')));
-  return raw;
-}
-
-test('every precached file of the app is served with its content ETag, stable across restarts', async (t) => {
-  const first = await serve(PUBLIC_DIR, { brotli: false, strip: true });
-  const second = await serve(PUBLIC_DIR, { brotli: false, strip: true });
+test('every precached file of the built app is served with its content ETag, stable across restarts', async (t) => {
+  const first = await serve(DIST, { brotli: false });
+  const second = await serve(DIST, { brotli: false });
   t.after(async () => { await first.close(); await second.close(); });
-  const list = precacheList();
-  assert.ok(list.length > 250, `nur ${list.length} Precache-Eintraege gelesen`);
+  const list = distPrecache();
+  assert.ok(list.length >= 150, `nur ${list.length} Precache-Eintraege gelesen`);
 
   const wrong = [];
   for (const urlPath of list) {
     const res = await first.request(urlPath);
-    const file = path.join(PUBLIC_DIR, urlPath === '/' ? 'index.html' : urlPath);
-    const expected = sha(shippedBytes(file));
+    const file = path.join(DIST, urlPath === '/' ? 'index.html' : urlPath);
+    const expected = sha(readFileSync(file));
     const again = await second.request(urlPath, { 'if-none-match': res.headers.etag });
     if (res.status !== 200 || res.headers.etag !== expected || again.status !== 304) {
       wrong.push(`${urlPath} (${res.status}, ${res.headers.etag}, erneut ${again.status})`);
@@ -548,17 +525,21 @@ test('every precached file of the app is served with its content ETag, stable ac
   assert.deepEqual(wrong, [], 'ohne Inhalts-ETag ist die Revalidierung beim Precache nicht sicher');
 });
 
-test('the worker revalidates its precache, and the server serves both ways from one header function', () => {
+test('the worker revalidates its precache, and the server serves dist/ both ways from one header function', () => {
   const sw = readFileSync(path.join(PUBLIC_DIR, 'sw.js'), 'utf8');
   const install = sw.slice(sw.indexOf("self.addEventListener('install'"), sw.indexOf("self.addEventListener('activate'"));
-  assert.equal([...install.matchAll(/cache: 'no-cache'/g)].length, 3);
+  // Shell und Rueckfallsprache; einen eigenen Seiten-Cache gibt es seit dem Build nicht mehr.
+  assert.equal([...install.matchAll(/cache: 'no-cache'/g)].length, 2);
   assert.doesNotMatch(install, /cache: 'reload'/);
 
   const index = readFileSync(path.join(import.meta.dirname, '..', 'server', 'index.js'), 'utf8');
   assert.match(index, /res\.setHeader\('ETag', staticAssets\.etagFor\(filePath, stat\)\);/);
-  assert.match(index, /createStaticAssets\(PUBLIC_DIR, \{[\s\S]*?setHeaders: setStaticHeaders,\s*\}\);/);
-  assert.match(index, /app\.use\(staticStoreLimiter, staticAssets\.middleware\);\s*\n\s*app\.use\(express\.static\(PUBLIC_DIR, \{[\s\S]*?setHeaders: setStaticHeaders,/,
+  assert.match(index, /createStaticAssets\(STATIC_DIR, \{[\s\S]*?setHeaders: setStaticHeaders,\s*\}\);/);
+  assert.match(index, /app\.use\(staticStoreLimiter, staticAssets\.middleware\);\s*\n\s*app\.use\(express\.static\(STATIC_DIR, \{[\s\S]*?setHeaders: setStaticHeaders,/,
     'die Speicher-Fassung steht VOR express.static, hinter ihrer Bremse, und teilt dessen Header');
+  assert.match(index, /const STATIC_DIR = FRONTEND\.dir \?\?/, 'der Server liefert dist/ (utils/frontend-dir.js), nicht public/');
+  assert.doesNotMatch(index, /express\.static\(PUBLIC_DIR|root: path\.join\(import\.meta\.dirname, '\.\.', 'public'\)/, 'ein Weg liefert noch die ungebauten Quellen');
+  assert.match(index, /res\.sendFile\('index\.html', \{ root: STATIC_DIR \}\);/);
   // Die Bremse fuehrt ueber der Grenze am Speicher vorbei, statt abzuweisen:
   // ein 429 auf ein Stylesheet oder ein Modul zerlegte die App.
   assert.match(index, /const staticStoreLimiter = rateLimit\(\{[\s\S]*?handler: staticAssets\.overLimit,\s*\}\);/);
@@ -566,6 +547,50 @@ test('the worker revalidates its precache, and the server serves both ways from 
   assert.match(index, /process\.env\.STATIC_BROTLI/);
   assert.ok(index.indexOf('app.use(compression());') < index.indexOf('app.use(staticStoreLimiter, staticAssets.middleware);'),
     'compression() bleibt davor - es uebernimmt alles, was nicht aus dem Speicher kommt');
+  // Die Startpruefung laeuft als Import vor Sperre und Datenbank (nach dem
+  // Secrets-Handschlag, der erste Import bleibt: test:file-secrets).
+  const at = index.indexOf("import { FRONTEND } from './utils/require-frontend.js';");
+  assert.ok(at > 0 && at < index.indexOf("import './utils/claim-instance-lock.js';") && at < index.indexOf("import * as db from './db.js';"),
+    'die Pruefung auf dist/ kommt erst nach Sperre oder Datenbank');
+});
+
+test('hashed chunks are immutable for a year, facades, HTML, the worker and copied files revalidate', () => {
+  const index = readFileSync(path.join(import.meta.dirname, '..', 'server', 'index.js'), 'utf8');
+  const fn = index.slice(index.indexOf('function setStaticHeaders('), index.indexOf('\n}\n', index.indexOf('function setStaticHeaders(')));
+  const setHeaders = new Function('path', 'HASHED_DIR', 'staticAssets', `${fn}\n}; return setStaticHeaders;`)(
+    path, path.join('/srv/dist', 'assets') + path.sep, { etagFor: () => 'W/"x"' },
+  );
+  const headerFor = (/** @type {string} */ file) => {
+    /** @type {Record<string, string>} */
+    const headers = {};
+    setHeaders({ setHeader: (/** @type {string} */ k, /** @type {string} */ v) => { headers[k] = v; } }, file, {});
+    return headers['Cache-Control'];
+  };
+  assert.equal(headerFor('/srv/dist/assets/router-Ab12Cd34.js'), 'public, max-age=31536000, immutable');
+  assert.equal(headerFor('/srv/dist/assets/router-Ab12Cd34.js.map'), 'public, max-age=31536000, immutable');
+  for (const file of ['/srv/dist/api.js', '/srv/dist/i18n.js', '/srv/dist/utils/html.js', '/srv/dist/index.html', '/srv/dist/sw.js', '/srv/dist/styles/layout.css', '/srv/dist/locales/de.json']) {
+    assert.equal(headerFor(file), 'no-cache, must-revalidate', file);
+  }
+});
+
+test('without a build the server refuses to start, under npm run dev it serves no files', () => {
+  const root = tempDir('yuvomi-frontend-');
+  try {
+    assert.throws(() => resolveFrontendDir(root, {}), (err) => err instanceof Error && err.message === MISSING_BUILD_MESSAGE);
+    assert.match(MISSING_BUILD_MESSAGE, /npm run build/);
+    assert.match(MISSING_BUILD_MESSAGE, /npm run dev/);
+    mkdirSync(path.join(root, 'public'), { recursive: true });
+    writeFileSync(path.join(root, 'public', 'index.html'), '<!doctype html>');
+    assert.throws(() => resolveFrontendDir(root, {}), 'public/ allein ist kein Rueckfall');
+    mkdirSync(path.join(root, 'dist'), { recursive: true });
+    writeFileSync(path.join(root, 'dist', 'index.html'), '<!doctype html>');
+    assert.throws(() => resolveFrontendDir(root, {}), 'ohne dist/sw.js ist der Build unvollstaendig');
+    writeFileSync(path.join(root, 'dist', 'sw.js'), '');
+    assert.deepEqual(resolveFrontendDir(root, {}), { mode: 'dist', dir: path.join(root, 'dist'), serviceWorker: path.join(root, 'dist', 'sw.js') });
+    assert.deepEqual(resolveFrontendDir(root, { YUVOMI_DEV_FRONTEND: 'vite' }), { mode: 'vite-dev', dir: null, serviceWorker: null });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('what counts as compressible covers the text types the app ships', () => {
@@ -574,104 +599,30 @@ test('what counts as compressible covers the text types the app ships', () => {
 });
 
 // --------------------------------------------------------
-// 4. Kommentare bleiben im Repo, nicht auf der Leitung (R19)
+// 4. Kein Schnitt mehr auf der Leitung (seit Phase 1a)
 // --------------------------------------------------------
 
-const STYLE = readFileSync(path.join(PUBLIC_DIR, 'styles', 'datepicker.css'), 'utf8');
-
-test('own JS and CSS go out without comments - lines stay where they were', async (t) => {
+test('what goes out is the file, byte for byte, on every encoding', async (t) => {
   const fx = fixture();
-  fx.write('app.js', SCRIPT);
-  fx.write('styles/app.css', STYLE);
-  const srv = await serve(fx.dir, { strip: true });
+  const code = `/** Modul: ein Kommentar, den frueher der Server schnitt. */\n${SCRIPT}`;
+  fx.write('app.js', code);
+  const srv = await serve(fx.dir);
   t.after(async () => { await srv.close(); fx.cleanup(); });
-
-  for (const [urlPath, source, cut] of [['/app.js', SCRIPT, stripJsComments], ['/styles/app.css', STYLE, stripCssComments]]) {
-    const res = await srv.request(urlPath);
-    assert.equal(res.status, 200);
-    const expected = cut(source);
-    assert.equal(res.body.toString(), expected, `${urlPath}: nicht die geschnittene Fassung`);
-    assert.ok(expected.length < source.length * 0.8, `${urlPath}: der Schnitt spart nichts`);
-    assert.doesNotMatch(expected, /\/\*\*?\s+(Modul|DIE|Der|Die)\b/, `${urlPath}: Kommentartext ging mit`);
-    assert.equal(res.headers.etag, sha(Buffer.from(expected)), 'der ETag gehoert zu den Bytes, die gehen');
-  }
-  assert.equal(stripJsComments(SCRIPT).split('\n').length, SCRIPT.split('\n').length, 'Zeilen bleiben stehen');
-});
-
-test('br, gzip and identity carry the same cut bytes under the same ETag, and 304 works', async (t) => {
-  const fx = fixture();
-  fx.write('app.js', SCRIPT);
-  const srv = await serve(fx.dir, { strip: true });
-  t.after(async () => { await srv.close(); fx.cleanup(); });
-  const expected = stripJsComments(SCRIPT);
-
-  const plain = await srv.request('/app.js', { 'accept-encoding': 'identity' });
+  const identity = await srv.request('/app.js', { 'accept-encoding': 'identity' });
+  assert.equal(identity.body.toString(), code);
+  assert.equal(identity.headers.etag, sha(Buffer.from(code)));
   await srv.request('/app.js', { 'accept-encoding': 'br' });
   await srv.compressed();
   const br = await srv.request('/app.js', { 'accept-encoding': 'br' });
-  const gzip = await srv.request('/app.js', { 'accept-encoding': 'gzip' });
   assert.equal(br.headers['content-encoding'], 'br');
-  assert.equal(gzip.headers['content-encoding'], 'gzip');
-  assert.equal(plain.body.toString(), expected);
-  assert.equal(brotliDecompressSync(br.body).toString(), expected);
-  assert.equal(gunzipSync(gzip.body).toString(), expected);
-  assert.equal(new Set([plain.headers.etag, br.headers.etag, gzip.headers.etag]).size, 1);
-  assert.equal(plain.headers['cache-control'], 'no-cache, must-revalidate');
-  const again = await srv.request('/app.js', { 'if-none-match': plain.headers.etag });
-  assert.equal(again.status, 304);
-  // Ein Teilabruf bekommt die ganze geschnittene Fassung, nie Bytes der Datei.
-  const ranged = await srv.request('/app.js', { range: 'bytes=0-9', 'accept-encoding': 'identity' });
-  assert.equal(ranged.status, 200);
-  assert.equal(ranged.body.toString(), expected);
+  assert.equal(brotliDecompressSync(br.body).toString(), code);
+  assert.equal(br.headers.etag, identity.headers.etag);
+  const gz = await srv.request('/app.js', { 'accept-encoding': 'gzip' });
+  if (gz.headers['content-encoding'] === 'gzip') assert.equal(gunzipSync(gz.body).toString(), code);
 });
 
-test('vendored and minified code is never cut', async (t) => {
-  const fx = fixture();
-  fx.write('vendor/lib/lib.js', SCRIPT);
-  fx.write('lucide.min.js', SCRIPT);
-  const srv = await serve(fx.dir, { strip: true });
-  t.after(async () => { await srv.close(); fx.cleanup(); });
-  for (const urlPath of ['/vendor/lib/lib.js', '/lucide.min.js']) {
-    const res = await srv.request(urlPath, { 'accept-encoding': 'identity' });
-    assert.equal(res.body.toString(), SCRIPT, urlPath);
-    assert.equal(res.headers.etag, sha(Buffer.from(SCRIPT)), urlPath);
-  }
-});
-
-test('over the request limit the file comes as it is, under its own ETag', async (t) => {
-  const fx = fixture();
-  fx.write('app.js', SCRIPT);
-  const srv = await serve(fx.dir, { strip: true, limits: { requestsPerMinute: 1 } });
-  t.after(async () => { await srv.close(); fx.cleanup(); });
-  const cut = await srv.request('/app.js', { 'accept-encoding': 'identity' });
-  const raw = await srv.request('/app.js', { 'accept-encoding': 'identity', 'if-none-match': cut.headers.etag });
-  // Gleicher ETag hiesse gleicher Inhalt: der Weg an der Bremse vorbei darf
-  // den der geschnittenen Fassung nicht bestaetigen.
-  assert.equal(raw.status, 200);
-  assert.equal(raw.body.toString(), SCRIPT);
-  assert.equal(raw.headers.etag, sha(Buffer.from(SCRIPT)));
-  assert.notEqual(raw.headers.etag, cut.headers.etag);
-});
-
-test('a file edited while the server runs is cut again', async (t) => {
-  const fx = fixture();
-  const file = fx.write('app.js', '/* alt */\nexport const a = 1;\n');
-  const srv = await serve(fx.dir, { strip: true });
-  t.after(async () => { await srv.close(); fx.cleanup(); });
-  const before = await srv.request('/app.js', { 'accept-encoding': 'identity' });
-  assert.equal(before.body.toString(), '\nexport const a = 1;\n');
-  writeFileSync(file, '/* neu, laenger */\nexport const a = 2;\n');
-  utimesSync(file, new Date('2026-02-01T00:00:00Z'), new Date('2026-02-01T00:00:00Z'));
-  const after = await srv.request('/app.js', { 'accept-encoding': 'identity', 'if-none-match': before.headers.etag });
-  assert.equal(after.status, 200);
-  assert.equal(after.body.toString(), '\nexport const a = 2;\n');
-});
-
-test('the server cuts comments by default', () => {
-  const index = readFileSync(path.join(import.meta.dirname, '..', 'server', 'index.js'), 'utf8');
-  const call = index.match(/createStaticAssets\(PUBLIC_DIR, \{[\s\S]*?\}\);/)?.[0] ?? '';
-  assert.ok(call, 'createStaticAssets(PUBLIC_DIR, ...) nicht gefunden');
-  assert.doesNotMatch(call, /strip\s*:/, 'der Schnitt ist der Standard - wer ihn abschaltet, sagt es in DECISIONS.md');
+test('the comment cutter is gone with the build', () => {
   const lib = readFileSync(path.join(import.meta.dirname, '..', 'server', 'utils', 'static-assets.js'), 'utf8');
-  assert.match(lib, /strip = true,/);
+  assert.doesNotMatch(lib, /from '\.\/strip-comments\.js'|\bstrip\s*=/, 'static-assets.js schneidet wieder');
+  assert.throws(() => statSync(path.join(import.meta.dirname, '..', 'server', 'utils', 'strip-comments.js')), 'strip-comments.js liegt noch da');
 });
