@@ -17,6 +17,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { isPrecachedSource } from './dist-build.js';
 
 const load = () => import('../public/utils/friendly-error.js');
 
@@ -92,8 +93,7 @@ test('der Router nimmt die Zuordnung aus dem Modul und hat keine eigene', () => 
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
   assert.match(router, /import \{ unhandledErrorSentence \} from '\/utils\/friendly-error\.js';/);
   assert.doesNotMatch(router, /function (?:friendlyError|unhandledErrorSentence)\(/, 'router.js hat wieder eine eigene Zuordnung');
-  const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
-  assert.ok(sw.includes("'/utils/friendly-error.js'"), 'das Modul fehlt in der Shell-Liste des Service Workers');
+  assert.ok(isPrecachedSource('/utils/friendly-error.js'), 'das Modul fehlt in der Shell-Liste des Service Workers (dist/sw.js)');
 });
 
 // ---------------------------------------------------------------------------

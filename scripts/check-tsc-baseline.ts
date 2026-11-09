@@ -26,7 +26,7 @@ const rootIdx = args.indexOf('--root');
 const root = rootIdx >= 0 ? resolve(String(args[rootIdx + 1])) : fileURLToPath(new URL('..', import.meta.url));
 const baselinePath = resolve(root, 'tsc-baseline.json');
 // Welche Verzeichnisse ein Projekt besitzt; alles andere ist nur Mitlaeufer.
-const OWNED: Record<string, string[]> = { server: ['server/', 'scripts/'] };
+const OWNED: Record<string, string[]> = { server: ['server/', 'scripts/', 'vite.config.ts'] };
 
 function measure(): Counts {
   const run = spawnSync(process.execPath, [tscBin, '--build', '--force', '--verbose', '--pretty', 'false'], {
