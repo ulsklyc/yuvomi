@@ -27,7 +27,7 @@ const repoRoot = fileURLToPath(new URL('.', import.meta.url));
 
 // `npm run dev` (scripts/dev.mjs): Vite serves public/ on 5173, everything the
 // Express server answers itself goes through to it (scripts/build/dev-proxy.ts).
-// PORT comes from scripts/dev.mjs, which reads .env for both processes.
+// PORT and BIND_ADDRESS come from scripts/dev.mjs, which reads .env for both processes.
 const backendPort = process.env.PORT || 3000;
 const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 
@@ -55,7 +55,7 @@ export default defineConfig({
     strictPort: true,
     // Host stays localhost:5173 (no changeOrigin): the session cookie and the
     // CSRF origin check see the address the browser uses.
-    proxy: devProxy(backendPort),
+    proxy: devProxy(backendPort, process.env.BIND_ADDRESS),
   },
   plugins: modulesLayout ? [
     staticCopyPlugin(publicDir, ['index.html']),

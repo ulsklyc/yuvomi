@@ -9,8 +9,10 @@
  *          test:dev-server checks the keys against every file under public/.
  *          Not /health: without an HTML Accept it is the container probe, with
  *          one it is the health module page.
- * Abhaengigkeiten: keine (reine Daten fuer vite.config.ts und test:dev-server)
+ * Abhaengigkeiten: server/utils/bind-address.js
  */
+
+import { readBindAddress, selfCallHost } from '../../server/utils/bind-address.js';
 
 /** Path roots the Express server answers itself. `/sw.js` on purpose: Vite must not serve the unbuilt worker. */
 export const PROXIED_ROOTS: readonly string[] = [
@@ -19,8 +21,14 @@ export const PROXIED_ROOTS: readonly string[] = [
 
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** `server.proxy` for vite.config.ts, aimed at the Express server on `port`. */
-export function devProxy(port: number | string): Record<string, { target: string }> {
-  const target = `http://localhost:${port}`;
+/**
+ * `server.proxy` for vite.config.ts, aimed at the Express server on `port` and
+ * the address it listens on (`app.listen(PORT, BIND_ADDRESS)`): unset ->
+ * localhost, a wildcard -> loopback, IPv6 in brackets, a host name refused like
+ * the server refuses it (server/utils/bind-address.js).
+ */
+export function devProxy(port: number | string, bindAddress?: string): Record<string, { target: string }> {
+  const bind = readBindAddress(bindAddress);
+  const target = `http://${bind ? selfCallHost(bind) : 'localhost'}:${port}`;
   return Object.fromEntries(PROXIED_ROOTS.map((root) => [`^${escapeRegExp(root)}(?:[/?]|$)`, { target }]));
 }

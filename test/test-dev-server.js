@@ -51,8 +51,18 @@ test('jeder Proxy-Schluessel trifft die Server-Pfade und keine Datei unter publi
   for (const facade of ['/api.js', '/i18n.js', '/utils/html.js']) assert.ok(!proxied(facade), facade);
 });
 
-test('der Proxy zielt auf den PORT des Servers', () => {
-  for (const [, rule] of Object.entries(devProxy(4321))) assert.equal(/** @type {{ target: string }} */ (rule).target, 'http://localhost:4321');
+test('der Proxy zielt auf PORT und BIND_ADDRESS des Servers', () => {
+  // Express lauscht mit app.listen(PORT, BIND_ADDRESS); mit einer LAN-Adresse
+  // in .env scheiterte jede durchgereichte Anfrage an localhost (Codex auf #2631).
+  /** @param {number} port @param {string | undefined} bind */
+  const targets = (port, bind) => [...new Set(Object.values(devProxy(port, bind)).map((rule) => rule.target))];
+  assert.deepEqual(targets(4321, undefined), ['http://localhost:4321']);
+  assert.deepEqual(targets(4321, ''), ['http://localhost:4321']);
+  assert.deepEqual(targets(4321, '192.0.2.10'), ['http://192.0.2.10:4321']);
+  assert.deepEqual(targets(4321, '0.0.0.0'), ['http://127.0.0.1:4321']);
+  assert.deepEqual(targets(4321, '::'), ['http://[::1]:4321']);
+  assert.deepEqual(targets(4321, '2001:db8::5'), ['http://[2001:db8::5]:4321']);
+  assert.throws(() => devProxy(4321, 'yuvomi.local'), /BIND_ADDRESS/, 'ein Hostname ist wie beim Server ein Fehler');
 });
 
 test('PORT aus .env erreicht beide Prozesse, eine gesetzte Umgebung gewinnt', () => {
