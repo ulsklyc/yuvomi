@@ -241,7 +241,7 @@ und die [Installationsanleitung im Repository](docs/installation.md).
 <details>
 <summary><b>Voraussetzungen, Netzwerk und eure Daten</b></summary>
 
-- **Browser** - Chrome und Edge 105, Firefox 115, Safari 15.4 und iOS 15.4 oder neuer; ein älterer Browser bekommt eine Seite, die das sagt ([Details](docs/installation.md#browser-support)).
+- **Browser** - Chrome und Edge 105, Firefox 115, Safari 15.4 und iOS 15.4 oder neuer. Ältere Safari- und iOS-Versionen, Chrome vor 99 und Firefox vor 97 bekommen eine Seite, die diese Versionen nennt; Chrome 99 bis 104 und Firefox 97 bis 114 starten mit Lücken ([Details](docs/installation.md#browser-support)).
 - **Schreibt** - vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.
 - **Nach außen** - von sich aus eine Update-Abfrage an die GitHub-Releases-API. Blockiert sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht:
   - **Wenn ihr sie nutzt** - das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org; die Logo-Suche für ein Abo ruft die Website des Dienstes auf.

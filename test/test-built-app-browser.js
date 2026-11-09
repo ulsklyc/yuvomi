@@ -231,31 +231,42 @@ const polyfillRequests = (paths) => paths.filter((p) => /^\/assets\/popover-fn-[
  * utils/popover-menu.js es tut: ein Klick auf den `popovertarget`-Knopf liefe
  * in diesem Chrome zusaetzlich durch die native Aktivierung und belegte nichts.
  */
+/**
+ * Stellt in einer offenen Seite den Browser ohne Popover-API nach (siehe
+ * oben) und laedt `/` neu. Liefert die mitgeschnittenen Pfade.
+ * @param {import('puppeteer').Page} page
+ * @returns {Promise<string[]>}
+ */
+async function withoutPopoverApi(page) {
+  /** @type {string[]} */
+  const requested = [];
+  page.on('request', (/** @type {import('puppeteer').HTTPRequest} */ req) => requested.push(new URL(req.url()).pathname));
+  /** @type {any} */ (page).__yuvomiRequestInterceptor = (/** @type {import('puppeteer').HTTPRequest} */ req) => {
+    if (!new URL(req.url()).pathname.endsWith('.css')) return false;
+    fetch(req.url())
+      .then((res) => res.text())
+      .then((css) => req.respond({
+        status: 200,
+        contentType: 'text/css; charset=utf-8',
+        body: css.replace(/(?<!\\):popover-open/g, ':x-no-popover-open'),
+      }))
+      .catch(() => req.continue());
+    return true;
+  };
+  await page.evaluateOnNewDocument(() => {
+    const proto = /** @type {any} */ (HTMLElement.prototype);
+    for (const name of ['popover', 'showPopover', 'hidePopover', 'togglePopover']) delete proto[name];
+  });
+  await gotoRoute(page, '/');
+  return requested;
+}
+
 test('without the Popover API the polyfill chunk loads and an overflow menu opens and closes; with it, nothing loads', async () => {
   const harness = /** @type {any} */ (await startHarness());
   try {
     await harness.reset();
     const page = await openPage(harness, { device: 'mobile', locale: 'de' });
-    /** @type {string[]} */
-    const requested = [];
-    page.on('request', (/** @type {import('puppeteer').HTTPRequest} */ req) => requested.push(new URL(req.url()).pathname));
-    /** @type {any} */ (page).__yuvomiRequestInterceptor = (/** @type {import('puppeteer').HTTPRequest} */ req) => {
-      if (!new URL(req.url()).pathname.endsWith('.css')) return false;
-      fetch(req.url())
-        .then((res) => res.text())
-        .then((css) => req.respond({
-          status: 200,
-          contentType: 'text/css; charset=utf-8',
-          body: css.replace(/(?<!\\):popover-open/g, ':x-no-popover-open'),
-        }))
-        .catch(() => req.continue());
-      return true;
-    };
-    await page.evaluateOnNewDocument(() => {
-      const proto = /** @type {any} */ (HTMLElement.prototype);
-      for (const name of ['popover', 'showPopover', 'hidePopover', 'togglePopover']) delete proto[name];
-    });
-    await gotoRoute(page, '/');
+    const requested = await withoutPopoverApi(page);
     assert.equal(polyfillRequests(requested).length, 1, 'ohne Popover-API laedt der Router den Polyfill-Chunk');
     assert.equal(await page.evaluate(() => CSS.supports('selector(:x-no-popover-open)')), false, 'Vorbedingung: die Ersatz-Pseudoklasse ist unbekannt');
 
@@ -297,6 +308,47 @@ test('without the Popover API the polyfill chunk loads and an overflow menu open
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.equal((await menuState())?.open, false, 'ein Klick daneben schliesst');
     await page.close();
+
+    // DAS KONTOMENUE AM DESKTOP (Review auf #2640). Es haengt in der
+    // Seitenleiste, und die ist `position: fixed`, `overflow: hidden` und traegt
+    // `backdrop-filter`: ohne Top-Layer wird sie zum Containing Block des
+    // Panels und schneidet ab, was ueber ihre Kante ragt. Gemessen wird, dass
+    // das Menue ganz im Fenster und ganz in der Leiste steht und jeder Eintrag
+    // trifft - ausgeklappt und eingeklappt (dort klappt der Fokus auf dem
+    // Ausloeser die Leiste auf, `:focus-within`, wie beim echten Klick).
+    for (const collapsed of [false, true]) {
+      const desk = await openPage(harness, { device: 'desktop', locale: 'de' });
+      await desk.evaluate((/** @type {boolean} */ c) => localStorage.setItem('yuvomi.sidebar.collapsed', c ? '1' : '0'), collapsed);
+      await withoutPopoverApi(desk);
+      const account = await desk.evaluate(async () => {
+        const panel = /** @type {any} */ (document.getElementById('nav-account-menu'));
+        /** @type {HTMLElement | null} */ (document.querySelector('[popovertarget="nav-account-menu"]'))?.focus();
+        panel.showPopover();
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        const box = (/** @type {Element} */ el) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
+        const p = box(panel);
+        const side = box(/** @type {Element} */ (document.querySelector('.nav-sidebar')));
+        const items = [...panel.querySelectorAll('.popover-menu__item')].map((/** @type {Element} */ it) => {
+          const r = it.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return Boolean(hit && it.contains(hit));
+        });
+        return {
+          polyfilled: panel.classList.contains(':popover-open'),
+          inViewport: p.left >= 0 && p.top >= 0 && p.right <= innerWidth && p.bottom <= innerHeight && p.right > p.left,
+          inSidebar: p.left >= side.left && p.right <= side.right && p.top >= side.top && p.bottom <= side.bottom,
+          items,
+          collapsed: document.documentElement.classList.contains('sidebar-collapsed'),
+        };
+      });
+      assert.equal(account.collapsed, collapsed, 'Vorbedingung: Zustand der Seitenleiste');
+      assert.equal(account.polyfilled, true, 'das Kontomenue ist ueber den Polyfill offen');
+      assert.ok(account.items.length >= 2, 'Reichweite: Eintraege des Kontomenues');
+      assert.deepEqual({ inViewport: account.inViewport, inSidebar: account.inSidebar, items: account.items },
+        { inViewport: true, inSidebar: true, items: account.items.map(() => true) },
+        `Kontomenue ${collapsed ? 'eingeklappt' : 'ausgeklappt'}: ganz sichtbar, nicht von der Seitenleiste geschnitten, jeder Eintrag trifft`);
+      await desk.close();
+    }
 
     // Gegenlauf mit der API: der Chunk wird nie angefragt.
     const plain = await openPage(harness, { device: 'mobile', locale: 'de' });

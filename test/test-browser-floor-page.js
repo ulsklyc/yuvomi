@@ -65,6 +65,11 @@ const ES2015_FORMS = [
   { form: 'Optional Chaining (?.)', pattern: /\?\.(?!\d)/ },
   { form: 'Nullish Coalescing (??)', pattern: /\?\?/ },
   { form: 'Potenz (**)', pattern: /\*\*/ },
+  // Review auf #2640: `function (a = 1) { var o = { m() {} }; var {b} = o; }`
+  // blieb gruen. Default-Parameter, Methoden-Kurzform und Destrukturierung.
+  { form: 'Default-Parameter', pattern: /\bfunction\b[\w$\s]*\([^)]*[^=!<>]=(?!=)[^)]*\)/ },
+  { form: 'Methoden-Kurzform', pattern: /[{,]\s*(?!(?:if|for|while|switch|catch|function|with|return)\b)[\w$]+\s*\([^)]*\)\s*\{/ },
+  { form: 'Destrukturierung', pattern: /\b(?:var|let|const)\s*[[{]|\bfunction\b[\w$\s]*\((?:[^)]*,)?\s*[[{]|(?:^|[;{}(])\s*\(?\s*[[{][\w$\s,:]*[\]}]\s*=(?!=)/m },
 ];
 
 /**
@@ -100,6 +105,17 @@ test('Leser: erkennt ES2015+-Formen, nicht ihre Doppelgaenger in Kommentaren und
   assert.deepEqual(es2015Findings('var v = a?.b;'), ['Optional Chaining (?.)']);
   assert.deepEqual(es2015Findings('var v = a ?? b;'), ['Nullish Coalescing (??)']);
   assert.deepEqual(es2015Findings('import x from "/x.js";'), ['import/export']);
+  assert.deepEqual(es2015Findings('var f = function (a = 1) {};'), ['Default-Parameter']);
+  assert.deepEqual(es2015Findings('function g(a, b = {}) { return b; }'), ['Default-Parameter']);
+  assert.deepEqual(es2015Findings('var o = { m() { return 1; } };'), ['Methoden-Kurzform']);
+  assert.deepEqual(es2015Findings('var o = { a: 1, m(x) {} };'), ['Methoden-Kurzform']);
+  assert.deepEqual(es2015Findings('var {b} = o;'), ['Destrukturierung']);
+  assert.deepEqual(es2015Findings('var [x, y] = list;'), ['Destrukturierung']);
+  assert.deepEqual(es2015Findings('function h({ a }) { return a; }'), ['Destrukturierung']);
+  assert.deepEqual(es2015Findings('function h(a) { ({ a } = o); }'), ['Destrukturierung']);
+  // Der Mutant aus dem Review, als Ganzes.
+  assert.deepEqual(es2015Findings('(function (a = 1) { var o = { m() {} }; var {b} = o; })();'),
+    ['Default-Parameter', 'Methoden-Kurzform', 'Destrukturierung']);
   // Erlaubt: dieselben Zeichen in Kommentaren, Strings und Regex-Literalen,
   // der Ternaer-Operator mit einer Zahl, `letter` als Bezeichner.
   assert.deepEqual(es2015Findings([
@@ -109,12 +125,27 @@ test('Leser: erkennt ES2015+-Formen, nicht ihre Doppelgaenger in Kommentaren und
     'var r = /=>/.test(s);',
     'var v = ok ?.5 : 1;',
     'var letter = 1; letter = 2;',
+    // ES5-Doppelgaenger: Vergleich in Klammern, Bloecke nach if/for/while,
+    // Objekt- und Array-Literale, Getter, Zuweisung an ein Element.
+    'function k(a, b) { if (a == b) { return a !== b; } for (var i = 0; i < 1; i++) { while (b) { b = 0; } } }',
+    'var o = { a: 1, b: [1, 2], c: function () {} }; var g = { get x() { return 1; } };',
+    'var list = [1, 2]; list[0] = 3; o.a = { x: 1 };',
+    'try { k(); } catch (e) { k(); }',
   ].join('\n')), []);
 });
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Die Probe
  * ────────────────────────────────────────────────────────────────────────── */
+
+test('alle fuenf klassischen Skripte, die auf der Hinweisseite oder vor ihr laufen, sind ES5', () => {
+  const notice = scriptTags(read(NOTICE)).map(srcOf);
+  assert.deepEqual(notice, ['/night-hours.js', '/theme-init.js', '/lang-init.js', '/static-page-title.js'],
+    'die Skripte der Hinweisseite - eine neue Datei hier gehoert in diese Pruefung');
+  for (const src of ['/browser-floor.js', ...notice]) {
+    assert.deepEqual(es2015Findings(read(`public${src}`)), [], `${src} traegt Syntax ueber ES5`);
+  }
+});
 
 test('die Probe ist eine klassische ES5-Datei, die node parst', () => {
   assert.ok(existsSync(new URL(PROBE, REPO)), `${PROBE} fehlt`);

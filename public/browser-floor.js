@@ -6,9 +6,10 @@
 // hierhin sah ein zu alter Browser nur eine leere Seite. Diese Probe fragt zwei
 // APIs ab, die genau dort ankamen, und schickt einen Browser ohne sie auf eine
 // statische Seite, die sagt, was fehlt und was hilft:
-//   - CSSLayerBlockRule (Chrome 99, Firefox 97, Safari 15.4), die Kaskaden-
-//     Ebenen, auf die das Stylesheet der App baut;
-//   - Object.hasOwn (Chrome 93, Firefox 92, Safari 15.4).
+//   - CSSLayerBlockRule (Chrome 99, Firefox 97, Safari 15.4) - nur als
+//     Versionsmerkmal: die App nutzt `@layer` nicht, die Schnittstelle kam
+//     aber in allen drei Engines nahe der Untergrenze an;
+//   - Object.hasOwn (Chrome 93, Firefox 92, Safari 15.4), ebenso.
 // Bewusst eine Naeherung: Chrome 99-104 und Firefox 97-114 bestehen die Probe,
 // obwohl sie unter build.target liegen - dort startet die App mit Luecken
 // statt gar nicht (docs/installation.md, "Browser Support").
