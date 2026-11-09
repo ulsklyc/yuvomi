@@ -927,6 +927,12 @@ install record.
 
 ## 13. Comments stay in the source and stay off the wire
 
+> **Superseded in November 2026 by entry 20.** The web app ships built since then: the build
+> minifies the bundle and keeps the reasons in the source and in the source maps it ships, so
+> the comment cut at delivery time, its cutter and `test:strip-comments` are gone. What this
+> entry wanted still holds: comments stay in the repository, and a stack trace from a bug report
+> still points at a line in it, now through the map. The text below is kept as it was decided.
+
 **The files under `public/` keep their comments. The server removes them from Yuvomi's own
 JavaScript and CSS when it serves them, keeps the result in memory, and gives it the ETag of the
 bytes it sends. There is no build step, and line numbers stay where they are.**
@@ -990,6 +996,11 @@ then the number of real `!important` declarations in `public/styles/` may only g
 14.1, which drop a layered stylesheet whole, and wrapping the current sheets in layers changed
 52 of 76 measured screens; the ceiling lives in `npm run test:frontend-audit`,
 "!important-Sperrklinke"; raising the floor reopens it).
+
+> **The floor moved in November 2026** (Phase 1a of the architecture roadmap, PR #2640): Chrome
+> 105, Firefox 115, Safari and iOS 15.4, so `@layer` is no longer held back by this entry.
+> Nothing uses it yet; phase 4 of the roadmap introduces the layers with the stylesheet rework.
+> The `!important` ratchet stays until then.
 
 ---
 
@@ -1244,3 +1255,158 @@ server's, and the recipient's own permission is not asked there.
 A permission model with a per-row axis for feeds (a member allowed some calendars and not others),
 which would make "empty" too coarse. Not a request to clear feed tokens on revoke: that is the write
 side again.
+
+---
+
+## 20. A build step, and what it may not take away
+
+**The web app ships built: Vite turns `public/` into `dist/`, the server serves `dist/`, and
+the release carries two attested artifacts, the container image and the `dist` tarball. The
+build may change how the bytes are packed, never what the project promised about them: no
+runtime CDN, no telemetry, third-party code pinned and listed, markup built as DOM, and a build
+that anyone can repeat from the source tarball and compare byte for byte.**
+
+For two years the rule was "no frameworks, no build tools", and it did its job: it kept a
+one-person project readable and kept every dependency decision visible. It also named the means
+rather than the ends. By autumn 2026 the means were in the way: `index.html` carried 128 hand-kept
+`modulepreload` lines, the service worker a hand-kept list of 368 paths that changed in 268 commits
+over 90 days, the server stripped comments at delivery time to keep the transport bearable, and
+the cold start of the calendar loaded 226 files. The architecture review of 7 and 8 November 2026
+([docs/plans/2026-11-08-architecture-roadmap.md](plans/2026-11-08-architecture-roadmap.md),
+decisions 3, 10 and 12) separated the two: a build is a tool, the guarantees are the promise.
+Measured on the first built release: 0 preload lines, the precache from the manifest, 103 files to
+the calendar's first paint instead of 226, median largest contentful paint on a slow connection
+2.9 s instead of 5.6 s, and no change on screen.
+
+What the build may not take away is written down as the five guarantees in CONTRIBUTING.md
+("Hard Constraints"), and each has a guard rather than a sentence. The three facades `/api.js`,
+`/i18n.js` and `/utils/html.js` keep their paths, because third-party modules import them
+(MODULES.md); everything else ships hashed. The build is reproducible: two builds of the same
+source give the same bytes, the build in the checkout equals a build from `git archive`, and the
+release attestation covers the tarball that results. The source stays in `public/`, plain and
+commented, and the source maps ship, so an operator reading the delivered code reads the reasons
+too.
+
+### How to sort the next case
+
+1. **Does it change what the browser loads from where?** A CDN, a font service, an update ping
+   with an identifier: no, whatever it saves. Guarantee 1 and 2.
+2. **Does it add third-party code to the browser?** An issue first, then an exact pin, the
+   `IMPORTED_PACKAGES` list and the notices file. Hand copies under `public/vendor/` are the
+   old path and are not extended.
+3. **Does it change how markup is made?** `insertAdjacentHTML`, `replaceChildren()`, the DOM
+   API and `esc()`; no virtual DOM, no component framework. A renderer that writes to the real
+   DOM (phase 3 of the roadmap considers lit-html) is a question for that phase, not a loophole
+   in this entry.
+4. **Does it put a path, a time or a random value into `dist/`?** Then the attestation signs
+   something nobody can rebuild. Fix it before it ships.
+
+### Where the rule lives
+
+- `vite.config.ts` and `scripts/build/` (copy list, service worker, notices, dev proxy);
+  `server/utils/frontend-dir.js` refuses to start without `dist/index.html` and `dist/sw.js`.
+- `scripts/check-build-determinism.mjs` on every pull request; `.github/workflows/release-assets.yml`
+  builds the tarball in a job without a token and attests it in a second job.
+- `npm run test:module-facades` (the three facades and the MODULES.md example),
+  `npm run test:vendor-policy` (exact pins, `IMPORTED_PACKAGES`, notices),
+  `npm run test:static-copy-list` and `npm run test:sw-precache` (every shipped file is reached
+  or named), `npm run test:dist-css` (no declaration lost in minification),
+  `npm run test:frontend-audit` (no `innerHTML` assignment).
+
+### What counts as undoing it
+
+A runtime load from another host. A dependency with a caret. A fourth facade added without a
+MODULES.md entry, or one of the three renamed. A build whose output depends on the machine that
+ran it. Committing `dist/`. And a second copy of the source in the image: `public/` stays the
+one place the code is written.
+
+---
+
+## 21. The Node floor follows the LTS calendar
+
+**Yuvomi runs on Node.js 24.12 or newer and on 26 (`engines.node` in `package.json`,
+`^24.12.0 || >=26.0.0`); the container image stays on the older of the two supported lines, and
+the floor moves at most once a year, when the next even line is in active LTS and the older one
+is six months from its end. The floor is also what the test suite and the type checker run on, so
+nothing in the repository needs a flag or a transpiler to start.**
+
+The floor was Node 22 until November 2026 (entry 18 of this page kept the native client on a
+runtime this project does not install; this one is about the runtime it does). Two things made
+24.12 the line: `node:sqlite` left its flag there, which removed `--experimental-sqlite` from 300
+script lines and 155 test headers, and type stripping became stable, which lets the build scripts
+and later the server run TypeScript as written. A floor below that would have meant two
+code paths. A floor above it would have dropped the LTS line every NAS image and YunoHost ship
+with. The decision is in the architecture roadmap (decision 1) and in the phase plan
+([docs/plans/2026-11-08-phase-1a-plan.md](plans/2026-11-08-phase-1a-plan.md), section B).
+
+### How to sort the next case
+
+1. **Is the older supported line within six months of its end of life, and is the next even
+   line in active LTS?** Then raise the floor to the newer line's first version that has what the
+   code needs, announce it one release ahead and ship it in a foundation release. Otherwise wait.
+2. **Does a feature need a newer Node than the floor?** Then it waits for the floor, or it ships
+   behind a runtime check with the older behaviour kept. A flag on the command line is not a
+   third option: a bare-metal install does not pass flags.
+3. **Does a dependency raise its own floor?** The dependency waits, not the project.
+
+### Where the rule lives
+
+- `package.json` `engines.node`, read at start by `server/utils/node-runtime.js`, which prints
+  the supported range and exits on an older Node; `.nvmrc` names the floor for local work.
+- `.github/workflows/ci.yml` runs the tests on both lines (24.x and 26.x), the type check on the
+  floor; the `Dockerfile` base image is the older line.
+- `npm run test:node-runtime` holds the check and its message; `npm run test:tsc-baseline` runs
+  the TypeScript scripts natively, which only works on the floor or newer.
+
+### What would reopen it
+
+An even Node line that drops `node:sqlite`, type stripping or Node-API 10 (the database driver),
+or an LTS schedule that stops being yearly. A request to support an odd-numbered line is not a
+reopening: odd lines are never LTS and never supported here.
+
+---
+
+## 22. If ever hosted, then without the operator holding the key
+
+**Yuvomi is self-hosted and offers no hosting service. Should one ever exist, from the project
+or from anyone else, it must work without the operator being able to read a household's data:
+the key stays with the household. Nothing is built for that today, and nothing may be built that
+rules it out: no shortcut across households, no server-side feature that needs the plaintext of
+every household at once.**
+
+The question comes up in every second thread about adoption ("could you just host it?"), and
+the answer has always been the same for the same reason. A household planner holds a family's
+calendar, health notes, documents and money. Self-hosting is not a preference here but the
+mechanism that keeps the operator and the reader the same person. A hosted Yuvomi would separate
+them, and then the only acceptable design is one where the operator cannot read what they host.
+That is a hard design (search, reminders, feeds and the MCP interface all read data on the
+server), which is exactly why it is written down before anyone starts: it is a condition, not a
+feature. The decision is from the architecture review of 8 November 2026 (roadmap decision 13);
+the database already encrypts at rest per installation (SQLCipher), which is the shape such a
+design would build on.
+
+### How to sort the next case
+
+1. **A request to host Yuvomi, as a service or a demo with real households?** The answer is the
+   rule above: not without a design in which the operator holds no key. A public demo with seed
+   data is not hosting.
+2. **A feature that reads across households on one server?** There is one household per
+   database by design; a feature that needs more than one at once is building the thing this
+   entry forbids.
+3. **An operator convenience that needs the plaintext key on the server beyond what SQLCipher
+   needs to open the database?** It conflicts with the direction and needs a thread before any
+   code.
+
+### Where the rule lives
+
+- [SCOPE.md](SCOPE.md) says there is no hosting service; this entry says what one would have to
+  look like. One encrypted SQLite file per household (`server/db.js`, `DB_ENCRYPTION_KEY`), no
+  table and no route that spans households.
+- There is no code for hosting, and there is no test for an absence. The guard is this page: a
+  pull request that adds a cross-household table or a server-held key store cites this entry or
+  reopens it.
+
+### What would reopen it
+
+A credible design for end-to-end encrypted hosting, with search and reminders solved, discussed
+in a thread of its own. Not a request for a hosted plan, however often it comes.
