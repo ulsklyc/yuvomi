@@ -54,6 +54,7 @@ export const REFUSAL_MESSAGES = new Map([
  */
 export const CASE_MESSAGES = new Map([
   ['shopping_list_not_found', 'shopping.errorListGone'],
+  ['shopping_webhook_url_invalid', 'settings.shoppingWebhookUrlInvalid'],
   ['shopping_item_not_found', 'shopping.errorItemGone'],
   ['shopping_store_not_found', 'shopping.errorStoreGone'],
   // Ein Kuechenweg zur Liste, dessen Rueckgaengig nicht in eine Anfrage passt

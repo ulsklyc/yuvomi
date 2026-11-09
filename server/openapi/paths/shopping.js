@@ -327,6 +327,46 @@ export function shoppingPaths() {
         }),
       }),
     },
+    '/api/v1/shopping/webhook': {
+      get: op({
+        summary: 'Get the shopping webhook configuration',
+        tag: 'Shopping',
+        admin: true,
+        description: 'The household webhook URL that `POST /api/v1/shopping/{listId}/send-webhook` posts to. '
+          + 'A credential (often a Home Assistant webhook id or an n8n path with a token in the query), so this '
+          + 'is admin-only; every member instead sees the boolean `shopping_webhook_configured` in '
+          + '`GET /api/v1/preferences`. Returns `{ data: { url } }`, `url` is `null` when nothing is set.',
+      }),
+      put: op({
+        summary: 'Set or clear the shopping webhook URL',
+        tag: 'Shopping',
+        admin: true,
+        stateChanging: true,
+        description: '`url` must be an absolute `http`/`https` URL, or `null`/`""` to clear it. Returns the new value '
+          + 'in the same shape as the GET.',
+        requestBody: jsonBody(null),
+      }),
+    },
+    '/api/v1/shopping/{listId}/send-webhook': {
+      post: op({
+        summary: 'Send the open items of a list to the household webhook',
+        description: 'Posts all unchecked items of the list as JSON to the household webhook URL. '
+          + 'The URL is set by an admin under `GET`/`PUT /api/v1/shopping/webhook`; any household member may trigger a send. '
+          + 'Payload: `{ list: { id, name }, items: [{ name, quantity, category }], sentAt }`. '
+          + '`quantity` is the free-text amount as entered ("2 l"); the table carries no separate unit. '
+          + 'Rate limited to 10 requests per minute per IP. '
+          + 'Fails with 422 when no webhook URL is configured, the list has no open items, or the target '
+          + 'resolves to a private address while `NOTIFICATION_ALLOW_PRIVATE_NETWORK` is not set '
+          + '(reason `shopping_webhook_private_network`) - a target in your own network, such as Home '
+          + 'Assistant or a local n8n, needs that opt-in. '
+          + 'The request is given up after 8 seconds. '
+          + 'Fails with 502 when the webhook returns a non-2xx status or is unreachable.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
     '/api/v1/shopping/{listId}/items/checked': {
       delete: op({
         summary: 'Delete checked shopping items',
@@ -375,6 +415,7 @@ const LIST_GONE = '`shopping_list_not_found` (404, the list does not exist - del
 const MEALS_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no write access to the meal plan - for API tokens a `meals:write` scope)';
 const PANTRY_READ_REQUIRED = '`cross_module_access` (403, the caller has no read access to the pantry - for API tokens a `pantry:read` scope)';
 const CASE_REASONS = {
+  '/api/v1/shopping/webhook': { put: '`shopping_webhook_url_invalid` (400, `url` is not an absolute http/https URL)' },
   '/api/v1/shopping/{listId}': { put: LIST_GONE, delete: LIST_GONE },
   '/api/v1/shopping/{listId}/duplicate': { post: LIST_GONE },
   '/api/v1/shopping/{listId}/items': { get: LIST_GONE, post: LIST_GONE },
@@ -386,6 +427,12 @@ const CASE_REASONS = {
     post: `${LIST_GONE}, \`nothing_open\` (422, the list has no open item to send), `
       + '`recipient_no_email` (422, the chosen member has no email address on their contact), '
       + '`smtp_unconfigured` (422, email is not set up for this instance)',
+  },
+  '/api/v1/shopping/{listId}/send-webhook': {
+    post: `${LIST_GONE}, \`nothing_open\` (422, the list has no open items), `
+      + '`shopping_webhook_unconfigured` (422, no webhook URL configured), '
+      + '`shopping_webhook_private_network` (422, the target is on a private network and '
+      + '`NOTIFICATION_ALLOW_PRIVATE_NETWORK` is not set)',
   },
   '/api/v1/shopping/items/{itemId}': { delete: '`shopping_item_not_found` (404, the item does not exist - deleted)' },
   '/api/v1/shopping/items/undo-transfer': { post: `${MEALS_WRITE_REQUIRED}, when the undo touches meal ingredients` },

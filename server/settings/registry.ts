@@ -1189,6 +1189,17 @@ const ENTRIES: readonly Entry[] = [
     write: 'none',
     read: (ctx) => ctx.get('holiday_last_sync') ?? null,
   },
+  {
+    // The URL itself is a credential (#2502, review): it is written through
+    // GET/PUT /api/v1/shopping/webhook, admin only, never through this
+    // registry. Every member gets just the flag, which decides whether the
+    // shopping list menu offers the send action.
+    field: 'shopping_webhook_configured',
+    storage: ['shopping_webhook_url'],
+    scope: 'household',
+    write: 'none',
+    read: (ctx) => !!ctx.get('shopping_webhook_url'),
+  },
 ];
 
 /** The order of the fields in the answer of GET and PUT (unchanged since before C3). */
@@ -1209,6 +1220,7 @@ const ANSWER_ORDER = [
   'weather_user',
   'holiday_country', 'holiday_subdivision', 'holiday_group', 'holiday_show_public', 'holiday_show_school',
   'holiday_public_color', 'holiday_school_color', 'holiday_last_sync',
+  'shopping_webhook_configured',
 ];
 
 const BY_FIELD = new Map(ENTRIES.map((entry) => [entry.field, entry]));

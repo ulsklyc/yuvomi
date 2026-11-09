@@ -26,8 +26,27 @@ import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
+import { guardedFetch } from '../services/notification-providers/guarded-fetch.js';
+import { PROVIDER_TIMEOUT_MS } from '../services/notifications.js';
+import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 
 const log = createLogger('Shopping');
+
+/** Haushaltweite Einstellung aus `sync_config` - wie in routes/preferences.js. */
+function cfgGet(key) {
+  const row = db.get().prepare('SELECT value FROM sync_config WHERE key = ?').get(key);
+  return row ? row.value : null;
+}
+
+/** Wie cfgGet, nur schreibend - dasselbe INSERT/UPDATE wie storeValue() im Register. */
+function cfgSet(key, value) {
+  db.get().prepare(`
+    INSERT INTO sync_config (key, value)
+    VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                   updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+  `).run(key, value);
+}
 
 const router  = express.Router();
 
@@ -567,6 +586,54 @@ router.get('/price-history', validateRequest(), (req, res) => {
   const purchases = db.get().prepare(sql).all(...params);
 
   res.json({ data: purchases });
+});
+
+// --------------------------------------------------------
+// GET/PUT /api/v1/shopping/webhook
+// Die Webhook-URL selbst - admin-only und ausserhalb von /preferences (#2502,
+// Review): eine Home-Assistant-Webhook-Id oder ein n8n-Pfad ist der ganze
+// Zugang, oft mit einem Token in der Query, also ein Zugangsdatum wie bei den
+// Notification-Channels (routes/notifications.js). Jedes Mitglied bekommt nur
+// die TATSACHE - shopping_webhook_configured in GET /api/v1/preferences
+// (server/settings/registry.ts) - und mehr braucht es nicht: sie schaltet
+// nur den Menuepunkt in der Einkaufsliste frei (public/pages/shopping.js).
+// --------------------------------------------------------
+
+router.get('/webhook', (req, res) => {
+  if (!isAdminRequest(req)) return refuseAdmin(req, res);
+  try {
+    res.json({ data: { url: cfgGet('shopping_webhook_url') || null } });
+  } catch (err) {
+    log.error('GET /webhook error:', err);
+    res.status(500).json({ error: 'Internal error', code: 500 });
+  }
+});
+
+router.put('/webhook', (req, res) => {
+  if (!isAdminRequest(req)) return refuseAdmin(req, res);
+  try {
+    const { url: rawUrl } = req.body;
+    if (rawUrl === null || rawUrl === undefined || rawUrl === '') {
+      cfgSet('shopping_webhook_url', '');
+      return res.json({ data: { url: null } });
+    }
+    let parsed;
+    try { parsed = new URL(String(rawUrl)); } catch {
+      // DER SERVER BENENNT DEN FALL, DIE APP BESITZT DEN SATZ (#1909):
+      // ohne `reason` bliebe der Oberflaeche nur der Allgemeinsatz, und der
+      // haeufigste Tippfehler (fehlendes https://) waere nicht mehr zu
+      // erkennen.
+      return res.status(400).json({ error: 'url must be a valid URL.', code: 400, reason: 'shopping_webhook_url_invalid' });
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ error: 'url must use http or https.', code: 400, reason: 'shopping_webhook_url_invalid' });
+    }
+    cfgSet('shopping_webhook_url', parsed.toString());
+    res.json({ data: { url: parsed.toString() } });
+  } catch (err) {
+    log.error('PUT /webhook error:', err);
+    res.status(500).json({ error: 'Internal error', code: 500 });
+  }
 });
 
 // --------------------------------------------------------
@@ -1341,6 +1408,87 @@ function requirePantryRead(req, res, next) {
   }
   return next();
 }
+
+// --------------------------------------------------------
+// POST /api/v1/shopping/:listId/send-webhook
+// Sendet die offenen Artikel einer Liste als JSON an eine haushaltweite
+// Webhook-URL, die ein Admin unter PUT /api/v1/preferences gesetzt hat.
+// Payload: { list: { id, name }, items: [{name, quantity, category}], sentAt }
+// Response: { data: { sent: true, items: count } }
+// --------------------------------------------------------
+router.post('/:listId/send-webhook', sendListLimiter, async (req, res) => {
+  try {
+    const list = db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+
+    const webhookUrl = cfgGet('shopping_webhook_url');
+    if (!webhookUrl) {
+      return res.status(422).json({ error: 'No shopping webhook URL configured.', code: 422, reason: 'shopping_webhook_unconfigured' });
+    }
+
+    // `quantity`, NICHT `amount`/`unit`: die Spalten gibt es nicht. Bis hier
+    // stand `SELECT name, amount, unit, category`, und damit warf JEDER Versand
+    // "no such column: amount" - gefangen vom catch unten, beantwortet mit 502
+    // "nicht erreichbar". Der Weg hat also nie funktioniert, und der Fehler sah
+    // nach einem Problem beim Ziel aus. `shopping_items.quantity` ist EIN
+    // Textfeld ("2 l"), eine Einheit fuehrt die Tabelle nicht - die Nutzlast
+    // nennt es deshalb so, wie es ist.
+    const openItems = db.get().prepare(`
+      SELECT name, quantity, category FROM shopping_items
+      WHERE list_id = ? AND is_checked = 0
+      ORDER BY sort_order ASC, created_at ASC
+    `).all(req.params.listId);
+
+    if (openItems.length === 0) {
+      return res.status(422).json({ error: 'Nothing to send: the list has no open items.', code: 422, reason: 'nothing_open' });
+    }
+
+    const sentAt = new Date().toISOString();
+    const body = JSON.stringify({
+      list: { id: list.id, name: list.name },
+      items: openItems.map((item) => ({
+        name: item.name,
+        quantity: item.quantity ?? null,
+        category: item.category ?? null,
+      })),
+      sentAt,
+    });
+
+    // EIN ZIEL, DAS NICHT ANTWORTET, HAELT SONST DEN REQUEST (Review zu #2502).
+    // `safeRequest` bringt kein eigenes Zeitlimit mit, und die
+    // Benachrichtigungswege laufen genau deshalb unter `withTimeout` mit
+    // PROVIDER_TIMEOUT_MS - derselbe Wert, dasselbe Ziel: ein Webhook.
+    const response = await guardedFetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      log.error(`POST /:listId/send-webhook: webhook returned HTTP ${response.status}`);
+      return res.status(502).json({ error: `Webhook returned HTTP ${response.status}.`, code: 502 });
+    }
+
+    res.json({ data: { sent: true, items: openItems.length } });
+  } catch (err) {
+    log.error('POST /:listId/send-webhook error:', err.message);
+    // EIN LAN-ZIEL IST DER HAEUFIGSTE FALL, UND ER SAH AUS WIE EIN AUSFALL
+    // (Review zu #2502). Home Assistant und ein eigenes n8n stehen im eigenen
+    // Netz; der SSRF-Schutz weist sie ab, solange
+    // NOTIFICATION_ALLOW_PRIVATE_NETWORK nicht gesetzt ist. Ohne eigenen Grund
+    // bekam die Oberflaeche dafuer "nicht erreichbar" und der Admin suchte den
+    // Fehler beim Ziel. `cause` mitlesen: der Wurf des Lookup-Hooks kommt je
+    // nach Node-Pfad auch verpackt an.
+    if (err?.name === 'BlockedAddressError' || err?.cause?.name === 'BlockedAddressError') {
+      return res.status(422).json({
+        error: 'The webhook target is on a private network. Set NOTIFICATION_ALLOW_PRIVATE_NETWORK=true to allow it.',
+        code: 422,
+        reason: 'shopping_webhook_private_network',
+      });
+    }
+    res.status(502).json({ error: 'The webhook could not be reached.', code: 502 });
+  }
+});
 
 // --------------------------------------------------------
 // POST /api/v1/shopping/:listId/import-meal-plan
