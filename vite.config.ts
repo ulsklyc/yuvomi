@@ -19,14 +19,14 @@ import {
   staticCopyPlugin,
 } from './scripts/build/vite-plugins.ts';
 import { serviceWorkerPlugin } from './scripts/build/service-worker.ts';
+import { devProxy } from './scripts/build/dev-proxy.ts';
 
 const repoRoot = fileURLToPath(new URL('.', import.meta.url));
 
 // `npm run dev` (scripts/dev.mjs): Vite serves public/ on 5173, everything the
-// Express server answers itself goes through to it. Not /health: without an
-// HTML Accept it is the container probe, with one it is the health module page.
-const backend = `http://localhost:${process.env.PORT || 3000}`;
-const PROXIED = ['/api', '/auth', '/sw.js', '/openapi.json', '/docs', '/modules', '/feed', '/mcp', '/manifest.webmanifest'];
+// Express server answers itself goes through to it (scripts/build/dev-proxy.ts).
+// PORT comes from scripts/dev.mjs, which reads .env for both processes.
+const backendPort = process.env.PORT || 3000;
 const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 
 export default defineConfig({
@@ -40,7 +40,7 @@ export default defineConfig({
     strictPort: true,
     // Host stays localhost:5173 (no changeOrigin): the session cookie and the
     // CSRF origin check see the address the browser uses.
-    proxy: Object.fromEntries(PROXIED.map((prefix) => [prefix, { target: backend }])),
+    proxy: devProxy(backendPort),
   },
   plugins: [
     nonModuleTagsPlugin(),

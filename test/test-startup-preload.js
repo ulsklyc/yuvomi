@@ -98,13 +98,47 @@ function builtStart() {
 
 test('die gebaute index.html laedt genau den Startgraphen vor: Eintrag und Uebersicht', () => {
   const { entry, builtHead, shell, dashboard, preloads } = builtStart();
-  assert.match(builtHead, new RegExp(`<script type="module" crossorigin src="/${entry.file.replace(/[.]/g, '\\.')}"></script>`), 'der gebaute Eintrag steht nicht im <head>');
+  assert.ok(builtHead.includes(`<script type="module" crossorigin src="/${entry.file}"></script>`), 'der gebaute Eintrag steht nicht im <head>');
   const expected = new Set([...shell, ...dashboard]);
   const listed = new Set(preloads.map((p) => p.href));
   assert.ok(shell.length >= 3 && dashboard.length >= 3, `Startgraph zu klein (${shell.length}/${dashboard.length}) - das Manifest wird nicht mehr gelesen`);
   assert.deepEqual([...expected].filter((href) => !listed.has(href)), [], 'diese Chunks laedt der Start, ohne dass dist/index.html sie vorab nennt');
   assert.deepEqual([...listed].filter((href) => !expected.has(href)), [], 'diese Vorab-Ladungen gehoeren nicht zum Start');
   assert.equal(preloads.length, listed.size, 'ein Chunk steht doppelt in der Liste');
+});
+
+/**
+ * Die Adresse, die das Vorwaermen in `link.href` schreibt, kommt aus DOM-Text
+ * (#yuvomi-page-urls). Angenommen wird nur, was wie ein gebauter Chunk aussieht;
+ * alles andere faellt auf den Quellpfad der Route zurueck (CodeQL auf #2631).
+ */
+test('pageModuleUrl nimmt aus der Liste nur gebaute Chunks, nie eine fremde Adresse', () => {
+  const router = read('router.js');
+  const start = router.indexOf('function pageModuleUrl(');
+  assert.ok(start > 0, 'pageModuleUrl fehlt in router.js');
+  const fn = router.slice(start, router.indexOf('\n}\n', start) + 2);
+  /** @param {Record<string, string>} table */
+  const make = (table) => new Function('document', `let _pageUrls = null;\n${fn}\nreturn pageModuleUrl;`)({
+    getElementById: () => ({ textContent: JSON.stringify(table) }),
+  });
+  const pick = make({
+    '/pages/tasks.js': '/assets/tasks-B4py-J9e.js',
+    '/pages/a.js': 'javascript:alert(1)',
+    '/pages/b.js': '//evil.example/x.js',
+    '/pages/c.js': 'https://evil.example/assets/x.js',
+    '/pages/d.js': '/assets/../api/v1/x.js',
+    '/pages/e.js': '/assets/x.js?y=1',
+  });
+  assert.equal(pick('/pages/tasks.js'), '/assets/tasks-B4py-J9e.js');
+  for (const page of ['/pages/a.js', '/pages/b.js', '/pages/c.js', '/pages/d.js', '/pages/e.js']) {
+    assert.equal(pick(page), page, `${page}: eine fremde Adresse landete im href`);
+  }
+  assert.equal(pick('/api/v1/modules/assets/x/index.js'), '/api/v1/modules/assets/x/index.js', 'Drittmodule laufen unveraendert durch');
+  // Die Muster muessen zu dem passen, was der Build schreibt.
+  const built = Object.values(JSON.parse(readDist('index.html').match(/<script type="application\/json" id="yuvomi-page-urls">(.*?)<\/script>/)?.[1] ?? '{}'));
+  assert.ok(built.length >= 25, `nur ${built.length} gebaute Seiten in der Liste`);
+  const real = make(Object.fromEntries(built.map((url, i) => [`/p${i}`, url])));
+  assert.deepEqual(built.filter((url, i) => real(`/p${i}`) !== url), [], 'gebaute Adressen werden abgewiesen - Muster und vite.config passen nicht zusammen');
 });
 
 test('der Teil der Uebersicht laedt mit niedriger Prioritaet, hinter dem der Shell', () => {

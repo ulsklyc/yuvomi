@@ -508,7 +508,12 @@ function pageModuleUrl(pagePath) {
       _pageUrls = {};
     }
   }
-  return _pageUrls?.[pagePath] || pagePath;
+  // Die Liste ist DOM-Text und landet in `link.href` (CodeQL: DOM-Text als
+  // Adresse). Der Build schreibt nur Chunks unter /assets/ (vite.config.ts,
+  // Rolldown-Standard `assets/[name]-[hash].js`); alles andere, auch eine
+  // eingeschleuste Adresse, faellt auf den Quellpfad der Route zurueck.
+  const built = Object.prototype.hasOwnProperty.call(_pageUrls ?? {}, pagePath) ? _pageUrls?.[pagePath] : null;
+  return typeof built === 'string' && /^\/assets\/[A-Za-z0-9_-][A-Za-z0-9._-]*\.js$/.test(built) ? built : pagePath;
 }
 
 /**
