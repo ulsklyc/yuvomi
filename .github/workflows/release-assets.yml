@@ -1,0 +1,201 @@
+name: Release Assets
+
+# Puts a signed tarball on every GitHub release: `yuvomi-<version>-dist.tar.gz`,
+# its `SHA256SUMS`, and a build provenance attestation over both (Sigstore,
+# keyless, verified with `gh attestation verify ... -R ulsklyc/yuvomi`).
+# YunoHost and the Proxmox community script install from this asset instead of
+# GitHub's generated source tarball (phase 1a, section A of the roadmap).
+#
+# THE RELEASE STAYS A DRAFT UNTIL THE ASSET IS ON IT. release-prep creates the
+# release with `--draft` and then starts this workflow AT THE TAG:
+#   gh workflow run release-assets.yml --ref vX.Y.Z -f tag=vX.Y.Z
+# The run must sit on the tag, not on main: the attestation takes its source
+# (repository, ref, commit) from the run's OIDC token, so a run on main would
+# sign "built from main@<sha>" for a tarball of the tag, and
+# `gh attestation verify --source-ref refs/tags/vX.Y.Z` would fail. The first
+# step refuses any other ref.
+# It builds, attests, uploads and only then publishes the release. Drafts are
+# invisible to `releases/latest`, to the YunoHost autoupdater
+# (`latest_github_release`) and to Proxmox (`check_for_gh_release`), so there
+# is no window in which a release exists without its asset - Proxmox
+# `prebuild` would silently fall back to the previous release in that window.
+# If a step fails, the release simply stays a draft; run it again with the tag.
+#
+# WHY A DISPATCH AND NOT `release: created`. GitHub does not trigger workflows
+# for the `created`, `edited` or `deleted` activity of a DRAFT release
+# (docs: "Events that trigger workflows" > release). A `created` trigger would
+# only fire for a release that is already public, which is exactly the window
+# this workflow exists to close. `published` is too late for the same reason.
+# So the start is explicit, and a forgotten start leaves an invisible draft,
+# never a public release without its tarball.
+#
+# CONTENT FOR NOW: the tarball is byte-for-byte what `git archive` makes of the
+# tag, with the top-level folder `yuvomi-<version>/` (decision E2) - the same
+# content as the source tarball, so the channels can switch over before the
+# content changes. Section D (Vite build) replaces the archive step with
+# `npm ci && npm run build` and packs `dist/` instead.
+#
+# PUBLISHING WITH GITHUB_TOKEN TRIGGERS NOTHING. Events caused by the workflow
+# token never start other workflows (except workflow_dispatch and
+# repository_dispatch), so `umbrel-publish.yml`, which listens to
+# `release: published`, would not run for a release this job publishes. The
+# last step therefore dispatches it explicitly, on every successful run for
+# the NEWEST release: a rerun after a failure past the publish step sees the
+# release already public and must still hand over, and the Umbrel workflow
+# updates its PR in place, so a second run for the same version changes
+# nothing. A run for an older tag hands over nothing: umbrel-publish refuses to
+# walk the store backwards only for its `release` event, while a dispatch is
+# its deliberate rollback path. It is dispatched at the
+# TAG, not at main: umbrel-publish reads `.github/umbrel-release-notes.md` from
+# its checkout, and the notes for this version are committed before the tag -
+# on main they may already belong to the next release, or (patch release from
+# a branch) never have been there.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build the assets for, e.g. v2.87.0 (the draft release must exist)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  actions: write
+
+concurrency:
+  group: release-assets-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  assets:
+    name: Build, attest and publish the release tarball
+    runs-on: ubuntu-latest
+    # Measured steps are seconds (archive, hash, one attestation, one upload);
+    # nothing in the job waits on purpose. 15 leaves room for a slow Sigstore
+    # or upload round trip without hiding a hang for six hours.
+    timeout-minutes: 15
+    env:
+      TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Resolve the version
+        id: version
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag '$TAG' is not of the form vX.Y.Z"
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "::error::Run this workflow at the tag, so the attestation names it: gh workflow run release-assets.yml --ref $TAG -f tag=$TAG (this run is on $GITHUB_REF)"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          # Fails here, before any work, when there is no release for the tag.
+          gh release view "$TAG" --json isDraft --jq '"draft: \(.isDraft)"'
+          {
+            echo "version=$VERSION"
+            echo "tarball=yuvomi-$VERSION-dist.tar.gz"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out the tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - name: Pack the tarball
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TARBALL: ${{ steps.version.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          git archive --format=tar --prefix="yuvomi-$VERSION/" "refs/tags/$TAG" | gzip -n > "$TARBALL"
+          gzip -t "$TARBALL"
+          # Every entry sits under the one top-level folder (YunoHost
+          # `in_subdir`, Proxmox `_deploy_source_tarball`). sed reads the whole
+          # listing, so pipefail never sees a SIGPIPE from tar.
+          OUTSIDE="$(tar -tzf "$TARBALL" | sed -n "\#^yuvomi-$VERSION/#!p" | sed -n 1p)"
+          if [ -n "$OUTSIDE" ]; then
+            echo "::error::$TARBALL has an entry outside yuvomi-$VERSION/: $OUTSIDE"
+            exit 1
+          fi
+
+      - name: Write SHA256SUMS
+        env:
+          TARBALL: ${{ steps.version.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          sha256sum "$TARBALL" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            ${{ steps.version.outputs.tarball }}
+            SHA256SUMS
+
+      - name: Upload the assets
+        env:
+          TARBALL: ${{ steps.version.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          # Replace only on a draft. `--clobber` deletes an existing asset
+          # before uploading the new one, so on a PUBLIC release (a rerun after
+          # a failure past the publish step) a failed upload would leave the
+          # release without its file. There, add only what is missing; the
+          # pack is deterministic, so a present file is the same bytes.
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = "true" ]; then
+            gh release upload "$TAG" "$TARBALL" SHA256SUMS --clobber
+          else
+            HAVE="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+            for NAME in "$TARBALL" SHA256SUMS; do
+              if printf '%s\n' "$HAVE" | grep -qxF "$NAME"; then
+                echo "$TAG is public and already has $NAME - kept"
+              else
+                gh release upload "$TAG" "$NAME"
+              fi
+            done
+          fi
+
+      - name: Publish the release
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false
+
+      - name: Verify the published release
+        env:
+          TARBALL: ${{ steps.version.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          STATE="$(gh release view "$TAG" --json assets,isDraft)"
+          echo "$STATE" | jq .
+          if [ "$(echo "$STATE" | jq -r .isDraft)" != "false" ]; then
+            echo "::error::Release $TAG is still a draft"
+            exit 1
+          fi
+          for NAME in "$TARBALL" SHA256SUMS; do
+            if ! echo "$STATE" | jq -e --arg n "$NAME" '.assets | map(.name) | index($n)' > /dev/null; then
+              echo "::error::Release $TAG has no asset $NAME"
+              exit 1
+            fi
+          done
+
+      - name: Start the Umbrel catalog publish
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          NEWEST="$(gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
+          if [ "$NEWEST" != "$TAG" ]; then
+            echo "::notice::$TAG is not the newest release ($NEWEST); the Umbrel store is not moved back. A deliberate rollback is a manual dispatch of umbrel-publish.yml."
+            exit 0
+          fi
+          gh workflow run umbrel-publish.yml --ref "$TAG" -f version="$VERSION"

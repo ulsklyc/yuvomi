@@ -34,7 +34,7 @@
  * HTTP-Server. Die Startzeit ist eine ganze Sekunde, weil `Expires` nur
  * sekundengenau im Kopf steht - so laesst sich exakt vergleichen.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-session-sliding.js
+ * Ausfuehren: node --test test/test-session-sliding.js
  */
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';

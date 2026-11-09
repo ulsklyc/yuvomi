@@ -12,7 +12,7 @@
  *  - wer nicht mehr zugewiesen ist, behaelt keine geerbte Meldung
  *  - wer NICHT der Ersteller ist, verteilt beim Setzen gar nichts
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-event-reminder-fanout.js
+ * Ausfuehren: node --test test/test-event-reminder-fanout.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

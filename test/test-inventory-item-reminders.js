@@ -12,7 +12,7 @@
  *          - PUT ersetzt die Erinnerung vollständig
  *          - DELETE /items/:id räumt die Erinnerung explizit ab (reminders hat
  *            keinen FK auf inventory_items)
- * Ausführen: node --experimental-sqlite --test test/test-inventory-item-reminders.js
+ * Ausführen: node --test test/test-inventory-item-reminders.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

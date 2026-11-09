@@ -5,7 +5,7 @@
  *        Felder (phones/emails/addresses) bei POST/PUT inkl. Replacement-Semantik,
  *        GET /-Filter (category + q), vCard-Export mit Escaping, validateAddresses-
  *        Feldzweige, sowie die 404/403-Pfade (GET/:id, DELETE/:id family, Kategorie-404).
- * Ausführen: node --experimental-sqlite test/test-contacts-routes.js
+ * Ausführen: node test/test-contacts-routes.js
  */
 
 import os from 'node:os';

@@ -19,7 +19,7 @@
  * selbst einhaengt, sieht sie nie; er waere eine Kopie der Kette, und eine
  * Kopie kann nicht belegen, dass das Original sperrt.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-display-account.js
+ * Ausfuehren: node --test test/test-display-account.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

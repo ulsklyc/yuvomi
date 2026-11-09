@@ -4,7 +4,7 @@
  *        Kategorie haengt betroffene Gegenstaende auf 'other' um, Umsortieren,
  *        Lokalisierung der fuenf Seed-Kategorien (label_key, name = NULL,
  *        gleiches Muster wie task_categories/server/routes/tasks.js).
- * Ausfuehren: node --experimental-sqlite --test test/test-inventory-categories-routes.js
+ * Ausfuehren: node --test test/test-inventory-categories-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

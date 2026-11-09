@@ -1,7 +1,7 @@
 /**
  * Modul: Dashboard-API-Test
  * Zweck: Validiert die Dashboard-Aggregationsabfragen mit node:sqlite
- * Ausführen: node --experimental-sqlite test-dashboard.js
+ * Ausführen: node test-dashboard.js
  */
 
 process.env.DB_PATH = ':memory:';

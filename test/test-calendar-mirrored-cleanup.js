@@ -5,7 +5,7 @@
  *        wieder an, und ein erneutes Verbinden legte sie ein zweites Mal an.
  *        Geprüft wird, dass das Aufräumen genau seine Quelle trifft und alles
  *        andere in Ruhe lässt.
- * Ausführen: node --experimental-sqlite test/test-calendar-mirrored-cleanup.js
+ * Ausführen: node test/test-calendar-mirrored-cleanup.js
  */
 process.env.DB_PATH = ':memory:';
 

@@ -4994,10 +4994,14 @@ client-side in `public/utils/health-cycle.js` / rendered in `public/pages/health
 
 Medication reminders reuse the existing push/notification-channel layer (no dedicated reminder
 table): `server/services/medication-scheduler.js` turns due schedule slots into `pending` logs and
-fans out via Web Push and the household channels (Gotify, ntfy, webhook, email) to the person the
-medication belongs to and to every caregiver granted for them in `health_care_grants` (D#1041);
-a caregiver's copy carries the person's display name in front of the medication, the person's
-own copy does not. With `health` in `disabled_modules` the run does nothing - no log, no delivery
+fans out to the person the medication belongs to and to every caregiver granted for them in
+`health_care_grants` (D#1041); a caregiver's copy carries the person's display name in front of the
+medication, the person's own copy does not. **A dose is personal, whatever the medication's
+visibility (#2602, #2598, decided 08.11.2026):** it goes out by Web Push and to the notification
+channels the recipient owns, never to a household channel (Gotify, ntfy, webhook, email shared by
+the household), the same rule as every other health reminder (`HOUSEHOLD_CHANNEL_POLICY`,
+SECURITY.md). A recipient whose `health` permission is `none` is skipped, person and caregiver
+alike; the dose is still logged. With `health` in `disabled_modules` the run does nothing - no log, no delivery
 (#1660); after the module is back on, only today's slots that are already due come up, earlier
 days are not caught up. Medications (`name`, `dosage_text`) and activities
 (`type`, `note`) are indexed in the FTS5 `search_index` (migration 66) with the same
@@ -6765,7 +6769,7 @@ were, except that the German `error` texts of those inventory, notes, contacts a
 answers are now English.
 
 Authentication options for external integrations:
-- **Session cookie:** standard browser session after login, sliding for 90 days (see [Session lifetime](#session-lifetime-1356))
+- **Session cookie:** standard browser session after login, sliding for 90 days (see [Session lifetime](#session-lifetime-1356)). The session stores the account id only: **role and module permissions are read from `users` on every request (#2611)**, so a demotion or a changed permission applies to every signed-in device at once, including a sign-in or SSO link that was still in flight. The "at least one administrator must remain" check and the demotion happen in one statement (#2612): of two administrators demoting each other at the same moment, one is refused.
 - **Bearer token:** `Authorization: Bearer <token>` - tokens created via Settings → Household → API access (admin only)
 - **X-API-Key header:** `X-API-Key: <token>` — alternative header accepted alongside Bearer (the plain `API-Key` header is also accepted for MCP-client compatibility)
 

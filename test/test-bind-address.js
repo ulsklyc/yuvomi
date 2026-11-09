@@ -5,7 +5,7 @@
  *        in Klammern) UND der echte Aufruf: server/index.js bindet ueber
  *        test/server-ready.js an 127.0.0.1. Ein Unit-Test allein saehe nicht, ob
  *        index.js die Funktion ueberhaupt fragt.
- * Ausfuehren: node --experimental-sqlite --test test/test-bind-address.js
+ * Ausfuehren: node --test test/test-bind-address.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

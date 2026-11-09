@@ -12,7 +12,7 @@
  *          - PUT ohne das Feld laesst Belege unangetastet (Ausnahme vom
  *            vollen Replace der uebrigen Felder, siehe items.js)
  *          - Cascade in beide Richtungen (Gegenstand weg / Dokument weg)
- * Ausfuehren: node --experimental-sqlite --test test/test-inventory-item-documents.js
+ * Ausfuehren: node --test test/test-inventory-item-documents.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

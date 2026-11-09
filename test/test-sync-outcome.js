@@ -5,7 +5,7 @@
  *        der aufhörte sich zu aktualisieren. Geprüft wird, dass der Ausgang eines
  *        Laufs den Lauf überlebt, dass ein sauberer Lauf den alten Stand AKTIV
  *        löscht, und dass das Festhalten den Sync selbst nie zu Fall bringt.
- * Ausführen: node --experimental-sqlite test/test-sync-outcome.js
+ * Ausführen: node test/test-sync-outcome.js
  */
 process.env.DB_PATH = ':memory:';
 

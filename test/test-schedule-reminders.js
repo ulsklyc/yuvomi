@@ -5,7 +5,7 @@
  *        ueber mehrere Nutzer isoliert. (3) Der Verwaltungs-Router
  *        (/schedule/preferences) end-to-end. (4) Integration mit dem generischen
  *        Erinnerungs-Router: schedule_entry ist eine abgeleitete Herkunft.
- * Ausführen: node --experimental-sqlite --test test/test-schedule-reminders.js
+ * Ausführen: node --test test/test-schedule-reminders.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

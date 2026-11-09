@@ -16,7 +16,7 @@
  *          - ein Distanz-Intervall erzeugt keine zusaetzliche Erinnerung
  *          - ein rueckdatierter Kilometerstand auf einer Log-Zeile rollt
  *            inventory_items.odometer nicht zurueck
- * Ausfuehren: node --experimental-sqlite --test test/test-inventory-service-log.js
+ * Ausfuehren: node --test test/test-inventory-service-log.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

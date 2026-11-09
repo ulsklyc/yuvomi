@@ -6,7 +6,7 @@
  *        `red;position:fixed;inset:0` legte eine Flaeche ueber fremde Ansichten.
  *        Jeder Schreibweg prueft deshalb auf HEX, und die Anzeige laesst nur
  *        HEX durch.
- * Ausführen: node --experimental-sqlite --test test/test-avatar-color.js
+ * Ausführen: node --test test/test-avatar-color.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
