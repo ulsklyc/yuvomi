@@ -322,12 +322,14 @@ export async function render(container) {
   if (passkeysSupported()) void (async () => {
     try {
       const { data: state } = await api.get('/auth/passkeys/config');
-      if (!form.isConnected) return;
+      if (!form?.isConnected) return;
       if (state?.enabled && state?.login_enabled) {
-        const slot = container.querySelector('#passkey-login-slot');
-        const button = slot.querySelector('#passkey-login');
+        const slot = /** @type {HTMLElement|null} */ (container.querySelector('#passkey-login-slot'));
+        if (!slot) return;
+        const button = /** @type {HTMLButtonElement|null} */ (slot.querySelector('#passkey-login'));
+        if (!button) return;
         button.addEventListener('click', async () => {
-          const error = slot.querySelector('#passkey-login-error');
+          const error = /** @type {HTMLElement} */ (slot.querySelector('#passkey-login-error'));
           error.hidden = true; button.disabled = true;
           try {
             const { data: options } = await api.post('/auth/passkeys/login/options', {});

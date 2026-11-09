@@ -369,6 +369,7 @@ const api = {
 // --------------------------------------------------------
 
 const auth = {
+  /** @param {object} credential */
   loginWithPasskey: async (credential) => {
     const res = await api.post('/auth/passkeys/login/verify', { credential });
     setPermissions(res?.permissions);

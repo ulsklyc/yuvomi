@@ -677,7 +677,7 @@
     "test:passkeys-browser-api": "node --loader ./test/test-browser-loader.mjs --test test/test-passkeys-browser-api.js"
   },
   "dependencies": {
-    "@simplewebauthn/server": "^14.0.3",
+    "@simplewebauthn/server": "14.0.3",
     "bcrypt": "^6.0.0",
     "better-sqlite3-multiple-ciphers": "^13.0.3",
     "compression": "^1.8.2",
