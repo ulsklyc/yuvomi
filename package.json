@@ -678,6 +678,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@oddbird/popover-polyfill": "0.7.3",
     "@types/node": "24.19.2",
     "axe-core": "^4.14.0",
     "esbuild": "0.28.2",

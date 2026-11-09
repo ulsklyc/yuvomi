@@ -195,19 +195,21 @@ the app starts, but single screens can stay empty.
 | `color-mix()` | 111 | 113 | 16.2 | Tinted surfaces and hover states lose their color; the dialog backdrop loses its tint. Where that would lose information, a plain color stands in: primary buttons, the add button, toasts, holidays, selected rows and filters, the search overlay, note and shift colors (as a ring) and empty checklist boxes |
 | `:has()` | 105 | 121 | 15.4 | Layout details: toolbar wrapping, the space kept free above the bottom navigation, full-height split pages |
 | Container queries | 105 | 110 | 16 | Cards and lists keep their narrow layout; split views stay in one column |
-| Popover | 114 | 125 | 17 | The menus behind a button are not available and stay hidden: every "more" menu (module tools, list rows, documents), the account menu at the foot of the sidebar, the Overview's New and tools menus, the calendar's view menu. Their buttons do nothing; Log out is also under Settings > Account. The date field's calendar does not open (typing a date works, touch devices get the system picker) |
 | `dvh` | 108 | 101 | 15.4 | Heights fall back to `vh`; on a phone the bottom edge can sit under the browser's toolbar |
 | `inert` | 102 | 112 | 15.5 | Behind an open dialog the page stays reachable with the keyboard |
 | Subgrid, `text-wrap: balance`, `@starting-style` | 117 | 129 | 17.5 | Fasting week chart alignment, balanced headings, the date picker's fade-in |
 | Document preview (bundled PDF.js 4.10) | 94 | 93 | 16.4 | PDFs do not open in the viewer; PDF.js itself targets current browsers, so treat these as a lower bound |
+
+Menus behind a button (Popover, Chrome 114, Firefox 125, Safari 17) work below those versions
+too: where the browser lacks the feature, Yuvomi loads a small polyfill for it; browsers that
+have it load nothing extra.
 
 Newer features that change nothing essential are not counted: `text-wrap: pretty`,
 `hyphenate-limit-chars`, `prefers-reduced-transparency`, `scrollbar-width` and `scrollbar-color`
 (WebKit has its own scrollbar styling), masonry behind `@supports`. On iOS before 18.3 a popover
 menu does not close when you tap next to it.
 
-Firefox ESR 115 sits at the floor: it works, but without `:has()`, the popover menus and
-balanced headings. Firefox ESR 128 and later have everything except the date picker's fade-in.
+Firefox ESR 115 sits at the floor: it works, but without `:has()` and balanced headings. Firefox ESR 128 and later have everything except the date picker's fade-in.
 
 `npm run test:old-browser-fallbacks` keeps the row true: the scripts that run before the first
 screen may not call APIs newer than it, no module may use syntax newer than it, and no

@@ -23,7 +23,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { startHarness, openPage, openAnonPage, settle } from './document-guards-harness.js';
+import { startHarness, openPage, openAnonPage, settle, gotoRoute } from './document-guards-harness.js';
 import { readDist } from './dist-build.js';
 
 const FIXTURE_URL = '/__fixture__/module-facade/index.js';
@@ -205,6 +205,108 @@ test('a browser below the floor lands on /browser-too-old.html in its language, 
     assert.notEqual(path, '/browser-too-old.html', 'ein Browser ueber der Untergrenze landet auf der Hinweisseite');
     assert.equal(await page.evaluate(() => typeof CSSLayerBlockRule), 'function', 'Vorbedingung: der Testbrowser kennt CSSLayerBlockRule');
     await page.close();
+  } finally {
+    await harness.close();
+  }
+});
+
+/**
+ * Der Polyfill-Chunk unter den Anfragen einer Seite.
+ * @param {string[]} paths
+ */
+const polyfillRequests = (paths) => paths.filter((p) => /^\/assets\/popover-fn-[\w-]+\.js$/.test(p));
+
+/**
+ * EIN BROWSER OHNE POPOVER-API, SO NAH WIE ES IN CHROME GEHT. Ein aelteres
+ * Chrome laesst sich hier nicht starten, und `--disable-blink-features=
+ * HTMLPopoverAttribute` wirkt nicht mehr (gemessen an Chrome 156). Deshalb
+ * zwei Eingriffe, die zusammen den alten Browser nachstellen:
+ *   - JS: `popover` und die drei Methoden fehlen am Prototyp - so fragt die
+ *     Probe in utils/popover-support.js, und so findet der Polyfill sie vor;
+ *   - CSS: jedes `:popover-open` (nicht das escapte `.\:popover-open`) wird in
+ *     den ausgelieferten Blaettern zu einer unbekannten Pseudoklasse. Damit
+ *     faellt jede Regel damit weg wie im alten Browser, und
+ *     `@supports not selector(...)` in reset.css greift.
+ * Geoeffnet wird ueber `showPopover()` am Panel, wie showPopoverMenuAt() in
+ * utils/popover-menu.js es tut: ein Klick auf den `popovertarget`-Knopf liefe
+ * in diesem Chrome zusaetzlich durch die native Aktivierung und belegte nichts.
+ */
+test('without the Popover API the polyfill chunk loads and an overflow menu opens and closes; with it, nothing loads', async () => {
+  const harness = /** @type {any} */ (await startHarness());
+  try {
+    await harness.reset();
+    const page = await openPage(harness, { device: 'mobile', locale: 'de' });
+    /** @type {string[]} */
+    const requested = [];
+    page.on('request', (/** @type {import('puppeteer').HTTPRequest} */ req) => requested.push(new URL(req.url()).pathname));
+    /** @type {any} */ (page).__yuvomiRequestInterceptor = (/** @type {import('puppeteer').HTTPRequest} */ req) => {
+      if (!new URL(req.url()).pathname.endsWith('.css')) return false;
+      fetch(req.url())
+        .then((res) => res.text())
+        .then((css) => req.respond({
+          status: 200,
+          contentType: 'text/css; charset=utf-8',
+          body: css.replace(/(?<!\\):popover-open/g, ':x-no-popover-open'),
+        }))
+        .catch(() => req.continue());
+      return true;
+    };
+    await page.evaluateOnNewDocument(() => {
+      const proto = /** @type {any} */ (HTMLElement.prototype);
+      for (const name of ['popover', 'showPopover', 'hidePopover', 'togglePopover']) delete proto[name];
+    });
+    await gotoRoute(page, '/');
+    assert.equal(polyfillRequests(requested).length, 1, 'ohne Popover-API laedt der Router den Polyfill-Chunk');
+    assert.equal(await page.evaluate(() => CSS.supports('selector(:x-no-popover-open)')), false, 'Vorbedingung: die Ersatz-Pseudoklasse ist unbekannt');
+
+    /** Zustand des Anpassen-Menues der Uebersicht (mobil ein Ueberlaufmenue). */
+    const menuState = () => page.evaluate(() => {
+      const panel = /** @type {HTMLElement | null} */ (document.getElementById('dashboard-tools-menu'));
+      if (!panel) return null;
+      const rect = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return {
+        polyfilled: !/native code/.test(String(/** @type {any} */ (panel).showPopover)),
+        open: panel.classList.contains(':popover-open'),
+        display: style.display,
+        opacity: style.opacity,
+        onTop: Boolean(hit && panel.contains(hit)),
+        size: rect.width > 0 && rect.height > 0,
+      };
+    });
+    // Die Deckkraft zaehlt geschlossen nicht: `.popover-menu:not(:popover-open)`
+    // faellt im alten Browser weg, `display: none` aus reset.css traegt allein.
+    const closed = await menuState();
+    assert.deepEqual(closed && { ...closed, opacity: undefined }, { polyfilled: true, open: false, display: 'none', opacity: undefined, onTop: false, size: false },
+      'geschlossen ist das Menue weg (reset.css), und showPopover() ist die Fassung des Polyfills');
+
+    await page.evaluate(() => /** @type {any} */ (document.getElementById('dashboard-tools-menu')).showPopover());
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    assert.deepEqual(await menuState(), { polyfilled: true, open: true, display: 'flex', opacity: '1', onTop: true, size: true },
+      'offen steht das Menue sichtbar ueber der Seite (Zwilling in reset.css, z-index statt Top-Layer)');
+
+    await page.keyboard.press('Escape');
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.equal((await menuState())?.open, false, 'Esc schliesst');
+
+    await page.evaluate(() => /** @type {any} */ (document.getElementById('dashboard-tools-menu')).showPopover());
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.equal((await menuState())?.open, true);
+    await page.mouse.click(8, 700);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.equal((await menuState())?.open, false, 'ein Klick daneben schliesst');
+    await page.close();
+
+    // Gegenlauf mit der API: der Chunk wird nie angefragt.
+    const plain = await openPage(harness, { device: 'mobile', locale: 'de' });
+    /** @type {string[]} */
+    const plainRequests = [];
+    plain.on('request', (/** @type {import('puppeteer').HTTPRequest} */ req) => plainRequests.push(new URL(req.url()).pathname));
+    await gotoRoute(plain, '/');
+    assert.ok(plainRequests.some((p) => /^\/assets\/index-[\w-]+\.js$/.test(p)), 'Reichweite: der Start wurde mitgeschnitten');
+    assert.deepEqual(polyfillRequests(plainRequests), [], 'ein Browser mit Popover-API laedt den Polyfill nicht');
+    await plain.close();
   } finally {
     await harness.close();
   }

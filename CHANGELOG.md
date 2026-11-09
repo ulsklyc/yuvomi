@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a short page in German or English names the versions Yuvomi needs and suggests updating or
   another browser. The offline page now speaks English as well as German, and the supported
   browsers are documented as one list instead of two.
+- **Menus behind a button now open on Firefox ESR 115 and Safari 15.4 to 16** (and Chrome
+  105 to 113): every "more" menu, the account menu, filters and the date field's calendar
+  stayed closed there. Those browsers now load a small polyfill for the Popover API; newer
+  browsers load nothing extra.
 - **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
   serving the API on 3000; `npm run build` makes the production build.
 

@@ -23,6 +23,9 @@
  *        5. POPOVER. Ohne Popover-API bleibt jedes Popover zu: reset.css reicht
  *           die UA-Regel `[popover] { display: none }` nach, und keine Regel
  *           schlaegt sie mit einem `display` an einer Popover-Klasse (#2107).
+ *           Seit Phase 1a E oeffnen sie dort trotzdem: der Router laedt den
+ *           Popover-Polyfill nur ohne die API, und jede Regel des offenen
+ *           Zustands hat ihren Zwilling an `.\:popover-open` (5b).
  *
  * DIE MINDESTVERSION steht in docs/installation.md, Abschnitt "Browser
  * Support", in der Zeile "Starts, every screen opens, scrolls" - erst
@@ -998,8 +1001,8 @@ test('die Pille der Kapsel steht nur dort, wo translate gilt', () => {
 /**
  * Jedes Popover der App verlaesst sich fuer den geschlossenen Zustand auf das
  * UA-Blatt (`[popover] { display: none }`). Ein Browser ohne die API (Chrome
- * < 114, Firefox < 125, Safari < 17, also zwischen den beiden Zeilen der
- * Doku) hat diese Regel nicht und verwirft jede Autorenregel mit
+ * < 114, Firefox < 125, Safari < 17, also ueber der Untergrenze der Doku)
+ * hat diese Regel nicht und verwirft jede Autorenregel mit
  * `:popover-open`, auch `.popover-menu:not(:popover-open)`. In einer WebView
  * mit Chrome 106 stand deshalb jedes Menue der Seite offen und fing die Klicks
  * darunter ab. reset.css reicht die UA-Regel in
@@ -1154,6 +1157,169 @@ test('keine Regel setzt display an einem Popover ausserhalb von :popover-open (#
     'Diese Regel schlaegt in einem Browser ohne Popover-API den Rueckfall `[popover] { display: none }` '
     + '(reset.css) - das Panel stuende offen. `display` an einem Popover nur unter `:popover-open`:\n'
     + offenders.join('\n'));
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * (5b) Der Popover-Polyfill (Phase 1a E, Entscheidung Ulas 09.11.2026)
+ *
+ * Wo die API fehlt (Chrome 105-113, Firefox 115-124, Safari 15.4-16), laedt
+ * der Router `@oddbird/popover-polyfill` (utils/popover-support.js). Zwei
+ * Zusagen:
+ *   1. Der Polyfill kommt NUR per dynamischem Import hinter der Probe - nie
+ *      statisch, sonst laedt ihn jeder Browser (und Vite legte ihn in den
+ *      Start-Chunk).
+ *   2. Er kennt `:popover-open` in CSS nicht, sondern setzt die Klasse
+ *      `.\:popover-open`. Jede Regel, die ein offenes Popover erst zeigt
+ *      (`display`, `opacity`, `transform`, `pointer-events`), hat ihren
+ *      Zwilling an dieser Klasse im Rueckfall-Block von reset.css - sonst
+ *      stuende das Menue offen, aber unsichtbar.
+ * ────────────────────────────────────────────────────────────────────────── */
+const POLYFILL = '@oddbird/popover-polyfill';
+const OPEN_STATE_PROPS = ['display', 'opacity', 'transform', 'pointer-events'];
+
+/**
+ * Statische und dynamische Importe des Polyfills in einer Quelle.
+ * @param {string} source
+ */
+function polyfillImports(source) {
+  const { static: statics, dynamic } = moduleSpecifiers(source);
+  const ofPolyfill = (/** @type {string} */ spec) => spec === POLYFILL || spec.startsWith(`${POLYFILL}/`);
+  return { static: statics.filter(ofPolyfill), dynamic: dynamic.filter(ofPolyfill) };
+}
+
+/**
+ * Klasse -> Eigenschaften, die eine Grundebenen-Regel `.x:popover-open` setzt.
+ * @param {string} css
+ */
+function openStateRules(css) {
+  /** @type {Map<string, Set<string>>} */
+  const map = new Map();
+  for (const { selector, body, at } of eachRule(css)) {
+    if (at.length) continue;
+    for (const part of selectorParts(selector)) {
+      const cls = part.match(/^\.([\w-]+):popover-open$/)?.[1];
+      if (!cls) continue;
+      const props = declarations(body).map((d) => d.property).filter((p) => OPEN_STATE_PROPS.includes(p));
+      if (props.length) map.set(cls, new Set([...(map.get(cls) ?? []), ...props]));
+    }
+  }
+  return map;
+}
+
+/**
+ * Klasse -> Eigenschaften ihrer Zwillinge `.x.\:popover-open` im Rueckfall-Block.
+ * @param {string} css
+ */
+function polyfillTwins(css) {
+  /** @type {Map<string, Set<string>>} */
+  const map = new Map();
+  for (const { selector, body, at } of eachRule(css)) {
+    if (at.length !== 1 || !POPOVER_FALLBACK_AT.test(at[0])) continue;
+    for (const part of selectorParts(selector)) {
+      const cls = part.match(/^\.([\w-]+)\.\\:popover-open$/)?.[1];
+      if (!cls) continue;
+      map.set(cls, new Set([...(map.get(cls) ?? []), ...declarations(body).map((d) => d.property)]));
+    }
+  }
+  return map;
+}
+
+/**
+ * Was an den Zwillingen fehlt: `.x { prop }` je fehlender Eigenschaft.
+ * @param {Map<string, Set<string>>} open
+ * @param {Map<string, Set<string>>} twins
+ */
+function missingTwins(open, twins) {
+  const missing = [];
+  for (const [cls, props] of open) {
+    for (const prop of props) if (!twins.get(cls)?.has(prop)) missing.push(`.${cls}.\\:popover-open { ${prop} }`);
+  }
+  return missing.sort();
+}
+
+test('Leser: Polyfill-Importe und Zwillinge des offenen Zustands (erfundene Faelle)', () => {
+  assert.deepEqual(polyfillImports("import '@oddbird/popover-polyfill';"), { static: [POLYFILL], dynamic: [] });
+  assert.deepEqual(polyfillImports("const m = await import('@oddbird/popover-polyfill/fn');"), { static: [], dynamic: [`${POLYFILL}/fn`] });
+  assert.deepEqual(polyfillImports("// import '@oddbird/popover-polyfill';\nimport x from '/x.js';"), { static: [], dynamic: [] });
+  const open = openStateRules([
+    '.a:popover-open { display: flex; transition: none }',
+    '.b:popover-open, .c:popover-open { opacity: 1 }',
+    '.d:not(:popover-open) { opacity: 0 }',
+    '@media (max-width: 1px) { .e:popover-open { opacity: 1 } }',
+    '.f:popover-open { color: red }',
+  ].join('\n'));
+  assert.deepEqual([...open.keys()].sort(), ['a', 'b', 'c']);
+  const twins = polyfillTwins('@supports not selector(:popover-open) { .a.\\:popover-open, .b.\\:popover-open { display: flex; opacity: 1 } } .c.\\:popover-open { opacity: 1 }');
+  assert.deepEqual(missingTwins(open, twins), ['.c.\\:popover-open { opacity }'], 'ein Zwilling ausserhalb des Rueckfall-Blocks zaehlt nicht');
+});
+
+test('der Popover-Polyfill laedt nur dynamisch und nur hinter der Probe', () => {
+  const sites = [];
+  for (const file of appScripts()) {
+    const found = polyfillImports(read(file));
+    if (found.static.length || found.dynamic.length) sites.push({ file, ...found });
+  }
+  assert.deepEqual(sites.map((x) => x.file), ['public/utils/popover-support.js'], 'genau eine Stelle laedt den Polyfill');
+  assert.deepEqual(sites[0].static, [], 'statisch geladen, laedt ihn jeder Browser');
+  assert.deepEqual(sites[0].dynamic, [`${POLYFILL}/fn`]);
+  const source = read('public/utils/popover-support.js');
+  const fn = source.slice(source.indexOf('export async function ensurePopoverApi('));
+  const probe = fn.indexOf('if (!needsPopoverPolyfill()) return false;');
+  assert.ok(probe > 0 && probe < fn.indexOf(`import('${POLYFILL}/fn')`), 'der Import steht hinter der Probe');
+  // Der Router wartet vor dem ersten Seitenaufbau darauf.
+  const router = read('public/router.js');
+  const ready = router.indexOf('const popoverReady = ensurePopoverApi();');
+  const awaited = router.indexOf('await popoverReady;');
+  assert.ok(ready > 0 && awaited > ready && awaited < router.indexOf('navigate(location.pathname, false)', awaited),
+    'router.js setzt den Polyfill vor der ersten Navigation');
+});
+
+test('ensurePopoverApi() als Programm: laedt nur ohne die API, und ein Ladefehler haelt den Start nicht auf', async () => {
+  const { needsPopoverPolyfill, ensurePopoverApi } = await import('../public/utils/popover-support.js');
+  assert.equal(needsPopoverPolyfill({}), true, 'ohne popover und showPopover');
+  assert.equal(needsPopoverPolyfill({ popover: null }), true, 'ohne showPopover');
+  assert.equal(needsPopoverPolyfill({ popover: null, showPopover() {} }), false);
+  assert.equal(needsPopoverPolyfill(null), false, 'ohne DOM (Node) nichts');
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'HTMLElement');
+  /** @type {string[]} */
+  const calls = [];
+  const load = async () => { calls.push('load'); return { apply: () => calls.push('apply') }; };
+  try {
+    Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, writable: true, value: { prototype: { popover: null, showPopover() {} } } });
+    assert.equal(await ensurePopoverApi(load), false);
+    assert.deepEqual(calls, [], 'ein Browser mit der API laedt nichts');
+    Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, writable: true, value: { prototype: {} } });
+    assert.equal(await ensurePopoverApi(load), true);
+    assert.deepEqual(calls, ['load', 'apply']);
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      assert.equal(await ensurePopoverApi(async () => { throw new Error('offline'); }), false, 'ein Ladefehler wirft nicht');
+    } finally {
+      console.warn = warn;
+    }
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'HTMLElement', saved);
+    else delete (/** @type {any} */ (globalThis)).HTMLElement;
+  }
+});
+
+test('jede Regel des offenen Popovers hat ihren Zwilling fuer den Polyfill in reset.css', () => {
+  const open = new Map();
+  for (const file of appStylesheets()) {
+    for (const [cls, props] of openStateRules(read(file))) open.set(cls, new Set([...(open.get(cls) ?? []), ...props]));
+  }
+  for (const known of ['popover-menu', 'filter-popover', 'ydp-popover', 'documents-context-menu']) {
+    assert.ok(open.has(known), `Reichweite: keine Regel .${known}:popover-open gefunden`);
+  }
+  const twins = polyfillTwins(read('public/styles/reset.css'));
+  assert.deepEqual(missingTwins(open, twins), [],
+    'Mit dem Popover-Polyfill traegt ein offenes Popover die Klasse `.\\:popover-open`, `:popover-open` gilt dort nicht. '
+    + 'Diese Zwillinge fehlen im Block `@supports not selector(:popover-open)` in reset.css - das Menue stuende offen, aber unsichtbar');
+  const base = [...eachRule(read('public/styles/reset.css'))]
+    .find((r) => r.selector === '[popover].\\:popover-open' && r.at.length === 1 && POPOVER_FALLBACK_AT.test(r.at[0]));
+  assert.ok(base, 'reset.css: `[popover].\\:popover-open` im Rueckfall-Block fehlt');
+  assert.match(base.body, /z-index:\s*2147483647/, 'ohne Top-Layer hebt der z-index das offene Popover ueber Dialoge und Meldungen');
 });
 
 /* ──────────────────────────────────────────────────────────────────────────
