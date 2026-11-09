@@ -14,6 +14,7 @@ import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { getPreferences, resetPreferencesCache, savePreferences } from '/settings/preferences-cache.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { applyModuleColorOverrides } from '/utils/module-color-overrides.js';
+import { colorPickerHtml, wireColorPicker, setColorPickerValue } from '/utils/color-picker.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { isWallModeEnabled, setWallModeEnabled } from '/utils/wall-mode.js';
@@ -678,21 +679,16 @@ function renderPage(container, preferences, isAdmin) {
           return settingRowHtml({
             label: t(`nav.${id}`),
             labelId: `module-color-label-${id}`,
-            control: `<span class="form-composite" role="group" aria-labelledby="module-color-label-${id}">
-              <label class="settings-module-color__swatch">
-                <span class="settings-module-color__theme-label">${esc(t('settings.moduleColorsLightLabel'))}</span>
-                <input type="color" id="module-color-${id}-light"
-                  class="settings-module-color__input"
-                  value="${lVal}"
-                  ${!saved?.light ? 'data-unset="true"' : ''}>
-              </label>
-              <label class="settings-module-color__swatch">
-                <span class="settings-module-color__theme-label">${esc(t('settings.moduleColorsDarkLabel'))}</span>
-                <input type="color" id="module-color-${id}-dark"
-                  class="settings-module-color__input"
-                  value="${dVal}"
-                  ${!saved?.dark ? 'data-unset="true"' : ''}>
-              </label>
+            stacked: true,
+            control: `<span class="form-composite settings-module-color" role="group" aria-labelledby="module-color-label-${id}">
+              <span class="settings-module-color__swatch">
+                <span class="settings-module-color__theme-label" id="module-color-${id}-light-label">${esc(t('settings.moduleColorsLightLabel'))}</span>
+                ${colorPickerHtml({ id: `module-color-${id}-light`, value: lVal, labelledBy: `module-color-${id}-light-label` })}
+              </span>
+              <span class="settings-module-color__swatch">
+                <span class="settings-module-color__theme-label" id="module-color-${id}-dark-label">${esc(t('settings.moduleColorsDarkLabel'))}</span>
+                ${colorPickerHtml({ id: `module-color-${id}-dark`, value: dVal, labelledBy: `module-color-${id}-dark-label` })}
+              </span>
               <button type="button" id="module-color-${id}-reset"
                 class="btn btn--ghost btn--sm"
                 aria-label="${esc(t('settings.moduleColorsReset') + ': ' + t(`nav.${id}`))}"
@@ -1019,7 +1015,12 @@ function bindDeviceDisplay(container) {
  * einen Hinweis unterhalb der Zeile, verhindert das Speichern aber nicht.
  */
 function bindModuleColors(container) {
-  for (const { id } of BUILTIN_MODULES) {
+  // Kanon: colorPickerHtml()/wireColorPicker() (utils/color-picker.js, E6) -
+  // eine Verdrahtung fuer alle Waehler im Blatt. Der Wert steht wie zuvor im
+  // versteckten Feld mit der `id`, das `input`/`change` bubbelnd meldet.
+  wireColorPicker(container);
+
+  for (const { id, light: defLight, dark: defDark } of BUILTIN_MODULES) {
     const lightInput = container.querySelector(`#module-color-${id}-light`);
     const darkInput  = container.querySelector(`#module-color-${id}-dark`);
     const resetBtn   = container.querySelector(`#module-color-${id}-reset`);
@@ -1043,8 +1044,6 @@ function bindModuleColors(container) {
       try {
         const saved = await savePreferences({ module_colors: { [id]: { light: lightVal, dark: darkVal } } });
         if (resetBtn) resetBtn.hidden = false;
-        lightInput.removeAttribute('data-unset');
-        darkInput.removeAttribute('data-unset');
         // Apply immediately so the sidebar and widgets reflect the new colour.
         applyModuleColorOverrides(saved?.data?.module_colors);
         updateWarn();
@@ -1063,11 +1062,10 @@ function bindModuleColors(container) {
     resetBtn?.addEventListener('click', async () => {
       try {
         const saved = await savePreferences({ module_colors: { [id]: null } });
-        // Restore picker values to built-in defaults.
-        const def = BUILTIN_MODULES.find((m) => m.id === id);
-        if (def) { lightInput.value = def.light; darkInput.value = def.dark; }
-        lightInput.setAttribute('data-unset', 'true');
-        darkInput.setAttribute('data-unset', 'true');
+        // Restore the pickers to the built-in defaults, without re-emitting
+        // change (that would save the default back as a custom choice).
+        setColorPickerValue(lightInput, defLight);
+        setColorPickerValue(darkInput, defDark);
         resetBtn.hidden = true;
         applyModuleColorOverrides(saved?.data?.module_colors);
         if (warnEl) { warnEl.textContent = ''; warnEl.hidden = true; }
@@ -1078,7 +1076,7 @@ function bindModuleColors(container) {
     });
 
     // Show contrast warning for already-saved colours on initial render.
-    if (!lightInput.dataset.unset) updateWarn();
+    if (resetBtn && !resetBtn.hidden) updateWarn();
   }
 }
 
