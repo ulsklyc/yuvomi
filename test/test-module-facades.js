@@ -58,6 +58,21 @@ test('MODULES.md nennt genau die Fassaden aus scripts/build/static-files.ts', ()
   assert.ok(FACADES.includes('api.js') && FACADES.includes('utils/html.js'), 'docs/SPEC.md sagt /api.js und /utils/html.js zu');
 });
 
+test('MODULES.md und die SPEC zeigen Drittmodulen nur Importe der Fassaden', () => {
+  // Entscheidung 09.11.2026: genau drei Fassaden. Ein Beispiel, das einen
+  // anderen App-Pfad importiert (bis dahin /utils/page-layout.js), laedt im
+  // Build nicht: der Pfad liegt gehasht im Buendel, der Server antwortet 404.
+  const allowed = new Set(FACADES.map((f) => `/${f}`));
+  const spec = readFileSync(new URL('../docs/SPEC.md', import.meta.url), 'utf8');
+  const third = spec.slice(spec.indexOf('### Third-Party Modules'), spec.indexOf('\n---', spec.indexOf('### Third-Party Modules')));
+  for (const [name, text] of [['MODULES.md', readFileSync(new URL('../MODULES.md', import.meta.url), 'utf8')], ['docs/SPEC.md (Third-Party Modules)', third]]) {
+    const imports = [...text.matchAll(/\bfrom\s+['"](\/[^'"]+)['"]|\bimport\(\s*['"](\/[^'"]+)['"]/g)].map((m) => m[1] ?? m[2]);
+    const foreign = imports.filter((spec) => !allowed.has(spec) && !spec.startsWith('/api/v1/'));
+    assert.deepEqual(foreign, [], `${name} importiert App-Pfade ausserhalb der Fassaden`);
+    assert.doesNotMatch(text, /page-layout\.js|utilities under `?\/utils\/`?/, `${name} verweist Modulautoren auf Pfade ausserhalb der Fassaden`);
+  }
+});
+
 test('jede Fassade liegt ungehasht unter ihrem Pfad und ist Eintrag im Manifest', () => {
   requireDist();
   const manifest = distManifest();

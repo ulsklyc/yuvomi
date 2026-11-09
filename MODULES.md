@@ -81,7 +81,9 @@ Optional fields:
   (see [`docs/PAGE-COMPOSITION.md`](docs/PAGE-COMPOSITION.md)). The app applies it: the
   `container` your `render()` receives is the `.app-page--<composition>` root, with the page
   measure set. Declare intent; do not invent page width, gutters, or breakpoints. Build the
-  header and body with `/utils/page-layout.js`.
+  header and body inside it with the app's classes (`page-toolbar`, `page-toolbar__title`,
+  `app-page__body`, `page-section`), as in the example below; a module imports only the three
+  stable facades, not the app's own layout helpers.
 - `page.width`: semantic width (`reading` | `content` | `wide`); defaults from composition and
   refines the measure inside `reading`, `form`, `data` and `dashboard`. `split` and `full` own
   their width and ignore it. In `split`, the first two children of the body are the master and
@@ -128,22 +130,23 @@ example module; the manifest and entry above are the example.
 ```js
 import { api } from '/api.js';
 import { esc } from '/utils/html.js';
-import { renderPageHeader, renderPageTitle, renderPageBody, renderPageSection } from '/utils/page-layout.js';
 
 export async function render(container, context) {
   // `container` already is your page root: the app has wrapped it in the
   // composition you declared in module.json (`.app-page.app-page--reading`,
-  // `--page-measure` set). Render the header and the body into it; do not
-  // call renderAppPage() yourself, that would nest a second page root.
+  // `--page-measure` set). Render the header and the body into it with the
+  // app's classes; do not add a second page root.
   const me = await api.get('/auth/me');
   container.replaceChildren();
-  container.insertAdjacentHTML('beforeend',
-    renderPageHeader({ title: renderPageTitle('Example Module') })
-    + renderPageBody({
-      content: renderPageSection({
-        content: `<p>Hello, ${esc(me.user.display_name)}</p>`,
-      }),
-    }));
+  container.insertAdjacentHTML('beforeend', `
+    <div class="page-toolbar page-toolbar--narrow">
+      <h1 class="page-toolbar__title">Example Module</h1>
+    </div>
+    <div class="app-page__body">
+      <section class="page-section page-measure">
+        <p>Hello, ${esc(me.user.display_name)}</p>
+      </section>
+    </div>`);
 }
 ```
 

@@ -18799,7 +18799,8 @@ test('PAGE-013: a narrow header follows the measure of ITS page, and full/split 
 });
 
 test('PAGE-014: page-layout helpers escape every attribute they emit', async () => {
-  // Die Helfer sind die zugesagte Oberflaeche fuer Erweiterungen (MODULES.md);
+  // Die Helfer bauen die Kernseiten (Drittmodulen waren sie bis Phase 1a in
+  // MODULES.md zugesagt, seit dem Build nur noch die drei Fassaden);
   // eine id aus einem Datensatz ist der erwartete Gebrauch der Option. Die
   // erste Fassung ersetzte nur `"` in Attribut-WERTEN - id, className und
   // Attribut-SCHLUESSEL gingen roh in den String (claude-review, dritte Runde
