@@ -29,6 +29,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MiniElement, installMiniDom } from './mini-dom.js';
+import { isPrecachedSource } from './dist-build.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(path.join(HERE, '..', rel), 'utf8');
@@ -482,7 +483,7 @@ test('die Einstellungen zeigen die Zeile fuer alle und die Handlung nur Admins',
 });
 
 test('das Modul steht in der Precache-Liste des Service Workers', () => {
-  assert.match(read('public/sw.js'), /'\/utils\/household-zone-hint\.js'/);
+  assert.ok(isPrecachedSource('/utils/household-zone-hint.js'), 'liegt in keinem precachten Chunk von dist/sw.js');
 });
 
 test('die Bauform ist das vorhandene Band, kein neues Muster', () => {

@@ -15,14 +15,18 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
-import { renderServiceWorkerSource } from '../server/utils/service-worker.js';
+import { renderServiceWorker } from '../scripts/build/service-worker.ts';
 
-const SRC = renderServiceWorkerSource(
-  readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'),
-  'sw-network-first-test',
-);
+// Wie der Build ihn schreibt (scripts/build/service-worker.ts): Listen vorne,
+// Version und Revision eingesetzt. Die Seiten liegen gebaut unter /assets/.
+const SRC = renderServiceWorker(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), {
+  precache: ['/', '/index.html', '/router.js', '/assets/tasks-test.js', '/locales/de.json'],
+  locales: readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json')).map((f) => `/locales/${f}`),
+  release: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version,
+  revision: 'sw-network-first-test',
+});
 const ORIGIN = 'https://app.test';
 // Die Version kommt aus dem Worker selbst: ein festes Literal hier brach die
 // Suite bei jedem Versionssprung, weil die Saat dann im Cache der alten
@@ -30,14 +34,16 @@ const ORIGIN = 'https://app.test';
 const RELEASE = SRC.match(/const APP_RELEASE\s*=\s*'([^']+)'/)[1];
 
 class MockResponse {
-  constructor(body, { status = 200, type = 'basic' } = {}) {
+  /** @param {any} body @param {{ status?: number, type?: string, contentType?: string | null }} [init] */
+  constructor(body, { status = 200, type = 'basic', contentType = null } = {}) {
     this.body = body;
     this.status = status;
     this.ok = status >= 200 && status < 300;
     this.type = type;
-    this.headers = { get: () => null };
+    this.contentType = contentType;
+    this.headers = { get: (/** @type {string} */ name) => (String(name).toLowerCase() === 'content-type' ? this.contentType : null) };
   }
-  clone() { return new MockResponse(this.body, { status: this.status, type: this.type }); }
+  clone() { return new MockResponse(this.body, { status: this.status, type: this.type, contentType: this.contentType }); }
 }
 
 class MockRequest {
@@ -163,12 +169,13 @@ async function seed(env, cacheName, path, body) {
 }
 
 const SHELL = 'yuvomi-shell-';
-const PAGES = 'yuvomi-pages-';
+// Seit dem Build liegen die Seiten gehasht unter /assets/ und im Shell-Cache.
+const PAGES = SHELL;
 
 for (const [label, path, cacheName, mode] of [
   ['navigation', '/', SHELL, 'navigate'],
   ['shell module', '/router.js', SHELL, 'cors'],
-  ['page module', '/pages/tasks.js', PAGES, 'cors'],
+  ['page module', '/assets/tasks-test.js', PAGES, 'cors'],
   ['stylesheet', '/styles/layout.css', SHELL, 'cors'],
 ]) {
   test(`${label}: a network that never answers gets the cached copy after the deadline`, async () => {
@@ -254,7 +261,7 @@ test('one missed deadline covers the whole start: the next cached files come at 
   const env = loadSw(net.impl);
   await seed(env, SHELL, '/router.js', 'router');
   await seed(env, SHELL, '/api.js', 'api');
-  await seed(env, PAGES, '/pages/tasks.js', 'tasks');
+  await seed(env, PAGES, '/assets/tasks-test.js', 'tasks');
 
   const first = env.fetchEvent('/router.js');
   await settle();
@@ -264,7 +271,7 @@ test('one missed deadline covers the whole start: the next cached files come at 
   // Die naechste Ebene des Modulgraphen: ohne die Regel wartete jede Ebene
   // erneut 1,5 s auf ein Netz, das eben nicht geantwortet hat.
   const second = env.fetchEvent('/api.js');
-  const third = env.fetchEvent('/pages/tasks.js');
+  const third = env.fetchEvent('/assets/tasks-test.js');
   assert.equal((await within(second.result)).body, 'api');
   assert.equal((await within(third.result)).body, 'tasks');
   assert.equal(env.timers.length, 0, 'keine neue Frist im Langsam-Fenster');
@@ -272,7 +279,7 @@ test('one missed deadline covers the whole start: the next cached files come at 
   assert.equal(second.waited.length, 1);
 
   // Was nicht im Cache liegt, wartet auch im Fenster aufs Netz.
-  const uncached = env.fetchEvent('/pages/never-seen.js');
+  const uncached = env.fetchEvent('/assets/never-seen.js');
   await settle();
   let answered = false;
   uncached.result.then(() => { answered = true; });
@@ -302,7 +309,7 @@ test('without a cached copy the deadline changes nothing: the request keeps wait
   const net = heldFetch();
   const env = loadSw(net.impl);
 
-  const { result } = env.fetchEvent('/pages/tasks.js');
+  const { result } = env.fetchEvent('/assets/tasks-test.js');
   await settle();
   env.expireDeadlines();
   await settle();
@@ -353,9 +360,9 @@ test('what is not an app route never gets the shell before the network has actua
 
 test('a failing network still falls back at once, without waiting for the deadline', async () => {
   const env = loadSw(() => Promise.reject(new TypeError('Failed to fetch')));
-  await seed(env, PAGES, '/pages/tasks.js', 'cached');
+  await seed(env, PAGES, '/assets/tasks-test.js', 'cached');
 
-  const { result } = env.fetchEvent('/pages/tasks.js');
+  const { result } = env.fetchEvent('/assets/tasks-test.js');
   assert.equal((await within(result)).body, 'cached');
 });
 
@@ -454,4 +461,31 @@ test('a locale request while offline and never cached gets the offline page, not
   const response = await within(result);
   assert.equal(response.body, 'offline-page');
   assert.equal(response.ok, true);
+});
+
+// Guertel zum 404 des Servers (Review auf #2631): bekommt eine Datei-Anfrage
+// HTML zurueck (ein alter Server, ein Proxy, der auf die Shell umleitet), darf
+// das nie die gute Kopie im Cache ersetzen - der naechste Offline-Start bekaeme
+// sonst index.html als Modul.
+test('an HTML answer to a .js, .css or .json request never replaces the cached file', async () => {
+  for (const [path, cacheName] of [['/assets/tasks-test.js', SHELL], ['/styles/layout.css', SHELL], ['/locales/de.json', 'yuvomi-locales-']]) {
+    const env = loadSw(async () => new MockResponse('<!DOCTYPE html><html></html>', { contentType: 'text/html; charset=utf-8' }));
+    await seed(env, cacheName, path, 'good');
+    const { result, waited } = env.fetchEvent(path);
+    await result;
+    await Promise.all(waited);
+    await settle();
+    const name = (await env.caches.keys()).find((n) => n.startsWith(cacheName));
+    const cached = await (await env.caches.open(name)).match(`${ORIGIN}${path}`);
+    assert.equal(cached.body, 'good', `${path}: die HTML-Antwort hat die Kopie im Cache ersetzt`);
+  }
+  // Eine echte Datei wird weiter abgelegt.
+  const env = loadSw(async () => new MockResponse('fresh', { contentType: 'text/javascript' }));
+  await seed(env, SHELL, '/assets/tasks-test.js', 'old');
+  const { result, waited } = env.fetchEvent('/assets/tasks-test.js');
+  await result;
+  await Promise.all(waited);
+  await settle();
+  const name = (await env.caches.keys()).find((n) => n.startsWith(SHELL));
+  assert.equal((await (await env.caches.open(name)).match(`${ORIGIN}/assets/tasks-test.js`)).body, 'fresh');
 });

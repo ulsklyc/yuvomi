@@ -31,6 +31,10 @@ interface Window {
   /** Legacy-Alias fuer Drittanbieter-Module (public/router.js). */
   oikos: YuvomiApi;
   lucide?: any;
+  /** Nur im Service Worker: vom Build vorangestellt (scripts/build/service-worker.ts). */
+  __PRECACHE__?: string[];
+  /** Nur im Service Worker: vom Build vorangestellt (scripts/build/service-worker.ts). */
+  __LOCALES__?: string[];
 }
 
 /** Definition: public/night-hours.js (klassisches Skript, legt das Objekt auf globalThis). */
@@ -46,3 +50,13 @@ declare var yuvomiNightHours: {
   hourIn: YuvomiFn;
   isNight: YuvomiFn;
 };
+
+/**
+ * Vite (Phase 1a, Abschnitt D): `import.meta.glob` in public/router.js und
+ * `import.meta.env` in public/sw-register.js. Nur die zwei Stellen, die der
+ * Code nutzt, statt `vite/client` mit allen Asset-Modulen.
+ */
+interface ImportMeta {
+  glob(pattern: string): Record<string, () => Promise<any>>;
+  readonly env?: { readonly DEV: boolean };
+}

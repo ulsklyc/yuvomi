@@ -6,7 +6,7 @@
     "types": ["node"],
     "allowJs": true, "checkJs": true, "strict": true, "noEmit": true, "incremental": false, "erasableSyntaxOnly": true, "verbatimModuleSyntax": true, "allowImportingTsExtensions": true, "skipLibCheck": true
   },
-  "include": ["./**/*", "../scripts/**/*", "../types/**/*.d.ts"],
+  "include": ["./**/*", "../scripts/**/*", "../types/**/*.d.ts", "../vite.config.ts"],
   // Lokale Screenshot-Pipeline: importiert Playwright ueber den absoluten Homebrew-Pfad
   // /opt/homebrew/lib/node_modules/playwright (nur auf dem Mac da, kein Teil der Laufzeit).
   // Ein maschinenabhaengiger Fehler gehoert nicht in die Baseline.

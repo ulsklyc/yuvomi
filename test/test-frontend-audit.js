@@ -11,6 +11,7 @@ import { SETTINGS_DOMAINS, SETTINGS_LEAVES } from '../public/settings/registry.j
 import { eachRule } from './css-rules.js';
 import { keySetDiff } from './i18n-plural-keys.js';
 import { withoutHtmlComments, withoutBlockComments, withoutCommentsKeepingLines } from './source-text.js';
+import { distPrecache, isPrecachedSource, readDist } from './dist-build.js';
 import {
   dialogSegments, submitOutsideFooter, footerWithoutCancel, saveBranchPartners,
   fixedSaveOnTwoCaseDialog, foreignCreateVerbs, aliasFieldClasses,
@@ -736,34 +737,39 @@ test('service worker knows every supported locale file', () => {
   // die Precache-Liste: vorab gecacht wird nur die Rueckfallsprache
   // (PRECACHED_LOCALES), jede andere beim ersten Abruf oder auf Zuruf der Seite
   // (CACHE_LOCALE) - und der Worker nimmt nur an, was in APP_LOCALES steht.
-  // Gelesen wird deshalb der Block dieser einen Liste, nicht jedes Literal der Datei.
+  // Seit dem Build (Phase 1a, Abschnitt D) schreibt Vite beide Listen in
+  // dist/sw.js (`self.__LOCALES__`, `self.__PRECACHE__`); gelesen wird das Artefakt.
   const i18n = read('../public/i18n.js');
-  const sw = read('../public/sw.js');
+  const sw = readDist('sw.js');
   const supportedLocales = [...i18n.match(/SUPPORTED_LOCALES\s*=\s*\[([^\]]+)\]/)?.[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
   const localeFiles = readdirSync(new URL('../public/locales/', import.meta.url))
     .filter((file) => file.endsWith('.json'))
     .map((file) => file.replace(/\.json$/, ''))
     .sort();
-  const appLocalesBlock = sw.match(/const APP_LOCALES = \[([\s\S]*?)\];/)?.[1] ?? '';
-  const knownLocales = [...appLocalesBlock.matchAll(/'\/locales\/([^']+)\.json'/g)].map((match) => match[1]).sort();
+  const appLocalesBlock = sw.match(/^self\.__LOCALES__ = (\[.*\]);$/m)?.[1] ?? '[]';
+  const knownLocales = /** @type {string[]} */ (JSON.parse(appLocalesBlock)).map((p) => p.replace(/^\/locales\/(.+)\.json$/, '$1')).sort();
 
   assert.deepEqual(supportedLocales.sort(), localeFiles, 'SUPPORTED_LOCALES must match public/locales/*.json');
   assert.deepEqual(knownLocales, supportedLocales.sort(), 'Service worker APP_LOCALES must list every supported locale');
-  assert.match(sw, /const PRECACHED_LOCALES = \['\/locales\/de\.json'\];/, 'the fallback locale is precached');
+  assert.deepEqual(distPrecache().filter((p) => p.startsWith('/locales/')), ['/locales/de.json'], 'the fallback locale is precached, no other');
 });
 
 test('service worker release caches track package and deployment revisions and include the early locale bootstrap', () => {
+  // Quelle: beide Werte sind Tokens, die der Build einsetzt (scripts/build/service-worker.ts).
+  // Artefakt: dist/sw.js traegt die Version aus package.json.
   const pkg = JSON.parse(read('../package.json'));
   const sw = read('../public/sw.js');
-  const release = sw.match(/const APP_RELEASE\s*=\s*['"]([^'"]+)['"]/)?.[1];
+  const built = readDist('sw.js');
+  const release = built.match(/const APP_RELEASE\s*=\s*['"]([^'"]+)['"]/)?.[1];
 
   assert.equal(release, pkg.version, 'Service worker APP_RELEASE must match package.json');
+  assert.match(sw, /const APP_RELEASE\s*=\s*['"]__YUVOMI_APP_RELEASE__['"]/);
   assert.match(sw, /const APP_BUILD_REVISION\s*=\s*['"]__YUVOMI_BUILD_REVISION__['"]/);
   assert.match(sw, /const CACHE_RELEASE\s*=\s*`\$\{APP_RELEASE\}-\$\{APP_BUILD_REVISION\}`/);
-  for (const cache of ['shell', 'pages', 'locales', 'assets', 'api']) {
+  for (const cache of ['shell', 'locales', 'assets', 'api']) {
     assert.match(sw, new RegExp(`yuvomi-${cache}-\\$\\{CACHE_RELEASE\\}`));
   }
-  assert.match(sw, /['"]\/lang-init\.js['"]/, 'early lang/dir bootstrap must be available offline');
+  assert.ok(distPrecache().includes('/lang-init.js'), 'early lang/dir bootstrap must be available offline');
 });
 
 test('an announced update stops the router from loading further page modules (#616)', () => {
@@ -17355,9 +17361,8 @@ test('die Nacht hat EINE Rechnung: theme-init.js und isWallNight fragen /night-h
     assert.ok(at !== -1 && at < html.indexOf('<script src="/theme-init.js"></script>'),
       `${doc} laedt /night-hours.js vor /theme-init.js`);
   }
-  const sw = read('../public/sw.js');
-  assert.ok(sw.includes("'/night-hours.js',"), 'im Precache des Service Workers');
-  assert.ok(sw.includes("'/utils/night-hours.js',"));
+  assert.ok(distPrecache().includes('/night-hours.js'), 'im Precache des gebauten Service Workers');
+  assert.ok(isPrecachedSource('/utils/night-hours.js'), 'utils/night-hours.js liegt in keinem precachten Chunk');
 });
 
 test('the early screensaver delay in theme-init.js does not drift from utils/screensaver-idle.js (#885)', async () => {
@@ -18794,7 +18799,8 @@ test('PAGE-013: a narrow header follows the measure of ITS page, and full/split 
 });
 
 test('PAGE-014: page-layout helpers escape every attribute they emit', async () => {
-  // Die Helfer sind die zugesagte Oberflaeche fuer Erweiterungen (MODULES.md);
+  // Die Helfer bauen die Kernseiten (Drittmodulen waren sie bis Phase 1a in
+  // MODULES.md zugesagt, seit dem Build nur noch die drei Fassaden);
   // eine id aus einem Datensatz ist der erwartete Gebrauch der Option. Die
   // erste Fassung ersetzte nur `"` in Attribut-WERTEN - id, className und
   // Attribut-SCHLUESSEL gingen roh in den String (claude-review, dritte Runde
@@ -23595,6 +23601,8 @@ test('router: idle warm-up preloads at low priority, intent and the start route 
     document: { createElement: () => ({}), head: { appendChild: (l) => links.push(l) } },
     allRoutes: () => [{ path: '/tasks', page: '/pages/tasks.js', module: 'tasks' }, { path: '/notes', page: '/pages/notes.js', module: 'notes' }],
     moduleCache: new Map(),
+    // Im Build die gehashte Datei aus #yuvomi-page-urls (router.js).
+    pageModuleUrl: (/** @type {string} */ page) => `/assets${page}`,
     shellStale: false,
     navItems: () => [{ path: '/tasks' }, { path: '/notes' }],
     routerState: { currentPath: '/' },
@@ -23613,6 +23621,7 @@ test('router: idle warm-up preloads at low priority, intent and the start route 
   warmPrimaryRoutes();
   const warm = links.filter((l) => l.rel === 'modulepreload');
   assert.equal(warm.length, 2, 'beide Hauptziele vorgewaermt');
+  assert.deepEqual(warm.map((l) => l.href), ['/assets/pages/tasks.js', '/assets/pages/notes.js'], 'vorgewaermt wird die gebaute Datei, nicht der Quellpfad (der liefert im Build index.html)');
   assert.deepEqual(warm.map((l) => l.fetchPriority), ['low', 'low'], 'das Vorwaermen im Leerlauf laedt mit niedriger Prioritaet');
   links.length = 0;
   env.allRoutes = undefined;

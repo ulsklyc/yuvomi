@@ -81,7 +81,9 @@ Optional fields:
   (see [`docs/PAGE-COMPOSITION.md`](docs/PAGE-COMPOSITION.md)). The app applies it: the
   `container` your `render()` receives is the `.app-page--<composition>` root, with the page
   measure set. Declare intent; do not invent page width, gutters, or breakpoints. Build the
-  header and body with `/utils/page-layout.js`.
+  header and body inside it with the app's classes (`page-toolbar`, `page-toolbar__title`,
+  `app-page__body`, `page-section`), as in the example below; a module imports only the three
+  stable facades, not the app's own layout helpers.
 - `page.width`: semantic width (`reading` | `content` | `wide`); defaults from composition and
   refines the measure inside `reading`, `form`, `data` and `dashboard`. `split` and `full` own
   their width and ignore it. In `split`, the first two children of the body are the master and
@@ -128,28 +130,29 @@ example module; the manifest and entry above are the example.
 ```js
 import { api } from '/api.js';
 import { esc } from '/utils/html.js';
-import { renderPageHeader, renderPageTitle, renderPageBody, renderPageSection } from '/utils/page-layout.js';
 
 export async function render(container, context) {
   // `container` already is your page root: the app has wrapped it in the
   // composition you declared in module.json (`.app-page.app-page--reading`,
-  // `--page-measure` set). Render the header and the body into it; do not
-  // call renderAppPage() yourself, that would nest a second page root.
+  // `--page-measure` set). Render the header and the body into it with the
+  // app's classes; do not add a second page root.
   const me = await api.get('/auth/me');
   container.replaceChildren();
-  container.insertAdjacentHTML('beforeend',
-    renderPageHeader({ title: renderPageTitle('Example Module') })
-    + renderPageBody({
-      content: renderPageSection({
-        content: `<p>Hello, ${esc(me.user.display_name)}</p>`,
-      }),
-    }));
+  container.insertAdjacentHTML('beforeend', `
+    <div class="page-toolbar page-toolbar--narrow">
+      <h1 class="page-toolbar__title">Example Module</h1>
+    </div>
+    <div class="app-page__body">
+      <section class="page-section page-measure">
+        <p>Hello, ${esc(me.user.display_name)}</p>
+      </section>
+    </div>`);
 }
 ```
 
 `context` carries `user`, `page` and `signal`. `page` is the normalized declaration from your manifest (`composition`, `width`, `navigation`, `responsive`), so a module can branch on it without reading `module.json` a second time. `signal` is an `AbortSignal` the router aborts as soon as the user leaves your page: pass it to every `addEventListener` (`{ signal }`) and clear timers on its `abort` event, and check `signal.aborted` after each `await` before touching the DOM. Without that, a page keeps polling and re-rendering into a container that is no longer on screen.
 
-Modules may import public Yuvomi browser libraries such as `/api.js`, `/i18n.js`, and utilities under `/utils/`. For calls to Yuvomi's built-in REST API, prefer `import { api } from '/api.js'`: it prefixes requests with `/api/v1`, sends the current session credentials, handles CSRF tokens, and uses non-cached fetches for user data.
+Modules may import exactly these Yuvomi browser modules, the stable facades: `/api.js`, `/i18n.js`, `/utils/html.js`. The web app ships built (bundled by Vite), and only these paths are stable across releases; every other file under `/utils/` lives inside the bundle under a hashed name and has no address a module can import. For calls to Yuvomi's built-in REST API, prefer `import { api } from '/api.js'`: it prefixes requests with `/api/v1`, sends the current session credentials, handles CSRF tokens, and uses non-cached fetches for user data.
 
 If a module calls a separate backend service through a reverse proxy, expose that service on a same-origin `/api/...` path whenever the response is dynamic. Yuvomi's service worker deliberately bypasses `/api/` requests, while other same-origin GET requests may be handled by the app-shell caching strategy. A dynamic proxy path such as `/ext/myservice/...` can therefore return stale cached responses unless you also change the service-worker strategy.
 
