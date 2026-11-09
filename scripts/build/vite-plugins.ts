@@ -9,13 +9,13 @@
  *     and the start page is preloaded at low priority behind the shell;
  *   - module list: dist/.vite/modules.json names every source module in the
  *     bundle (the copy-list guard and the third-party notices read it).
- * Abhaengigkeiten: node:child_process (git ls-files), node:fs, lightningcss, ../build-third-party-notices.mjs, ./static-files.ts, vite (Typen)
+ * Abhaengigkeiten: node:child_process (git ls-files), node:fs, esbuild (CSS-Minify), ../build-third-party-notices.mjs, ./static-files.ts, vite (Typen)
  */
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
-import { transform as transformCss } from 'lightningcss';
+import { transformSync as transformWithEsbuild } from 'esbuild';
 import type { Plugin } from 'vite';
 import { writeNotices } from '../build-third-party-notices.mjs';
 import { FACADES, NOT_COPIED, copyEntryFor } from './static-files.ts';
@@ -95,10 +95,21 @@ export function staticCopyPlugin(publicDir: string, also: readonly string[] = []
         const source = readFileSync(join(publicDir, rel));
         if (rel.startsWith('styles/') && rel.endsWith('.css')) {
           const name = rel.slice(rel.lastIndexOf('/') + 1);
-          // No targets: minify only, never lower or prefix - the browsers read
-          // these sheets unbundled today and keep reading the same syntax.
-          const result = transformCss({ filename: name, code: source, minify: true, sourceMap: true });
-          writeFileSync(target, `${result.code.toString()}\n/*# sourceMappingURL=${name}.map */\n`);
+          // esbuild, not lightningcss (Vite's CSS minifier): lightningcss folds a
+          // hand-written pair `-webkit-backdrop-filter` + `backdrop-filter` into
+          // one line and shortens the @supports condition that names both, and
+          // merges and rewrites declarations elsewhere - 157 losses over the
+          // sheets, no glass in Chrome and Firefox (document-guards probe 12 on
+          // #2631). Safari 15.4, the floor, needs the prefix, the source keeps
+          // both lines by hand, and the minifier must touch neither. esbuild
+          // without a target and with whitespace minification only (its syntax
+          // minifier would still merge adjacent rules with equal bodies) drops
+          // comments and whitespace and nothing else; test:dist-css holds every
+          // declaration and @supports condition against the source.
+          const result = transformWithEsbuild(source.toString('utf8'), {
+            loader: 'css', minifyWhitespace: true, minifySyntax: false, charset: 'utf8', sourcemap: 'external', sourcefile: name,
+          });
+          writeFileSync(target, `${result.code.trimEnd()}\n/*# sourceMappingURL=${name}.map */\n`);
           if (result.map) writeFileSync(`${target}.map`, result.map);
         } else {
           writeFileSync(target, source);

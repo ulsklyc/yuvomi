@@ -20,7 +20,7 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 
 /**
  * Pakete, die App-Code importiert und die der Build buendelt. Startet leer:
- * vite, lightningcss und typescript sind Werkzeuge, kein Code im Browser.
+ * vite, esbuild und typescript sind Werkzeuge, kein Code im Browser.
  * Wer hier eines eintraegt, hat vorher ein Issue (CONTRIBUTING, Vendor-Politik).
  */
 /** @type {string[]} */
@@ -68,7 +68,7 @@ test('was der Build buendelt, ist bekannt und exakt gepinnt', () => {
   assert.deepEqual(helpers, TOOLCHAIN_HELPERS, 'die Werkzeugkette legt andere Helfer in die Chunks als bekannt');
   assert.deepEqual(pinViolations(pkg, [...IMPORTED_PACKAGES, ...TOOLCHAIN_HELPERS]), [],
     'ein gebuendeltes Paket steht mit ^ oder ~ in package.json');
-  assert.deepEqual(pinViolations(pkg, ['vite', 'lightningcss', 'typescript']), [], 'die Build-Werkzeuge sind exakt gepinnt');
+  assert.deepEqual(pinViolations(pkg, ['vite', 'esbuild', 'typescript']), [], 'die Build-Werkzeuge sind exakt gepinnt');
 });
 
 test('THIRD-PARTY-NOTICES.txt nennt jedes gebuendelte Paket und jede Handkopie', () => {
