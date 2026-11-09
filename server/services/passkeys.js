@@ -6,10 +6,15 @@ import {
   generateAuthenticationOptions, verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 
+/** @typedef {ReturnType<typeof import('../db.js').get>} Database */
+/** @typedef {{ id: number, username: string, display_name: string }} PasskeyUser */
+/** @typedef {{ credential_id: string, transports: string }} StoredCredential */
+
 export const CHALLENGE_TTL_MS = 5 * 60_000;
 const WINDOW_MS = CHALLENGE_TTL_MS;
 const MAX_PASSKEYS = 10;
 const MAX_ANONYMOUS_CHALLENGES_PER_CLIENT = 20;
+/** @param {string} id */
 const sessionHash = id => createHash('sha256').update(String(id)).digest('hex');
 export class PasskeyVerificationError extends Error {
   constructor(reason = 'credential_invalid') {
@@ -18,7 +23,12 @@ export class PasskeyVerificationError extends Error {
     this.reason = reason;
   }
 }
+/** @param {string} [reason] */
 const fail = reason => new PasskeyVerificationError(reason);
+/** @template O, R
+ * @param {(options: O) => Promise<R>} verify
+ * @param {O} options
+ */
 async function verifyCredential(verify, options) {
   try { return await verify(options); }
   catch { throw fail('credential_verification'); }
@@ -27,7 +37,7 @@ async function verifyCredential(verify, options) {
 export function configuration() {
   if (process.env.PASSKEYS_ENABLED === 'false') return null;
   try {
-    const url = new URL(process.env.BASE_URL);
+    const url = new URL(process.env.BASE_URL ?? '');
     if (url.username || url.password || url.search || url.hash || url.pathname !== '/' || isIP(url.hostname)) return null;
     if (url.protocol !== 'https:' && !(url.protocol === 'http:' && url.hostname === 'localhost')) return null;
     return { origin: url.origin, rpID: url.hostname, rpName: 'Yuvomi' };
@@ -40,14 +50,24 @@ function config() {
   return value;
 }
 
+/** @param {Database} database
+ * @param {number} userId
+ */
 export function list(database, userId) {
   return database.prepare('SELECT id, name, created_at, last_used_at FROM user_passkeys WHERE user_id = ? ORDER BY id').all(userId);
 }
 
+/** @param {Database} database
+ * @param {number} userId
+ * @param {number} id
+ */
 export function remove(database, userId, id) {
   return database.prepare('DELETE FROM user_passkeys WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
 }
 
+/** @param {Database} database
+ * @param {number} userId
+ */
 export function revokeAll(database, userId) {
   // Rotating the opaque handle also invalidates registration already verifying.
   database.exec('SAVEPOINT revoke_passkeys');
@@ -63,6 +83,13 @@ export function revokeAll(database, userId) {
   }
 }
 
+/** @param {Database} database
+ * @param {string} sessionId
+ * @param {"register" | "authenticate"} operation
+ * @param {string} challenge
+ * @param {number|null} [userId]
+ * @param {string} [clientId]
+ */
 function remember(database, sessionId, operation, challenge, userId = null, clientId = sessionId) {
   database.transaction(() => {
     database.prepare('DELETE FROM passkey_challenges WHERE expires_at <= ?').run(Date.now());
@@ -82,6 +109,11 @@ function remember(database, sessionId, operation, challenge, userId = null, clie
 
 // DELETE RETURNING consumes before any asynchronous verification: concurrent
 // requests cannot both spend the same challenge, even with stale session copies.
+/** @param {Database} database
+ * @param {string} sessionId
+ * @param {"register" | "authenticate"} operation
+ * @param {number|null} [userId]
+ */
 function consume(database, sessionId, operation, userId = null) {
   const row = database.prepare('DELETE FROM passkey_challenges WHERE session_hash = ? AND operation = ? RETURNING *')
     .get(sessionHash(sessionId), operation);
@@ -89,12 +121,19 @@ function consume(database, sessionId, operation, userId = null) {
   return row.challenge;
 }
 
+/** @param {Database} database
+ * @param {number} userId
+ */
 function handle(database, userId) {
   database.prepare('INSERT OR IGNORE INTO user_passkey_handles (user_id, user_handle) VALUES (?, ?)')
     .run(userId, randomBytes(32).toString('base64url'));
   return database.prepare('SELECT user_handle FROM user_passkey_handles WHERE user_id = ?').get(userId).user_handle;
 }
 
+/** @param {Database} database
+ * @param {PasskeyUser} user
+ * @param {string} sessionId
+ */
 export async function beginRegistration(database, user, sessionId) {
   const cfg = config();
   if (list(database, user.id).length >= MAX_PASSKEYS) throw fail();
@@ -105,7 +144,7 @@ export async function beginRegistration(database, user, sessionId) {
     userDisplayName: user.display_name, userID: Buffer.from(userHandle, 'base64url'),
     attestationType: 'none', timeout: WINDOW_MS,
     supportedAlgorithmIDs: [-7, -257],
-    excludeCredentials: credentials.map(row => ({ id: row.credential_id, transports: JSON.parse(row.transports) })),
+    excludeCredentials: credentials.map(/** @param {StoredCredential} row */ row => ({ id: row.credential_id, transports: JSON.parse(row.transports) })),
     authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
   });
   if (database.prepare('SELECT user_handle FROM user_passkey_handles WHERE user_id = ?').get(user.id)?.user_handle !== userHandle) throw fail();
@@ -113,6 +152,13 @@ export async function beginRegistration(database, user, sessionId) {
   return options;
 }
 
+/** @param {Database} database
+ * @param {number} userId
+ * @param {string} sessionId
+ * @param {import("@simplewebauthn/server").RegistrationResponseJSON} response
+ * @param {unknown} name
+ * @param {() => boolean} [isAllowed]
+ */
 export async function finishRegistration(database, userId, sessionId, response, name, isAllowed = () => true) {
   const cfg = config();
   const userHandle = database.prepare('SELECT user_handle FROM user_passkey_handles WHERE user_id = ?').get(userId)?.user_handle;
@@ -135,18 +181,28 @@ export async function finishRegistration(database, userId, sessionId, response, 
   })();
 }
 
+/** @param {Database} database
+ * @param {string} sessionId
+ * @param {number|null} [userId]
+ * @param {string} [clientId]
+ */
 export async function beginAuthentication(database, sessionId, userId = null, clientId = sessionId) {
   const cfg = config();
   const credentials = userId === null ? null : database.prepare('SELECT credential_id, transports FROM user_passkeys WHERE user_id = ?').all(userId);
   if (credentials && !credentials.length) throw fail();
   const options = await generateAuthenticationOptions({ rpID: cfg.rpID, userVerification: 'required', timeout: WINDOW_MS,
-    ...(credentials ? { allowCredentials: credentials.map(row => ({ id: row.credential_id, transports: JSON.parse(row.transports) })) } : {}),
+    ...(credentials ? { allowCredentials: credentials.map(/** @param {StoredCredential} row */ row => ({ id: row.credential_id, transports: JSON.parse(row.transports) })) } : {}),
   });
   // A non-null user binding distinguishes reauthentication from anonymous sign-in.
   remember(database, sessionId, 'authenticate', options.challenge, userId, clientId);
   return options;
 }
 
+/** @param {Database} database
+ * @param {string} sessionId
+ * @param {import("@simplewebauthn/server").AuthenticationResponseJSON} response
+ * @param {number|null} [userId]
+ */
 export async function finishAuthentication(database, sessionId, response, userId = null) {
   const cfg = config();
   const challenge = consume(database, sessionId, 'authenticate', userId);

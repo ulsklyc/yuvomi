@@ -2,14 +2,23 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, constraintErrors, reportFieldErrors } from '/components/modal.js';
+import { openModal as openHostModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal as confirmHostModal, constraintErrors, reportFieldErrors } from '/components/modal.js';
 import { settingRowHtml } from '/settings/components.js';
 import { createPasskey, usePasskey, passkeyErrorText, passkeysSupported } from '/utils/passkeys.js';
 
+// Describe the host modal's existing runtime options at this call boundary.
+/** @type {(options:{title:string,size:string,dirtyGuard:boolean,onClose:()=>void,content:string,onSave:(panel:HTMLElement)=>void})=>void} */
+const openModal = openHostModal;
+/** @typedef {(message:string,options:{detail:string,danger:boolean,confirmLabel:string})=>Promise<boolean>} PasskeyConfirmation */
+const confirmModal = /** @type {PasskeyConfirmation} */ (/** @type {unknown} */ (confirmHostModal));
+
+/** @typedef {{id:number, name:string, last_used_at?:string|null}} NamedPasskey */
+/** @typedef {{enabled:boolean, enrollment_allowed:boolean, second_factor_required:boolean, passkeys:NamedPasskey[]}} PasskeyState */
+/** @param {PasskeyState} state */
 async function reauthenticate(state) {
-  return new Promise(resolve => {
+  return new Promise(/** @param {(value:boolean)=>void} resolve */ resolve => {
     let finished = false;
-    const settle = value => { if (!finished) { finished = true; resolve(value); } };
+    const settle = /** @param {boolean} value */ value => { if (!finished) { finished = true; resolve(value); } };
     openModal({
       title: t('passkeys.reauthTitle'), size: 'sm', dirtyGuard: false,
       onClose: () => settle(false),
@@ -30,16 +39,16 @@ async function reauthenticate(state) {
             <button type="submit" class="btn btn--primary">${esc(t('common.confirm'))}</button>
           </div>
         </form>`,
-      onSave: panel => {
+      onSave: (/** @type {HTMLElement} */ panel) => {
         const context = captureModalContext();
-        const form = panel.querySelector('#passkey-reauth-form');
-        const password = panel.querySelector('#passkey-reauth-password');
-        const status = panel.querySelector('#passkey-reauth-status');
-        const buttons = panel.querySelectorAll('button:not([data-action="close-modal"])');
+        const form = /** @type {HTMLFormElement} */ (panel.querySelector('#passkey-reauth-form'));
+        const password = /** @type {HTMLInputElement} */ (panel.querySelector('#passkey-reauth-password'));
+        const status = /** @type {HTMLElement} */ (panel.querySelector('#passkey-reauth-status'));
+        const buttons = /** @type {NodeListOf<HTMLButtonElement>} */ (panel.querySelectorAll('button:not([data-action="close-modal"])'));
         let busy = false;
-        const verify = async method => {
+        const verify = async (/** @type {"password"|"passkey"} */ method) => {
           if (busy || finished) return;
-          const code = panel.querySelector('#passkey-reauth-code');
+          const code = /** @type {HTMLInputElement|null} */ (panel.querySelector('#passkey-reauth-code'));
           password.required = method === 'password';
           if (code) code.required = method === 'password' && state.second_factor_required;
           const invalid = reportFieldErrors(constraintErrors(form));
@@ -47,6 +56,7 @@ async function reauthenticate(state) {
           if (code) code.required = state.second_factor_required;
           if (invalid) return;
           busy = true;
+          /** @type {{method:"password"|"passkey",code?:string,password?:string,credential?:Awaited<ReturnType<typeof usePasskey>>}} */
           const proof = { method };
           if (method === 'password' && code) proof.code = code.value.trim();
           for (const button of buttons) button.disabled = true;
@@ -63,7 +73,7 @@ async function reauthenticate(state) {
             settle(true);
             closeModal({ force: true, context });
           } catch (error) {
-            if (!finished) status.textContent = error?.data?.reason === 'passkey_failed'
+            if (!finished) status.textContent = error instanceof Object && 'data' in error && (/** @type {{reason?:string}|undefined} */ (error.data))?.reason === 'passkey_failed'
               ? t('passkeys.reauthFailed') : passkeyErrorText(error);
           } finally {
             busy = false;
@@ -78,11 +88,14 @@ async function reauthenticate(state) {
   });
 }
 
+/** @template T
+ * @param {() => Promise<T>} action
+ */
 async function withRecentAuthentication(action) {
   const context = captureOpenContext();
   try { return await action(); }
   catch (error) {
-    if (error?.data?.reason !== 'passkey_reauth_required') throw error;
+    if (!(error instanceof Object && 'data' in error && (/** @type {{reason?:string}|undefined} */ (error.data))?.reason === 'passkey_reauth_required')) throw error;
     const { data: state } = await api.get('/auth/passkeys');
     if (!isModalContextCurrent(context)) throw Object.assign(new Error(), { name: 'AbortError' });
     if (!state?.enrollment_allowed) throw error;
@@ -91,7 +104,9 @@ async function withRecentAuthentication(action) {
   }
 }
 
+/** @param {HTMLElement} container */
 export async function renderPasskeyCard(container) {
+  /** @type {PasskeyState|undefined} */
   let state;
   try { state = (await api.get('/auth/passkeys'))?.data; } catch { return; }
   if (!state) return;
@@ -122,13 +137,13 @@ export async function renderPasskeyCard(container) {
       </form>` : ''}
       <p id="passkey-status" class="form-hint" role="status" aria-live="polite"></p>
     </div>`);
-  const status = container.querySelector('#passkey-status');
+  const status = /** @type {HTMLElement} */ (container.querySelector('#passkey-status'));
   container.querySelector('#passkey-add-form')?.addEventListener('submit', async event => {
     event.preventDefault();
-    const form = event.currentTarget;
+    const form = /** @type {HTMLFormElement} */ (event.currentTarget);
     if (reportFieldErrors(constraintErrors(form))) return;
-    const button = form.querySelector('button');
-    const name = form.querySelector('input').value.trim();
+    const button = /** @type {HTMLButtonElement} */ (form.querySelector('button'));
+    const name = /** @type {HTMLInputElement} */ (form.querySelector('input')).value.trim();
     if (!name) return;
     button.disabled = true;
     status.textContent = t('passkeys.waiting');
@@ -137,11 +152,11 @@ export async function renderPasskeyCard(container) {
       const credential = await createPasskey(options);
       await withRecentAuthentication(() => api.post('/auth/passkeys/register/verify', { credential, name }));
       await renderPasskeyCard(container);
-      container.querySelector('#passkey-status').textContent = t('passkeys.added');
+      /** @type {HTMLElement} */ (container.querySelector('#passkey-status')).textContent = t('passkeys.added');
     } catch (error) { status.textContent = passkeyErrorText(error); }
     finally { button.disabled = false; }
   });
-  for (const button of container.querySelectorAll('[data-remove-passkey]')) {
+  for (const button of /** @type {NodeListOf<HTMLButtonElement>} */ (container.querySelectorAll('[data-remove-passkey]'))) {
     button.addEventListener('click', async () => {
       if (!await confirmModal(t('passkeys.remove'), { detail: t('passkeys.removeConfirm'), danger: true, confirmLabel: t('passkeys.remove') })) return;
       button.disabled = true;
@@ -149,7 +164,7 @@ export async function renderPasskeyCard(container) {
         const result = await withRecentAuthentication(() => api.delete(`/auth/passkeys/${button.dataset.removePasskey}`));
         container.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
         await renderPasskeyCard(container);
-        container.querySelector('#passkey-status').textContent = `${t('passkeys.removed')} ${t('settings.otherSessionsEnded', { count: result?.data?.ended ?? 0 })}`;
+        /** @type {HTMLElement} */ (container.querySelector('#passkey-status')).textContent = `${t('passkeys.removed')} ${t('settings.otherSessionsEnded', { count: result?.data?.ended ?? 0 })}`;
       }
       catch (error) { status.textContent = passkeyErrorText(error); button.disabled = false; }
     });

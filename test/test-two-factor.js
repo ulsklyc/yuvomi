@@ -326,7 +326,9 @@ test('every sign-in path verifies TOTP or a UV-required passkey before creating 
   const source = readFileSync(new URL('../server/auth.js', import.meta.url), 'utf8');
   const lines = source.split('\n');
 
+  /** @type {string[]} */
   const callers = [];
+  /** @type {string[]} */
   const unguarded = [];
   lines.forEach((line, index) => {
     // Der Aufruf, nicht die Definition - die traegt dieselbe Zeichenfolge.

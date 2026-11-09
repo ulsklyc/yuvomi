@@ -13,7 +13,9 @@ delete process.env.AUTH_ALLOW_PASSWORD_LOGIN;
 const passkeys = await import('../server/services/passkeys.js');
 const { get } = await import('../server/db.js');
 const database = get();
+/** @param {string|Buffer} value */
 const digest = value => createHash('sha256').update(value).digest();
+/** @param {string|Uint8Array} value */
 const b64 = value => Buffer.from(value).toString('base64url');
 const origin = process.env.BASE_URL;
 const rpID = new URL(origin).hostname;
@@ -25,23 +27,37 @@ function user() {
 function authenticator() {
   const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const jwk = keys.publicKey.export({ format: 'jwk' });
-  return { ...keys, id: b64(randomBytes(32)), cose: isoCBOR.encode(new Map([[1, 2], [3, -7], [-1, 1], [-2, new Uint8Array(Buffer.from(jwk.x, 'base64url'))], [-3, new Uint8Array(Buffer.from(jwk.y, 'base64url'))]])) };
+  return { ...keys, id: b64(randomBytes(32)), cose: isoCBOR.encode(new Map(/** @type {[number, number|Uint8Array][]} */ ([[1, 2], [3, -7], [-1, 1], [-2, new Uint8Array(Buffer.from(jwk.x ?? '', 'base64url'))], [-3, new Uint8Array(Buffer.from(jwk.y ?? '', 'base64url'))]]))) };
 }
+/** @param {{challenge:string}} options
+ * @param {ReturnType<typeof authenticator>} device
+ * @param {{client?:Record<string,unknown>,flags?:number}} [overrides]
+ * @returns {import('@simplewebauthn/server').RegistrationResponseJSON}
+ */
 function registration(options, device, overrides = {}) {
   const clientDataJSON = b64(JSON.stringify({ type: 'webauthn.create', challenge: options.challenge, origin, ...overrides.client }));
   const id = Buffer.from(device.id, 'base64url');
   const length = Buffer.alloc(2); length.writeUInt16BE(id.length);
   const authData = Buffer.concat([digest(rpID), Buffer.from([overrides.flags ?? 0x45]), Buffer.alloc(4), Buffer.alloc(16), length, id, Buffer.from(device.cose)]);
-  return { id: device.id, rawId: device.id, type: 'public-key', clientExtensionResults: {}, response: { clientDataJSON, attestationObject: b64(isoCBOR.encode(new Map([['fmt', 'none'], ['authData', new Uint8Array(authData)], ['attStmt', new Map()]]))), transports: ['internal'] } };
+  return { id: device.id, rawId: device.id, type: 'public-key', clientExtensionResults: {}, response: { clientDataJSON, attestationObject: b64(isoCBOR.encode(new Map(/** @type {[string, any][]} */ ([['fmt', 'none'], ['authData', new Uint8Array(authData)], ['attStmt', new Map()]])))), transports: ['internal'] } };
 }
+/** @param {{challenge:string}} options
+ * @param {ReturnType<typeof authenticator>} device
+ * @param {string|null} handle
+ * @param {{client?:Record<string,unknown>,flags?:number,counter?:number,rpID?:string,badSignature?:boolean}} [overrides]
+ * @returns {import('@simplewebauthn/server').AuthenticationResponseJSON}
+ */
 function assertion(options, device, handle, overrides = {}) {
   const clientData = Buffer.from(JSON.stringify({ type: 'webauthn.get', challenge: options.challenge, origin, ...overrides.client }));
   const counter = Buffer.alloc(4); counter.writeUInt32BE(overrides.counter ?? 1);
   const authData = Buffer.concat([digest(overrides.rpID ?? rpID), Buffer.from([overrides.flags ?? 0x05]), counter]);
   const signature = sign('sha256', Buffer.concat([authData, digest(clientData)]), device.privateKey);
   if (overrides.badSignature) signature[signature.length - 1] ^= 1;
-  return { id: device.id, rawId: device.id, type: 'public-key', clientExtensionResults: {}, response: { clientDataJSON: b64(clientData), authenticatorData: b64(authData), signature: b64(signature), userHandle: handle } };
+  return { id: device.id, rawId: device.id, type: 'public-key', clientExtensionResults: {}, response: { clientDataJSON: b64(clientData), authenticatorData: b64(authData), signature: b64(signature), ...(handle === null ? {} : {userHandle: handle}) } };
 }
+/** @param {import("../server/services/passkeys.js").PasskeyUser} person
+ * @param {string} [session]
+ */
 async function enroll(person, session = `session-${person.id}`) {
   const device = authenticator();
   const options = await passkeys.beginRegistration(database, person, session);
@@ -119,19 +135,21 @@ test('origin configuration is explicit and never taken from a request Host', () 
   for (const value of ['', 'http://planner.example.test', 'https://user:password@planner.example.test', 'https://planner.example.test/path', 'https://127.0.0.1']) {
     process.env.BASE_URL = value; assert.equal(passkeys.configuration(), null, value);
   }
-  process.env.BASE_URL = 'http://localhost:3000'; assert.equal(passkeys.configuration().rpID, 'localhost');
+  process.env.BASE_URL = 'http://localhost:3000'; assert.equal(passkeys.configuration()?.rpID, 'localhost');
   process.env.BASE_URL = saved;
 });
 
 let httpSerial = 0;
 async function httpFixture() {
-  const { default: express } = await import('express');
+  // Express has no declarations in this project; the HTTP fixture is a controlled boundary.
+  const expressModule = 'express';
+  const { default: express } = await import(expressModule);
   const { router, sessionMiddleware } = await import('../server/auth.js');
   const app = express(); app.set('trust proxy', 'loopback'); app.use(express.json()); app.use(sessionMiddleware);
   const clientIP = `198.51.100.${++httpSerial}`;
-  app.post('/__test/stale', (req, res) => { req.session.authenticatedAt = 0; res.json({ ok: true }); });
-  app.get('/__test/proof', (req, res) => res.json({ userId: req.session.userId, authenticatedAt: req.session.authenticatedAt, mfaVerifiedAt: req.session.mfaVerifiedAt, sessionId: req.sessionID, csrf: req.session.csrfToken }));
-  app.use((req, _res, next) => {
+  app.post('/__test/stale', (/** @type {any} */ req, /** @type {any} */ res) => { req.session.authenticatedAt = 0; res.json({ ok: true }); });
+  app.get('/__test/proof', (/** @type {any} */ req, /** @type {any} */ res) => res.json({ userId: req.session.userId, authenticatedAt: req.session.authenticatedAt, mfaVerifiedAt: req.session.mfaVerifiedAt, sessionId: req.sessionID, csrf: req.session.csrfToken }));
+  app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {any} */ next) => {
     if ((req.headers['x-test-sso-switch'] || req.headers['x-test-revoke-session']) && req.body?.credential && req.session.userId) {
       const credentialId = req.body.credential.id;
       Object.defineProperty(req.body.credential, 'id', { get() {
@@ -143,9 +161,15 @@ async function httpFixture() {
     next();
   });
   app.use('/api/v1/auth', router);
+  /** @type {import('node:http').Server} */
   const server = await new Promise((resolve, reject) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); s.on('error', reject); });
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const base = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`;
   const cookies = new Map(); let csrf = '';
+  /** @param {string} path
+   * @param {string} [method]
+   * @param {unknown} [body]
+   * @param {Record<string,string>} [headers]
+   */
   async function call(path, method = 'GET', body, headers = {}) {
     const response = await fetch(base + path, { method, headers: { 'Content-Type':'application/json', Origin:origin, 'X-Forwarded-For':clientIP,
       Cookie:[...cookies].map(([k,v])=>`${k}=${v}`).join('; '), 'X-CSRF-Token':csrf, ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -153,6 +177,11 @@ async function httpFixture() {
     const data = await response.json(); if(data.csrfToken) csrf=data.csrfToken;
     return { status:response.status, data };
   }
+  /** @param {string} p
+   * @param {string} [method]
+   * @param {unknown} [body]
+   * @param {Record<string,string>} [headers]
+   */
   const route = (p, method, body, headers) => call('/api/v1/auth' + p, method, body, headers);
   return { route, call, cookies, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
 }
@@ -212,7 +241,9 @@ test('device credentials, scoped tokens and paired displays cannot reach any pas
   const display = user();
   database.prepare("UPDATE users SET password_hash = '$display$' WHERE id = ?").run(display.id);
   database.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').run(display.id, person.id);
-  const paired = redeemPairingCode(issuePairingCode(display.id, person.id, {db:database}).code, {db:database});
+  const pairingOptions = {db:database,label:null};
+  const paired = redeemPairingCode(issuePairingCode(display.id, person.id, pairingOptions).code, pairingOptions);
+  assert.ok(paired);
   const deviceToken = 'yuvomi_passkey_device_boundary';
   const scopedToken = 'yuvomi_passkey_scoped_boundary';
   database.prepare("INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id, kind, platform, device_id) VALUES (?, ?, ?, ?, ?, 'device', 'test', 'passkey-boundary')")
@@ -221,11 +252,11 @@ test('device credentials, scoped tokens and paired displays cannot reach any pas
     .run('Passkey scoped boundary', digest(scopedToken).toString('hex'), 'yuvomi_test', person.id, JSON.stringify(['notes:read']));
   const challengeCount = database.prepare('SELECT count(*) AS n FROM passkey_challenges').get().n;
   try {
-    for (const [headers, reason] of [
+    for (const [headers, reason] of /** @type {[Record<string,string>,string|undefined][]} */ ([
       [{Authorization:`Bearer ${deviceToken}`}, 'device_credential'],
       [{Authorization:`Bearer ${scopedToken}`}, undefined],
       [{Cookie:`yuvomi.display=${paired.token}`}, 'display_account'],
-    ]) {
+    ])) {
       for (const [method, path] of [...managementRoutes, ...publicPasskeyRoutes]) {
         const response = await route(path, method, method === 'GET' ? undefined : {}, headers);
         assert.equal(response.status, 403, `${reason ?? 'scoped token'}: ${method} ${path}`);
@@ -331,7 +362,7 @@ test('reauthentication binds challenges to the current account and separates ano
   const own = await enroll(person); const foreign = await enroll(other);
   const session = 'reauth-session';
   let options = await passkeys.beginAuthentication(database, session, person.id);
-  assert.deepEqual(options.allowCredentials.map(c => c.id), [own.device.id]);
+  assert.deepEqual((options.allowCredentials ?? []).map(c => c.id), [own.device.id]);
   await assert.rejects(passkeys.finishAuthentication(database, session, assertion(options, foreign.device, foreign.handle), person.id));
   await assert.rejects(passkeys.finishAuthentication(database, session, assertion(options, own.device, own.handle), person.id), 'failed proof consumes the challenge');
   options = await passkeys.beginAuthentication(database, session);
@@ -406,7 +437,7 @@ test('HTTP inline reauth refreshes only after correct proof and preserves identi
 
 test('anonymous options count successful requests and expire sessions within the challenge window', async () => {
   const { route, cookies, close } = await httpFixture();
-  const previousSessions = new Set(database.prepare('SELECT sid FROM sessions').all().map(row => row.sid));
+  const previousSessions = new Set(database.prepare('SELECT sid FROM sessions').all().map(/** @param {{sid:string}} row */ row => row.sid));
   const before = previousSessions.size;
   const start = Date.now();
   try {
@@ -417,7 +448,7 @@ test('anonymous options count successful requests and expire sessions within the
     cookies.clear();
     assert.equal((await route('/passkeys/login/options', 'POST', {})).status, 429);
     assert.equal(database.prepare('SELECT count(*) AS n FROM sessions').get().n - before, 20);
-    const anonymous = database.prepare('SELECT sid, sess, expired_at FROM sessions').all().filter(row => !previousSessions.has(row.sid));
+    const anonymous = database.prepare('SELECT sid, sess, expired_at FROM sessions').all().filter(/** @param {{sid:string}} row */ row => !previousSessions.has(row.sid));
     assert.ok(anonymous.length >= 20);
     for (const row of anonymous) {
       const session = JSON.parse(row.sess);
@@ -486,11 +517,13 @@ test('the four credential-recovery paths revoke planted passkeys and pending enr
       let response;
       if (action === 'password-change') response = await route('/me/password', 'PATCH', {current_password:password, new_password:'Replacement-password-123!'});
       if (action === 'password-reset') {
-        const { token } = createPasswordResetService({db:database}).createToken(person.id);
+        const resetOptions={db:database,now:Date.now};
+        const { token } = createPasswordResetService(resetOptions).createToken(person.id);
         response = await route('/reset-password', 'POST', {token, password:'Replacement-password-123!'});
       }
       if (action === 'admin-password') response = await route(`/users/${person.id}`, 'PATCH', {password:'Replacement-password-123!'});
       if (action === 'admin-emergency') response = await route(`/users/${person.id}/devices/sign-out`, 'POST', {});
+      assert.ok(response);
       assert.equal(response.status, 200, `${action}: ${JSON.stringify(response.data)}`);
       assert.equal(passkeys.list(database, person.id).length, 0, action);
       assert.equal(database.prepare('SELECT count(*) AS n FROM passkey_challenges WHERE user_id = ?').get(person.id).n, 0);
@@ -598,14 +631,14 @@ test('passkey sign-in and reauth log verification failures without secrets and d
   const person=user(); const password='Never-log-this-password!'; const own=await enroll(person);
   database.prepare('UPDATE users SET password_hash=? WHERE id=?').run(await hashPassword(password),person.id);
   const {route,close}=await httpFixture();
-  const warnings=[];const errors=[];const warn=console.warn;const error=console.error;const prepare=database.prepare;
+  /** @type {any[][]} */ const warnings=[];const errors = /** @type {any[][]} */ ([]);const warn=console.warn;const error=console.error;const prepare=database.prepare;
   console.warn=(...args)=>warnings.push(args);console.error=(...args)=>errors.push(args);
   try {
     let options=(await route('/passkeys/login/options','POST',{})).data.data;
     assert.equal((await route('/passkeys/login/verify','POST',{credential:assertion(options,own.device,own.handle,{badSignature:true})})).status,400);
     assert.ok(warnings.some(args=>args[1]==='Passkey sign-in failed'&&args[2].ip&&args[2].reason));
     options=(await route('/passkeys/login/options','POST',{})).data.data;
-    database.prepare=function(sql){if(sql.includes('DELETE FROM passkey_challenges WHERE session_hash'))throw new Error('Simulated database failure');return prepare.call(this,sql);};
+    database.prepare=function(/** @type {string} */ sql){if(sql.includes('DELETE FROM passkey_challenges WHERE session_hash'))throw new Error('Simulated database failure');return prepare.call(this,sql);};
     const failed=await route('/passkeys/login/verify','POST',{credential:assertion(options,own.device,own.handle)});
     assert.equal(failed.status,500);
     assert.equal(JSON.stringify(failed.data).includes('Simulated'),false);
@@ -614,7 +647,7 @@ test('passkey sign-in and reauth log verification failures without secrets and d
     await route('/login','POST',{username:person.username,password});
     assert.equal((await route('/passkeys/reauth/verify','POST',{method:'password',password:'Never-log-this-invalid-password!'})).status,400);
     assert.ok(warnings.some(args=>args[2]?.operation==='reauth'));
-    database.prepare=function(sql){if(sql.includes('DELETE FROM passkey_challenges WHERE session_hash'))throw new Error('Simulated options failure');return prepare.call(this,sql);};
+    database.prepare=function(/** @type {string} */ sql){if(sql.includes('DELETE FROM passkey_challenges WHERE session_hash'))throw new Error('Simulated options failure');return prepare.call(this,sql);};
     assert.equal((await route('/passkeys/reauth/options','POST',{})).status,500);
     assert.ok(errors.some(args=>args[2]?.operation==='reauth'));
     const logged=JSON.stringify([warnings,errors]);
