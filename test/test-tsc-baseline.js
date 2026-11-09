@@ -12,10 +12,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from './tmp-dir.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(REPO, 'scripts', 'check-tsc-baseline.ts');
@@ -23,7 +23,7 @@ const TWO_ERRORS = 'export const a = (x) => x;\nexport const b = (y) => y;\n';
 const ONE_ERROR = 'export const a = (x) => x;\nexport const b = (y = 1) => y;\n';
 
 function fixture() {
-  const dir = mkdtempSync(join(tmpdir(), 'tsc-baseline-'));
+  const dir = tempDir('yuvomi-tsc-baseline-');
   mkdirSync(join(dir, 'server'));
   writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({ files: [], references: [{ path: './server' }] }));
   writeFileSync(join(dir, 'server', 'tsconfig.json'), JSON.stringify({
