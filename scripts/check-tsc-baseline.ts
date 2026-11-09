@@ -37,9 +37,17 @@ function measure(): Counts {
     console.error(`tsc lief nicht: ${run.error?.message ?? out.slice(0, 400)}`);
     process.exit(2);
   }
+  // Ohne Quellort (TS2688, TS18003, TS5xxx) oder in einer tsconfig: das Projekt wurde nicht
+  // geprueft. Das ist kein Typfehler fuer die Baseline, sondern ein kaputter Lauf.
+  const fatal = out.split('\n').filter((l) => /^error TS\d+:/.test(l) || /tsconfig[^/(]*\.json\(\d+,\d+\): error TS\d+:/.test(l));
+  if (fatal.length > 0) {
+    console.error(`tsc meldet Fehler der Konfiguration, nichts wird gezaehlt:\n${fatal.slice(0, 10).join('\n')}`);
+    process.exit(2);
+  }
   const places = new Set<string>();
   const counts: Counts = {};
   let owned: string[] = [];
+  let located = 0;
   for (const line of out.split('\n')) {
     const building = /Building project '([^']+)'/.exec(line);
     if (building) {
@@ -48,6 +56,7 @@ function measure(): Counts {
       continue;
     }
     const err = /^(\S.*?)\((\d+),(\d+)\): error (TS\d+):/.exec(line);
+    if (err) located++;
     if (!err || String(err[1]).includes('/vendor/')) continue; // Fremdcode: Regeln in CONTRIBUTING
     if (!owned.some((prefix) => String(err[1]).startsWith(prefix))) continue;
     const place = `${err[1]}:${err[2]}:${err[3]}:${err[4]}`;
@@ -55,6 +64,10 @@ function measure(): Counts {
     places.add(place);
     const key = `${err[1]}\t${err[4]}`;
     counts[key] = (counts[key] ?? 0) + 1;
+  }
+  if (run.status !== 0 && located === 0) {
+    console.error(`tsc endete mit Exit ${run.status} ohne eine Fehlerzeile mit Ort: ${out.slice(0, 400)}`);
+    process.exit(2);
   }
   return counts;
 }

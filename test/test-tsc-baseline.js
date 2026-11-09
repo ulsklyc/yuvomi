@@ -115,6 +115,23 @@ test('--update senkt und entfernt, erhoeht aber nie', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('ein Fehler ohne Quellort (TS2688) ist Exit 2 und laesst die Baseline in Ruhe', () => {
+  const dir = fixture();
+  try {
+    run(dir, '--init');
+    const before = readFileSync(join(dir, 'tsc-baseline.json'), 'utf8');
+    const cfg = JSON.parse(readFileSync(join(dir, 'server', 'tsconfig.json'), 'utf8'));
+    cfg.compilerOptions.types = ['gibtsnicht'];
+    writeFileSync(join(dir, 'server', 'tsconfig.json'), JSON.stringify(cfg));
+    for (const mode of [[], ['--update']]) {
+      const r = run(dir, ...mode);
+      assert.equal(r.code, 2, r.out);
+      assert.match(r.out, /TS2688/);
+    }
+    assert.equal(readFileSync(join(dir, 'tsc-baseline.json'), 'utf8'), before);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('die echte tsc-baseline.json ist sortiert, ohne Fremdcode und nennt nur vorhandene Dateien', () => {
   const baseline = JSON.parse(readFileSync(join(REPO, 'tsc-baseline.json'), 'utf8'));
   const keys = Object.keys(baseline);
