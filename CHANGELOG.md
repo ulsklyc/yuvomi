@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/utils/page-layout.js`; with this release every other file ships inside the bundle under a
   hashed name, and such an import stops the module from loading. Import only these three paths
   and build the page markup yourself (the example in MODULES.md shows how).
+- **A browser that is too old for Yuvomi now gets a page that says so** instead of an empty
+  app. Below Chrome and Edge 105, Firefox 115 and Safari 15.4 (iOS 15.4 on iPhone and iPad),
+  a short page in German or English names the versions Yuvomi needs and suggests updating or
+  another browser. The offline page now speaks English as well as German, and the supported
+  browsers are documented as one list instead of two.
 - **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
   serving the API on 3000; `npm run build` makes the production build.
 

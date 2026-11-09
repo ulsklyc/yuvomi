@@ -24,6 +24,9 @@ export interface CopyEntry {
 export const FACADES: readonly string[] = ['api.js', 'i18n.js', 'utils/html.js'];
 
 export const COPY_LIST: readonly CopyEntry[] = [
+  { path: 'browser-floor.js', precache: true, why: 'classic ES5 script, first in <head> of index.html and offline.html: sends a browser below the floor to browser-too-old.html' },
+  { path: 'browser-too-old.html', precache: true, why: 'the static notice for browsers below the floor; precached so a worker from before an update serves it offline too' },
+  { path: 'static-page-title.js', precache: true, why: 'classic ES5 script at the end of browser-too-old.html and offline.html, sets <title> in the page language' },
   { path: 'night-hours.js', precache: true, why: 'classic script in <head> of index.html and offline.html' },
   { path: 'theme-init.js', precache: true, why: 'classic script in <head>, sets the theme before the first paint' },
   { path: 'lang-init.js', precache: true, why: 'classic script in <head>, sets lang before the first paint' },

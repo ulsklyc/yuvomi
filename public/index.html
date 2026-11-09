@@ -33,6 +33,13 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
 
+  <!-- Die Browser-Untergrenze (Phase 1a, Abschnitt E): VOR jedem anderen Skript.
+       Ein Browser unter Chrome 105 / Firefox 115 / Safari 15.4 kann das Buendel
+       nicht laden; browser-floor.js (ES5, klassisch, blockierend) schickt ihn
+       auf /browser-too-old.html, statt ihn vor einer leeren Seite stehen zu
+       lassen. Auch die Skripte darunter sind nicht ES5-geprueft. -->
+  <script src="/browser-floor.js"></script>
+
   <!-- Theme: explizite Nutzer-Overrides vor CSS-Rendering anwenden (Flash-Prevention).
        System-Präferenz wird durch @media (prefers-color-scheme: dark) in tokens.css
        direkt per CSS behandelt — kein JS-matchMedia erforderlich. -->

@@ -3900,7 +3900,8 @@
         "staleData": "离线 - 数据截至：{{time}}",
         "pageTitle": "你已离线",
         "pageDescription": "此页面需要网络连接。设备恢复在线后会自动加载。",
-        "snapshot": "无法连接到服务器 - 已保存的数据，只读"
+        "snapshot": "无法连接到服务器 - 已保存的数据，只读",
+        "unreachableBody": "Yuvomi 暂时无法访问。请检查设备是否联网以及服务器是否在运行，然后重试。"
     },
     "emptyHint": {
         "recipes": "食谱可以直接进入用餐计划或购物清单。",
@@ -6881,5 +6882,12 @@
         "custom": "自定义颜色",
         "chooseCustom": "选择自定义颜色",
         "standard": "默认颜色"
+    },
+    "browserTooOld": {
+        "pageTitle": "浏览器版本过旧",
+        "title": "此浏览器版本过旧，无法运行 Yuvomi",
+        "body": "Yuvomi 需要一些此浏览器尚不支持的功能。你的数据不受影响。",
+        "versions": "Yuvomi 支持 Chrome 和 Edge {{chrome}}、Firefox {{firefox}} 和 Safari {{safari}} 及以上版本，iPhone 和 iPad 需 iOS {{ios}} 及以上。",
+        "action": "请更新浏览器或设备后重试。如果无法更新，请在其他浏览器中打开 Yuvomi。"
     }
 }
