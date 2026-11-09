@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/utils/page-layout.js`; with this release every other file ships inside the bundle under a
   hashed name, and such an import stops the module from loading. Import only these three paths
   and build the page markup yourself (the example in MODULES.md shows how).
+- **Yuvomi now needs Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4 on iPhone and
+  iPad).** Until now it still started down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5);
+  on Chrome 87 to 98 and Safari or iOS 14.1 to 15.3 it no longer does. Update the browser or
+  the device's system, or use another browser. Those browsers, and Firefox before 97, now get
+  a short page in German or English that names the versions and the way out, instead of an
+  empty app; Chrome 99 to 104 and Firefox 97 to 114 still start, with single screens that can
+  stay empty. The offline page now speaks English as well as German, and the supported
+  browsers are documented as one list instead of two.
+- **Menus behind a button now open on Firefox ESR 115 and Safari 15.4 to 16** (and Chrome
+  105 to 113): every "more" menu, the account menu, filters and the date field's calendar
+  stayed closed there. Those browsers now load a small polyfill for the Popover API; newer
+  browsers load nothing extra.
 - **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
   serving the API on 3000; `npm run build` makes the production build.
 
