@@ -1423,6 +1423,9 @@ const DELIBERATELY_EMPTY_ON_THE_WALL = Object.freeze({
   // Kalender: die Familienkarte, der Wochenstreifen und die Zahlen der Kachel.
   familyEvents: 'calendar', weekEvents: 'calendar',
   birthdayCount: 'calendar', birthdayTotal: 'calendar', birthdaySoonCount: 'calendar',
+  // Verfuegbarkeitsstatus (#1591): gehoert zur Familienkarte, keinem Modul -
+  // die Wand zeichnet die Familienkarte nicht, also auch nicht ihren Status.
+  familyStatuses: null,
   // Aufgaben: Kennzahlen der Kacheln und der Navigation.
   openTaskCount: 'tasks', overdueTaskCount: 'tasks', memberTodayTasks: 'tasks',
   // Einkauf: die Wand nennt nur die Zahl der offenen Artikel.
