@@ -63,6 +63,14 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => ({
     // CSRF origin check see the address the browser uses.
     proxy: (await import(/* @vite-ignore */ new URL(DEV_PROXY, import.meta.url).href)).devProxy(backendPort, process.env.BIND_ADDRESS),
   } : {},
+  // A bundled npm package (the popover polyfill, Phase 1a E) is named by its
+  // path in the manifest, modules.json and the source map. Following the
+  // symlink would put the real location of node_modules there:
+  // check-build-determinism.mjs links node_modules into its temp builds, and
+  // the key came out as ../../../Users/.../node_modules/... instead of
+  // ../node_modules/... (CI red on 863fc176d). The path as written keeps
+  // every build of the same source byte-identical.
+  resolve: { preserveSymlinks: true },
   plugins: modulesLayout ? [
     staticCopyPlugin(publicDir, ['index.html']),
     moduleListPlugin(repoRoot),
