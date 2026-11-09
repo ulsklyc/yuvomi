@@ -237,6 +237,21 @@ export function wallMeals(rows: unknown, audience: WallAudience): unknown {
   }));
 }
 
+/** The availability rows of the overview, as far as wallFamilyStatuses() reads them. */
+type FamilyStatusRow = Record<string, unknown>;
+
+/**
+ * Die Wand zeigt den Status nur lesend und ohne Notiz (#1591, Review): eine
+ * Notiz ist Freitext und die Wand steht in einem gemeinsamen Raum.
+ *
+ * Anything that is not a list (a module left out, a failed read) passes unchanged, as
+ * does every answer that is not the display wall.
+ */
+export function wallFamilyStatuses(rows: unknown, audience: WallAudience): unknown {
+  if (!displayWall(audience) || !Array.isArray(rows)) return rows;
+  return rows.map(({ note: _note, ...rest }: FamilyStatusRow) => rest);
+}
+
 /**
  * Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
  * Kennzahlen und gehoeren nicht an die Wand (#1903).
