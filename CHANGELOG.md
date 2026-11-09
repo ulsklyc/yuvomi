@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A synced contact's photo now shows in the list and on its card** (#2128). Both vCard 3
+  (`PHOTO;ENCODING=BASE64;TYPE=JPEG:...`) and vCard 4 (`PHOTO:data:image/jpeg;base64,...`) forms
+  are read from CardDAV, and a photo synced before this change is normalized on the next sync
+  instead of staying unreadable. The list answer never carries the image itself - only a
+  `has_photo` flag - and the card fetches it lazily from its own endpoint, so megabytes of base64
+  no longer travel through every list response. There is no control yet to add a photo to a
+  contact created directly in Yuvomi; the API accepts one, but the dialog does not offer a picker.
+
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
   accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run
@@ -94,15 +103,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filesystem, with hosts, ports and server paths. They now carry a fixed sentence or the class of
   the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
   status or a manifest check, stay.
-
-### Added
-- **A synced contact's photo now shows in the list and on its card** (#2128). Both vCard 3
-  (`PHOTO;ENCODING=BASE64;TYPE=JPEG:...`) and vCard 4 (`PHOTO:data:image/jpeg;base64,...`) forms
-  are read from CardDAV, and a photo synced before this change is normalized on the next sync
-  instead of staying unreadable. The list answer never carries the image itself - only a
-  `has_photo` flag - and the card fetches it lazily from its own endpoint, so megabytes of base64
-  no longer travel through every list response. There is no control yet to add a photo to a
-  contact created directly in Yuvomi; the API accepts one, but the dialog does not offer a picker.
 
 ## [2.86.0] - 2026-11-07
 
