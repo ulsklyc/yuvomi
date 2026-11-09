@@ -46,3 +46,13 @@ declare var yuvomiNightHours: {
   hourIn: YuvomiFn;
   isNight: YuvomiFn;
 };
+
+/**
+ * Vite (Phase 1a, Abschnitt D): `import.meta.glob` in public/router.js und
+ * `import.meta.env` in public/sw-register.js. Nur die zwei Stellen, die der
+ * Code nutzt, statt `vite/client` mit allen Asset-Modulen.
+ */
+interface ImportMeta {
+  glob(pattern: string): Record<string, () => Promise<any>>;
+  readonly env?: { readonly DEV: boolean };
+}

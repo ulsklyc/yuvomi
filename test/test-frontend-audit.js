@@ -23595,6 +23595,8 @@ test('router: idle warm-up preloads at low priority, intent and the start route 
     document: { createElement: () => ({}), head: { appendChild: (l) => links.push(l) } },
     allRoutes: () => [{ path: '/tasks', page: '/pages/tasks.js', module: 'tasks' }, { path: '/notes', page: '/pages/notes.js', module: 'notes' }],
     moduleCache: new Map(),
+    // Im Build die gehashte Datei aus #yuvomi-page-urls (router.js).
+    pageModuleUrl: (/** @type {string} */ page) => `/assets${page}`,
     shellStale: false,
     navItems: () => [{ path: '/tasks' }, { path: '/notes' }],
     routerState: { currentPath: '/' },
@@ -23613,6 +23615,7 @@ test('router: idle warm-up preloads at low priority, intent and the start route 
   warmPrimaryRoutes();
   const warm = links.filter((l) => l.rel === 'modulepreload');
   assert.equal(warm.length, 2, 'beide Hauptziele vorgewaermt');
+  assert.deepEqual(warm.map((l) => l.href), ['/assets/pages/tasks.js', '/assets/pages/notes.js'], 'vorgewaermt wird die gebaute Datei, nicht der Quellpfad (der liefert im Build index.html)');
   assert.deepEqual(warm.map((l) => l.fetchPriority), ['low', 'low'], 'das Vorwaermen im Leerlauf laedt mit niedriger Prioritaet');
   links.length = 0;
   env.allRoutes = undefined;
