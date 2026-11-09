@@ -480,6 +480,52 @@ function settleClosingOverlays() {
 const moduleCache = new Map();
 
 // --------------------------------------------------------
+// Seitenmodule im Build (Phase 1a, Abschnitt D). `import(route.page)` mit einem
+// Variablenpfad kann Vite nicht verfolgen; `import.meta.glob` nennt ihm jede
+// Datei unter pages/, und der Build legt sie als eigene, gehashte Chunks ab.
+// Die Tabelle ROUTES behaelt ihre Quellpfade: sie sind die Schluessel hier
+// ('.' + route.page) und in der Adressliste, die der Build in index.html legt
+// (#yuvomi-page-urls, scripts/build/vite-plugins.ts), damit das Vorwaermen
+// (`modulepreload`) die gebaute Datei trifft. Ein Pfad ohne Loader ist ein
+// Drittmodul unter /api/v1/modules/assets/ und laedt wie bisher.
+// --------------------------------------------------------
+const PAGE_LOADERS = import.meta.glob('./pages/*.js');
+
+/** @type {Record<string, string> | null} */
+let _pageUrls = null;
+
+/**
+ * Die ausgelieferte Adresse eines Seitenmoduls: im Build die gehashte Datei
+ * aus der Liste in index.html, unter `vite dev` (keine Liste) die Quelle.
+ * @param {string} pagePath
+ * @returns {string}
+ */
+function pageModuleUrl(pagePath) {
+  if (_pageUrls === null) {
+    try {
+      _pageUrls = JSON.parse(document.getElementById('yuvomi-page-urls')?.textContent || '{}');
+    } catch {
+      _pageUrls = {};
+    }
+  }
+  // Die Liste ist DOM-Text und landet in `link.href` (CodeQL: DOM-Text als
+  // Adresse). Der Build schreibt nur Chunks unter /assets/ (vite.config.ts,
+  // Rolldown-Standard `assets/[name]-[hash].js`); alles andere, auch eine
+  // eingeschleuste Adresse, faellt auf den Quellpfad der Route zurueck.
+  const built = Object.prototype.hasOwnProperty.call(_pageUrls ?? {}, pagePath) ? _pageUrls?.[pagePath] : null;
+  return typeof built === 'string' && /^\/assets\/[A-Za-z0-9_-][A-Za-z0-9._-]*\.js$/.test(built) ? built : pagePath;
+}
+
+/**
+ * @param {string} pagePath
+ * @returns {Promise<any>}
+ */
+function loadPageModule(pagePath) {
+  const load = PAGE_LOADERS[`.${pagePath}`];
+  return load ? load() : import(/* @vite-ignore */ pagePath);
+}
+
+// --------------------------------------------------------
 // Veraltete Shell nach SW-Update (#616)
 //
 // Der Browser führt pro Dokument genau eine Modul-Map. Ist ein geteiltes Modul
@@ -534,7 +580,7 @@ async function importPage(pagePath) {
   }
   if (!moduleCache.has(pagePath)) {
     try {
-      moduleCache.set(pagePath, await import(pagePath));
+      moduleCache.set(pagePath, await loadPageModule(pagePath));
     } catch (err) {
       moduleCache.delete(pagePath);
       // Zweiter Rettungsanker: das Update kam ohne Vorankündigung durch (der
@@ -574,7 +620,7 @@ function prefetchRoute(path, { now = false, priority = null } = {}) {
     _prefetchedPages.add(route.page);
     const link = document.createElement('link');
     link.rel = 'modulepreload';
-    link.href = route.page;
+    link.href = pageModuleUrl(route.page);
     // modulepreload laedt mit hoher Prioritaet. Das Vorwaermen im Leerlauf
     // (warmPrimaryRoutes, rund 19 Module) gibt `low` mit, damit es nichts
     // verdraengt, was die offene Seite gerade braucht; ohne Unterstuetzung
