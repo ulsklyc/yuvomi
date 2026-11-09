@@ -25,6 +25,7 @@ import { countdownsOverviewSlice, emptyCountdownsOverview } from '../services/co
 import { emptyScheduleOverview, scheduleOverviewSlice } from '../services/schedule-slices.ts';
 import { emptyWasteOverview, wasteOverviewSlice } from '../services/waste-slices.ts';
 import { emptyMembersOverview, membersOverviewSlice } from '../services/members-slices.ts';
+import { familyStatusesOverviewSlice } from '../services/family-statuses-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -36,6 +37,7 @@ import {
   modulesOutsideHouseholdAudience,
   openDisplayWallModules,
   rowReader,
+  wallFamilyStatuses,
   wallMeals,
   wallPantryExpiring,
 } from '../authorize/index.ts';
@@ -122,7 +124,7 @@ const DENIED_PAYLOAD = Object.freeze({
  * nur bei einer Listen-Auswahl, und ein Konto ohne den Einkauf bekommt es nie.
  */
 function emptyAnswer(context) {
-  const empty = { ...emptyMembersOverview(), ...emptyCountdownsOverview(), quicklinks: [] };
+  const empty = { ...emptyMembersOverview(), ...emptyCountdownsOverview(), quicklinks: [], familyStatuses: [] };
   for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
   return empty;
 }
@@ -488,6 +490,13 @@ router.get('/', validateRequest(), (req, res) => {
     result.wallTasks = tasks.wallTasks;
     result.tasksDoneToday = tasks.tasksDoneToday;
   }
+
+  // Verfuegbarkeitsstatus je Mitglied fuer die Familien-Kachel (#1591). Kein
+  // Modul-Gate: der Status gehoert der Person, nicht dem Family-Modul.
+  Object.assign(result, familyStatusesOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
+  // Die Wand zeigt den Status nur lesend und ohne Notiz (#1591, Review): eine
+  // Notiz ist Freitext und die Wand steht in einem gemeinsamen Raum.
+  Object.assign(result, { familyStatuses: wallFamilyStatuses(result.familyStatuses, wallAudience) });
 
   // DIE HAUSHALTSFASSUNG (#1817): von der leeren Fassung aus, nur was die Wand
   // zeichnet. Hier, hinter jeder Abfrage - ein Block, den jemand oben ergaenzt,
