@@ -212,8 +212,27 @@ function valueOf(locale, key, vars = {}) {
   return value.replace(/\{\{(\w+)\}\}/g, (all, name) => (name in vars ? vars[name] : all));
 }
 
-/** @param {string} html */
-const plainText = (html) => html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+/**
+ * Der sichtbare Text eines Markup-Stuecks: Tags weg, Leerraum zu einem
+ * Zeichen. Ein Zeichen-Scanner statt `replace(/<[^>]+>/g, '')`: ein Tag reicht
+ * vom `<` bis zum naechsten `>`, ein `<` ohne `>` nimmt den Rest mit - wie
+ * withoutHtmlComments() in source-text.js, und so liest CodeQL es nicht als
+ * unvollstaendige Bereinigung. Ein Text-Leser, kein Sanitizer.
+ * @param {string} html
+ */
+function plainText(html) {
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const open = html.indexOf('<', pos);
+    if (open === -1) { out += html.slice(pos); break; }
+    out += html.slice(pos, open);
+    const close = html.indexOf('>', open + 1);
+    if (close === -1) break;
+    pos = close + 1;
+  }
+  return out.split(/\s+/).filter(Boolean).join(' ');
+}
 
 /**
  * Die Sprachbloecke einer Seite: `<div class="copy" lang="xx" data-title="...">`
@@ -227,14 +246,37 @@ function copyBlocks(html) {
   const source = withoutHtmlComments(html);
   // Ein Block traegt kein weiteres <div>: das erste </div> schliesst ihn.
   for (const [, lang, title, body] of source.matchAll(/<div class="copy" lang="(\w+)" data-title="([^"]*)"[^>]*>([\s\S]*?)<\/div>/g)) {
-    const keys = [...body.matchAll(/<(\w+)\b[^>]*\bdata-key="([\w.]+)"[^>]*>([\s\S]*?)<\/\1>/g)]
-      .map(([, , key, inner]) => ({ key, text: plainText(inner) }));
-    // Text ausserhalb eines data-key-Elements zaehlt mit - er haette keinen Schluessel.
-    const loose = plainText(body.replace(/<(\w+)\b[^>]*\bdata-key="[\w.]+"[^>]*>[\s\S]*?<\/\1>/g, ''));
+    const keyed = [...body.matchAll(/<(\w+)\b[^>]*\bdata-key="([\w.]+)"[^>]*>([\s\S]*?)<\/\1>/g)];
+    const keys = keyed.map(([, , key, inner]) => ({ key, text: plainText(inner) }));
+    // Text ausserhalb eines data-key-Elements zaehlt mit - er haette keinen
+    // Schluessel. Die Treffer werden per Position herausgeschnitten, nicht per
+    // zweitem replace().
+    let rest = '';
+    let pos = 0;
+    for (const m of keyed) {
+      rest += body.slice(pos, m.index);
+      pos = (m.index ?? 0) + m[0].length;
+    }
+    const loose = plainText(rest + body.slice(pos));
     blocks[lang] = { title, keys, loose };
   }
   return blocks;
 }
+
+test('Leser: plainText und die Sprachbloecke (erfundene Faelle)', () => {
+  assert.equal(plainText('<a href="/">Erneut <b>versuchen</b></a>'), 'Erneut versuchen');
+  assert.equal(plainText('a <svg><path d="M1 1"/></svg>\n  b'), 'a b');
+  assert.equal(plainText('<<b>x</b>'), 'x', 'ein verschachteltes < laesst kein Tag stehen');
+  assert.equal(plainText('Text <ohne Ende'), 'Text', 'ein offenes Tag nimmt den Rest mit');
+  const blocks = copyBlocks([
+    '<div class="copy" lang="de" data-title="T - Yuvomi" dir="ltr">',
+    '  <h1 data-key="a.title">Titel</h1> lose <p data-key="a.body">Satz <b>fett</b></p>',
+    '</div>',
+    '<div class="copy" lang="en" data-title="E - Yuvomi"><h1 data-key="a.title">Title</h1></div>',
+  ].join('\n'));
+  assert.deepEqual(blocks.de, { title: 'T - Yuvomi', keys: [{ key: 'a.title', text: 'Titel' }, { key: 'a.body', text: 'Satz fett' }], loose: 'lose' });
+  assert.deepEqual(blocks.en, { title: 'E - Yuvomi', keys: [{ key: 'a.title', text: 'Title' }], loose: '' });
+});
 
 /** Was jede der beiden Seiten mindestens sagt: Titel, Satz, Aktion. @type {Record<string, string[]>} */
 const REQUIRED_KEYS = {
