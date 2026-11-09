@@ -16,7 +16,7 @@
  *      (es gibt keine "aktuelle", die es ausnehmen koennte) und bleibt selbst
  *      gueltig.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-sign-out-other-sessions.js
+ * Ausfuehren: node --test test/test-sign-out-other-sessions.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

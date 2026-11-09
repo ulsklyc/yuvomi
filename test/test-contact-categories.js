@@ -2,7 +2,7 @@
  * Modul: Kontakt-Kategorien-Test (#357)
  * Zweck: Migration (Seed mit Icons, DE-Namen→Keys, Orphan-Adoption) + CRUD-Routen
  *        inkl. Guards (in-use, letzte Kategorie), Slug-Vergabe, dynamische Validierung.
- * Ausführen: node --experimental-sqlite test/test-contact-categories.js
+ * Ausführen: node test/test-contact-categories.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

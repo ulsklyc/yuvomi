@@ -20,7 +20,7 @@
  *          - eine fehlende Variable behält ihre eigene, ältere Meldung
  *          - die Kopplung an .env.example: steht dort ein Platzhalter, der
  *            nicht mit REPLACE_WITH_ beginnt, ist der Guard still wirkungslos
- * Ausführen: node --experimental-sqlite --test test/test-session-secret-guard.js
+ * Ausführen: node --test test/test-session-secret-guard.js
  */
 process.env.DB_PATH = ':memory:';
 

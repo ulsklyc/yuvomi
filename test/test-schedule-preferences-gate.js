@@ -8,7 +8,7 @@
  *        Router direkt ein und sehen dieses Gate nie (server/index.js) -
  *        deshalb hier ueber `test/server-ready.js`, wie
  *        `test-shopping-versions.js` es fuer sein eigenes Modul-Gate tut.
- * Ausfuehren: node --experimental-sqlite --test test/test-schedule-preferences-gate.js
+ * Ausfuehren: node --test test/test-schedule-preferences-gate.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

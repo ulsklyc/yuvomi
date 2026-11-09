@@ -1,7 +1,7 @@
 /**
  * Modul: Email-Test
  * Zweck: SMTP-Config-Auflösung (DB + env-Override), Maskierung, Versand, Testmail.
- * Ausführen: node --experimental-sqlite test/test-email.js
+ * Ausführen: node test/test-email.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -4,7 +4,7 @@
  *        list/cleanup) gegen das echte Migrations-SQL aus v121, dazu die fünf
  *        Einladungs-Routen: Admin-Gate, CSRF, und dass Rolle und Familienrolle
  *        aus der Einladung stammen statt aus dem Body des Eingeladenen.
- * Ausführen: node --experimental-sqlite test/test-invites.js
+ * Ausführen: node test/test-invites.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 // Muss vor dem ersten db.js-Import stehen, sonst legt der Import eine echte

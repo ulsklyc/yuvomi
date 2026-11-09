@@ -8,7 +8,7 @@
  *        (db.get()-Singleton, den auch der Router nutzt), Router gemountet mit
  *        injizierter Auth. Tests isolieren sich über eindeutige Kontaktnamen und
  *        prüfen gegen konkrete IDs statt globaler COUNTs.
- * Ausführen: node --experimental-sqlite --test test/test-birthday-import.js
+ * Ausführen: node --test test/test-birthday-import.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

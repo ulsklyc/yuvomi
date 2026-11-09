@@ -3,7 +3,7 @@
  * Zweck: awardForCompletion mit aktiviertem/deaktiviertem tasks_late_decay_enabled -
  *        Dekrement pro Ueberfaelligkeitstag, Untergrenze 1, Audit-Spalten,
  *        Storno-Kompatibilitaet, Datum-Grenzfaelle.
- * Ausführen: node --experimental-sqlite --test test/test-rewards-late-decay.js
+ * Ausführen: node --test test/test-rewards-late-decay.js
  */
 
 import assert from 'node:assert/strict';

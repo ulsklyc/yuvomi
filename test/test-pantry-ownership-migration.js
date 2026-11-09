@@ -10,7 +10,7 @@
  *        Indizes und Trigger neu anlegen). Dieser Test belegt beides: dass der
  *        Bestand die Migration übersteht und dass das Löschen eines Nutzers ihn
  *        danach nicht mehr vernichtet.
- * Ausführen: node --experimental-sqlite --test test/test-pantry-ownership-migration.js
+ * Ausführen: node --test test/test-pantry-ownership-migration.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

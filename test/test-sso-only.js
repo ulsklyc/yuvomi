@@ -2,7 +2,7 @@
  * Modul: SSO als einziger Weg hinein (#847)
  * Zweck: Der Schalter `AUTH_ALLOW_PASSWORD_LOGIN`, Konten ohne Passwort und die
  *        Loecher, die beide im Passwort-Reset aufreissen wuerden.
- * Ausfuehren: node --experimental-sqlite test/test-sso-only.js
+ * Ausfuehren: node test/test-sso-only.js
  *
  * Warum eine eigene Suite und nicht ein Kapitel in test-oidc.js: die Regeln
  * hier gelten fuer die EINGEBAUTE Anmeldung. Dass OIDC ueber ihr Wirksamwerden

@@ -3,7 +3,7 @@
  * Zweck: Validiert die Content-Security-Policy am Preview-Endpunkt — PDFs benötigen
  *        eine gelockerte Policy, damit Chromiums interner PDF-Viewer rendert
  *        (Issue #328: "This page was blocked by Chrome"), nicht-PDFs bleiben strikt.
- * Ausführen: node --experimental-sqlite test/test-documents.js
+ * Ausführen: node test/test-documents.js
  */
 
 import assert from 'node:assert/strict';

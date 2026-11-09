@@ -6,7 +6,7 @@
  *        2. Es gab kein PUT auf Konten: ein rotiertes Passwort bedeutete löschen
  *           und neu anlegen, samt Verlust der Adressbuch-Auswahl.
  *        3. Sammelschalter „alle an/aus" fährt über dieselbe Toggle-Route.
- * Ausführen: node --experimental-sqlite test/test-carddav-account-lifecycle.js
+ * Ausführen: node test/test-carddav-account-lifecycle.js
  */
 
 import os from 'node:os';

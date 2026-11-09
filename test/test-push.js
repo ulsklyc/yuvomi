@@ -1,7 +1,7 @@
 /**
  * Modul: Push-Test
  * Zweck: VAPID-Auflösung, Subscribe/Unsubscribe-Routen, Versand, Scheduler.
- * Ausführen: node --experimental-sqlite test/test-push.js
+ * Ausführen: node test/test-push.js
  */
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';

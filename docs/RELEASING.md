@@ -190,7 +190,7 @@ CVE requested through GitHub. The response times this has to fit are in
   repositories only; a private fork has to drop that step.
 - The Claude review workflows need their own API key or can be deleted; they merge nothing.
 - The image runs Node 24 (`Dockerfile`, pinned to a digest that Dependabot moves), and CI tests
-  Node 22 and 24; `test:docker-publish` keeps the CI matrix and the image's major together.
+  Node 24 and 26; `test:docker-publish` keeps the CI matrix and the image's major together.
 - Every action in `.github/workflows/` is pinned to a commit SHA with the version as a comment;
   `test:workflow-pins` refuses a floating tag, and Dependabot updates the SHA and the comment
   together.

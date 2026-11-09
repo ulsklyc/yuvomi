@@ -11,7 +11,7 @@
  *          - Ruckrichtung (GET /entries/:entryId/items) filtert wie ein
  *            Einzelabruf
  *          - Cascade in beide Richtungen
- * Ausfuehren: node --experimental-sqlite --test test/test-inventory-item-entries.js
+ * Ausfuehren: node --test test/test-inventory-item-entries.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

@@ -25,7 +25,7 @@ Backend dependencies are evaluated case-by-case but must remain minimal. When in
 
 ### Prerequisites
 
-- Node.js 22.14 or newer, on Node 23 at least 23.6 (the database driver needs Node-API 10; tests also use `--experimental-sqlite`)
+- Node.js 24.12 or newer (the database driver needs Node-API 10; `engines.node` in `package.json` is the single source)
 - Git
 
 ### Getting started
@@ -93,7 +93,7 @@ npm run test:docker-publish
 This is a representative selection - run `npm run` to see the full list of suites.
 Which suite guards which invariant is catalogued in [docs/test-suites.md](docs/test-suites.md).
 
-Tests run with plain Node against real SQLite (`--experimental-sqlite`), in memory or in a
+Tests run with plain Node against real SQLite, in memory or in a
 temp file - newer suites use the built-in `node --test` runner, older ones are plain
 assertion scripts. Nothing has to be running beforehand: a suite that exercises routes over
 HTTP starts its own server on a free local port and stops it again.

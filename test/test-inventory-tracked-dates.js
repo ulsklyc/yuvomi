@@ -9,7 +9,7 @@
  *          - ungueltige Zeile / zu viele Zeilen -> 400, kein Teil-Schreiben
  *          - DELETE /items/:id raeumt Fristen UND ihre Erinnerungen ab
  *          - GET /pending loest den Titel ueber den Join korrekt auf
- * Ausführen: node --experimental-sqlite --test test/test-inventory-tracked-dates.js
+ * Ausführen: node --test test/test-inventory-tracked-dates.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

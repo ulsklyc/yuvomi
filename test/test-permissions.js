@@ -7,7 +7,7 @@
  *   3. Speicherung: Sparse (Standard nicht gespeichert), Validierung, atomarer
  *      Ersatz, „von Rolle erben" via leerer Eingabe.
  * Hintergrund: Discussion #467.
- * Ausführen: node --experimental-sqlite --test test/test-permissions.js
+ * Ausführen: node --test test/test-permissions.js
  */
 
 import { test } from 'node:test';

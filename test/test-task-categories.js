@@ -2,7 +2,7 @@
  * Modul: Aufgaben-Kategorien-Test (#494, #357)
  * Zweck: Migration (Seed, Sonstiges→misc, Orphan-Adoption) + CRUD-Routen inkl.
  *        Guards (in-use, letzte Kategorie), Slug-Vergabe, dynamische Validierung.
- * Ausführen: node --experimental-sqlite test/test-task-categories.js
+ * Ausführen: node test/test-task-categories.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

@@ -6,7 +6,7 @@
  *        von pushed_at/dismissed), Anker-Aufräumen bei einer verschobenen
  *        Vorhersage, und die drei Abschalt-Wege (keine Einstellung, Zyklus-
  *        Tab gesperrt, Health-Modul entzogen).
- * Ausführen: node --experimental-sqlite --test test/test-cycle-reminders.js
+ * Ausführen: node --test test/test-cycle-reminders.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

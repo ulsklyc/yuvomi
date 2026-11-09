@@ -5,7 +5,7 @@
  *        inkl. Tages-Doppelbuchungs-Guard und Besuchssumme, Bezahlen/Löschen,
  *        Decay-Tasks-CRUD + Complete, Supply-Requests (koppelt Einkaufsartikel)
  *        und Maintenance-Log. Die Billing-Mathematik liegt in test-housekeeping.js.
- * Ausführen: node --experimental-sqlite --test test/test-housekeeping-routes.js
+ * Ausführen: node --test test/test-housekeeping-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

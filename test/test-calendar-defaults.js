@@ -3,7 +3,7 @@
  * Zweck: Per-User-Preferences calendar_default_reminders (Offset-Liste, Cap,
  *        Validierung) und calendar_default_assign_me (Boolean). Prüft GET-Defaults,
  *        PUT-Roundtrip, ungültige Offsets/Cap → 400 und Per-User-Isolation.
- * Ausführen: node --experimental-sqlite --test test/test-calendar-defaults.js
+ * Ausführen: node --test test/test-calendar-defaults.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

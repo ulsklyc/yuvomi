@@ -3,7 +3,7 @@
  * Zweck: Prüft die serverseitige Durchsetzung (visibilityWhere) für Aufgaben und
  *        Termine — all | assignees | private, ohne Admin-Bypass — sowie
  *        normalizeVisibility.
- * Ausführen: node --experimental-sqlite test/test-visibility.js
+ * Ausführen: node test/test-visibility.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

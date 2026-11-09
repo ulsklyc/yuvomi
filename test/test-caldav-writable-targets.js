@@ -17,7 +17,7 @@
  *
  * Echtes tsdav gegen `test/caldav-fake-server.js`, wie test-caldav-http-refusals.js.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-caldav-writable-targets.js
+ * Ausfuehren: node --test test/test-caldav-writable-targets.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

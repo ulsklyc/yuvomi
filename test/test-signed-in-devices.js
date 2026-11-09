@@ -18,7 +18,7 @@
  *   5. Ein Admin sieht fremde Geraete nicht und kann ein Mitglied nur pauschal
  *      abmelden, die Token-Verwaltung fasst sie nicht an.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-signed-in-devices.js
+ * Ausfuehren: node --test test/test-signed-in-devices.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

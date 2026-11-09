@@ -7,7 +7,7 @@
  *        ist, nicht der (bei Umbenennung wechselnde) ref/Slug. Der Fake-Adapter-
  *        Hook (_setAdapterFactory) lebt auf recipe-providers/index.js, nicht mehr
  *        als lokaler Export des Sync-Moduls.
- * Ausführen: node --experimental-sqlite --test test/test-recipe-provider-sync.js
+ * Ausführen: node --test test/test-recipe-provider-sync.js
  */
 
 process.env.DB_PATH = ':memory:';

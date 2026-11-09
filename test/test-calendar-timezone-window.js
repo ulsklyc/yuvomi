@@ -18,7 +18,7 @@
  *
  *        Die Zeitzone wird hier explizit gesetzt: in der UTC-CI kippt kein
  *        Kalendertag, ein Test ohne TZ-Vorgabe wäre grün und blind.
- * Ausführen: node --experimental-sqlite --test test/test-calendar-timezone-window.js
+ * Ausführen: node --test test/test-calendar-timezone-window.js
  */
 process.env.TZ = 'America/Los_Angeles';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

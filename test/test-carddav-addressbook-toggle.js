@@ -5,7 +5,7 @@
  *        (existiert nicht → HTTP 404), während der Router PUT /addressbooks/:id anbietet.
  *        Zusätzlich: unbekannte Adressbuch-ID → 404 statt 500, und die Leseliste liefert
  *        `name` (nicht `display_name`), worauf das Frontend zugreifen muss.
- * Ausführen: node --experimental-sqlite test/test-carddav-addressbook-toggle.js
+ * Ausführen: node test/test-carddav-addressbook-toggle.js
  */
 
 import os from 'node:os';

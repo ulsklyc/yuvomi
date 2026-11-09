@@ -8,7 +8,7 @@
  * in die SUMMEN einfliesst und ob er seine DETAILS zeigt. Die Tests unten
  * pruefen beide Achsen einzeln - eine Stufe, die nur in einer Achse richtig
  * liegt, ist entweder ein Leck oder ein falscher Saldo.
- * Ausführen: node --experimental-sqlite test/test-budget-visibility.js
+ * Ausführen: node test/test-budget-visibility.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

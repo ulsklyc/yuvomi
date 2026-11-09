@@ -4,7 +4,7 @@
  *        target_outlook_account_id + target_outlook_calendar_id speichern,
  *        leeren können und ungültige Werte mit 400 ablehnen
  *        (Klon von test-caldav-event-target.js für den Outlook-Provider).
- * Ausführen: node --experimental-sqlite test/test-outlook-event-target.js
+ * Ausführen: node test/test-outlook-event-target.js
  */
 
 // Env vor dem Import der Route setzen (auth.js erwartet SESSION_SECRET,

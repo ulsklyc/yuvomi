@@ -33,7 +33,7 @@
  *            den Konflikt mit `id <> ?`, damit das Ergebnis nicht an der
  *            Reihenfolge eines Query-Plans haengt. Diese Zusicherung haelt
  *            den Zustand fest, den beide Fassungen erzeugen sollen.
- * Ausführen: node --experimental-sqlite --test test/test-split-folder-rename-migration.js
+ * Ausführen: node --test test/test-split-folder-rename-migration.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

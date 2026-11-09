@@ -1,6 +1,6 @@
 /**
  * Tests: OIDC/SSO-Integration
- * Ausführen: node --experimental-sqlite test-oidc.js
+ * Ausführen: node test-oidc.js
  */
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
