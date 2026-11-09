@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The release tarball carries the built app** in `dist/` next to the source, together with
   `THIRD-PARTY-NOTICES.txt`; the server starts only from a build and says so when `dist/` is
   missing.
+- **For module authors: only `/api.js`, `/i18n.js` and `/utils/html.js` are stable imports.**
+  Every other app file now ships inside the bundle under a hashed name, so a third-party module
+  that imports another path (for example a file under `/utils/`) stops loading; MODULES.md
+  lists the stable paths.
 - **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
   serving the API on 3000; `npm run build` makes the production build.
 

@@ -5,6 +5,7 @@
  * `import.meta.glob` in router.js and everything they import, plus the three
  * facades. What is copied by name: scripts/build/static-files.ts. The service
  * worker is copied with its precache list filled in: scripts/build/service-worker.ts.
+ * Abhaengigkeiten: vite, scripts/build/*.ts
  */
 
 import { readFileSync } from 'node:fs';

@@ -13,6 +13,7 @@
  *     commit, else the version), the tokens `__YUVOMI_APP_RELEASE__` and
  *     `__YUVOMI_BUILD_REVISION__`.
  * The hand lists (368 lines) are gone; test:sw-precache checks the output.
+ * Abhaengigkeiten: node:child_process (git), node:fs, ./static-files.ts, ./vite-plugins.ts, vite (Typen)
  */
 
 import { spawnSync } from 'node:child_process';

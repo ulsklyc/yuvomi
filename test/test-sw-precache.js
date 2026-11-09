@@ -38,7 +38,7 @@ import { createContext, runInContext } from 'node:vm';
 import { parseSync } from 'rolldown/utils';
 import { withoutHtmlComments } from './source-text.js';
 import { DIST, distManifest, readDist } from './dist-build.js';
-import { OFFLINE_EXCLUDED, copyEntryFor } from '../scripts/build/static-files.ts';
+import { FACADES, OFFLINE_EXCLUDED, copyEntryFor } from '../scripts/build/static-files.ts';
 import { copiedFiles } from '../scripts/build/vite-plugins.ts';
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
@@ -143,7 +143,7 @@ test('jeder precachte Pfad liegt in dist/ (addAll ist All-or-Nothing)', () => {
 
 test('der Graph ab den Eintraegen ist vollstaendig precacht (#616)', () => {
   const roots = Object.keys(manifest).filter((key) => manifest[key].isEntry);
-  assert.deepEqual(roots.sort(), ['api.js', 'i18n.js', 'index.html', 'utils/html.js'], 'andere Eintraege als index.html und die drei Fassaden');
+  assert.deepEqual(roots.sort(), ['index.html', ...FACADES].sort(), 'andere Eintraege als index.html und die Fassaden');
   const gaps = [];
   const usedExceptions = new Set();
   const skipped = new Set();

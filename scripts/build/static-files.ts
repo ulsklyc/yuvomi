@@ -11,6 +11,7 @@
  * Paths are relative to public/. An entry is a file, a directory ending in `/`
  * (copied recursively) or `dir/*.ext` (one level, one extension). The first
  * matching entry decides whether a file is precached by the service worker.
+ * Abhaengigkeiten: keine (reine Daten; Build-Plugins und Tests lesen sie nativ)
  */
 
 export interface CopyEntry {

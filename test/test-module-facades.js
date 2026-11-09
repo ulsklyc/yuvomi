@@ -48,10 +48,14 @@ function exportNames(file, code) {
   return names;
 }
 
-test('die Fassadenliste ist die aus der SPEC', () => {
-  assert.deepEqual([...FACADES], ['api.js', 'i18n.js', 'utils/html.js']);
-  const spec = readFileSync(new URL('../docs/SPEC.md', import.meta.url), 'utf8');
-  for (const file of ['/api.js', '/utils/html.js']) assert.ok(spec.includes(`\`${file}\``), `SPEC nennt ${file} nicht mehr`);
+test('MODULES.md nennt genau die Fassaden aus scripts/build/static-files.ts', () => {
+  // Eine weitere Fassade ist ein Eintrag in FACADES - und ein Satz in der Zusage.
+  const doc = readFileSync(new URL('../MODULES.md', import.meta.url), 'utf8');
+  const promise = doc.match(/the stable facades: ((?:`[^`]+`(?:, )?)+)\./)?.[1];
+  assert.ok(promise, 'MODULES.md nennt die Fassadenliste nicht mehr');
+  const named = [...promise.matchAll(/`\/([^`]+)`/g)].map((m) => m[1]);
+  assert.deepEqual(named, [...FACADES], 'MODULES.md und FACADES nennen verschiedene Pfade');
+  assert.ok(FACADES.includes('api.js') && FACADES.includes('utils/html.js'), 'docs/SPEC.md sagt /api.js und /utils/html.js zu');
 });
 
 test('jede Fassade liegt ungehasht unter ihrem Pfad und ist Eintrag im Manifest', () => {

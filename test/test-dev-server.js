@@ -11,6 +11,7 @@
  *   2. PORT aus .env kam nur beim Server an (`--import dotenv/config`), nicht
  *      bei Vite - der Proxy zielte auf 3000, der Server lief woanders.
  * Ausfuehren: node --test test/test-dev-server.js
+ * Abhaengigkeiten: scripts/build/dev-proxy.ts, scripts/dev.mjs, scripts/build/vite-plugins.ts, test/tmp-dir.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

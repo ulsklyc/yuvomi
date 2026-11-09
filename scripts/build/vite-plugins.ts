@@ -9,6 +9,7 @@
  *     and the start page is preloaded at low priority behind the shell;
  *   - module list: dist/.vite/modules.json names every source module in the
  *     bundle (the copy-list guard and the third-party notices read it).
+ * Abhaengigkeiten: node:child_process (git ls-files), node:fs, lightningcss, ../build-third-party-notices.mjs, ./static-files.ts, vite (Typen)
  */
 
 import { spawnSync } from 'node:child_process';

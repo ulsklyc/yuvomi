@@ -9,6 +9,7 @@
  *          test:dev-server checks the keys against every file under public/.
  *          Not /health: without an HTML Accept it is the container probe, with
  *          one it is the health module page.
+ * Abhaengigkeiten: keine (reine Daten fuer vite.config.ts und test:dev-server)
  */
 
 /** Path roots the Express server answers itself. `/sw.js` on purpose: Vite must not serve the unbuilt worker. */
