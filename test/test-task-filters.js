@@ -503,7 +503,7 @@ test('„Filter zuruecksetzen" stellt den Standard her, keinen dritten Zustand (
   tasks.state.filters.status = ['done'];
   const { container } = mountSheet();
   await tasks.resetTaskFilters(container);
-  assert.deepEqual(tasks.state.filters, { status: ['open'], priority: [], assigned_to: [], category: [], tags: [] });
+  assert.deepEqual(tasks.state.filters, { status: ['open'], priority: [], assigned_to: [], category: [], tags: [], creator: null });
   assert.equal(tasks.state.showFuture, false);
   assert.equal(tasks.activeFilterCount(), 0);
 });

@@ -1038,6 +1038,13 @@ function renderTaskDetail(task, reminders = [], ctx) {
     task.is_recurring
       ? { icon: 'history', label: t('tasks.historySeriesTitle'), node: seriesHistoryNode(task), multiline: true }
       : null,
+    // Ersteller (#2451): wer hat diese Aufgabe angelegt, und wann? Die Daten
+    // lagen immer vor (created_by ist NOT NULL), wurden aber nie angezeigt.
+    // Nützlich in Haushalten, wo Kinder Aufgaben erstellen.
+    task.created_by_name
+      ? { icon: 'user-pen', label: t('tasks.createdByLabel'),
+          value: `${task.created_by_name} · ${dateText(task.created_at)}` }
+      : null,
     // Ganz unten und immer sichtbar: die Unterhaltung ist der einzige Abschnitt,
     // der auch dann etwas anbietet, wenn er leer ist - nämlich das Eingabefeld.
     { icon: 'message-square', label: t('tasks.commentsLabel'), node: commentsNode(task, ctx), multiline: true },

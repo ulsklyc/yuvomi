@@ -551,6 +551,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     descriptionKey: 'settings.tasksSubtasksExpandedHint',
     options: [
       'settings.tasksSubtasksExpandedLabel',
+      'settings.tasksShowCreatorLabel',
     ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-options.js'),

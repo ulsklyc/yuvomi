@@ -268,6 +268,9 @@ const taskProperties = {
   assigned_color: { type: ['string', 'null'], description: 'Colour of `assigned_to`.' },
   assigned_avatar: avatarField('Picture of `assigned_to`.'),
   assigned_users: { type: 'array', items: { $ref: '#/components/schemas/AssignedPerson' } },
+  created_by_name: { type: ['string', 'null'], description: 'Display name of `created_by`.' },
+  created_by_color: { type: ['string', 'null'], description: 'Avatar colour of `created_by`.' },
+  created_by_avatar: avatarField('Picture of `created_by`.'),
   tags: { type: 'array', items: { type: 'string' }, description: 'Free-form labels, distinct from the single `category`.' },
   rotation_mode: { type: ['string', 'null'], enum: ['round_robin', null], description: 'Rotation of a recurring series (#1763): `round_robin` hands every follow-up instance to the next member of `rotation_pool` in a fixed order, null without rotation.' },
   rotation_last_user: { type: ['integer', 'null'], description: 'Informational: the member the pointer names. The order reads `rotation_last_position`, never this field.' },
@@ -282,6 +285,7 @@ const taskRequired = [
   'countdown', 'locked', 'archived_at', 'created_at', 'updated_at', 'external_source',
   'rotation_mode', 'rotation_last_user', 'rotation_last_position',
   'assigned_name', 'assigned_color', 'assigned_avatar', 'assigned_users', 'tags',
+  'created_by_name', 'created_by_color', 'created_by_avatar',
 ];
 
 // `urgentTasks` der Uebersicht liest `t.*` mit den Zugewiesenen, ohne Bild und Tags.
