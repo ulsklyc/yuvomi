@@ -179,7 +179,7 @@ test('the build stage copies every file the Vite config imports, before npm run 
   const copied = [...beforeBuild.matchAll(/^COPY (?!--from)(.+) \S+$/gm)].flatMap((m) => m[1].trim().split(/\s+/));
   const ignore = readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
   /** @param {string} rel */
-  const copiedBy = (rel) => copied.some((src) => (src.endsWith('/') ? rel.startsWith(src) : src.includes('*') ? new RegExp(`^${src.replace(/[.]/g, '\\.').replace(/\*/g, '[^/]*')}$`).test(rel) : rel === src));
+  const copiedBy = (rel) => copied.some((src) => (src.endsWith('/') ? rel.startsWith(src) : src.includes('*') ? new RegExp(`^${src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '[^/]*')}$`).test(rel) : rel === src));
   /** @param {string} rel */
   const ignored = (rel) => {
     let out = false;
