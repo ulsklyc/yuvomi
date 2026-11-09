@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.87.0] - 2026-11-08
+
 ### Added
 - **Every release carries a signed tarball of the app.** Next to the container image, each
   GitHub release now has `yuvomi-<version>-dist.tar.gz`, a `SHA256SUMS` file and a build
