@@ -22,15 +22,15 @@
    * wieder die grosse Hoehe.
    *   - 100dvh: wer dvh kennt (Chrome ab 108, Safari ab 15.4), nimmt die
    *     letzte Zeile, die beiden davor sind dort ueberstimmt.
-   *   - -webkit-fill-available: wer dvh nicht kennt, aber das hier (Safari
-   *     13.4 bis 15.3, Chromium), fuellt den Containing Block - auf iOS die
-   *     SICHTBARE Hoehe. 100vh waere dort die grosse, bei eingefahrener
+   *   - -webkit-fill-available: wer dvh nicht kennt, aber das hier (an der
+   *     Untergrenze Chrome 105 bis 107), fuellt den Containing Block. 100vh
+   *     waere auf dem Telefon die grosse Hoehe, bei eingefahrener
    *     Adressleiste, und die untere Navigation laege unter der Leiste.
-   *   - 100vh: wer beides nicht kennt. Ohne jede Hoehe waechst #main-content
+   *   - 100vh: wer beides nicht kennt - an der Untergrenze kein Browser mehr,
+   *     die Zeile ist der letzte Halt. Ohne jede Hoehe waechst #main-content
    *     auf Inhaltshoehe, und der Hauptbereich scrollt nicht mehr - die
-   *     Seitenleiste daneben schon (Chrome 91 auf einem Chromebook, #1276).
-   * Die Reihenfolge ist die Regel: umgestellt gewaenne auf alten Browsern
-   * die falsche Zeile. */
+   *     Seitenleiste daneben schon (#1276).
+   * Die Reihenfolge ist die Regel: umgestellt gewaenne die falsche Zeile. */
   height: 100vh;
   height: -webkit-fill-available;
   height: 100dvh;
@@ -2892,12 +2892,13 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
       scale var(--duration-md) var(--ease-out);
   }
 
-  /* NUR WO `translate` GILT (Review R20): Chromium kennt die Eigenschaft erst
-   * ab Version 104, `overflow: clip` ab 90. Darunter (der Chromebook aus #1276
-   * steht bei Chrome 91) schrumpfte die Kapsel, das aktive Ziel bliebe auf
-   * seinem Platz und fiele aus dem Schnitt - die Pille stuende leer. Ohne
-   * die Eigenschaft minimiert die Kapsel wie in R19: flacher, ohne Labels,
-   * in voller Breite. */
+  /* NUR WO `translate` GILT (Review R20): ohne die Eigenschaft schrumpfte die
+   * Kapsel, das aktive Ziel bliebe auf seinem Platz und fiele aus dem Schnitt -
+   * die Pille stuende leer. Ohne sie minimiert die Kapsel wie in R19: flacher,
+   * ohne Labels, in voller Breite. An der Untergrenze (Chrome 105, Firefox 115,
+   * Safari 15.4) kennt jeder Browser `translate` und `overflow: clip`; die
+   * Weiche greift dort immer und bindet die Pille an ihre Voraussetzung statt
+   * an eine Versionsannahme (test:old-browser-fallbacks). */
   @supports (translate: 0) {
     .nav-bottom--minimized:not(:focus-within) .nav-bottom__items {
       inline-size: var(--nav-pill-width, 100%);
@@ -7113,8 +7114,8 @@ a.popover-menu__item {
  * Grund deshalb voll. Der eigene Knoten folgt dem Finger per `--sheet-pull`
  * (utils/sheet-drag.js) wie der Backdrop des Mehr-Blatts, die Tafel bleibt
  * unberuehrt. Er traegt dieselbe Flaeche in jedem Zustand - in der Top-Layer,
- * im Ausgang ausserhalb und in einem Browser ohne showModal() (Safari vor
- * 15.4, die Mindestversion ist 14.1).
+ * im Ausgang ausserhalb und in einem Browser ohne showModal() (an der
+ * Untergrenze Safari 15.4 keiner mehr; der Zweig bleibt als Rueckfall).
  *
  * DER DIALOG SELBST BLENDET NIE (`animation: none`, auch im Ausgang). Eine
  * Deckkraft unter 1 an einem Vorfahren macht ihn zur Backdrop Root, und der
@@ -8248,8 +8249,8 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
  * setzt `.modal-panel__delete`), und an der Gruppe, in der er steht (Konto:
  * Loeschen plus Archivieren). `inline-end` spiegelt sich in RTL von selbst.
  *
- * Zwei Regeln statt einer Liste (R22 S10): ein Browser ohne `:has()` (die
- * Mindestversion ist Chrome 87) verwirft eine Selektorliste GANZ, und mit ihr
+ * Zwei Regeln statt einer Liste (R22 S10): ein Browser ohne `:has()` (an der
+ * Untergrenze Firefox 115, `:has()` erst ab 121) verwirft eine Selektorliste GANZ, und mit ihr
  * den Anfangsrand jedes Loeschen-Knopfs. Getrennt verliert er nur die Gruppe.
  * `.modal-panel__footer-start` ist derselbe Schub fuer einen Knopf, der kein
  * Loeschen ist und trotzdem am Anfang steht ("Gast anlegen" im Mitgliederdialog

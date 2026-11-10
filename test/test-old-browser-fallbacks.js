@@ -33,10 +33,11 @@
  * Phase 1a E (09.11.2026) die eine Matrix = `build.target` (Chrome 105,
  * Firefox 115, Safari/iOS 15.4). Mit der Anhebung fielen aus den Listen:
  * `Object.hasOwn`, `.at()`, `findLast`/`findLastIndex`, `structuredClone`,
- * `crypto.randomUUID`, private Klassenglieder und `@layer`. Die Rueckfaelle,
- * die der Code fuer die alte Grenze traegt (pickLocale ohne hasOwn,
- * formatUnit ohne findLastIndex), bleiben samt ihren Programm-Tests stehen;
- * ihr Abbau ist ein eigenes Ticket. Die Suite
+ * `crypto.randomUUID`, private Klassenglieder und `@layer`. Von den
+ * Rueckfaellen fuer die alte Grenze fiel pickLocale ohne Object.hasOwn (#2649:
+ * ohne die API laesst browser-floor.js keinen Browser durch); formatUnit ohne
+ * findLastIndex bleibt samt Programm-Test, weil die Probe Firefox 97 bis 103
+ * durchlaesst und findLastIndex dort fehlt (Teil 2). Die Suite
  * liest sie dort und prueft jeden Eintrag ihrer Verbotslisten dagegen: ein
  * Eintrag, den die Mindestversion schon kann, ist ueberfluessig. Hebt jemand
  * die Mindestversion, meldet die Suite genau die Eintraege, die dann fallen.
@@ -63,9 +64,9 @@
  *   - ohne var()/env(): der vh-Zwilling davor in derselben Regel, gleiche
  *     Eigenschaft, gleicher Wert bis auf die Einheit. Dazwischen darf nur
  *     dieselbe Eigenschaft ohne dvh-Einheit stehen - so steht
- *     `height: -webkit-fill-available` zwischen 100vh und 100dvh, das auf iOS
- *     13.4 bis 15.3 die SICHTBARE Hoehe liefert, wo 100vh die grosse waere
- *     (Review zu #1371). Jede andere Deklaration dazwischen bricht die Kette;
+ *     `height: -webkit-fill-available` zwischen 100vh und 100dvh, das ein
+ *     Chromium ohne dvh (an der Untergrenze Chrome 105 bis 107) den Containing
+ *     Block fuellen laesst, wo 100vh die grosse Hoehe waere (Review zu #1371). Jede andere Deklaration dazwischen bricht die Kette;
  *   - mit var()/env(): gar keine dvh-Einheit, sondern `var(--viewport-height)`
  *     aus tokens.css (dort 100vh, in `@supports (height: 100dvh)` 100dvh);
  *   - innerhalb eines `@supports`, das die Einheit selbst abfragt: nichts, denn
@@ -149,7 +150,7 @@ const guardedBySupports = (at) => at.some(
 /**
  * Steht der vh-Zwilling vor der Deklaration an `index`? Rueckwaerts gelesen
  * darf dazwischen nur dieselbe Eigenschaft OHNE dvh-Einheit stehen - etwa
- * `-webkit-fill-available` fuer Safari 13.4 bis 15.3. Eine andere Eigenschaft
+ * `-webkit-fill-available` fuer Chromium ohne dvh. Eine andere Eigenschaft
  * oder eine weitere dvh-Zeile beendet die Suche.
  */
 function twinBefore(decls, index, property, expected) {
@@ -283,7 +284,7 @@ test('Textleser: sieht, was eachRule() ueberspringt (erfundene Faelle)', () => {
   assert.equal(viewportUnitFindings(keyframes).seen, 0);
 });
 
-test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome 91 wirkt (#1276)', () => {
+test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome 105 wirkt (#1276)', () => {
   const files = appStylesheets();
   const offenders = [];
   const matchedExceptions = new Set();
@@ -319,7 +320,7 @@ test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome
     + 'einer Stelle, die eachRule() nicht liefert (z.B. @keyframes) - dort prueft dieser Guard nichts.');
 
   assert.deepEqual(offenders, [],
-    'Ein Browser ohne dvh (Chrome < 108, Safari < 15.4) verwirft diese Deklarationen, und der '
+    'Ein Browser ohne dvh (an der Untergrenze Chrome 105 bis 107) verwirft diese Deklarationen, und der '
     + 'Rueckfall fehlt oder wirkt nicht:\n' + offenders.join('\n'));
 
   const stale = EXCEPTIONS.filter((ex) => !matchedExceptions.has(ex));
@@ -333,9 +334,9 @@ test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome
  * Zwilling und dvh-Zeile nur ZU - er verlangt es nicht, und ohne diesen Test
  * gingen Entfernen und Vertauschen beide gruen durch (gemessen). Jede Zeile
  * gilt fuer andere Browser: 100dvh wo dvh bekannt ist, -webkit-fill-available
- * wo nur das bekannt ist (Safari 13.4 bis 15.3: die SICHTBARE Hoehe), 100vh wo
- * keins von beiden bekannt ist. Vertauscht gewaenne auf alten Browsern die
- * falsche Zeile.
+ * wo nur das bekannt ist (an der Untergrenze Chrome 105 bis 107), 100vh wo
+ * keins von beiden bekannt ist (an der Untergrenze kein Browser mehr - die
+ * Zeile ist der letzte Halt). Vertauscht gewaenne die falsche Zeile.
  */
 const IOS_HEIGHT_CHAIN = ['100vh', '-webkit-fill-available', '100dvh'];
 const IOS_HEIGHT_CHAIN_CARRIERS = [
@@ -357,9 +358,9 @@ test('body und .app-shell tragen die Hoehe als 100vh -> -webkit-fill-available -
   }
   assert.deepEqual(wrong, [],
     `body und .app-shell brauchen genau height: ${IOS_HEIGHT_CHAIN.join('; height: ')} - in dieser `
-    + 'Reihenfolge. iOS Safari 13.4 bis 15.3 kennt -webkit-fill-available, aber kein dvh: fehlt die '
-    + 'Zeile oder steht sie vor 100vh, gilt dort 100vh, die GROSSE Hoehe bei eingefahrener '
-    + 'Adressleiste, und die untere Navigation liegt unter der Adressleiste. An beiden Stellen, weil '
+    + 'Reihenfolge. Chrome 105 bis 107 kennt -webkit-fill-available, aber kein dvh: fehlt die '
+    + 'Zeile oder steht sie vor 100vh, gilt dort 100vh, auf dem Telefon die GROSSE Hoehe bei '
+    + 'eingefahrener Adressleiste, und die untere Navigation liegt unter der Leiste. An beiden Stellen, weil '
     + 'fill-available sich am Containing Block misst - body mit 100vh gaebe der Shell wieder die '
     + 'grosse Hoehe:\n' + wrong.join('\n'));
 });
@@ -748,31 +749,13 @@ test('die Ausnahmen des Startpfads haben ihren Anlass noch', () => {
     + 'und die Ausnahme streichen');
 });
 
-test('pickLocale() laeuft ohne Object.hasOwn - als Programm, nicht nur als Text', () => {
-  // Der Textguard oben sieht nur, was dasteht. Dieser Test nimmt dem Prozess
-  // die API weg, wie Chrome 91 sie nie hatte, und ruft die Aufloesung mit den
-  // Tags, die den Zweig mit der Region erreichen - `de-DE` genuegte dafuer.
-  const saved = Object.getOwnPropertyDescriptor(Object, 'hasOwn');
-  delete Object.hasOwn;
-  let results;
-  try {
-    results = [
-      pickLocale(['de-DE'], ['de', 'en']),
-      pickLocale(['zh-TW'], ['en', 'zh', 'zh-Hant']),
-      pickLocale(['zh-Hans-HK'], ['en', 'zh', 'zh-Hant']),
-      pickLocale(['xx-YY'], ['de', 'en']),
-    ];
-  } finally {
-    if (saved) Object.defineProperty(Object, 'hasOwn', saved);
-  }
-  assert.deepEqual(results, ['de', 'zh-Hant', 'zh', 'en']);
-});
-
 test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text', () => {
-  // Nicht im Startpfad, aber an der Mindestversion (Chrome 87) auf dem Schirm:
-  // die Leseansicht eines Geburtstags mit eigener Erinnerungsfrist und die
-  // Fastendauern. findLastIndex kennt Chrome erst ab 97; dort warf der Aufruf,
-  // und die Angabe fehlte. Erwartet wird dasselbe Ergebnis wie mit der API.
+  // Nicht im Startpfad, aber auf dem Schirm: die Leseansicht eines Geburtstags
+  // mit eigener Erinnerungsfrist, die Fastendauern, Groessen und Fristen in den
+  // Einstellungen. findLastIndex kennt Firefox erst ab 104, und browser-floor.js
+  // laesst Firefox 97 bis 103 bewusst durch (docs/installation.md: "single
+  // screens can stay empty"); dort wuerfe der Aufruf die ganze Ansicht um.
+  // Erwartet wird dasselbe Ergebnis wie mit der API.
   const cases = [[2, 'day'], [1, 'week'], [1.5, 'hour'], [-3, 'minute'], [1234.5, 'hour']];
   const format = () => cases.flatMap(([value, unit]) => ['short', 'long']
     .map((unitDisplay) => formatUnit(value, unit, { unitDisplay })));
@@ -800,8 +783,8 @@ test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text'
  *
  * Erhoben wurde die Syntax aller Module mit einem echten Parser (acorn,
  * ecmaVersion-Leiter, #1369): das Neueste in der App ist `||=`/`??=`
- * (Firefox 79) und ein statisches Klassenfeld (Safari 14.1), beides genau an
- * der Mindestversion. Private Klassenglieder, statische Initialisierungsbloecke
+ * und ein statisches Klassenfeld, beides seit der Untergrenze 105/115/15.4
+ * weit unter ihr. Private Klassenglieder, statische Initialisierungsbloecke
  * und Lookbehind stehen nur im vendorten PDF.js. Die Muster hier sind Text und
  * damit eine Naeherung: sie treffen die Schreibweise, mit der die Konstrukte
  * tatsaechlich benutzt werden (`this.#x`, `static {`, `(?<=`).
@@ -846,7 +829,7 @@ test('Leser: erkennt neuere Syntax, nicht ihre Doppelgaenger in Strings (erfunde
   assert.deepEqual(kinds('const re = /(?<=\\$)\\d+/;'), ['Lookbehind']);
   assert.deepEqual(kinds("const re = new RegExp('(?<!a)b');"), ['Lookbehind']);
   // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte
-  // Gruppen und private Klassenglieder (Safari 14.1, unter der Grenze seit Phase 1a E).
+  // Gruppen und private Klassenglieder (die Untergrenze kann sie seit Phase 1a E).
   assert.deepEqual(kinds([
     'class A { #n = 0; get n() { return this.#n; } }',
     "el.style.color = '#fff'; const sel = '#main-content'; location.hash = '#top';",
@@ -940,8 +923,8 @@ test('Leser: erkennt die Block-Konstrukte, nicht ihre harmlosen Nachbarn (erfund
   assert.deepEqual(kinds('@media (width >= 768px) { .a { display: flex } .b { gap: 0 } }'), ['Bereichssyntax in @media']);
   assert.deepEqual(kinds('@media (400px < width < 800px) { .a { display: flex } }'), ['Bereichssyntax in @media']);
   // Erlaubt: klassische Media-Merkmale, @supports und @container, @starting-style,
-  // @keyframes, und `@layer` (Chrome 99, Firefox 97, Safari 15.4 - unter der
-  // Grenze seit Phase 1a E; ob ein Blatt es nutzt, entscheidet DECISIONS 14).
+  // @keyframes, und `@layer` (die Untergrenze kann es seit Phase 1a E; ob ein
+  // Blatt es nutzt, entscheidet DECISIONS 14).
   assert.deepEqual(kinds([
     '@layer base { .a { color: red } }',
     '@layer base, theme;',
@@ -977,11 +960,13 @@ test('kein Stylesheet nutzt ein Konstrukt, das an der Mindestversion einen ganze
 });
 
 // DIE PILLE DER MOBILEN KAPSEL (R20, Review): sie verschiebt das aktive Ziel
-// mit `translate` (Chromium 104) und schneidet mit `overflow: clip` (90). Unter
-// der Mindestversion (Chrome 87, der Chromebook aus #1276 bei 91) schrumpfte
-// die Kapsel ohne den Versatz, und die Pille stuende leer. Jede Regel, die die
-// Pille baut, steht deshalb in `@supports (translate: 0)`; ohne die Eigenschaft
-// minimiert die Kapsel wie in R19.
+// mit `translate` und schneidet mit `overflow: clip`. Ohne `translate`
+// schrumpfte die Kapsel ohne den Versatz, und die Pille stuende leer. Jede
+// Regel, die die Pille baut, steht deshalb in `@supports (translate: 0)`; ohne
+// die Eigenschaft minimiert die Kapsel wie in R19. An der Untergrenze
+// (Chrome 105, Firefox 115, Safari 15.4) kennt jeder Browser `translate`, die
+// Weiche greift dort also immer; sie bleibt, weil sie die Pille an ihre
+// Voraussetzung bindet statt an eine Versionsannahme.
 test('die Pille der Kapsel steht nur dort, wo translate gilt', () => {
   const pillRules = [...eachRule(read('public/styles/layout.css'))].filter(({ selector, body }) => (
     /nav-item--pill/.test(selector)

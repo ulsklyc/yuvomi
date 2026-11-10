@@ -76,8 +76,8 @@ html:lang(ko) {
 body {
   /* Dieselbe Kette wie an .app-shell in layout.css, mit der Begruendung dort
    * (#1276): 100dvh, wo der Browser dvh kennt; sonst -webkit-fill-available,
-   * das sich an html (height: 100%) misst und auf iOS 13.4 bis 15.3 die
-   * sichtbare Hoehe ergibt; sonst 100vh. Ohne jede Hoehe waechst der Body mit
+   * das sich an html (height: 100%) misst (an der Untergrenze fuer Chrome 105
+   * bis 107, die dvh noch nicht kennen); sonst 100vh. Ohne jede Hoehe waechst der Body mit
    * seinem Inhalt, overflow: hidden schneidet nichts mehr ab, und der
    * Hauptbereich hat keine Grenze, an der er scrollen koennte. */
   height: 100vh;
