@@ -73,6 +73,65 @@ test('parseReleaseBody trennt den fettgedruckten Vorspann von der Begruendung', 
   assert.match(sections[0].items[0], /^The weather forecast was off by a day \(#851\)\./);
 });
 
+test('parseReleaseBody haelt einen Vorspann zusammen, der in der Quelle umbricht (#2656)', () => {
+  // CHANGELOG.md bricht bei rund 100 Zeichen um, und ein laengerer Vorspann
+  // schliesst sein `**` dann erst auf der zweiten Zeile. Der Parser las Zeile
+  // fuer Zeile: die erste Zeile wurde ganz zum Vorspann, der Rest des Vorspanns
+  // landete in der Begruendung ("... on iPhone and" / "iPad). Until now ...").
+  const sections = __test.parseReleaseBody(`
+### Foundation
+- **Yuvomi now needs Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4 on iPhone and
+  iPad).** Until now it still started down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5);
+  on Chrome 87 to 98 it no longer does.
+- **A lead on one line.** With a reason that
+  wraps.
+- **A lead that wraps over
+  three lines before it
+  closes.** And then the reason.
+- **A lead that never closes, as some very old entries
+  have it
+`);
+
+  const [wrapped, single, three, open] = sections[0].entries;
+  assert.equal(wrapped.lead, 'Yuvomi now needs Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4 on iPhone and iPad).');
+  assert.equal(wrapped.detail, 'Until now it still started down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5); on Chrome 87 to 98 it no longer does.');
+  // Der Normalfall bleibt, wie er war: Fortsetzungszeilen gehoeren zur Begruendung.
+  assert.deepEqual(single, { lead: 'A lead on one line.', detail: 'With a reason that wraps.' });
+  assert.deepEqual(three, { lead: 'A lead that wraps over three lines before it closes.', detail: 'And then the reason.' });
+  // Schliesst der Vorspann nie, ist der ganze Eintrag der Vorspann - wie bei
+  // jedem Eintrag ohne Vorspann, erfunden wird keiner.
+  assert.deepEqual(open, { lead: 'A lead that never closes, as some very old entries have it', detail: '' });
+  // `entries` traegt genau die zwei zugesagten Felder, kein Arbeitsfeld des Parsers.
+  for (const entry of sections[0].entries) assert.deepEqual(Object.keys(entry).sort(), ['detail', 'lead']);
+  assert.equal(sections[0].items[0], `${wrapped.lead} ${wrapped.detail}`);
+});
+
+test('jeder fettgedruckte Vorspann in CHANGELOG.md kommt ganz in der Ansicht an (#2656)', () => {
+  // Die Gegenprobe an der echten Datei: der Vorspann, wie er in der Quelle
+  // steht (vom ersten `**` bis zum schliessenden, auch ueber den Umbruch), muss
+  // Wort fuer Wort der sein, den der Parser liefert. 155 Eintraege waren es nicht.
+  const text = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  /** @type {string[]} */
+  const offenders = [];
+  let checked = 0;
+  for (const block of text.split(/^## \[/m).slice(1)) {
+    const version = block.slice(0, block.indexOf(']'));
+    const body = block.slice(block.indexOf('\n') + 1);
+    const leads = __test.parseReleaseBody(body).flatMap((section) => section.entries.map((/** @type {{ lead: string }} */ entry) => entry.lead));
+    const bullets = body.split(/^(?=- )/m).filter((part) => part.startsWith('- '));
+    if (bullets.length !== leads.length) continue; // Bloecke mit Fliesstext zwischen den Eintraegen: kein Index-Vergleich
+    bullets.forEach((bullet, index) => {
+      const source = bullet.match(/^- \*\*([\s\S]+?)\*\*/);
+      if (!source) return;
+      checked += 1;
+      const expected = __test.cleanMarkdownText(source[1]);
+      if (leads[index] !== expected) offenders.push(`[${version}] "${leads[index].slice(0, 60)}" statt "${expected.slice(0, 60)}"`);
+    });
+  }
+  assert.ok(checked > 800, `nur ${checked} Vorspaenne verglichen - der Vergleich greift nicht mehr`);
+  assert.deepEqual(offenders.slice(0, 10), [], `${offenders.length} Vorspaenne kommen abgeschnitten an`);
+});
+
 test('buildChangelogPayload marks current version when it appears in releases', () => {
   const payload = __test.buildChangelogPayload([
     { tag_name: 'v1.2.2', body: '- Newest release', html_url: 'https://example.test/latest' },
