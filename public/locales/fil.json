@@ -3901,7 +3901,8 @@
         "staleData": "Offline - noong: {{time}}",
         "pageTitle": "Offline ka",
         "pageDescription": "Kailangan ng koneksyon ang pahinang ito. Kapag online na ulit ang device mo, kusa itong maglo-load.",
-        "snapshot": "Walang koneksyon sa server - naka-save na data, pagbasa lang"
+        "snapshot": "Walang koneksyon sa server - naka-save na data, pagbasa lang",
+        "unreachableBody": "Hindi maabot ang Yuvomi sa ngayon. Tingnan kung online ang device mo at tumatakbo ang server, saka subukang muli."
     },
     "emptyHint": {
         "tasks": "I-tap ang + para gawin ang iyong unang gawain. I-swipe pakaliwa ang isang card para tapusin, pakanan para tingnan.",
@@ -6882,5 +6883,12 @@
         "custom": "Sariling kulay",
         "chooseCustom": "Pumili ng sariling kulay",
         "standard": "Default na kulay"
+    },
+    "browserTooOld": {
+        "pageTitle": "Masyadong luma ang browser",
+        "title": "Masyadong luma ang browser na ito para sa Yuvomi",
+        "body": "Kailangan ng Yuvomi ang ilang feature na hindi pa kilala ng browser na ito. Hindi apektado ang data mo.",
+        "versions": "Gumagana ang Yuvomi mula Chrome at Edge {{chrome}}, Firefox {{firefox}} at Safari {{safari}}, at sa iPhone at iPad mula iOS {{ios}}.",
+        "action": "I-update ang browser o ang device, saka subukang muli. Kung hindi ito posible, buksan ang Yuvomi sa ibang browser."
     }
 }

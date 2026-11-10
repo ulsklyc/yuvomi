@@ -8,14 +8,41 @@ Have a question before diving in? Start a thread in [Discussions](https://github
 
 ## Hard Constraints
 
-**Yuvomi enforces a strict "no frameworks, no build tools" policy.** This is a permanent architectural decision, not a temporary limitation.
+**Yuvomi makes five guarantees about what runs in your browser and how it gets there.** They
+replace the older "no frameworks, no build tools" rule, which named the means rather than the
+ends (entry 20 in [docs/DECISIONS.md](docs/DECISIONS.md)). The build arrived in November 2026;
+the guarantees are what did not change:
+
+1. **No runtime CDN.** Everything the browser loads comes from your own server, out of the
+   release you installed. Nothing is fetched from another host at runtime.
+2. **No telemetry.** No analytics, no crash reporting, no identifier of your installation
+   leaves it. The server's outbound requests are the ones you configure (calendars, mail,
+   weather, storage) and the public release list from GitHub for the update notice, fetched
+   without any data about you.
+3. **Third-party code is pinned and readable.** A frontend dependency is an npm package with
+   an exact version in `package.json` and `package-lock.json` (`.npmrc` sets `save-exact`),
+   listed in `IMPORTED_PACKAGES` in `test/test-vendor-policy.js`, and its license appears in
+   the generated `dist/THIRD-PARTY-NOTICES.txt`. Open an issue before adding one: it ends up
+   in every household's browser. The four hand copies under `public/vendor/` (PDF.js,
+   SortableJS, libphonenumber) and `public/lucide.min.js` stay until phase 4 of the
+   architecture roadmap moves them.
+4. **Markup is the DOM.** Pages build their markup with `insertAdjacentHTML`,
+   `replaceChildren()` and the DOM API, and user data goes through `esc()`. No virtual DOM, no
+   component framework, no `innerHTML` assignment.
+5. **The build is reproducible.** `npm run build` (Vite 8) turns `public/` into `dist/`, the
+   same source gives the same bytes (checked on every pull request), and every release ships
+   two attested artifacts, the container image and the `dist` tarball, so anyone can rebuild
+   what was signed and compare.
 
 Specifically - the following will **not** be merged:
 
-- Frontend frameworks (React, Vue, Svelte, Angular, etc.)
-- Bundlers or transpilers (Webpack, Vite, Rollup, esbuild, TypeScript, etc.)
+- Component frameworks and virtual-DOM renderers (React, Vue, Svelte, Angular, Preact, etc.)
 - CSS libraries (Tailwind, Bootstrap, etc.)
-- External frontend dependencies at runtime - no CDN loads, no npm frontend packages. Third-party frontend code is allowed only as hand-copied, committed vendoring under `public/vendor/` (currently PDF.js, SortableJS, libphonenumber - plus Lucide at `public/lucide.min.js`); each vendored package ships its license and a README with update steps
+- Anything the browser loads from a CDN or another host at runtime
+- A dependency without an exact version, or a frontend dependency without an issue first
+- Enums, namespaces, decorators or parameter properties in TypeScript: the server runs its
+  TypeScript natively with type stripping, which only erases syntax, and
+  `erasableSyntaxOnly` in the `tsconfig` files rejects the rest
 
 Backend dependencies are evaluated case-by-case but must remain minimal. When in doubt, open an issue before writing code.
 
@@ -41,14 +68,17 @@ cp .env.example .env
 npm run dev
 ```
 
-`npm run dev` starts the server with `--watch` for automatic restarts on file changes.
-The app answers on [http://localhost:3000](http://localhost:3000). On the first visit it
-guides you through creating the admin account in the browser; headless setups can run
-`npm run setup` instead.
+`npm run dev` starts two processes and keeps them together: Vite's dev server on
+[http://localhost:5173](http://localhost:5173), which serves the sources under `public/` with
+hot reload, and the Express server on port 3000 with `--watch`, which Vite proxies for the API,
+the feeds and `/sw.js`. Open the app on **5173**; the service worker does not register there.
+On the first visit it guides you through creating the admin account in the browser; headless
+setups can run `npm run setup` instead. To run the app the way a release runs it, build first:
+`npm run build && npm start` serves `dist/` on port 3000 (see [Build](#build) below).
 
-The dev server listens on all interfaces, so other devices on your network can reach it too.
+The Express server listens on all interfaces, so other devices on your network can reach it too.
 On a network you do not trust, set `BIND_ADDRESS=127.0.0.1` in `.env` to keep it on your
-machine. The suites that start `server/index.js` as a program already do that, through
+machine; `npm run dev` passes it to Vite as well. The suites that start `server/index.js` as a program already do that, through
 `test/server-ready.js` and the document-guards harness; a new harness that starts the server
 itself has to set it as well.
 
@@ -93,6 +123,10 @@ npm run test:docker-publish
 This is a representative selection - run `npm run` to see the full list of suites.
 Which suite guards which invariant is catalogued in [docs/test-suites.md](docs/test-suites.md).
 
+`npm test` builds the app first (`pretest`): several suites read `dist/`, and the server
+under test serves it. A single suite that needs the build says so when `dist/` is missing;
+run `npm run build` once, then the suite.
+
 Tests run with plain Node against real SQLite, in memory or in a
 temp file - newer suites use the built-in `node --test` runner, older ones are plain
 assertion scripts. Nothing has to be running beforehand: a suite that exercises routes over
@@ -126,6 +160,47 @@ up there, and the `/bin/sh` and process group parts of `test:restore-swap` and
 `test:parallel-runner`; `test:runtime-deps` links its folders as junctions and runs in full.
 `npm run test-parallel` itself is POSIX only. CI and the Docker image run on Linux.
 
+### Type checking
+
+`npm run typecheck` runs `tsc --build` over three projects (`server/` with `scripts/`,
+`tools/` and `.github/scripts/`, `public/`, `test/`; the solution file is `tsconfig.json`) with `strict`, `checkJs`,
+`erasableSyntaxOnly` and `verbatimModuleSyntax`, and compares the diagnostics with
+`tsc-baseline.json`, one count per file and error code. The baseline only sinks: a count that
+rises or a new key fails the check, in CI as a required job. A change that fixes types runs
+`node scripts/check-tsc-baseline.ts --update`, which writes back lower counts and nothing else;
+`--init` exists for an empty baseline only. The baseline is a debt register, not a licence:
+new code is expected to type-check clean. TypeScript files run natively on Node 24.12 and 26
+through type stripping, which is why only erasable syntax is allowed.
+
+### Build
+
+`npm run build` runs Vite 8 (Rolldown) over `public/` and writes `dist/`: hashed chunks under
+`dist/assets/`, source maps, `dist/index.html` with the page table the router reads,
+`dist/sw.js` with the precache list from the build manifest, and
+`dist/THIRD-PARTY-NOTICES.txt`. `public/` stays the source and the place you edit; `dist/` is
+generated and not committed. The server serves `dist/` and refuses to start without it.
+
+Three things about the build are rules, each with a guard:
+
+- **Facades.** Exactly three files keep their path and are importable from outside the bundle:
+  `/api.js`, `/i18n.js` and `/utils/html.js`. They are what a third-party module may import
+  (see [MODULES.md](MODULES.md)); everything else ships under a hashed name and may be imported
+  only from inside the app. `npm run test:module-facades` holds the list.
+- **The copy list.** A file under `public/` that no `import` reaches (a classic script in
+  `<head>`, an icon, a locale file, a hand copy under `vendor/`) is named in
+  `scripts/build/static-files.ts`, with whether the service worker precaches it and why.
+  `npm run test:static-copy-list` and `npm run test:sw-precache` fail on a file that is
+  neither reached nor listed.
+- **Determinism.** Two builds of the same source give the same bytes, and the build in the
+  checkout equals a build from `git archive`. `scripts/check-build-determinism.mjs` runs on
+  every pull request. Anything that puts a path, a time or a random value into the output
+  breaks the release attestation and is a bug.
+
+CSS is minified whitespace-only (esbuild); `npm run test:dist-css` compares every declaration
+of the source with the output, after a minifier merged `backdrop-filter` into its prefixed twin
+and the glass surfaces disappeared. Dependencies that end up in the bundle follow guarantee 3
+above; `npm run test:vendor-policy` checks pins, the list and the notices.
+
 ---
 
 ## Project Structure
@@ -139,16 +214,19 @@ server/
   auth.js              # Session auth + user management
   routes/              # API route handlers - one file per module
   services/            # Business logic (calendar sync, recurrence engine)
-public/
+public/                  # The source of the web app (what you edit)
   index.html           # SPA shell (single entry point)
   router.js            # Client-side History API router
-  api.js               # Fetch wrapper (auth, CSRF, error handling)
+  api.js               # Fetch wrapper (auth, CSRF, error handling); a facade, see Build
   styles/
     tokens.css         # Design tokens - all colors, radii, shadows, fonts
   components/          # Reusable UI building blocks (modal, pickers, detail views); the Web Components among them use the yuvomi-* prefix
   pages/               # Page modules - each exports a render() function
-  sw.js                # Service worker
+  sw.js                # Service worker source; the build fills in the precache list and the release
   offline.html         # Offline fallback page (served by service worker)
+  browser-too-old.html # Notice for a browser below the floor, reached by the ES5 probe browser-floor.js
+vite.config.ts         # The build (Vite 8); helpers in scripts/build/
+dist/                  # Generated by `npm run build`, served by the server, not committed
 test/                  # One test file per module (test-[module].js)
 docs/                  # Product spec, screenshots
 ```
@@ -520,7 +598,7 @@ That is worth stating plainly rather than leaving to inference. An automated rev
 Beyond that decision, three things are mechanical and hold for every change regardless of who or what wrote it:
 
 - The full test suite runs on every pull request, and a red build is not merged.
-- The [Hard Constraints](#hard-constraints) above are enforced by tests, not by good intentions - a framework import or an `innerHTML` call fails the build.
+- The [Hard Constraints](#hard-constraints) above are enforced by tests, not by good intentions - an `innerHTML` call, an unpinned or unlisted dependency, an import past the three facades, a type count above the baseline or a build that differs between two runs fails the pull request (`test:frontend-audit`, `test:vendor-policy`, `test:module-facades`, `test:tsc-baseline` and the determinism check in CI).
 - Behaviour that is claimed to be fixed carries a test that fails against the state before the fix. A guard that was never seen red is not evidence.
 
 **On "a human has read and understood every merged line":** for a one-person project shipping several releases a week, that sentence would be a promise nobody could keep, and a promise that cannot be kept is worse than none - it invites exactly the trust it does not earn. What is true instead: the maintainer decides what gets built and whether it goes in, and is answerable for it either way. Where a change touches something sensitive - authentication, permissions, storage, anything reaching the network - the maintainer reads it line by line and merges it by hand.

@@ -76,8 +76,8 @@ html:lang(ko) {
 body {
   /* Dieselbe Kette wie an .app-shell in layout.css, mit der Begruendung dort
    * (#1276): 100dvh, wo der Browser dvh kennt; sonst -webkit-fill-available,
-   * das sich an html (height: 100%) misst und auf iOS 13.4 bis 15.3 die
-   * sichtbare Hoehe ergibt; sonst 100vh. Ohne jede Hoehe waechst der Body mit
+   * das sich an html (height: 100%) misst (an der Untergrenze fuer Chrome 105
+   * bis 107, die dvh noch nicht kennen); sonst 100vh. Ohne jede Hoehe waechst der Body mit
    * seinem Inhalt, overflow: hidden schneidet nichts mehr ab, und der
    * Hauptbereich hat keine Grenze, an der er scrollen koennte. */
   height: 100vh;
@@ -127,10 +127,26 @@ img, svg, video {
  * Menue unsichtbar macht. Ergebnis: jedes Panel der Seite stand offen und fing
  * die Klicks darunter ab.
  *
- * Hier wird die UA-Regel genau dort nachgereicht, wo sie fehlt. Die Menues
- * sind in diesen Browsern NICHT verfuegbar, statt offen zu stehen
- * (docs/installation.md, "Browser Support"); einen Polyfill gibt es bewusst
- * nicht. `@supports selector()` kennt schon die Mindestversion der App.
+ * Hier wird die UA-Regel genau dort nachgereicht, wo sie fehlt.
+ * `@supports selector()` kennt schon die Mindestversion der App.
+ *
+ * SEIT PHASE 1a E OEFFNEN SIE AUCH DORT (Entscheidung Ulas 09.11.2026): wo die
+ * API fehlt, laedt der Router `@oddbird/popover-polyfill`
+ * (utils/popover-support.js). Der kennt `:popover-open` in CSS nicht und setzt
+ * am offenen Popover die Klasse `.\:popover-open`. Jede Regel der App, die ein
+ * offenes Popover erst zeigt (`display`, Blende, Zeiger), steht deshalb hier
+ * noch einmal als Zwilling an dieser Klasse - sonst stuende das Menue offen,
+ * aber unsichtbar. Die Zwillinge haben zwei Klassen Spezifitaet und schlagen
+ * damit die Grundregeln der Seitenblaetter, die spaeter laden. Der Polyfill
+ * hat keinen Top-Layer: `--z-top-layer` (tokens.css) hebt das offene Popover
+ * ueber Dialoge und Meldungen. Ohne Top-Layer gilt auch der Containing Block
+ * der Seite: in der Desktop-Seitenleiste (`position: fixed` mit
+ * `backdrop-filter`) misst sich das Kontomenue an der Leiste statt am Fenster
+ * und steht 9px neben seinem Platz mit der API - vollstaendig sichtbar und
+ * bedienbar (gemessen in test:built-app-browser), bewusst so gelassen
+ * (#2650). test:old-browser-fallbacks verlangt fuer jede `:popover-open`-
+ * Regel ihren Zwilling hier. Laedt der Polyfill nicht, traegt kein Element die
+ * Klasse, und die Menues bleiben zu wie vorher.
  *
  * `[popover]` hat die Spezifitaet einer Klasse und steht im ersten Blatt nach
  * den Tokens: eine spaetere Regel, die `display` an einer Popover-Klasse setzt,
@@ -140,6 +156,47 @@ img, svg, video {
 @supports not selector(:popover-open) {
   [popover] {
     display: none;
+  }
+
+  [popover].\:popover-open {
+    display: block;
+    z-index: var(--z-top-layer);
+  }
+
+  .popover-menu.\:popover-open,
+  .documents-context-menu.\:popover-open {
+    display: flex;
+  }
+
+  .filter-popover.\:popover-open,
+  .ydp-popover.\:popover-open,
+  .documents-context-menu.\:popover-open {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  /* Die Faltzeile (layout.css, "DIE FALTZEILE") bleibt mit offenem
+   * Werkzeugmenue stehen: `:not(:has(:popover-open))`. Unter dem Polyfill gilt
+   * die Pseudoklasse nicht, und ein unbekannter Selektor in `:has()` verwirft
+   * die ganze Regel (gemessen in aktuellem Chromium mit einer unbekannten
+   * Pseudoklasse) - die Zeile faltete nie. Der Zwilling fragt die Klasse ab,
+   * als eigene Regel (nie in derselben Liste wie `:popover-open`). Parste ein
+   * Browser `:has()` noch nachsichtig, gilt dort zusaetzlich die Grundregel
+   * ohne die Menue-Ausnahme; ein offenes Menue haelt die Zeile dann ueber den
+   * Fokus darin (`:not(:focus-within)`).
+   * Wo `:has()` fehlt (Firefox 115), fallen beide weg, und die Zeile bleibt
+   * stehen wie die anderen `:has()`-Details (docs/installation.md). */
+  @media (max-width: 1023px) {
+    .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(.\:popover-open)) {
+      margin-block-end: calc(-1 * var(--fold-row-h, 0px));
+      translate: 0 calc(-1 * var(--fold-row-h, 0px));
+      pointer-events: none;
+    }
+
+    .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(.\:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools) {
+      opacity: 0;
+    }
   }
 }
 

@@ -3901,7 +3901,8 @@
         "staleData": "Offline - senast uppdaterad: {{time}}",
         "pageTitle": "Du är offline",
         "pageDescription": "Den här sidan behöver en anslutning. Så fort enheten är online igen laddas den av sig själv.",
-        "snapshot": "Ingen anslutning till servern - sparade data, endast läsning"
+        "snapshot": "Ingen anslutning till servern - sparade data, endast läsning",
+        "unreachableBody": "Yuvomi går inte att nå just nu. Kontrollera att enheten är ansluten och att servern körs, och försök igen."
     },
     "emptyHint": {
         "recipes": "Ett recept går direkt till måltidsplanen eller till inköpslistan.",
@@ -6882,5 +6883,12 @@
         "custom": "Egen färg",
         "chooseCustom": "Välj egen färg",
         "standard": "Standardfärg"
+    },
+    "browserTooOld": {
+        "pageTitle": "Webbläsaren är för gammal",
+        "title": "Den här webbläsaren är för gammal för Yuvomi",
+        "body": "Yuvomi behöver några funktioner som den här webbläsaren inte har ännu. Dina data påverkas inte.",
+        "versions": "Yuvomi fungerar från Chrome och Edge {{chrome}}, Firefox {{firefox}} och Safari {{safari}}, och på iPhone och iPad från iOS {{ios}}.",
+        "action": "Uppdatera webbläsaren eller enheten och försök sedan igen. Går det inte, öppna Yuvomi i en annan webbläsare."
     }
 }

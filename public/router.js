@@ -34,6 +34,7 @@ import { numberLocaleFor } from '/settings/region-presets.js';
 import { setDisplayTimeZone, zonedDateKey } from '/utils/timezone.js';
 import { rememberZonePrefs, forgetZonePrefs, noteZoneDecision } from '/utils/household-zone-hint.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
+import { ensurePopoverApi } from '/utils/popover-support.js';
 import { swapPage, swapTheme } from '/utils/view-transition.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { brandMarkSvg } from '/utils/brand-mark.js';
@@ -5809,6 +5810,11 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
     // der catch unten ausdruecklich als unkritisch behandelt. Wer spaeter auf
     // die Antwort wartet, sieht den Fehler trotzdem.
     version.catch(() => {});
+    // DIE POPOVER-API, WO SIE FEHLT (Phase 1a E): Chrome 105-113, Firefox
+    // 115-124 und Safari 15.4-16 haben sie nicht, und ohne sie oeffnet kein
+    // Menue. Der Polyfill laedt parallel zu den Sprachdateien und steht vor
+    // dem ersten Seitenaufbau; ein Browser mit der API laedt nichts davon.
+    const popoverReady = ensurePopoverApi();
     const startRoute = ROUTES.find((r) => r.path === location.pathname);
     if (!startRoute || startRoute.requiresAuth) {
       startHandoff.askSession();
@@ -5828,6 +5834,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
     } catch {
       routerState._setupRequired = false; // Fail-safe: kein Setup erzwingen
     }
+    await popoverReady;
     // Was die erste Navigation nicht abgeholt hat, verfaellt mit ihr: eine
     // spaetere Anmeldung faende sonst die Antwort einer frueheren Sitzung vor.
     navigate(location.pathname, false).finally(() => startHandoff.expireStart());

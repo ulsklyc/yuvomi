@@ -24,6 +24,9 @@ export interface CopyEntry {
 export const FACADES: readonly string[] = ['api.js', 'i18n.js', 'utils/html.js'];
 
 export const COPY_LIST: readonly CopyEntry[] = [
+  { path: 'browser-floor.js', precache: true, why: 'classic ES5 script, first in <head> of index.html and offline.html: sends a browser below the floor to browser-too-old.html' },
+  { path: 'browser-too-old.html', precache: true, why: 'the static notice for browsers below the floor; precached so a worker from before an update serves it offline too' },
+  { path: 'static-page-title.js', precache: true, why: 'classic ES5 script at the end of browser-too-old.html and offline.html, sets <title> in the page language' },
   { path: 'night-hours.js', precache: true, why: 'classic script in <head> of index.html and offline.html' },
   { path: 'theme-init.js', precache: true, why: 'classic script in <head>, sets the theme before the first paint' },
   { path: 'lang-init.js', precache: true, why: 'classic script in <head>, sets lang before the first paint' },
@@ -41,7 +44,7 @@ export const COPY_LIST: readonly CopyEntry[] = [
   { path: 'vendor/sortablejs/sortable.esm.min.js', precache: true, why: 'hand copy, imported by utils/sortable.js at runtime (external)' },
   { path: 'vendor/libphonenumber/core.min.mjs', precache: true, why: 'hand copy, imported by utils/phone.js at runtime, offline phone formatting' },
   { path: 'vendor/libphonenumber/metadata.min.json', precache: true, why: 'fetched by utils/phone.js next to core.min.mjs' },
-  { path: 'vendor/', precache: false, why: 'hand copies with LICENSE and README (pdf.js is never precached: documents are not offline)' },
+  { path: 'vendor/', precache: false, why: 'hand copies with LICENSE and README; pdf.js is never cached at all: documents are not offline, and public/sw.js lets /vendor/pdfjs/ pass to the browser (#2634)' },
 ];
 
 /**

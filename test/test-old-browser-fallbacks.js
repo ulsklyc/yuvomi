@@ -19,13 +19,25 @@
  *           Startpfad also die App, sonst einen ganzen Bildschirm (#1369).
  *        4. GANZE BLOECKE. Kein Stylesheet nutzt ein Konstrukt, bei dem ein
  *           Browser an der Mindestversion einen ganzen Block verwirft
- *           (`@layer`, `@scope`, Nesting, Media-Bereichssyntax) (#1369).
+ *           (`@scope`, Nesting, Media-Bereichssyntax; `@layer` bis Phase 1a E) (#1369).
  *        5. POPOVER. Ohne Popover-API bleibt jedes Popover zu: reset.css reicht
  *           die UA-Regel `[popover] { display: none }` nach, und keine Regel
  *           schlaegt sie mit einem `display` an einer Popover-Klasse (#2107).
+ *           Seit Phase 1a E oeffnen sie dort trotzdem: der Router laedt den
+ *           Popover-Polyfill nur ohne die API, und jede Regel des offenen
+ *           Zustands hat ihren Zwilling an `.\:popover-open` (5b).
  *
  * DIE MINDESTVERSION steht in docs/installation.md, Abschnitt "Browser
- * Support", zweite Tabellenzeile - gemessen am 21.09.2026 (#1369). Die Suite
+ * Support", in der Zeile "Starts, every screen opens, scrolls" - erst
+ * gemessen am 21.09.2026 (#1369: Chrome 87, Firefox 79, Safari 14.1), seit
+ * Phase 1a E (09.11.2026) die eine Matrix = `build.target` (Chrome 105,
+ * Firefox 115, Safari/iOS 15.4). Mit der Anhebung fielen aus den Listen:
+ * `Object.hasOwn`, `.at()`, `findLast`/`findLastIndex`, `structuredClone`,
+ * `crypto.randomUUID`, private Klassenglieder und `@layer`. Von den
+ * Rueckfaellen fuer die alte Grenze fiel pickLocale ohne Object.hasOwn (#2649:
+ * ohne die API laesst browser-floor.js keinen Browser durch); formatUnit ohne
+ * findLastIndex bleibt samt Programm-Test, weil die Probe Firefox 97 bis 103
+ * durchlaesst und findLastIndex dort fehlt (Teil 2). Die Suite
  * liest sie dort und prueft jeden Eintrag ihrer Verbotslisten dagegen: ein
  * Eintrag, den die Mindestversion schon kann, ist ueberfluessig. Hebt jemand
  * die Mindestversion, meldet die Suite genau die Eintraege, die dann fallen.
@@ -52,9 +64,9 @@
  *   - ohne var()/env(): der vh-Zwilling davor in derselben Regel, gleiche
  *     Eigenschaft, gleicher Wert bis auf die Einheit. Dazwischen darf nur
  *     dieselbe Eigenschaft ohne dvh-Einheit stehen - so steht
- *     `height: -webkit-fill-available` zwischen 100vh und 100dvh, das auf iOS
- *     13.4 bis 15.3 die SICHTBARE Hoehe liefert, wo 100vh die grosse waere
- *     (Review zu #1371). Jede andere Deklaration dazwischen bricht die Kette;
+ *     `height: -webkit-fill-available` zwischen 100vh und 100dvh, das ein
+ *     Chromium ohne dvh (an der Untergrenze Chrome 105 bis 107) den Containing
+ *     Block fuellen laesst, wo 100vh die grosse Hoehe waere (Review zu #1371). Jede andere Deklaration dazwischen bricht die Kette;
  *   - mit var()/env(): gar keine dvh-Einheit, sondern `var(--viewport-height)`
  *     aus tokens.css (dort 100vh, in `@supports (height: 100dvh)` 100dvh);
  *   - innerhalb eines `@supports`, das die Einheit selbst abfragt: nichts, denn
@@ -138,7 +150,7 @@ const guardedBySupports = (at) => at.some(
 /**
  * Steht der vh-Zwilling vor der Deklaration an `index`? Rueckwaerts gelesen
  * darf dazwischen nur dieselbe Eigenschaft OHNE dvh-Einheit stehen - etwa
- * `-webkit-fill-available` fuer Safari 13.4 bis 15.3. Eine andere Eigenschaft
+ * `-webkit-fill-available` fuer Chromium ohne dvh. Eine andere Eigenschaft
  * oder eine weitere dvh-Zeile beendet die Suche.
  */
 function twinBefore(decls, index, property, expected) {
@@ -272,7 +284,7 @@ test('Textleser: sieht, was eachRule() ueberspringt (erfundene Faelle)', () => {
   assert.equal(viewportUnitFindings(keyframes).seen, 0);
 });
 
-test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome 91 wirkt (#1276)', () => {
+test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome 105 wirkt (#1276)', () => {
   const files = appStylesheets();
   const offenders = [];
   const matchedExceptions = new Set();
@@ -308,7 +320,7 @@ test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome
     + 'einer Stelle, die eachRule() nicht liefert (z.B. @keyframes) - dort prueft dieser Guard nichts.');
 
   assert.deepEqual(offenders, [],
-    'Ein Browser ohne dvh (Chrome < 108, Safari < 15.4) verwirft diese Deklarationen, und der '
+    'Ein Browser ohne dvh (an der Untergrenze Chrome 105 bis 107) verwirft diese Deklarationen, und der '
     + 'Rueckfall fehlt oder wirkt nicht:\n' + offenders.join('\n'));
 
   const stale = EXCEPTIONS.filter((ex) => !matchedExceptions.has(ex));
@@ -322,9 +334,9 @@ test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome
  * Zwilling und dvh-Zeile nur ZU - er verlangt es nicht, und ohne diesen Test
  * gingen Entfernen und Vertauschen beide gruen durch (gemessen). Jede Zeile
  * gilt fuer andere Browser: 100dvh wo dvh bekannt ist, -webkit-fill-available
- * wo nur das bekannt ist (Safari 13.4 bis 15.3: die SICHTBARE Hoehe), 100vh wo
- * keins von beiden bekannt ist. Vertauscht gewaenne auf alten Browsern die
- * falsche Zeile.
+ * wo nur das bekannt ist (an der Untergrenze Chrome 105 bis 107), 100vh wo
+ * keins von beiden bekannt ist (an der Untergrenze kein Browser mehr - die
+ * Zeile ist der letzte Halt). Vertauscht gewaenne die falsche Zeile.
  */
 const IOS_HEIGHT_CHAIN = ['100vh', '-webkit-fill-available', '100dvh'];
 const IOS_HEIGHT_CHAIN_CARRIERS = [
@@ -346,9 +358,9 @@ test('body und .app-shell tragen die Hoehe als 100vh -> -webkit-fill-available -
   }
   assert.deepEqual(wrong, [],
     `body und .app-shell brauchen genau height: ${IOS_HEIGHT_CHAIN.join('; height: ')} - in dieser `
-    + 'Reihenfolge. iOS Safari 13.4 bis 15.3 kennt -webkit-fill-available, aber kein dvh: fehlt die '
-    + 'Zeile oder steht sie vor 100vh, gilt dort 100vh, die GROSSE Hoehe bei eingefahrener '
-    + 'Adressleiste, und die untere Navigation liegt unter der Adressleiste. An beiden Stellen, weil '
+    + 'Reihenfolge. Chrome 105 bis 107 kennt -webkit-fill-available, aber kein dvh: fehlt die '
+    + 'Zeile oder steht sie vor 100vh, gilt dort 100vh, auf dem Telefon die GROSSE Hoehe bei '
+    + 'eingefahrener Adressleiste, und die untere Navigation liegt unter der Leiste. An beiden Stellen, weil '
     + 'fill-available sich am Containing Block misst - body mit 100vh gaebe der Shell wieder die '
     + 'grosse Hoehe:\n' + wrong.join('\n'));
 });
@@ -521,7 +533,7 @@ const newer = (a, b) => {
 const describeSince = (since) => ENGINES.map((e) => `${ENGINE_NAMES[e]} ${since[e]}`).join(', ');
 
 /**
- * Die zweite Zeile der Tabelle in docs/installation.md ("Starts, every screen
+ * Die Zeile der Tabelle in docs/installation.md ("Starts, every screen
  * opens, scrolls"): Chrome, Firefox, Safari (macOS), iOS. Gelesen und nicht
  * abgeschrieben - sonst stuende dieselbe Zahl an zwei Stellen, und nur eine
  * davon waere die gepruefte.
@@ -553,43 +565,12 @@ test('die Mindestversion steht lesbar in docs/installation.md', () => {
  * ────────────────────────────────────────────────────────────────────────── */
 
 // APIs, die neuer sind als die Mindestversion und die man leicht hinschreibt.
-// Versionen aus MDN browser-compat-data 8.1.2 (#1369). Eine Liste von Hand und
+// Versionen aus MDN browser-compat-data 8.1.2 (#1369). Seit der Anhebung auf
+// 105/115/15.4 (Phase 1a E) gestrichen, weil die Grenze sie kann: Object.hasOwn,
+// .at(), findLast/findLastIndex, structuredClone, crypto.randomUUID. Eine Liste von Hand und
 // keine vollstaendige Pruefung: sie haelt die haeufigen Griffe fest, nicht
 // jede denkbare API.
 const STARTUP_FORBIDDEN = [
-  {
-    api: 'Object.hasOwn',
-    since: { chrome: '93', firefox: '92', safari: '15.4' },
-    instead: 'Object.prototype.hasOwnProperty.call(obj, key)',
-    patterns: [
-      /\bObject\s*(?:\.\s*hasOwn|\[\s*(['"`])hasOwn\1\s*\])(?![\w$])/,
-      /\{[^{}]*\bhasOwn\b[^{}]*\}\s*=\s*Object\b/,
-    ],
-  },
-  {
-    api: 'Array.prototype.at / String.prototype.at',
-    since: { chrome: '92', firefox: '90', safari: '15.4' },
-    instead: 'list[list.length - 1]',
-    patterns: [/\.\s*at\s*\(/],
-  },
-  {
-    api: 'Array.prototype.findLast / findLastIndex',
-    since: { chrome: '97', firefox: '104', safari: '15.4' },
-    instead: 'eine Schleife von hinten',
-    patterns: [/\.\s*findLast(?:Index)?\s*\(/],
-  },
-  {
-    api: 'structuredClone',
-    since: { chrome: '98', firefox: '94', safari: '15.4' },
-    instead: 'JSON.parse(JSON.stringify(x)) oder eine gezielte Kopie',
-    patterns: [/\bstructuredClone\s*\(/],
-  },
-  {
-    api: 'crypto.randomUUID',
-    since: { chrome: '92', firefox: '95', safari: '15.4' },
-    instead: 'crypto.getRandomValues()',
-    patterns: [/\.\s*randomUUID\s*\(/],
-  },
   {
     api: 'Array.prototype.toSorted / toReversed / toSpliced',
     since: { chrome: '110', firefox: '115', safari: '16' },
@@ -692,29 +673,19 @@ test('Leser: auskommentierte Skripte zaehlen nicht, auch hinter einem offenen Ko
   ]);
 });
 
-test('Leser: findet Object.hasOwn in jeder Form, Kommentare und hasOwnProperty nicht (erfundene Faelle)', () => {
-  const hits = (source) => forbiddenCalls(source).map((hit) => hit.number);
-  assert.deepEqual(hits('if (Object.hasOwn(o, k)) {}'), [1]);
-  assert.deepEqual(hits("x = Object['hasOwn'](o, k);"), [1]);
-  assert.deepEqual(hits('const { hasOwn } = Object;'), [1]);
-  assert.deepEqual(hits('Object.prototype.hasOwnProperty.call(o, k);'), []);
-  assert.deepEqual(hits('// statt Object.hasOwn\n * Object.hasOwn im Kommentar\nok();'), []);
-});
-
 test('Leser: findet die neueren APIs, nicht ihre aelteren Namensvettern (erfundene Faelle)', () => {
   const apis = (source) => forbiddenCalls(source).map((hit) => hit.rule.api);
-  assert.deepEqual(apis('const last = parts.at(-1);'), ['Array.prototype.at / String.prototype.at']);
-  assert.deepEqual(apis('const i = parts.findLastIndex((p) => p);'), ['Array.prototype.findLast / findLastIndex']);
-  assert.deepEqual(apis('const copy = window.structuredClone(x);'), ['structuredClone']);
-  assert.deepEqual(apis('const id = crypto.randomUUID();'), ['crypto.randomUUID']);
   assert.deepEqual(apis('const s = list.toSorted();'), ['Array.prototype.toSorted / toReversed / toSpliced']);
   assert.deepEqual(apis('const g = Object.groupBy(xs, f);'), ['Object.groupBy / Map.groupBy']);
   assert.deepEqual(apis('const { promise } = Promise.withResolvers();'), ['Promise.withResolvers']);
   assert.deepEqual(apis('fetch(u, { signal: AbortSignal.timeout(5000) });'), ['AbortSignal.timeout']);
   assert.deepEqual(apis('const s = AbortSignal.any([a, b]);'), ['AbortSignal.any']);
   assert.deepEqual(apis('const xs = await Array.fromAsync(it);'), ['Array.fromAsync']);
-  // Die aelteren Nachbarn bleiben erlaubt.
+  // Die aelteren Nachbarn bleiben erlaubt, und was die Grenze seit 105/115/15.4
+  // kann, ebenso.
   assert.deepEqual(apis([
+    'if (Object.hasOwn(o, k)) {} const last = parts.at(-1);',
+    'const i = parts.findLastIndex((p) => p); const id = crypto.randomUUID();',
     'const i = parts.findIndex((p) => p);',
     'const d = new Date(at); const v = row.attr; const c = item.atTop;',
     'list.sort(); list.reverse(); list.splice(1, 1); list.toString();',
@@ -778,31 +749,13 @@ test('die Ausnahmen des Startpfads haben ihren Anlass noch', () => {
     + 'und die Ausnahme streichen');
 });
 
-test('pickLocale() laeuft ohne Object.hasOwn - als Programm, nicht nur als Text', () => {
-  // Der Textguard oben sieht nur, was dasteht. Dieser Test nimmt dem Prozess
-  // die API weg, wie Chrome 91 sie nie hatte, und ruft die Aufloesung mit den
-  // Tags, die den Zweig mit der Region erreichen - `de-DE` genuegte dafuer.
-  const saved = Object.getOwnPropertyDescriptor(Object, 'hasOwn');
-  delete Object.hasOwn;
-  let results;
-  try {
-    results = [
-      pickLocale(['de-DE'], ['de', 'en']),
-      pickLocale(['zh-TW'], ['en', 'zh', 'zh-Hant']),
-      pickLocale(['zh-Hans-HK'], ['en', 'zh', 'zh-Hant']),
-      pickLocale(['xx-YY'], ['de', 'en']),
-    ];
-  } finally {
-    if (saved) Object.defineProperty(Object, 'hasOwn', saved);
-  }
-  assert.deepEqual(results, ['de', 'zh-Hant', 'zh', 'en']);
-});
-
 test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text', () => {
-  // Nicht im Startpfad, aber an der Mindestversion (Chrome 87) auf dem Schirm:
-  // die Leseansicht eines Geburtstags mit eigener Erinnerungsfrist und die
-  // Fastendauern. findLastIndex kennt Chrome erst ab 97; dort warf der Aufruf,
-  // und die Angabe fehlte. Erwartet wird dasselbe Ergebnis wie mit der API.
+  // Nicht im Startpfad, aber auf dem Schirm: die Leseansicht eines Geburtstags
+  // mit eigener Erinnerungsfrist, die Fastendauern, Groessen und Fristen in den
+  // Einstellungen. findLastIndex kennt Firefox erst ab 104, und browser-floor.js
+  // laesst Firefox 97 bis 103 bewusst durch (docs/installation.md: "single
+  // screens can stay empty"); dort wuerfe der Aufruf die ganze Ansicht um.
+  // Erwartet wird dasselbe Ergebnis wie mit der API.
   const cases = [[2, 'day'], [1, 'week'], [1.5, 'hour'], [-3, 'minute'], [1234.5, 'hour']];
   const format = () => cases.flatMap(([value, unit]) => ['short', 'long']
     .map((unitDisplay) => formatUnit(value, unit, { unitDisplay })));
@@ -830,18 +783,13 @@ test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text'
  *
  * Erhoben wurde die Syntax aller Module mit einem echten Parser (acorn,
  * ecmaVersion-Leiter, #1369): das Neueste in der App ist `||=`/`??=`
- * (Firefox 79) und ein statisches Klassenfeld (Safari 14.1), beides genau an
- * der Mindestversion. Private Klassenglieder, statische Initialisierungsbloecke
+ * und ein statisches Klassenfeld, beides seit der Untergrenze 105/115/15.4
+ * weit unter ihr. Private Klassenglieder, statische Initialisierungsbloecke
  * und Lookbehind stehen nur im vendorten PDF.js. Die Muster hier sind Text und
  * damit eine Naeherung: sie treffen die Schreibweise, mit der die Konstrukte
  * tatsaechlich benutzt werden (`this.#x`, `static {`, `(?<=`).
  */
 const MODULE_SYNTAX_FORBIDDEN = [
-  {
-    syntax: 'private Klassenglieder (#feld, #methode(), #x in obj)',
-    since: { chrome: '74', firefox: '90', safari: '14.1' },
-    patterns: [/\.\s*#[A-Za-z_$]/, /#[A-Za-z_$][\w$]*\s+in\s/],
-  },
   {
     syntax: 'statischer Initialisierungsblock (static { ... })',
     since: { chrome: '94', firefox: '93', safari: '16.4' },
@@ -877,13 +825,13 @@ function appScripts() {
 
 test('Leser: erkennt neuere Syntax, nicht ihre Doppelgaenger in Strings (erfundene Faelle)', () => {
   const kinds = (source) => syntaxHits(source).map((hit) => hit.rule.syntax.split(' ')[0]);
-  assert.deepEqual(kinds('class A { #n = 0; get n() { return this.#n; } }'), ['private']);
-  assert.deepEqual(kinds('if (#brand in obj) {}'), ['private']);
   assert.deepEqual(kinds('class A { static { init(); } }'), ['statischer']);
   assert.deepEqual(kinds('const re = /(?<=\\$)\\d+/;'), ['Lookbehind']);
   assert.deepEqual(kinds("const re = new RegExp('(?<!a)b');"), ['Lookbehind']);
-  // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte Gruppen.
+  // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte
+  // Gruppen und private Klassenglieder (die Untergrenze kann sie seit Phase 1a E).
   assert.deepEqual(kinds([
+    'class A { #n = 0; get n() { return this.#n; } }',
     "el.style.color = '#fff'; const sel = '#main-content'; location.hash = '#top';",
     'const css = `.x { color: #1a1a18; }`;',
     'class B { static formAssociated = true; static get observedAttributes() { return []; } }',
@@ -925,7 +873,8 @@ test('kein Modul der App traegt Syntax, die neuer ist als die Mindestversion (#1
  * Eine unbekannte Eigenschaft kostet eine Zeile; diese Konstrukte kosten einen
  * ganzen Block, und darin kann die Hoehe der Shell, die Lage der Navigation
  * oder ein Dialog stehen. Heute nutzt kein Stylesheet der App eines davon.
- *   - `@layer` / `@scope`: der Block faellt weg, samt allem darin;
+ *   - `@scope`: der Block faellt weg, samt allem darin (`@layer` stand hier
+ *     bis zur Anhebung auf 105/115/15.4, die es kann);
  *   - Nesting: die verschachtelte Regel faellt weg;
  *   - Bereichssyntax in `@media` (`width >= 768px`): die Bedingung ist
  *     ungueltig, der Block greift nie - die responsive Regel ist weg.
@@ -933,7 +882,6 @@ test('kein Modul der App traegt Syntax, die neuer ist als die Mindestversion (#1
  * Verfeinerung oberhalb der Mindestversion (docs/installation.md).
  */
 const CSS_BLOCK_DROPPERS = [
-  { construct: '@layer', since: { chrome: '99', firefox: '97', safari: '15.4' } },
   { construct: '@scope', since: { chrome: '118', firefox: '146', safari: '26.4' } },
   { construct: 'CSS-Nesting', since: { chrome: '120', firefox: '117', safari: '17.2' } },
   { construct: 'Bereichssyntax in @media', since: { chrome: '104', firefox: '102', safari: '16.4' } },
@@ -947,7 +895,7 @@ const RANGE_FEATURE = /\([^():]*[<>=][^():]*\)/;
 function blockDropperFindings(css) {
   const findings = [];
   const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const match of plain.matchAll(/@(layer|scope)\b/gi)) {
+  for (const match of plain.matchAll(/@(scope)\b/gi)) {
     findings.push({ construct: `@${match[1].toLowerCase()}`, where: plain.slice(match.index, match.index + 60).split('\n')[0] });
   }
   for (const { selector, body, at } of eachRule(css)) {
@@ -969,16 +917,17 @@ function blockDropperFindings(css) {
 
 test('Leser: erkennt die Block-Konstrukte, nicht ihre harmlosen Nachbarn (erfundene Faelle)', () => {
   const kinds = (css) => blockDropperFindings(css).map((f) => f.construct);
-  assert.deepEqual(kinds('@layer base { .a { color: red } }'), ['@layer']);
-  assert.deepEqual(kinds('@layer base, theme;'), ['@layer']);
   assert.deepEqual(kinds('@scope (.card) { img { border: 0 } }'), ['@scope']);
   assert.deepEqual(kinds('.a { color: red; .b { color: blue } }'), ['CSS-Nesting']);
   assert.deepEqual(kinds('.a { &:hover { color: blue } }'), ['CSS-Nesting']);
   assert.deepEqual(kinds('@media (width >= 768px) { .a { display: flex } .b { gap: 0 } }'), ['Bereichssyntax in @media']);
   assert.deepEqual(kinds('@media (400px < width < 800px) { .a { display: flex } }'), ['Bereichssyntax in @media']);
   // Erlaubt: klassische Media-Merkmale, @supports und @container, @starting-style,
-  // @keyframes, ein Kommentar ueber @layer.
+  // @keyframes, und `@layer` (die Untergrenze kann es seit Phase 1a E; ob ein
+  // Blatt es nutzt, entscheidet DECISIONS 14).
   assert.deepEqual(kinds([
+    '@layer base { .a { color: red } }',
+    '@layer base, theme;',
     '/* frueher @layer base */',
     '@media (min-width: 768px) and (max-height: 499px) { .a { display: flex } }',
     '@supports (height: 100dvh) { :root { --h: 100dvh } }',
@@ -1011,11 +960,13 @@ test('kein Stylesheet nutzt ein Konstrukt, das an der Mindestversion einen ganze
 });
 
 // DIE PILLE DER MOBILEN KAPSEL (R20, Review): sie verschiebt das aktive Ziel
-// mit `translate` (Chromium 104) und schneidet mit `overflow: clip` (90). Unter
-// der Mindestversion (Chrome 87, der Chromebook aus #1276 bei 91) schrumpfte
-// die Kapsel ohne den Versatz, und die Pille stuende leer. Jede Regel, die die
-// Pille baut, steht deshalb in `@supports (translate: 0)`; ohne die Eigenschaft
-// minimiert die Kapsel wie in R19.
+// mit `translate` und schneidet mit `overflow: clip`. Ohne `translate`
+// schrumpfte die Kapsel ohne den Versatz, und die Pille stuende leer. Jede
+// Regel, die die Pille baut, steht deshalb in `@supports (translate: 0)`; ohne
+// die Eigenschaft minimiert die Kapsel wie in R19. An der Untergrenze
+// (Chrome 105, Firefox 115, Safari 15.4) kennt jeder Browser `translate`, die
+// Weiche greift dort also immer; sie bleibt, weil sie die Pille an ihre
+// Voraussetzung bindet statt an eine Versionsannahme.
 test('die Pille der Kapsel steht nur dort, wo translate gilt', () => {
   const pillRules = [...eachRule(read('public/styles/layout.css'))].filter(({ selector, body }) => (
     /nav-item--pill/.test(selector)
@@ -1035,8 +986,8 @@ test('die Pille der Kapsel steht nur dort, wo translate gilt', () => {
 /**
  * Jedes Popover der App verlaesst sich fuer den geschlossenen Zustand auf das
  * UA-Blatt (`[popover] { display: none }`). Ein Browser ohne die API (Chrome
- * < 114, Firefox < 125, Safari < 17, also zwischen den beiden Zeilen der
- * Doku) hat diese Regel nicht und verwirft jede Autorenregel mit
+ * < 114, Firefox < 125, Safari < 17, also ueber der Untergrenze der Doku)
+ * hat diese Regel nicht und verwirft jede Autorenregel mit
  * `:popover-open`, auch `.popover-menu:not(:popover-open)`. In einer WebView
  * mit Chrome 106 stand deshalb jedes Menue der Seite offen und fing die Klicks
  * darunter ab. reset.css reicht die UA-Regel in
@@ -1191,6 +1142,231 @@ test('keine Regel setzt display an einem Popover ausserhalb von :popover-open (#
     'Diese Regel schlaegt in einem Browser ohne Popover-API den Rueckfall `[popover] { display: none }` '
     + '(reset.css) - das Panel stuende offen. `display` an einem Popover nur unter `:popover-open`:\n'
     + offenders.join('\n'));
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * (5b) Der Popover-Polyfill (Phase 1a E, Entscheidung Ulas 09.11.2026)
+ *
+ * Wo die API fehlt (Chrome 105-113, Firefox 115-124, Safari 15.4-16), laedt
+ * der Router `@oddbird/popover-polyfill` (utils/popover-support.js). Zwei
+ * Zusagen:
+ *   1. Der Polyfill kommt NUR per dynamischem Import hinter der Probe - nie
+ *      statisch, sonst laedt ihn jeder Browser (und Vite legte ihn in den
+ *      Start-Chunk).
+ *   2. Er kennt `:popover-open` in CSS nicht, sondern setzt die Klasse
+ *      `.\:popover-open`. Jede Regel, die vom offenen Zustand abhaengt, hat
+ *      ihren Zwilling an dieser Klasse im Rueckfall-Block von reset.css -
+ *      sonst stuende das Menue offen, aber unsichtbar. "Jede" heisst (#2650):
+ *      auch in `@media` (der Zwilling steht im selben `@media` im
+ *      Rueckfall-Block, oder der Zwilling der Basisebene setzt denselben Wert),
+ *      auch zusammengesetzt (`.a.b:popover-open`, `.a:popover-open .c`) und
+ *      auch als Bedingung (`:has(:popover-open)`). Ein unbekannter Selektor
+ *      macht die ganze Liste ungueltig - der Zwilling ist deshalb eine eigene
+ *      Regel, nie ein Glied derselben Liste.
+ *      Nicht verlangt: `:not(:popover-open)` allein (der geschlossene Zustand,
+ *      den `[popover] { display: none }` traegt), `transition*` (ohne
+ *      `@starting-style` blendet unter dem Polyfill nichts) und alles in
+ *      `@starting-style` (Chrome 117, also nie zusammen mit dem Polyfill).
+ * ────────────────────────────────────────────────────────────────────────── */
+const POLYFILL = '@oddbird/popover-polyfill';
+const NOT_OPEN_STATE = /^transition/;
+// `:popover-open`, das nicht direkt in `:not(` steht.
+const OPEN_PSEUDO = /(?<!:not\()(?<!\\):popover-open\b/g;
+
+/**
+ * Statische und dynamische Importe des Polyfills in einer Quelle.
+ * @param {string} source
+ */
+function polyfillImports(source) {
+  const { static: statics, dynamic } = moduleSpecifiers(source);
+  const ofPolyfill = (/** @type {string} */ spec) => spec === POLYFILL || spec.startsWith(`${POLYFILL}/`);
+  return { static: statics.filter(ofPolyfill), dynamic: dynamic.filter(ofPolyfill) };
+}
+
+/**
+ * Schluessel aus At-Kette und Selektor: `@media (...) > .a.\:popover-open`.
+ * @param {string[]} at
+ * @param {string} selector
+ */
+const twinKey = (at, selector) => [...at.map(norm), norm(selector)].join(' > ');
+
+/**
+ * Was der Polyfill verliert: Zwilling-Schluessel -> Eigenschaft -> Wert, je
+ * Regel, die vom offenen Zustand abhaengt. Der Schluessel nennt den Zwilling,
+ * der verlangt ist (`:popover-open` -> `.\:popover-open`), samt `@media`-Kette.
+ * @param {string} css
+ */
+function openStateRules(css) {
+  /** @type {Map<string, Map<string, string>>} */
+  const map = new Map();
+  for (const { selector, body, at } of eachRule(css)) {
+    if (at.some((a) => /^@starting-style\b/i.test(a) || /^@supports\s+(?:not\s+)?selector\(\s*:popover-open\s*\)$/i.test(a))) continue;
+    const props = declarations(body).filter((d) => !NOT_OPEN_STATE.test(d.property));
+    if (!props.length) continue;
+    for (const part of selectorParts(selector)) {
+      if (!OPEN_PSEUDO.test(part)) continue;
+      OPEN_PSEUDO.lastIndex = 0;
+      const key = twinKey(at, part.replace(OPEN_PSEUDO, '.\\:popover-open'));
+      const entry = map.get(key) ?? new Map();
+      for (const d of props) entry.set(d.property, norm(d.value));
+      map.set(key, entry);
+    }
+  }
+  return map;
+}
+
+/**
+ * Die Zwillinge im Rueckfall-Block, gleich verschluesselt (ohne die
+ * `@supports`-Stufe selbst).
+ * @param {string} css
+ */
+function polyfillTwins(css) {
+  /** @type {Map<string, Map<string, string>>} */
+  const map = new Map();
+  for (const { selector, body, at } of eachRule(css)) {
+    if (!at.length || !POPOVER_FALLBACK_AT.test(at[0])) continue;
+    for (const part of selectorParts(selector)) {
+      if (!part.includes('.\\:popover-open')) continue;
+      const key = twinKey(at.slice(1), part);
+      const entry = map.get(key) ?? new Map();
+      for (const d of declarations(body)) entry.set(d.property, norm(d.value));
+      map.set(key, entry);
+    }
+  }
+  return map;
+}
+
+/**
+ * Was an den Zwillingen fehlt: `<Schluessel> { prop }` je fehlender Eigenschaft.
+ * Eine Regel in `@media` ist gedeckt, wenn ihr Zwilling im selben `@media`
+ * steht oder der Zwilling der Basisebene denselben Wert setzt.
+ * @param {Map<string, Map<string, string>>} open
+ * @param {Map<string, Map<string, string>>} twins
+ */
+function missingTwins(open, twins) {
+  const missing = [];
+  for (const [key, props] of open) {
+    const baseKey = key.split(' > ').filter((step) => !step.startsWith('@')).join(' > ');
+    for (const [prop, value] of props) {
+      if (twins.get(key)?.has(prop)) continue;
+      if (baseKey !== key && twins.get(baseKey)?.get(prop) === value) continue;
+      missing.push(`${key} { ${prop} }`);
+    }
+  }
+  return missing.sort();
+}
+
+test('Leser: Polyfill-Importe und Zwillinge des offenen Zustands (erfundene Faelle)', () => {
+  assert.deepEqual(polyfillImports("import '@oddbird/popover-polyfill';"), { static: [POLYFILL], dynamic: [] });
+  assert.deepEqual(polyfillImports("const m = await import('@oddbird/popover-polyfill/fn');"), { static: [], dynamic: [`${POLYFILL}/fn`] });
+  assert.deepEqual(polyfillImports("// import '@oddbird/popover-polyfill';\nimport x from '/x.js';"), { static: [], dynamic: [] });
+  const open = openStateRules([
+    '.a:popover-open { display: flex; transition: none }',
+    '.b:popover-open, .c:popover-open { opacity: 1 }',
+    '.d:not(:popover-open) { opacity: 0 }',
+    '@media (max-width: 1px) { .a:popover-open { display: grid } .b:popover-open { opacity: 1 } }',
+    '.f:popover-open { color: red }',
+    '.g.h:popover-open { display: grid }',
+    '.i:popover-open .j { opacity: 1 }',
+    '.k:not(:has(:popover-open)) { translate: 0 -1px }',
+    '@starting-style { .a:popover-open { opacity: 0 } }',
+    '@supports selector(:popover-open) { .l:popover-open { opacity: 1 } }',
+  ].join('\n'));
+  assert.deepEqual([...open.keys()].sort(), [
+    '.a.\\:popover-open', '.b.\\:popover-open', '.c.\\:popover-open', '.f.\\:popover-open',
+    '.g.h.\\:popover-open', '.i.\\:popover-open .j', '.k:not(:has(.\\:popover-open))',
+    '@media (max-width: 1px) > .a.\\:popover-open', '@media (max-width: 1px) > .b.\\:popover-open',
+  ]);
+  assert.deepEqual([...(open.get('.a.\\:popover-open')?.keys() ?? [])], ['display'], 'transition zaehlt nicht');
+  const twins = polyfillTwins([
+    '@supports not selector(:popover-open) {',
+    '  .a.\\:popover-open, .b.\\:popover-open { display: flex; opacity: 1 }',
+    '  .f.\\:popover-open { color: red } .g.h.\\:popover-open { display: grid }',
+    '  .i.\\:popover-open .j { opacity: 1 }',
+    '  @media (max-width: 1px) { .k:not(:has(.\\:popover-open)) { translate: 0 -1px } }',
+    '}',
+    '.c.\\:popover-open { opacity: 1 }',
+  ].join('\n'));
+  assert.deepEqual(missingTwins(open, twins), [
+    '.c.\\:popover-open { opacity }',
+    '.k:not(:has(.\\:popover-open)) { translate }',
+    '@media (max-width: 1px) > .a.\\:popover-open { display }',
+  ], 'ausserhalb des Rueckfall-Blocks zaehlt nichts; in @media deckt die Basis nur denselben Wert; '
+    + 'ein Zwilling in einem anderen @media deckt nicht');
+});
+
+test('der Popover-Polyfill laedt nur dynamisch und nur hinter der Probe', () => {
+  const sites = [];
+  for (const file of appScripts()) {
+    const found = polyfillImports(read(file));
+    if (found.static.length || found.dynamic.length) sites.push({ file, ...found });
+  }
+  assert.deepEqual(sites.map((x) => x.file), ['public/utils/popover-support.js'], 'genau eine Stelle laedt den Polyfill');
+  assert.deepEqual(sites[0].static, [], 'statisch geladen, laedt ihn jeder Browser');
+  assert.deepEqual(sites[0].dynamic, [`${POLYFILL}/fn`]);
+  const source = read('public/utils/popover-support.js');
+  const fn = source.slice(source.indexOf('export async function ensurePopoverApi('));
+  const probe = fn.indexOf('if (!needsPopoverPolyfill()) return false;');
+  assert.ok(probe > 0 && probe < fn.indexOf(`import('${POLYFILL}/fn')`), 'der Import steht hinter der Probe');
+  // Der Router wartet vor dem ersten Seitenaufbau darauf.
+  const router = read('public/router.js');
+  const ready = router.indexOf('const popoverReady = ensurePopoverApi();');
+  const awaited = router.indexOf('await popoverReady;');
+  assert.ok(ready > 0 && awaited > ready && awaited < router.indexOf('navigate(location.pathname, false)', awaited),
+    'router.js setzt den Polyfill vor der ersten Navigation');
+});
+
+test('ensurePopoverApi() als Programm: laedt nur ohne die API, und ein Ladefehler haelt den Start nicht auf', async () => {
+  const { needsPopoverPolyfill, ensurePopoverApi } = await import('../public/utils/popover-support.js');
+  assert.equal(needsPopoverPolyfill({}), true, 'ohne popover und showPopover');
+  assert.equal(needsPopoverPolyfill({ popover: null }), true, 'ohne showPopover');
+  assert.equal(needsPopoverPolyfill({ popover: null, showPopover() {} }), false);
+  assert.equal(needsPopoverPolyfill(null), false, 'ohne DOM (Node) nichts');
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'HTMLElement');
+  /** @type {string[]} */
+  const calls = [];
+  const load = async () => { calls.push('load'); return { apply: () => calls.push('apply') }; };
+  try {
+    Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, writable: true, value: { prototype: { popover: null, showPopover() {} } } });
+    assert.equal(await ensurePopoverApi(load), false);
+    assert.deepEqual(calls, [], 'ein Browser mit der API laedt nichts');
+    Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, writable: true, value: { prototype: {} } });
+    assert.equal(await ensurePopoverApi(load), true);
+    assert.deepEqual(calls, ['load', 'apply']);
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      assert.equal(await ensurePopoverApi(async () => { throw new Error('offline'); }), false, 'ein Ladefehler wirft nicht');
+    } finally {
+      console.warn = warn;
+    }
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'HTMLElement', saved);
+    else delete (/** @type {any} */ (globalThis)).HTMLElement;
+  }
+});
+
+test('jede Regel des offenen Popovers hat ihren Zwilling fuer den Polyfill in reset.css', () => {
+  /** @type {Map<string, Map<string, string>>} */
+  const open = new Map();
+  for (const file of appStylesheets()) {
+    for (const [key, props] of openStateRules(read(file))) open.set(key, new Map([...(open.get(key) ?? []), ...props]));
+  }
+  for (const known of ['popover-menu', 'filter-popover', 'ydp-popover', 'documents-context-menu']) {
+    assert.ok(open.has(`.${known}.\\:popover-open`), `Reichweite: keine Regel .${known}:popover-open gefunden`);
+  }
+  // Reichweite in @media und an einer Bedingung (#2650).
+  assert.ok([...open.keys()].some((key) => key.startsWith('@media')), 'Reichweite: keine Regel in @media gelesen');
+  assert.ok([...open.keys()].some((key) => key.includes(':has(.\\:popover-open)')), 'Reichweite: keine :has(:popover-open)-Regel gelesen');
+  const twins = polyfillTwins(read('public/styles/reset.css'));
+  assert.deepEqual(missingTwins(open, twins), [],
+    'Mit dem Popover-Polyfill traegt ein offenes Popover die Klasse `.\\:popover-open`, `:popover-open` gilt dort nicht. '
+    + 'Diese Zwillinge fehlen im Block `@supports not selector(:popover-open)` in reset.css - das Menue stuende offen, aber unsichtbar');
+  const base = [...eachRule(read('public/styles/reset.css'))]
+    .find((r) => r.selector === '[popover].\\:popover-open' && r.at.length === 1 && POPOVER_FALLBACK_AT.test(r.at[0]));
+  assert.ok(base, 'reset.css: `[popover].\\:popover-open` im Rueckfall-Block fehlt');
+  assert.match(base.body, /z-index:\s*var\(--z-top-layer\)/, 'ohne Top-Layer hebt der z-index das offene Popover ueber Dialoge und Meldungen');
+  assert.match(read('public/styles/tokens.css'), /--z-top-layer:\s*2147483647;/, 'tokens.css: --z-top-layer steht fuer die Top Layer, der groesste z-index');
 });
 
 /* ──────────────────────────────────────────────────────────────────────────

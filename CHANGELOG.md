@@ -28,8 +28,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/utils/page-layout.js`; with this release every other file ships inside the bundle under a
   hashed name, and such an import stops the module from loading. Import only these three paths
   and build the page markup yourself (the example in MODULES.md shows how).
+- **Yuvomi now needs Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4 on iPhone and
+  iPad).** Until now it still started down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5);
+  on Chrome 87 to 98 and Safari or iOS 14.1 to 15.3 it no longer does. Update the browser or
+  the device's system, or use another browser. Those browsers, and Firefox before 97, now get
+  a short page in German or English that names the versions and the way out, instead of an
+  empty app; Chrome 99 to 104 and Firefox 97 to 114 still start, with single screens that can
+  stay empty. The offline page now speaks English as well as German, and the supported
+  browsers are documented as one list instead of two.
+- **Menus behind a button now open on Firefox ESR 115 and Safari 15.4 to 16** (and Chrome
+  105 to 113): every "more" menu, the account menu, filters and the date field's calendar
+  stayed closed there. Those browsers now load a small polyfill for the Popover API; newer
+  browsers load nothing extra.
 - **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
   serving the API on 3000; `npm run build` makes the production build.
+- **The contributor rules now state what the project guarantees instead of which tools it
+  avoids.** CONTRIBUTING.md replaces "no frameworks, no build tools" with five guarantees (no
+  runtime CDN, no telemetry, third-party code pinned and listed, markup built as DOM, a
+  reproducible build with two attested release artifacts), describes the build and the type
+  check, and docs/DECISIONS.md records the build step, the Node floor and the position on
+  hosting as entries 20 to 22.
 
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
@@ -37,6 +55,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on 24 and 26 and no longer need the SQLite flag. Anyone who still runs a bare-metal
   install on Node 22 sees a one-line message at start that names the supported range; update
   Node, then start again. The container image is unchanged and already runs on Node 24.
+
+### Fixed
+- **The in-app changelog shows a summary whole when it runs over two lines.** An entry whose
+  bold first sentence wrapped in the source lost the end of that sentence to the text below
+  it, so the short form read "... on iPhone and" with "iPad)." opening the reason. This hit
+  154 entries since 2.45.0; summary and reason are now split where the sentence ends.
+- **Birthdays no longer rewrite their calendar entries every minute.** The check that keeps a
+  birthday's calendar entry and reminder in step runs once a minute for every account, and on
+  every visit to the birthday list. It wrote each entry again even when nothing had changed,
+  which also rebuilt the entry in the search index: constant small writes to the database, on
+  a NAS or a Raspberry Pi to its disk or SD card. It now writes only what differs.
+- **Pages open from the app's cache without a round trip to the server.** The service worker
+  asked the network first for every page and module before handing out the copy it already
+  held, although the built files under `/assets/` carry a hash of their content in the name and
+  never change under it; it now serves them straight from its cache and fetches only a file
+  that is missing. Files without a hash, such as `index.html` and `/api.js`, still come from the
+  network first. The PDF viewer (pdf.js) also no longer lands in the worker's cache after the
+  first opened document: documents are not available offline, so it is left to the browser.
+- **On a phone, the tool row of Recipes, Pantry, Meals and Shopping folds away on scroll in
+  browsers that need the menu polyfill too.** The rule that folds it keeps the row while one
+  of its menus is open, and it asked for that with a selector those browsers do not know, so
+  they dropped the whole rule and the row kept its space above the list. It now has a second
+  rule that asks the way the polyfill marks an open menu.
+- **An up-to-date browser that lands on the "browser too old" page now returns to the app on
+  its own.** Opened from a bookmark, or reloaded after a browser update, the page kept saying
+  the browser was too old until you pressed "Try again"; it now runs the same check as the app
+  and sends a browser that passes it back to the start page. A browser that is too old stays
+  on the page. The page and the offline page also no longer request a language file they
+  never use.
 
 ## [2.87.0] - 2026-11-08
 
@@ -118,6 +165,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filesystem, with hosts, ports and server paths. They now carry a fixed sentence or the class of
   the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
   status or a manifest check, stay.
+
+### Upcoming: foundation release 2.88.0 (toolchain)
+- **The next release changes how Yuvomi is built and what it runs on, not what it does.** It
+  is planned for Wednesday, 11 November 2026, and carries no new feature; pages, data and the
+  database stay as they are. This note is the advance notice for it.
+- **Outside a container, Node.js 24.12 or newer becomes the minimum.** The container image
+  already runs on Node 24 and needs nothing, and so do the YunoHost package and the Proxmox
+  script. A bare-metal install on Node 22 has to update Node before it updates Yuvomi.
+- **The web app ships built.** Vite bundles and minifies it and ships source maps; nothing
+  changes on screen. For authors of third-party modules: `/api.js`, `/i18n.js` and
+  `/utils/html.js` stay importable, every other app file moves into the bundle under a hashed
+  name, and a module that imports one of those stops loading.
+- **Yuvomi will need Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4).** Today it
+  still starts down to Chrome 87, Firefox 79 and Safari 14.1. Chrome before 99, Firefox before
+  97 and Safari before 15.4 then get a short page that names the versions instead of the app;
+  Chrome 99 to 104 and Firefox 97 to 114 still start, with single screens that can stay empty.
+  Update the browser or the device's system beforehand.
+- **The release tarball carries the built app.** `yuvomi-<version>-dist.tar.gz` gets a `dist/`
+  folder next to the source; the YunoHost package and the Proxmox script already install from
+  the tarball and pick it up with their normal update.
+- **The way back stays open.** The release does not change the database, so pinning the
+  previous image tag `2.87.0` returns to this version with your data untouched (installation
+  guide, "Pinning a version"). That way is tried once before the release is tagged.
 
 ## [2.86.0] - 2026-11-07
 

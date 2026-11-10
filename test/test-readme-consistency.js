@@ -568,6 +568,25 @@ for (const lang of Object.keys(READMES)) {
     assert.deepEqual(nameless, [], 'Bilder ohne Alt-Text (GitHub verlinkt sie, der Link bliebe namenlos)');
   });
 
+  // (7) Phase 1a (November 2026): die App wird gebaut ausgeliefert, und die
+  // Mindestversion von Node ist 24.12. Der Satz "No build step" und jede Node-
+  // Zahl unter 24 waren bis dahin wahr und stehen seitdem als Behauptung im
+  // Weg: wer sie liest, baut nicht und wundert sich ueber einen Server, der
+  // ohne dist/ nicht startet. Rot gegen main vor dem Regelwerk-PR (Abschnitt F).
+  test(`${READMES[/** @type {keyof typeof READMES} */ (lang)]}: kein "No build step" und keine Node-Version unter 24`, () => {
+    const text = readme(lang);
+    const claims = text.split('\n')
+      .map((line, i) => (/\b(no|kein|ohne)\s+build[- ]?(step|schritt)\b/i.test(line) ? `${i + 1}: ${line.trim()}` : null))
+      .filter(Boolean);
+    assert.deepEqual(claims, [],
+      'Die App wird seit Phase 1a gebaut ausgeliefert (CONTRIBUTING.md, "Hard Constraints" und "Build"):\n  ' + claims.join('\n  '));
+    const nodes = [...text.matchAll(/\bNode(?:\.js)?\s+(\d+)(?:\.(\d+))?/g)]
+      .filter((m) => Number(m[1]) < 24 || (Number(m[1]) === 24 && m[2] !== undefined && Number(m[2]) < 12))
+      .map((m) => m[0]);
+    assert.deepEqual(nodes, [],
+      'engines.node in package.json ist ^24.12.0 || >=26.0.0; die README nennt eine aeltere Version: ' + nodes.join(', '));
+  });
+
   test(`${READMES[lang]}: kein Em- oder En-Dash`, () => {
     const hits = readme(lang).split('\n')
       .map((line, i) => (/[–—]/.test(line) ? `${i + 1}: ${line.trim()}` : null))

@@ -3901,7 +3901,8 @@
         "staleData": "Çevrimdışı - son güncelleme: {{time}}",
         "pageTitle": "Çevrimdışısın",
         "pageDescription": "Bu sayfanın bağlantıya ihtiyacı var. Cihazın yeniden çevrimiçi olunca kendiliğinden yüklenir.",
-        "snapshot": "Sunucuya bağlantı yok - kayıtlı veriler, salt okunur"
+        "snapshot": "Sunucuya bağlantı yok - kayıtlı veriler, salt okunur",
+        "unreachableBody": "Yuvomi şu anda erişilemiyor. Cihazının ağa bağlı olduğunu ve sunucunun çalıştığını kontrol et, sonra tekrar dene."
     },
     "emptyHint": {
         "recipes": "Bir tarif doğrudan öğün planına ya da alışveriş listesine gider.",
@@ -6882,5 +6883,12 @@
         "custom": "Özel renk",
         "chooseCustom": "Özel renk seç",
         "standard": "Varsayılan renk"
+    },
+    "browserTooOld": {
+        "pageTitle": "Tarayıcı çok eski",
+        "title": "Bu tarayıcı Yuvomi için çok eski",
+        "body": "Yuvomi, bu tarayıcının henüz bilmediği bazı özelliklere ihtiyaç duyuyor. Verilerin bundan etkilenmez.",
+        "versions": "Yuvomi; Chrome ve Edge {{chrome}}, Firefox {{firefox}} ve Safari {{safari}} sürümünden itibaren, iPhone ve iPad'de iOS {{ios}} sürümünden itibaren çalışır.",
+        "action": "Tarayıcıyı veya cihazı güncelle, ardından tekrar dene. Bu mümkün değilse Yuvomi'yi başka bir tarayıcıda aç."
     }
 }
