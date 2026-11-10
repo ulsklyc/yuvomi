@@ -169,6 +169,7 @@
         "sectionPeople": "Mga Tao",
         "sectionFinance": "Pananalapi",
         "help": "Tulong",
+        "setStatus": "Pagkakaroon",
         "changelog": "Ano ang bago",
         "accountMenu": "Menu ng account, {{name}}",
         "accountMenuAnonymous": "Menu ng account",

@@ -169,6 +169,7 @@
         "sectionPeople": "人员",
         "sectionFinance": "财务",
         "help": "帮助",
+        "setStatus": "状态",
         "changelog": "新功能",
         "accountMenu": "账户菜单，{{name}}",
         "accountMenuAnonymous": "账户菜单",

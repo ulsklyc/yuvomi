@@ -169,6 +169,7 @@
         "sectionPeople": "사람",
         "sectionFinance": "재정",
         "help": "도움말",
+        "setStatus": "상태",
         "changelog": "새로운 기능",
         "accountMenu": "계정 메뉴, {{name}}",
         "accountMenuAnonymous": "계정 메뉴",

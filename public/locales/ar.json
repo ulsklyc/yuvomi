@@ -196,6 +196,7 @@
         "sectionPeople": "الأشخاص",
         "sectionFinance": "المالية",
         "help": "مساعدة",
+        "setStatus": "التوفر",
         "changelog": "ما الجديد",
         "accountMenu": "قائمة الحساب، {{name}}",
         "accountMenuAnonymous": "قائمة الحساب",

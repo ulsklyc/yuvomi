@@ -187,6 +187,7 @@
         "sectionPeople": "Люди",
         "sectionFinance": "Фінанси",
         "help": "Довідка",
+        "setStatus": "Доступність",
         "changelog": "Що нового",
         "accountMenu": "Меню облікового запису, {{name}}",
         "accountMenuAnonymous": "Меню облікового запису",

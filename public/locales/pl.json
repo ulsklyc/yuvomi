@@ -187,6 +187,7 @@
         "sectionPeople": "Osoby",
         "sectionFinance": "Finanse",
         "help": "Pomoc",
+        "setStatus": "Dostępność",
         "changelog": "Nowości",
         "accountMenu": "Menu konta, {{name}}",
         "accountMenuAnonymous": "Menu konta",
