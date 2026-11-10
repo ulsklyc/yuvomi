@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The container image of a release is now built from its tag alone.** Until now a release
+  build reused layers from the build cache that builds of `main` fill, the dependency install
+  and the app build included. A tagged build now ignores that cache and writes none; only the
+  rolling `main` image keeps it. Nothing changes for an installation.
+
 ## [2.88.0] - 2026-11-10
 
 ### Foundation
