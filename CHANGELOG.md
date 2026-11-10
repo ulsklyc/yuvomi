@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and in the app - and two failed nights replace one notification instead of stacking up. A
   successful run afterwards clears the warning by itself.
 
+### Changed
+- **The container image of a release is now built from its tag alone.** Until now a release
+  build reused layers from the build cache that builds of `main` fill, the dependency install
+  and the app build included. A tagged build now ignores that cache and writes none; only the
+  rolling `main` image keeps it. Nothing changes for an installation.
+- **CI runs the test suites side by side and takes about ten minutes instead of thirty.**
+  The `Tests` job now runs `npm run test-parallel` with four jobs instead of `npm test`. A red
+  suite no longer hides the ones after it: the job log ends with every red suite and its log,
+  and when one is red, the logs are attached to the run. Contributors run `npm run test-parallel` before a push.
+  A new push to a pull request cancels the run it replaces.
+
+## [2.88.0] - 2026-11-10
+
 ### Foundation
 - **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
   service worker takes its offline list from the build instead of a hand-kept one; pages,
@@ -48,6 +61,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reproducible build with two attested release artifacts), describes the build and the type
   check, and docs/DECISIONS.md records the build step, the Node floor and the position on
   hosting as entries 20 to 22.
+- **The way back to 2.87.0 was tried before the tag.** Image 2.87.0 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.87.0 to 2.88.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.88.0 restored on
+  2.87.0 through the admin restore. To go back, pin the image tag `2.87.0`.
 
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
