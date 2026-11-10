@@ -169,6 +169,7 @@
         "sectionPeople": "Άτομα",
         "sectionFinance": "Οικονομικά",
         "help": "Βοήθεια",
+        "setStatus": "Διαθεσιμότητα",
         "changelog": "Τι νέο υπάρχει",
         "accountMenu": "Μενού λογαριασμού, {{name}}",
         "accountMenuAnonymous": "Μενού λογαριασμού",

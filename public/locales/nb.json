@@ -169,6 +169,7 @@
         "sectionPeople": "Personer",
         "sectionFinance": "Økonomi",
         "help": "Hjelp",
+        "setStatus": "Tilgjengelighet",
         "changelog": "Endringslogg",
         "accountMenu": "Kontomeny, {{name}}",
         "accountMenuAnonymous": "Kontomeny",

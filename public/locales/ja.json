@@ -169,6 +169,7 @@
         "sectionPeople": "メンバー",
         "sectionFinance": "家計",
         "help": "ヘルプ",
+        "setStatus": "在席状況",
         "changelog": "新機能",
         "accountMenu": "アカウントメニュー、{{name}}",
         "accountMenuAnonymous": "アカウントメニュー",

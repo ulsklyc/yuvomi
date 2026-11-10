@@ -169,6 +169,7 @@
         "sectionPeople": "लोग",
         "sectionFinance": "वित्त",
         "help": "सहायता",
+        "setStatus": "उपलब्धता",
         "changelog": "नया क्या है",
         "accountMenu": "खाता मेनू, {{name}}",
         "accountMenuAnonymous": "खाता मेनू",

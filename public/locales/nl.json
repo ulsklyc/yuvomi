@@ -169,6 +169,7 @@
         "sectionPeople": "Mensen",
         "sectionFinance": "Financiën",
         "help": "Help",
+        "setStatus": "Beschikbaarheid",
         "changelog": "Nieuw",
         "accountMenu": "Accountmenu, {{name}}",
         "accountMenuAnonymous": "Accountmenu",

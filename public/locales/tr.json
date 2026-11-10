@@ -169,6 +169,7 @@
         "sectionPeople": "Kişiler",
         "sectionFinance": "Finans",
         "help": "Yardım",
+        "setStatus": "Müsaitlik",
         "changelog": "Yenilikler",
         "accountMenu": "Hesap menüsü, {{name}}",
         "accountMenuAnonymous": "Hesap menüsü",

@@ -169,6 +169,7 @@
         "sectionPeople": "Menschen",
         "sectionFinance": "Finanzen",
         "help": "Hilfe",
+        "setStatus": "Verfügbarkeit",
         "changelog": "Neuigkeiten",
         "accountMenu": "Konto-Menü, {{name}}",
         "accountMenuAnonymous": "Konto-Menü",
