@@ -3904,7 +3904,8 @@
         "staleData": "오프라인 - 기준: {{time}}",
         "pageTitle": "오프라인 상태입니다",
         "pageDescription": "이 페이지는 연결이 필요합니다. 기기가 다시 온라인이 되면 자동으로 불러옵니다.",
-        "snapshot": "서버에 연결할 수 없음 - 저장된 데이터, 읽기 전용"
+        "snapshot": "서버에 연결할 수 없음 - 저장된 데이터, 읽기 전용",
+        "unreachableBody": "지금은 Yuvomi에 연결할 수 없습니다. 기기가 네트워크에 연결되어 있고 서버가 실행 중인지 확인한 뒤 다시 시도하세요."
     },
     "emptyHint": {
         "tasks": "+ 를 탭하여 첫 할 일을 만드세요. 카드를 왼쪽으로 밀면 완료, 오른쪽으로 밀면 보기가 열립니다.",
@@ -6885,5 +6886,12 @@
         "custom": "사용자 지정 색상",
         "chooseCustom": "사용자 지정 색상 선택",
         "standard": "기본 색상"
+    },
+    "browserTooOld": {
+        "pageTitle": "브라우저가 너무 오래되었습니다",
+        "title": "이 브라우저는 Yuvomi를 쓰기에 너무 오래되었습니다",
+        "body": "Yuvomi에는 이 브라우저가 아직 지원하지 않는 기능이 필요합니다. 데이터에는 영향이 없습니다.",
+        "versions": "Yuvomi는 Chrome 및 Edge {{chrome}}, Firefox {{firefox}}, Safari {{safari}} 이상, iPhone과 iPad에서는 iOS {{ios}} 이상에서 작동합니다.",
+        "action": "브라우저나 기기를 업데이트한 뒤 다시 시도하세요. 업데이트할 수 없다면 다른 브라우저에서 Yuvomi를 여세요."
     }
 }

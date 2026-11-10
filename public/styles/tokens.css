@@ -1923,6 +1923,11 @@
   --z-drag:    250;   /* Drag-Ghost (z.B. Kanban) — über Modal, unter Toast */
   --z-toast:   300;
   --z-skip-link: 400; /* Skip-Link im Keyboard-Fokus — bewusst über allem */
+  /* Steht fuer die Top Layer, wo es sie nicht gibt: ein offenes Popover unter
+   * dem Popover-Polyfill (reset.css) liegt in der Seite und muss trotzdem ueber
+   * Dialogen, Meldungen und dem Skip-Link stehen wie ein echtes. Der groesste
+   * 32-Bit-Wert, den ein Browser fuer z-index annimmt (#2650). */
+  --z-top-layer: 2147483647;
 
   /* --------------------------------------------------------
    * 16. Glass-Design-System (Liquid Glass Layer)

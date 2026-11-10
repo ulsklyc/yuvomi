@@ -3904,7 +3904,8 @@
         "staleData": "Offline - Stand: {{time}}",
         "pageTitle": "Du bist offline",
         "pageDescription": "Diese Seite braucht eine Verbindung. Sobald dein Gerät wieder online ist, lädt sie von selbst.",
-        "snapshot": "Keine Verbindung zum Server - gespeicherter Stand, nur lesen"
+        "snapshot": "Keine Verbindung zum Server - gespeicherter Stand, nur lesen",
+        "unreachableBody": "Yuvomi ist gerade nicht erreichbar. Prüfe, ob dein Gerät im Netz ist und der Server läuft, und versuche es erneut."
     },
     "emptyHint": {
         "tasks": "Tippe auf + um deine erste Aufgabe zu erstellen. Wische eine Karte nach links zum Abhaken, nach rechts zum Ansehen.",
@@ -6885,5 +6886,12 @@
         "custom": "Eigene Farbe",
         "chooseCustom": "Eigene Farbe wählen",
         "standard": "Standardfarbe"
+    },
+    "browserTooOld": {
+        "pageTitle": "Browser zu alt",
+        "title": "Dieser Browser ist zu alt für Yuvomi",
+        "body": "Yuvomi braucht ein paar Funktionen, die dieser Browser noch nicht kennt. Deine Daten sind davon nicht betroffen.",
+        "versions": "Yuvomi läuft ab Chrome und Edge {{chrome}}, Firefox {{firefox}} und Safari {{safari}}, auf iPhone und iPad ab iOS {{ios}}.",
+        "action": "Aktualisiere den Browser oder das Gerät und versuche es dann erneut. Geht das nicht, öffne Yuvomi in einem anderen Browser."
     }
 }

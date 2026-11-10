@@ -3904,7 +3904,8 @@
         "staleData": "Offline - as of: {{time}}",
         "pageTitle": "You are offline",
         "pageDescription": "This page needs a connection. As soon as your device is back online, it loads by itself.",
-        "snapshot": "No connection to the server - saved data, read-only"
+        "snapshot": "No connection to the server - saved data, read-only",
+        "unreachableBody": "Yuvomi cannot be reached right now. Check that your device is online and the server is running, then try again."
     },
     "shortcuts": {
         "search": "Open search",
@@ -6885,5 +6886,12 @@
         "custom": "Custom color",
         "chooseCustom": "Choose a custom color",
         "standard": "Default color"
+    },
+    "browserTooOld": {
+        "pageTitle": "Browser too old",
+        "title": "This browser is too old for Yuvomi",
+        "body": "Yuvomi needs a few features this browser does not have yet. Your data is not affected.",
+        "versions": "Yuvomi runs on Chrome and Edge {{chrome}}, Firefox {{firefox}} and Safari {{safari}} or newer, and on iPhone and iPad from iOS {{ios}}.",
+        "action": "Update the browser or the device, then try again. If that is not possible, open Yuvomi in another browser."
     }
 }

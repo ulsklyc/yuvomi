@@ -3904,7 +3904,8 @@
         "staleData": "Ngoại tuyến - cập nhật lúc: {{time}}",
         "pageTitle": "Bạn đang ngoại tuyến",
         "pageDescription": "Trang này cần kết nối. Ngay khi thiết bị trực tuyến trở lại, trang sẽ tự tải.",
-        "snapshot": "Không có kết nối tới máy chủ - dữ liệu đã lưu, chỉ đọc"
+        "snapshot": "Không có kết nối tới máy chủ - dữ liệu đã lưu, chỉ đọc",
+        "unreachableBody": "Hiện không thể truy cập Yuvomi. Hãy kiểm tra thiết bị đã kết nối mạng và máy chủ đang chạy, rồi thử lại."
     },
     "shortcuts": {
         "search": "Mở tìm kiếm",
@@ -6885,5 +6886,12 @@
         "custom": "Màu tùy chỉnh",
         "chooseCustom": "Chọn màu tùy chỉnh",
         "standard": "Màu mặc định"
+    },
+    "browserTooOld": {
+        "pageTitle": "Trình duyệt quá cũ",
+        "title": "Trình duyệt này quá cũ để dùng Yuvomi",
+        "body": "Yuvomi cần một số tính năng mà trình duyệt này chưa hỗ trợ. Dữ liệu của bạn không bị ảnh hưởng.",
+        "versions": "Yuvomi chạy từ Chrome và Edge {{chrome}}, Firefox {{firefox}} và Safari {{safari}}, trên iPhone và iPad từ iOS {{ios}}.",
+        "action": "Hãy cập nhật trình duyệt hoặc thiết bị rồi thử lại. Nếu không thể, hãy mở Yuvomi trong một trình duyệt khác."
     }
 }

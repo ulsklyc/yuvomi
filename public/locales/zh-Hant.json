@@ -3904,7 +3904,8 @@
         "staleData": "離線 - 資料截至：{{time}}",
         "pageTitle": "你已離線",
         "pageDescription": "此頁面需要網路連線。裝置恢復連線後會自動載入。",
-        "snapshot": "無法連線到伺服器 - 已儲存的資料，唯讀"
+        "snapshot": "無法連線到伺服器 - 已儲存的資料，唯讀",
+        "unreachableBody": "Yuvomi 目前無法連線。請檢查裝置是否連上網路以及伺服器是否在執行，然後重試。"
     },
     "emptyHint": {
         "recipes": "食譜可以直接進入用餐計劃或購物清單。",
@@ -6885,5 +6886,12 @@
         "custom": "自訂顏色",
         "chooseCustom": "選擇自訂顏色",
         "standard": "預設顏色"
+    },
+    "browserTooOld": {
+        "pageTitle": "瀏覽器版本過舊",
+        "title": "此瀏覽器版本過舊，無法執行 Yuvomi",
+        "body": "Yuvomi 需要一些此瀏覽器尚未支援的功能。你的資料不受影響。",
+        "versions": "Yuvomi 支援 Chrome 和 Edge {{chrome}}、Firefox {{firefox}} 和 Safari {{safari}} 以上版本，iPhone 和 iPad 需 iOS {{ios}} 以上。",
+        "action": "請更新瀏覽器或裝置後重試。如果無法更新，請在其他瀏覽器中開啟 Yuvomi。"
     }
 }
