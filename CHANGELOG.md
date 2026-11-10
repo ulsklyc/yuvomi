@@ -58,6 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every visit to the birthday list. It wrote each entry again even when nothing had changed,
   which also rebuilt the entry in the search index: constant small writes to the database, on
   a NAS or a Raspberry Pi to its disk or SD card. It now writes only what differs.
+- **Pages open from the app's cache without a round trip to the server.** The service worker
+  asked the network first for every page and module before handing out the copy it already
+  held, although the built files under `/assets/` carry a hash of their content in the name and
+  never change under it; it now serves them straight from its cache and fetches only a file
+  that is missing. Files without a hash, such as `index.html` and `/api.js`, still come from the
+  network first. The PDF viewer (pdf.js) also no longer lands in the worker's cache after the
+  first opened document: documents are not available offline, so it is left to the browser.
 
 ## [2.87.0] - 2026-11-08
 
