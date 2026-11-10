@@ -5,8 +5,9 @@
  * Usage: node scripts/seed-demo.js [--db /path/to/yuvomi.db] [--locale en|de]
  *
  * Opens the database through server/db.js, exactly like the server: it reads
- * `.env` from the working directory, applies DB_ENCRYPTION_KEY (an encrypted
- * installation works the same as an unencrypted one) and migrates the schema,
+ * `.env` from the working directory, finds DB_ENCRYPTION_KEY in the environment,
+ * through DB_ENCRYPTION_KEY_FILE or in `.secrets/` next to the database (an
+ * encrypted installation works the same as an unencrypted one) and migrates the schema,
  * so a database the server has not opened yet works too. `--db` wins over
  * DB_PATH from the environment or `.env`. Populates EVERY module:
  *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children, with the
@@ -85,6 +86,13 @@ if (!['en', 'de'].includes(LOCALE)) {
 const L = (en, de) => (LOCALE === 'de' ? de : en);
 
 console.log(`Locale: ${LOCALE}`);
+
+// Der Secret-Handschlag des Servers (env > `_FILE` > `.secrets/` neben der
+// Datenbank), dynamisch und erst hier: er leitet den Ablageort aus DB_PATH ab,
+// und das setzt `--db` oben erst nach den statischen Imports. Ohne ihn fand der
+// Seed weder `DB_ENCRYPTION_KEY_FILE` noch den Schluessel, den der Server beim
+// ersten Start unter `.secrets/` gespeichert hat.
+await import('../server/utils/load-file-secrets.js');
 
 // Ueber server/db.js statt `new Database()`: Schluessel, Platzhalter-Guard,
 // Cipher-Pruefung, WAL und Migrationen kommen aus derselben Quelle wie beim
