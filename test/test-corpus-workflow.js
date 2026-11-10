@@ -119,7 +119,7 @@ test('runs from main and checks out the tag; the tag is checked before it is use
 });
 
 test('one database per schema change: compare, foundation, force', () => {
-  assert.match(seedJob, /^ {4}if: needs\.locate\.outputs\.exists != 'true'$/m, 'a release that has its database is left alone');
+  assert.match(seedJob, /^ {4}if: needs\.locate\.outputs\.state == 'none'$/m, 'a release that has its database is left alone');
   const decide = steps(seedJob).find((s) => /^ {8}id: decide$/m.test(s.text));
   assert.ok(decide, 'a step decides whether to upload');
   assert.match(decide.text, /SELECT MAX\(version\) AS v FROM schema_migrations/);
@@ -129,7 +129,7 @@ test('one database per schema change: compare, foundation, force', () => {
   const compare = decide.text.indexOf('if [ "$EXPECTED" != "$ACTUAL" ]');
   const read = decide.text.indexOf('PREVIOUS_SCHEMA="$(schema_of');
   assert.ok(download !== -1 && compare > download && read > compare, 'the earlier database is checked against its .sha256 before it is read');
-  assert.match(publishJob, /^ {4}if: needs\.seed\.outputs\.upload == 'true'$/m);
+  assert.match(publishJob, /^ {4}if: \$\{\{ !cancelled\(\) && \(needs\.seed\.outputs\.upload == 'true' \|\|/m);
 });
 
 test('the seed job seeds and backs up with the tag\'s own code and the public test key', () => {
@@ -155,6 +155,31 @@ test('publish checks the hash, uploads only what is missing and never replaces',
   assert.doesNotMatch(code(workflow), /--clobber/, 'a corpus database is frozen once it is on a release');
   assert.doesNotMatch(code(workflow), /gh release (?:create|edit|delete)/, 'the release itself is never changed');
   assert.match(ps[upload].text, /grep -qxF "\$NAME"[\s\S]*gh release upload "\$TAG" "\$NAME"/, 'a present file is kept');
+});
+
+test('a release with the database but no checksum gets the checksum of the published file', () => {
+  // publish uploads the .db first: a run that stops before the .sha256 leaves
+  // half a corpus, and the drill refuses a database without its checksum.
+  const find = steps(locateJob)[0];
+  assert.match(find.text, /grep -qxF "yuvomi-\$VERSION-corpus\.db\.sha256"/, 'locate looks for the checksum too');
+  assert.match(find.text, /STATE=checksum_missing/, 'database without checksum: repair');
+  assert.match(find.text, /::error::\$TAG has yuvomi-\$VERSION-corpus\.db\.sha256 but no database/,
+    'checksum without database: stop, a new seed would not match it and nothing is replaced');
+  assert.match(find.text, /echo "state=\$STATE"/);
+  assert.match(find.text, /grep -qxF "yuvomi-\$\{T#v\}-corpus\.db\.sha256"/, 'an earlier corpus database counts only with its checksum');
+  assert.match(seedJob, /^ {4}if: needs\.locate\.outputs\.state == 'none'$/m, 'seeds only a release without any corpus file');
+  assert.match(publishJob,
+    /^ {4}if: \$\{\{ !cancelled\(\) && \(needs\.seed\.outputs\.upload == 'true' \|\| needs\.locate\.outputs\.state == 'checksum_missing'\) \}\}$/m,
+    'publish also runs when seed was skipped for a repair');
+  const ps = steps(publishJob);
+  const take = ps.findIndex((s) => /uses: actions\/download-artifact@/.test(s.text));
+  const recover = ps.findIndex((s) => /gh release download "\$TAG" --pattern "yuvomi-\$VERSION-corpus\.db"/.test(s.text));
+  const check = ps.findIndex((s) => /sha256sum -c "yuvomi-\$VERSION-corpus\.db\.sha256"/.test(s.text));
+  assert.ok(recover !== -1 && check > recover, 'the recovered checksum goes through the same check and upload');
+  assert.match(ps[take].text, /^ {8}if: needs\.seed\.outputs\.upload == 'true'$/m);
+  assert.match(ps[recover].text, /^ {8}if: needs\.locate\.outputs\.state == 'checksum_missing'$/m);
+  assert.match(ps[recover].text, /"SQLite format 3"/, 'a plain database on the release is not blessed with a checksum');
+  assert.match(ps[recover].text, /sha256sum "\$DB" > "\$DB\.sha256"/);
 });
 
 test('every job has a runtime cap and every action a pinned SHA', () => {

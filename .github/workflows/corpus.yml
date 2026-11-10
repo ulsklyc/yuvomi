@@ -69,7 +69,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
     outputs:
       version: ${{ steps.find.outputs.version }}
-      exists: ${{ steps.find.outputs.exists }}
+      state: ${{ steps.find.outputs.state }}
       previous_url: ${{ steps.find.outputs.previous_url }}
 
     steps:
@@ -91,16 +91,32 @@ jobs:
           # One line per published release: "<tag> <asset names...>".
           gh api "repos/$GH_REPO/releases?per_page=100" --paginate \
             --jq '.[] | select(.draft | not) | ([.tag_name] + [.assets[].name]) | join(" ")' > releases.txt
-          EXISTS=false
-          if awk -v t="$TAG" '$1 == t' releases.txt | tr ' ' '\n' | grep -qxF "yuvomi-$VERSION-corpus.db"; then
-            EXISTS=true
+          awk -v t="$TAG" '$1 == t' releases.txt | tr ' ' '\n' > assets.txt
+          # none: seed one. complete: leave it. checksum_missing: a publish run
+          # stopped between its two uploads; the checksum is recovered from the
+          # published database (a new seed would be a different file).
+          if grep -qxF "yuvomi-$VERSION-corpus.db" assets.txt; then
+            if grep -qxF "yuvomi-$VERSION-corpus.db.sha256" assets.txt; then
+              STATE=complete
+            else
+              STATE=checksum_missing
+            fi
+          elif grep -qxF "yuvomi-$VERSION-corpus.db.sha256" assets.txt; then
+            # Nothing is replaced (no --clobber), and a new database would not
+            # match this checksum: the stray file has to go by hand first.
+            echo "::error::$TAG has yuvomi-$VERSION-corpus.db.sha256 but no database; delete that asset, then run again"
+            exit 1
+          else
+            STATE=none
           fi
-          # Newest release below TAG that carries a corpus database.
+          # Newest release below TAG that carries a corpus database and its checksum.
           PREVIOUS=""
           for T in $(awk '{print $1}' releases.txt | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -r); do
             [ "$T" = "$TAG" ] && continue
             [ "$(printf '%s\n%s\n' "$T" "$TAG" | sort -V | tail -1)" = "$TAG" ] || continue
-            if awk -v t="$T" '$1 == t' releases.txt | tr ' ' '\n' | grep -qxF "yuvomi-${T#v}-corpus.db"; then
+            awk -v t="$T" '$1 == t' releases.txt | tr ' ' '\n' > previous-assets.txt
+            if grep -qxF "yuvomi-${T#v}-corpus.db" previous-assets.txt \
+              && grep -qxF "yuvomi-${T#v}-corpus.db.sha256" previous-assets.txt; then
               PREVIOUS="$T"
               break
             fi
@@ -109,17 +125,17 @@ jobs:
           if [ -n "$PREVIOUS" ]; then
             URL="https://github.com/$GH_REPO/releases/download/$PREVIOUS/yuvomi-${PREVIOUS#v}-corpus.db"
           fi
-          echo "release $TAG: corpus database present: $EXISTS; newest earlier corpus database: ${PREVIOUS:-none}"
+          echo "release $TAG: corpus files $STATE; newest earlier corpus database: ${PREVIOUS:-none}"
           {
             echo "version=$VERSION"
-            echo "exists=$EXISTS"
+            echo "state=$STATE"
             echo "previous_url=$URL"
           } >> "$GITHUB_OUTPUT"
 
   seed:
     name: Seed and back up at the tag (read-only)
     needs: locate
-    if: needs.locate.outputs.exists != 'true'
+    if: needs.locate.outputs.state == 'none'
     runs-on: ubuntu-latest
     # Read-only: this job runs npm install scripts and the tag's code.
     permissions:
@@ -233,7 +249,9 @@ jobs:
   publish:
     name: Upload the corpus database to the release
     needs: [locate, seed]
-    if: needs.seed.outputs.upload == 'true'
+    # Also when seed was skipped: a release whose database is there but whose
+    # checksum is not gets it here (state checksum_missing).
+    if: ${{ !cancelled() && (needs.seed.outputs.upload == 'true' || needs.locate.outputs.state == 'checksum_missing') }}
     runs-on: ubuntu-latest
     # The only write right in this workflow, for a job that runs no npm and no
     # project code: the release asset upload.
@@ -248,9 +266,27 @@ jobs:
 
     steps:
       - name: Take over the corpus database
+        if: needs.seed.outputs.upload == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: corpus
+
+      - name: Recover the checksum of the published database
+        if: needs.locate.outputs.state == 'checksum_missing'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The database on the release is the corpus database; the checksum
+          # records that file. A plain SQLite file there gets none.
+          DB="yuvomi-$VERSION-corpus.db"
+          gh release download "$TAG" --pattern "yuvomi-$VERSION-corpus.db"
+          if [ "$(head -c 15 "$DB")" = "SQLite format 3" ]; then
+            echo "::error::$DB on $TAG is not encrypted"
+            exit 1
+          fi
+          sha256sum "$DB" > "$DB.sha256"
+          cat "$DB.sha256"
 
       - name: Check the database against its .sha256
         run: |
