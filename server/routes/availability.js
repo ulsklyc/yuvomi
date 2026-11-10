@@ -27,12 +27,12 @@ function getAllStatuses() {
            a.state,
            a.note,
            a.expires_at,
-           a.set_at
+           a.updated_at
     FROM user_availability a
     JOIN users u ON u.id = a.user_id
     WHERE ${householdMemberSql('u')}
       AND a.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-    ORDER BY a.set_at DESC
+    ORDER BY a.updated_at DESC
   `).all();
 }
 
@@ -89,11 +89,11 @@ router.put('/', (req, res) => {
         state      = excluded.state,
         note       = excluded.note,
         expires_at = excluded.expires_at,
-        set_at     = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
     `).run(userId, state, note ?? null, expires_at);
 
     const row = db.get().prepare(
-      'SELECT state, note, expires_at, set_at FROM user_availability WHERE user_id = ?'
+      'SELECT state, note, expires_at, updated_at FROM user_availability WHERE user_id = ?'
     ).get(userId);
     res.json({ data: row });
   } catch (err) {

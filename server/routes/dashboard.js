@@ -1424,9 +1424,12 @@ router.get('/', (req, res) => {
   }
 
   // Verfuegbarkeitsstatus je Mitglied fuer die Familien-Kachel (#1591). Kein
-  // Modul-Gate: der Status gehoert der Person, nicht dem Family-Modul.
+  // Modul-Gate: der Status gehoert der Person, nicht dem Family-Modul. Die
+  // Wand zeigt den Status nur lesend und ohne Notiz: eine Notiz ist Freitext
+  // und die Wand steht in einem gemeinsamen Raum (Review zu #1591).
   try {
-    result.familyStatuses = getAllStatuses();
+    const statuses = getAllStatuses();
+    result.familyStatuses = isDisplay ? statuses.map(({ note, ...rest }) => rest) : statuses;
   } catch (err) {
     log.error('familyStatuses error:', err.message);
     result.familyStatuses = [];

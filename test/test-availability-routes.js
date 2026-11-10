@@ -63,7 +63,7 @@ test('PUT: valid state sets status', async () => {
   assert.equal(status, 200);
   assert.equal(json.data.state, 'busy');
   assert.equal(json.data.expires_at, exp);
-  assert.ok(json.data.set_at);
+  assert.ok(json.data.updated_at);
 });
 
 test('PUT: state with note stores note', async () => {
@@ -138,11 +138,11 @@ test('GET: does not return expired status', async () => {
   // Insert a row that expires 1 second from now, then wait 2 s... that is too slow.
   // Instead: insert directly with an already-past expires_at via direct DB write.
   db.prepare(`
-    INSERT INTO user_availability (user_id, state, expires_at, set_at)
+    INSERT INTO user_availability (user_id, state, expires_at, updated_at)
     VALUES (?, 'busy', '2000-01-01T00:00:00Z', strftime('%Y-%m-%dT%H:%M:%SZ','now'))
     ON CONFLICT(user_id) DO UPDATE SET
       state='busy', expires_at='2000-01-01T00:00:00Z',
-      set_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
+      updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
   `).run(USER_A);
   const { json } = await call('GET', '/');
   const alice = json.data.find((r) => r.user_id === USER_A);

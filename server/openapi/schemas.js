@@ -3710,13 +3710,13 @@ export const schemas = {
         },
         AvailabilityStatus: {
           type: 'object',
-          required: ['user_id', 'state', 'expires_at', 'set_at'],
+          required: ['user_id', 'state', 'expires_at', 'updated_at'],
           properties: {
             user_id: { type: 'integer' },
             state: { type: 'string', enum: ['available', 'busy', 'do_not_disturb', 'away'] },
             note: { type: ['string', 'null'], maxLength: 200 },
             expires_at: { type: 'string', format: 'date-time', description: 'ISO-8601 UTC timestamp' },
-            set_at: { type: 'string', format: 'date-time', description: 'ISO-8601 UTC timestamp' },
+            updated_at: { type: 'string', format: 'date-time', description: 'ISO-8601 UTC timestamp' },
           },
         },
         AvailabilityInput: {
