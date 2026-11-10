@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.88.0] - 2026-11-10
+
 ### Foundation
 - **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
   service worker takes its offline list from the build instead of a hand-kept one; pages,
@@ -40,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reproducible build with two attested release artifacts), describes the build and the type
   check, and docs/DECISIONS.md records the build step, the Node floor and the position on
   hosting as entries 20 to 22.
+- **The way back to 2.87.0 was tried before the tag.** Image 2.87.0 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.87.0 to 2.88.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.88.0 restored on
+  2.87.0 through the admin restore. To go back, pin the image tag `2.87.0`.
 
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
