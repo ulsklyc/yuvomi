@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bold first sentence wrapped in the source lost the end of that sentence to the text below
   it, so the short form read "... on iPhone and" with "iPad)." opening the reason. This hit
   154 entries since 2.45.0; summary and reason are now split where the sentence ends.
+- **Birthdays no longer rewrite their calendar entries every minute.** The check that keeps a
+  birthday's calendar entry and reminder in step runs once a minute for every account, and on
+  every visit to the birthday list. It wrote each entry again even when nothing had changed,
+  which also rebuilt the entry in the search index: constant small writes to the database, on
+  a NAS or a Raspberry Pi to its disk or SD card. It now writes only what differs.
 
 ## [2.87.0] - 2026-11-08
 
