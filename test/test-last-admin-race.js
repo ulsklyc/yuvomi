@@ -111,3 +111,32 @@ test('a single demotion with a password change works while another admin remains
   assert.equal(db.prepare('SELECT role FROM users WHERE id = ?').get(d.id).role, 'member');
   await login(d.username, 'd-new-password-123');
 });
+
+test('an admin demoted while their password hash is running cannot finish the update', async () => {
+  const [remainingAdminId] = adminIds();
+  const remainingAdmin = db.prepare('SELECT username FROM users WHERE id = ?').get(remainingAdminId);
+  const creator = as(await login(remainingAdmin.username, `${remainingAdmin.username}-pass-123`));
+  const actor = await newAdmin(creator);
+  counter += 1;
+  const targetName = `member${counter}`;
+  const created = await creator('POST', '/auth/users', {
+    username: targetName,
+    display_name: targetName,
+    password: `${targetName}-pass-123`,
+  });
+  assert.equal(created.status, 201);
+
+  // The password hash is the handler's async yield point. Let the authenticated
+  // request enter it, then use the remaining admin to revoke the caller's role.
+  const pendingUpdate = actor.call('PATCH', `/auth/users/${created.body.user.id}`, {
+    display_name: 'Must not be saved',
+    password: 'replacement-password-123',
+  });
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  const demotion = await creator('PATCH', `/auth/users/${actor.id}`, { system_admin: false });
+  assert.equal(demotion.status, 200, 'the other admin demotes the request actor');
+
+  const update = await pendingUpdate;
+  assert.equal(update.status, 403, 'the in-flight write is denied after the actor loses admin role');
+  assert.equal(db.prepare('SELECT display_name FROM users WHERE id = ?').get(created.body.user.id).display_name, targetName);
+});

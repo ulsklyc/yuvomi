@@ -4184,6 +4184,16 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     // (#2612). A better-sqlite3 transaction is synchronous and cannot hold an
     // `await`, so check and write can never be split again by a yield point.
     const refusal = db.transaction(() => {
+      // `requireAdmin` ran before the password hash above. A different admin
+      // may have demoted this caller while bcrypt was running, so confirm the
+      // actor's current database role at the write boundary as well. API
+      // tokens can carry a role snapshot too; the subject account is the
+      // authority for this mutation.
+      const actor = db.get().prepare('SELECT role FROM users WHERE id = ?').get(req.authUserId);
+      if (!actor || actor.role !== 'admin') {
+        return { error: 'Permission denied.', code: 403 };
+      }
+
       // Dieselben Gruende wie beim Entfernen (#1909): die Verwaltung sagt den
       // Satz dazu, auch wenn ein Admin sich selbst herabstuft.
       const adminError = assertAdminWouldRemain(userId, nextRole);
@@ -4221,7 +4231,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       }
       return null;
     });
-    if (refusal) return res.status(400).json(refusal);
+    if (refusal) return res.status(refusal.code).json(refusal);
 
     if (newPasswordHash) {
       invalidateUserSessions(userId, req.sessionID);
