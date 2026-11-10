@@ -163,7 +163,7 @@ up there, and the `/bin/sh` and process group parts of `test:restore-swap` and
 ### Type checking
 
 `npm run typecheck` runs `tsc --build` over three projects (`server/` with `scripts/`,
-`public/`, `test/`; the solution file is `tsconfig.json`) with `strict`, `checkJs`,
+`tools/` and `.github/scripts/`, `public/`, `test/`; the solution file is `tsconfig.json`) with `strict`, `checkJs`,
 `erasableSyntaxOnly` and `verbatimModuleSyntax`, and compares the diagnostics with
 `tsc-baseline.json`, one count per file and error code. The baseline only sinks: a count that
 rises or a new key fails the check, in CI as a required job. A change that fixes types runs
