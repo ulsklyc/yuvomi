@@ -89,8 +89,10 @@ test('two admins demoting each other with a password change leave exactly one ad
       b.call('PATCH', `/auth/users/${a.id}`, { system_admin: false, password: `a-new-password-${round}` }),
     ]);
     const statuses = JSON.stringify([ra.status, rb.status]);
-    const refused = [ra, rb].filter((r) => r.status === 400 && r.body?.reason === 'last_admin');
-    assert.ok(refused.length >= 1, `round ${round}: at least one demotion is refused as last_admin, got ${statuses}`);
+    const refused = [ra, rb].some((r) => r.status === 400 && r.body?.reason === 'last_admin');
+    const demotedCallerDenied = (ra.status === 403 && db.prepare('SELECT role FROM users WHERE id = ?').get(a.id).role !== 'admin')
+      || (rb.status === 403 && db.prepare('SELECT role FROM users WHERE id = ?').get(b.id).role !== 'admin');
+    assert.ok(refused || demotedCallerDenied, `round ${round}: at least one request is refused by the last-admin or fresh-role check, got ${statuses}`);
     assert.equal(adminIds().length, 1, `round ${round}: exactly one admin remains, got ${JSON.stringify(adminIds())}`);
     survivor = adminIds()[0] === a.id ? a.call : b.call;
   }
