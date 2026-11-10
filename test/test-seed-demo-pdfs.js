@@ -11,14 +11,15 @@
  *        demselben Parser, den die Vorschau der App benutzt, und liest den Text
  *        der Seite zurück - Umlaute, Klammern und Backslash eingeschlossen.
  *        Dazu der Seed gegen eine VERSCHLÜSSELTE Datenbank (#2114): der
- *        Schlüssel kommt aus der Umgebung oder aus `.env` im
- *        Arbeitsverzeichnis, wie beim Server.
+ *        Schlüssel kommt aus der Umgebung, aus `.env` im
+ *        Arbeitsverzeichnis, aus `DB_ENCRYPTION_KEY_FILE` oder aus `.secrets/`
+ *        neben der Datenbank, wie beim Server.
  * Ausführen: npm run test:seed-demo-pdfs
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { openSync, readSync, closeSync, rmSync, writeFileSync } from 'node:fs';
+import { openSync, readFileSync, readSync, closeSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -28,23 +29,22 @@ import Database from 'better-sqlite3-multiple-ciphers';
 import { buildDemoPdf, toWinAnsi } from '../scripts/seed-demo-pdf.js';
 import { matchChecklistLine } from '../public/utils/markdown-checklist.js';
 import { CHILD_START_PERMISSIONS, CHILD_START_PREFERENCES } from '../server/permissions.js';
-import { freshTestDbPath } from './tmp-db.js';
 import { tempDir } from './tmp-dir.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = resolve(ROOT, 'public/vendor/pdfjs');
 
 // ── Migrierte Wegwerf-DB: der Seed verlangt das aktuelle Schema ───────────────
-const dbPath = freshTestDbPath('seed-demo-pdfs');
+// In einem EIGENEN Ordner, nicht direkt im Temp-Ordner wie `freshTestDbPath`:
+// der Seed liest wie der Server `.secrets/` neben der Datenbank, und dort legt
+// jeder Serverstart auf einer neuen Datei im Temp-Ordner einen Schlüssel ab.
+// Den fände der Seed und verschlüsselte diese Klartext-DB damit (encryptPlaintextDatabase).
+const dbPath = join(tempDir('yuvomi-seed-demo-pdfs-'), 'seed.db');
+process.env.DB_PATH = dbPath;
 const dbModule = await import('../server/db.js');
 dbModule.init();
 dbModule.get().close();
 const { readDocumentContent } = await import('../server/services/document-storage.js');
-
-// `freshTestDbPath` räumt VOR dem Lauf; das hier hält nur den Temp-Ordner sauber.
-test.after(() => {
-  for (const suffix of ['', '-wal', '-shm', '-journal', '.lock']) rmSync(dbPath + suffix, { force: true });
-});
 
 // PDF.js meldet in Node fehlende Canvas-Polyfills (DOMMatrix, Path2D) auf der
 // Konsole. Gezeichnet wird hier nichts: geladen und Text gelesen, mehr nicht.
@@ -472,6 +472,58 @@ test('Seed: falscher Schlüssel bricht mit der Meldung des Servers ab und lässt
   assert.match(run.stderr, /Wrong encryption key/, 'die Meldung aus server/db.js, nicht SQLITE_NOTADB');
   assert.doesNotMatch(run.stderr, /\n\s+at /, 'kein Stacktrace');
   assert.deepEqual(usernames(file, key), [], 'mit dem richtigen Schlüssel weiter lesbar, nichts geschrieben');
+});
+
+// Der Server legt den Schlüssel beim ersten Start selbst unter
+// `<Verzeichnis von DB_PATH>/.secrets/` ab (auto-secrets.js), und `_FILE`
+// zeigt auf eine Datei. Der Seed las beides nicht: `--db` auf eine vom Server
+// angelegte Datenbank brach ab, Umweg war `node --import
+// ./server/utils/load-secrets-readonly.js scripts/seed-demo.js`.
+const SECRETS_LOADER_URL = pathToFileURL(resolve(ROOT, 'server/utils/load-file-secrets.js')).href;
+
+/**
+ * Der erste Serverstart ohne Schlüssel in der Umgebung: der Handschlag erzeugt und speichert ihn, db.js verschlüsselt damit.
+ * @param {string} dir
+ */
+function createDbLikeFirstServerStart(dir) {
+  const file = join(dir, 'yuvomi.db');
+  const run = spawnSync(process.execPath, [
+    '--input-type=module', '-e',
+    'await import(process.env.YUVOMI_TEST_LOADER); await import(process.env.YUVOMI_TEST_DB_MODULE);',
+  ], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: {
+      ...envWithout('DB_ENCRYPTION_KEY', 'DB_ENCRYPTION_KEY_FILE', 'SESSION_SECRET', 'SESSION_SECRET_FILE'),
+      DB_PATH: file, YUVOMI_TEST_LOADER: SECRETS_LOADER_URL, YUVOMI_TEST_DB_MODULE: DB_MODULE_URL,
+    },
+  });
+  assert.equal(run.status, 0, `erster Serverstart:\n${run.stderr}`);
+  assert.equal(isPlaintext(file), false, 'der erste Start verschlüsselt mit dem erzeugten Schlüssel');
+  return file;
+}
+
+test('Seed: verschlüsselte DB, Schlüssel unter .secrets/ wie nach dem ersten Serverstart', () => {
+  const dir = tempDir('yuvomi-seed-stored-key-');
+  const file = createDbLikeFirstServerStart(dir);
+  const key = readFileSync(join(dir, '.secrets', 'DB_ENCRYPTION_KEY'), 'utf8').replace(/\n$/, '');
+
+  const run = seedIn(dir, file, envWithout('DB_PATH', 'DB_ENCRYPTION_KEY', 'DB_ENCRYPTION_KEY_FILE', 'SESSION_SECRET', 'SESSION_SECRET_FILE'));
+  assert.equal(run.status, 0, `seed-demo.js lief nicht durch:\n${run.stderr}`);
+  assert.equal(isPlaintext(file), false, 'die Datei bleibt verschlüsselt');
+  assert.deepEqual(usernames(file, key), DEMO_USERS);
+});
+
+test('Seed: verschlüsselte DB, Schlüssel aus DB_ENCRYPTION_KEY_FILE wie beim Server', () => {
+  const dir = tempDir('yuvomi-seed-key-file-');
+  const key = randomBytes(32).toString('hex');
+  const file = createEncryptedDb(dir, key);
+  const keyFile = join(dir, 'db-key');
+  writeFileSync(keyFile, `${key}\n`, { mode: 0o600 });
+
+  const run = seedIn(dir, file, { ...envWithout('DB_PATH', 'DB_ENCRYPTION_KEY'), DB_ENCRYPTION_KEY_FILE: keyFile });
+  assert.equal(run.status, 0, `seed-demo.js lief nicht durch:\n${run.stderr}`);
+  assert.deepEqual(usernames(file, key), DEMO_USERS);
 });
 
 test('Erzeuger: Umlaute, Klammern und Backslash im Titel kommen unverändert zurück', async () => {
