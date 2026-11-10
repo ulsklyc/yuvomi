@@ -18,6 +18,15 @@ on:
 permissions:
   contents: read
 
+# Ein neuer Push auf einen PR bricht dessen ueberholten Lauf ab: niemand liest
+# das Ergebnis eines Stands, der schon ersetzt ist, und er belegt Runner. Pushes
+# auf main und Laeufe von Hand bekommen je Lauf eine eigene Gruppe (run_id) und
+# werden nie abgebrochen oder in eine Warteschlange gestellt - jeder main-Stand
+# braucht sein eigenes Ergebnis (#1814).
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     name: Tests (Node.js ${{ matrix.node-version }})
@@ -122,8 +131,28 @@ jobs:
       - name: Check that the build is deterministic
         run: node scripts/check-build-determinism.mjs
 
+      # Die Kette laeuft ueber den Parallel-Runner (#1814): jeder Schritt von
+      # `npm test` als eigener Prozess, vier gleichzeitig, und ein roter Schritt
+      # haelt den Lauf nicht an. Am Ende stehen alle roten Schritte mit ihrem Log,
+      # der Exit-Code ist der der ganzen Kette. Die Jobzahl steht fest statt
+      # "Kerne minus eins", damit eine Messung von gestern auch morgen dieselbe
+      # Laufart misst; der naechste Schritt zeigt, wie viele Kerne der Runner hat.
+      - name: Show the runner's core count
+        run: nproc
+
       - name: Run tests
-        run: npm test
+        run: npm run test-parallel -- --jobs 4 --logs "$RUNNER_TEMP/test-logs"
+
+      # Die Logs der Schritte liegen nur auf dem Runner; bei Rot gehen sie als
+      # Artefakt mit, sonst bliebe vom roten Schritt nur sein Pfad im Job-Log.
+      - name: Upload the test logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-logs-node-${{ matrix.node-version }}
+          path: ${{ runner.temp }}/test-logs
+          if-no-files-found: ignore
+          retention-days: 7
 
   # DIE EINZIGE BROWSER-SUITE IN DER CI (Entscheidung vom 23.9.2026). Die uebrigen
   # Browser-Suiten haengen an `test:document-guards` und laufen nur von Hand (rund
