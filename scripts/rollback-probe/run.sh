@@ -63,7 +63,13 @@ node_ fpdiff.mjs 11-after-prev 13-after-prev-again
 
 step "5 previous -> new build"
 need probe up new; node_ api.mjs snap 20-new; node_ apidiff.mjs 12-prev-again 20-new; node_ sw.mjs 20-new | tail -6
-need node_ api.mjs backup; ls backups; node_ api.mjs write "after-backup-on-new-build"; node_ api.mjs snap 22-new-after-write | head -1
+BEFORE="$(ls backups | sort)"; need node_ api.mjs backup
+# Exactly the file this trigger wrote: backups/ may hold older ones (a scheduled
+# run, a work dir used before), and they sort ahead of it.
+NEW="$(comm -13 <(printf '%s\n' "$BEFORE") <(ls backups | sort) | grep '\.db$' || true)"
+[ "$(printf '%s\n' "$NEW" | grep -c .)" = 1 ] || { echo "ABORTED: expected one new backup, got: ${NEW:-none}"; exit 1; }
+BK="backups/$NEW"; echo "backup of the new build: $BK"
+node_ api.mjs write "after-backup-on-new-build"; node_ api.mjs snap 22-new-after-write | head -1
 probe down 20-new; snapdb 21-after-new
 node_ fpdiff.mjs 13-after-prev-again 21-after-new
 
@@ -73,7 +79,7 @@ probe down 30-prev-back; snapdb 31-after-prev-back
 node_ fpdiff.mjs 21-after-new 31-after-prev-back
 
 step "7 restore of the new build's backup on the previous image"
-BK="$(ls backups/*.db | head -1)"; [ -n "$BK" ] || { echo "ABORTED: no backup in backups/"; exit 1; }; cp "$BK" copies/backup.db; node_ fp.mjs backup copies/backup.db
+cp "$BK" copies/backup.db; node_ fp.mjs backup copies/backup.db
 need probe up prev; need node_ api.mjs restore "$BK"; sleep 3
 curl -s "http://127.0.0.1:$PROBE_PORT/health" | cut -c1-120; echo
 node_ api.mjs snap 32-prev-restored; node_ apidiff.mjs 20-new 32-prev-restored; node_ sw.mjs 32-prev-restored | tail -6
