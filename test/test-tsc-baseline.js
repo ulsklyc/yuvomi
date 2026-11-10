@@ -147,3 +147,19 @@ test('die echte tsc-baseline.json ist sortiert, ohne Fremdcode und nennt nur vor
   }
   assert.deepEqual([...new Set(stale)], [], 'Baseline nennt Dateien, die es nicht gibt');
 });
+
+test('der Typecheck erfasst tools/, .github/scripts/ und alle scripts/ (#2637, #2638)', () => {
+  // Ohne Kommentare gelesen: server/tsconfig.json ist JSONC.
+  const raw = readFileSync(join(REPO, 'server', 'tsconfig.json'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const cfg = JSON.parse(raw);
+  for (const dir of ['../scripts/', '../tools/', '../.github/scripts/']) {
+    assert.ok(cfg.include.some((/** @type {string} */ g) => g.startsWith(dir)), `${dir} liegt in keinem Projekt`);
+  }
+  assert.equal(cfg.exclude, undefined, `exclude nimmt Dateien aus dem Typecheck: ${JSON.stringify(cfg.exclude)}`);
+  const script = readFileSync(SCRIPT, 'utf8');
+  for (const prefix of ["'tools/'", "'.github/'"]) assert.ok(script.includes(prefix), `OWNED kennt ${prefix} nicht`);
+  const baseline = Object.keys(JSON.parse(readFileSync(join(REPO, 'tsc-baseline.json'), 'utf8')));
+  for (const file of ['scripts/take-screenshots.mjs', 'tools/installer/field-checks.js', '.github/scripts/review-verdict.mjs']) {
+    assert.ok(baseline.some((k) => k.startsWith(`${file}\t`)), `${file} fehlt in der Baseline`);
+  }
+});
