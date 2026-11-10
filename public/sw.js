@@ -5,10 +5,13 @@
  *
  * Caching-Strategien (der Dispatcher unten ist die Wahrheit; dieser Kopf
  * behauptete bis 2026-08-31 "Cache-First" für Shell und Seitenmodule):
- *   Navigation + APP_SHELL + Locales: Network-First mit dem
+ *   Navigation + ungehashte Shell + Locales: Network-First mit dem
  *        Precache (install) als Offline-Fallback - frisch, solange Netz da ist.
  *        Antwortet das Netz nicht binnen NETWORK_FIRST_DEADLINE_MS, kommt der
  *        Cache-Treffer; die Netzantwort fuellt den Cache trotzdem nach.
+ *   Gehashte Build-Dateien unter /assets/: Cache-First aus dem Precache, ohne
+ *        Netzumlauf (#2633) - der Name wechselt mit dem Inhalt.
+ *   pdf.js (/vendor/pdfjs/): gar nicht, der Browser holt es selbst (#2634).
  *   ASSETS (Bilder, Icons) und der Rest-Fallback: Cache-First, lazily gecacht,
  *        bei SW-Update geleert
  *   API: Network-First für eine Read-only-GET-Whitelist (Kalender, Tasks, …)
@@ -273,9 +276,8 @@ function apiSnapshotReducer(pathname) {
 const PRECACHE = Array.isArray(self.__PRECACHE__) ? self.__PRECACHE__ : [];
 
 // App-Shell: alles ausser den Sprachdateien, vorab in SHELL_CACHE. Die gebauten
-// Seiten liegen gehasht unter /assets/ und gehen damit denselben Weg wie die
-// Shell (isMutableAppResource unten); einen eigenen Seiten-Cache braucht es
-// nicht mehr.
+// Seiten liegen gehasht unter /assets/ im selben Cache (cacheFirstHashed
+// unten liest dort); einen eigenen Seiten-Cache braucht es nicht mehr.
 const APP_SHELL = PRECACHE.filter((path) => !path.startsWith('/locales/'));
 
 // Jede Sprache, die die App kennt. NICHT die Precache-Liste: vorab gecacht
@@ -420,6 +422,14 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET') return;
 
+  // PDF.JS BLEIBT GANZ AUS DEN CACHES (#2634, Entscheidung 2026-11-10). Die
+  // Kopierliste nimmt es aus dem Precache (scripts/build/static-files.ts):
+  // ohne die Datei des Dokuments, die offline nicht kommt, hat es nichts zu
+  // zeigen. Bis hierher legte der Worker es trotzdem beim ersten Oeffnen eines
+  // PDFs ab - als .mjs fiel es unter isMutableAppResource. Jetzt kein
+  // respondWith: der Browser holt es selbst, sein HTTP-Cache bleibt.
+  if (url.origin === self.location.origin && url.pathname.startsWith('/vendor/pdfjs/')) return;
+
   // Erste Fetch-Events nach SW-Start: auf Cache-API-Initialisierung warten,
   // damit bypassCacheUntil korrekt gesetzt ist bevor wir entscheiden.
   if (!_bypassInitDone) {
@@ -433,6 +443,13 @@ self.addEventListener('fetch', (event) => {
 });
 
 function dispatchFetch(request, url, event) {
+  // Gehashte Build-Dateien VOR dem Bypass-Fenster: das Fenster gibt es, weil
+  // ungehashte Dateien unter ihrem Namen wechseln. Ein gehashter Name im Cache
+  // dieser Revision ist genau die Datei, die der Server auch liefern wuerde.
+  if (isHashedBuildFile(url)) {
+    return cacheFirstHashed(request, event);
+  }
+
   // Nach SW-Update: direkt vom Netz, kein SW-Cache, kein HTTP-Cache.
   // Gilt für ALLE Requests (JS, CSS, Images, HTML) im Bypass-Fenster.
   if (Date.now() < bypassCacheUntil) {
@@ -461,11 +478,9 @@ function dispatchFetch(request, url, event) {
     return networkFirst(request, LOCALES_CACHE, event);
   }
 
-  // Seit dem Build gibt es keinen eigenen Seiten-Cache mehr: Seiten, Settings-
-  // Blaetter und lazy geladene Module liegen gehasht unter /assets/ und gehen
-  // wie die Shell durch isMutableAppResource in SHELL_CACHE - dort liegt auch
-  // ihr Precache. Bis dahin leitete hier ein Zweig /pages/, /settings/ und die
-  // Einzelfaelle aus PAGE_MODULES in einen PAGES_CACHE.
+  // Seiten, Settings-Blaetter und lazy geladene Module sind oben schon
+  // abgezweigt (/assets/, cacheFirstHashed). Was hier ankommt, ist ungehashte
+  // Shell: Fassaden, klassische Skripte, Stylesheets, Manifest.
   if (url.origin === self.location.origin && isMutableAppResource(url.pathname)) {
     return networkFirst(request, SHELL_CACHE, event);
   }
@@ -478,7 +493,7 @@ function dispatchFetch(request, url, event) {
 }
 
 // --------------------------------------------------------
-// Strategie: Network-First mit Frist (Navigation, Shell, Seitenmodule,
+// Strategie: Network-First mit Frist (Navigation, ungehashte Shell,
 // Stylesheets, Locales)
 //
 // EIN NETZ, DAS NICHT "OFFLINE" MELDET, ABER NICHT ANTWORTET (Critique R18).
@@ -700,7 +715,45 @@ async function networkFirstApi(request, event, generation = _cacheGeneration) {
 }
 
 // --------------------------------------------------------
-// Strategie: Cache-First (für Shell, Pages, Assets)
+// Strategie: Cache-First fuer gehashte Build-Dateien (#2633)
+//
+// Der Precache legt jede gehashte Datei der Revision in SHELL_CACHE, und genau
+// dort wird gesucht - kein zweiter Ablageort. Ein Treffer kommt ohne
+// Netzumlauf. Fehlt sie (eine Datei, die nicht precacht ist, oder ein
+// geleerter Cache), holt der Worker sie und legt sie ab: nur eine gelungene,
+// gleichoriginaere Antwort, die keine HTML-Shell ist - ein 404 nach einem
+// Release oder die Shell eines alten Servers darf nie unter dem Namen einer
+// Datei liegen (Review auf #2631). Alte Dateien raeumt activate mit dem Cache
+// der alten Revision ab.
+//
+// Ohne Netz und ohne Treffer scheitert die Anfrage als Datei (503), nicht mit
+// der Shell: index.html als Modul gaebe nur einen MIME-Fehler, und der Router
+// behandelt einen gescheiterten Seitenimport ohnehin selbst (importPage).
+// --------------------------------------------------------
+/** @param {Request} request @param {{ waitUntil?: (p: Promise<unknown>) => void }} [event] */
+async function cacheFirstHashed(request, event) {
+  const cache = await caches.open(SHELL_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  let response;
+  try {
+    response = await fetch(request);
+  } catch {
+    return new Response('Keine Verbindung', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
+  if (response.ok && response.type === 'basic' && !isShellInsteadOfFile(request, response)) {
+    const stored = Promise.resolve(cache.put(request, response.clone())).catch(() => {});
+    if (event && typeof event.waitUntil === 'function') event.waitUntil(stored);
+  }
+  return response;
+}
+
+// --------------------------------------------------------
+// Strategie: Cache-First (Bilder, Icons, Fonts und der Rest-Fallback)
 // --------------------------------------------------------
 async function cacheFirst(request, cacheName) {
   const cache  = await caches.open(cacheName);
@@ -724,6 +777,16 @@ function isAsset(pathname) {
 }
 
 /**
+ * Eine Datei, die der Build unter /assets/ mit dem Hash ihres Inhalts im Namen
+ * schreibt (vite.config.ts; der Server liefert sie `immutable`, server/index.js).
+ * Der Name wechselt mit dem Inhalt - unter ihm aendert sich nie etwas.
+ * @param {URL} url
+ */
+function isHashedBuildFile(url) {
+  return url.origin === self.location.origin && url.pathname.startsWith('/assets/');
+}
+
+/**
  * Ist das eine Navigation auf eine Route der App - also eine, die der Server
  * mit `index.html` beantwortet? Die App-Routen kennt der Worker nicht, wohl
  * aber, was KEINE ist: alles mit Dateiendung, die Feeds, der MCP-Endpunkt und
@@ -740,7 +803,18 @@ function isAppRouteNavigation(request) {
 }
 
 /**
- * Was sich ohne neue Version aendern kann, kommt zuerst aus dem Netz.
+ * Was sich unter seinem Namen aendern kann, kommt zuerst aus dem Netz: die
+ * UNGEHASHTEN Dateien - `/`, index.html, die drei Fassaden (/api.js, /i18n.js,
+ * /utils/html.js), klassische Skripte, Stylesheets, Manifest. Ein Server-Update
+ * tauscht ihren Inhalt, ohne dass sich die Adresse aendert; cache-first saehe
+ * ein Browser bis zur Uebernahme durch den neuen Worker den alten Stand, und
+ * ein Modul, das der Browser einmal geladen hat, gilt fuer das ganze Dokument
+ * (#616: neue Seite, alte geteilte Abhaengigkeit). Fuer die gehashten Dateien
+ * unter /assets/ entfaellt dieser Grund: eine neue Fassung hat einen neuen
+ * Namen, und die neue Seite importiert genau ihn. Sie gehen deshalb
+ * cache-first (isHashedBuildFile, cacheFirstHashed) und erreichen diese
+ * Pruefung nie.
+ *
  * `/manifest.webmanifest` ist keine Datei, sondern die Route in
  * server/index.js, die den eingestellten App-Namen einsetzt; die Endung faellt
  * durch das Muster unten. Lag sie cache-first im SHELL_CACHE, sah ein Browser,

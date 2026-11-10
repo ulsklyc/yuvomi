@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.88.0] - 2026-11-10
+
 ### Foundation
 - **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
   service worker takes its offline list from the build instead of a hand-kept one; pages,
@@ -40,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reproducible build with two attested release artifacts), describes the build and the type
   check, and docs/DECISIONS.md records the build step, the Node floor and the position on
   hosting as entries 20 to 22.
+- **The way back to 2.87.0 was tried before the tag.** Image 2.87.0 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.87.0 to 2.88.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.88.0 restored on
+  2.87.0 through the admin restore. To go back, pin the image tag `2.87.0`.
 
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
@@ -53,6 +61,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bold first sentence wrapped in the source lost the end of that sentence to the text below
   it, so the short form read "... on iPhone and" with "iPad)." opening the reason. This hit
   154 entries since 2.45.0; summary and reason are now split where the sentence ends.
+- **Birthdays no longer rewrite their calendar entries every minute.** The check that keeps a
+  birthday's calendar entry and reminder in step runs once a minute for every account, and on
+  every visit to the birthday list. It wrote each entry again even when nothing had changed,
+  which also rebuilt the entry in the search index: constant small writes to the database, on
+  a NAS or a Raspberry Pi to its disk or SD card. It now writes only what differs.
+- **Pages open from the app's cache without a round trip to the server.** The service worker
+  asked the network first for every page and module before handing out the copy it already
+  held, although the built files under `/assets/` carry a hash of their content in the name and
+  never change under it; it now serves them straight from its cache and fetches only a file
+  that is missing. Files without a hash, such as `index.html` and `/api.js`, still come from the
+  network first. The PDF viewer (pdf.js) also no longer lands in the worker's cache after the
+  first opened document: documents are not available offline, so it is left to the browser.
+- **On a phone, the tool row of Recipes, Pantry, Meals and Shopping folds away on scroll in
+  browsers that need the menu polyfill too.** The rule that folds it keeps the row while one
+  of its menus is open, and it asked for that with a selector those browsers do not know, so
+  they dropped the whole rule and the row kept its space above the list. It now has a second
+  rule that asks the way the polyfill marks an open menu.
+- **An up-to-date browser that lands on the "browser too old" page now returns to the app on
+  its own.** Opened from a bookmark, or reloaded after a browser update, the page kept saying
+  the browser was too old until you pressed "Try again"; it now runs the same check as the app
+  and sends a browser that passes it back to the start page. A browser that is too old stays
+  on the page. The page and the offline page also no longer request a language file they
+  never use.
 
 ## [2.87.0] - 2026-11-08
 

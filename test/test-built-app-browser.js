@@ -9,7 +9,9 @@
  *   - das Vorwaermen trifft Adressen aus #yuvomi-page-urls;
  *   - ein Drittmodul (test/fixtures/module-facade/) importiert /api.js,
  *     /i18n.js und /utils/html.js und bekommt DIESELBE Instanz wie die App;
- *   - der Service Worker registriert sich und precacht die gehashten Chunks;
+ *   - der Service Worker registriert sich und precacht die gehashten Chunks,
+ *     liefert gecachte Chunks ohne eigene Netzanfrage aus (#2633) und legt
+ *     pdf.js in keinen Cache (#2634);
  *   - die Browser-Untergrenze (Phase 1a E): ohne `CSSLayerBlockRule` schickt
  *     browser-floor.js auf /browser-too-old.html, die Seite zeigt den Text der
  *     Seitensprache, axe meldet dort nichts, und ein Lauf ohne Eingriff bleibt
@@ -152,14 +154,81 @@ test('the service worker registers and precaches the hashed chunks', async () =>
   }
 });
 
+test('the running worker serves cached hashed chunks without the network and keeps pdf.js out of its caches', async () => {
+  // #2633 und #2634 am laufenden Worker. Was der Worker selbst anfragt, sieht
+  // die Seite nicht; gezaehlt wird deshalb im Worker-Ziel ueber CDP.
+  const table = pageUrls();
+  const harness = /** @type {any} */ (await startHarness());
+  try {
+    await harness.reset();
+    const page = await harness.context.newPage();
+    await page.setCookie(...harness.cookies);
+    harness.touched = true;
+    await page.goto(`${harness.baseUrl}/`, { waitUntil: 'load' });
+    const swTarget = await harness.context.waitForTarget((/** @type {any} */ t) => t.type() === 'service_worker', { timeout: 30000 });
+    // Precache durch und die Seite kontrolliert (sw-register.js laedt beim
+    // ersten controllerchange einmal neu).
+    await page.waitForFunction(async () => {
+      if (!navigator.serviceWorker.controller) return false;
+      const shell = (await caches.keys()).find((n) => n.startsWith('yuvomi-shell-'));
+      return shell !== undefined && (await (await caches.open(shell)).keys()).length >= 150;
+    }, { timeout: 30000, polling: 500 });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), { timeout: 15000 });
+
+    const cdp = await swTarget.createCDPSession();
+    /** @type {string[]} */
+    const workerRequests = [];
+    cdp.on('Network.requestWillBeSent', (/** @type {any} */ e) => workerRequests.push(new URL(e.request.url).pathname));
+    await cdp.send('Network.enable');
+
+    const chunks = ['/pages/budget.js', '/pages/notes.js', '/pages/contacts.js'].map((source) => table[source]);
+    assert.ok(chunks.every(Boolean), 'Seitenliste ohne die erwarteten Seiten');
+    const statuses = await page.evaluate(async (/** @type {string[]} */ urls) => Promise.all(urls.map(async (u) => (await fetch(u)).status)), chunks);
+    assert.deepEqual(statuses, chunks.map(() => 200));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    assert.deepEqual(workerRequests.filter((p) => chunks.includes(p)), [], 'der Worker fragt fuer gecachte gehashte Chunks das Netz');
+
+    // pdf.js erst nach dem Bypass-Fenster des Updates (30 s ab activate): darin
+    // legte auch der alte Worker nichts ab, die Probe waere dort blind.
+    await page.evaluate(async () => {
+      const flag = await (await caches.open('yuvomi-bypass-flag')).match('/active');
+      const until = Number(flag?.headers.get('x-until') || 0);
+      if (until > Date.now()) await new Promise((resolve) => setTimeout(resolve, until - Date.now() + 200));
+    });
+    // pdf.js so, wie die Dokumente es laden: Modulimport, dazu der Worker.
+    await page.evaluate(async () => {
+      const pdfjsUrl = '/vendor/pdfjs/pdf.min.mjs';
+      await import(pdfjsUrl);
+      await fetch('/vendor/pdfjs/pdf.worker.min.mjs');
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const pdfEntries = await page.evaluate(async () => {
+      const found = [];
+      for (const name of await caches.keys()) {
+        for (const req of await (await caches.open(name)).keys()) {
+          if (new URL(req.url).pathname.startsWith('/vendor/pdfjs/')) found.push(`${name}: ${new URL(req.url).pathname}`);
+        }
+      }
+      return found;
+    });
+    assert.deepEqual(pdfEntries, [], 'pdf.js liegt nach dem Laden in einem Cache des Workers');
+    await cdp.detach().catch(() => {});
+  } finally {
+    await harness.close();
+  }
+});
+
 /**
- * Oeffnet `/` ohne Sitzung und wartet, bis die Adresse steht - auch ueber die
- * Weiterleitung der Probe hinweg, die den ersten Ladevorgang abbricht.
+ * Oeffnet `/` (oder `start`) ohne Sitzung und wartet, bis die Adresse steht -
+ * auch ueber die Weiterleitung der Probe hinweg, die den ersten Ladevorgang
+ * abbricht.
  * @param {import('puppeteer').Page} page
  * @param {string} base
+ * @param {string} [start]
  */
-async function landing(page, base) {
-  await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+async function landing(page, base, start = '/') {
+  await page.goto(`${base}${start}`, { waitUntil: 'domcontentloaded' }).catch(() => {});
   // Fertig ist die Adresse, die 1,5 s lang steht (die App selbst leitet
   // anonym noch auf /login weiter).
   const until = Date.now() + 15000;
@@ -183,6 +252,13 @@ test('a browser below the floor lands on /browser-too-old.html in its language, 
       await page.evaluateOnNewDocument(() => { delete (/** @type {any} */ (window)).CSSLayerBlockRule; });
       const path = await landing(page, harness.baseUrl);
       assert.equal(path, '/browser-too-old.html', `${locale}: die Probe hat nicht weitergeleitet`);
+      // Die Hinweisseite laedt keine Sprachdatei und fordert sie auch nicht
+      // vorab an (data-no-locale-preload, #2651).
+      const localeHints = await page.evaluate(() => ({
+        links: [...document.querySelectorAll('link[rel="preload"]')].map((el) => el.getAttribute('href')),
+        fetched: performance.getEntriesByType('resource').map((e) => new URL(e.name).pathname).filter((p) => p.startsWith('/locales/')),
+      }));
+      assert.deepEqual(localeHints, { links: [], fetched: [] }, `${locale}: Sprachdatei auf der Hinweisseite angefordert`);
       const visible = await page.evaluate(() => [...document.querySelectorAll('.copy')]
         .filter((el) => getComputedStyle(el).display !== 'none')
         .map((el) => ({ lang: el.getAttribute('lang'), title: el.querySelector('h1')?.textContent?.trim() })));
@@ -204,6 +280,10 @@ test('a browser below the floor lands on /browser-too-old.html in its language, 
     const path = await landing(page, harness.baseUrl);
     assert.notEqual(path, '/browser-too-old.html', 'ein Browser ueber der Untergrenze landet auf der Hinweisseite');
     assert.equal(await page.evaluate(() => typeof CSSLayerBlockRule), 'function', 'Vorbedingung: der Testbrowser kennt CSSLayerBlockRule');
+    // Und oeffnet er die Hinweisseite direkt (Lesezeichen, Neuladen nach einem
+    // Update), geht er von selbst zurueck in die App (#2651).
+    const back = await landing(page, harness.baseUrl, '/browser-too-old.html');
+    assert.notEqual(back, '/browser-too-old.html', 'ein faehiger Browser bleibt auf der Hinweisseite stehen');
     await page.close();
   } finally {
     await harness.close();

@@ -104,7 +104,7 @@ the last tag is an interface release.
    went red in the past (`test:sw-precache`, `test:document-folder-keys`, `test:changelog`) were
    never in anyone's "relevant" list.
 10. **Commit, fetch, tag, push - in that order.** `git commit -m "chore: release vX.Y.Z"` with
-    `CHANGELOG.md`, `package.json`, `package-lock.json`, `public/sw.js`, the docs from steps 4 and 5 and
+    `CHANGELOG.md`, `package.json`, `package-lock.json`, the docs from steps 4 and 5 and
     the Umbrel notes staged by name (never `git add -A`). Then `git fetch origin` **before**
     `git tag vX.Y.Z`: the fetch brings in a tag somebody else may have set for the same version,
     and the tag command fails before anything is pushed. Then `git push && git push --tags`.
@@ -172,10 +172,10 @@ last tag, carrying the fix, its tests and its documentation and nothing else:
 4. `npm test` on the branch, then commit, fetch, tag, push, release, downstream - steps 9 to 12.
    The cadence check passes on the second track by construction: the diff since the last tag is
    the fix.
-5. Merge the branch back: `git switch main && git merge --no-ff release/X.Y.Z`. Two conflicts
-   are normal - `CHANGELOG.md`, where the new block goes below `## [Unreleased]` and the
-   Unreleased bullets stay, and `public/sw.js`, where `main`'s shape of the file wins with the new
-   version number. After resolving, check that `CHANGELOG.md` contains no conflict markers and that
+5. Merge the branch back: `git switch main && git merge --no-ff release/X.Y.Z`. One conflict
+   is normal - `CHANGELOG.md`, where the new block goes below `## [Unreleased]` and the
+   Unreleased bullets stay. A branch off a tag before 2.88.0 also conflicts in `public/sw.js`,
+   which carried the version by hand until then; `main`'s shape of the file wins. After resolving, check that `CHANGELOG.md` contains no conflict markers and that
    its heading structure is what you meant (`git add` checks neither; `test:changelog` compares
    every released section with the new tag and so catches a bullet that slid into or out of the
    new block, but not one that landed under the wrong heading inside `[Unreleased]`), run

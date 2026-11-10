@@ -306,9 +306,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. Nothing to build or install on the host, not even Node.js; the image carries the built app.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.87.0` (exact version), `2.87` (latest patch of that minor), plus a moving `main`
+> `2.88.0` (exact version), `2.88` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.87.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.88.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 >
 > **Going back to an earlier release** is the same move in reverse: pin the previous tag and
@@ -324,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. Nothing to build or 
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.87.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.88.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -333,7 +333,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. Nothing to build or 
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.87.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.88.0 --format '{{ json .Provenance }}'`.
 
 > **Verify a release tarball.** Releases from November 2026 on also carry the app as a tarball,
 > `yuvomi-<version>-dist.tar.gz` (one top-level folder `yuvomi-<version>/`), next to a
@@ -398,7 +398,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.87.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.88.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
