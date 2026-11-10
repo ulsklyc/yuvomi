@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A restore drill checks that a release database restores and migrates on this version.**
+  `scripts/restore-drill.mjs` restores a database through the same restore command an operator
+  uses, migrates it to the current schema and checks its integrity, foreign keys, schema and row
+  counts before it starts the server on it and reads every module. The rollback probe that
+  tries the way back before a foundation release moved into the repository as
+  `scripts/rollback-probe/`. Nothing changes for an installation.
+
 ### Changed
 - **The container image of a release is now built from its tag alone.** Until now a release
   build reused layers from the build cache that builds of `main` fill, the dependency install
