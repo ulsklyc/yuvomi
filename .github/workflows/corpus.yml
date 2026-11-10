@@ -1,0 +1,274 @@
+name: Migration Corpus
+
+# Puts one frozen database on a release: `yuvomi-<version>-corpus.db` plus
+# `yuvomi-<version>-corpus.db.sha256` (phase 1b, section B; decisions E14 and
+# E15 of the plan). The restore drill (scripts/restore-drill.mjs) restores every
+# corpus database through the real restore path and migrates it to the head,
+# so a migration that breaks an old database shows up before a user meets it.
+#
+# WHAT IS IN IT. The demo seed of THAT tag (scripts/seed-demo.js, demo data
+# only), written to a backup by THAT tag's own code (`backupToFile` in
+# server/db.js), encrypted with a PUBLIC test key. The key is not a secret:
+# anyone must be able to open a corpus database, and the restore drill uses the
+# same literal (CORPUS_TEST_KEY in scripts/restore-drill.mjs; the workflow guard
+# test:corpus-workflow keeps both equal).
+# One path for every tag: older seeds (before #2114) open the file without a
+# key and need a migrated database, so the seed job migrates and seeds without
+# a key and only the backup step sets it; server/db.js encrypts the plain file
+# with it (encryptPlaintextDatabase) before `VACUUM INTO` writes the backup.
+#
+# ONE DATABASE PER SCHEMA CHANGE (E14). release-assets.yml starts this workflow
+# for every release it publishes. A release whose schema version equals that of
+# the newest earlier corpus database gets nothing, unless its CHANGELOG block
+# starts with `### Foundation`. The input `force` uploads regardless: for the
+# anchor releases of the first stage (E15), started by hand.
+#
+# RUNS FROM main, CHECKS OUT THE TAG. Tags older than this file do not contain
+# it, so a dispatch `--ref <tag>` would find no workflow:
+#   gh workflow run corpus.yml --ref main -f tag=vX.Y.Z [-f force=true]
+# The workflow definition comes from main; the code it runs comes from the tag.
+#
+# THREE JOBS, NO TOKEN NEXT TO PROJECT CODE (as in release-assets.yml).
+# `locate` holds a read token and runs no project code: it finds the newest
+# earlier corpus database. `seed` runs `npm ci` (install scripts included) and
+# the tag's seed and backup with `contents: read`, no GH_TOKEN and no OIDC
+# token; it downloads the earlier corpus database over its public URL. `publish`
+# holds `contents: write`, runs no npm and has no checkout: it checks the hash
+# and uploads. A failure here never touches the release itself, and the restore
+# drill reports a missing corpus database.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Published release tag to build the corpus database for, e.g. v2.88.0'
+        required: true
+        type: string
+      force:
+        description: 'Upload even when the schema version equals the newest earlier corpus database (anchors)'
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: corpus-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  locate:
+    name: Find the newest earlier corpus database (no project code)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # A few API calls; 5 leaves room for a slow API without hiding a hang.
+    timeout-minutes: 5
+    env:
+      TAG: ${{ inputs.tag }}
+      GH_REPO: ${{ github.repository }}
+    outputs:
+      version: ${{ steps.find.outputs.version }}
+      exists: ${{ steps.find.outputs.exists }}
+      previous_url: ${{ steps.find.outputs.previous_url }}
+
+    steps:
+      - name: Find the release and the newest earlier corpus database
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag '$TAG' is not of the form vX.Y.Z"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "false" ]; then
+            echo "::error::$TAG is not a published release"
+            exit 1
+          fi
+          # One line per published release: "<tag> <asset names...>".
+          gh api "repos/$GH_REPO/releases?per_page=100" --paginate \
+            --jq '.[] | select(.draft | not) | ([.tag_name] + [.assets[].name]) | join(" ")' > releases.txt
+          EXISTS=false
+          if awk -v t="$TAG" '$1 == t' releases.txt | tr ' ' '\n' | grep -qxF "yuvomi-$VERSION-corpus.db"; then
+            EXISTS=true
+          fi
+          # Newest release below TAG that carries a corpus database.
+          PREVIOUS=""
+          for T in $(awk '{print $1}' releases.txt | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -r); do
+            [ "$T" = "$TAG" ] && continue
+            [ "$(printf '%s\n%s\n' "$T" "$TAG" | sort -V | tail -1)" = "$TAG" ] || continue
+            if awk -v t="$T" '$1 == t' releases.txt | tr ' ' '\n' | grep -qxF "yuvomi-${T#v}-corpus.db"; then
+              PREVIOUS="$T"
+              break
+            fi
+          done
+          URL=""
+          if [ -n "$PREVIOUS" ]; then
+            URL="https://github.com/$GH_REPO/releases/download/$PREVIOUS/yuvomi-${PREVIOUS#v}-corpus.db"
+          fi
+          echo "release $TAG: corpus database present: $EXISTS; newest earlier corpus database: ${PREVIOUS:-none}"
+          {
+            echo "version=$VERSION"
+            echo "exists=$EXISTS"
+            echo "previous_url=$URL"
+          } >> "$GITHUB_OUTPUT"
+
+  seed:
+    name: Seed and back up at the tag (read-only)
+    needs: locate
+    if: needs.locate.outputs.exists != 'true'
+    runs-on: ubuntu-latest
+    # Read-only: this job runs npm install scripts and the tag's code.
+    permissions:
+      contents: read
+    # npm ci (about a minute, longer when an old driver builds from source),
+    # seed and backup are seconds. 20 leaves room without hiding a hang.
+    timeout-minutes: 20
+    env:
+      TAG: ${{ inputs.tag }}
+      FORCE: ${{ inputs.force }}
+      VERSION: ${{ needs.locate.outputs.version }}
+      PREVIOUS_URL: ${{ needs.locate.outputs.previous_url }}
+      CORPUS_KEY: yuvomi-public-corpus-test-key
+    outputs:
+      upload: ${{ steps.decide.outputs.upload }}
+
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - name: Set up Node.js 24.x
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+
+      - name: Install dependencies
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+        run: npm ci
+
+      - name: Seed and back up with the tag's own code
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/corpus"
+          mkdir -p "$WORK"
+          export DB_PATH="$WORK/yuvomi.db" DB_ENCRYPTION_AUTO_KEY=false LOG_LEVEL=warn
+          export SESSION_SECRET=corpus-seed-session-secret-not-used
+          # 1. Migrate an empty database, 2. seed it, both without a key.
+          node --input-type=module -e "const db = await import('./server/db.js'); db.get().close(); process.exit(0);"
+          node scripts/seed-demo.js --db "$DB_PATH"
+          # 3. The backup through backupToFile, with the public key: db.js
+          #    encrypts the plain file with it first.
+          OUT="yuvomi-$VERSION-corpus.db"
+          DB_ENCRYPTION_KEY="$CORPUS_KEY" OUT="$PWD/$OUT" \
+            node --input-type=module -e "const db = await import('./server/db.js'); await db.backupToFile(process.env.OUT); process.exit(0);"
+          if [ "$(head -c 15 "$OUT")" = "SQLite format 3" ]; then
+            echo "::error::$OUT is not encrypted"
+            exit 1
+          fi
+          sha256sum "$OUT" > "$OUT.sha256"
+          cat "$OUT.sha256"
+
+      - name: Compare the schema version with the newest earlier corpus database
+        id: decide
+        run: |
+          set -euo pipefail
+          OUT="yuvomi-$VERSION-corpus.db"
+          # Highest migration in a corpus database, read with the tag's driver
+          # (resolved from the checkout, so the reader file can live outside it).
+          cat > "$RUNNER_TEMP/schema-of.mjs" <<'EOF'
+          import { createRequire } from 'node:module';
+          const Database = createRequire(process.cwd() + '/')('better-sqlite3-multiple-ciphers');
+          const db = new Database(process.argv[2], { readonly: true, fileMustExist: true });
+          db.pragma("cipher = 'sqlcipher'");
+          db.pragma(`key="x'${Buffer.from(process.env.CORPUS_KEY, 'utf8').toString('hex')}'"`);
+          console.log(db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v);
+          db.close();
+          EOF
+          schema_of() { node "$RUNNER_TEMP/schema-of.mjs" "$1"; }
+          SCHEMA="$(schema_of "$OUT")"
+          echo "schema of $TAG: v$SCHEMA"
+          FOUNDATION=false
+          # The block of this version in the tag's CHANGELOG starts with ### Foundation.
+          if awk -v h="## [$VERSION]" 'index($0, h) == 1 { inblock = 1; next } inblock && /^## \[/ { exit } inblock && /^### / { print; exit }' CHANGELOG.md | grep -qx '### Foundation'; then
+            FOUNDATION=true
+          fi
+          PREVIOUS_SCHEMA=none
+          if [ -n "$PREVIOUS_URL" ]; then
+            mkdir -p "$RUNNER_TEMP/previous"
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/previous/previous.db" "$PREVIOUS_URL"
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/previous/previous.db.sha256" "$PREVIOUS_URL.sha256"
+            EXPECTED="$(cut -d' ' -f1 "$RUNNER_TEMP/previous/previous.db.sha256")"
+            ACTUAL="$(sha256sum "$RUNNER_TEMP/previous/previous.db" | cut -d' ' -f1)"
+            if [ "$EXPECTED" != "$ACTUAL" ]; then
+              echo "::error::$PREVIOUS_URL does not match its .sha256"
+              exit 1
+            fi
+            PREVIOUS_SCHEMA="$(schema_of "$RUNNER_TEMP/previous/previous.db")"
+          fi
+          UPLOAD=false
+          if [ "$FORCE" = "true" ] || [ "$FOUNDATION" = "true" ] || [ "$PREVIOUS_SCHEMA" != "$SCHEMA" ]; then
+            UPLOAD=true
+          fi
+          echo "schema v$SCHEMA, newest earlier corpus v$PREVIOUS_SCHEMA, foundation $FOUNDATION, force $FORCE -> upload $UPLOAD"
+          echo "upload=$UPLOAD" >> "$GITHUB_OUTPUT"
+
+      - name: Hand the corpus database to the publish job
+        if: steps.decide.outputs.upload == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: corpus
+          path: |
+            yuvomi-${{ env.VERSION }}-corpus.db
+            yuvomi-${{ env.VERSION }}-corpus.db.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Upload the corpus database to the release
+    needs: [locate, seed]
+    if: needs.seed.outputs.upload == 'true'
+    runs-on: ubuntu-latest
+    # The only write right in this workflow, for a job that runs no npm and no
+    # project code: the release asset upload.
+    permissions:
+      contents: write
+    # Download, one hash check, two uploads; 10 leaves room for a slow upload.
+    timeout-minutes: 10
+    env:
+      TAG: ${{ inputs.tag }}
+      VERSION: ${{ needs.locate.outputs.version }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Take over the corpus database
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: corpus
+
+      - name: Check the database against its .sha256
+        run: |
+          set -euo pipefail
+          sha256sum -c "yuvomi-$VERSION-corpus.db.sha256"
+
+      - name: Upload what the release does not have yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Never --clobber: a corpus database is frozen once it is on a release.
+          HAVE="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          for NAME in "yuvomi-$VERSION-corpus.db" "yuvomi-$VERSION-corpus.db.sha256"; do
+            if printf '%s\n' "$HAVE" | grep -qxF "$NAME"; then
+              echo "$TAG already has $NAME - kept"
+            else
+              gh release upload "$TAG" "$NAME"
+            fi
+          done
+          gh release view "$TAG" --json assets --jq '.assets[].name'
