@@ -44,7 +44,7 @@ export const COPY_LIST: readonly CopyEntry[] = [
   { path: 'vendor/sortablejs/sortable.esm.min.js', precache: true, why: 'hand copy, imported by utils/sortable.js at runtime (external)' },
   { path: 'vendor/libphonenumber/core.min.mjs', precache: true, why: 'hand copy, imported by utils/phone.js at runtime, offline phone formatting' },
   { path: 'vendor/libphonenumber/metadata.min.json', precache: true, why: 'fetched by utils/phone.js next to core.min.mjs' },
-  { path: 'vendor/', precache: false, why: 'hand copies with LICENSE and README (pdf.js is never precached: documents are not offline)' },
+  { path: 'vendor/', precache: false, why: 'hand copies with LICENSE and README; pdf.js is never cached at all: documents are not offline, and public/sw.js lets /vendor/pdfjs/ pass to the browser (#2634)' },
 ];
 
 /**

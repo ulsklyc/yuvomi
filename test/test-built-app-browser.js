@@ -9,7 +9,9 @@
  *   - das Vorwaermen trifft Adressen aus #yuvomi-page-urls;
  *   - ein Drittmodul (test/fixtures/module-facade/) importiert /api.js,
  *     /i18n.js und /utils/html.js und bekommt DIESELBE Instanz wie die App;
- *   - der Service Worker registriert sich und precacht die gehashten Chunks;
+ *   - der Service Worker registriert sich und precacht die gehashten Chunks,
+ *     liefert gecachte Chunks ohne eigene Netzanfrage aus (#2633) und legt
+ *     pdf.js in keinen Cache (#2634);
  *   - die Browser-Untergrenze (Phase 1a E): ohne `CSSLayerBlockRule` schickt
  *     browser-floor.js auf /browser-too-old.html, die Seite zeigt den Text der
  *     Seitensprache, axe meldet dort nichts, und ein Lauf ohne Eingriff bleibt
@@ -147,6 +149,71 @@ test('the service worker registers and precaches the hashed chunks', async () =>
     }
     assert.ok(cached.urls.some((/** @type {string} */ u) => /^\/assets\/index-[\w-]+\.js$/.test(u)), 'der gebaute Eintrag fehlt im Precache');
     assert.deepEqual(cached.urls.filter((/** @type {string} */ u) => u.startsWith('/pages/')), [], 'Quellpfade im Precache');
+  } finally {
+    await harness.close();
+  }
+});
+
+test('the running worker serves cached hashed chunks without the network and keeps pdf.js out of its caches', async () => {
+  // #2633 und #2634 am laufenden Worker. Was der Worker selbst anfragt, sieht
+  // die Seite nicht; gezaehlt wird deshalb im Worker-Ziel ueber CDP.
+  const table = pageUrls();
+  const harness = /** @type {any} */ (await startHarness());
+  try {
+    await harness.reset();
+    const page = await harness.context.newPage();
+    await page.setCookie(...harness.cookies);
+    harness.touched = true;
+    await page.goto(`${harness.baseUrl}/`, { waitUntil: 'load' });
+    const swTarget = await harness.context.waitForTarget((/** @type {any} */ t) => t.type() === 'service_worker', { timeout: 30000 });
+    // Precache durch und die Seite kontrolliert (sw-register.js laedt beim
+    // ersten controllerchange einmal neu).
+    await page.waitForFunction(async () => {
+      if (!navigator.serviceWorker.controller) return false;
+      const shell = (await caches.keys()).find((n) => n.startsWith('yuvomi-shell-'));
+      return shell !== undefined && (await (await caches.open(shell)).keys()).length >= 150;
+    }, { timeout: 30000, polling: 500 });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), { timeout: 15000 });
+
+    const cdp = await swTarget.createCDPSession();
+    /** @type {string[]} */
+    const workerRequests = [];
+    cdp.on('Network.requestWillBeSent', (/** @type {any} */ e) => workerRequests.push(new URL(e.request.url).pathname));
+    await cdp.send('Network.enable');
+
+    const chunks = ['/pages/budget.js', '/pages/notes.js', '/pages/contacts.js'].map((source) => table[source]);
+    assert.ok(chunks.every(Boolean), 'Seitenliste ohne die erwarteten Seiten');
+    const statuses = await page.evaluate(async (/** @type {string[]} */ urls) => Promise.all(urls.map(async (u) => (await fetch(u)).status)), chunks);
+    assert.deepEqual(statuses, chunks.map(() => 200));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    assert.deepEqual(workerRequests.filter((p) => chunks.includes(p)), [], 'der Worker fragt fuer gecachte gehashte Chunks das Netz');
+
+    // pdf.js erst nach dem Bypass-Fenster des Updates (30 s ab activate): darin
+    // legte auch der alte Worker nichts ab, die Probe waere dort blind.
+    await page.evaluate(async () => {
+      const flag = await (await caches.open('yuvomi-bypass-flag')).match('/active');
+      const until = Number(flag?.headers.get('x-until') || 0);
+      if (until > Date.now()) await new Promise((resolve) => setTimeout(resolve, until - Date.now() + 200));
+    });
+    // pdf.js so, wie die Dokumente es laden: Modulimport, dazu der Worker.
+    await page.evaluate(async () => {
+      const pdfjsUrl = '/vendor/pdfjs/pdf.min.mjs';
+      await import(pdfjsUrl);
+      await fetch('/vendor/pdfjs/pdf.worker.min.mjs');
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const pdfEntries = await page.evaluate(async () => {
+      const found = [];
+      for (const name of await caches.keys()) {
+        for (const req of await (await caches.open(name)).keys()) {
+          if (new URL(req.url).pathname.startsWith('/vendor/pdfjs/')) found.push(`${name}: ${new URL(req.url).pathname}`);
+        }
+      }
+      return found;
+    });
+    assert.deepEqual(pdfEntries, [], 'pdf.js liegt nach dem Laden in einem Cache des Workers');
+    await cdp.detach().catch(() => {});
   } finally {
     await harness.close();
   }
