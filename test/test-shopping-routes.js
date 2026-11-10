@@ -1150,7 +1150,7 @@ test('Kaufhistorie: estimated_price_cents liefert den zuletzt gezahlten Preis (#
 
   // 4. Auch beim Laden der Liste vorhanden
   const items = (await call('GET', `/${list.id}/items`)).body.data;
-  const geladen = items.find((i) => i.id === zweiter.id);
+  const geladen = items.find((/** @type {{ id: number }} */ i) => i.id === zweiter.id);
   assert.equal(geladen.estimated_price_cents, 349);
 
   // 5. Bei PATCH auf den Artikel bleibt/aktualisiert sich estimated_price_cents

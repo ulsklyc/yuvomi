@@ -2600,17 +2600,24 @@ test('R22 D22: der Wisch-Hinweis liest den Viewport per Medienabfrage und zeigt 
 // --------------------------------------------------------
 // Preisschätzung und Summenzeile (#1003)
 // --------------------------------------------------------
+/** Zustand als lose Struktur: die Tests setzen Artikel mit nur den Feldern, die sie brauchen. */
+const summaryState = /** @type {any} */ (__test.state);
+/** @returns {any} ein Attrappen-Container, der nur die Summenzeile kennt */
 function makeSummaryContainer() {
   const pendingEl = { textContent: '' };
   const purchasedEl = { textContent: '' };
   const totalEl = {
     textContent: '',
+    /** @type {string|null} */
     ariaLabel: null,
+    /** @param {string} k @param {string} v */
     setAttribute(k, v) { if (k === 'aria-label') this.ariaLabel = v; },
+    /** @param {string} k */
     removeAttribute(k) { if (k === 'aria-label') this.ariaLabel = null; },
   };
   const summaryRoot = {
     hidden: false,
+    /** @param {string} sel */
     querySelector(sel) {
       if (sel === '[data-summary="pending"]') return pendingEl;
       if (sel === '[data-summary="purchased"]') return purchasedEl;
@@ -2623,6 +2630,7 @@ function makeSummaryContainer() {
     purchasedEl,
     totalEl,
     summaryRoot,
+    /** @param {string} sel */
     querySelector(sel) {
       if (sel === '#shopping-price-summary') return summaryRoot;
       return null;
@@ -2635,12 +2643,12 @@ test('#1003: Summenzeile bleibt ausgeblendet (hidden), solange kein Artikel eine
   const c = makeSummaryContainer();
 
   // Liste ohne Artikel
-  __test.state.items = [];
+  summaryState.items = [];
   __test.renderShoppingSummary(c);
   assert.equal(c.summaryRoot.hidden, true, 'ohne Artikel bleibt die Summenzeile verborgen');
 
   // Artikel ohne Preis und ohne Schätzpreis
-  __test.state.items = [
+  summaryState.items = [
     { id: 1, name: 'Brot', quantity: '1', price_cents: null, estimated_price_cents: null },
     { id: 2, name: 'Milch', quantity: '2', price_cents: null, estimated_price_cents: null },
   ];
@@ -2648,7 +2656,7 @@ test('#1003: Summenzeile bleibt ausgeblendet (hidden), solange kein Artikel eine
   assert.equal(c.summaryRoot.hidden, true, 'ohne Preise bleibt die Summenzeile verborgen');
 
   // Artikel mit Preis oder Schätzpreis
-  __test.state.items[0].price_cents = 250;
+  summaryState.items[0].price_cents = 250;
   __test.renderShoppingSummary(c);
   assert.equal(c.summaryRoot.hidden, false, 'mit Preis wird die Summenzeile sichtbar');
 });
@@ -2657,7 +2665,7 @@ test('#1003: Summen wandern beim Abhaken/Wiedereröffnen zwischen Ausstehend und
   resetShoppingState();
   const c = makeSummaryContainer();
 
-  __test.state.items = [
+  summaryState.items = [
     { id: 10, name: 'Kaffee', quantity: '1', price_cents: 600, is_checked: 0 },
     { id: 11, name: 'Tee', quantity: '1', price_cents: 400, is_checked: 0 },
   ];
@@ -2686,8 +2694,9 @@ test('#1003: Summen wandern beim Abhaken/Wiedereröffnen zwischen Ausstehend und
 
 test('#1003: Eingetippter Preis sticht den Schätzpreis', () => {
   resetShoppingState();
-  globalThis.__tDict = {
-    ...(globalThis.__tDict || {}),
+  const g = /** @type {any} */ (globalThis);
+  g.__tDict = {
+    ...(g.__tDict || {}),
     'shopping.estimatedPrice': '~ {{price}}',
     'shopping.estimatedPriceAria': 'about {{price}}',
   };
