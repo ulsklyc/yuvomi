@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   install on Node 22 sees a one-line message at start that names the supported range; update
   Node, then start again. The container image is unchanged and already runs on Node 24.
 
+### Fixed
+- **The in-app changelog shows a summary whole when it runs over two lines.** An entry whose
+  bold first sentence wrapped in the source lost the end of that sentence to the text below
+  it, so the short form read "... on iPhone and" with "iPad)." opening the reason. This hit
+  154 entries since 2.45.0; summary and reason are now split where the sentence ends.
+
 ## [2.87.0] - 2026-11-08
 
 ### Added
