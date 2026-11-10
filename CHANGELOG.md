@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counts before it starts the server on it and reads every module. The rollback probe that
   tries the way back before a foundation release moved into the repository as
   `scripts/rollback-probe/`. Nothing changes for an installation.
+- **Releases that change the database schema carry a frozen demo database.** A new workflow
+  attaches `yuvomi-<version>-corpus.db` and its `.sha256` to every release whose schema differs
+  from the last one with such a file, and to every foundation release. It is the demo seed of
+  that release, encrypted with a public test key, and the restore drill migrates each of them
+  to the current version. Nothing changes for an installation.
 
 ### Changed
 - **The container image of a release is now built from its tag alone.** Until now a release

@@ -150,7 +150,10 @@ the last tag is an interface release.
     ```
 
     YunoHost's daily bump PR (`ulsklyc/yuvomi_ynh`) and the Proxmox script pick the asset up from
-    there. Then look the Umbrel PR up rather than
+    there. The asset job also starts `corpus.yml`, which attaches `yuvomi-X.Y.Z-corpus.db` (plus
+    `.sha256`) when the release changes the database schema or is a foundation release; check it
+    with `gh run list --repo ulsklyc/yuvomi --workflow=corpus.yml --limit 1`. A red run does not
+    touch the release; the restore drill names the missing database. Then look the Umbrel PR up rather than
     assuming a number - the workflow renames the open PR if there is one and opens a new one only
     once the previous one was merged:
 
