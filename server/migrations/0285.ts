@@ -12,8 +12,8 @@ export default {
         state      TEXT    NOT NULL CHECK (state IN ('available', 'busy', 'do_not_disturb', 'away')),
         note       TEXT,
         expires_at TEXT    NOT NULL,
-        set_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         UNIQUE (user_id)
       );
     `,
