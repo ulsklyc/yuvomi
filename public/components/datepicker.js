@@ -1,9 +1,10 @@
 /**
  * Modul: yuvomi-datepicker Web Component
  * Zweck: Gemeinsame Datum-/Zeit-Eingabe für die ganze App. Tippen bleibt der
- *        schnelle Pfad (locale-Parsing wie bisher, #442); ein Icon-Trigger
- *        öffnet auf Desktop ein Glass-Popover (Kalender-Grid / Zeit-Liste),
- *        auf Touch das native OS-Sheet (showPicker()).
+ *        schnelle Pfad (locale-Parsing wie bisher, #442); ein Klick ins Feld
+ *        oder auf den Icon-Trigger öffnet ein Glass-Popover (Kalender-Grid /
+ *        Spalten Stunde | Minute), das dem Getippten folgt. Nur ohne
+ *        Popover-API greift auf Touch das native OS-Sheet (showPicker()).
  * Abhängigkeiten: /i18n.js (Format/Parse/Locale), /utils/html.js (esc)
  *
  * API (an nativem Input orientiert, damit der Umstieg mechanisch ist):
@@ -11,7 +12,7 @@
  *   value  — kanonisch ISO: "YYYY-MM-DD", "HH:MM" oder "YYYY-MM-DDTHH:MM".
  *            Der Setter toleriert auch locale-Anzeigeformat und normalisiert.
  *   min / max — ISO-Grenzen (nur Datum; optional)
- *   step   — Minuten-Raster der Zeit-Liste (default 15)
+ *   step   — Minuten-Raster der Minuten-Spalte (default 5)
  *   disabled
  *   Property `.value` liefert immer die kanonische ISO-Form (oder "").
  *   Feuert `input` + `change` (bubbles) bei jeder Wertänderung.
@@ -90,6 +91,59 @@ const ICON = {
 };
 
 const VALID_TYPES = ['date', 'time', 'datetime'];
+
+/** @typedef {{ kind: string, wrap: HTMLElement, input: HTMLInputElement, native: HTMLInputElement, trigger: HTMLButtonElement, iso: string }} DpSub */
+
+// ── Zeit-Spalten als reine Logik (test-datepicker.js faehrt sie direkt) ──
+const timeOf = (iso) => {
+  const m = /^(\d{2}):(\d{2})$/.exec(iso || '');
+  return m ? { h: Number(m[1]), m: Number(m[2]) } : null;
+};
+
+/**
+ * Werte und Markierung der Spalten fuer einen ISO-Wert ('HH:MM' oder '').
+ * Minuten im Raster `step`; eine Minute ausserhalb (18:07) kommt dazu.
+ * @param {string} iso
+ * @param {{ use12h?: boolean, step?: number }} [opts]
+ */
+function timeColumns(iso, { use12h = false, step = 5 } = {}) {
+  const cur = timeOf(iso);
+  const minutes = [];
+  for (let m = 0; m < 60; m += Math.max(1, step)) minutes.push(m);
+  if (cur && !minutes.includes(cur.m)) minutes.push(cur.m);
+  minutes.sort((a, b) => a - b);
+  /** @type {Record<string, number[]>} */
+  const values = {
+    hour: use12h ? [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [...Array(24).keys()],
+    minute: minutes,
+  };
+  /** @type {Record<string, number|null>} */
+  const selected = {
+    hour: cur ? (use12h ? (cur.h % 12 || 12) : cur.h) : null,
+    minute: cur ? cur.m : null,
+  };
+  if (use12h) {
+    values.period = [0, 1];
+    selected.period = cur ? (cur.h >= 12 ? 1 : 0) : null;
+  }
+  return { parts: Object.keys(values), values, selected };
+}
+
+/**
+ * Neuer ISO-Wert nach einem Tipp in eine Spalte. Ohne Wert gilt die
+ * laufende Stunde (`nowHour`) und Minute 00 als Ausgang.
+ * @param {string} iso
+ * @param {string} part  'hour' | 'minute' | 'period'
+ * @param {number} value
+ * @param {{ use12h?: boolean, nowHour?: number }} [opts]
+ */
+function pickTime(iso, part, value, { use12h = false, nowHour = 0 } = {}) {
+  let { h, m } = timeOf(iso) || { h: nowHour, m: 0 };
+  if (part === 'hour') h = use12h ? (value % 12) + (h >= 12 ? 12 : 0) : value;
+  else if (part === 'minute') m = value;
+  else h = (h % 12) + (value ? 12 : 0);
+  return `${pad2(h)}:${pad2(m)}`;
+}
 
 class YuvomiDatepicker extends HTMLElement {
   // form-associated: erscheint in form.elements / FormData über `name`,
@@ -246,7 +300,12 @@ class YuvomiDatepicker extends HTMLElement {
     });
 
     // Blur: normalisieren + Validität spiegeln (inkl. min/max-Grenzen)
-    sub.input.addEventListener('blur', () => {
+    sub.input.addEventListener('blur', (/** @type {FocusEvent} */ e) => {
+      // Mit Tab aus dem Feld weiter: das aus dem Feld geoeffnete Blatt geht
+      // mit zu. Ein Tipp ausserhalb schliesst ueber _onDocPointer.
+      const to = /** @type {Node|null} */ (e.relatedTarget);
+      if (this._activeSub === sub && this._fromField && to
+        && !this._popover?.contains(to)) this._closePopover();
       const raw = sub.input.value.trim();
       const iso = parse(raw);
       if (raw && (!iso || this._outOfRange(sub.kind, iso))) {
@@ -275,6 +334,42 @@ class YuvomiDatepicker extends HTMLElement {
         sub.input.setAttribute('aria-invalid', 'false');
       }
       this._emit();
+      this._syncPopover(sub);
+    });
+
+    // Das Feld oeffnet die Auswahl selbst, nicht erst der Knopf: mit der Maus
+    // bleibt der Fokus im Feld (weitertippen, das Blatt zieht mit), am
+    // Finger geht das Blatt ohne Tastatur auf. Ein zweiter Tipp ins Feld
+    // holt die Tastatur dazu. Ohne Popover-API (#2107) bleibt es ein Feld.
+    // Entschieden wird je Tipp (pointerType), nicht je Geraet: ein Laptop mit
+    // Touchscreen bekommt am Finger das Blatt, mit der Maus das Feld.
+    let tap = false;
+    sub.input.addEventListener('pointerdown', (/** @type {PointerEvent} */ e) => {
+      tap = e.pointerType === 'touch' || e.pointerType === 'pen';
+      if (!tap || this._activeSub === sub || this.hasAttribute('disabled') || !this._supportsPopover()) return;
+      e.preventDefault(); // kein Fokus, also keine Tastatur
+    });
+    sub.input.addEventListener('click', () => {
+      const byTap = tap;
+      tap = false;
+      if (this.hasAttribute('disabled') || !this._supportsPopover()) return;
+      if (this._activeSub === sub) { this._fromField = true; this._returnTo = sub.input; return; }
+      this._openPopover(sub, { fromField: !byTap });
+    });
+    sub.input.addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
+      if (e.key === 'Escape' && this._activeSub === sub) {
+        e.preventDefault();
+        this._closePopover();
+      } else if (e.key === 'ArrowDown' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        // Pfeil runter fuehrt von der Tastatur in die Auswahl
+        e.preventDefault();
+        if (this._activeSub !== sub) this._openPopover(sub, { returnTo: sub.input });
+        else {
+          const into = /** @type {HTMLElement|null} */ (this._popover?.querySelector('[aria-selected="true"]')
+            || this._popover?.querySelector('[tabindex="0"]') || null);
+          into?.focus();
+        }
+      }
     });
 
     // Trigger: das DOM-Popover ist auf jedem Pointer-Typ der Primärpfad - es ist
@@ -371,11 +466,19 @@ class YuvomiDatepicker extends HTMLElement {
     el.className = 'ydp-popover';
     el.setAttribute('popover', 'manual');
     el.setAttribute('role', 'dialog');
+    // Aus dem Feld geoeffnet: ein Klick ins Blatt nimmt dem Feld den Fokus
+    // nicht (sonst schloesse der Blur das Blatt, bevor der Klick ankommt).
+    el.addEventListener('pointerdown', (/** @type {PointerEvent} */ e) => {
+      if (this._fromField && e.pointerType === 'mouse') e.preventDefault();
+    });
     el.addEventListener('keydown', (e) => {
       // Esc schliesst NUR den Kalender. `preventDefault` nimmt dem nativen
       // Dialog darunter den Close-Request (sonst ginge das Formular mit zu),
       // und das Modal laesst ein schon erledigtes Esc liegen (modal.js, onEscape).
-      if (e.key === 'Escape') { e.preventDefault(); this._closePopover(); this._activeSub?.trigger.focus(); return; }
+      // Der Fokus geht dorthin zurueck, woher das Blatt kam (_returnTo); vorher
+      // fragte er `_activeSub` erst NACH dem Schliessen und blieb auf einer
+      // Zeile des verborgenen Blatts liegen.
+      if (e.key === 'Escape') { e.preventDefault(); this._returnFocus(); return; }
       if (e.key === 'Tab') this._trapTab(e, el);
     });
     this._popover = el;
@@ -397,7 +500,7 @@ class YuvomiDatepicker extends HTMLElement {
     }
   }
 
-  _openPopover(sub) {
+  _openPopover(sub, { fromField = false, returnTo = null } = {}) {
     // Ohne Popover-API ist das Kalenderblatt nicht verfuegbar (#2107): reset.css
     // blendet jedes `[popover]` aus, und ein `aria-expanded="true"` samt
     // Fokus-Sprung meldete einen Dialog, den niemand sieht. Tippen bleibt.
@@ -410,12 +513,14 @@ class YuvomiDatepicker extends HTMLElement {
     const host = overlayHost(this);
     if (el.parentNode !== host) host.appendChild(el);
     this._activeSub = sub;
+    this._fromField = fromField;
+    this._returnTo = returnTo || (fromField ? sub.input : sub.trigger);
     // Zugänglicher Name des Dialogs + Schreibrichtung (RTL für ar/fa)
     el.setAttribute('aria-label', this._resolveLabel()
       || (sub.kind === 'date' ? t('datepicker.openCalendar') : t('datepicker.openTimePicker')));
     el.dir = this._dir();
     if (sub.kind === 'date') this._renderCalendar(el, sub);
-    else this._renderTimeList(el, sub);
+    else this._renderTimeColumns(el, sub);
 
     sub.trigger.setAttribute('aria-expanded', 'true');
     try { el.showPopover(); } catch { /* bereits offen */ }
@@ -424,12 +529,35 @@ class YuvomiDatepicker extends HTMLElement {
     window.addEventListener('resize', this._reposition, { passive: true });
     window.addEventListener('scroll', this._reposition, { passive: true, capture: true });
 
-    // Fokus in die aktive Auswahl
-    (el.querySelector('[aria-selected="true"]') || el.querySelector('[tabindex="0"]')
-      || el.querySelector('button'))?.focus();
-    if (sub.kind === 'time') {
-      el.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' });
+    // Aus dem Feld geoeffnet bleibt der Fokus im Feld: weitertippen geht,
+    // und das Blatt zieht mit (_syncPopover). Sonst in die aktive Auswahl.
+    if (sub.kind === 'time') this._syncTimeColumns(el, sub);
+    if (!fromField) {
+      (el.querySelector('[aria-selected="true"]') || el.querySelector('[tabindex="0"]')
+        || el.querySelector('button'))?.focus({ preventScroll: true });
     }
+  }
+
+  // Nach einer fertigen Wahl (Tag, Minute, Heute, Loeschen) und mit Esc:
+  // Blatt zu, Fokus dorthin, woher es kam - ins Feld oder auf den Knopf.
+  _returnFocus() {
+    const target = this._returnTo;
+    this._closePopover();
+    target?.focus();
+  }
+
+  // Getipptes ins offene Blatt spiegeln: die Spalten markieren die Stunde und
+  // Minute, der Kalender springt auf den Monat des Tages.
+  /** @param {DpSub} sub */
+  _syncPopover(sub) {
+    if (this._activeSub !== sub || !this._popover) return;
+    if (sub.kind === 'time') { this._syncTimeColumns(this._popover, sub); return; }
+    const p = parseIso(sub.iso);
+    if (p && (p.y !== this._viewYear || p.m !== this._viewMonth)) {
+      this._viewYear = p.y;
+      this._viewMonth = p.m;
+    }
+    this._paintDays(this._popover, sub);
   }
 
   _closePopover() {
@@ -437,6 +565,8 @@ class YuvomiDatepicker extends HTMLElement {
     try { this._popover.hidePopover(); } catch { /* war zu */ }
     this._activeSub?.trigger.setAttribute('aria-expanded', 'false');
     this._activeSub = null;
+    this._fromField = false;
+    this._returnTo = null;
     document.removeEventListener('pointerdown', this._onDocPointer, true);
     window.removeEventListener('resize', this._reposition);
     window.removeEventListener('scroll', this._reposition, true);
@@ -503,13 +633,11 @@ class YuvomiDatepicker extends HTMLElement {
     el.querySelector('.ydp-nav-next').addEventListener('click', () => this._shiftMonth(el, sub, 1));
     el.querySelector('.ydp-today').addEventListener('click', () => {
       this._setSubIso(sub, todayIso(), true);
-      this._closePopover();
-      sub.trigger.focus();
+      this._returnFocus();
     });
     el.querySelector('.ydp-clear').addEventListener('click', () => {
       this._setSubIso(sub, '', true);
-      this._closePopover();
-      sub.trigger.focus();
+      this._returnFocus();
     });
 
     this._paintDays(el, sub);
@@ -576,8 +704,7 @@ class YuvomiDatepicker extends HTMLElement {
       if (disabled) btn.disabled = true;
       btn.addEventListener('click', () => {
         this._setSubIso(sub, iso, true);
-        this._closePopover();
-        sub.trigger.focus();
+        this._returnFocus();
       });
       grid.appendChild(btn);
     }
@@ -618,56 +745,116 @@ class YuvomiDatepicker extends HTMLElement {
     });
   }
 
-  // ── Zeit-Liste ─────────────────────────────────────────────────────────
-  _renderTimeList(el, sub) {
-    el.replaceChildren();
-    el.insertAdjacentHTML('beforeend', `<div class="ydp-time"><div class="ydp-time__list" role="listbox" aria-label="${esc(t('datepicker.openTimePicker'))}"></div></div>`);
-    const list = el.querySelector('.ydp-time__list');
-    const step = Math.max(1, Number(this.getAttribute('step')) || 15);
+  // ── Zeit-Spalten ───────────────────────────────────────────────────────
+  // Stunde und Minute nebeneinander (im 12h-Format dazu AM/PM), statt EINER
+  // Liste aller Zeiten im 15-Minuten-Raster (96 Zeilen, 18:05 gab es nicht).
+  // Antippen stellt ein, die Position in der Spalte nicht: ein Rad, das den
+  // Wert in der Mitte liest, verstellte sich beim Vorbeiscrollen und braeuchte
+  // `scrollend` (Safari erst ab 26.2). Die Stunde laesst das Blatt offen, die
+  // Minute schliesst es. Minuten im Raster `step` (default 5); eine getippte
+  // Minute ausserhalb (18:07) steht als eigene Zeile markiert dabei.
+  // Spaltennamen aus Intl, wie Wochentage und Monate: keine Locale-Keys.
+  /** @param {HTMLElement} el @param {DpSub} sub */
+  _renderTimeColumns(el, sub) {
     const use12h = getTimeFormat() === '12h';
-
-    for (let mins = 0; mins < 24 * 60; mins += step) {
-      const h = Math.floor(mins / 60);
-      const m = mins % 60;
-      const iso = `${pad2(h)}:${pad2(m)}`;
-      const opt = document.createElement('button');
-      opt.type = 'button';
-      opt.className = 'ydp-time__opt';
-      opt.setAttribute('role', 'option');
-      opt.dataset.iso = iso;
-      opt.textContent = use12h ? formatTimeInput(iso) : iso;
-      opt.tabIndex = -1;
-      if (iso === sub.iso) {
-        opt.setAttribute('aria-selected', 'true');
-        opt.tabIndex = 0;
-      }
-      opt.addEventListener('click', () => {
-        this._setSubIso(sub, iso, true);
-        this._closePopover();
-        sub.trigger.focus();
+    // Intl liefert die Form fuer den Satz ("hour", "heure"); als Spaltenkopf
+    // mit grossem Anfang wie formatMonthYear().
+    /** @param {string} field @param {string} fallback */
+    const fieldName = (field, fallback) => {
+      let name = fallback;
+      try { name = new Intl.DisplayNames(getLocale(), { type: 'dateTimeField' }).of(field) || fallback; }
+      catch { /* aelterer Browser: Rueckfall */ }
+      return name.charAt(0).toLocaleUpperCase(getLocale()) + name.slice(1);
+    };
+    /** @type {Record<string, string>} */
+    const names = { hour: fieldName('hour', 'h'), minute: fieldName('minute', 'min'), period: fieldName('dayPeriod', 'AM/PM') };
+    const cols = timeColumns('', { use12h }).parts.map((part) => [part, names[part]]);
+    el.replaceChildren();
+    el.insertAdjacentHTML('beforeend', `<div class="ydp-time">${cols.map(([part, name]) => `
+      <div class="ydp-time__col">
+        <span class="ydp-time__head" aria-hidden="true">${esc(name)}</span>
+        <div class="ydp-time__list" role="listbox" data-part="${part}" aria-label="${esc(name)}"></div>
+      </div>`).join('')}</div>`);
+    el.querySelectorAll('.ydp-time__list').forEach((node) => {
+      const list = /** @type {HTMLElement} */ (node);
+      list.addEventListener('click', (e) => {
+        const opt = /** @type {HTMLElement|null} */ (/** @type {Element} */ (e.target).closest('.ydp-time__opt'));
+        if (opt) this._pickTime(el, sub, list.dataset.part || '', Number(opt.dataset.value));
       });
-      list.appendChild(opt);
-    }
-    if (!list.querySelector('[tabindex="0"]') && list.firstElementChild) {
-      list.firstElementChild.tabIndex = 0;
-    }
-
-    list.addEventListener('keydown', (e) => {
-      const cur = document.activeElement;
-      if (!cur?.classList.contains('ydp-time__opt')) return;
-      let target = null;
-      if (e.key === 'ArrowDown') target = cur.nextElementSibling;
-      else if (e.key === 'ArrowUp') target = cur.previousElementSibling;
-      else if (e.key === 'Home') target = list.firstElementChild;
-      else if (e.key === 'End') target = list.lastElementChild;
-      if (target) {
-        e.preventDefault();
-        cur.tabIndex = -1;
-        target.tabIndex = 0;
-        target.focus();
-        target.scrollIntoView({ block: 'nearest' });
-      }
+      list.addEventListener('keydown', (e) => this._timeListKeys(e, list));
     });
+    this._syncTimeColumns(el, sub);
+  }
+
+  // Optionen und Markierung aus `sub.iso` - beim Oeffnen und nach jedem
+  // Tastendruck im Feld: wer "18" tippt, sieht die Stunden-Spalte auf 18.
+  /** @param {HTMLElement} el @param {DpSub} sub */
+  _syncTimeColumns(el, sub) {
+    const use12h = getTimeFormat() === '12h';
+    const { values, selected: sel } = timeColumns(sub.iso, {
+      use12h, step: Number(this.getAttribute('step')) || 5,
+    });
+    const cur = timeOf(sub.iso);
+    /** @param {string} part @param {number} v */
+    const label = (part, v) => (part === 'period' ? (v ? 'PM' : 'AM')
+      : part === 'hour' && use12h ? String(v) : pad2(v));
+    el.querySelectorAll('.ydp-time__list').forEach((node) => {
+      const list = /** @type {HTMLElement} */ (node);
+      const part = list.dataset.part || '';
+      const hadFocus = list.contains(document.activeElement);
+      list.replaceChildren();
+      values[part].forEach((v) => {
+        const opt = document.createElement('button');
+        opt.type = 'button';
+        opt.className = 'ydp-time__opt';
+        opt.setAttribute('role', 'option');
+        opt.dataset.value = String(v);
+        opt.textContent = label(part, v);
+        opt.tabIndex = -1;
+        if (v === sel[part]) opt.setAttribute('aria-selected', 'true');
+        list.appendChild(opt);
+      });
+      const target = /** @type {HTMLElement|null} */ (list.querySelector('[aria-selected="true"]') || list.firstElementChild);
+      if (target) target.tabIndex = 0;
+      if (hadFocus) target?.focus({ preventScroll: true });
+      // Die Markierung in die Mitte der Spalte, ohne die Seite zu bewegen
+      // (scrollIntoView rollte auch den Dialog darunter). Ohne Wert steht die
+      // Stunden-Spalte bei der laufenden Stunde statt bei 00, gewaehlt ist nichts.
+      const nowHour = use12h ? (new Date().getHours() % 12 || 12) : new Date().getHours();
+      const mark = /** @type {HTMLElement|null} */ (list.querySelector('[aria-selected="true"]')
+        || (part === 'hour' && !cur ? list.querySelector(`[data-value="${nowHour}"]`) : null));
+      if (mark) list.scrollTop = mark.offsetTop - (list.clientHeight - mark.offsetHeight) / 2;
+    });
+  }
+
+  /** @param {HTMLElement} el @param {DpSub} sub @param {string} part @param {number} value */
+  _pickTime(el, sub, part, value) {
+    const iso = pickTime(sub.iso, part, value, {
+      use12h: getTimeFormat() === '12h', nowHour: new Date().getHours(),
+    });
+    this._setSubIso(sub, iso, true);
+    if (part === 'minute') { this._returnFocus(); return; }
+    this._syncTimeColumns(el, sub);
+  }
+
+  /** @param {KeyboardEvent} e @param {HTMLElement} list */
+  _timeListKeys(e, list) {
+    const cur = /** @type {HTMLElement|null} */ (document.activeElement);
+    if (!cur?.classList.contains('ydp-time__opt')) return;
+    /** @type {Element|null} */
+    let next = null;
+    if (e.key === 'ArrowDown') next = cur.nextElementSibling;
+    else if (e.key === 'ArrowUp') next = cur.previousElementSibling;
+    else if (e.key === 'Home') next = list.firstElementChild;
+    else if (e.key === 'End') next = list.lastElementChild;
+    const target = /** @type {HTMLElement|null} */ (next);
+    if (target) {
+      e.preventDefault();
+      cur.tabIndex = -1;
+      target.tabIndex = 0;
+      target.focus();
+      target.scrollIntoView({ block: 'nearest' });
+    }
   }
 }
 
@@ -675,4 +862,4 @@ if (!customElements.get('yuvomi-datepicker')) {
   customElements.define('yuvomi-datepicker', YuvomiDatepicker);
 }
 
-export { YuvomiDatepicker };
+export { YuvomiDatepicker, timeColumns, pickTime };

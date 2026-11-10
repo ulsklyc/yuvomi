@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Picking a time takes two taps: hour and minute stand side by side.** The clock button of a
+  time field used to open one list of every time in 15-minute steps (96 rows, and 18:05 was not
+  in it). It now opens an hour column and a minute column in 5-minute steps, with an AM/PM column
+  for the 12-hour format; the hour keeps the picker open, the minute closes it. A minute typed
+  outside the steps (18:07) shows up marked in its column.
+- **Clicking into a date or time field opens its picker, and typing moves it along.** Until now
+  only the small calendar or clock button did. With a mouse the cursor stays in the field: typing
+  `18` marks 18 in the hour column, typing `24122026` turns the calendar to that day. On a phone a
+  tap opens the picker without the keyboard; a second tap into the field brings the keyboard.
+  Typing stays as fast as before, and the arrow key down moves from the field into the picker.
 - **The container image of a release is now built from its tag alone.** Until now a release
   build reused layers from the build cache that builds of `main` fill, the dependency install
   and the app build included. A tagged build now ignores that cache and writes none; only the
@@ -17,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite no longer hides the ones after it: the job log ends with every red suite and its log,
   and when one is red, the logs are attached to the run. Contributors run `npm run test-parallel` before a push.
   A new push to a pull request cancels the run it replaces.
+
+### Fixed
+- **Escape in a date or time picker returns the focus to where it came from.** It stayed on a row
+  of the closed picker, so the next Tab started from nowhere.
 
 ## [2.88.0] - 2026-11-10
 
