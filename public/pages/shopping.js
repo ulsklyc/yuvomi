@@ -2803,8 +2803,16 @@ function priceReadText(cents) {
 }
 
 /**
+ * @typedef {object} ShoppingPriceItem
+ * @property {number|string|null} [price_cents]
+ * @property {number|string|null} [estimated_price_cents]
+ * @property {string|null} [quantity]
+ */
+
+/**
  * Liefert den maßgeblichen Zeilenpreis eines Artikels in Cents (#1003):
  * der tatsächliche Preis oder der Schätzpreis aus vorherigen Käufen, wie er ist.
+ * @param {ShoppingPriceItem} item
  */
 function itemPriceCents(item) {
   const price = item.price_cents ?? item.estimated_price_cents;
@@ -2816,6 +2824,7 @@ function itemPriceCents(item) {
 /**
  * Baut die kombinierte Metazeile aus Menge und Zeilenpreis (#1003):
  * z.B. "3 · 30,00 €" in einheitlicher Typografie.
+ * @param {ShoppingPriceItem} item
  */
 function renderItemDetailsMeta(item) {
   const qtyText = String(item.quantity ?? '').trim();
@@ -2851,14 +2860,17 @@ function renderItemDetailsMeta(item) {
  * Summenzeile fuer die Einkaufsliste (#1003): Ausstehend, Gekauft und Gesamt.
  * Bleibt ausgeblendet (hidden), solange kein Artikel einen Preis oder
  * Schaetzpreis hat, um die Oberflaeche sauber zu halten.
+ * @param {Element} container
  */
 function renderShoppingSummary(container) {
-  const root = container.querySelector('#shopping-price-summary');
+  const root = /** @type {HTMLElement|null} */ (container.querySelector('#shopping-price-summary'));
   if (!root) return;
   let pending = 0;
   let purchased = 0;
   let hasEstimated = false;
-  for (const item of state.items) {
+  /** @type {ShoppingPriceItem[]} */
+  const items = state.items;
+  for (const item of items) {
     const price = itemPriceCents(item);
     if (price == null) continue;
     if (item.price_cents == null && item.estimated_price_cents != null) {
