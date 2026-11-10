@@ -279,7 +279,7 @@ Yuvomi was renamed from **Oikos** to avoid a trademark conflict with an unrelate
 
 ## Under the hood
 
-- **No build step** - pure ES modules and plain CSS. No bundler, no transpiler, no framework, no runtime CDN.
+- **Built, and still readable** - Vite bundles the app and ships it with source maps; there is no framework, no runtime CDN and no telemetry, every third-party package is pinned and listed, and the same source gives the same bytes, so the release tarball can be rebuilt and compared ([the five guarantees](CONTRIBUTING.md#hard-constraints)).
 - **Feels like a native app** - built to Apple's interface guidelines: the system font, capsule buttons, grouped lists and spring motion, with WCAG AA contrast checked in light and dark.
 - **Privacy first** - fully self-hosted, optional SQLCipher AES-256 database encryption, zero telemetry.
 - **Sign-in for a whole household** - two-factor authentication, invite links, optional password reset by email and single sign-on with any OIDC provider; see [how safe access from outside is](#before-you-commit).

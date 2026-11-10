@@ -14,12 +14,15 @@
  *                            published set; the locale is NOT appended)
  *   SHOT_ONLY=a,b            capture only these motif names (e.g. dashboard-wall)
  *   SHOT_CLOCK=HH:MM         browser wall-clock time for the run, default 18:10
+ *   YUVOMI_PLAYWRIGHT_PATH   path to a globally installed playwright/index.mjs
+ *                            (Playwright is not a dependency); default is the
+ *                            Homebrew path, see scripts/lib/playwright-module.js
  *
  * Side effects: writes a temporary database to /tmp/yuvomi-screenshot.db
  *               and starts a server on port 3099. Both are cleaned up on exit.
  */
 
-import { chromium } from '/opt/homebrew/lib/node_modules/playwright/index.mjs';
+import { loadChromium } from './lib/playwright-module.js';
 import { mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -431,7 +434,7 @@ async function warmWeatherCache(browser) {
 
 async function main() {
   console.log('Launching browser…');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await (await loadChromium()).launch({ headless: true });
   const warnings = [];
 
   try {
