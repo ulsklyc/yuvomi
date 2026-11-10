@@ -286,6 +286,13 @@ test('ein roter Schritt haelt den Lauf nicht an, der Exit-Code kommt aus dem Kin
     assert.equal(readFileSync(redLog, 'utf8').length, 200000, 'das Log traegt die ganze Ausgabe');
     assert.ok(out.includes(redLog), 'die Zusammenfassung nennt den Logpfad des roten Schritts');
     assert.match(out, /exit 3/);
+    // CI zeigt nur das Job-Log: die Liste der roten Schritte steht nach dem
+    // letzten Fortschritt und nennt jeden mit Namen, Urteil und Logpfad (#1814).
+    const stdout = r.run.stdout;
+    const redList = stdout.indexOf('\nRot (1):\n');
+    assert.ok(redList > stdout.lastIndexOf('[3/3]'), `die Liste der roten Schritte steht nicht am Ende: ${stdout}`);
+    assert.ok(stdout.slice(redList).includes(`  ${r.summary.steps[1].step}  (exit 3)\n    ${redLog}\n`),
+      `die Liste nennt den roten Schritt nicht mit Name und Logpfad: ${stdout.slice(redList)}`);
   } finally {
     r.cleanup();
   }
