@@ -516,6 +516,7 @@ test('jeder getaggte Release hat einen CHANGELOG-Eintrag, keine Version doppelt'
  *   ueberfluessig und darf gehen. */
 const RELEASED_SECTION_EDITS = {
   // 'x.y.z': '<hash aus der Fehlermeldung>', // #Issue: warum der Abschnitt nachtraeglich geaendert wurde
+  '2.87.0': '7c05e9db8ec6', // RELEASING.md Schritt 7: ein Fundament-Release wird ein Release vorher angekuendigt (Rubrik "Upcoming")
 };
 
 const sectionHash = (section) => createHash('sha256').update(section).digest('hex').slice(0, 12);

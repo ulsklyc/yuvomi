@@ -129,6 +129,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
   status or a manifest check, stay.
 
+### Upcoming: foundation release 2.88.0 (toolchain)
+- **The next release changes how Yuvomi is built and what it runs on, not what it does.** It
+  is planned for Wednesday, 11 November 2026, and carries no new feature; pages, data and the
+  database stay as they are. This note is the advance notice for it.
+- **Outside a container, Node.js 24.12 or newer becomes the minimum.** The container image
+  already runs on Node 24 and needs nothing, and so do the YunoHost package and the Proxmox
+  script. A bare-metal install on Node 22 has to update Node before it updates Yuvomi.
+- **The web app ships built.** Vite bundles and minifies it and ships source maps; nothing
+  changes on screen. For authors of third-party modules: `/api.js`, `/i18n.js` and
+  `/utils/html.js` stay importable, every other app file moves into the bundle under a hashed
+  name, and a module that imports one of those stops loading.
+- **Yuvomi will need Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4).** Today it
+  still starts down to Chrome 87, Firefox 79 and Safari 14.1. Chrome before 99, Firefox before
+  97 and Safari before 15.4 then get a short page that names the versions instead of the app;
+  Chrome 99 to 104 and Firefox 97 to 114 still start, with single screens that can stay empty.
+  Update the browser or the device's system beforehand.
+- **The release tarball carries the built app.** `yuvomi-<version>-dist.tar.gz` gets a `dist/`
+  folder next to the source; the YunoHost package and the Proxmox script already install from
+  the tarball and pick it up with their normal update.
+- **The way back stays open.** The release does not change the database, so pinning the
+  previous image tag `2.87.0` returns to this version with your data untouched (installation
+  guide, "Pinning a version"). That way is tried once before the release is tagged.
+
 ## [2.86.0] - 2026-11-07
 
 ### Added
