@@ -57,11 +57,16 @@ scripts/
 # and fails the image when one is missing (#2006).
 !scripts/check-runtime-deps.mjs
 # Exception: the build stage runs `npm run build` (Vite, Phase 1a section D),
-# which needs its plugins and the third-party notices. dist/ is NOT listed
-# here on purpose and is never copied from the context: the build stage makes
-# its own, the runtime stage takes that one (COPY --from=build).
+# which needs its plugins and the third-party notices.
 !scripts/build/
 !scripts/build-third-party-notices.mjs
+
+# Build output of a working copy. The build stage makes its own dist/ and the
+# runtime stage takes that one (COPY --from=build), which .dockerignore does
+# not touch. A dist/ from the working tree is 35 MB with its source maps and
+# would be sent to the daemon on every local build (#2636). Vite's manifest
+# lives inside it (dist/.vite/), its temp folder under node_modules.
+dist/
 
 # Markdown files (README etc.)
 *.md

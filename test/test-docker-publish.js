@@ -157,7 +157,12 @@ test('the image builds the web app and ships dist/ from the build stage, plus th
   assert.doesNotMatch(runtimeStage, /COPY test\//);
   const ignore = readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8').split('\n').map((l) => l.trim());
   assert.ok(ignore.includes('test/'), '.dockerignore keeps test/ out');
-  assert.ok(!ignore.some((l) => /^\/?dist\/?$/.test(l)), '.dockerignore must not list dist/ - it is built in the image, never copied in');
+  // dist/ entsteht in der Build-Stage. Ein dist/ aus dem Arbeitsbaum (35 MB samt
+  // Sourcemaps) hat im Kontext nichts verloren: es wuerde bei jedem lokalen
+  // `docker build` zum Daemon geschickt, und ein spaeteres `COPY dist/` naehme
+  // still den Stand des Entwicklerrechners statt den der Build-Stage (#2636).
+  assert.ok(ignore.includes('dist/'), '.dockerignore keeps a dist/ from the working tree out of the build context');
+  assert.doesNotMatch(dockerfile, /^COPY (?!--from=)[^\n]*\bdist\b/m, 'dist/ is never copied from the build context, only from the build stage');
   for (const need of ['!scripts/build/', '!scripts/build-third-party-notices.mjs']) assert.ok(ignore.includes(need), `${need} missing in .dockerignore`);
 });
 
