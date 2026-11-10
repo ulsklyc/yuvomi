@@ -25,6 +25,8 @@ export PROBE_PREV_IMAGE="$1" PROBE_NEW_IMAGE="$2"
 export PROBE_DIR="${3:-$(mktemp -d "${TMPDIR:-/tmp}/yuvomi-rollback-probe.XXXXXX")}"
 export PROBE_PORT="${PROBE_PORT:-3871}"
 mkdir -p "$PROBE_DIR/data" "$PROBE_DIR/backups" "$PROBE_DIR/logs" "$PROBE_DIR/copies"
+# Absolute before the cd below: a relative work dir would resolve twice.
+PROBE_DIR="$(cd "$PROBE_DIR" && pwd)"
 [ -z "$(ls -A "$PROBE_DIR/data")" ] || { echo "$PROBE_DIR/data is not empty: the probe starts on an empty volume"; exit 2; }
 echo "work dir: $PROBE_DIR"
 cd "$PROBE_DIR" || exit 1
@@ -61,7 +63,7 @@ node_ fpdiff.mjs 11-after-prev 13-after-prev-again
 
 step "5 previous -> new build"
 need probe up new; node_ api.mjs snap 20-new; node_ apidiff.mjs 12-prev-again 20-new; node_ sw.mjs 20-new | tail -6
-node_ api.mjs backup; ls backups; node_ api.mjs write "after-backup-on-new-build"; node_ api.mjs snap 22-new-after-write | head -1
+need node_ api.mjs backup; ls backups; node_ api.mjs write "after-backup-on-new-build"; node_ api.mjs snap 22-new-after-write | head -1
 probe down 20-new; snapdb 21-after-new
 node_ fpdiff.mjs 13-after-prev-again 21-after-new
 
@@ -71,8 +73,8 @@ probe down 30-prev-back; snapdb 31-after-prev-back
 node_ fpdiff.mjs 21-after-new 31-after-prev-back
 
 step "7 restore of the new build's backup on the previous image"
-BK="$(ls backups/*.db | head -1)"; cp "$BK" copies/backup.db; node_ fp.mjs backup copies/backup.db
-need probe up prev; node_ api.mjs restore "$BK"; sleep 3
+BK="$(ls backups/*.db | head -1)"; [ -n "$BK" ] || { echo "ABORTED: no backup in backups/"; exit 1; }; cp "$BK" copies/backup.db; node_ fp.mjs backup copies/backup.db
+need probe up prev; need node_ api.mjs restore "$BK"; sleep 3
 curl -s "http://127.0.0.1:$PROBE_PORT/health" | cut -c1-120; echo
 node_ api.mjs snap 32-prev-restored; node_ apidiff.mjs 20-new 32-prev-restored; node_ sw.mjs 32-prev-restored | tail -6
 probe down 32-prev-restored; snapdb 33-after-restore
