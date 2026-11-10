@@ -1,5 +1,6 @@
-// Die Browser-Untergrenze, als erstes Skript im <head> von index.html und
-// offline.html (Phase 1a, Abschnitt E; Entscheidung 11 des Umbaufahrplans).
+// Die Browser-Untergrenze, als erstes Skript im <head> von index.html,
+// offline.html und browser-too-old.html (Phase 1a, Abschnitt E; Entscheidung
+// 11 des Umbaufahrplans).
 //
 // Das Buendel ist fuer Chrome 105, Firefox 115 und Safari/iOS 15.4 gebaut
 // (vite.config.ts `build.target`). Darunter scheitert es beim Laden, und bis
@@ -19,8 +20,21 @@
 // Syntaxfehler hier liesse die Probe stumm (test:browser-floor-page).
 // Eine eigene Datei statt eines Inline-Skripts: die CSP dieses Servers erlaubt
 // nur `script-src 'self'`.
+//
+// ZWEI RICHTUNGEN, EIN PRAEDIKAT (#2651): auf der Hinweisseite (Schalter
+// `data-browser-floor-notice` am <html>) laeuft dieselbe Frage andersherum -
+// ein faehiger Browser, der die Seite direkt oeffnet oder nach einem Update
+// neu laedt, geht von selbst zurueck auf `/`. Keine Schleife: ein zu alter
+// Browser geht von `/` auf die Hinweisseite und bleibt dort, ein faehiger von
+// der Hinweisseite auf `/` und bleibt dort (test:browser-floor-page). Der
+// Schalter steht am <html> statt am Skript-Tag, weil `document.currentScript`
+// gerade den aeltesten Browsern fehlt - ohne ihn liefe die Hinweisseite sonst
+// in den Zweig der App und laede sich selbst neu.
 (function () {
-  if (typeof CSSLayerBlockRule === 'undefined' || typeof Object.hasOwn !== 'function') {
+  var capable = typeof CSSLayerBlockRule !== 'undefined' && typeof Object.hasOwn === 'function';
+  if (document.documentElement.hasAttribute('data-browser-floor-notice')) {
+    if (capable) location.replace('/');
+  } else if (!capable) {
     location.replace('/browser-too-old.html');
   }
 })();

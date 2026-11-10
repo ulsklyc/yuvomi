@@ -88,8 +88,13 @@
   // wenn der ganze Modulgraph geladen ist, und vor ihr zeichnet nichts. Die
   // deutsche Rueckfallsprache meldet index.html selbst an. `crossorigin` passt
   // zum Modus von fetch() in i18n.js - sonst holt der Browser die Datei zweimal.
+  // Die statischen Seiten (browser-too-old.html, offline.html) laden die Datei
+  // nie und schalten den Hinweis mit `data-no-locale-preload` am <html> ab:
+  // sonst eine verlorene Anfrage samt Konsolenwarnung, offline eine
+  // scheiternde (#2651).
   if (locale !== 'de') {
     try {
+      if (document.documentElement.hasAttribute('data-no-locale-preload')) return;
       var hint = document.createElement('link');
       hint.rel = 'preload';
       hint.as = 'fetch';

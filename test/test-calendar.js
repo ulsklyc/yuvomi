@@ -1797,7 +1797,7 @@ test('R22 D5: Woche/Tag nennen "F · LJ" vor der Uhrzeit, der Monat zeigt Strich
     assert((cell.match(/class="month-day__shift"/g) || []).length === 3, 'hoechstens drei Striche');
     assert(/class="month-day__shifts-more">\+1</.test(cell), 'der Rest als +N');
     // Der Bezugsrahmen der Striche haengt an einer Klasse, nicht an `:has()`
-    // (S10): die Mindestversion Chrome 87 verwirft jede `:has()`-Regel, und
+    // (S10): Firefox 115 an der Untergrenze verwirft jede `:has()`-Regel, und
     // die absoluten Striche aller Zellen stuenden an derselben Ecke.
     assert(/class="month-day[^"]*\bmonth-day--shifts\b/.test(cell), 'die Zelle mit Schichten traegt month-day--shifts');
     const shiftsBox = [...eachRule(calendarCss)].find((r) => /\.month-day__shifts\b/.test(r.selector) && /position:\s*absolute/.test(r.body));

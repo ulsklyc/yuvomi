@@ -220,13 +220,15 @@ test('the running worker serves cached hashed chunks without the network and kee
 });
 
 /**
- * Oeffnet `/` ohne Sitzung und wartet, bis die Adresse steht - auch ueber die
- * Weiterleitung der Probe hinweg, die den ersten Ladevorgang abbricht.
+ * Oeffnet `/` (oder `start`) ohne Sitzung und wartet, bis die Adresse steht -
+ * auch ueber die Weiterleitung der Probe hinweg, die den ersten Ladevorgang
+ * abbricht.
  * @param {import('puppeteer').Page} page
  * @param {string} base
+ * @param {string} [start]
  */
-async function landing(page, base) {
-  await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+async function landing(page, base, start = '/') {
+  await page.goto(`${base}${start}`, { waitUntil: 'domcontentloaded' }).catch(() => {});
   // Fertig ist die Adresse, die 1,5 s lang steht (die App selbst leitet
   // anonym noch auf /login weiter).
   const until = Date.now() + 15000;
@@ -250,6 +252,13 @@ test('a browser below the floor lands on /browser-too-old.html in its language, 
       await page.evaluateOnNewDocument(() => { delete (/** @type {any} */ (window)).CSSLayerBlockRule; });
       const path = await landing(page, harness.baseUrl);
       assert.equal(path, '/browser-too-old.html', `${locale}: die Probe hat nicht weitergeleitet`);
+      // Die Hinweisseite laedt keine Sprachdatei und fordert sie auch nicht
+      // vorab an (data-no-locale-preload, #2651).
+      const localeHints = await page.evaluate(() => ({
+        links: [...document.querySelectorAll('link[rel="preload"]')].map((el) => el.getAttribute('href')),
+        fetched: performance.getEntriesByType('resource').map((e) => new URL(e.name).pathname).filter((p) => p.startsWith('/locales/')),
+      }));
+      assert.deepEqual(localeHints, { links: [], fetched: [] }, `${locale}: Sprachdatei auf der Hinweisseite angefordert`);
       const visible = await page.evaluate(() => [...document.querySelectorAll('.copy')]
         .filter((el) => getComputedStyle(el).display !== 'none')
         .map((el) => ({ lang: el.getAttribute('lang'), title: el.querySelector('h1')?.textContent?.trim() })));
@@ -271,6 +280,10 @@ test('a browser below the floor lands on /browser-too-old.html in its language, 
     const path = await landing(page, harness.baseUrl);
     assert.notEqual(path, '/browser-too-old.html', 'ein Browser ueber der Untergrenze landet auf der Hinweisseite');
     assert.equal(await page.evaluate(() => typeof CSSLayerBlockRule), 'function', 'Vorbedingung: der Testbrowser kennt CSSLayerBlockRule');
+    // Und oeffnet er die Hinweisseite direkt (Lesezeichen, Neuladen nach einem
+    // Update), geht er von selbst zurueck in die App (#2651).
+    const back = await landing(page, harness.baseUrl, '/browser-too-old.html');
+    assert.notEqual(back, '/browser-too-old.html', 'ein faehiger Browser bleibt auf der Hinweisseite stehen');
     await page.close();
   } finally {
     await harness.close();

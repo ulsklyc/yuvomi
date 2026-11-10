@@ -23134,8 +23134,8 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
 });
 
 // DIE !important-SPERRKLINKE (R20, Entscheidung Ulas 2026-10-18). `@layer`
-// ist vertagt, bis das Mindestziel Chrome 99 / Firefox 97 / Safari 15.4 traegt
-// (docs/DECISIONS.md); bis dahin darf die Zahl der echten `!important` nur
+// traegt die Untergrenze seit Phase 1a E; ob ein Blatt es nutzt, entscheidet
+// docs/DECISIONS.md 14. Bis dahin darf die Zahl der echten `!important` nur
 // sinken. Zaehlregel: jede Deklaration mit `!important` in einer Regel, die
 // `eachRule()` in public/styles/*.css liefert - Kommentare zaehlen nicht,
 // `@media`/`@supports`/`@container` zaehlen mit, `@keyframes` nicht (dort
@@ -23678,7 +23678,7 @@ test('long contact and recipe lists skip rendering rows out of view', () => {
     assert.match(rule.body, /content-visibility:\s*auto/);
     const size = rule.body.match(/contain-intrinsic-size:\s*(auto none auto \d+px)/)?.[1];
     assert.ok(size, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
-    // `auto none` versteht Chrome erst ab 117; Chrome 87-116 kennt
+    // `auto none` versteht Chrome erst ab 117; Chrome 105-116 kennt
     // content-visibility schon und verwuerfe nur die Hoehe - Zeilen ohne
     // Platzhalter. Die Weiche fragt deshalb den ganzen Wert ab.
     assert.ok(rule.at.some((at) => at.includes('(contain-intrinsic-size: auto none auto 1px)')),

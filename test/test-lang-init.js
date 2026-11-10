@@ -42,6 +42,51 @@ function runLangInit(options = {}) {
   return runLangInitState(options).lang;
 }
 
+/**
+ * Fuehrt lang-init.js mit einem <head> aus und liefert die Adressen der
+ * Preload-Hinweise, die es anhaengt. `noPreload` setzt den Schalter
+ * `data-no-locale-preload` am <html>, wie die statischen Seiten es tun (#2651).
+ * @param {{ stored?: string | null, noPreload?: boolean }} [options]
+ */
+function preloadsOf({ stored = null, noPreload = false } = {}) {
+  /** @type {string[]} */
+  const hrefs = [];
+  const html = {
+    lang: '',
+    dir: '',
+    hasAttribute: (/** @type {string} */ name) => noPreload && name === 'data-no-locale-preload',
+  };
+  const sandbox = {
+    document: {
+      documentElement: html,
+      createElement: () => ({}),
+      head: { appendChild: (/** @type {any} */ el) => { if (el.rel === 'preload') hrefs.push(el.href); } },
+    },
+    navigator: { languages: ['de'] },
+    localStorage: { getItem: (/** @type {string} */ key) => (key === 'yuvomi-locale' ? stored : null) },
+  };
+  runInContext(SRC, createContext(sandbox));
+  return { lang: html.lang, hrefs };
+}
+
+test('die Sprachdatei wird vorab angefordert - ausser die Seite schaltet es ab (#2651)', () => {
+  assert.deepEqual(preloadsOf({ stored: 'fr' }), { lang: 'fr', hrefs: ['/locales/fr.json'] }, 'die App: Hinweis fuer fr');
+  assert.deepEqual(preloadsOf({ stored: 'de' }).hrefs, [], 'Deutsch meldet index.html selbst an');
+  // browser-too-old.html und offline.html laden die Sprachdatei nie: ein
+  // Hinweis waere eine verlorene Anfrage samt Konsolenwarnung, offline eine
+  // scheiternde.
+  assert.deepEqual(preloadsOf({ stored: 'fr', noPreload: true }), { lang: 'fr', hrefs: [] },
+    'mit data-no-locale-preload: Sprache gesetzt, kein Hinweis');
+});
+
+test('die statischen Seiten setzen data-no-locale-preload, index.html nicht (#2651)', () => {
+  const htmlTag = (/** @type {string} */ file) => readFileSync(new URL(`../public/${file}`, import.meta.url), 'utf8').match(/<html\b[^>]*>/i)?.[0] ?? '';
+  for (const file of ['browser-too-old.html', 'offline.html']) {
+    assert.match(htmlTag(file), /\sdata-no-locale-preload(?:[\s>=])/, `${file}: <html> traegt data-no-locale-preload`);
+  }
+  assert.doesNotMatch(htmlTag('index.html'), /data-no-locale-preload/, 'index.html laedt die Sprachdatei und braucht den Hinweis');
+});
+
 test('gültiger localStorage-Override gewinnt', () => {
   assert.equal(runLangInit({ stored: 'fr', languages: ['de-DE'] }), 'fr');
 });
