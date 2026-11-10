@@ -190,6 +190,18 @@ jobs:
       - name: Run the fasting browser suite
         run: npm run test:fasting-browser
 
+  # Restore-Drill (Phase 1b, Abschnitt B): jede Korpus-DB der Releases ueber den
+  # echten Restore-Weg einspielen und auf den Kopf DIESES Stands migrieren - eine
+  # Migration, die eine alte Datenbank bricht, faellt im PR auf statt beim Nutzer.
+  # Derselbe Job laeuft nachts aus restore-drill.yml. Kein Pflicht-Check.
+  # `timeout-minutes` darf hier nicht stehen (GitHub lehnt es an einem Job ab,
+  # der einen wiederverwendbaren Workflow ruft); der gerufene Job traegt 20.
+  restore-drill:
+    name: Restore drill
+    permissions:
+      contents: read
+    uses: ./.github/workflows/restore-drill.yml
+
   # Typpruefung (Phase 1a, Abschnitt C): `tsc --build` ueber server/, public/ und
   # test/ mit checkJs und strict, verglichen mit tsc-baseline.json, die nur sinken
   # darf. Eigener Job, parallel zu den Tests; eine Node-Version reicht, 24.x ist
