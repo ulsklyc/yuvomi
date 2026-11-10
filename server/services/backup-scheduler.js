@@ -155,8 +155,8 @@ export async function createLocalBackup() {
  * das erst, wenn jemand Einstellungen > Sicherung aufschlaegt - also meistens
  * dann, wenn die Sicherung gebraucht wird.
  *
- * DER TEXT DES FEHLERS STEHT NICHT IM PUSH. Er gehoert ins Log und in
- * Einstellungen > Sicherung, wo `lastError` ihn vollstaendig zeigt. Eine
+ * DER TEXT DES FEHLERS STEHT NICHT IM PUSH. Er gehoert ins Log, und - seit
+ * #2540 - als uebersetzter Satz in Einstellungen > Sicherung. Eine
  * Push-Mitteilung steht auf einem Sperrbildschirm, in der Sprache des
  * Haushalts, und "EACCES: permission denied, open
  * '/backups/yuvomi-backup-...'" ist dort kein Satz - sie sagt DASS und WO
