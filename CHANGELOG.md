@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   build reused layers from the build cache that builds of `main` fill, the dependency install
   and the app build included. A tagged build now ignores that cache and writes none; only the
   rolling `main` image keeps it. Nothing changes for an installation.
+- **CI runs the test suites side by side and takes about ten minutes instead of thirty.**
+  The `Tests` job now runs `npm run test-parallel` with four jobs instead of `npm test`. A red
+  suite no longer hides the ones after it: the job log ends with every red suite and its log,
+  and when one is red, the logs are attached to the run. Contributors run `npm run test-parallel` before a push.
+  A new push to a pull request cancels the run it replaces.
 
 ## [2.88.0] - 2026-11-10
 

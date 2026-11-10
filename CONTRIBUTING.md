@@ -85,9 +85,11 @@ itself has to set it as well.
 ### Running tests
 
 ```bash
-npm test              # All suites
-npm run test-parallel # The same suites side by side, keeps going after a failure
+npm run test-parallel # All suites side by side, keeps going after a failure
+npm test              # The same suites one after the other, stops at the first failure
 ```
+
+CI runs `npm run test-parallel`, so that is the command to run before you push.
 
 Individual suites (faster during development):
 
@@ -145,8 +147,9 @@ signal is ignored). The steps come
 from the `test` script itself, so a new suite is still registered there
 and nowhere else. Because suites run side by side, a suite takes a free port
 (`listen(0, '127.0.0.1')`) and a temp path of its own (`freshTestDbPath()`, `mkdtemp`), never a
-fixed one. CI runs `npm test`, one suite after the other, and next to it one browser suite,
-`test:fasting-browser`, as a job of its own.
+fixed one. CI runs the same runner with `--jobs 4` in the `Tests` job and uploads the step logs
+as an artifact when a step is red; next to it runs one browser suite, `test:fasting-browser`, as a
+job of its own.
 
 On Windows, check the repository out with LF line endings: Git for Windows turns them
 into CRLF by default, and the guards that read docs and locale files byte for byte then
