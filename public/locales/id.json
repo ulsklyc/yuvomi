@@ -170,6 +170,7 @@
         "sectionPeople": "Orang",
         "sectionFinance": "Keuangan",
         "help": "Bantuan",
+        "setStatus": "Ketersediaan",
         "changelog": "Yang baru",
         "accountMenu": "Menu akun, {{name}}",
         "accountMenuAnonymous": "Menu akun",

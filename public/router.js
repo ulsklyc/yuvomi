@@ -1172,6 +1172,20 @@ function refreshThemeColorForTheme() {
 // Mehr-Sheet). Teilt den Server-Logout mit den Einstellungen; das finally räumt
 // die lokale Session auch bei Netzfehler, damit man nie „eingeloggt festhängt"
 // (siehe clearSession/#478). Danger-Confirm schützt vor versehentlichem Klick.
+// Kontomenue -> eigenen Status setzen (#1591): der zweite Weg neben der
+// eigenen Zeile auf der Familien-Kachel, von jeder Seite aus erreichbar.
+async function openOwnAvailabilityModal() {
+  const userId = routerState.currentUser?.id;
+  if (!userId) return;
+  let currentAvail = null;
+  try {
+    const { data } = await api.get('/availability');
+    currentAvail = data?.find((a) => a.user_id === userId) ?? null;
+  } catch { /* ohne Vorbesetzung oeffnen - PUT/DELETE pruefen ohnehin serverseitig */ }
+  const { openAvailabilityModal } = await import('/pages/dashboard.js');
+  openAvailabilityModal(userId, currentAvail, refreshCurrentRoute);
+}
+
 async function confirmAndLogout() {
   // Kein danger/Rot: Abmelden ist reversibel (wieder einloggen), nicht
   // destruktiv — Rot bleibt echten Löschaktionen vorbehalten. Der Confirm-
@@ -1311,6 +1325,11 @@ function sidebarAccountEl({ isDisplayShell = false } = {}) {
     btn.append(i, span);
     return btn;
   };
+  // VERFUEGBARKEIT HAT HIER KEINEN EINZELNEN TRAEGER (#1591): ein Display
+  // vertritt niemanden Bestimmten, so wie es sich auch nicht abmelden kann.
+  if (!isDisplayShell) {
+    menu.append(item('availability', 'circle-dot', 'nav.setStatus', 'nav-account__availability'));
+  }
   menu.append(
     item('help', 'circle-help', 'nav.help', 'nav-account__help'),
     // `nav-item--changelog` traegt den Update-Hinweis im Namen (applyUpdateBadge).
@@ -1328,7 +1347,8 @@ function sidebarAccountEl({ isDisplayShell = false } = {}) {
   }
   menu.addEventListener('click', (event) => {
     const action = event.target.closest?.('.popover-menu__item')?.dataset.action;
-    if (action === 'help') showHelpModal();
+    if (action === 'availability') openOwnAvailabilityModal();
+    else if (action === 'help') showHelpModal();
     else if (action === 'changelog') showChangelogModal();
     else if (action === 'logout') confirmAndLogout();
   });

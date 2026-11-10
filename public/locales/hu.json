@@ -170,6 +170,7 @@
         "sectionPeople": "Emberek",
         "sectionFinance": "Pénzügyek",
         "help": "Súgó",
+        "setStatus": "Elérhetőség",
         "changelog": "Újdonságok",
         "accountMenu": "Fiókmenü, {{name}}",
         "accountMenuAnonymous": "Fiókmenü",

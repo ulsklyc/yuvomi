@@ -188,6 +188,7 @@
         "sectionPeople": "Люди",
         "sectionFinance": "Финансы",
         "help": "Справка",
+        "setStatus": "Доступность",
         "changelog": "Что нового",
         "accountMenu": "Меню аккаунта, {{name}}",
         "accountMenuAnonymous": "Меню аккаунта",
