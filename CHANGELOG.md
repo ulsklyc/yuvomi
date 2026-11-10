@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and when one is red, the logs are attached to the run. Contributors run `npm run test-parallel` before a push.
   A new push to a pull request cancels the run it replaces.
 
+### Fixed
+- **The demo seed finds the database key the server stored itself.** `scripts/seed-demo.js
+  --db <path>` now reads `DB_ENCRYPTION_KEY_FILE` and the key a first start keeps under
+  `.secrets/` next to the database, in the same order as the server. Until now it stopped on an
+  encrypted database unless the key was in the environment or in `.env`.
+
 ## [2.88.0] - 2026-11-10
 
 ### Foundation
