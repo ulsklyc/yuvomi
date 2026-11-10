@@ -336,6 +336,59 @@ test('GET /: eine im Kalender gewaehlte Farbe uebersteht den Abgleich, bei jedem
   assert.equal(colorOf(a.body.data.id), '#2563EB');
 });
 
+test('GET /: ein Abgleich ohne Aenderung schreibt keinen Kalendertermin', async () => {
+  // Der Abgleich haengt an jedem GET /birthdays, an jeder Erinnerungsabfrage und
+  // am Benachrichtigungslauf, der alle 60 Sekunden fuer jedes aktive Konto
+  // laeuft. Er schrieb jeden Geburtstagstermin bei jedem Lauf neu, auch wenn
+  // sich nichts geaendert hatte: jede Zeile bekam einen neuen `updated_at`
+  // (Trigger), und der Suchindex wurde je Zeile geloescht und neu eingetragen.
+  // Gezaehlt wird am Trigger, nicht an `updated_at`: die Spalte hat
+  // Sekundenaufloesung, zwei Laeufe in derselben Sekunde saehen gleich aus.
+  db.exec('CREATE TEMP TABLE IF NOT EXISTS event_update_log (id INTEGER)');
+  db.exec('CREATE TEMP TRIGGER IF NOT EXISTS trg_event_update_log AFTER UPDATE ON calendar_events BEGIN INSERT INTO event_update_log VALUES (NEW.id); END');
+  const updates = () => db.prepare('SELECT COUNT(*) AS n FROM event_update_log').get().n;
+  const reset = () => db.exec('DELETE FROM event_update_log');
+  try {
+    const created = await call('POST', '/', { name: 'Ruhe', birth_date: '1975-05-05', name_day: '06-06' });
+    assert.equal(created.status, 201);
+    const row = () => db.prepare('SELECT * FROM birthdays WHERE id = ?').get(created.body.data.id);
+    await call('GET', '/'); // einmal einschwingen
+    const events = db.prepare('SELECT COUNT(*) AS n FROM birthdays WHERE created_by = ? AND calendar_event_id IS NOT NULL').get(USER).n;
+    assert.ok(events >= 2, 'der Lauf hat mehrere Geburtstagstermine vor sich');
+
+    reset();
+    await call('GET', '/');
+    await call('GET', '/upcoming');
+    assert.equal(updates(), 0, 'zwei Abrufe ohne Aenderung schreiben keine Zeile in calendar_events');
+
+    // Eine echte Aenderung kommt weiter an: der Name steht im Titel des Termins.
+    reset();
+    db.prepare('UPDATE birthdays SET name = ? WHERE id = ?').run('Unruhe', created.body.data.id);
+    await call('GET', '/');
+    const title = db.prepare('SELECT title FROM calendar_events WHERE id = ?').get(row().calendar_event_id).title;
+    assert.match(title, /Unruhe/);
+    assert.ok(updates() >= 1, 'der geaenderte Termin wurde geschrieben');
+
+    // Der gespiegelte Zweig: ein Termin, den ein Provider traegt, wird ohne
+    // Aenderung ebenso wenig angefasst und nicht zum Senden vorgemerkt.
+    const eventId = row().calendar_event_id;
+    db.prepare("UPDATE calendar_events SET external_source = 'google', external_calendar_id = 'cal-1', end_datetime = start_datetime, outbound_dirty = 0 WHERE id = ?").run(eventId);
+    reset();
+    await call('GET', '/');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_update_log WHERE id = ?').get(eventId).n, 0, 'gespiegelter Termin ohne Aenderung bleibt unberuehrt');
+    assert.equal(db.prepare('SELECT outbound_dirty FROM calendar_events WHERE id = ?').get(eventId).outbound_dirty, 0);
+
+    db.prepare('UPDATE birthdays SET name = ? WHERE id = ?').run('Gespiegelt', created.body.data.id);
+    await call('GET', '/');
+    const mirrored = db.prepare('SELECT title, outbound_dirty FROM calendar_events WHERE id = ?').get(eventId);
+    assert.match(mirrored.title, /Gespiegelt/);
+    assert.equal(mirrored.outbound_dirty, 1, 'eine echte Aenderung wird weiter zum Senden vorgemerkt');
+  } finally {
+    db.exec('DROP TRIGGER IF EXISTS trg_event_update_log');
+    db.exec('DROP TABLE IF EXISTS event_update_log');
+  }
+});
+
 test('GET /?q=: filtert nach Name (LIKE)', async () => {
   const r = await call('GET', '/?q=Lena');
   assert.equal(r.status, 200);

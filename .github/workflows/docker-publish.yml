@@ -14,8 +14,9 @@ on:
     #      always runs, and the versioned images plus `latest` come from exactly
     #      that run.
     #   2. Even the branch run survives: a `chore: release vX.Y.Z` commit always
-    #      touches package.json, package-lock.json and public/sw.js, so it is
-    #      never docs-only and never matches this filter.
+    #      touches package.json and package-lock.json, so it is never docs-only
+    #      and never matches this filter. (Until the build wrote the service
+    #      worker's release itself, it also touched public/sw.js.)
     #
     # Ignoring docs/ costs the image nothing either way - .dockerignore drops it
     # from the build context, and no Markdown is read at runtime (the in-app

@@ -84,7 +84,14 @@ the last tag is an interface release.
    separated from `main` - pass `--hotfix "<reason>"`; the reason is mandatory and printed. A
    foundation release of the architecture roadmap (build, runtime and rules, no feature
    interface) passes `--foundation "<phase>"` instead, for example `--foundation "1a toolchain"`;
-   it is allowed on any day and prints `Fundament-Release <phase>`.
+   it is allowed on any day and prints `Fundament-Release <phase>`. A foundation release is
+   announced one release ahead (a paragraph under the previous release block and an
+   Announcements discussion), its CHANGELOG block starts with `### Foundation`, and before its
+   tag the way back is tried once: the previous image and the foundation build run in turn on a
+   copy of the same database (the demo seed does), a backup made on the new build restores on
+   the previous one, and the service worker switches both ways without an error screen. The
+   result goes into the release notes. The foundation does not change the database, so an
+   operator can pin the previous tag (installation.md, "Pinning a version").
 8. **Handrail, interface releases only.** If the diff since the last tag touches the interface
    paths above, run the browser suite once, and read its exit code from a file rather than a
    pipe (`| tail` reports the status of `tail`):

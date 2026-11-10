@@ -19,8 +19,8 @@
 // Index 2,2 -> 3,6 s, TBT 30 -> 130 ms).
 //
 // Ein Import ginge nicht (das hier laeuft vor jedem Modul), ein Inline-Skript
-// scheitert an der CSP (`script-src 'self'`). Keine API juenger als die des
-// Startpfads (Chrome 87, Firefox 79, Safari 14.1).
+// scheitert an der CSP (`script-src 'self'`). Keine API juenger als die
+// Untergrenze (Chrome 105, Firefox 115, Safari 15.4; docs/installation.md).
 (function () {
   if (typeof window.fetch !== 'function') return;
   // Die oeffentlichen Seiten fragen anders (oder gar nicht) - dort nichts vorab.

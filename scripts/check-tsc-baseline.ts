@@ -2,7 +2,7 @@
 /**
  * Modul: Typpruefung - tsc-Fehler gegen eine sinkende Baseline (Phase 1a, Abschnitt C)
  * Zweck: Ruft `tsc --build --force --verbose --pretty false`, ordnet jede Fehlerzeile dem
- *        Projekt zu, das die Datei besitzt (server/ + scripts/, public/, test/; ein Projekt
+ *        Projekt zu, das die Datei besitzt (server/ + scripts/ + tools/ + .github/scripts/, public/, test/; ein Projekt
  *        zieht per Import auch fremde Dateien mit, deren Fehler dort mit falscher
  *        Konfiguration entstuenden; public/vendor/ zaehlt nie), zaehlt eindeutige Stellen je `datei<TAB>TScode` und
  *        vergleicht mit tsc-baseline.json. Exit 1, wenn ein Schluessel steigt oder neu ist.
@@ -26,7 +26,7 @@ const rootIdx = args.indexOf('--root');
 const root = rootIdx >= 0 ? resolve(String(args[rootIdx + 1])) : fileURLToPath(new URL('..', import.meta.url));
 const baselinePath = resolve(root, 'tsc-baseline.json');
 // Welche Verzeichnisse ein Projekt besitzt; alles andere ist nur Mitlaeufer.
-const OWNED: Record<string, string[]> = { server: ['server/', 'scripts/', 'vite.config.ts'] };
+const OWNED: Record<string, string[]> = { server: ['server/', 'scripts/', 'tools/', '.github/', 'vite.config.ts'] };
 
 function measure(): Counts {
   const run = spawnSync(process.execPath, [tscBin, '--build', '--force', '--verbose', '--pretty', 'false'], {

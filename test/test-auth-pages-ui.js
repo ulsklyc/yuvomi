@@ -345,8 +345,10 @@ test('R24: offline.html steht auf der Buehne der Zugangsseiten und heisst wie de
   const offline = read('../public/offline.html');
   const de = JSON.parse(read('../public/locales/de.json'));
   const title = de.common.sessionUnreachableTitle;
-  assert.equal(offline.match(/<h1>([^<]+)<\/h1>/)?.[1], title, 'derselbe Titel wie page-unreachable');
-  assert.match(offline, new RegExp(`<title>${title} - Yuvomi</title>`));
+  // Seit Phase 1a E traegt die Seite de und en (test:browser-floor-page haelt
+  // jeden Text an seinem Schluessel); hier zaehlt der deutsche Block.
+  assert.equal(offline.match(/<h1 data-key="common\.sessionUnreachableTitle">([^<]+)<\/h1>/)?.[1], title, 'derselbe Titel wie page-unreachable');
+  assert.match(offline, new RegExp(`<div class="copy" lang="de" data-title="${title} - Yuvomi"`));
   const style = offline.slice(offline.indexOf('<style>') + 7, offline.indexOf('</style>'));
   const stage = [...eachRule(style)].find((r) => r.selector === '.stage' && !r.at.length);
   assert.ok(stage, '.stage fehlt');

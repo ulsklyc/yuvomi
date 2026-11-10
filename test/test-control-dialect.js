@@ -2011,6 +2011,10 @@ test('Zeilenaktionen sind dauerhaft sichtbar: keine Regel blendet einen Aktions-
     // :has() machte jede Einfuegung zur Stilrunde ueber das ganze Dokument).
     ['.page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools)',
       'Faltzeile: die ganze Werkzeugzeile gleitet hinter die Leiste, keine Zeilenaktion'],
+    // Ihr Zwilling fuer den Popover-Polyfill (reset.css, #2650): dieselbe Regel
+    // an der Klasse `.\:popover-open`.
+    ['.page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(.\\:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools)',
+      'Faltzeile unter dem Popover-Polyfill: derselbe Fall wie oben'],
   ]);
   const hidden = [];
   for (const { file, src } of CSS) {
@@ -2369,7 +2373,7 @@ test('R22 S10: kein Dialogfuss der App schiebt oder gruppiert per Inline-Stil', 
   const layout = CSS.find(({ file }) => file === 'public/styles/layout.css')?.src ?? '';
   const push = [...eachRule(layout)].find((r) => /\.modal-panel__footer > \.modal-panel__footer-start/.test(r.selector));
   assert.ok(push && /margin-inline-end:\s*auto/.test(push.body), '.modal-panel__footer-start schiebt den Rest ans Ende');
-  // Ohne `:has()` (Chrome 87) verwirft der Browser eine Selektorliste ganz:
+  // Ohne `:has()` (Firefox 115 an der Untergrenze) verwirft der Browser eine Selektorliste ganz:
   // der Schub am Loeschen-Knopf steht deshalb in einer Regel ohne `:has()`.
   const del = [...eachRule(layout)].find((r) => /\.modal-panel__footer > \.modal-panel__delete(?![\w-])/.test(r.selector) && /margin-inline-end:\s*auto/.test(r.body));
   assert.ok(del && !/:has\(/.test(del.selector), `der Schub am Loeschen-Knopf haengt an keiner :has()-Liste: ${del?.selector}`);

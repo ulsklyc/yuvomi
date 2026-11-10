@@ -23,8 +23,14 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
  * vite, esbuild und typescript sind Werkzeuge, kein Code im Browser.
  * Wer hier eines eintraegt, hat vorher ein Issue (CONTRIBUTING, Vendor-Politik).
  */
-/** @type {string[]} */
-const IMPORTED_PACKAGES = [];
+/**
+ * @oddbird/popover-polyfill: die Popover-API fuer Chrome 105-113, Firefox
+ * 115-124 und Safari 15.4-16 (Phase 1a E, Entscheidung Ulas 09.11.2026), nur
+ * per dynamischem Import hinter der Probe (utils/popover-support.js,
+ * test:old-browser-fallbacks).
+ * @type {string[]}
+ */
+const IMPORTED_PACKAGES = ['@oddbird/popover-polyfill'];
 
 /**
  * Laufzeit-Helfer, die die Werkzeugkette selbst in die Chunks legt (Preload,

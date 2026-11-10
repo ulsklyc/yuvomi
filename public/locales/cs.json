@@ -3844,7 +3844,8 @@
         "staleData": "Offline - stav: {{time}}",
         "pageTitle": "Jsi offline",
         "pageDescription": "Tato stránka potřebuje připojení. Jakmile bude zařízení opět online, načte se sama.",
-        "snapshot": "Bez připojení k serveru - uložený stav, jen pro čtení"
+        "snapshot": "Bez připojení k serveru - uložený stav, jen pro čtení",
+        "unreachableBody": "Yuvomi teď není dostupné. Zkontroluj, že je zařízení online a server běží, a zkus to znovu."
     },
     "onboarding": {
         "step1Title": "Vítejte v {{name}}",
@@ -7065,5 +7066,12 @@
         "custom": "Vlastní barva",
         "chooseCustom": "Vybrat vlastní barvu",
         "standard": "Výchozí barva"
+    },
+    "browserTooOld": {
+        "pageTitle": "Prohlížeč je příliš starý",
+        "title": "Tento prohlížeč je pro Yuvomi příliš starý",
+        "body": "Yuvomi potřebuje několik funkcí, které tento prohlížeč zatím nezná. Tvých dat se to netýká.",
+        "versions": "Yuvomi funguje od Chrome a Edge {{chrome}}, Firefox {{firefox}} a Safari {{safari}}, na iPhonu a iPadu od iOS {{ios}}.",
+        "action": "Aktualizuj prohlížeč nebo zařízení a zkus to znovu. Pokud to nejde, otevři Yuvomi v jiném prohlížeči."
     }
 }
