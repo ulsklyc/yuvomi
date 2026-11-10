@@ -84,7 +84,14 @@ the last tag is an interface release.
    separated from `main` - pass `--hotfix "<reason>"`; the reason is mandatory and printed. A
    foundation release of the architecture roadmap (build, runtime and rules, no feature
    interface) passes `--foundation "<phase>"` instead, for example `--foundation "1a toolchain"`;
-   it is allowed on any day and prints `Fundament-Release <phase>`.
+   it is allowed on any day and prints `Fundament-Release <phase>`. A foundation release is
+   announced one release ahead (a paragraph under the previous release block and an
+   Announcements discussion), its CHANGELOG block starts with `### Foundation`, and before its
+   tag the way back is tried once: the previous image and the foundation build run in turn on a
+   copy of the same database (the demo seed does), a backup made on the new build restores on
+   the previous one, and the service worker switches both ways without an error screen. The
+   result goes into the release notes. The foundation does not change the database, so an
+   operator can pin the previous tag (installation.md, "Pinning a version").
 8. **Handrail, interface releases only.** If the diff since the last tag touches the interface
    paths above, run the browser suite once, and read its exit code from a file rather than a
    pipe (`| tail` reports the status of `tail`):
@@ -97,7 +104,7 @@ the last tag is an interface release.
    went red in the past (`test:sw-precache`, `test:document-folder-keys`, `test:changelog`) were
    never in anyone's "relevant" list.
 10. **Commit, fetch, tag, push - in that order.** `git commit -m "chore: release vX.Y.Z"` with
-    `CHANGELOG.md`, `package.json`, `package-lock.json`, `public/sw.js`, the docs from steps 4 and 5 and
+    `CHANGELOG.md`, `package.json`, `package-lock.json`, the docs from steps 4 and 5 and
     the Umbrel notes staged by name (never `git add -A`). Then `git fetch origin` **before**
     `git tag vX.Y.Z`: the fetch brings in a tag somebody else may have set for the same version,
     and the tag command fails before anything is pushed. Then `git push && git push --tags`.
@@ -165,10 +172,10 @@ last tag, carrying the fix, its tests and its documentation and nothing else:
 4. `npm test` on the branch, then commit, fetch, tag, push, release, downstream - steps 9 to 12.
    The cadence check passes on the second track by construction: the diff since the last tag is
    the fix.
-5. Merge the branch back: `git switch main && git merge --no-ff release/X.Y.Z`. Two conflicts
-   are normal - `CHANGELOG.md`, where the new block goes below `## [Unreleased]` and the
-   Unreleased bullets stay, and `public/sw.js`, where `main`'s shape of the file wins with the new
-   version number. After resolving, check that `CHANGELOG.md` contains no conflict markers and that
+5. Merge the branch back: `git switch main && git merge --no-ff release/X.Y.Z`. One conflict
+   is normal - `CHANGELOG.md`, where the new block goes below `## [Unreleased]` and the
+   Unreleased bullets stay. A branch off a tag before 2.88.0 also conflicts in `public/sw.js`,
+   which carried the version by hand until then; `main`'s shape of the file wins. After resolving, check that `CHANGELOG.md` contains no conflict markers and that
    its heading structure is what you meant (`git add` checks neither; `test:changelog` compares
    every released section with the new tag and so catches a bullet that slid into or out of the
    new block, but not one that landed under the wrong heading inside `[Unreleased]`), run

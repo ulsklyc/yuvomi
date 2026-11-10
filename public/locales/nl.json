@@ -3900,7 +3900,8 @@
         "staleData": "Offline - stand: {{time}}",
         "pageTitle": "Je bent offline",
         "pageDescription": "Deze pagina heeft een verbinding nodig. Zodra je apparaat weer online is, laadt ze vanzelf.",
-        "snapshot": "Geen verbinding met de server - opgeslagen gegevens, alleen-lezen"
+        "snapshot": "Geen verbinding met de server - opgeslagen gegevens, alleen-lezen",
+        "unreachableBody": "Yuvomi is nu niet bereikbaar. Controleer of je apparaat online is en de server draait, en probeer het opnieuw."
     },
     "shortcuts": {
         "search": "Zoeken openen",
@@ -6881,5 +6882,12 @@
         "custom": "Eigen kleur",
         "chooseCustom": "Eigen kleur kiezen",
         "standard": "Standaardkleur"
+    },
+    "browserTooOld": {
+        "pageTitle": "Browser te oud",
+        "title": "Deze browser is te oud voor Yuvomi",
+        "body": "Yuvomi heeft een paar functies nodig die deze browser nog niet kent. Je gegevens blijven daarbuiten.",
+        "versions": "Yuvomi werkt vanaf Chrome en Edge {{chrome}}, Firefox {{firefox}} en Safari {{safari}}, en op iPhone en iPad vanaf iOS {{ios}}.",
+        "action": "Werk de browser of het apparaat bij en probeer het dan opnieuw. Lukt dat niet, open Yuvomi dan in een andere browser."
     }
 }

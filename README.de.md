@@ -241,7 +241,7 @@ und die [Installationsanleitung im Repository](docs/installation.md).
 <details>
 <summary><b>Voraussetzungen, Netzwerk und eure Daten</b></summary>
 
-- **Browser** - alles wie vorgesehen ab Chrome und Edge 117, Firefox 129 und Safari 17.5. Bis hinunter zu Chrome 87, Firefox 79 und Safari 14.1 (iOS 14.5) startet und scrollt es noch, schlichter und mit einzelnen fehlenden Funktionen ([gemessen am 21. September 2026](docs/installation.md#browser-support)).
+- **Browser** - Chrome und Edge 105, Firefox 115, Safari 15.4 und iOS 15.4 oder neuer. Ältere Safari- und iOS-Versionen, Chrome vor 99 und Firefox vor 97 bekommen eine Seite, die diese Versionen nennt; Chrome 99 bis 104 und Firefox 97 bis 114 starten mit Lücken ([Details](docs/installation.md#browser-support)).
 - **Schreibt** - vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.
 - **Nach außen** - von sich aus eine Update-Abfrage an die GitHub-Releases-API. Blockiert sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht:
   - **Wenn ihr sie nutzt** - das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org; die Logo-Suche für ein Abo ruft die Website des Dienstes auf.
@@ -283,7 +283,7 @@ Yuvomi wurde von **Oikos** umbenannt, um einen Markenkonflikt mit einem unabhän
 
 ## Unter der Haube
 
-- **Kein Build-Schritt** - reine ES-Module und einfaches CSS. Kein Bundler, kein Transpiler, kein Framework, kein CDN zur Laufzeit.
+- **Gebaut und trotzdem lesbar** - Vite bündelt die App und liefert sie mit Source Maps aus; es gibt kein Framework, kein CDN zur Laufzeit und keine Telemetrie, jedes Fremdpaket ist gepinnt und aufgelistet, und dieselbe Quelle ergibt dieselben Bytes, so dass sich der Release-Tarball nachbauen und vergleichen lässt ([die fünf Garantien](CONTRIBUTING.md#hard-constraints)).
 - **Fühlt sich an wie eine native App** - gebaut nach Apples Gestaltungsrichtlinien: Systemschrift, Kapsel-Knöpfe, gruppierte Listen und federnde Bewegung, mit in Hell und Dunkel geprüftem WCAG-AA-Kontrast.
 - **Privatsphäre zuerst** - vollständig selbstgehostet, optionale SQLCipher-AES-256-Datenbankverschlüsselung, keine Telemetrie.
 - **Anmeldung für einen ganzen Haushalt** - Zwei-Faktor-Anmeldung, Einladungslinks, optionaler Passwort-Reset per E-Mail und Single Sign-on mit jedem OIDC-Anbieter; siehe [wie sicher der Zugang von außen ist](#bevor-ihr-euch-festlegt).

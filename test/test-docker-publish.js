@@ -26,9 +26,26 @@ function namedWorkflowStep(source, name) {
 test('Docker publish treats the remote build cache as an optional optimization', () => {
   assert.match(
     workflow,
-    /cache-to:\s*type=gha,mode=max,ignore-error=true/,
+    /cache-to:.*type=gha,mode=max,ignore-error=true/,
     'A failed GitHub Actions cache export must not fail an otherwise successful image push'
   );
+});
+
+test('a release image is built without the layer cache, main keeps it (#2635)', () => {
+  // Der gha-Cache ist je Repository geteilt: ein Tag-Build konnte Layer aus einem
+  // frueheren main-Build uebernehmen, npm ci und der Vite-Build der Build-Stage
+  // eingeschlossen. Ein Release-Image entsteht deshalb immer frisch aus dem Tag;
+  // der Cache bleibt den Branch-Builds, wo er Minuten spart und nichts ausliefert,
+  // was jemand pinnt. Entscheidung Ulas, 10.11.2026.
+  const step = workflow.slice(workflow.indexOf('- name: Build and push'), workflow.indexOf('- name: Install cosign'));
+  const isTag = "startsWith(github.ref, 'refs/tags/v')";
+  assert.ok(step.includes(`no-cache: \${{ ${isTag} }}`), 'tag builds pass --no-cache');
+  assert.ok(step.includes(`cache-from: \${{ !${isTag} && 'type=gha' || '' }}`), 'tag builds import no cache');
+  assert.ok(step.includes(`cache-to: \${{ !${isTag} && 'type=gha,mode=max,ignore-error=true' || '' }}`), 'tag builds export no cache');
+  // Kein zweiter Weg an der Bedingung vorbei.
+  assert.equal((step.match(/^\s+cache-from:/gm) || []).length, 1);
+  assert.equal((step.match(/^\s+cache-to:/gm) || []).length, 1);
+  assert.equal((step.match(/^\s+no-cache:/gm) || []).length, 1);
 });
 
 test('Docker publishing injects the immutable Git revision into the image', () => {
@@ -157,7 +174,12 @@ test('the image builds the web app and ships dist/ from the build stage, plus th
   assert.doesNotMatch(runtimeStage, /COPY test\//);
   const ignore = readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8').split('\n').map((l) => l.trim());
   assert.ok(ignore.includes('test/'), '.dockerignore keeps test/ out');
-  assert.ok(!ignore.some((l) => /^\/?dist\/?$/.test(l)), '.dockerignore must not list dist/ - it is built in the image, never copied in');
+  // dist/ entsteht in der Build-Stage. Ein dist/ aus dem Arbeitsbaum (35 MB samt
+  // Sourcemaps) hat im Kontext nichts verloren: es wuerde bei jedem lokalen
+  // `docker build` zum Daemon geschickt, und ein spaeteres `COPY dist/` naehme
+  // still den Stand des Entwicklerrechners statt den der Build-Stage (#2636).
+  assert.ok(ignore.includes('dist/'), '.dockerignore keeps a dist/ from the working tree out of the build context');
+  assert.doesNotMatch(dockerfile, /^COPY (?!--from=)[^\n]*\bdist\b/m, 'dist/ is never copied from the build context, only from the build stage');
   for (const need of ['!scripts/build/', '!scripts/build-third-party-notices.mjs']) assert.ok(ignore.includes(need), `${need} missing in .dockerignore`);
 });
 
