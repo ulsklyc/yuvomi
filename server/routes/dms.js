@@ -11,12 +11,14 @@ import { isAdminRequest } from '../middleware/require-admin.js';
 import { getAdapter as defaultGetAdapter, SUPPORTED_PROVIDERS } from '../services/dms/index.js';
 import { documentVisibleSql } from '../services/document-access.js';
 import { StorageError, readDocumentContent } from '../services/document-storage.js';
+import paperlessFoldersRouter from './paperless-folders.js';
 
 let adapterFactory = defaultGetAdapter;
 export function _setAdapterFactory(fn) { adapterFactory = fn || defaultGetAdapter; }
 
 const log = createLogger('DMS');
 const router = express.Router();
+router.use('/paperless', paperlessFoldersRouter);
 
 const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
 const VISIBILITIES = ['family', 'restricted', 'private'];

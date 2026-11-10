@@ -10654,8 +10654,8 @@ test('documents and navigation settings use progressive disclosure instead of st
   // einem <details>-Slider in die Kopfzeile gequetscht.
   assert.doesNotMatch(documentsPage, /documents-secondary-controls/);
   assert.match(documentsPage, /<div class="documents-filters">/);
-  assert.match(documentsPage, /class="segmented documents-status" id="documents-status"/);
-  assert.match(documentsPage, /class="documents-filter-chips" id="documents-category"/);
+  assert.match(documentsPage, /class="[^"]*\bsegmented documents-status\b[^"]*" id="documents-status"/);
+  assert.match(documentsPage, /class="[^"]*\bdocuments-filter-chips\b[^"]*" id="documents-category"/);
   // Nur die Chip-Spur scrollt; die Filterzeile selbst nicht. Das hält das
   // Status-Segment immer sichtbar und verhindert verschachtelte Scroller.
   // Sortierung und Auswahl stehen seit 2026-09-25 im Kopf-Menue.

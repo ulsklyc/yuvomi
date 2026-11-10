@@ -35,6 +35,22 @@ function mockResponse(status, body = {}, headers = {}) {
 const { api, auth, ApiError, isAbortError } = await import('../public/api.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
 
+test('Paperless API documents personal credentials and all three folder audiences', () => {
+  const root = '/api/v1/documents/dms/paperless';
+  const { paths } = buildOpenApiSpec();
+  const folder = paths[`${root}/folders`].post.requestBody.content['application/json'].schema;
+  assert.deepEqual(folder.properties.visibility.enum, ['private', 'restricted', 'family']);
+  assert.ok(folder.properties.allowed_member_ids);
+  for (const [path, methods] of [
+    ['/live-settings', ['get']], ['/live-settings/{id}', ['put']],
+    ['/live-settings/{id}/tags', ['get']], ['/live-settings/{id}/token', ['put', 'delete']],
+  ]) for (const method of methods) assert.ok(paths[root + path]?.[method], `${method} ${path}`);
+  const credential = paths[`${root}/live-settings/{id}/token`].put;
+  assert.equal(credential.requestBody.content['application/json'].schema.properties.api_token.writeOnly, true);
+  assert.match(credential.description, /Documents readers using a session/);
+  assert.ok(paths[`${root}/tags`].get.parameters.some((p) => p.name === 'folder_id'));
+});
+
 function setup() {
   dispatchedEvents = [];
   document.cookie = '';
@@ -818,6 +834,8 @@ const publicSource = (rel) => readFileSync(new URL(`../public/${rel}`, import.me
 
 // Grund -> Datei unter public/, die ihn liest.
 const REASONS_READ_BY_A_PAGE = new Map([
+  ['paperless_personal_token_required', 'components/paperless-folders.js'],
+  ['paperless_dms_forbidden', 'components/paperless-folders.js'],
   ['ATTACHMENT_CHANGE_REFUSED', 'pages/calendar.js'],
   ['ATTACHMENT_UPLOAD_REFUSED', 'pages/calendar.js'],
   // Ein Mitglied loescht einen Kalender, den ein Admin exportiert (#1909): das
@@ -971,6 +989,9 @@ const REASONS_PASSED_THROUGH = new Map([
   ['services/recipe-providers/failure.js: failure?.reason ?? null', { sites: 1, at403: [], why: 'probeFailure: Feld im Ergebnis des Verbindungstests' }],
   ['services/recipe-providers/failure.js: probe.reason', { sites: 1, at403: [], why: 'classifyProbe: reicht den Fall des Adapters weiter' }],
   ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  ['routes/paperless-live-settings.js: reason (Kurzform)', { sites: 1, at403: [], why: 'Settings validation, conflicts and upstream failures; all permission refusals return a generic 403 before this response.' }],
+  ['routes/paperless-tags.js: reason (Kurzform)', { sites: 1, at403: [['paperless_personal_token_required', 'services/paperless-live-settings.js']], why: 'Missing personal credentials have a local UI explanation; other permission errors are generic.' }],
+  ['routes/paperless-folders.js: reason (Kurzform)', { sites: 1, at403: [['paperless_personal_token_required', 'services/paperless-live-settings.js'], ['paperless_dms_forbidden', 'routes/paperless-folders.js']], why: 'Personal-token absence and DMS permission failures are handled by the Live-folder UI; other permission errors are generic.' }],
   ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
   ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
   ['routes/weather.js: WEATHER_REASON.NOT_CONFIGURED', { sites: 1, at403: [], why: 'Antwort 200 ohne Daten' }],

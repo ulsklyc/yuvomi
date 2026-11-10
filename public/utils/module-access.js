@@ -223,6 +223,13 @@ export function pathAccess(path) {
  */
 export const READ_LEVEL_WRITES = Object.freeze([
   Object.freeze({
+    id: 'paperless-personal-token',
+    pattern: '^\\/documents\\/dms\\/paperless\\/live-settings\\/[1-9]\\d*\\/token\\/?$',
+    flags: 'i',
+    methods: Object.freeze(['PUT', 'DELETE']),
+    axes: Object.freeze(['session']),
+  }),
+  Object.freeze({
     id: 'schedule-preferences',
     pattern: '^\\/schedule\\/preferences$',
     flags: '',

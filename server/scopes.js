@@ -190,6 +190,13 @@ function moduleForPath(path) {
  */
 const READ_LEVEL_WRITES = Object.freeze([
   Object.freeze({
+    id: 'paperless-personal-token',
+    pattern: '^\\/documents\\/dms\\/paperless\\/live-settings\\/[1-9]\\d*\\/token\\/?$',
+    flags: 'i',
+    methods: Object.freeze(['PUT', 'DELETE']),
+    axes: Object.freeze(['session']),
+  }),
+  Object.freeze({
     id: 'schedule-preferences',
     // OHNE Falten von Schreibweise und Schlussstrich - mit Absicht, und es
     // schliesst: `/Schedule/Preferences` oder `/schedule/preferences/` erreicht

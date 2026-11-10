@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Live-folder settings centrally control available tags and DMS authentication.** Administrators can choose allowed tags per Paperless connection and use either the shared connection token or personal tokens. Users save and remove their own write-only tokens in Documents settings. Personal mode never falls back to the shared token, and existing folder visibility still applies. Tags outside the allowed selection are preserved when editing Live-folder documents.
+- **Saved Paperless views can be opened as live document folders.** Connect a
+  view in Documents, keep it private or explicitly share its current and future
+  matches with selected members or the family. Source filters, ordering and pagination are read on
+  demand; preview and download recheck membership. Disconnecting only removes
+  the binding. Migration 283 adds the folder and member-access tables.
+- **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
+
+### Fixed
+- **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
+- **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
 ### Foundation
 - **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
   service worker takes its offline list from the build instead of a hand-kept one; pages,

@@ -2651,3 +2651,72 @@
     transition: none;
   }
 }
+
+/* Paperless views use their source's ordering and pagination. Local upload,
+ * category and archive controls apply only to Yuvomi's own document list. */
+.documents--paperless-view .documents-local-only {
+  display: none;
+}
+
+.paperless-folder {
+  padding-block: var(--space-3);
+}
+
+.paperless-folder__head,
+.paperless-folder__pagination,
+.paperless-folder__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.paperless-folder__head {
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.paperless-folder__title {
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+}
+
+.paperless-folder__documents {
+  margin-block: var(--space-3);
+}
+
+.paperless-folder__document {
+  flex-wrap: wrap;
+}
+
+.paperless-folder__document > .list-row__name {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.paperless-folder__actions {
+  margin-inline-start: auto;
+}
+
+.paperless-folder__pagination {
+  justify-content: space-between;
+}
+
+.paperless-tags__choices { min-width: 0; margin: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.paperless-tags__choices [data-pl-tag-list] { display: grid; gap: var(--space-2); max-height: 40vh; overflow-y: auto; }
+.paperless-tags__choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+}
+.paperless-tags__choice input { flex-shrink: 0; }

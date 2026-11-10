@@ -654,8 +654,11 @@ test('verschobene Blatt-Pfade landen am neuen Ort statt beim Fallback', () => {
   assert.equal(currentSettingsPath('/settings/modules/documents'), '/settings/modules/documents');
   assert.equal(currentSettingsPath('/settings/unbekannt'), '/settings/unbekannt');
   assert.equal(movedSettingsUrl('/settings/documents/dms'), '/settings/modules/documents?section=documents-dms');
-  // Rollen-Gate greift auch ueber den alten Pfad.
-  assert.equal(findSettingsLeaf('/settings/documents/storage', member), null);
+  // The old Documents bookmark now reaches the personal-token section,
+  // while household storage and DMS administration remain hidden.
+  const leaf = findSettingsLeaf('/settings/documents/storage', member);
+  assert.equal(leaf?.id, 'module-documents');
+  assert.deepEqual(settingsSheetSections(leaf, member).map((entry) => entry.id), ['documents-live-folders']);
 });
 
 test('das aufgelöste Übersicht-Blatt landet beim Haushalts-Wetter', () => {
@@ -5870,4 +5873,16 @@ test('R24: die Mobil-Plaetze stehen als Optionszeilen in einem Traeger', async (
   assert.match(src, /<div class="row-carrier settings-group settings-mobile-nav-slots">/, 'ein Traeger fuer alle drei');
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   assert.ok(![...eachRule(css)].some((r) => r.selector.trim() === '.settings-mobile-nav-slot'), 'keine eigene Karte je Platz');
+});
+
+
+test('Live-folder settings follow DMS administration and expose personal credentials to members', async () => {
+  const leaf = findSettingsLeaf('/settings/modules/documents', admin);
+  assert.deepEqual(settingsSheetSections(leaf, admin).map((entry) => entry.id),
+    ['documents-storage', 'documents-dms', 'documents-live-folders']);
+  assert.deepEqual(settingsSheetSections(leaf, member).map((entry) => entry.id), ['documents-live-folders']);
+  const source = await readFile(new URL('../public/settings/pages/documents-live-folders.js', import.meta.url), 'utf8');
+  assert.match(source, /type="password"/);
+  assert.match(source, /has_personal_token/);
+  assert.doesNotMatch(source, /value="\$\{account\.api_token/);
 });

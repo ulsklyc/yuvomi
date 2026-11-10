@@ -372,6 +372,8 @@ const SECRET_COLUMNS = {
   'caldav_accounts.password': 'household: Zugang zu einem fremden Kalenderdienst',
   'carddav_accounts.password': 'household: Zugang zu einem fremden Adressbuchdienst',
   'dms_accounts.api_token': 'household: Zugang zu einem fremden Dokumentendienst',
+  'paperless_live_settings.token_mode': 'no-secret: selects shared or personal authentication for a household connection',
+  'paperless_user_tokens.api_token': 'ended: personal DMS credentials are deleted on deactivation and cascade on deletion',
   'recipe_provider_accounts.api_token': 'household: Zugang zu einem fremden Rezeptdienst',
   'google_calendar_selection.sync_token': 'no-secret: Fortschrittsmarke des Abgleichs',
 };
