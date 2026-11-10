@@ -2011,6 +2011,10 @@ test('Zeilenaktionen sind dauerhaft sichtbar: keine Regel blendet einen Aktions-
     // :has() machte jede Einfuegung zur Stilrunde ueber das ganze Dokument).
     ['.page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools)',
       'Faltzeile: die ganze Werkzeugzeile gleitet hinter die Leiste, keine Zeilenaktion'],
+    // Ihr Zwilling fuer den Popover-Polyfill (reset.css, #2650): dieselbe Regel
+    // an der Klasse `.\:popover-open`.
+    ['.page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(.\\:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools)',
+      'Faltzeile unter dem Popover-Polyfill: derselbe Fall wie oben'],
   ]);
   const hidden = [];
   for (const { file, src } of CSS) {

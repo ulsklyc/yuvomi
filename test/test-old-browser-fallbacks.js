@@ -1154,13 +1154,24 @@ test('keine Regel setzt display an einem Popover ausserhalb von :popover-open (#
  *      statisch, sonst laedt ihn jeder Browser (und Vite legte ihn in den
  *      Start-Chunk).
  *   2. Er kennt `:popover-open` in CSS nicht, sondern setzt die Klasse
- *      `.\:popover-open`. Jede Regel, die ein offenes Popover erst zeigt
- *      (`display`, `opacity`, `transform`, `pointer-events`), hat ihren
- *      Zwilling an dieser Klasse im Rueckfall-Block von reset.css - sonst
- *      stuende das Menue offen, aber unsichtbar.
+ *      `.\:popover-open`. Jede Regel, die vom offenen Zustand abhaengt, hat
+ *      ihren Zwilling an dieser Klasse im Rueckfall-Block von reset.css -
+ *      sonst stuende das Menue offen, aber unsichtbar. "Jede" heisst (#2650):
+ *      auch in `@media` (der Zwilling steht im selben `@media` im
+ *      Rueckfall-Block, oder der Zwilling der Basisebene setzt denselben Wert),
+ *      auch zusammengesetzt (`.a.b:popover-open`, `.a:popover-open .c`) und
+ *      auch als Bedingung (`:has(:popover-open)`). Ein unbekannter Selektor
+ *      macht die ganze Liste ungueltig - der Zwilling ist deshalb eine eigene
+ *      Regel, nie ein Glied derselben Liste.
+ *      Nicht verlangt: `:not(:popover-open)` allein (der geschlossene Zustand,
+ *      den `[popover] { display: none }` traegt), `transition*` (ohne
+ *      `@starting-style` blendet unter dem Polyfill nichts) und alles in
+ *      `@starting-style` (Chrome 117, also nie zusammen mit dem Polyfill).
  * ────────────────────────────────────────────────────────────────────────── */
 const POLYFILL = '@oddbird/popover-polyfill';
-const OPEN_STATE_PROPS = ['display', 'opacity', 'transform', 'pointer-events'];
+const NOT_OPEN_STATE = /^transition/;
+// `:popover-open`, das nicht direkt in `:not(` steht.
+const OPEN_PSEUDO = /(?<!:not\()(?<!\\):popover-open\b/g;
 
 /**
  * Statische und dynamische Importe des Polyfills in einer Quelle.
@@ -1173,51 +1184,74 @@ function polyfillImports(source) {
 }
 
 /**
- * Klasse -> Eigenschaften, die eine Grundebenen-Regel `.x:popover-open` setzt.
+ * Schluessel aus At-Kette und Selektor: `@media (...) > .a.\:popover-open`.
+ * @param {string[]} at
+ * @param {string} selector
+ */
+const twinKey = (at, selector) => [...at.map(norm), norm(selector)].join(' > ');
+
+/**
+ * Was der Polyfill verliert: Zwilling-Schluessel -> Eigenschaft -> Wert, je
+ * Regel, die vom offenen Zustand abhaengt. Der Schluessel nennt den Zwilling,
+ * der verlangt ist (`:popover-open` -> `.\:popover-open`), samt `@media`-Kette.
  * @param {string} css
  */
 function openStateRules(css) {
-  /** @type {Map<string, Set<string>>} */
+  /** @type {Map<string, Map<string, string>>} */
   const map = new Map();
   for (const { selector, body, at } of eachRule(css)) {
-    if (at.length) continue;
+    if (at.some((a) => /^@starting-style\b/i.test(a) || /^@supports\s+(?:not\s+)?selector\(\s*:popover-open\s*\)$/i.test(a))) continue;
+    const props = declarations(body).filter((d) => !NOT_OPEN_STATE.test(d.property));
+    if (!props.length) continue;
     for (const part of selectorParts(selector)) {
-      const cls = part.match(/^\.([\w-]+):popover-open$/)?.[1];
-      if (!cls) continue;
-      const props = declarations(body).map((d) => d.property).filter((p) => OPEN_STATE_PROPS.includes(p));
-      if (props.length) map.set(cls, new Set([...(map.get(cls) ?? []), ...props]));
+      if (!OPEN_PSEUDO.test(part)) continue;
+      OPEN_PSEUDO.lastIndex = 0;
+      const key = twinKey(at, part.replace(OPEN_PSEUDO, '.\\:popover-open'));
+      const entry = map.get(key) ?? new Map();
+      for (const d of props) entry.set(d.property, norm(d.value));
+      map.set(key, entry);
     }
   }
   return map;
 }
 
 /**
- * Klasse -> Eigenschaften ihrer Zwillinge `.x.\:popover-open` im Rueckfall-Block.
+ * Die Zwillinge im Rueckfall-Block, gleich verschluesselt (ohne die
+ * `@supports`-Stufe selbst).
  * @param {string} css
  */
 function polyfillTwins(css) {
-  /** @type {Map<string, Set<string>>} */
+  /** @type {Map<string, Map<string, string>>} */
   const map = new Map();
   for (const { selector, body, at } of eachRule(css)) {
-    if (at.length !== 1 || !POPOVER_FALLBACK_AT.test(at[0])) continue;
+    if (!at.length || !POPOVER_FALLBACK_AT.test(at[0])) continue;
     for (const part of selectorParts(selector)) {
-      const cls = part.match(/^\.([\w-]+)\.\\:popover-open$/)?.[1];
-      if (!cls) continue;
-      map.set(cls, new Set([...(map.get(cls) ?? []), ...declarations(body).map((d) => d.property)]));
+      if (!part.includes('.\\:popover-open')) continue;
+      const key = twinKey(at.slice(1), part);
+      const entry = map.get(key) ?? new Map();
+      for (const d of declarations(body)) entry.set(d.property, norm(d.value));
+      map.set(key, entry);
     }
   }
   return map;
 }
 
 /**
- * Was an den Zwillingen fehlt: `.x { prop }` je fehlender Eigenschaft.
- * @param {Map<string, Set<string>>} open
- * @param {Map<string, Set<string>>} twins
+ * Was an den Zwillingen fehlt: `<Schluessel> { prop }` je fehlender Eigenschaft.
+ * Eine Regel in `@media` ist gedeckt, wenn ihr Zwilling im selben `@media`
+ * steht oder der Zwilling der Basisebene denselben Wert setzt.
+ * @param {Map<string, Map<string, string>>} open
+ * @param {Map<string, Map<string, string>>} twins
  */
 function missingTwins(open, twins) {
   const missing = [];
-  for (const [cls, props] of open) {
-    for (const prop of props) if (!twins.get(cls)?.has(prop)) missing.push(`.${cls}.\\:popover-open { ${prop} }`);
+  for (const [key, props] of open) {
+    const baseKey = key.split(' > ').filter((step) => !step.startsWith('@')).join(' > ');
+    for (const [prop, value] of props) {
+      if (twins.get(key)?.has(prop)) continue;
+      if (baseKey !== key && twins.get(baseKey)?.get(prop) === value) continue;
+      missing.push(`${key} { ${prop} }`);
+    }
   }
   return missing.sort();
 }
@@ -1230,12 +1264,35 @@ test('Leser: Polyfill-Importe und Zwillinge des offenen Zustands (erfundene Fael
     '.a:popover-open { display: flex; transition: none }',
     '.b:popover-open, .c:popover-open { opacity: 1 }',
     '.d:not(:popover-open) { opacity: 0 }',
-    '@media (max-width: 1px) { .e:popover-open { opacity: 1 } }',
+    '@media (max-width: 1px) { .a:popover-open { display: grid } .b:popover-open { opacity: 1 } }',
     '.f:popover-open { color: red }',
+    '.g.h:popover-open { display: grid }',
+    '.i:popover-open .j { opacity: 1 }',
+    '.k:not(:has(:popover-open)) { translate: 0 -1px }',
+    '@starting-style { .a:popover-open { opacity: 0 } }',
+    '@supports selector(:popover-open) { .l:popover-open { opacity: 1 } }',
   ].join('\n'));
-  assert.deepEqual([...open.keys()].sort(), ['a', 'b', 'c']);
-  const twins = polyfillTwins('@supports not selector(:popover-open) { .a.\\:popover-open, .b.\\:popover-open { display: flex; opacity: 1 } } .c.\\:popover-open { opacity: 1 }');
-  assert.deepEqual(missingTwins(open, twins), ['.c.\\:popover-open { opacity }'], 'ein Zwilling ausserhalb des Rueckfall-Blocks zaehlt nicht');
+  assert.deepEqual([...open.keys()].sort(), [
+    '.a.\\:popover-open', '.b.\\:popover-open', '.c.\\:popover-open', '.f.\\:popover-open',
+    '.g.h.\\:popover-open', '.i.\\:popover-open .j', '.k:not(:has(.\\:popover-open))',
+    '@media (max-width: 1px) > .a.\\:popover-open', '@media (max-width: 1px) > .b.\\:popover-open',
+  ]);
+  assert.deepEqual([...(open.get('.a.\\:popover-open')?.keys() ?? [])], ['display'], 'transition zaehlt nicht');
+  const twins = polyfillTwins([
+    '@supports not selector(:popover-open) {',
+    '  .a.\\:popover-open, .b.\\:popover-open { display: flex; opacity: 1 }',
+    '  .f.\\:popover-open { color: red } .g.h.\\:popover-open { display: grid }',
+    '  .i.\\:popover-open .j { opacity: 1 }',
+    '  @media (max-width: 1px) { .k:not(:has(.\\:popover-open)) { translate: 0 -1px } }',
+    '}',
+    '.c.\\:popover-open { opacity: 1 }',
+  ].join('\n'));
+  assert.deepEqual(missingTwins(open, twins), [
+    '.c.\\:popover-open { opacity }',
+    '.k:not(:has(.\\:popover-open)) { translate }',
+    '@media (max-width: 1px) > .a.\\:popover-open { display }',
+  ], 'ausserhalb des Rueckfall-Blocks zaehlt nichts; in @media deckt die Basis nur denselben Wert; '
+    + 'ein Zwilling in einem anderen @media deckt nicht');
 });
 
 test('der Popover-Polyfill laedt nur dynamisch und nur hinter der Probe', () => {
@@ -1290,13 +1347,17 @@ test('ensurePopoverApi() als Programm: laedt nur ohne die API, und ein Ladefehle
 });
 
 test('jede Regel des offenen Popovers hat ihren Zwilling fuer den Polyfill in reset.css', () => {
+  /** @type {Map<string, Map<string, string>>} */
   const open = new Map();
   for (const file of appStylesheets()) {
-    for (const [cls, props] of openStateRules(read(file))) open.set(cls, new Set([...(open.get(cls) ?? []), ...props]));
+    for (const [key, props] of openStateRules(read(file))) open.set(key, new Map([...(open.get(key) ?? []), ...props]));
   }
   for (const known of ['popover-menu', 'filter-popover', 'ydp-popover', 'documents-context-menu']) {
-    assert.ok(open.has(known), `Reichweite: keine Regel .${known}:popover-open gefunden`);
+    assert.ok(open.has(`.${known}.\\:popover-open`), `Reichweite: keine Regel .${known}:popover-open gefunden`);
   }
+  // Reichweite in @media und an einer Bedingung (#2650).
+  assert.ok([...open.keys()].some((key) => key.startsWith('@media')), 'Reichweite: keine Regel in @media gelesen');
+  assert.ok([...open.keys()].some((key) => key.includes(':has(.\\:popover-open)')), 'Reichweite: keine :has(:popover-open)-Regel gelesen');
   const twins = polyfillTwins(read('public/styles/reset.css'));
   assert.deepEqual(missingTwins(open, twins), [],
     'Mit dem Popover-Polyfill traegt ein offenes Popover die Klasse `.\\:popover-open`, `:popover-open` gilt dort nicht. '
@@ -1304,7 +1365,8 @@ test('jede Regel des offenen Popovers hat ihren Zwilling fuer den Polyfill in re
   const base = [...eachRule(read('public/styles/reset.css'))]
     .find((r) => r.selector === '[popover].\\:popover-open' && r.at.length === 1 && POPOVER_FALLBACK_AT.test(r.at[0]));
   assert.ok(base, 'reset.css: `[popover].\\:popover-open` im Rueckfall-Block fehlt');
-  assert.match(base.body, /z-index:\s*2147483647/, 'ohne Top-Layer hebt der z-index das offene Popover ueber Dialoge und Meldungen');
+  assert.match(base.body, /z-index:\s*var\(--z-top-layer\)/, 'ohne Top-Layer hebt der z-index das offene Popover ueber Dialoge und Meldungen');
+  assert.match(read('public/styles/tokens.css'), /--z-top-layer:\s*2147483647;/, 'tokens.css: --z-top-layer steht fuer die Top Layer, der groesste z-index');
 });
 
 /* ──────────────────────────────────────────────────────────────────────────

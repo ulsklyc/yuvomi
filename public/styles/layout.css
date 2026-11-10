@@ -4898,7 +4898,8 @@ html.fab-steady .page-fab {
  *
  * WANN SIE STEHEN BLEIBT: mit Fokus darin (wer per Tab hineinkommt, bekommt
  * die Zeile zurueck), mit einem Suchbegriff und mit offenem Werkzeugmenue -
- * dieselben Ausnahmen wie die Suche der gedeckelten Koepfe oben. */
+ * dieselben Ausnahmen wie die Suche der gedeckelten Koepfe oben. Unter dem
+ * Popover-Polyfill traegt reset.css den Zwilling an `.\:popover-open`. */
 @media (max-width: 1023px) {
   /* Der Rand springt (EIN Layout); die Liste darunter gleitet per FLIP aus
    * ihrer alten Lage nach (wireCollapsingHeader, R20) - vorher lief hier der

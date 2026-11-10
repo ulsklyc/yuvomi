@@ -65,6 +65,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that is missing. Files without a hash, such as `index.html` and `/api.js`, still come from the
   network first. The PDF viewer (pdf.js) also no longer lands in the worker's cache after the
   first opened document: documents are not available offline, so it is left to the browser.
+- **On a phone, the tool row of Recipes, Pantry, Meals and Shopping folds away on scroll in
+  browsers that need the menu polyfill too.** The rule that folds it keeps the row while one
+  of its menus is open, and it asked for that with a selector those browsers do not know, so
+  they dropped the whole rule and the row kept its space above the list. It now has a second
+  rule that asks the way the polyfill marks an open menu.
 
 ## [2.87.0] - 2026-11-08
 
