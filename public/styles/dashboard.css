@@ -5554,6 +5554,25 @@ button.today-cockpit__more--link {
   overflow: hidden;
 }
 
+/* Verfuegbarkeits-Punkt (#1591): die Farbe ist nie das einzige Signal (der
+ * Zustand steht auch als Text - sr-only hier, sichtbar im Satz darunter),
+ * aber die Farbe laesst ihn auf einen Blick erkennen, ohne die Zeile zu
+ * oeffnen. `inset-inline-end`, nicht `right`: die Reihe spiegelt in RTL. */
+.family-widget-avatar[data-avail]::after {
+  content: '';
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  width: var(--space-2h);
+  height: var(--space-2h);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-surface);
+}
+
+.family-widget-avatar[data-avail="available"]::after { background: var(--color-success); }
+.family-widget-avatar[data-avail="busy"]::after { background: var(--color-warning); }
+.family-widget-avatar[data-avail="do_not_disturb"]::after { background: var(--color-danger); }
+.family-widget-avatar[data-avail="away"]::after { background: var(--color-text-tertiary); }
 
 .family-widget-avatar img {
   width: 100%;

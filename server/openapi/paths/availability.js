@@ -7,7 +7,7 @@ export function availabilityPaths() {
         summary: 'List household availability statuses',
         tag: 'Family',
         description: 'Returns the active (non-expired) availability statuses for all household members. '
-          + 'Rows whose `expires_at` is in the past are omitted. Ordered by `set_at` descending.',
+          + 'Rows whose `expires_at` is in the past are omitted. Ordered by `updated_at` descending.',
         responses: {
           200: {
             description: 'Active availability statuses',
