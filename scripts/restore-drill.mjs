@@ -18,7 +18,8 @@
  *   integrity       PRAGMA integrity_check is ok
  *   foreign-keys    PRAGMA foreign_key_check is empty
  *   schema-hash     the schema equals that of a database migrated from zero
- *   rows            no table has fewer rows than in the corpus file
+ *   rows            no table of the head schema has fewer rows than in the
+ *                   corpus file (full-text index tables excluded: derived data)
  *   server          server/index.js starts on it and every endpoint of the
  *                   API probe answers 200 for the demo admin (needs `npm run build`)
  *
@@ -285,7 +286,7 @@ export async function drillOne(file, { key, work, reference, skipServer = false 
       return restored.schema_hash;
     }],
     ['rows', () => {
-      const lost = lostRows(/** @type {NonNullable<typeof before>} */ (before), /** @type {NonNullable<typeof after>} */ (after));
+      const lost = lostRows(/** @type {NonNullable<typeof before>} */ (before), /** @type {NonNullable<typeof after>} */ (after), reference);
       if (lost.length) throw new StepError('rows_lost', lost.join('; '));
       const total = Object.values(/** @type {NonNullable<typeof after>} */ (after).tables)
         .reduce((sum, t) => sum + ('n' in t ? t.n : 0), 0);

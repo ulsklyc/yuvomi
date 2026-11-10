@@ -24,7 +24,7 @@ import { basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tempDir } from './tmp-dir.js';
 import { CORPUS_TEST_KEY } from '../scripts/restore-drill.mjs';
-import { openDatabase } from '../scripts/rollback-probe/fingerprint.mjs';
+import { lostRows, openDatabase } from '../scripts/rollback-probe/fingerprint.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DRILL = join(ROOT, 'scripts', 'restore-drill.mjs');
@@ -167,4 +167,28 @@ test('eine fehlende Tabelle ist rot beim Schema-Hash', () => {
   assert.equal(result.failedStep, 'schema-hash', JSON.stringify(result, null, 1));
   assert.equal(result.reason, 'schema_hash_mismatch');
   assert.match(result.steps.at(-1).detail, new RegExp(`${table}: missing`));
+});
+
+
+// Gemessen an den Ankern v2.0.0 und v2.18.0: Migration v151 raeumt doppelte
+// Eintraege aus dem Volltext-Index (47 Zeilen fuer 26 Einkaufsartikel, danach
+// 26), und `mealie_accounts` heisst seit einer Migration
+// `recipe_provider_accounts`. Beides ist gewollt. Der Zeilenschritt zaehlt
+// deshalb nur Tabellen des Kopf-Schemas und keine abgeleiteten FTS-Tabellen;
+// weniger Zeilen in einer echten Tabelle bleiben rot. Eine Korpus-Datei kann
+// das nicht vorfuehren (die Messung "vorher" liest dieselbe Datei), also an
+// der Regel selbst.
+test('Zeilenregel: echte Tabellen zaehlen, FTS-Index und vom Kopf entfernte Tabellen nicht', () => {
+  /** @param {Record<string, number>} counts @param {string[]} [virtualTables] */
+  const fp = (counts, virtualTables = []) => ({
+    journal: 'wal', migrations: 1, schema_version: 1, schema_hash: 'x', virtual_tables: virtualTables,
+    tables: Object.fromEntries(Object.entries(counts).map(([k, n]) => [k, { n, h: 'h' }])),
+  });
+  const reference = fp({ notes: 0, search_index_content: 0, search_index_docsize: 0, recipe_provider_accounts: 0 }, ['search_index']);
+  const before = fp({ notes: 8, search_index_content: 110, search_index_docsize: 110, mealie_accounts: 1 });
+  assert.deepEqual(lostRows(before, fp({ notes: 8, search_index_content: 89, search_index_docsize: 89, recipe_provider_accounts: 1 }), reference), [],
+    'Index geschrumpft, Tabelle umbenannt: kein Verlust');
+  assert.deepEqual(lostRows(before, fp({ notes: 6, search_index_content: 110, search_index_docsize: 110 }), reference), ['notes: 8 -> 6 rows']);
+  assert.deepEqual(lostRows(before, fp({ search_index_content: 110 }), reference), ['notes: table missing'],
+    'eine Tabelle des Kopf-Schemas, die nach dem Restore fehlt, ist rot');
 });

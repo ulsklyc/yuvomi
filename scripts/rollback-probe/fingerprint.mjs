@@ -19,7 +19,7 @@ import Database from '../../server/utils/sqlite-driver.js';
  * @typedef {{ n: number, h: string } | { err: string }} TablePrint
  * @typedef {{
  *   journal: string, migrations: number, schema_version: number,
- *   schema_hash: string, tables: Record<string, TablePrint>
+ *   schema_hash: string, virtual_tables: string[], tables: Record<string, TablePrint>
  * }} Fingerprint
  * @typedef {any} Connection a better-sqlite3-multiple-ciphers database
  */
@@ -106,6 +106,9 @@ export function fingerprintOf(db) {
     migrations: mig.n,
     schema_version: mig.v ?? 0,
     schema_hash: schemaHash(db),
+    virtual_tables: /** @type {{ name: string }[]} */ (db.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND sql LIKE 'CREATE VIRTUAL TABLE%' ORDER BY name"
+    ).all()).map((r) => r.name),
     tables,
   };
 }
@@ -148,14 +151,27 @@ export function diffFingerprints(a, b) {
 
 /**
  * Tables whose row count went down (or that are gone) from `before` to `after`.
+ *
+ * With `reference` (a database migrated from zero), only tables of that head
+ * schema count, and no full-text index: a migration may rename or drop a table
+ * (the schema hash already holds the head schema), and an FTS5 table with its
+ * shadow tables (`<name>_content`, `_docsize`, ...) is derived data that a
+ * migration rebuilds. Measured on the v2.0.0 and v2.18.0 corpus: migration
+ * v151 removes duplicate index rows (47 rows for 26 shopping items, then 26),
+ * and `mealie_accounts` became `recipe_provider_accounts`.
  * @param {Fingerprint} before
  * @param {Fingerprint} after
+ * @param {Fingerprint} [reference]
  * @returns {string[]}
  */
-export function lostRows(before, after) {
+export function lostRows(before, after, reference) {
+  const derived = reference?.virtual_tables ?? [];
+  /** @param {string} name */
+  const counts = (name) => !reference
+    || (name in reference.tables && !derived.some((v) => name === v || name.startsWith(`${v}_`)));
   const lost = [];
   for (const [name, x] of Object.entries(before.tables)) {
-    if ('err' in x) continue;
+    if ('err' in x || !counts(name)) continue;
     const y = after.tables[name];
     if (!y) lost.push(`${name}: table missing`);
     else if ('err' in y) lost.push(`${name}: unreadable (${y.err})`);
