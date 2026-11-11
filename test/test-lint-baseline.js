@@ -27,7 +27,7 @@ const SCRIPT = join(REPO, 'scripts', 'check-lint-baseline.ts');
 const OXLINT = join(REPO, 'node_modules', 'oxlint', 'bin', 'oxlint');
 const FIXTURE = join(REPO, 'test', 'fixtures', 'lint');
 const DEPCRUISE = join(REPO, 'node_modules', 'dependency-cruiser', 'bin', 'dependency-cruiser.mjs');
-const DEPCRUISE_CONFIG = join(REPO, '.dependency-cruiser.cjs');
+const DEPCRUISE_CONFIG = join(REPO, '.dependency-cruiser.mjs');
 const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
 const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'blanket-disable', 'disable-no-restricted-syntax'];
 
@@ -213,7 +213,7 @@ test('the real tree has no hard finding (runs in the required test jobs)', () =>
 test('a layer violation is keyed per module and rule, under the same ratchet', () => {
   const dir = project(NONE);
   try {
-    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.cjs'));
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
     mkdirSync(join(dir, 'server', 'routes'));
     writeFileSync(join(dir, 'server', 'routes', 'r.js'), 'export const r = 1;\n');
     assert.equal(run(dir, '--init').code, 0);
@@ -231,7 +231,7 @@ test('a layer violation is keyed per module and rule, under the same ratchet', (
 test('a cycle through a browser-root import (/x.js) is a cycle', () => {
   const dir = project(NONE);
   try {
-    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.cjs'));
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
     mkdirSync(join(dir, 'public'));
     copyFileSync(join(REPO, 'public', 'tsconfig.json'), join(dir, 'public', 'tsconfig.json'));
     writeFileSync(join(dir, 'public', 'a.js'), "import { b } from '/b.js';\nexport const a = () => b;\n");
@@ -244,11 +244,38 @@ test('a cycle through a browser-root import (/x.js) is a cycle', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('each of the other layer rules fires, and an unresolved local import is keyed', () => {
+  const dir = project(NONE);
+  try {
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
+    for (const d of ['server/services', 'public/pages', 'public/utils', 'node_modules/web-push']) mkdirSync(join(dir, d), { recursive: true });
+    writeFileSync(join(dir, 'node_modules', 'web-push', 'package.json'), JSON.stringify({ name: 'web-push', version: '0.0.0', main: 'index.js' }));
+    writeFileSync(join(dir, 'node_modules', 'web-push', 'index.js'), 'export const sendNotification = () => {};\n');
+    writeFileSync(join(dir, 'public', 'pages', 'p.js'), 'export const p = 1;\n');
+    writeFileSync(join(dir, 'public', 'utils', 'u.js'), 'export const u = 1;\n');
+    writeFileSync(join(dir, 'server', 'services', 'ok.js'), "import { u } from '../../public/utils/u.js';\nexport const ok = () => u;\n");
+    assert.equal(run(dir, '--init').code, 0);
+    assert.deepEqual(baselineOf(dir), {}, 'reading public/utils/ is allowed');
+    writeFileSync(join(dir, 'server', 'services', 'w.js'), "import { sendNotification } from 'web-push';\nexport const w = sendNotification;\n");
+    writeFileSync(join(dir, 'server', 'services', 'p.js'), "import { p } from '../../public/pages/p.js';\nexport const q = p;\n");
+    writeFileSync(join(dir, 'public', 'utils', 's.js'), "import { ok } from '../../server/services/ok.js';\nexport const s = ok;\n");
+    writeFileSync(join(dir, 'server', 'services', 'gone.js'), "import { x } from './missing.js';\nexport const g = x;\n");
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    for (const [file, rule] of [
+      ['server/services/w.js', 'web-push-only-in-push-service'],
+      ['server/services/p.js', 'server-not-to-public-except-shared'],
+      ['public/utils/s.js', 'public-not-to-server'],
+      ['server/services/gone.js', 'unresolved-import'],
+    ]) assert.match(r.out, new RegExp(`${file.replace(/[./]/g, '\\$&')}\\s+depcruise/${rule}\\s+0 -> 1`), `${file} ${rule}`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('a broken dependency-cruiser config is exit 2', () => {
   const dir = project(NONE);
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, '.dependency-cruiser.cjs'), 'module.exports = { forbidden: [{ name: 1 }] };\n');
+    writeFileSync(join(dir, '.dependency-cruiser.mjs'), 'module.exports = { forbidden: [{ name: 1 }] };\n');
     assert.equal(run(dir).code, 2);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -261,6 +288,9 @@ test('the TypeScript layer fixture gives exactly its three violations', () => {
   });
   const report = JSON.parse(r.stdout);
   assert.equal(report.summary.totalCruised, 5, 'dependency-cruiser does not read the .ts files');
+  const b = report.modules.find((/** @type {{ source: string }} */ m) => m.source === 'server/routes/b.ts');
+  assert.ok(b?.dependencies.some((/** @type {{ resolved: string, dependencyTypes: string[] }} */ d) => d.resolved === 'server/services/types.ts'
+    && d.dependencyTypes.includes('type-only')), 'the type-only import is not an edge');
   const found = report.summary.violations
     .map((/** @type {{ rule: { name: string }, from: string, to: string }} */ v) => `${v.rule.name} ${v.from} -> ${v.to}`)
     .sort();

@@ -3,17 +3,18 @@
  * Run through scripts/check-lint-baseline.ts, which keys every violation per file and
  * rule in lint-baseline.json; a known violation stays countable and may only sink.
  * Paths match `.js` and `.ts` alike: phase 2 renames files, and the `.ts` fixture in
- * test/fixtures/lint/layers/ proves the tool reads TypeScript (through @swc/core, as
- * dependency-cruiser 18.7 does not take TypeScript 7 as its transpiler).
+ * test/fixtures/lint/layers/ proves the tool reads TypeScript: @swc/core is its parser
+ * (`parser: 'swc'`), as dependency-cruiser 18.7 does not take TypeScript 7 as its
+ * transpiler; without swc the .ts files would be skipped or guessed at, without an error.
  * Browser code imports from the web root (`/api.js`); public/tsconfig.json maps `/*` to
  * `public/*` for the type check, and the same mapping resolves those imports here, so a
  * cycle through them is an edge like any other (without it 1,535 imports stayed unresolved).
  */
-const { existsSync } = require('node:fs');
+import { existsSync } from 'node:fs';
 
 const BROWSER_PATHS = 'public/tsconfig.json';
 
-module.exports = {
+export default {
   forbidden: [
     {
       name: 'no-circular',
@@ -50,7 +51,8 @@ module.exports = {
       comment: 'The web-push package is called in one place, which checks isActiveAccount first.',
       severity: 'error',
       from: { pathNot: '^server/services/push\\.[jt]s$' },
-      to: { path: '(^|/)node_modules/web-push/' },
+      // Resolved into node_modules, or left as the bare name when resolution fails.
+      to: { path: '^web-push(/|$)|(^|/)node_modules/web-push/' },
     },
     {
       name: 'server-not-to-public-except-shared',
@@ -71,7 +73,7 @@ module.exports = {
     doNotFollow: { path: 'node_modules' },
     exclude: { path: ['^public/vendor/', '^public/lucide\\.min\\.js$'] },
     moduleSystems: ['es6'],
-    tsPreCompilationDeps: true,
+    parser: 'swc',
     // Relative to the working directory: the repository, or a fixture project with its own.
     ...(existsSync(BROWSER_PATHS) ? { tsConfig: { fileName: BROWSER_PATHS } } : {}),
   },

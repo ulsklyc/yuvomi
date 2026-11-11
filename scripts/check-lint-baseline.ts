@@ -7,8 +7,9 @@
  *          One mechanism for every tool (pattern: scripts/check-tsc-baseline.ts).
  * Tools:   oxlint (`.oxlintrc.json`, rules with `no-restricted-syntax` are keyed by the tag at the
  *          start of their message, e.g. `oxlint/no-restricted-syntax/LOG-PLUS-500`);
- *          dependency-cruiser (`.dependency-cruiser.cjs`, one key per violating module and rule,
- *          e.g. `depcruise/no-circular`). In the repository every tool must run; under `--root`
+ *          dependency-cruiser (`.dependency-cruiser.mjs`, one key per violating module and rule,
+ *          e.g. `depcruise/no-circular`, plus `depcruise/unresolved-import` for a local import
+ *          it cannot resolve; a missing parser is exit 2). In the repository every tool must run; under `--root`
  *          (fixture projects) a tool runs only when its config file is there.
  * Inline:  oxlint obeys `eslint-disable` and `oxlint-disable` comments and has no switch to
  *          ignore them, so a comment would hide a finding from this gate. Every such directive
@@ -35,7 +36,7 @@ const root = rootIdx >= 0 ? resolve(String(args[rootIdx + 1])) : repo;
 const baselinePath = resolve(root, 'lint-baseline.json');
 const oxlintBin = resolve(repo, 'node_modules', 'oxlint', 'bin', 'oxlint');
 const depcruiseBin = resolve(repo, 'node_modules', 'dependency-cruiser', 'bin', 'dependency-cruiser.mjs');
-const DEPCRUISE_CONFIG = '.dependency-cruiser.cjs';
+const DEPCRUISE_CONFIG = '.dependency-cruiser.mjs';
 // What dependency-cruiser walks: the app, the build and maintenance code, no tests (a test
 // imports whatever it checks, and its imports are not a layer).
 const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.ts', 'setup.js'];
@@ -115,6 +116,11 @@ function oxlint(counts: Counts) {
 }
 
 type DepcruiseViolation = { from?: string; rule?: { name?: string } };
+type DepcruiseModule = { source?: string; dependencies?: { module?: string; couldNotResolve?: boolean }[] };
+type DepcruiseReport = {
+  modules?: DepcruiseModule[];
+  summary?: { violations?: DepcruiseViolation[]; environment?: { issues?: { name?: string }[] } };
+};
 
 function depcruise(counts: Counts) {
   if (!existsSync(resolve(root, DEPCRUISE_CONFIG))) {
@@ -122,21 +128,44 @@ function depcruise(counts: Counts) {
     return;
   }
   if (!existsSync(depcruiseBin)) fail(`dependency-cruiser is not installed (${depcruiseBin}); run npm ci.`);
-  const targets = DEPCRUISE_TARGETS.filter((t) => existsSync(resolve(root, t)));
+  const missing = DEPCRUISE_TARGETS.filter((t) => !existsSync(resolve(root, t)));
+  // In the repository a renamed target would silently leave the graph; fixture projects
+  // bring only the directories they need.
+  if (root === repo && missing.length > 0) fail(`dependency-cruiser targets are missing: ${missing.join(', ')} (update DEPCRUISE_TARGETS).`);
+  const targets = DEPCRUISE_TARGETS.filter((t) => !missing.includes(t));
   const run = spawnSync(process.execPath, [depcruiseBin, '--config', DEPCRUISE_CONFIG, '--output-type', 'json', ...targets], {
     cwd: root, encoding: 'utf8', maxBuffer: 1 << 29,
   });
-  let report: { summary?: { violations?: DepcruiseViolation[]; totalCruised?: number } };
+  let report: DepcruiseReport;
   try {
     report = JSON.parse(run.stdout);
   } catch {
     fail(`dependency-cruiser did not run (exit ${run.status}):\n${`${run.stdout}${run.stderr}`.slice(0, 600)}`);
   }
   const violations = report.summary?.violations;
-  if (!Array.isArray(violations) || !report.summary?.totalCruised) fail('dependency-cruiser cruised no module.');
+  const modules = report.modules;
+  if (!Array.isArray(violations) || !Array.isArray(modules)) fail('dependency-cruiser gave no module list.');
+  // Without its parser the tool skips or guesses at .ts files and still exits 0.
+  const issues = (report.summary?.environment?.issues ?? []).filter((i) => /transpiler/.test(String(i.name)));
+  if (issues.length > 0) fail(`dependency-cruiser cannot read every source: ${issues.map((i) => i.name).join(', ')}; run npm ci.`);
+  if (root === repo) {
+    for (const dir of ['server/', 'public/']) {
+      const n = modules.filter((m) => String(m.source).startsWith(dir)).length;
+      if (n < 100) fail(`dependency-cruiser read only ${n} modules under ${dir}; the graph is not the app.`);
+    }
+  }
   for (const v of violations) {
     const key = `${posix(String(v.from))}\tdepcruise/${String(v.rule?.name)}`;
     counts[key] = (counts[key] ?? 0) + 1;
+  }
+  // A local import the tool cannot resolve is an edge it does not see: every layer rule
+  // and the cycle check are blind to it. Package imports (vite, dotenv/config) are not keyed.
+  for (const m of modules) {
+    for (const d of m.dependencies ?? []) {
+      if (!d.couldNotResolve || !/^[./]/.test(String(d.module))) continue;
+      const key = `${posix(String(m.source))}\tdepcruise/unresolved-import`;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
   }
 }
 

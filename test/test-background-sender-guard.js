@@ -17,7 +17,7 @@
  *
  * A TEXT READER THAT STAYS FOR NOW: phase 1b (section D2) added the
  * dependency-cruiser rule "only these four files import server/services/push.js"
- * (.dependency-cruiser.cjs), which sees imports instead of call spellings. It
+ * (.dependency-cruiser.mjs), which sees imports instead of call spellings. It
  * does not cover the channel providers: they reach a sender as a parameter
  * (medication-scheduler.js gets them from notifications.js), so a fifth file
  * calling `provider.send({ channel ... })` imports nothing a rule could forbid
