@@ -47,14 +47,17 @@ async function checkReadiness() {
     } catch {
       return { ready: false, reason: 'data_dir_not_writable' };
     }
+    // The only await is behind us: a restore may have begun meanwhile.
+    if (db.isRestoreRunning()) return { ready: false, reason: 'restore_in_progress' };
   }
   return { ready: true };
 }
 
 /**
  * `GET /readyz`: 200 `{ status: 'ready' }` or 503 `{ status: 'not_ready', reason }`.
- * A check that throws is not an answer of its own: it reaches the central error
- * handler, and the prober sees a 500, which is "not ready" as well.
+ * A schema read that fails (`currentVersion()` answers 0 then) counts as
+ * `schema_behind`: the instance cannot serve, and the cause is in the log of
+ * whatever request hit the database next.
  * @param {unknown} _req
  * @param {{ setHeader(name: string, value: string): unknown, status(code: number): { json(body: unknown): unknown }, json(body: unknown): unknown }} res
  */

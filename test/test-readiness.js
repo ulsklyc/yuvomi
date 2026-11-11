@@ -20,6 +20,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -29,10 +30,12 @@ import { tempDir } from './tmp-dir.js';
 // A directory of its own: the read-only case changes the mode of the data
 // directory, and the shared tmpdir belongs to every suite running next to this one.
 const dataDir = tempDir('yuvomi-test-readiness-');
+const SESSION_SECRET = 'test-readiness-secret-min-32-chars-long';
+const SESSION_COOKIE = 'yuvomi.sid';
 const { baseUrl: BASE } = await startTestServer({
   name: 'readiness',
   env: {
-    SESSION_SECRET: 'test-readiness-secret-min-32-chars-long',
+    SESSION_SECRET,
     DB_PATH: join(dataDir, 'readiness.db'),
   },
 });
@@ -74,8 +77,6 @@ async function restoreHeldWithDatabaseClosed() {
   };
   const done = dbmod.restoreFromFile(backupPath).finally(() => { fsp.copyFile = realCopyFile; });
   await copying;
-  assert.equal(dbmod.isRestoreRunning(), true, 'precondition: the restore is running');
-  assert.equal(dbmod.isDatabaseOpen(), false, 'precondition: the connection is closed');
   return { release, done };
 }
 
@@ -103,6 +104,8 @@ test('restore running: 503 restore_in_progress, /health answers 200 at the same 
   let ready;
   let health;
   try {
+    assert.equal(dbmod.isRestoreRunning(), true, 'precondition: the restore is running');
+    assert.equal(dbmod.isDatabaseOpen(), false, 'precondition: the connection is closed');
     ready = await probe('/readyz');
     health = await probe('/health');
   } finally {
@@ -169,18 +172,23 @@ test('data directory not writable: 503 data_dir_not_writable', { skip: process.g
   assert.equal((await probe('/readyz')).status, 200, 'ready again once the directory is writable');
 });
 
-test('no state leaks a path, a version or a timestamp', async () => {
-  const dir = dirname(dbmod.getPath());
+test('database closed: a signed session cookie does not turn the answer into a 500', async () => {
+  // The session store reads the database for a signed cookie and throws without
+  // a connection. /readyz is mounted before the session middleware, so a
+  // monitor or a browser that carries a cookie gets the reason all the same.
+  const sid = 'readiness-probe-session-id';
+  const signature = createHmac('sha256', SESSION_SECRET).update(sid).digest('base64').replace(/=+$/, '');
+  const cookie = `${SESSION_COOKIE}=${encodeURIComponent(`s:${sid}.${signature}`)}`;
   dbmod._setTestDatabase(null);
   let res;
   try {
-    res = await fetch(`${BASE}/readyz`);
+    res = await probe('/readyz', { Cookie: cookie });
   } finally {
     dbmod._resetTestDatabase();
   }
-  const text = await res.text();
-  assert.ok(!text.includes(dir), 'no directory in the answer');
-  assert.doesNotMatch(text, /\d{4}-\d{2}-\d{2}|\d+\.\d+\.\d+|version|path/i);
+  assert.equal(res.status, 503);
+  assert.deepEqual(res.body, { status: 'not_ready', reason: 'database_closed' });
+  assert.equal(res.headers.get('set-cookie'), null, 'the endpoint sets no cookie');
 });
 
 test('HEAD answers with the same status and no body', async () => {
