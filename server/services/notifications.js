@@ -1,19 +1,15 @@
 /**
  * Modul: Notification-Orchestrator
  * Zweck: Reminder an Web Push und externe Notification-Channels fan-outen und Delivery-State pflegen.
- * Abhaengigkeiten: server/db.js, push.js, notification-channels.js, Provider-Adapter
+ * Abhaengigkeiten: server/db.js, push.js, notification-channels.js, channel-delivery.js
  */
 import { createLogger } from '../logger.js';
 import * as dbModule from '../db.js';
 import { activeAccountSql } from './account-state.js';
 import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
-import { gotifyProvider } from './notification-providers/gotify.js';
-import { ntfyProvider } from './notification-providers/ntfy.js';
-import { webhookProvider } from './notification-providers/webhook.js';
-import { emailProvider } from './notification-providers/email.js';
+import { defaultProviders, sendToChannel } from './channel-delivery.js';
 import { guardedFetch } from './notification-providers/guarded-fetch.js';
-import { NotificationProviderError } from './notification-providers/provider-error.js';
 import { syncAllBirthdayReminders } from './birthdays.js';
 import { resolveHouseholdFormats, formatDateKey, translate } from '../utils/i18n.js';
 import { moveNoticeFields } from './shopping-move-notices.js';
@@ -36,20 +32,9 @@ const APP_NAME = 'Yuvomi';
 const FALLBACK_BODY = 'Reminder';
 const RETRY_DELAY_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
-// Exportiert, damit die Zeitschranken des Mail-Transports (services/email.js)
-// dagegen gepruefte werden koennen statt gegen eine abgeschriebene Zahl: die
-// Staffelung ist die Zusicherung, nicht der einzelne Wert.
-export const PROVIDER_TIMEOUT_MS = 8_000;
 
 // Herkuenfte, deren eine Erinnerung als je eine Zeile pro Person gespeichert ist.
 const PER_PERSON_ROW_TYPES = new Set(['document_expiry', 'event', 'waste_pickup']);
-
-export const defaultProviders = {
-  gotify: gotifyProvider,
-  ntfy: ntfyProvider,
-  webhook: webhookProvider,
-  email: emailProvider,
-};
 
 function iso(value) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
@@ -413,21 +398,9 @@ function allKnownDeliveriesComplete(database, reminderId, expectedTargets) {
   });
 }
 
-async function withTimeout(fn, timeoutMs = PROVIDER_TIMEOUT_MS) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fn(controller.signal);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export function createNotificationService({ providers = defaultProviders, channelStore } = {}) {
   async function testChannel({ channel, payload, fetchImpl = guardedFetch } = {}) {
-    const provider = providers[channel?.provider];
-    if (!provider) throw new NotificationProviderError('Unknown notification provider.');
-    return withTimeout((signal) => provider.send({ channel, payload, fetchImpl, signal }));
+    return sendToChannel({ channel, payload, fetchImpl, providers });
   }
 
   return { providers, channelStore, testChannel };
@@ -764,9 +737,7 @@ export async function processDueNotifications({
             counters.skipped += 1;
           }
         } else {
-          const provider = providers[target.provider];
-          if (!provider) throw new NotificationProviderError('Unknown notification provider.');
-          await withTimeout((signal) => provider.send({ channel: target.channel, payload, fetchImpl, signal }));
+          await sendToChannel({ channel: target.channel, payload, fetchImpl, providers });
           markSent(activeDb, delivery.id, nowIso);
           counters.sent += 1;
         }

@@ -10,6 +10,10 @@
  *          findings, the TypeScript layer fixture test/fixtures/lint/layers/ exactly its three
  *          dependency-cruiser violations, the knip fixture test/fixtures/lint/knip/ (run with the
  *          real knip.json) exactly its six findings; a knip entry that names no file is exit 2;
+ *          the sender fixture test/fixtures/lint/senders/ exactly its two import violations and
+ *          ten lint lines, all hard; no override for a server/ file loses a sender selector
+ *          it is not exempt from; every sender the rules name still sends (module graph),
+ *          and the lint exceptions name the same files as the import rules;
  *          the real tree has no hard finding (this runs in the required test jobs, next to the
  *          lint job); the real lint-baseline.json is sorted, carries no hard rule and names no
  *          missing file.
@@ -21,7 +25,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tempDir } from './tmp-dir.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -32,7 +36,9 @@ const DEPCRUISE = join(REPO, 'node_modules', 'dependency-cruiser', 'bin', 'depen
 const DEPCRUISE_CONFIG = join(REPO, '.dependency-cruiser.mjs');
 const KNIP = join(REPO, 'node_modules', 'knip', 'bin', 'knip.js');
 const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
-const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'blanket-disable', 'disable-no-restricted-syntax'];
+const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'CHANNEL-SEND', 'PUSH-SEND',
+  'push-service-importers', 'web-push-only-in-push-service', 'channel-delivery-importers', 'providers-only-in-channel-delivery',
+  'blanket-disable', 'disable-no-restricted-syntax'];
 
 /** The real rule set for a directory outside the repo: no fixture ignore, plugin by absolute URL. */
 function portableConfig() {
@@ -259,14 +265,12 @@ test('each of the other layer rules fires, and an unresolved local import is key
     writeFileSync(join(dir, 'server', 'services', 'ok.js'), "import { u } from '../../public/utils/u.js';\nexport const ok = () => u;\n");
     assert.equal(run(dir, '--init').code, 0);
     assert.deepEqual(baselineOf(dir), {}, 'reading public/utils/ is allowed');
-    writeFileSync(join(dir, 'server', 'services', 'w.js'), "import { sendNotification } from 'web-push';\nexport const w = sendNotification;\n");
     writeFileSync(join(dir, 'server', 'services', 'p.js'), "import { p } from '../../public/pages/p.js';\nexport const q = p;\n");
     writeFileSync(join(dir, 'public', 'utils', 's.js'), "import { ok } from '../../server/services/ok.js';\nexport const s = ok;\n");
     writeFileSync(join(dir, 'server', 'services', 'gone.js'), "import { x } from './missing.js';\nexport const g = x;\n");
     const r = run(dir);
     assert.equal(r.code, 1, r.out);
     for (const [file, rule] of [
-      ['server/services/w.js', 'web-push-only-in-push-service'],
       ['server/services/p.js', 'server-not-to-public-except-shared'],
       ['public/utils/s.js', 'public-not-to-server'],
       ['server/services/gone.js', 'unresolved-import'],
@@ -274,6 +278,11 @@ test('each of the other layer rules fires, and an unresolved local import is key
       const lines = r.out.split('\n').map((l) => l.trim().split(/\s+/).join(' '));
       assert.ok(lines.includes(`${file} depcruise/${rule} 0 -> 1`), `${file} ${rule}:\n${r.out}`);
     }
+    // A sender rule is hard: it is named on its own and never ratchets.
+    writeFileSync(join(dir, 'server', 'services', 'w.js'), "import { sendNotification } from 'web-push';\nexport const w = sendNotification;\n");
+    const hard = run(dir);
+    assert.equal(hard.code, 1, hard.out);
+    assert.match(hard.out, /Hard rules[\s\S]*server\/services\/w\.js\s+depcruise\/web-push-only-in-push-service\s+1/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -331,12 +340,178 @@ test('the fixture gives exactly its ten findings, and nothing for the allowed li
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+/** @typedef {{ selector: string, message: string }} Selector */
+/** @typedef {{ files: string[], rules: Record<string, [string, ...Selector[]]> }} Override */
+const RESTRICTED = 'eslint-js/no-restricted-syntax';
+/** @param {string} file */
+const overrideFor = (file) => CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes(file));
+/**
+ * The selectors server/ files get: the base rule plus the sender selectors.
+ * @returns {[string, ...Selector[]]}
+ */
+function serverSelectors() {
+  const override = overrideFor('server/**');
+  assert.ok(override, 'no override for server/**');
+  return override.rules[RESTRICTED];
+}
+/** @param {string} tag @returns {(s: Selector) => boolean} */
+const tagged = (tag) => (s) => s.message.startsWith(`${tag}:`);
+
+test('server/ gets the whole base rule plus the sender selectors, nothing else', () => {
+  const [severity, ...base] = CONFIG.rules[RESTRICTED];
+  const [serverSeverity, ...server] = serverSelectors();
+  assert.equal(serverSeverity, severity);
+  assert.deepEqual(server.slice(0, base.length), base);
+  const extra = server.slice(base.length);
+  assert.ok(extra.length > 0 && extra.every((s) => tagged('CHANNEL-SEND')(s) || tagged('PUSH-SEND')(s)), 'only sender selectors are added');
+  assert.ok(!base.some((/** @type {Selector} */ s) => tagged('CHANNEL-SEND')(s) || tagged('PUSH-SEND')(s)), 'test files may stub a sender; the rule is for server/ only');
+});
+
 test('the timezone exception drops only the UTC selector', () => {
-  const [severity, ...selectors] = CONFIG.rules['eslint-js/no-restricted-syntax'];
-  const override = CONFIG.overrides.find((/** @type {{ files: string[], rules: Record<string, unknown> }} */ o) => o.files.includes('server/utils/timezone.js'));
+  const [severity, ...selectors] = serverSelectors();
+  const override = overrideFor('server/utils/timezone.js');
   assert.ok(override, 'no override for server/utils/timezone.js');
-  assert.deepEqual(override.rules['eslint-js/no-restricted-syntax'],
-    [severity, ...selectors.filter((/** @type {{ message: string }} */ s) => !s.message.startsWith('UTC-DAY-KEY:'))]);
+  assert.deepEqual(override.rules[RESTRICTED], [severity, ...selectors.filter((s) => !tagged('UTC-DAY-KEY')(s))]);
+});
+
+test('each sender exception drops only its own sender selectors', () => {
+  const [severity, ...selectors] = serverSelectors();
+  const push = selectors.filter(tagged('PUSH-SEND'));
+  const sendPushToUser = push.filter((s) => s.selector.includes('sendPushToUser'));
+  assert.equal(sendPushToUser.length, 1);
+  /** @param {Selector[]} drop */
+  const without = (drop) => [severity, ...selectors.filter((s) => !drop.includes(s))];
+  assert.deepEqual(overrideFor('server/services/channel-delivery.js')?.rules[RESTRICTED], without(selectors.filter(tagged('CHANNEL-SEND'))));
+  assert.deepEqual(overrideFor('server/services/push.js')?.rules[RESTRICTED], without(push));
+  for (const file of PUSH_SENDERS) assert.deepEqual(overrideFor(file)?.rules[RESTRICTED], without(sendPushToUser), file);
+});
+
+test('no override for a server/ file loses a sender selector it is not exempt from', () => {
+  // oxlint replaces the whole option list per override and the later one wins, so an
+  // override that copies only the base rule would switch the sender rules off for its files.
+  const [, ...selectors] = serverSelectors();
+  const channel = selectors.filter(tagged('CHANNEL-SEND'));
+  const push = selectors.filter(tagged('PUSH-SEND'));
+  assert.ok(channel.length > 0 && push.length > 0, 'the server/** override carries no sender selectors');
+  /** The documented exemptions: what a file may drop. @param {string} file @returns {Selector[]} */
+  const mayDrop = (file) => {
+    if (file === 'server/services/channel-delivery.js') return channel;
+    if (file === 'server/services/push.js') return push;
+    if (PUSH_SENDERS.includes(file)) return push.filter((s) => s.selector.includes('sendPushToUser'));
+    return [];
+  };
+  const lost = [];
+  let seen = 0;
+  for (const override of /** @type {Override[]} */ (CONFIG.overrides)) {
+    const list = override.rules?.[RESTRICTED];
+    if (!list || !override.files.some((f) => f.startsWith('server/'))) continue;
+    seen += 1;
+    const has = new Set(list.slice(1).map((s) => JSON.stringify(s)));
+    for (const s of [...channel, ...push]) {
+      if (has.has(JSON.stringify(s))) continue;
+      // A selector may be missing only if every file of the override is exempt from it.
+      if (override.files.every((f) => mayDrop(f).includes(s))) continue;
+      lost.push(`${override.files.join(', ')}: ${s.message.split(':')[0]} ${s.selector}`);
+    }
+  }
+  assert.ok(seen >= 5, 'the server overrides were not read');
+  assert.deepEqual(lost, [], 'an override for a server/ file drops a sender selector');
+});
+
+/** Files a rule lets through, as the pathNot list of .dependency-cruiser.mjs spells them. */
+async function exemptPaths(/** @type {string} */ ruleName) {
+  const { default: config } = await import(pathToFileURL(DEPCRUISE_CONFIG).href);
+  const rule = config.forbidden.find((/** @type {{ name: string }} */ r) => r.name === ruleName);
+  assert.ok(rule, `no rule ${ruleName}`);
+  return [rule.from.pathNot].flat().map((/** @type {string} */ p) => new RegExp(p));
+}
+// The four push senders, as the lint exception lists them (push.js itself apart).
+const PUSH_SENDERS = ['server/services/notifications.js', 'server/services/medication-scheduler.js', 'server/routes/tasks.js', 'server/routes/push.js'];
+
+test('the lint exceptions name exactly the senders the import rules let through', async () => {
+  const pushOverride = CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes('server/routes/push.js'));
+  assert.deepEqual([...pushOverride.files].sort(), [...PUSH_SENDERS].sort());
+  const pushImporters = await exemptPaths('push-service-importers');
+  for (const file of [...PUSH_SENDERS, 'server/services/push.js']) assert.ok(pushImporters.some((re) => re.test(file)), `${file} is not a named push importer`);
+  assert.equal(pushImporters.length, PUSH_SENDERS.length + 1, 'a push importer without a lint exception');
+  const channelOverride = overrideFor('server/services/channel-delivery.js');
+  assert.deepEqual(channelOverride?.files, ['server/services/channel-delivery.js']);
+});
+
+test('every sender the import rules name still sends (the list may only shrink)', async () => {
+  // A stale exception would let the next file in under an old name. Checked on the
+  // module graph, not on the spelling: each named importer imports what it is named for.
+  const r = spawnSync(process.execPath, [DEPCRUISE, '--config', DEPCRUISE_CONFIG, '--output-type', 'json', 'server'], {
+    cwd: REPO, encoding: 'utf8', maxBuffer: 1 << 29,
+  });
+  const modules = JSON.parse(r.stdout).modules;
+  assert.ok(modules.length > 100, 'dependency-cruiser read too few modules');
+  /** @param {string} target */
+  const importersOf = (target) => modules
+    .filter((/** @type {{ dependencies: { resolved: string }[] }} */ m) => m.dependencies.some((d) => d.resolved === target))
+    .map((/** @type {{ source: string }} */ m) => m.source);
+  for (const [rule, target] of [
+    ['push-service-importers', 'server/services/push.js'],
+    ['channel-delivery-importers', 'server/services/channel-delivery.js'],
+  ]) {
+    const importers = importersOf(target);
+    const stale = (await exemptPaths(rule))
+      .filter((re) => !re.test(target) && !importers.some((/** @type {string} */ m) => re.test(m)))
+      .map(String);
+    assert.deepEqual(stale, [], `${rule}: named but no longer importing ${target}`);
+  }
+  assert.deepEqual(importersOf('server/services/notification-providers/gotify.js'), ['server/services/channel-delivery.js']);
+});
+
+test('the sender fixture gives exactly its two import violations', () => {
+  const r = spawnSync(process.execPath, [DEPCRUISE, '--config', DEPCRUISE_CONFIG, '--output-type', 'json', 'server'], {
+    cwd: join(FIXTURE, 'senders'), encoding: 'utf8',
+  });
+  const report = JSON.parse(r.stdout);
+  assert.equal(report.summary.totalCruised, 8, 'dependency-cruiser does not read the whole sender fixture');
+  const found = report.summary.violations
+    .map((/** @type {{ rule: { name: string }, from: string, to: string }} */ v) => `${v.rule.name} ${v.from} -> ${v.to}`)
+    .sort();
+  assert.deepEqual(found, [
+    'channel-delivery-importers server/services/fifth.js -> server/services/channel-delivery.js', // a fifth importer
+    'providers-only-in-channel-delivery server/routes/sixth.js -> server/services/notification-providers/gotify.js', // past the bottleneck
+  ]);
+});
+
+test('the sender fixture gives exactly its lint lines, and the ratchet holds them all as hard', () => {
+  const dir = tempDir('yuvomi-sender-fixture-');
+  try {
+    cpSync(join(FIXTURE, 'senders'), dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    const lint = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(lint.stdout).diagnostics
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    const handed = 'server/services/handed.js';
+    assert.deepEqual(found, [
+      `${handed}:11 CHANNEL-SEND`, `${handed}:11 CHANNEL-SEND`, // provider.send({ channel }): name and shape
+      `${handed}:12 CHANNEL-SEND`, `${handed}:12 CHANNEL-SEND`, // providers[x].send({ ..., channel }): name and shape
+      `${handed}:13 CHANNEL-SEND`, // p.send({ channel: ... }): the shape under any name
+      `${handed}:14 CHANNEL-SEND`, // provider?.send(...): the name, optional call
+      `${handed}:15 PUSH-SEND`, // pushService.sendPushToUser(...) handed in as a parameter
+      `${handed}:16 PUSH-SEND`, // webpush.sendNotification(...)
+      `${handed}:17 CHANNEL-SEND`, // this.providers[x].send(...): the name behind this
+      `${handed}:18 CHANNEL-SEND`, // svc.providers[x].send(...): the name behind a member
+      `${handed}:19 CHANNEL-SEND`, // deps.provider.send(...): the name as the last member
+      `${handed}:20 CHANNEL-SEND`, // svc['providers'][x].send(...): the name as a computed key
+    ]);
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
+    const r = run(dir, '--init');
+    assert.equal(r.code, 1, r.out);
+    const lines = r.out.split('\n').map((l) => l.trim().split(/\s+/).join(' '));
+    for (const key of [
+      `${handed} oxlint/no-restricted-syntax/CHANNEL-SEND 10`,
+      `${handed} oxlint/no-restricted-syntax/PUSH-SEND 2`,
+      'server/services/fifth.js depcruise/channel-delivery-importers 1',
+      'server/routes/sixth.js depcruise/providers-only-in-channel-delivery 1',
+    ]) assert.ok(lines.includes(key), `${key}:\n${r.out}`);
+    assert.equal(existsSync(join(dir, 'lint-baseline.json')), false, 'a hard sender finding never enters a baseline');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('oxlint reaches the source tree, but not vendor code or the fixture', () => {
