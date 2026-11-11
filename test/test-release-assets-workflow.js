@@ -283,3 +283,18 @@ test('hands over to the Umbrel publish on every successful run, at the tag', () 
   assert.match(umbrel, /^ {2}workflow_dispatch:\n {4}inputs:\n {6}version:/m,
     'umbrel-publish.yml still takes the version input this step passes');
 });
+
+test('starts the migration corpus for every published release, from main, without failing the run', () => {
+  // Phase 1b, section B: corpus.yml decides itself whether this release
+  // changes the schema. It runs from main because tags older than corpus.yml
+  // do not contain it; it checks out the tag itself.
+  const dispatch = indexOf(/gh workflow run corpus\.yml --ref main -f tag="\$TAG"/);
+  assert.notEqual(dispatch, -1, 'the publish job starts corpus.yml with the tag');
+  assert.equal(dispatch, allSteps.length - 1, 'it is the last step, after the Umbrel handover');
+  assert.ok(dispatch > indexOf(/gh workflow run umbrel-publish\.yml/), 'after the Umbrel handover');
+  const text = allSteps[dispatch].text;
+  assert.match(text, /^ {8}continue-on-error: true$/m, 'a failed start never turns a published release run red');
+  assert.doesNotMatch(text, /^ {8}if:/m, 'on every successful run; corpus.yml skips a release without a schema change');
+  const corpus = readFileSync(new URL('../.github/workflows/corpus.yml', import.meta.url), 'utf8');
+  assert.match(corpus, /^ {2}workflow_dispatch:\n {4}inputs:\n {6}tag:/m, 'corpus.yml takes the tag input this step passes');
+});
