@@ -9,12 +9,15 @@
  *          start of their message, e.g. `oxlint/no-restricted-syntax/LOG-PLUS-500`);
  *          dependency-cruiser (`.dependency-cruiser.mjs`, one key per violating module and rule,
  *          e.g. `depcruise/no-circular`, plus `depcruise/unresolved-import` for a local import
- *          it cannot resolve; a missing parser is exit 2). In the repository every tool must run; under `--root`
- *          (fixture projects) a tool runs only when its config file is there.
+ *          it cannot resolve; a missing parser is exit 2);
+ *          knip (`knip.json`, one key per file and issue type, e.g. `knip/exports`, `knip/files`;
+ *          an entry that names no file is exit 2). In the repository every tool must run; under
+ *          `--root` (fixture projects) a tool other than oxlint runs only when its config file is there.
  * Inline:  oxlint obeys `eslint-disable` and `oxlint-disable` comments and has no switch to
  *          ignore them, so a comment would hide a finding from this gate. Every such directive
  *          in a linted file is counted as `directive/disable` under the same ratchet; one without
- *          a rule list or one naming `no-restricted-syntax` is a hard key.
+ *          a rule list or one naming `no-restricted-syntax` is a hard key. knip skips an export
+ *          whose JSDoc tags it public, beta or alias; each such tag is `directive/knip-tag`.
  * Run:     node scripts/check-lint-baseline.ts [--update | --init] [--root <dir>]
  *   --update  writes back ONLY lower or vanished counts, never higher ones.
  *   --init    fills a missing or empty baseline completely (one-time start).
@@ -37,6 +40,8 @@ const baselinePath = resolve(root, 'lint-baseline.json');
 const oxlintBin = resolve(repo, 'node_modules', 'oxlint', 'bin', 'oxlint');
 const depcruiseBin = resolve(repo, 'node_modules', 'dependency-cruiser', 'bin', 'dependency-cruiser.mjs');
 const DEPCRUISE_CONFIG = '.dependency-cruiser.mjs';
+const knipBin = resolve(repo, 'node_modules', 'knip', 'bin', 'knip.js');
+const KNIP_CONFIG = 'knip.json';
 // What dependency-cruiser walks: the app, the build and maintenance code, no tests (a test
 // imports whatever it checks, and its imports are not a layer).
 const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.ts', 'setup.js'];
@@ -59,6 +64,10 @@ const HARD = new Set([
 // the closing `*/` for a block, which may span lines.
 // Matched as text over the files oxlint lints: wider than the tool's own parser (a directive
 // spelled inside a string counts too), which errs on the side of a red gate.
+// knip leaves out an export whose JSDoc carries @public, @beta or @alias, with no switch
+// against it: the same hole as a disable comment, counted as `directive/knip-tag`.
+const JSDOC = /\/\*\*[\s\S]*?\*\//g;
+const KNIP_TAG = /@(?:public|beta|alias)(?![\w-])/g;
 const DIRECTIVE = /\/\/\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?![\w-])([^\n]*)|\/\*\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?![\w-])([\s\S]*?)(?:\*\/|$(?![\s\S]))/g;
 
 function fail(message: string): never {
@@ -86,12 +95,19 @@ function directives(counts: Counts) {
   const files = `${run.stdout}`.split('\n').map((l) => l.trim()).filter(Boolean);
   if (run.status !== 0 || files.length === 0) fail(`oxlint listed no files (exit ${run.status}): ${`${run.stderr}`.slice(0, 400)}`);
   for (const file of files) {
-    for (const m of readFileSync(resolve(root, file), 'utf8').matchAll(DIRECTIVE)) {
+    const source = readFileSync(resolve(root, file), 'utf8');
+    for (const m of source.matchAll(DIRECTIVE)) {
       const rules = String(m[1] ?? m[2]).split('--')[0]!.trim();
       const kind = rules === '' ? 'blanket-disable'
         : /(^|[\s,/])no-restricted-syntax\b/.test(rules) ? 'disable-no-restricted-syntax' : 'disable';
       const key = `${posix(file)}\tdirective/${kind}`;
       counts[key] = (counts[key] ?? 0) + 1;
+    }
+    for (const doc of source.matchAll(JSDOC)) {
+      const n = [...doc[0].matchAll(KNIP_TAG)].length;
+      if (n === 0) continue;
+      const key = `${posix(file)}\tdirective/knip-tag`;
+      counts[key] = (counts[key] ?? 0) + n;
     }
   }
 }
@@ -169,12 +185,57 @@ function depcruise(counts: Counts) {
   }
 }
 
+type KnipIssue = { file?: string } & Record<string, unknown>;
+
+function knip(counts: Counts) {
+  const configPath = resolve(root, KNIP_CONFIG);
+  if (!existsSync(configPath)) {
+    if (root === repo) fail(`${KNIP_CONFIG} is missing.`);
+    return;
+  }
+  if (!existsSync(knipBin)) fail(`knip is not installed (${knipBin}); run npm ci.`);
+  // knip skips an entry that names no file without a word: after a rename the files behind a
+  // CLI entry would count as dead, or a static page's exports would go unchecked.
+  let entries: unknown;
+  try {
+    entries = JSON.parse(readFileSync(configPath, 'utf8')).entry;
+  } catch {
+    fail(`${KNIP_CONFIG} is not valid JSON.`);
+  }
+  const named = (Array.isArray(entries) ? entries : []).map(String).filter((e) => !/[*?{[!]/.test(e));
+  const gone = named.filter((e) => !existsSync(resolve(root, e)));
+  if (gone.length > 0) fail(`${KNIP_CONFIG} names entry files that do not exist: ${gone.join(', ')}.`);
+  const run = spawnSync(process.execPath, [knipBin, '--config', KNIP_CONFIG, '--reporter', 'json', '--no-exit-code', '--no-progress'], {
+    cwd: root, encoding: 'utf8', maxBuffer: 1 << 29,
+  });
+  // With --no-exit-code a non-zero exit is an error: a plugin that cannot load its config
+  // (vite.config.ts) leaves part of the graph out.
+  let report: { issues?: KnipIssue[] } = {};
+  try {
+    report = JSON.parse(run.stdout);
+  } catch {
+    fail(`knip did not run (exit ${run.status}):\n${`${run.stdout}${run.stderr}`.slice(0, 600)}`);
+  }
+  if (run.status !== 0 || !Array.isArray(report.issues)) {
+    fail(`knip did not run cleanly (exit ${run.status}):\n${run.stderr.slice(0, 600)}`);
+  }
+  for (const issue of report.issues) {
+    for (const [type, list] of Object.entries(issue)) {
+      // `owners` (from a CODEOWNERS file) describes the row, it is not an issue type.
+      if (type === 'owners' || !Array.isArray(list) || list.length === 0) continue;
+      const key = `${posix(String(issue.file))}\tknip/${type}`;
+      counts[key] = (counts[key] ?? 0) + list.length;
+    }
+  }
+}
+
 function measure(): Counts {
   if (!existsSync(oxlintBin)) fail(`oxlint is not installed (${oxlintBin}); run npm ci.`);
   const counts: Counts = {};
   oxlint(counts);
   directives(counts);
   depcruise(counts);
+  knip(counts);
   return counts;
 }
 
