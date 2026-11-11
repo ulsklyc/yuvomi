@@ -461,7 +461,7 @@ test('ein Platzhalter mit Sonderzeichen wird gemeldet, nicht durchgewinkt (#692)
   // Die Pruefung sagt zu, Unbekanntes abzulehnen. Mit einem gemeinsamen \w+ galt
   // diese Zusage nur fuer Wortzeichen: {{task-title}} war fuer Erkennung UND
   // Ersetzung unsichtbar und ging woertlich an den Empfaenger.
-  const { unknownTemplatePlaceholders } = await import('../server/services/notification-providers/webhook.js');
+  const { unknownTemplatePlaceholders } = await import('../server/services/notification-providers/webhook-template.js');
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{task-title}}"}'), ['task-title']);
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{ title }}"}'), [' title ']);
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{item.name}}"}'), ['item.name']);
@@ -1449,7 +1449,7 @@ test('der Mail-Transport gibt vor dem Aufrufer auf (#944)', async () => {
   });
   await service.sendMail({ to: 'a@b.de', subject: 's', text: 't', html: '<p>t</p>' });
 
-  const { PROVIDER_TIMEOUT_MS } = await import('../server/services/notifications.js');
+  const { PROVIDER_TIMEOUT_MS } = await import('../server/services/channel-delivery.js');
   for (const key of ['connectionTimeout', 'greetingTimeout', 'socketTimeout']) {
     assert.ok(Number.isFinite(opts[key]), `${key} muss gesetzt sein - sonst wartet nodemailer unbegrenzt`);
     assert.ok(opts[key] < PROVIDER_TIMEOUT_MS,

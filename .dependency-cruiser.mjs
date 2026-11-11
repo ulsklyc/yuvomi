@@ -30,10 +30,32 @@ export default {
       from: { path: '^server/(services|utils|middleware|mcp)/' },
       to: { path: '^server/routes/' },
     },
+    // THE SENDERS (#2602, #2598). Every file that hands household data to a device or
+    // an outside service is named below with the reason why its recipients may hear
+    // what it sends; a new sender changes this file, and that is what a review sees.
+    // The reasons (the permission check itself stays with each sender until phase 2
+    // moves it behind authorize(); a behaviour test holds each one):
+    // - server/services/notifications.js: processDueNotifications() drops every due row
+    //   whose module is denied to its recipient (#1289) and gives a non-public row only
+    //   to channels the recipient owns (GHSA-r3q8-gh3w-5qvw); testChannel() sends an
+    //   admin-composed test message without household data.
+    //   Held by test:denied-module-reminders and test:reminder-target-visibility.
+    // - server/services/medication-scheduler.js: recipients with Health denied are
+    //   skipped (#2602), and only channels the recipient owns get a dose - never a
+    //   household channel (#2598). Held by test:medication-scheduler.
+    // - server/routes/tasks.js: the @-mention push asks for each mentioned member
+    //   whether they can see the task and whether Tasks is denied to them
+    //   (resolvePermissions, own spelling; moves to authorize() in phase 2).
+    //   Held by test:tasks-routes.
+    // - server/routes/push.js: the test push goes to the requester themself, with the
+    //   text they sent. Held by test:push.
+    // A provider or the push service handed to another file as a parameter imports
+    // nothing these rules could see; the lint selectors CHANNEL-SEND and PUSH-SEND
+    // (.oxlintrc.json, server/ only) catch the call there.
     {
       name: 'push-service-importers',
-      comment: 'Web Push goes through server/services/push.js; these four files may import it, '
-        + 'each with its recipient check (test/test-background-sender-guard.js names the checks).',
+      comment: 'Web Push goes through server/services/push.js; only the senders named above may import it, '
+        + 'each with its recipient check.',
       severity: 'error',
       from: {
         pathNot: [
@@ -45,6 +67,27 @@ export default {
         ],
       },
       to: { path: '^server/services/push\\.[jt]s$' },
+    },
+    {
+      name: 'channel-delivery-importers',
+      comment: 'Channel messages (Gotify, ntfy, webhook, e-mail) go through server/services/channel-delivery.js; '
+        + 'only notifications.js and medication-scheduler.js may import it, each with its recipient check named above.',
+      severity: 'error',
+      from: {
+        pathNot: [
+          '^server/services/notifications\\.[jt]s$',
+          '^server/services/medication-scheduler\\.[jt]s$',
+        ],
+      },
+      to: { path: '^server/services/channel-delivery\\.[jt]s$' },
+    },
+    {
+      name: 'providers-only-in-channel-delivery',
+      comment: 'The four channel providers (the modules that send) are imported only by channel-delivery.js; '
+        + 'their helpers (guarded-fetch, provider-error, webhook-template) are free to import.',
+      severity: 'error',
+      from: { pathNot: '^server/services/channel-delivery\\.[jt]s$' },
+      to: { path: '^server/services/notification-providers/(gotify|ntfy|webhook|email)\\.[jt]s$' },
     },
     {
       name: 'web-push-only-in-push-service',
