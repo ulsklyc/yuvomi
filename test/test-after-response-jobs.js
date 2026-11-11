@@ -442,6 +442,7 @@ const SPAET_OHNE_RIEGEL = new Map([
 
 /** GET-Routen mit `await`, ohne Riegel, die nach dem Warten nichts in die Datenbank schreiben. */
 const LESEN_NACH_AWAIT = new Map([
+  ['server/index.js|/readyz', 'Readiness (Phase 1b, E11): wartet nur auf `fs.access` am Datenverzeichnis, liest davor synchron und schreibt nichts in die Datenbank'],
   ['server/routes/backup.js|/webdav/files', 'listet die Dateien auf dem WebDAV-Server, schreibt nichts'],
   ['server/routes/cardav.js|/accounts', 'liest die Konten, der Aufruf ist synchron'],
   ['server/routes/changelog.js|/', 'GitHub-Releases, Cache im Speicher'],

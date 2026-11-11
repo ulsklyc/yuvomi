@@ -15,6 +15,25 @@ export function corePaths() {
         },
       }),
     },
+    '/readyz': {
+      get: op({
+        summary: 'Readiness check',
+        operationId: 'getReadiness',
+        tag: 'System',
+        auth: false,
+        description: 'Whether this instance can serve right now. Unlike `/health`, which only says that the process answers and stays 200 during a restore, this answers 503 with a `reason` while a restore is running, the database connection is closed, the applied schema is behind this build, or the data directory is not writable. It does not write to the database. Point a load balancer or an uptime monitor here; keep a container healthcheck on `/health`, or the container is restarted in the middle of a restore.',
+        responses: /** @type {any} */ ({
+          200: {
+            description: 'The instance is ready',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ReadinessResponse' } } },
+          },
+          503: {
+            description: 'The instance is not ready; `reason` says why',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/NotReadyResponse' } } },
+          },
+        }),
+      }),
+    },
     '/api/v1/version': {
       get: op({
         summary: 'Get application version',

@@ -24,6 +24,7 @@ import idempotencyMiddleware from './middleware/idempotency.js';
 import { defaultEmptyBody } from './middleware/empty-body.js';
 import { createRestoreWriteGate, trackAdmittedWrite } from './middleware/restore-gate.js';
 import { runExternalJob, waitUntilIdle } from './utils/restore-state.js';
+import { readinessHandler } from './services/readiness.js';
 import { createErrorHandler } from './middleware/error-handler.js';
 import { buildOpenApiSpec } from './openapi.js';
 import * as googleCalendar from './services/google-calendar.js';
@@ -226,6 +227,19 @@ app.use(function bodyParseErrorHandler(err, req, res, next) {
   }
   next(err);
 });
+
+// --------------------------------------------------------
+// Readiness (Phase 1b, E11): can this instance serve right now?
+// --------------------------------------------------------
+// Next to /health, not instead of it: /health stays 200 during a restore so
+// Docker does not restart the container in the middle of one, /readyz says 503
+// then. Unauthenticated, so the answer is the status and one of four reasons -
+// no version, no path, no timestamp. /readyz is no client route: a browser gets
+// the JSON as well.
+// Before the sessions: the session store reads the database for a signed
+// cookie and throws without a connection, which would turn the very answer
+// this path exists for (database_closed) into a 500 for anyone with a cookie.
+app.get('/readyz', readinessHandler);
 
 // --------------------------------------------------------
 // Sessions
