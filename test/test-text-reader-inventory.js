@@ -298,6 +298,10 @@ test('an entry without its suite, a target without its file and a wrong shape ar
     assert.deepEqual(Object.keys(readInventory(root).suites), ['test-reader.js'], '--update drops the line of a deleted suite');
     inventory({ targets: ['public/pages/moved.js'] });
     assert.match(problemsOf(root).join('\n'), /target public\/pages\/moved\.js does not exist/);
+    inventory({ targets: ['public/pages/b.js'], fate: 'falls-with:public/pages/b.js' });
+    assert.match(problemsOf(root).join('\n'), /test-reader\.js: reads public\/pages\/a\.js, which its targets do not name/);
+    inventory({ targets: ['public/pages/'] });
+    assert.deepEqual(problemsOf(root), [], 'a directory target covers the files below it');
     inventory({ targets: ['public/locales/de.json'] });
     assert.match(problemsOf(root).join('\n'), /target public\/locales\/de\.json is not source text/);
     inventory({ targets: ['public/pages'] });

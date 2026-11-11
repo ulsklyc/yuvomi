@@ -888,6 +888,10 @@ export function verify(inv, measured, root) {
       else if (!exists(t)) problems.push(`${where} target ${t} does not exist. The file was moved or rebuilt: work off the entry by its fate, or point it at the new file.`);
       else if (t.endsWith('/') !== statSync(join(root, t)).isDirectory()) problems.push(`${where} target ${t}: a directory ends with "/", a file does not.`);
     }
+    // What the detector sees the suite read has to be named: `--target` answers from here.
+    const named = (/** @type {string} */ t) => (e.targets ?? []).some((x) => x === t || (x.endsWith('/') && t.startsWith(x)));
+    const unnamed = (measured[name]?.targets ?? []).filter((t) => !named(t));
+    if (unnamed.length > 0) problems.push(`${where} reads ${unnamed.join(', ')}, which its targets do not name. Add ${unnamed.length === 1 ? 'it' : 'them'} to "targets".`);
     if (!FATE.test(e.fate ?? '')) problems.push(`${where} fate "${e.fate}" is none of lint:<rule>, falls-with:<file under public/ or server/>, stays:<reason>.`);
     else if (e.class === 'V' && !e.fate.startsWith('stays:')) problems.push(`${where} a V suite stays; its fate is stays:<reason>.`);
     else if (e.fate.startsWith('falls-with:') && !exists(e.fate.slice('falls-with:'.length))) problems.push(`${where} fate names ${e.fate.slice('falls-with:'.length)}, which does not exist.`);
