@@ -61,9 +61,9 @@ const drill = jobBlock(workflow, 'drill');
 const drillSteps = steps(drill);
 const stepAt = (/** @type {RegExp} */ re) => drillSteps.findIndex((s) => re.test(s.text));
 
-test('runs every night, by hand and when ci.yml calls it', () => {
+test('runs once a day, by hand and when ci.yml calls it', () => {
   const on = workflow.match(/^on:\n((?: {2}.*\n|\n)+?)(?=^\S)/m)?.[1] ?? '';
-  assert.match(on, /^ {2}schedule:\n {4}- cron: '\d+ \d+ \* \* \*'$/m, 'one run a night (UTC)');
+  assert.match(on, /^ {2}schedule:\n {4}- cron: '\d+ \d+ \* \* \*'$/m, 'one run a day (UTC)');
   assert.match(on, /^ {2}workflow_dispatch:$/m);
   assert.match(on, /^ {2}workflow_call:$/m, 'ci.yml runs the same job for every pull request');
   assert.doesNotMatch(on, /pull_request_target|workflow_run|issue_comment/);
