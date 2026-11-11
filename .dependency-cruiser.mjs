@@ -55,6 +55,9 @@ export default {
     // destructured `const { send } = provider`, `send.call/apply`, an alias without a
     // `channel` key or a `provider(s)` name, or an object spread `{ ...opts }`; these
     // are left to review.
+    // A new push sender goes into the pathNot of push-service-importers below, with its
+    // reason above; then `node scripts/generate-oxlint-overrides.mjs` carries it into the
+    // lint exceptions of .oxlintrc.json (test:lint-baseline fails until it does).
     {
       name: 'push-service-importers',
       comment: 'Web Push goes through server/services/push.js; only the senders named above may import it, '
