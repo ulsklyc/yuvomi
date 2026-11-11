@@ -14,16 +14,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tempDir } from './tmp-dir.js';
 import {
-  INVENTORY_FILE, analyzeSuite, entryLine, formatInventory, phases, readInventory, readersOf, scan, sums, traceGaps, verify,
+  INVENTORY_FILE, analyzeSuite, entryLine, formatInventory, phases, readInventory, readTrace, readersOf, scan, sums, traceGaps, verify,
 } from '../scripts/test-inventory.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(REPO, 'scripts', 'test-inventory.mjs');
+const PRELOAD = pathToFileURL(join(REPO, 'scripts', 'trace-test-reads.mjs')).href;
 
 /* ---------- the detector, against a small tree of its own ---------- */
 
@@ -370,6 +371,45 @@ test('a run-time trace is compared with the inventory: no entry, read not covere
   });
   inv.suites['test-a.js']?.targets.push('server/');
   assert.deepEqual(traceGaps(inv, trace).uncovered, [], 'a directory target covers what the walk read below it');
+});
+
+test('the preload records what test code reads, one file per process, and nothing the app reads', () => {
+  const probe = "import { readFileSync, readdirSync } from 'node:fs';\nimport { readFile } from 'node:fs/promises';\n"
+    + "import { appRead } from '../server/reader.js';\n"
+    + "const at = (rel) => new URL(rel, import.meta.url);\n"
+    + "readFileSync(at('../public/pages/a.js'), 'utf8');\nreadFileSync(at('../public/pages/a.js'), 'utf8');\n"
+    + "readdirSync(at('../server/routes/'));\nawait readFile(at('../public/index.html'), 'utf8');\n"
+    + "readFileSync(at('../public/locales/de.json'), 'utf8');\nreadFileSync(at('../docs/readme.md'), 'utf8');\n"
+    + 'appRead();\n';
+  // The app module reads a file of its own: that is no read by the suite.
+  const root = realpathSync(tree({
+    'test-probe.js': probe,
+    '../server/reader.js': "import { readFileSync } from 'node:fs';\nexport const appRead = () => readFileSync(new URL('../public/pages/b.js', import.meta.url), 'utf8');\n",
+    // Code under test/ that is no suite: a helper run on its own.
+    'runner.js': "import { readFileSync } from 'node:fs';\nreadFileSync(new URL('../public/pages/a.js', import.meta.url), 'utf8');\n",
+  }));
+  const out = join(root, 'trace');
+  const node = (/** @type {string} */ file) => spawnSync(process.execPath, ['--import', PRELOAD, file], {
+    cwd: root, encoding: 'utf8', env: { ...process.env, TEXT_READER_TRACE: out, TEXT_READER_TRACE_ROOT: root },
+  });
+  try {
+    const first = node('test/test-probe.js');
+    assert.equal(first.status, 0, first.stderr);
+    assert.equal(node('test/test-probe.js').status, 0);
+    assert.equal(node('test/runner.js').status, 0, 'a process that runs no suite records nothing');
+    const files = readdirSync(out);
+    assert.equal(files.length, 2, `one file per suite process: ${files.join(', ')}`);
+    assert.ok(files.every((name) => /^test-probe\.js\.\d+\.tsv$/.test(name)));
+    const lines = readFileSync(join(out, String(files[0])), 'utf8').trim().split('\n').sort();
+    assert.deepEqual(lines, [
+      'test-probe.js\tpublic/index.html', 'test-probe.js\tpublic/locales/de.json',
+      'test-probe.js\tpublic/pages/a.js', 'test-probe.js\tserver/routes/',
+    ], 'each path once; no docs/, and not public/pages/b.js, which the app module read');
+    // The directory is read as one trace; locale JSON drops out in the comparison.
+    const gaps = traceGaps({ ceiling: { sBlocks: 0, suites: 0 }, sections: {}, suites: {}, wideOnly: {} }, readTrace(out));
+    assert.deepEqual(gaps.unlisted, [{ suite: 'test-probe.js', paths: ['public/index.html', 'public/pages/a.js', 'server/routes/'] }]);
+    assert.equal(readTrace(join(out, String(files[0]))).trim().split('\n').length, 4, 'a single file is read as it is');
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('--target and the phase table answer from the inventory', () => {
