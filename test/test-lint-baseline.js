@@ -16,7 +16,12 @@
  *          and the lint exceptions name the same files as the import rules;
  *          the real tree has no hard finding (this runs in the required test jobs, next to the
  *          lint job); the real lint-baseline.json is sorted, carries no hard rule and names no
- *          missing file.
+ *          missing file. The fixture test/fixtures/lint/error-text/ must give exactly its
+ *          thirty-three ERROR-TEXT findings (the self-test cases of the text reader the rule
+ *          replaced, phase 1b section E, and the spellings a probe against that reader
+ *          found) and nothing for the lines it must leave alone. A
+ *          baseline key of that rule needs a reason in lint-baseline-reasons.json, and a
+ *          reason needs its key.
  * Run:     npm run test:lint-baseline
  */
 
@@ -207,6 +212,57 @@ test('a file oxlint cannot parse is keyed as a parse error, not as an unknown ru
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+const LEAK = 'export function f(res, err) { res.status(400).json({ error: err.message }); }\n';
+const ERROR_TEXT = 'server/x.js\toxlint/no-restricted-syntax/ERROR-TEXT';
+const OWN_TEXT = 'instanceof OwnError, the sentence is ours';
+/**
+ * @param {string} dir
+ * @param {Record<string, string>} reasons
+ */
+const writeReasons = (dir, reasons) => writeFileSync(join(dir, 'lint-baseline-reasons.json'), `${JSON.stringify(reasons, null, 1)}\n`);
+/** @param {string} dir */
+const reasonsOf = (dir) => JSON.parse(readFileSync(join(dir, 'lint-baseline-reasons.json'), 'utf8'));
+
+test('a baseline key of the error-text rule needs a reason of twenty characters', () => {
+  const dir = project(LEAK);
+  try {
+    const init = run(dir, '--init');
+    assert.equal(init.code, 1, init.out);
+    assert.match(init.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/ERROR-TEXT\s+no reason/);
+    assert.deepEqual(baselineOf(dir), { [ERROR_TEXT]: 1 }, '--init still wrote the baseline');
+    assert.equal(run(dir).code, 1, 'no reasons file');
+    writeReasons(dir, { [ERROR_TEXT]: 'own text' });
+    const short = run(dir);
+    assert.equal(short.code, 1, short.out);
+    assert.match(short.out, /ERROR-TEXT\s+no reason/);
+    writeReasons(dir, { [ERROR_TEXT]: OWN_TEXT });
+    const ok = run(dir);
+    assert.equal(ok.code, 0, ok.out);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a reason without a baseline key is red, and --update drops a reason with its key', () => {
+  const dir = project(LEAK);
+  try {
+    run(dir, '--init');
+    writeReasons(dir, { [ERROR_TEXT]: OWN_TEXT, 'server/gone.js\toxlint/no-restricted-syntax/ERROR-TEXT': 'a place that was fixed long ago' });
+    const stale = run(dir);
+    assert.equal(stale.code, 1, stale.out);
+    assert.match(stale.out, /server\/gone\.js\s+oxlint\/no-restricted-syntax\/ERROR-TEXT\s+reason without a baseline key/);
+    assert.equal(run(dir, '--update').code, 1, '--update only drops the reason of a key it lowers away');
+    writeReasons(dir, { [ERROR_TEXT]: OWN_TEXT });
+    assert.equal(run(dir).code, 0);
+    // The place is fixed: the key sinks away, and its reason goes with it.
+    writeFileSync(join(dir, 'server', 'x.js'), NONE);
+    assert.equal(run(dir).code, 0, 'the reason of a key that can sink is not stale yet');
+    assert.equal(run(dir, '--update').code, 0);
+    assert.deepEqual(baselineOf(dir), {});
+    assert.deepEqual(reasonsOf(dir), {});
+    writeFileSync(join(dir, 'lint-baseline-reasons.json'), '{ "broken": ');
+    assert.equal(run(dir).code, 2, 'a reasons file that is not JSON is a broken run');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('the size rules stand at the planned limits', () => {
   assert.deepEqual(CONFIG.rules['max-lines'], ['error', { max: 1500 }]);
   assert.deepEqual(CONFIG.rules['max-lines-per-function'], ['error', { max: 200 }]);
@@ -337,6 +393,24 @@ test('the fixture gives exactly its ten findings, and nothing for the allowed li
       'tx.js:5 TX-ASYNC-FN', // async transaction function
       'tx.js:7 TX-AWAIT-INSIDE', // await nested in a synchronous transaction body
     ]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the error-text fixture gives exactly its thirty-three findings, and nothing for the lines to leave alone', () => {
+  const dir = tempDir('yuvomi-lint-error-text-');
+  try {
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    copyFileSync(join(FIXTURE, 'error-text', 'cases.js'), join(dir, 'cases.js'));
+    // The fixture marks every line that must be reported with `et-N`.
+    const marked = readFileSync(join(dir, 'cases.js'), 'utf8').split('\n')
+      .flatMap((line, i) => (/\/\/ et-\d+:/.test(line) ? [i + 1] : []));
+    assert.equal(marked.length, 33, 'the fixture marks thirty-three lines');
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .map((/** @type {{ message: string, labels: { span: { line: number } }[] }} */ d) => ({ line: d.labels[0].span.line, tag: d.message.split(':')[0] }))
+      .sort((/** @type {{ line: number }} */ a, /** @type {{ line: number }} */ b) => a.line - b.line)
+      .map((/** @type {{ line: number, tag: string }} */ f) => `${f.line} ${f.tag}`);
+    assert.deepEqual(found, marked.map((line) => `${line} ERROR-TEXT`));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -657,4 +731,18 @@ test('the real lint-baseline.json is sorted, has no hard rule and names only exi
     if (!existsSync(join(REPO, file))) stale.push(file);
   }
   assert.deepEqual([...new Set(stale)], [], 'baseline names files that do not exist');
+});
+
+test('the real lint-baseline-reasons.json is sorted and explains every error-text key', () => {
+  const baseline = JSON.parse(readFileSync(join(REPO, 'lint-baseline.json'), 'utf8'));
+  const reasons = JSON.parse(readFileSync(join(REPO, 'lint-baseline-reasons.json'), 'utf8'));
+  const keys = Object.keys(reasons);
+  assert.deepEqual(keys, [...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)), 'keys not sorted');
+  for (const key of keys) {
+    assert.ok(key in baseline, `reason without a baseline key: ${key}`);
+    assert.ok(typeof reasons[key] === 'string' && reasons[key].trim().length >= 20, `reason too short: ${key}`);
+  }
+  const errorText = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/ERROR-TEXT'));
+  assert.ok(errorText.length > 0, 'the baseline carries no error-text key');
+  assert.deepEqual(errorText.filter((key) => !(key in reasons)), [], 'error-text keys without a reason');
 });

@@ -2407,7 +2407,7 @@ test('Admin-Liste nennt, wer installiert hat (installedByName); geloeschtes Kont
   assert.equal(recordOf('anon-mod').installedBy, null);
 });
 
-// Phase 0 section H (test:client-error-text-guard): a filesystem error without
+// Phase 0 section H (lint rule ERROR-TEXT): a filesystem error without
 // `status` must not reach the browser with its message - it names the absolute
 // path of modules/. The source reader cannot tell this catch from a gated one,
 // so it runs as a program: modules/ is replaced by a FILE, and the mkdir in

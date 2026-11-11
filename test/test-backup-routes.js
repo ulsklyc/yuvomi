@@ -627,7 +627,7 @@ test('GET /database und POST /webdav/trigger: ein Backup ohne bestandene Integri
 });
 
 // ── Phase 0 section H: a foreign server's text stays out of the answer ────────
-// test:client-error-text-guard reads the routes; this runs one as a program. A
+// The lint rule ERROR-TEXT reads the routes; this runs one as a program. A
 // WebDAV server answers the connection test with a status line that names its
 // internal host and path - exactly what a misconfigured reverse proxy sends.
 // Decision E4 (08.11.2026): the admin gets a fixed sentence, a `reason` and the
