@@ -405,6 +405,24 @@ yuvomi  | [Sync] Auto-sync active every 15 minutes.
 
 Press `Ctrl+C` to stop following the logs (the container keeps running).
 
+Two paths answer without a login and tell you how the instance is doing:
+
+| Path | Says | During a restore | Use it for |
+|---|---|---|---|
+| `/health` | the process answers | `200` | the container healthcheck (all shipped descriptors use it) |
+| `/readyz` | the instance can serve right now | `503` | a load balancer, a reverse proxy check, an uptime monitor |
+
+`/readyz` answers `200 {"status":"ready"}`, or `503 {"status":"not_ready","reason":"..."}` with one
+of four reasons: `restore_in_progress`, `database_closed` (a restore failed and left no open
+database - restart Yuvomi), `schema_behind` (the database is older than this version expects) and
+`data_dir_not_writable` (the folder of the database file refuses writes - check the volume's
+ownership). Do not point a container healthcheck at `/readyz`: Docker would restart the container
+in the middle of a restore.
+
+```bash
+curl -s http://localhost:3000/readyz
+```
+
 ### 5. Create the First Admin Account
 
 On the first visit, Yuvomi detects that no account exists yet and guides you through

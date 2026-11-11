@@ -1364,6 +1364,26 @@ export const schemas = {
           },
           required: ['status', 'timestamp'],
         },
+        ReadinessResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['ready'] },
+          },
+          required: ['status'],
+          additionalProperties: false,
+        },
+        NotReadyResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['not_ready'] },
+            reason: {
+              type: 'string',
+              enum: ['restore_in_progress', 'database_closed', 'schema_behind', 'data_dir_not_writable'],
+            },
+          },
+          required: ['status', 'reason'],
+          additionalProperties: false,
+        },
         VersionResponse: {
           type: 'object',
           properties: {

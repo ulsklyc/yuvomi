@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would, migrates it to the code under test and starts the server on it. A migration that
   breaks an older database now fails in CI, and the run is also red when the newest release
   changed the schema but has no frozen database. Nothing changes for an installation.
+- **A readiness endpoint `/readyz` next to `/health`.** `/health` only says that the process
+  answers, and it stays `200` during a restore so that Docker does not restart the container in
+  the middle of one. `/readyz` says whether the instance can serve right now: `200` with
+  `{"status":"ready"}`, or `503` with `{"status":"not_ready","reason":"..."}` while a restore is
+  running, the database connection is closed, the database is older than this version expects or
+  the data folder refuses writes. It needs no login, tells nothing else about the instance and
+  does not write to the database. `/health` and every shipped healthcheck stay as they are; the
+  new path is for a load balancer or an uptime monitor.
 
 ### Changed
 - **Unexpected errors are answered and logged in one place.** The central error handler now
