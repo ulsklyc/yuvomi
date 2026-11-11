@@ -59,8 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Medication reminders to a person's own notification channel now go through the same SSRF
   guard as every other channel delivery.** Until now they were sent with an unguarded request.
   The deployment switch `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` applies to them as it does to
-  the other channels: a person whose own Gotify or ntfy channel lives in the local network needs
-  that switch for medication reminders too, as it was already needed for every other reminder.
+  the other channels: a person whose own Gotify, ntfy or webhook channel lives in the local
+  network needs that switch for medication reminders too, as it was already needed for every
+  other reminder.
 
 ## [2.88.0] - 2026-11-10
 

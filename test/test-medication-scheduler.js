@@ -603,12 +603,9 @@ test('ein entfernter Betreuer bekommt nichts mehr, weder per Push noch ueber ein
 // --------------------------------------------------------
 // The person's own channel is reached through the SSRF guard
 // --------------------------------------------------------
-// The channel form refuses only what can be decided without DNS. A host name
-// that resolves to a private address, or a redirect, is refused at send time,
-// by the guarded fetch that channel-delivery.js sets as the one default for
-// every sender. The scheduler carried its own default, the bare global fetch,
-// and handed it on - so this path alone skipped the guard. Real providers and
-// the real default here: no `fetchImpl`, no `providers`.
+// The person's own channel is reached through the guarded fetch that
+// channel-delivery.js sets as the one default for every sender. Real providers
+// and the real default here: no `fetchImpl`, no `providers`.
 
 /**
  * @param {import('node:http').RequestListener} handler
@@ -621,7 +618,7 @@ function startLocalServer(handler) {
       base: `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`,
       close: () => new Promise((done) => {
         server.close(done);
-        // A kept-alive socket of the unguarded client would hold close() open.
+        // A kept-alive socket would hold close() open.
         server.closeAllConnections();
       }),
     }));
