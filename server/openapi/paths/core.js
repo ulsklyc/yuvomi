@@ -34,6 +34,21 @@ export function corePaths() {
         }),
       }),
     },
+    '/api/v1/system/diagnostics': {
+      get: op({
+        summary: 'Get system diagnostics',
+        operationId: 'getSystemDiagnostics',
+        tag: 'System',
+        admin: true,
+        description: 'What this installation runs on, for a bug report or a look at the last backup: version, runtime, schema, sizes, backup status, readiness. Never a key, a path, a hostname, the value of an environment variable or anything about a member. A value that cannot be read is `null` (`schema_version`: 0), so the answer also comes while the database is not available. Not cached.',
+        responses: /** @type {any} */ ({
+          200: {
+            description: 'Diagnostics of this installation',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SystemDiagnosticsResponse' } } },
+          },
+        }),
+      }),
+    },
     '/api/v1/version': {
       get: op({
         summary: 'Get application version',

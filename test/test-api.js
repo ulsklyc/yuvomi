@@ -903,6 +903,8 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/split-expenses.js: err.reason', { sites: 1, at403: [],
     why: 'Refusal: ein Grund nur an 409 (email_in_use, group_archived); die 403 dort tragen keinen' }],
   ['auth.js: err.code', { sites: 1, at403: [], why: 'feste 409 (2FA)' }],
+  ['routes/system.js: backup?.lastError?.reason ?? null', { sites: 1, at403: [],
+    why: 'Diagnose (Phase 1b F): Feld `backup.reason` einer festen 200, der Grund des letzten Backup-Fehlschlags aus der geschlossenen Menge' }],
   // Gravatar-Import: GravatarError traegt seinen Grund, die Route schlaegt den
   // Status nach (400/404/413/415/502, 500 bei falsch gesetzter GRAVATAR_BASE_URL)
   // - eine 403 baut sie daraus nie. Ihre eigene 403 (not_a_household_member)

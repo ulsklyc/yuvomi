@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the database, without a schema change, and a restore keeps the values of the installation it
   runs on rather than those inside the restored file. `GET /api/v1/backup/status` gains
   `scheduler.lastSuccess`.
+- **Admins can ask the server what it runs on.** `GET /api/v1/system/diagnostics` answers with
+  the version and build revision, the Node.js and SQLite versions, platform, schema version and
+  the time of the last migration, the size of the database and its write-ahead log, free space on
+  the data volume, uptime, the status of the last backup with the next scheduled run, where the
+  database key comes from, readiness and the number of installed modules. It never carries a key,
+  a path, a hostname, the value of an environment variable or anything about a member, and it is
+  refused for members and for signed-in devices. `GET /api/v1/backup/status` gains
+  `scheduler.nextRun`. The settings page does not show any of this yet.
 
 ### Changed
 - **Unexpected errors are answered and logged in one place.** The central error handler now
