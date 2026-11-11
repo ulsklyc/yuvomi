@@ -175,6 +175,19 @@ rises or a new key fails the check, in CI as a required job. A change that fixes
 new code is expected to type-check clean. TypeScript files run natively on Node 24.12 and 26
 through type stripping, which is why only erasable syntax is allowed.
 
+### Linting
+
+`npm run lint` runs oxlint with the rule set in `.oxlintrc.json` and compares the findings with
+`lint-baseline.json`, one count per file and rule, in CI as the `lint` job. The rules: files up to
+1,500 lines and functions up to 200, no `innerHTML`/`outerHTML` assignment, no
+`toISOString().slice(0, 10)` as a day key (the helpers in `server/utils/timezone.js` know the
+household's zone), no catch block that answers 500 itself, no `async` function or `await` in a
+`db.transaction()` body, no manual `BEGIN`/`COMMIT`, and oxlint's `correctness` category. The
+`innerHTML` and transaction rules are hard: they have no baseline and fail at the first finding.
+Everything else works like the type baseline: a count that rises or a new key fails, a change that
+fixes findings runs `node scripts/check-lint-baseline.ts --update`, which only lowers counts. The
+rules themselves are tested on the fixture `test/fixtures/lint/` (`npm run test:lint-baseline`).
+
 ### Build
 
 `npm run build` runs Vite 8 (Rolldown) over `public/` and writes `dist/`: hashed chunks under
@@ -601,7 +614,7 @@ That is worth stating plainly rather than leaving to inference. An automated rev
 Beyond that decision, three things are mechanical and hold for every change regardless of who or what wrote it:
 
 - The full test suite runs on every pull request, and a red build is not merged.
-- The [Hard Constraints](#hard-constraints) above are enforced by tests, not by good intentions - an `innerHTML` call, an unpinned or unlisted dependency, an import past the three facades, a type count above the baseline or a build that differs between two runs fails the pull request (`test:frontend-audit`, `test:vendor-policy`, `test:module-facades`, `test:tsc-baseline` and the determinism check in CI).
+- The [Hard Constraints](#hard-constraints) above are enforced by tests, not by good intentions - an `innerHTML` or `outerHTML` write, an unpinned or unlisted dependency, an import past the three facades, a type count or a lint count above its baseline or a build that differs between two runs fails the pull request (the `lint` job with oxlint and `scripts/check-lint-baseline.ts`, `test:vendor-policy`, `test:module-facades`, the `typecheck` job and the determinism check in CI).
 - Behaviour that is claimed to be fixed carries a test that fails against the state before the fix. A guard that was never seen red is not evidence.
 
 **On "a human has read and understood every merged line":** for a one-person project shipping several releases a week, that sentence would be a promise nobody could keep, and a promise that cannot be kept is worse than none - it invites exactly the trust it does not earn. What is true instead: the maintainer decides what gets built and whether it goes in, and is answerable for it either way. Where a change touches something sensitive - authentication, permissions, storage, anything reaching the network - the maintainer reads it line by line and merges it by hand.
