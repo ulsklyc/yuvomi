@@ -2285,7 +2285,9 @@ reset finds the account by `contacts.email` and sends the link there, and the SS
 account by a verified address matching either column. Only the linked person or an admin may change
 them, and only in a session or with an unscoped token: a token scoped to modules (for example
 `contacts:write`) is refused even for the admin or the person themselves, because the addresses are
-the key to the account and not part of the module. `PUT /api/v1/contacts/:id` refuses anyone else
+the key to the account and not part of the module. A signed-in device is refused the same way: its
+credential carries no scopes, but a device changes neither password, email nor second factor
+(SECURITY.md), and these addresses are where the password reset goes. `PUT /api/v1/contacts/:id` refuses anyone else
 with 403 when the request would change the primary address or the set of addresses. Addresses are
 compared without regard to letter case, as the SSO link compares them; sending them unchanged or only
 in another case is not a change, and the stored spelling is kept. The CardDAV sync

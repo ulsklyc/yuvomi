@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **A signed-in device can no longer change the email addresses of a household member.**
+  SECURITY.md says that a device credential changes neither password, email nor second factor.
+  The addresses of the contact that belongs to an account were outside that rule, and they are
+  where a password reset is sent. A device is now refused there like a module-scoped token
+  (`403`, `contact_email_protected`), for the person's own contact too. The other fields of the
+  contact stay editable from a device, and a browser session or a full-access token changes
+  the addresses as before.
+
 ## [2.89.0] - 2026-11-12
 
 ### Foundation
