@@ -188,6 +188,13 @@ The same script runs dependency-cruiser with the layer rules in `.dependency-cru
 import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
 named files import `server/services/push.js`, and only that file imports `web-push`; the server
 reads nothing from `public/` but `utils/` and `locales/`; `public/` never imports `server/`.
+knip (`knip.json`) adds dead code: files no entry point reaches, exports nobody imports, an export
+under two names, packages imported but not listed and listed but not used. Its entry points are the
+server, the router and pages, the three facades, the classic scripts the HTML pages load, the two
+CLI files, scripts, tools and tests; a new file that is loaded some other way is an entry there, not
+a baseline key. An entry naming a file that no longer exists stops the run. In the same job zizmor
+audits `.github/`; a finding that stays is listed in `.github/zizmor.yml` with its reason, per file
+and audit.
 Everything else works like the type baseline: a count that rises or a new key fails, a change that
 fixes findings runs `node scripts/check-lint-baseline.ts --update`, which only lowers counts. The
 rules themselves are tested on the fixture `test/fixtures/lint/` (`npm run test:lint-baseline`).

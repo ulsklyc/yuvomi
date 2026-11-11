@@ -1,0 +1,45 @@
+# zizmor configuration (phase 1b, section D3). The lint job runs zizmor 1.32.0 over
+# .github/ with offline audits only; every finding below was there when the audit came in
+# (11 Nov 2026) and is accepted for the reason given next to it. A fix changes what a
+# workflow does and belongs in a pull request of its own, which then removes the entry.
+#
+# Entries name a whole file: a line number would move with every edit above it and turn
+# the lint job red for an unrelated change. The price: a second finding of the same audit
+# in the same file passes as well, so a new checkout or trigger in these files needs the
+# reviewer's eye.
+rules:
+  artipacked:
+    ignore:
+      # actions/checkout keeps the job token in .git/config. None of these jobs uploads the
+      # checkout: ci.yml uploads only $RUNNER_TEMP/test-logs, the others upload nothing.
+      - ci.yml
+      - claude.yml
+      - claude-code-review.yml
+      - docker-publish.yml
+      - umbrel-publish.yml
+
+  dangerous-triggers:
+    ignore:
+      # issue_comment and pull_request_review(_comment) run in the base repository's
+      # context. The job runs only on an @claude mention, and claude-code-action acts only
+      # for users with write access to the repository (its default, not overridden here).
+      - claude.yml
+
+  self-repository:
+    ignore:
+      # Low: the audit prefers the `$/` self-repository syntax for the restore drill, a
+      # reusable workflow of this repository called by its local path; both name the same
+      # file at this commit.
+      - ci.yml
+
+  template-injection:
+    ignore:
+      # Informational: steps.ver.outputs.version, which the "Resolve version" step sets
+      # only after checking it against a version pattern; no free text reaches the shell.
+      - umbrel-publish.yml
+
+  dependabot-cooldown:
+    ignore:
+      # No cooldown is configured, so updates come as soon as they are published. A
+      # cooldown changes when updates arrive; that is the maintainer's call.
+      - dependabot.yml
