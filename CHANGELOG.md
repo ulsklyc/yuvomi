@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`403`, `contact_email_protected`), for the person's own contact too. The other fields of the
   contact stay editable from a device, and a browser session or a full-access token changes
   the addresses as before.
+- **The Umbrel catalog workflow no longer runs foreign code next to its token.** On every
+  release it ran the catalog repository's linter and installed its npm dependencies in the step
+  that held the token for the catalog fork. It now has three jobs: one edits the catalog files
+  as text, one runs the linter with no secret and no rights and installs with
+  `npm ci --ignore-scripts`, and only the last one holds the token and pushes. Nothing changes
+  for an installation.
 
 ## [2.89.0] - 2026-11-12
 
