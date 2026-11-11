@@ -14,6 +14,10 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
+import {
+  recordingLog, withTableGone, requestLogged, assertFixed500, FIXED_500,
+} from './helpers/forced-db-error.js';
 
 const dbmod = await import('../server/db.js');
 const { default: permissionsRouter } = await import('../server/routes/permissions.js');
@@ -38,6 +42,9 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/', permissionsRouter);
+// Wie server/index.js: der zentrale Fehlerhandler steht hinter dem Router.
+const handlerLog = recordingLog();
+app.use(createErrorHandler(handlerLog));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
@@ -240,6 +247,7 @@ test('PUT /user rolls permission revocation back when fasting cleanup fails', as
       body: { capabilities: { health_use_fasting: 'none' } },
     });
     assert.equal(response.status, 500);
+    assert.deepEqual(response.body, FIXED_500, 'fester Satz, kein Text des Triggers');
     assert.equal(db.prepare(`SELECT access FROM access_permissions
       WHERE subject_type = 'user' AND subject_id = ?
         AND resource_type = 'capability' AND resource_key = 'health_use_fasting'`).get(String(userId)).access, 'allow');
@@ -266,6 +274,7 @@ test('PUT /role rolls permission revocation back when fasting cleanup fails', as
       body: { capabilities: { health_use_fasting: 'none' } },
     });
     assert.equal(response.status, 500);
+    assert.deepEqual(response.body, FIXED_500, 'fester Satz, kein Text des Triggers');
     assert.equal(db.prepare(`SELECT access FROM access_permissions
       WHERE subject_type = 'role' AND subject_id = ?
         AND resource_type = 'capability' AND resource_key = 'health_use_fasting'`).get(familyRole).access, 'allow');
@@ -277,6 +286,50 @@ test('PUT /role rolls permission revocation back when fasting cleanup fails', as
     db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'role' AND subject_id = ?`).run(familyRole);
   }
 });
+
+// --------------------------------------------------------------------------
+// Datenbankfehler (Phase 1b Abschnitt E, Pilot des zentralen Fehlerhandlers).
+// Jede Route antwortet auf einen SQLite-Fehler mit 500 und dem festen Satz,
+// ohne SQLite-Text im Rumpf, und der Fehler steht genau einmal im Log - gleich,
+// ob die Route selbst antwortet oder ihn dem Handler überlässt. Die Übersetzung
+// der Validator-Fehler in 400 bleibt daneben, was sie war.
+// --------------------------------------------------------------------------
+test('GET /catalog: Datenbankfehler -> 500 mit festem Satz, kein SQLite-Text im Rumpf', async () => {
+  actor = ADM;
+  const answer = await withTableGone(db, 'users', () => requestLogged(baseUrl, handlerLog, 'GET', '/catalog'));
+  assertFixed500(answer, 'no such table: users', 'GET /catalog');
+});
+
+// 'child' ist die Familienrolle von MEMBER; ein leeres Profil ist gültige Eingabe.
+const BROKEN_ROUTES = [
+  { method: 'GET', name: '/role/:familyRole', path: '/role/child' },
+  { method: 'PUT', name: '/role/:familyRole', path: '/role/child', body: { modules: {} } },
+  { method: 'GET', name: '/user/:userId', path: `/user/${MEMBER}` },
+  { method: 'PUT', name: '/user/:userId', path: `/user/${MEMBER}`, body: { modules: {} } },
+];
+for (const { method, name, path, body } of BROKEN_ROUTES) {
+  test(`${method} ${name}: Datenbankfehler -> 500 mit festem Satz, kein SQLite-Text im Rumpf`, async () => {
+    actor = ADM;
+    const answer = await withTableGone(db, 'access_permissions', () => requestLogged(baseUrl, handlerLog, method, path, body));
+    assertFixed500(answer, 'no such table: access_permissions', `${method} ${name}`);
+  });
+}
+
+for (const [name, path] of [['/role/:familyRole', '/role/child'], ['/user/:userId', `/user/${MEMBER}`]]) {
+  test(`PUT ${name}: ein Validator-Fehler bleibt 400 mit seinem Satz und ohne Fehlerzeile im Log`, async () => {
+    actor = ADM;
+    const catalog = await requestLogged(baseUrl, handlerLog, 'GET', '/catalog');
+    const moduleKey = String(catalog.body.data.modules[0].key);
+
+    const unknown = await requestLogged(baseUrl, handlerLog, 'PUT', String(path), { modules: { __no_such_module__: 'read' } });
+    assert.equal(unknown.status, 400);
+    assert.deepEqual(unknown.body, { error: 'Unknown module: __no_such_module__', code: 400 });
+    const invalid = await requestLogged(baseUrl, handlerLog, 'PUT', String(path), { modules: { [moduleKey]: 'bogus-access' } });
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(invalid.body, { error: 'Invalid module access: bogus-access', code: 400 });
+    assert.deepEqual([...unknown.errorLines, ...invalid.errorLines], []);
+  });
+}
 
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
