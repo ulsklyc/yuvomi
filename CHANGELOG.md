@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   try again. And "Active" is green only while nothing on the card asks for attention: after a
   failed run or with an overdue backup the word stays, since the schedule is still running, but
   without the green that would say all is well next to a red line.
+- **Deleting a calendar asks whether its events go with it or move** (#2570). The confirmation
+  now names the number of events and offers a choice: delete them too, or move them to another
+  calendar (the default calendar preselected). With no events, it stays the plain confirmation
+  it was before. Moving never pushes a synced event anywhere - a local calendar move isn't a
+  change to what the event looks like at Google, CalDAV or iCloud - and only deleting the events,
+  or moving them to a calendar other than the default, stops the "also uploads to iCloud" note
+  from applying. Existing API callers that send no body keep today's behavior unchanged.
 
 ### Fixed
 - **"Create backup now" no longer reports success when the backup failed.** The server answers

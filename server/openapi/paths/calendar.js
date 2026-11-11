@@ -243,9 +243,9 @@ export function calendarPaths() {
         requestBody: jsonBody('#/components/schemas/LocalCalendarUpdateInput'),
       }),
       delete: op({
-        summary: 'Delete local calendar and reassign events to the default calendar',
+        summary: 'Delete local calendar, moving or deleting its events',
         tag: 'Calendar',
-        description: 'Requires calendar write access. An active feed link also requires admin access: otherwise 403 with `reason: calendar_feed_admin_only`. An unknown calendar returns 404 with `reason: calendar_calendar_not_found`.',
+        description: 'Requires calendar write access. An active feed link also requires admin access: otherwise 403 with `reason: calendar_feed_admin_only`. An unknown calendar returns 404 with `reason: calendar_calendar_not_found`. With no body, or `mode: "move"`, the calendar\'s events move to `target_calendar_id` (the default calendar when omitted); `mode: "delete"` removes them with the calendar. `target_calendar_id` equal to the calendar being deleted, or naming a calendar that does not exist, returns 400 with `reason: calendar_move_target_same` or `calendar_selected_calendar_not_found`.',
         params: [idParam()],
         stateChanging: true,
         responses: {
@@ -255,6 +255,15 @@ export function calendarPaths() {
           403: { $ref: '#/components/responses/Forbidden' },
           404: apiError('Local calendar not found.'),
           500: { $ref: '#/components/responses/InternalServerError' },
+        },
+        requestBody: {
+          required: false,
+          description: 'Optional - omit for the previous behaviour (move to the default calendar).',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/LocalCalendarDeleteInput' },
+            },
+          },
         },
       }),
     },

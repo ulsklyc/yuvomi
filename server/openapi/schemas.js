@@ -380,6 +380,13 @@ export const schemas = {
             sort_order: { type: 'integer', minimum: 0 },
           },
         },
+        LocalCalendarDeleteInput: {
+          type: 'object',
+          properties: {
+            mode: { type: 'string', enum: ['move', 'delete'], description: 'Omit or `move` to reassign the calendar\'s events; `delete` removes them with the calendar.' },
+            target_calendar_id: { type: 'integer', description: '`move` only. Omit for the default calendar.' },
+          },
+        },
         ApiError: {
           type: 'object',
           properties: {
