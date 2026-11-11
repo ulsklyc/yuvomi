@@ -47,6 +47,10 @@ function tree(suites = {}) {
     'test/css-rules.js': "import { readFileSync } from 'node:fs';\nexport function* eachRule(css) { yield css; }\n"
       + "export function globalHiddenRule() {\n  return readFileSync(new URL('../public/styles/a.css', import.meta.url), 'utf8');\n}\n",
     'test/source-text.js': 'export function withoutCommentsKeepingLines(src) { return src; }\n',
+    // A helper that reads while it loads: a constant taken from the source.
+    'test/harness.js': "import { readFileSync } from 'node:fs';\n"
+      + "const DELAY = (() => Number(/b = (\\d+)/.exec(readFileSync(new URL('../public/pages/b.js', import.meta.url), 'utf8'))?.[1]))();\n"
+      + 'export function wait() { return DELAY; }\n',
   };
   for (const [name, src] of Object.entries(suites)) files[`test/${name}`] = src;
   for (const [rel, content] of Object.entries(files)) {
@@ -102,6 +106,19 @@ test('a loop variable and a callback parameter carry their list', () => {
   assert.deepEqual(loop.targets, ['server/x.js']);
   const callback = measure(`${HEAD}const FILES = ['public/pages/a.js', 'server/routes/y.js'];\nconst all = FILES.map((f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8'));\n`);
   assert.deepEqual(callback.targets, ['public/pages/a.js', 'server/routes/y.js']);
+});
+
+test('a list of names behind one directory is read name by name', () => {
+  const found = measure(`${HEAD}const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));\nfor (const page of ['index.html', 'pages/a.js', 'pages/b.js']) readFileSync(PUBLIC + page, 'utf8');\n`);
+  assert.deepEqual(found.targets, ['public/index.html', 'public/pages/a.js', 'public/pages/b.js']);
+});
+
+test('a helper that reads while it loads reads for every suite that imports it', () => {
+  const named = measure("import { wait } from './harness.js';\nconst ms = wait();\n");
+  assert.equal(named.narrow, true);
+  assert.deepEqual(named.targets, ['public/pages/b.js']);
+  const bare = measure("import './harness.js';\n");
+  assert.deepEqual(bare.targets, ['public/pages/b.js'], 'the import alone runs the read');
 });
 
 test('an aliased read function is still a read', () => {

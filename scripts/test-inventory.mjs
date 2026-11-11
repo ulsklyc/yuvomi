@@ -486,14 +486,23 @@ export function targetsOf(items, root) {
     let cur = value.slice(value.indexOf(String(m[1]), m.index)).replace(/\/+$/, '');
     while (!existsSync(join(root, cur)) && cur.includes('/')) cur = dirname(cur);
     if (!existsSync(join(root, cur))) continue;
-    for (let j = i + 1; j < strings.length && isDir(cur); j++) {
-      const next = String(strings[j]).replace(/^\.?\/+/, '').replace(/\/+$/, '');
-      if (next === '' || /\s/.test(next) || next.startsWith('..') || !existsSync(join(root, cur, next))) break;
-      cur = join(cur, next);
+    const part = (/** @type {number} */ k) => String(strings[k]).replace(/^\.?\/+/, '').replace(/\/+$/, '');
+    const below = (/** @type {string} */ dir, /** @type {string} */ name) => name !== '' && !/\s/.test(name) && !name.startsWith('..') && existsSync(join(root, dir, name));
+    /** @type {string | null} */
+    let parent = null;
+    let j = i + 1;
+    for (; j < strings.length && isDir(cur) && below(cur, part(j)); j++) {
+      parent = cur;
+      cur = join(cur, part(j));
     }
-    const target = isDir(cur) ? `${cur}/` : cur;
-    if (target.startsWith('public/locales/')) locales.add(target);
-    else targets.add(target);
+    const found = [cur];
+    // A list of names behind one directory (`PUBLIC + page` over two pages): each is read.
+    for (; parent !== null && j < strings.length && below(parent, part(j)); j++) found.push(join(parent, part(j)));
+    for (const path of found) {
+      const target = isDir(path) ? `${path}/` : path;
+      if (target.startsWith('public/locales/')) locales.add(target);
+      else targets.add(target);
+    }
   }
   return { targets, locales };
 }
@@ -602,22 +611,28 @@ function importSpecifiers(code, pieces) {
 /**
  * Measures one suite.
  * @param {string} src
- * @param {{ root: string, helpers?: Map<string, Map<string, Fn>> }} options
- *   `helpers` maps an import specifier ('./css-rules.js') to its reading exports.
+ * @typedef {{ exports: Map<string, Fn>, onImport: Item[][] }} Helper
+ * @param {{ root: string, helpers?: Map<string, Helper> }} options
+ *   `helpers` maps an import specifier ('./css-rules.js') to its reading exports and
+ *   to what the module reads while it loads.
  */
 export function analyzeSuite(src, { root, helpers = new Map() }) {
   const file = index(src);
   /** @type {Map<string, Fn>} */
   const imported = new Map();
   for (const imp of importsOf(file.code, [...file.specifiers])) {
-    const exported = helpers.get(imp.from);
-    if (!exported) continue;
+    const helper = helpers.get(imp.from);
+    if (!helper) continue;
     for (const [name, local] of imp.names) {
-      const fn = exported.get(name);
+      const fn = helper.exports.get(name);
       if (fn) imported.set(local, fn);
     }
   }
   const terminal = reads(file, imported);
+  // A helper that reads while it loads reads for everyone who imports it.
+  for (const spec of file.specifiers) {
+    for (const items of helpers.get(spec.v)?.onImport ?? []) terminal.push({ at: spec.s, items });
+  }
   /** @type {Set<string>} */
   const targets = new Set();
   /** @type {number[]} */
@@ -682,6 +697,9 @@ export function analyzeSuite(src, { root, helpers = new Map() }) {
     textBlocks,
     readLines: [...new Set(hits.map(lineOf))].sort((a, b) => a - b),
     fns: file.fns,
+    // Reads outside every named function: they run when the module loads.
+    moduleReads: terminal.filter((t) => !file.fns.some((fn) => t.at > fn.range[0] && t.at <= fn.range[1])
+      && targetsOf(t.items.filter((i) => i.k !== 'p'), root).targets.size > 0).map((t) => t.items),
   };
 }
 
@@ -689,7 +707,7 @@ export function analyzeSuite(src, { root, helpers = new Map() }) {
 function helperExports(root) {
   const dir = join(root, 'test');
   const files = readdirSync(dir).filter((f) => /\.m?js$/.test(f) && !/^test-/.test(f));
-  /** @type {Map<string, Map<string, Fn>>} */
+  /** @type {Map<string, Helper>} */
   const helpers = new Map();
   for (let round = 0; round < 2; round++) {
     for (const f of files) {
@@ -704,7 +722,7 @@ function helperExports(root) {
         const isExported = new RegExp(`export\\s+(?:async\\s+)?(?:function\\s*\\*?|const|let)\\s+${escapeRe(fn.name)}(?![\\w$])|export\\s*\\{[^}]*(?<![\\w$])${escapeRe(fn.name)}(?![\\w$])[^}]*\\}`).test(code);
         if (reads && isExported) exported.set(fn.name, fn);
       }
-      if (exported.size > 0) helpers.set(`./${f}`, exported);
+      if (exported.size > 0 || measured.moduleReads.length > 0) helpers.set(`./${f}`, { exports: exported, onImport: measured.moduleReads });
     }
   }
   return helpers;
