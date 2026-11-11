@@ -663,6 +663,59 @@ test('ohne fetchImpl senden alle drei Provider ueber guardedFetch (die Voreinste
   }
 });
 
+// Die regulaere Erinnerungsschleife ohne `fetchImpl` und ohne `providers`: echte
+// Provider, echte Voreinstellung aus channel-delivery.js. Kaeme in
+// processDueNotifications() ein eigener fetch-Default zurueck, faellt es hier auf.
+test('ohne fetchImpl geht die faellige Erinnerung ueber den SSRF-Schutz - ein privates Ziel bleibt unerreicht', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  /** @type {string[]} */
+  const hits = [];
+  /** @type {import('node:http').RequestListener} */
+  const record = (req, res) => {
+    req.resume();
+    req.on('end', () => {
+      hits.push(String(req.url));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  };
+  const { base, close } = await startLocalServer(record);
+  // Ein frischer Haushalt je Lauf: eine Erinnerung geht nur einmal raus.
+  const runOnce = async () => {
+    const db = makeDb();
+    const store = createNotificationChannelStore({ db });
+    // Der Store nimmt das private Ziel nur mit dem Schalter an; der Versand prueft danach selbst.
+    await withPrivateNetworkAllowed(() => {
+      store.createChannel({ provider: 'webhook', name: 'Hook', enabled: true, config: { baseUrl: `${base}/hook` }, secrets: {} });
+    });
+    db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Müll rausbringen', 1)").run();
+    db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1)")
+      .run('2026-06-19T09:59:00.000Z');
+    // Push erreicht niemanden, die Zaehler gelten dem Kanal allein.
+    const pushService = /** @type {any} */ ({ sendPushToUser: async () => 0 });
+    return processDueNotifications({ database: db, channelStore: store, pushService, now: new Date() });
+  };
+  const before = process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+  try {
+    delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    const guarded = await runOnce();
+    assert.deepEqual(hits, [], 'der lokale Server darf nichts empfangen haben');
+    assert.equal(guarded.sent, 0);
+    assert.equal(guarded.failed, 1, 'die abgelehnte Zustellung zaehlt als fehlgeschlagen');
+
+    // Gegenprobe: der Schalter oeffnet das private Netz auch fuer diesen Pfad.
+    const opened = await withPrivateNetworkAllowed(() => runOnce());
+    assert.deepEqual(hits, ['/hook'], 'mit dem Schalter kommt genau eine Anfrage an');
+    assert.equal(opened.sent, 1);
+    assert.equal(opened.failed, 0);
+  } finally {
+    if (before === undefined) delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    else process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = before;
+    await close();
+  }
+});
+
 test('providers throw sanitized HTTP errors', async () => {
   const { gotifyProvider } = await import('../server/services/notification-providers/gotify.js');
   await assert.rejects(() => gotifyProvider.send({
