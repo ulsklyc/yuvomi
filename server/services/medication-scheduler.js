@@ -19,6 +19,7 @@ import * as dbModule from '../db.js';
 import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
 import { defaultProviders } from './notifications.js';
+import { guardedFetch } from './notification-providers/guarded-fetch.js';
 import { householdDisabledModules } from './household-modules.js';
 import { recipientDeniedModules } from './reminder-origins.js';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
@@ -106,7 +107,8 @@ function mayHearAboutHealth(database, userId) {
  * @param {Object} [opts.channelStore] - { listEnabledChannelsForUser }
  * @param {Object} [opts.providers]    - { [provider]: { send } }
  * @param {Date}   [opts.now]
- * @param {Function} [opts.fetchImpl]
+ * @param {Function} [opts.fetchImpl] - tests inject one; the default is the SSRF-guarded
+ *   fetch, the same one every other channel delivery uses
  * @returns {Promise<{ due:number, created:number, notified:number, sent:number, failed:number }>}
  */
 /**
@@ -124,7 +126,7 @@ async function processDueMedicationsUntracked({
   channelStore,
   providers = defaultProviders,
   now = new Date(),
-  fetchImpl = fetch,
+  fetchImpl = guardedFetch,
 } = {}) {
   const activeDb = database || dbModule.get();
 
