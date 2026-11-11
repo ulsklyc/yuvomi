@@ -24,7 +24,8 @@ import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { guardedFetch } from '../services/notification-providers/guarded-fetch.js';
-import { PROVIDER_TIMEOUT_MS } from '../services/channel-delivery.js';
+
+const WEBHOOK_TIMEOUT_MS = 8_000;
 
 const log = createLogger('Shopping');
 
@@ -1469,14 +1470,15 @@ router.post('/:listId/send-webhook', sendListLimiter, async (req, res) => {
     });
 
     // EIN ZIEL, DAS NICHT ANTWORTET, HAELT SONST DEN REQUEST (Review zu #2502).
-    // `safeRequest` bringt kein eigenes Zeitlimit mit, und die
-    // Benachrichtigungswege laufen genau deshalb unter `withTimeout` mit
-    // PROVIDER_TIMEOUT_MS - derselbe Wert, dasselbe Ziel: ein Webhook.
+    // `safeRequest` bringt kein eigenes Zeitlimit mit, und channel-delivery.js'
+    // eigenes PROVIDER_TIMEOUT_MS ist diesem Modul per depcruise-Regel verschlossen
+    // (nur notifications.js und medication-scheduler.js duerfen es importieren) -
+    // derselbe Wert (8s), eigene Konstante.
     const response = await guardedFetch(webhookUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body,
-      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
     });
     if (!response.ok) {
       log.error(`POST /:listId/send-webhook: webhook returned HTTP ${response.status}`);
