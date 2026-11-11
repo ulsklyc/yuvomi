@@ -1166,28 +1166,29 @@ test('Kommentare: wem das Modul entzogen ist, bekommt keine Erwähnungs-Meldung'
   // auf `none` steht, der kommt an die Aufgabe gar nicht heran - und bekäme mit
   // dem Push trotzdem ihren Titel und den Anfang des Kommentars zugestellt.
   const { resolvePermissions } = await import('../server/permissions.js');
+  const bob = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(BOB);
+  // Die Aufgabe selbst bleibt für ihn sichtbar (visibility `all`) - genau
+  // deshalb reicht `findVisibleTask` als Prüfung nicht aus.
+  const task = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Ohne Modulzugriff', visibility: 'all' } });
   // subject_id wird als TEXT gehalten und auch so abgefragt (`loadSubjectRows`)
   db.prepare(`
     INSERT OR REPLACE INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
     VALUES ('user', ?, 'module', 'tasks', 'none')
   `).run(String(BOB));
-
-  const bob = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(BOB);
-  const perms = resolvePermissions(db, bob);
-  assert.equal(perms.modules.tasks, 'none', 'Vorbedingung: Bob darf die Aufgaben nicht sehen');
-
-  // Die Aufgabe selbst bleibt für ihn sichtbar (visibility `all`) - genau
-  // deshalb reicht `findVisibleTask` als Prüfung nicht aus.
-  const task = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Ohne Modulzugriff', visibility: 'all' } });
-  const gesperrt = await mentionPushes(async () => {
-    const posted = await call('POST', `/${task.body.data.id}/comments`, {
-      as: { id: ALICE, role: 'admin' }, body: { comment: '@bob liest das nicht' },
+  try {
+    const perms = resolvePermissions(db, bob);
+    assert.equal(perms.modules.tasks, 'none', 'Vorbedingung: Bob darf die Aufgaben nicht sehen');
+    const gesperrt = await mentionPushes(async () => {
+      const posted = await call('POST', `/${task.body.data.id}/comments`, {
+        as: { id: ALICE, role: 'admin' }, body: { comment: '@bob liest das nicht' },
+      });
+      assert.equal(posted.status, 201);
     });
-    assert.equal(posted.status, 201);
-  });
-  assert.deepEqual(gesperrt, [], 'Bob ist das Aufgaben-Modul entzogen: kein Push');
-
-  db.prepare("DELETE FROM access_permissions WHERE subject_id = ? AND resource_key = 'tasks'").run(String(BOB));
+    assert.deepEqual(gesperrt, [], 'Bob ist das Aufgaben-Modul entzogen: kein Push');
+  } finally {
+    // Auch nach einem roten Befund: sonst erben die folgenden Tests Bobs Sperre.
+    db.prepare("DELETE FROM access_permissions WHERE subject_id = ? AND resource_key = 'tasks'").run(String(BOB));
+  }
   const wieder = resolvePermissions(db, bob);
   assert.notEqual(wieder.modules.tasks, 'none', 'Aufräumen: Bobs Zugriff ist wiederhergestellt');
   // Gegenprobe in derselben Aufgabe: mit Zugriff kommt die Meldung an, die
