@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender, captureModalContext, dialogInitialFocus } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender, captureModalContext, dialogInitialFocus, reportFieldError } from '/components/modal.js';
 import { whenHistorySettled } from '/utils/overlay-history.js';
 import { beginRowFill, drawRowIcons, flushRowFill } from '/utils/row-fill.js';
 import { stagger, vibrate, scheduleUndoableDelete, offerUndo, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
@@ -1535,6 +1535,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
                  value="${esc(formatTimeInput(task?.due_time ?? ''))}"></yuvomi-datepicker>
         </div>
       </div>
+      ${renderDueClear(task, reminder)}
 
       <!-- „Zugewiesen an" bot einer Solo-Nutzerin eine Chip-Reihe mit ihr selbst
            und „- Niemand -" (Critique 2026-08-10). Das Feld bleibt im DOM und
@@ -2455,6 +2456,90 @@ function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel
 }
 
 /**
+ * „Faelligkeit entfernen" unter Datum und Uhrzeit.
+ *
+ * EINE AKTION STATT DREIER. Wer eine Aufgabe ohne Faelligkeit haben wollte,
+ * leerte Datum und Uhrzeit einzeln (von Hand oder je ueber das Kalender- bzw.
+ * Uhr-Symbol und „Loeschen") - und hing eine Erinnerung daran, verweigerte das
+ * Speichern danach mit einer Meldung ganz unten im Dialog, die man erst nach
+ * dem Scrollen sah. Der Knopf leert beide Felder in einem Zug; was ohne
+ * Faelligkeit nicht stehen kann, geht mit: der Countdown ueber seinen eigenen
+ * Riegel (`wireCountdownGate` hoert auf dieselben Ereignisse), die Erinnerung
+ * ueber ihren Schalter.
+ *
+ * Er steht nur da, wenn es etwas zu entfernen gibt, und gar nicht, wenn eine
+ * gesperrte Erinnerung an der Aufgabe haengt (`calendar: read`): dort verweigert
+ * das Speichern genau diesen Uebergang (`tasks.reminderLockedNeedsDueDate`),
+ * und ein Knopf, der in diese Meldung fuehrt, waere eine Falle.
+ *
+ * @param {any} [task]
+ * @param {object|null} [reminder]
+ * @returns {string}
+ */
+function renderDueClear(task = null, reminder = null) {
+  if (reminder && reminderAccess() === 'read') return '';
+  const hasDue = !!(task?.due_date || task?.due_time);
+  return `
+      <div class="task-due-clear" id="task-due-clear-row"${hasDue ? '' : ' hidden'}>
+        <button type="button" class="btn btn--ghost btn--sm task-due-clear__btn" id="task-due-clear"${hasDue ? '' : ' hidden'}>
+          <i data-lucide="calendar-x" class="icon-sm" aria-hidden="true"></i>${t('tasks.clearDue')}
+        </button>
+        <p class="task-field-hint field-hint--warn" id="task-due-clear-hint" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('tasks.clearDueReminderHint')}</span></p>
+      </div>`;
+}
+
+/**
+ * Verdrahtet „Faelligkeit entfernen" (renderDueClear).
+ *
+ * DER HINWEIS ANTWORTET AUF DEN KLICK, nicht auf den Zustand: er steht da, wenn
+ * dieser Knopf eine GESPEICHERTE Erinnerung abgeschaltet hat - nur dann wird
+ * beim Speichern etwas geloescht, das es vorher gab. Schaltet jemand die
+ * Erinnerung wieder ein, geht er weg (das Speichern verlangt dann ein Datum, und
+ * diese Meldung steht am Datumsfeld).
+ *
+ * Der Fokus geht danach ins Datumsfeld: der Knopf verschwindet unter ihm, und
+ * wer die Faelligkeit nur neu setzen wollte, tippt dort weiter.
+ *
+ * @param {{querySelector: (selector: string) => any}} panel
+ */
+function wireDueClear(panel) {
+  const row = panel.querySelector('#task-due-clear-row');
+  const btn = panel.querySelector('#task-due-clear');
+  const hint = panel.querySelector('#task-due-clear-hint');
+  const date = panel.querySelector('#task-due-date');
+  const time = panel.querySelector('#task-due-time');
+  if (!row || !btn || !date || !time) return;
+  const toggle = panel.querySelector('#reminder-toggle');
+  const storedReminder = !!panel.querySelector('#reminder-stored-at')?.value;
+  let switchedOff = false;
+  const sync = () => {
+    btn.hidden = !(date.value || time.value);
+    if (hint) hint.hidden = !(switchedOff && toggle && !toggle.checked);
+    row.hidden = btn.hidden && (!hint || hint.hidden);
+  };
+  btn.addEventListener('click', () => {
+    for (const field of [date, time]) {
+      field.value = '';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (toggle && !toggle.disabled && toggle.checked) {
+      toggle.checked = false;
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      switchedOff = storedReminder;
+    }
+    sync();
+    (date.querySelector?.('input') ?? date).focus?.();
+  });
+  for (const field of [date, time]) {
+    field.addEventListener('input', sync);
+    field.addEventListener('change', sync);
+  }
+  toggle?.addEventListener('change', sync);
+  sync();
+}
+
+/**
  * Der Countdown-Schalter haengt an der Faelligkeit (#647).
  *
  * GESPERRT UND NICHT NUR BESCHRIFTET. Die Hilfszeile sagte „Braucht ein
@@ -2733,6 +2818,7 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
     task?.created_by ?? state.currentUserId, 'task_rotation');
   wireRotationOrder(panel);
   wireCountdownGate(panel);
+  wireDueClear(panel);
 
   // Tag-Editor (#586)
   renderTagChips(panel);
@@ -3015,9 +3101,24 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   const dueDate = parseDateInput(dueDateRaw);
   const rrule = getRRuleValues(document, 'task');
   const reminderToggle = form.querySelector('#reminder-toggle');
+  // MELDUNGEN ZUR FAELLIGKEIT STEHEN AM FELD (reportFieldError: Text darunter,
+  // Fokus und Scroll dorthin). Unten im Dialog lagen sie unter der Falz - wer
+  // speicherte, sah keinen Fehler, nur einen Knopf, der nichts tat.
+  const failAt = (/** @type {Element} */ field, /** @type {string} */ msg) => {
+    const btn = /** @type {HTMLButtonElement} */ (submitBtn);
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    reportFieldError(field, msg);
+  };
+  const dueDateField = form.querySelector('#task-due-date');
+  if (!(startDateRaw && !isDateInputValid(startDateRaw)) && !isDateInputValid(dueDateRaw) && dueDateField) {
+    failAt(dueDateField, t('calendar.invalidDate'));
+    return;
+  }
   if ((startDateRaw && !isDateInputValid(startDateRaw)) || !isDateInputValid(dueDateRaw) || !rrule.valid_until) {
     errorEl.textContent = t('calendar.invalidDate');
     errorEl.hidden = false;
+    errorEl?.scrollIntoView?.({ block: 'nearest' });
     submitBtn.disabled = false;
     submitBtn.textContent = originalLabel;
     return;
@@ -3054,10 +3155,18 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   const resetSubmit = (msg) => {
     errorEl.textContent = msg;
     errorEl.hidden = false;
+    // Die Zeile steht am Ende des Dialogs; ohne den Sprung blieb sie unter der
+    // Falz, und das Speichern sah aus, als haette es nichts getan.
+    errorEl?.scrollIntoView?.({ block: 'nearest' });
     submitBtn.disabled = false;
     submitBtn.textContent = originalLabel;
   };
-  if (dueTimeRaw && !dueTime) { resetSubmit(t('calendar.invalidDate')); return; }
+  const dueTimeField = form.querySelector('#task-due-time');
+  if (dueTimeRaw && !dueTime) {
+    if (dueTimeField) failAt(dueTimeField, t('calendar.invalidDate'));
+    else resetSubmit(t('calendar.invalidDate'));
+    return;
+  }
   body.due_time = dueTime || null;
   if (form.status) body.status = form.status.value;
 
@@ -3129,12 +3238,17 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   const lockedReminderPresent = !canWriteReminder && !!reminderToggle?.checked;
   const dueDateWhenOpened = form.querySelector('.reminder-section[data-locked-due]')?.dataset.lockedDue || '';
   if (lockedReminderPresent && dueDateWhenOpened && !dueDate) {
-    resetSubmit(t('tasks.reminderLockedNeedsDueDate'));
+    if (dueDateField) failAt(dueDateField, t('tasks.reminderLockedNeedsDueDate'));
+    else resetSubmit(t('tasks.reminderLockedNeedsDueDate'));
     return;
   }
   let remindAt = null;
   if (wantsReminder) {
-    if (!dueDate) { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
+    if (!dueDate) {
+      if (dueDateField) failAt(dueDateField, t('tasks.reminderNeedsDueDate'));
+      else resetSubmit(t('tasks.reminderNeedsDueDate'));
+      return;
+    }
     const offsetPreset = form.querySelector('#reminder-offset')?.value || 'offset_none';
     if (offsetPreset === 'offset_none') { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
     remindAt = reminderRemindAtFromForm(form, { dueDate, dueTime: body.due_time });
@@ -6319,16 +6433,18 @@ function openTaskView(task, reminder, container, { pane = null } = {}) {
     // hier spart den Umweg und sagt es an der Stelle, an der das Formular
     // eingehaengt wuerde.
     edit: readOnly() ? null : {
-      mount: (panel, pane) => {
+      // `live` ist der Stand der Leseansicht: hat sie die Faelligkeit samt
+      // Erinnerung entfernt, ist `reminder` hier von gestern.
+      mount: (panel, pane, live = {}) => {
         // Working-Set VOR dem Rendern setzen: renderTagChips in wireTaskForm
         // liest ihn direkt danach.
         modalTags = normalizeTagList(task.tags);
-        pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder }));
+        pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder: 'reminder' in live ? live.reminder : reminder }));
         wireTaskForm(panel, { task, container });
       },
       // Aus der Detailspalte: das regulaere Formular-Modal, mit Fusszeile,
       // Verwerfen-Frage und Fokusfuehrung (detail-view.js, openInPane).
-      standalone: pane ? () => openTaskModal({ task, users: state.users, reminder }, container) : undefined,
+      standalone: pane ? (live = {}) => openTaskModal({ task, users: state.users, reminder: 'reminder' in live ? live.reminder : reminder }, container) : undefined,
     },
   });
 }
@@ -6832,9 +6948,9 @@ export async function openTaskById(taskId, { user = null, container = null, onCh
     container,
     onChanged,
     edit: !canOfferEdit ? null : {
-      mount: (panel, pane) => {
+      mount: (panel, pane, live = {}) => {
         modalTags = normalizeTagList(task.tags);
-        pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder }));
+        pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder: 'reminder' in live ? live.reminder : reminder }));
         // `container` reist MIT, obwohl es hier die Uebersicht ist und keine
         // Aufgabenliste haelt: sein zweiter Zweck ist das Ausblenden der Zeile
         // beim Loeschen. Ohne ihn haette derselbe Loeschbefehl zwei Verhalten -
@@ -7155,6 +7271,8 @@ export const __test = {
   // Faelligkeit. Was der Abschnitt dabei sagt, ist der halbe Fix - die andere
   // Haelfte ist, dass das Speichern daraus nicht rechnet.
   renderReminderSection, reminderRemindAtFromForm, afterDueResolution,
+  // Faelligkeit mit einer Aktion entfernen (Knopf unter Datum und Uhrzeit).
+  renderDueClear, wireDueClear,
   // Die Verdrahtung steht mit hier: die Regel allein zu messen hiesse, den
   // haeufigsten Ausfall auszulassen - einen Listener, den niemand anhaengt.
   syncReminderAfterDue, wireReminderAfterDue,

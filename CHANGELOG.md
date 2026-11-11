@@ -46,6 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a path, a hostname, the value of an environment variable or anything about a member, and it is
   refused for members and for signed-in devices. `GET /api/v1/backup/status` gains
   `scheduler.nextRun`. The settings page does not show any of this yet.
+- **A task's due date goes in one step, and the edit dialog says where a due-date problem is.**
+  The task read view has a "Remove due date" button right behind the date in its header. It
+  clears date and time together, along with the countdown flag and your own reminder on the
+  task, keeps the view open and offers Undo, which brings all of it back. Recurring and archived
+  tasks, and tasks whose reminder you may not change, keep the way through the edit dialog. The
+  edit dialog has the same button under date and time; it switches the reminder off and says that
+  the reminder goes when you save. A message about the due date (a reminder without a date, a date
+  or time it cannot read) now stands under that field, and the dialog moves there, instead of at
+  the bottom below the fold; the other messages at the bottom scroll into view.
 
 ### Changed
 - **Unexpected errors are answered and logged in one place.** The central error handler now

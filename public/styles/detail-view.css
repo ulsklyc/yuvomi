@@ -70,6 +70,23 @@
   overflow-wrap: anywhere;
 }
 
+/* Die Aktion hinter der Unterzeile (`subtitleAction`, "Faelligkeit entfernen"):
+ * ein leiser Knopf in derselben Zeile, der umbricht, statt den Text zu
+ * zerhacken. Mit Knopf richtet die Zeile mittig aus statt an der Grundlinie:
+ * der Knopf ist hoeher als die Schrift, und an der Grundlinie sass der Text
+ * sichtbar hoeher als sein Nachbar. */
+.detail-head__subtitle:has(> .detail-head__action) {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: var(--space-1);
+}
+
+.detail-head__action {
+  flex-shrink: 0;
+  margin-block: calc(-1 * var(--space-1));
+  font-weight: var(--font-weight-regular);
+}
+
 /* Der Farbpunkt: die Kalenderfarbe als Zeichen am Text statt als Streifen ueber
  * dem Blatt. Er sitzt auf der Mittellinie der ersten Zeile (die Unterzeile
  * richtet an der Grundlinie aus, der Punkt hebt sich um seine halbe Hoehe). */

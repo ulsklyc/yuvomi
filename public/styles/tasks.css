@@ -2164,6 +2164,20 @@
   color: var(--color-text-tertiary);
 }
 
+/* "Faelligkeit entfernen" unter Datum und Uhrzeit (renderDueClear): leise und
+ * dicht an den Feldern, die er leert - der Abstand zur naechsten Gruppe bleibt
+ * der des Formulars. Der Text des Knopfs fluchtet mit den Feldkanten. */
+.task-due-clear {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-block-start: calc(-1 * var(--space-2));
+}
+
+.task-due-clear__btn {
+  margin-inline-start: calc(-1 * var(--space-2));
+}
+
 /* Verknüpfte Dokumente in der LESEANSICHT (#503, #733).
  *
  * Im Formular steht seit #733 das geteilte Beleg-Feld (document-attach.css) -

@@ -35,7 +35,7 @@ import { dateText } from '/utils/date-format.js';
 import { openDetailView, closeDetailView, visibilityRow } from '/components/detail-view.js';
 import { closeModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { recurrenceRow } from '/rrule-ui.js';
-import { scheduleUndoableDelete, acknowledgeCheck, isImeComposing } from '/utils/ux.js';
+import { scheduleUndoableDelete, acknowledgeCheck, isImeComposing, offerUndo } from '/utils/ux.js';
 import { rowActionEl } from '/utils/row-action.js';
 import { renderMarkdownLight } from '/utils/html.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
@@ -43,7 +43,8 @@ import { errorSentence, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { splitMentions, applyMention } from '/utils/mentions.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
-import { isNavModuleReadOnly } from '/permissions.js';
+import { isNavModuleReadOnly, navModuleAccess } from '/permissions.js';
+import { clearTaskDue, ownRemindAts } from '/utils/task-due.js';
 import { pathAccess } from '/utils/module-access.js';
 import { installPopoverMenus, showPopoverMenuAt } from '/utils/popover-menu.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -950,14 +951,125 @@ function taskReminderSummary(reminders) {
  * `detailHeadEl`): wann sie faellig ist, in den Worten der Liste ("Heute
  * faellig", "Ueberfaellig · 11.08."), und wer sie hat - als Avatare mit Namen.
  */
-function taskDetailHead(task) {
+/**
+ * @param {any} task
+ * @param {{clearDue?: ((arg: {button: HTMLButtonElement}) => void) | null}} [options]
+ */
+function taskDetailHead(task, { clearDue = null } = {}) {
   const due = formatDueDate(task.due_date, task.due_time, task.status === 'done' || isArchived(task));
   return {
     subtitle: due?.label ?? '',
     subtitleLabel: t('tasks.dueDateLabel'),
+    // Direkt hinter der Angabe, die er entfernt (Entwurf: Faelligkeit ohne
+    // Umweg ueber das Formular). `mayClearDueHere` entscheidet, ob es ihn gibt.
+    subtitleAction: clearDue ? {
+      id: CLEAR_DUE_BUTTON_ID,
+      label: t('tasks.clearDue'),
+      icon: 'calendar-x',
+      onClick: clearDue,
+    } : null,
     people: task.assigned_users ?? [],
     peopleLabel: t('tasks.assignedLabel'),
   };
+}
+
+const CLEAR_DUE_BUTTON_ID = 'task-detail-clear-due';
+
+/**
+ * Darf die Leseansicht die Faelligkeit selbst entfernen?
+ *
+ * Nur dort, wo dasselbe auch im Formular ginge, und nur dort, wo es mit einem
+ * Tipp FERTIG ist:
+ *   - es gibt eine Faelligkeit (Datum oder Uhrzeit);
+ *   - die Aufgabendefinition darf geaendert werden (`canEdit`, gesperrte
+ *     Aufgaben #830, `tasks: read`) und sie liegt nicht in der Ablage;
+ *   - KEINE SERIE: eine wiederkehrende Aufgabe rechnet ihre naechste Instanz
+ *     von der Faelligkeit aus. Das ist eine Entscheidung, die man mit der
+ *     Wiederholung vor Augen trifft - im Formular, wo es den Knopf weiter gibt;
+ *   - KEINE ERINNERUNG, DIE MITGEHEN MUESSTE UND NICHT DARF: ohne Schreibrecht
+ *     auf den Kalender bleibt die eigene Erinnerung stehen, und das Formular
+ *     verweigert genau diesen Uebergang (`tasks.reminderLockedNeedsDueDate`).
+ *     Ein Knopf, der dann eine Aufgabe ohne Datum mit Erinnerung hinterliesse,
+ *     braeche die Regel, die das Formular schuetzt.
+ *
+ * @param {any} task
+ * @param {object|object[]|null} reminders
+ * @param {{canEdit: boolean}} viewer
+ * @returns {boolean}
+ */
+function mayClearDueHere(task, reminders, { canEdit }) {
+  if (!canEdit) return false;
+  if (!task?.due_date && !task?.due_time) return false;
+  if (isArchived(task) || task.is_recurring) return false;
+  if (ownRemindAts(reminders).length && navModuleAccess('calendar') !== 'write') return false;
+  return true;
+}
+
+/**
+ * Entfernt die Faelligkeit aus der Leseansicht - samt Countdown und eigener
+ * Erinnerung (utils/task-due.js) - und bietet „Rueckgaengig" an.
+ *
+ * DIE ANSICHT BLEIBT OFFEN. Anders als Status und Ablage verschiebt das die
+ * Aufgabe nicht in eine andere Liste; wer eben noch Teilaufgaben ergaenzt hat,
+ * soll danach weitermachen koennen. Kopf und Zeilen zeichnen sich mit dem neuen
+ * Stand neu (`live.render`), die Umgebung zieht nach (`ctx.onChanged`).
+ *
+ * @typedef {{
+ *   reminders: object|object[]|null,
+ *   view?: {update: (sections: Array<any>, opts?: {head?: Object}) => boolean} | null,
+ *   head: () => object,
+ *   render: () => void,
+ * }} TaskDetailLive
+ *
+ * @param {any} task
+ * @param {TaskDetailLive} live
+ * @param {any} button
+ * @param {{onChanged: () => (void|Promise<void>), onStale?: () => void}} ctx
+ */
+async function clearDueFromDetail(task, live, button, ctx) {
+  const stop = btnLoading(button);
+  const before = { due_date: task.due_date ?? null, due_time: task.due_time ?? null, countdown: task.countdown };
+  const remindersBefore = live.reminders;
+  let result;
+  try {
+    result = await clearTaskDue(api, task, remindersBefore);
+  } catch (err) {
+    stop();
+    window.yuvomi.showToast(errorSentence(err), 'danger');
+    return;
+  }
+  Object.assign(task, { due_date: null, due_time: null, ...(task.countdown ? { countdown: 0 } : {}) });
+  if (result.reminderGone) {
+    // null, nicht []: das Formular fragt `!!reminder` (renderReminderSection),
+    // und eine leere Liste schaltete dort den Erinnerungs-Schalter wieder ein.
+    live.reminders = null;
+    refreshReminders();
+  }
+  live.render();
+  if (result.reminderError) {
+    // Die Faelligkeit ist weg, die Erinnerung nicht: den halben Erfolg sagen,
+    // statt ihn zu verschweigen. Das Formular zeigt sie weiter an.
+    window.yuvomi.showToast(errorSentence(result.reminderError), 'danger');
+  } else {
+    offerUndo({
+      message: result.reminderGone ? t('tasks.dueAndReminderCleared') : t('tasks.dueCleared'),
+      undo: async () => {
+        await result.restore();
+        Object.assign(task, before);
+        live.reminders = remindersBefore;
+        if (result.reminderGone) refreshReminders();
+        live.render();
+        await ctx.onChanged();
+      },
+      onError: (/** @type {any} */ err) => window.yuvomi.showToast(errorSentence(err), 'danger'),
+    });
+  }
+  try {
+    await ctx.onChanged();
+  } catch {
+    window.yuvomi.showToast(t('tasks.listLoadError'), 'danger');
+    ctx.onStale?.();
+  }
 }
 
 /**
@@ -1173,8 +1285,8 @@ async function toggleDescriptionCheck(task, box) {
  *   categories?: object[],
  *   container?: HTMLElement|null,
  *   onChanged?: () => (void|Promise<void>),
- *   edit?: {mount?: (panel: HTMLElement, pane: HTMLElement) => void,
- *           standalone?: () => void}|null,
+ *   edit?: {mount?: (panel: HTMLElement, pane: HTMLElement, live?: {reminder?: object|object[]|null}) => void,
+ *           standalone?: (live?: {reminder?: object|object[]|null}) => void}|null,
  *   pane?: HTMLElement|null,
  *   onClose?: () => void,
  *   onStale?: () => void,
@@ -1292,11 +1404,28 @@ export function openTaskDetail({
     actions.push({ id: MORE_BUTTON_ID, label: '', variant: 'ghost', icon: 'more-horizontal' });
   }
 
-  openDetailView({
+  // DER STAND, DEN DIE ANSICHT SELBST AENDERN KANN (Faelligkeit samt
+  // Erinnerung). `render` zeichnet Kopf und Zeilen damit neu; das Formular
+  // bekommt `reminders` mit, damit es nach dem Entfernen keine Erinnerung von
+  // gestern anzeigt.
+  /** @type {TaskDetailLive} */
+  const live = {
+    reminders: reminder,
+    view: null,
+    head: () => taskDetailHead(task, {
+      clearDue: mayClearDueHere(task, live.reminders, { canEdit })
+        ? ({ button }) => clearDueFromDetail(task, live, button, ctx)
+        : null,
+    }),
+    render: () => { live.view?.update(renderTaskDetail(task, /** @type {any} */ (live.reminders), ctx), { head: live.head() }); },
+  };
+  const standalone = edit?.standalone;
+
+  live.view = openDetailView({
     title: task.title,
     key: `task:${task.id}`,
     size: 'lg',
-    head: taskDetailHead(task),
+    head: live.head(),
     // DIE DETAILSPALTE (Liste + Detail, utils/master-detail.js): dieselbe
     // Ansicht, nur in der rechten Spalte statt im Sheet. Bearbeiten fuehrt dort
     // ins eigene Formular-Modal (`edit.standalone`), weil die Spalte ein
@@ -1310,8 +1439,8 @@ export function openTaskDetail({
     edit: canEdit && edit ? {
       label: t('common.edit'),
       title: t('tasks.editTask'),
-      mount: (panel, formPane) => edit.mount?.(panel, formPane),
-      standalone: edit.standalone,
+      mount: (/** @type {HTMLElement} */ panel, /** @type {HTMLElement} */ formPane) => edit.mount?.(panel, formPane, { reminder: live.reminders }),
+      standalone: standalone ? () => standalone({ reminder: live.reminders }) : undefined,
     } : undefined,
   });
 
@@ -1673,4 +1802,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit, rotationDetailRow };
+export const __test = { mayClearDueHere, clearDueFromDetail, taskDetailHead, CLEAR_DUE_BUTTON_ID, subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit, rotationDetailRow };
