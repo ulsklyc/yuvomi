@@ -5,7 +5,14 @@
  * Paths match `.js` and `.ts` alike: phase 2 renames files, and the `.ts` fixture in
  * test/fixtures/lint/layers/ proves the tool reads TypeScript (through @swc/core, as
  * dependency-cruiser 18.7 does not take TypeScript 7 as its transpiler).
+ * Browser code imports from the web root (`/api.js`); public/tsconfig.json maps `/*` to
+ * `public/*` for the type check, and the same mapping resolves those imports here, so a
+ * cycle through them is an edge like any other (without it 1,535 imports stayed unresolved).
  */
+const { existsSync } = require('node:fs');
+
+const BROWSER_PATHS = 'public/tsconfig.json';
+
 module.exports = {
   forbidden: [
     {
@@ -65,5 +72,7 @@ module.exports = {
     exclude: { path: ['^public/vendor/', '^public/lucide\\.min\\.js$'] },
     moduleSystems: ['es6'],
     tsPreCompilationDeps: true,
+    // Relative to the working directory: the repository, or a fixture project with its own.
+    ...(existsSync(BROWSER_PATHS) ? { tsConfig: { fileName: BROWSER_PATHS } } : {}),
   },
 };

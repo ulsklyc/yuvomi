@@ -228,6 +228,22 @@ test('a layer violation is keyed per module and rule, under the same ratchet', (
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a cycle through a browser-root import (/x.js) is a cycle', () => {
+  const dir = project(NONE);
+  try {
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.cjs'));
+    mkdirSync(join(dir, 'public'));
+    copyFileSync(join(REPO, 'public', 'tsconfig.json'), join(dir, 'public', 'tsconfig.json'));
+    writeFileSync(join(dir, 'public', 'a.js'), "import { b } from '/b.js';\nexport const a = () => b;\n");
+    writeFileSync(join(dir, 'public', 'b.js'), "export const b = 1;\n");
+    assert.equal(run(dir, '--init').code, 0);
+    writeFileSync(join(dir, 'public', 'b.js'), "import { a } from './a.js';\nexport const b = () => a;\n");
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /public\/(a|b)\.js\s+depcruise\/no-circular\s+0 -> 1/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('a broken dependency-cruiser config is exit 2', () => {
   const dir = project(NONE);
   try {
