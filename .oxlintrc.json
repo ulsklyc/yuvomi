@@ -1,0 +1,112 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "import"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "jsPlugins": [
+    {
+      "name": "eslint-js",
+      "specifier": "oxlint-plugin-eslint"
+    }
+  ],
+  "ignorePatterns": [
+    "public/vendor/**",
+    "public/lucide.min.js",
+    "dist/**",
+    "**/node_modules/**",
+    ".claude/**",
+    "test/fixtures/lint/**"
+  ],
+  "rules": {
+    "max-lines": [
+      "error",
+      {
+        "max": 1500
+      }
+    ],
+    "max-lines-per-function": [
+      "error",
+      {
+        "max": 200
+      }
+    ],
+    "eslint-js/no-restricted-syntax": [
+      "error",
+      {
+        "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.name=/^(innerHTML|outerHTML)$/]",
+        "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+      },
+      {
+        "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.value=/^(innerHTML|outerHTML)$/]",
+        "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+      },
+      {
+        "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.type='TemplateLiteral'][left.property.expressions.length=0][left.property.quasis.0.value.cooked=/^(innerHTML|outerHTML)$/]",
+        "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+      },
+      {
+        "selector": "CallExpression[callee.property.name=/^(slice|substring|substr)$/][callee.object.type='CallExpression'][callee.object.callee.property.name='toISOString'][arguments.0.value=0][arguments.1.value=10]",
+        "message": "UTC-DAY-KEY: toISOString().slice(0, 10) is the UTC day, not the household's; use the helpers in server/utils/timezone.js."
+      },
+      {
+        "selector": "CatchClause CallExpression[callee.property.name='status'][arguments.0.value=500]",
+        "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
+        "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
+        "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+        "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "server/utils/timezone.js"
+      ],
+      "rules": {
+        "eslint-js/no-restricted-syntax": [
+          "error",
+          {
+            "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.name=/^(innerHTML|outerHTML)$/]",
+            "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+          },
+          {
+            "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.value=/^(innerHTML|outerHTML)$/]",
+            "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+          },
+          {
+            "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.type='TemplateLiteral'][left.property.expressions.length=0][left.property.quasis.0.value.cooked=/^(innerHTML|outerHTML)$/]",
+            "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+          },
+          {
+            "selector": "CatchClause CallExpression[callee.property.name='status'][arguments.0.value=500]",
+            "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+          }
+        ]
+      }
+    }
+  ]
+}
