@@ -29,7 +29,8 @@ import { sqlInList } from '../utils/sql-in-list.ts';
 import { guardedFetch } from '../services/notification-providers/guarded-fetch.js';
 import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 
-const WEBHOOK_TIMEOUT_MS = 8_000;
+const DEFAULT_WEBHOOK_TIMEOUT_MS = 8_000;
+let webhookTimeoutMs = DEFAULT_WEBHOOK_TIMEOUT_MS;
 
 const log = createLogger('Shopping');
 
@@ -1464,7 +1465,7 @@ router.post('/:listId/send-webhook', sendListLimiter, async (req, res) => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body,
-      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+      signal: AbortSignal.timeout(webhookTimeoutMs),
     });
     if (!response.ok) {
       log.error(`POST /:listId/send-webhook: webhook returned HTTP ${response.status}`);
@@ -1698,6 +1699,10 @@ router.delete('/:listId/items/checked', validateRequest(), (req, res) => {
 // Der Versand-Limiter, damit ihn eine Testsuite zwischen den Faellen zuruecksetzen
 // kann. Die Grenze bleibt so bei der Zahl, die fuer den Betrieb richtig ist,
 // statt auf die Zahl anzuwachsen, die eine Testdatei gerade braucht.
+export function __setWebhookTimeoutForTests(ms) {
+  webhookTimeoutMs = ms ?? DEFAULT_WEBHOOK_TIMEOUT_MS;
+}
+
 export const __test = { sendListLimiter };
 
 export default router;
