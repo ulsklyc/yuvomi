@@ -11,7 +11,8 @@
  *          dependency-cruiser violations, the knip fixture test/fixtures/lint/knip/ (run with the
  *          real knip.json) exactly its six findings; a knip entry that names no file is exit 2;
  *          the sender fixture test/fixtures/lint/senders/ exactly its two import violations and
- *          six lint lines, all hard; every sender the rules name still sends (module graph),
+ *          ten lint lines, all hard; no override for a server/ file loses a sender selector
+ *          it is not exempt from; every sender the rules name still sends (module graph),
  *          and the lint exceptions name the same files as the import rules;
  *          the real tree has no hard finding (this runs in the required test jobs, next to the
  *          lint job); the real lint-baseline.json is sorted, carries no hard rule and names no
@@ -385,6 +386,38 @@ test('each sender exception drops only its own sender selectors', () => {
   for (const file of PUSH_SENDERS) assert.deepEqual(overrideFor(file)?.rules[RESTRICTED], without(sendPushToUser), file);
 });
 
+test('no override for a server/ file loses a sender selector it is not exempt from', () => {
+  // oxlint replaces the whole option list per override and the later one wins, so an
+  // override that copies only the base rule would switch the sender rules off for its files.
+  const [, ...selectors] = serverSelectors();
+  const channel = selectors.filter(tagged('CHANNEL-SEND'));
+  const push = selectors.filter(tagged('PUSH-SEND'));
+  assert.ok(channel.length > 0 && push.length > 0, 'the server/** override carries no sender selectors');
+  /** The documented exemptions: what a file may drop. @param {string} file @returns {Selector[]} */
+  const mayDrop = (file) => {
+    if (file === 'server/services/channel-delivery.js') return channel;
+    if (file === 'server/services/push.js') return push;
+    if (PUSH_SENDERS.includes(file)) return push.filter((s) => s.selector.includes('sendPushToUser'));
+    return [];
+  };
+  const lost = [];
+  let seen = 0;
+  for (const override of /** @type {Override[]} */ (CONFIG.overrides)) {
+    const list = override.rules?.[RESTRICTED];
+    if (!list || !override.files.some((f) => f.startsWith('server/'))) continue;
+    seen += 1;
+    const has = new Set(list.slice(1).map((s) => JSON.stringify(s)));
+    for (const s of [...channel, ...push]) {
+      if (has.has(JSON.stringify(s))) continue;
+      // A selector may be missing only if every file of the override is exempt from it.
+      if (override.files.every((f) => mayDrop(f).includes(s))) continue;
+      lost.push(`${override.files.join(', ')}: ${s.message.split(':')[0]} ${s.selector}`);
+    }
+  }
+  assert.ok(seen >= 5, 'the server overrides were not read');
+  assert.deepEqual(lost, [], 'an override for a server/ file drops a sender selector');
+});
+
 /** Files a rule lets through, as the pathNot list of .dependency-cruiser.mjs spells them. */
 async function exemptPaths(/** @type {string} */ ruleName) {
   const { default: config } = await import(pathToFileURL(DEPCRUISE_CONFIG).href);
@@ -456,19 +489,23 @@ test('the sender fixture gives exactly its lint lines, and the ratchet holds the
       .sort();
     const handed = 'server/services/handed.js';
     assert.deepEqual(found, [
-      `${handed}:10 CHANNEL-SEND`, `${handed}:10 CHANNEL-SEND`, // providers[x].send({ ..., channel }): name and shape
-      `${handed}:11 CHANNEL-SEND`, // p.send({ channel: ... }): the shape under any name
-      `${handed}:12 CHANNEL-SEND`, // provider?.send(...): the name, optional call
-      `${handed}:13 PUSH-SEND`, // pushService.sendPushToUser(...) handed in as a parameter
-      `${handed}:14 PUSH-SEND`, // webpush.sendNotification(...)
-      `${handed}:9 CHANNEL-SEND`, `${handed}:9 CHANNEL-SEND`, // provider.send({ channel }): name and shape
+      `${handed}:11 CHANNEL-SEND`, `${handed}:11 CHANNEL-SEND`, // provider.send({ channel }): name and shape
+      `${handed}:12 CHANNEL-SEND`, `${handed}:12 CHANNEL-SEND`, // providers[x].send({ ..., channel }): name and shape
+      `${handed}:13 CHANNEL-SEND`, // p.send({ channel: ... }): the shape under any name
+      `${handed}:14 CHANNEL-SEND`, // provider?.send(...): the name, optional call
+      `${handed}:15 PUSH-SEND`, // pushService.sendPushToUser(...) handed in as a parameter
+      `${handed}:16 PUSH-SEND`, // webpush.sendNotification(...)
+      `${handed}:17 CHANNEL-SEND`, // this.providers[x].send(...): the name behind this
+      `${handed}:18 CHANNEL-SEND`, // svc.providers[x].send(...): the name behind a member
+      `${handed}:19 CHANNEL-SEND`, // deps.provider.send(...): the name as the last member
+      `${handed}:20 CHANNEL-SEND`, // svc['providers'][x].send(...): the name as a computed key
     ]);
     copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
     const r = run(dir, '--init');
     assert.equal(r.code, 1, r.out);
     const lines = r.out.split('\n').map((l) => l.trim().split(/\s+/).join(' '));
     for (const key of [
-      `${handed} oxlint/no-restricted-syntax/CHANNEL-SEND 6`,
+      `${handed} oxlint/no-restricted-syntax/CHANNEL-SEND 10`,
       `${handed} oxlint/no-restricted-syntax/PUSH-SEND 2`,
       'server/services/fifth.js depcruise/channel-delivery-importers 1',
       'server/routes/sixth.js depcruise/providers-only-in-channel-delivery 1',

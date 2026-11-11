@@ -51,7 +51,10 @@ export default {
     //   text they sent. Held by test:push.
     // A provider or the push service handed to another file as a parameter imports
     // nothing these rules could see; the lint selectors CHANNEL-SEND and PUSH-SEND
-    // (.oxlintrc.json, server/ only) catch the call there.
+    // (.oxlintrc.json, server/ only) catch the call there. Neither rule sees a
+    // destructured `const { send } = provider`, `send.call/apply`, an alias without a
+    // `channel` key or a `provider(s)` name, or an object spread `{ ...opts }`; these
+    // are left to review.
     {
       name: 'push-service-importers',
       comment: 'Web Push goes through server/services/push.js; only the senders named above may import it, '

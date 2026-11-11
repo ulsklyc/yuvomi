@@ -118,6 +118,14 @@
             "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
           },
           {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression']:matches([callee.object.property.name=/^providers?$/], [callee.object.property.value=/^providers?$/])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression'][callee.object.object.type='MemberExpression']:matches([callee.object.object.property.name=/^providers?$/], [callee.object.object.property.value=/^providers?$/])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
             "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send']) > ObjectExpression:first-child > Property:matches([key.name='channel'], [key.value='channel'])",
             "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
           },
@@ -173,6 +181,14 @@
           },
           {
             "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression'][callee.object.object.type='Identifier'][callee.object.object.name=/^providers?$/]",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression']:matches([callee.object.property.name=/^providers?$/], [callee.object.property.value=/^providers?$/])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression'][callee.object.object.type='MemberExpression']:matches([callee.object.object.property.name=/^providers?$/], [callee.object.object.property.value=/^providers?$/])",
             "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
           },
           {
@@ -291,6 +307,14 @@
             "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
           },
           {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression']:matches([callee.object.property.name=/^providers?$/], [callee.object.property.value=/^providers?$/])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression'][callee.object.object.type='MemberExpression']:matches([callee.object.object.property.name=/^providers?$/], [callee.object.object.property.value=/^providers?$/])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
             "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send']) > ObjectExpression:first-child > Property:matches([key.name='channel'], [key.value='channel'])",
             "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
           },
@@ -346,6 +370,14 @@
           },
           {
             "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression'][callee.object.object.type='Identifier'][callee.object.object.name=/^providers?$/]",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression']:matches([callee.object.property.name=/^providers?$/], [callee.object.property.value=/^providers?$/])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression'][callee.object.object.type='MemberExpression']:matches([callee.object.object.property.name=/^providers?$/], [callee.object.object.property.value=/^providers?$/])",
             "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
           },
           {
