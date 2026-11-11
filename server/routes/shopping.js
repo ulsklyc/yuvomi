@@ -24,7 +24,7 @@ import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { guardedFetch } from '../services/notification-providers/guarded-fetch.js';
-import { PROVIDER_TIMEOUT_MS } from '../services/notifications.js';
+import { PROVIDER_TIMEOUT_MS } from '../services/channel-delivery.js';
 
 const log = createLogger('Shopping');
 
