@@ -8,7 +8,10 @@
  *
  *          The message is the sentence the client sees: English, written by us,
  *          never the text of a foreign error (CONTRIBUTING, error contract).
- *          Pass the foreign error as `cause` so the log keeps it.
+ *          Pass the foreign error as `cause` so the log keeps it. The handler
+ *          logs the cause's message, so a cause must not carry a secret (an
+ *          upstream error that quotes a URL with a token, a password): wrap
+ *          such an error in one of our own first.
  */
 
 export class HttpError extends Error {
