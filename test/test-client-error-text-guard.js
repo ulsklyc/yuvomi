@@ -92,7 +92,7 @@ const ALLOWED = new Map([
   ['server/auth.js -> POST /2fa/enable', [2, 'gated on the three err.code values twoFactor throws itself']],
   ['server/auth.js -> POST /me/avatar/gravatar', [1, 'Gravatar import: instanceof the own GravatarError, an operator error (500) gets a fixed sentence']],
   ['server/auth.js -> DELETE /users/:id', [2, 'instanceof RemovalRefused, the sentence of the last-admin rule']],
-  ['server/middleware/error-handler.js -> errorHandler', [1, 'gated on reason restore_in_progress, the sentence of server/utils/restore-messages.js']],
+  ['server/middleware/error-handler.js -> errorHandler', [2, 'gated on reason restore_in_progress (the sentence of server/utils/restore-messages.js) and on expose of a 4xx (HttpError, http-errors: the thrower vouches for the text)']],
   ['server/routes/calendar/apple.js -> POST /apple/connect', [1, 'gated on err.code === apple_no_calendars, thrown by apple-calendar.js itself']],
   ['server/routes/calendar/caldav.js -> POST /caldav/accounts', [2, 'gated on err.code caldav_account_exists / caldav_no_calendars, thrown by caldav-sync.js']],
   ['server/routes/calendar/caldav.js -> PUT /caldav/accounts/:id', [1, 'gated on err.code === password_required, thrown by updateAccount']],

@@ -26,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changed the schema but has no frozen database. Nothing changes for an installation.
 
 ### Changed
+- **Unexpected errors are answered and logged in one place.** The central error handler now
+  keeps the status of a client error that is marked as safe to show; until now every error
+  that reached it was a 500. Its sentence and `reason` reach the client only from a
+  `HttpError` (`server/utils/http-error.js`), whose text we write ourselves; a 4xx of the HTTP
+  libraries gets a fixed sentence such as "The request was refused (Bad Request).", because
+  body-parser wraps foreign text (zlib) that way. Requests the HTTP layer refuses now get their
+  4xx instead of a 500: a corrupt compressed body, an aborted upload or a body shorter than its
+  `Content-Length` 400, a form nested too deep 400, too many form fields 413, an unsupported
+  `Content-Encoding` or charset 415. A path parameter that does not decode (`%ZZ`) is a 400.
+  Everything else stays a 500 with the fixed sentence, and the raw text stays in the log. The
+  log line names the method, the route pattern and the status instead of the path, and the
+  raw segment of an undecodable parameter is no longer written, so a calendar feed token in the
+  URL no longer lands in the log. The cause of an error is logged with it.
 - **The container image of a release is now built from its tag alone.** Until now a release
   build reused layers from the build cache that builds of `main` fill, the dependency install
   and the app build included. A tagged build now ignores that cache and writes none; only the
