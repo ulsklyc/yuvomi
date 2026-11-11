@@ -301,6 +301,7 @@
   "test-seed-demo-pdfs.js": "a key file under the temp directory; pdf.js is imported, not read",
   "test-settings-cron-label.js": "locale JSON",
   "test-settings-registry.js": "imports server/settings/registry.ts in a child process and lists the files a DB_PATH directory holds afterwards; the route path only to match stack frames",
+  "test-shopping-webhook.js": "locale JSON",
   "test-split-folder-rename-migration.js": "locale JSON",
   "test-subscription-meta-labels.js": "locale JSON",
   "test-suite-chain.js": "package.json, docs/test-suites.md and the suites under test/",
