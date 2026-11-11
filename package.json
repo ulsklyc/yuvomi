@@ -687,8 +687,10 @@
   "license": "MIT",
   "devDependencies": {
     "@oddbird/popover-polyfill": "0.7.3",
+    "@swc/core": "1.16.22",
     "@types/node": "24.19.2",
     "axe-core": "^4.14.0",
+    "dependency-cruiser": "18.7.2",
     "esbuild": "0.28.2",
     "oxlint": "1.93.0",
     "oxlint-plugin-eslint": "1.93.0",

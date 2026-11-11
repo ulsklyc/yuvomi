@@ -226,7 +226,8 @@ jobs:
       - name: Type check against the baseline
         run: npm run typecheck
 
-  # Lint (phase 1b, section D): oxlint with the rule set in .oxlintrc.json, compared
+  # Lint (phase 1b, section D): oxlint with the rule set in .oxlintrc.json and
+  # dependency-cruiser with the layer rules in .dependency-cruiser.cjs, compared
   # with lint-baseline.json, which only sinks (scripts/check-lint-baseline.ts). Hard
   # rules (innerHTML/outerHTML writes, async or await in a db.transaction() body)
   # have no baseline at all. Own job, parallel to the tests; one Node version is

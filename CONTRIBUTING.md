@@ -184,6 +184,10 @@ through type stripping, which is why only erasable syntax is allowed.
 household's zone), no catch block that answers 500 itself, no `async` function or `await` in a
 `db.transaction()` body, no manual `BEGIN`/`COMMIT`, and oxlint's `correctness` category. The
 `innerHTML` and transaction rules are hard: they have no baseline and fail at the first finding.
+The same script runs dependency-cruiser with the layer rules in `.dependency-cruiser.cjs`: no
+import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
+named files import `server/services/push.js`, and only that file imports `web-push`; the server
+reads nothing from `public/` but `utils/` and `locales/`; `public/` never imports `server/`.
 Everything else works like the type baseline: a count that rises or a new key fails, a change that
 fixes findings runs `node scripts/check-lint-baseline.ts --update`, which only lowers counts. The
 rules themselves are tested on the fixture `test/fixtures/lint/` (`npm run test:lint-baseline`).

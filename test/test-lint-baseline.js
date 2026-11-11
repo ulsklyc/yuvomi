@@ -7,7 +7,8 @@
  *          lowers and never raises, a hard rule fails even with --init, a broken tool run is
  *          exit 2, a disable comment is a finding of its own (hard without a rule list or for
  *          no-restricted-syntax). The fixture test/fixtures/lint/ must give exactly its ten
- *          findings; the real tree has no hard finding (this runs in the required test jobs,
+ *          findings, the TypeScript layer fixture test/fixtures/lint/layers/ exactly its three
+ *          dependency-cruiser violations; the real tree has no hard finding (this runs in the required test jobs,
  *          next to the lint job); the real lint-baseline.json is sorted, carries no hard rule
  *          and names no missing file.
  * Run:     npm run test:lint-baseline
@@ -25,6 +26,8 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(REPO, 'scripts', 'check-lint-baseline.ts');
 const OXLINT = join(REPO, 'node_modules', 'oxlint', 'bin', 'oxlint');
 const FIXTURE = join(REPO, 'test', 'fixtures', 'lint');
+const DEPCRUISE = join(REPO, 'node_modules', 'dependency-cruiser', 'bin', 'dependency-cruiser.mjs');
+const DEPCRUISE_CONFIG = join(REPO, '.dependency-cruiser.cjs');
 const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
 const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'blanket-disable', 'disable-no-restricted-syntax'];
 
@@ -207,11 +210,56 @@ test('the real tree has no hard finding (runs in the required test jobs)', () =>
   assert.doesNotMatch(out, /Hard rules have no baseline/, out);
 });
 
+test('a layer violation is keyed per module and rule, under the same ratchet', () => {
+  const dir = project(NONE);
+  try {
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.cjs'));
+    mkdirSync(join(dir, 'server', 'routes'));
+    writeFileSync(join(dir, 'server', 'routes', 'r.js'), 'export const r = 1;\n');
+    assert.equal(run(dir, '--init').code, 0);
+    assert.deepEqual(baselineOf(dir), {}, 'no violation yet');
+    writeFileSync(join(dir, 'server', 'x.js'), "import { r } from './routes/r.js';\nexport const f = () => r;\n");
+    mkdirSync(join(dir, 'server', 'services'));
+    writeFileSync(join(dir, 'server', 'services', 's.js'), "import { r } from '../routes/r.js';\nexport const s = () => r;\n");
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /server\/services\/s\.js\s+depcruise\/lower-layers-not-to-routes\s+0 -> 1/);
+    assert.doesNotMatch(r.out, /server\/x\.js/, 'a route import from outside the lower layers is allowed');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a broken dependency-cruiser config is exit 2', () => {
+  const dir = project(NONE);
+  try {
+    run(dir, '--init');
+    writeFileSync(join(dir, '.dependency-cruiser.cjs'), 'module.exports = { forbidden: [{ name: 1 }] };\n');
+    assert.equal(run(dir).code, 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the TypeScript layer fixture gives exactly its three violations', () => {
+  // Without a TypeScript parser dependency-cruiser sees 1 of these 5 modules and reports
+  // nothing, without an error (measured 10 Nov 2026); @swc/core is that parser.
+  const r = spawnSync(process.execPath, [DEPCRUISE, '--config', DEPCRUISE_CONFIG, '--output-type', 'json', 'server', 'public'], {
+    cwd: join(FIXTURE, 'layers'), encoding: 'utf8',
+  });
+  const report = JSON.parse(r.stdout);
+  assert.equal(report.summary.totalCruised, 5, 'dependency-cruiser does not read the .ts files');
+  const found = report.summary.violations
+    .map((/** @type {{ rule: { name: string }, from: string, to: string }} */ v) => `${v.rule.name} ${v.from} -> ${v.to}`)
+    .sort();
+  assert.deepEqual(found, [
+    'lower-layers-not-to-routes server/services/a.ts -> server/routes/b.ts',
+    'no-circular server/routes/b.ts -> server/services/a.ts',
+    'push-service-importers server/services/a.ts -> server/services/push.ts', // .js import resolved to the .ts file
+  ]);
+});
+
 test('the fixture gives exactly its ten findings, and nothing for the allowed lines', () => {
   const dir = tempDir('yuvomi-lint-fixture-');
   try {
     writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
-    for (const name of readdirSync(FIXTURE)) copyFileSync(join(FIXTURE, name), join(dir, name));
+    for (const name of readdirSync(FIXTURE).filter((n) => n.endsWith('.js'))) copyFileSync(join(FIXTURE, name), join(dir, name));
     const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
     const found = JSON.parse(r.stdout).diagnostics
       .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
@@ -257,7 +305,7 @@ test('the real lint-baseline.json is sorted, has no hard rule and names only exi
   const stale = [];
   for (const key of keys) {
     const [file, rule] = key.split('\t');
-    assert.match(rule, /^(oxlint|directive)\/[\w/-]+$/, `key without a tool and rule: ${key}`);
+    assert.match(rule, /^(oxlint|directive|depcruise)\/[\w/-]+$/, `key without a tool and rule: ${key}`);
     assert.ok(Number.isInteger(baseline[key]) && baseline[key] > 0, `count invalid: ${key}`);
     assert.ok(!HARD_RULES.some((h) => rule.endsWith(`/${h}`)), `hard rule in the baseline: ${key}`);
     assert.ok(!file.includes('/vendor/') && !file.startsWith('test/fixtures/lint/'), `excluded file in the baseline: ${file}`);

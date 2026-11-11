@@ -15,10 +15,15 @@
  * (#2598). The regular path had both filters for months. A comment listing the
  * senders would not have stopped the next one; this guard does.
  *
- * A TEXT READER WITH AN EXPIRY DATE: phase 1b of the architecture roadmap
- * replaces it with a dependency-cruiser rule ("only these files import
- * server/services/push.js"), which sees imports instead of call spellings.
- * Until then it reads the source with comments cut out
+ * A TEXT READER THAT STAYS FOR NOW: phase 1b (section D2) added the
+ * dependency-cruiser rule "only these four files import server/services/push.js"
+ * (.dependency-cruiser.cjs), which sees imports instead of call spellings. It
+ * does not cover the channel providers: they reach a sender as a parameter
+ * (medication-scheduler.js gets them from notifications.js), so a fifth file
+ * calling `provider.send({ channel ... })` imports nothing a rule could forbid
+ * (measured 11 Nov 2026: 3 modules, 0 violations). So this guard keeps the
+ * provider case and reads `.ts` files as well, ready for the renames of phase 2.
+ * It reads the source with comments cut out
  * (`withoutCommentsKeepingLines()`), so a comment that names a call neither
  * counts as a sender nor satisfies a check.
  *
@@ -83,7 +88,7 @@ function listSourceFiles(dir) {
     if (entry.name === 'node_modules') continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) out.push(...listSourceFiles(full));
-    else if (/\.(?:m|c)?js$/.test(entry.name)) out.push(full);
+    else if (/\.(?:m|c)?[jt]s$/.test(entry.name) && !entry.name.endsWith('.d.ts')) out.push(full);
   }
   return out;
 }

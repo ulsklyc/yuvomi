@@ -6,7 +6,10 @@
  *          all; exit 2 when a tool did not run. The baseline is a debt register, not a licence.
  *          One mechanism for every tool (pattern: scripts/check-tsc-baseline.ts).
  * Tools:   oxlint (`.oxlintrc.json`, rules with `no-restricted-syntax` are keyed by the tag at the
- *          start of their message, e.g. `oxlint/no-restricted-syntax/LOG-PLUS-500`).
+ *          start of their message, e.g. `oxlint/no-restricted-syntax/LOG-PLUS-500`);
+ *          dependency-cruiser (`.dependency-cruiser.cjs`, one key per violating module and rule,
+ *          e.g. `depcruise/no-circular`). In the repository every tool must run; under `--root`
+ *          (fixture projects) a tool runs only when its config file is there.
  * Inline:  oxlint obeys `eslint-disable` and `oxlint-disable` comments and has no switch to
  *          ignore them, so a comment would hide a finding from this gate. Every such directive
  *          in a linted file is counted as `directive/disable` under the same ratchet; one without
@@ -31,6 +34,11 @@ const rootIdx = args.indexOf('--root');
 const root = rootIdx >= 0 ? resolve(String(args[rootIdx + 1])) : repo;
 const baselinePath = resolve(root, 'lint-baseline.json');
 const oxlintBin = resolve(repo, 'node_modules', 'oxlint', 'bin', 'oxlint');
+const depcruiseBin = resolve(repo, 'node_modules', 'dependency-cruiser', 'bin', 'dependency-cruiser.mjs');
+const DEPCRUISE_CONFIG = '.dependency-cruiser.cjs';
+// What dependency-cruiser walks: the app, the build and maintenance code, no tests (a test
+// imports whatever it checks, and its imports are not a layer).
+const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.ts', 'setup.js'];
 
 // Rules with no debt: they stand at zero, and no baseline may ever carry them.
 // The transaction rules guard a driver behaviour (better-sqlite3 throws on a returned
@@ -106,11 +114,38 @@ function oxlint(counts: Counts) {
   }
 }
 
+type DepcruiseViolation = { from?: string; rule?: { name?: string } };
+
+function depcruise(counts: Counts) {
+  if (!existsSync(resolve(root, DEPCRUISE_CONFIG))) {
+    if (root === repo) fail(`${DEPCRUISE_CONFIG} is missing.`);
+    return;
+  }
+  if (!existsSync(depcruiseBin)) fail(`dependency-cruiser is not installed (${depcruiseBin}); run npm ci.`);
+  const targets = DEPCRUISE_TARGETS.filter((t) => existsSync(resolve(root, t)));
+  const run = spawnSync(process.execPath, [depcruiseBin, '--config', DEPCRUISE_CONFIG, '--output-type', 'json', ...targets], {
+    cwd: root, encoding: 'utf8', maxBuffer: 1 << 29,
+  });
+  let report: { summary?: { violations?: DepcruiseViolation[]; totalCruised?: number } };
+  try {
+    report = JSON.parse(run.stdout);
+  } catch {
+    fail(`dependency-cruiser did not run (exit ${run.status}):\n${`${run.stdout}${run.stderr}`.slice(0, 600)}`);
+  }
+  const violations = report.summary?.violations;
+  if (!Array.isArray(violations) || !report.summary?.totalCruised) fail('dependency-cruiser cruised no module.');
+  for (const v of violations) {
+    const key = `${posix(String(v.from))}\tdepcruise/${String(v.rule?.name)}`;
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+}
+
 function measure(): Counts {
   if (!existsSync(oxlintBin)) fail(`oxlint is not installed (${oxlintBin}); run npm ci.`);
   const counts: Counts = {};
   oxlint(counts);
   directives(counts);
+  depcruise(counts);
   return counts;
 }
 
