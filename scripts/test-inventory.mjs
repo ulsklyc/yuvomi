@@ -53,6 +53,8 @@ const ROOT_MARK = /import\.meta|__dirname|__filename|process\.cwd/;
 const TMP_MARK = /(?<![\w$])(?:tmpdir|mkdtempSync|mkdtemp|tempDir|freshTestDbPath)(?![\w$])/;
 const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'void', 'delete', 'throw', 'new', 'yield', 'await', 'instanceof']);
 const ARRAY_CALLBACKS = 'map|forEach|filter|flatMap|some|every|find|findIndex|findLast|reduce';
+/** @param {string} text a name as a literal inside a regular expression */
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const MAX_DEPTH = 6;
 const MAX_ROUNDS = 4;
 const MAX_INIT = 60_000;
@@ -529,7 +531,7 @@ function reads(file, imported) {
     for (const p of params) if (p.k === 'p' && !p.fn.carried.includes(items)) p.fn.carried.push(items);
     terminal.push({ at, items });
   };
-  const aliases = [...file.code.matchAll(READ_ALIAS)].map((m) => String(m[1]).replace(/\$/g, '\\$'));
+  const aliases = [...file.code.matchAll(READ_ALIAS)].map((m) => escapeRe(String(m[1])));
   const calls = aliases.length === 0 ? READ_API : new RegExp(`${READ_API.source}|(?<![\\w$.])(?:${aliases.join('|')})\\s*\\(`, 'g');
   for (const m of file.code.matchAll(calls)) {
     const before = file.code.slice(Math.max(0, m.index - 40), m.index);
@@ -553,7 +555,7 @@ function reads(file, imported) {
     }
     for (const [name, fn] of callable) {
       if (fn.carried.length === 0 && fn.fixed.length === 0) continue;
-      const call = new RegExp(`(?<![\\w$.])${name.replace(/\$/g, '\\$')}\\s*\\(`, 'g');
+      const call = new RegExp(`(?<![\\w$.])${escapeRe(name)}\\s*\\(`, 'g');
       for (const m of file.code.matchAll(call)) {
         if (/(?:function\s*\*?|const|let|var)\s*$/.test(file.code.slice(Math.max(0, m.index - 40), m.index))) continue;
         const args = argumentRanges(file.code, m.index + m[0].length - 1, file.match);
@@ -699,7 +701,7 @@ function helperExports(root) {
       for (const fn of measured.fns) {
         const reads = [...fn.carried, ...fn.fixed].some((items) => targetsOf(items.filter((i) => i.k !== 'p'), root).targets.size > 0)
           || fn.carried.length > 0;
-        const isExported = new RegExp(`export\\s+(?:async\\s+)?(?:function\\s*\\*?|const|let)\\s+${fn.name.replace(/\$/g, '\\$')}(?![\\w$])|export\\s*\\{[^}]*(?<![\\w$])${fn.name.replace(/\$/g, '\\$')}(?![\\w$])[^}]*\\}`).test(code);
+        const isExported = new RegExp(`export\\s+(?:async\\s+)?(?:function\\s*\\*?|const|let)\\s+${escapeRe(fn.name)}(?![\\w$])|export\\s*\\{[^}]*(?<![\\w$])${escapeRe(fn.name)}(?![\\w$])[^}]*\\}`).test(code);
         if (reads && isExported) exported.set(fn.name, fn);
       }
       if (exported.size > 0) helpers.set(`./${f}`, exported);
