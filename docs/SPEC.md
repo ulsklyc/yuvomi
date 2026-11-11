@@ -6843,6 +6843,44 @@ A stateless [Model Context Protocol](https://modelcontextprotocol.io) endpoint i
 
 ---
 
+## Operations
+
+Three surfaces tell an operator how the installation is doing (Phase 1b, section F). None of them
+changes the database schema.
+
+**Health and readiness.** `GET /health` answers `200 { status: 'ok', timestamp }` whenever the
+process answers, also during a restore: container healthchecks use it, and a 503 there would make
+Docker restart the container in the middle of a restore. `GET /readyz` says whether the instance
+can serve right now: `200 { status: 'ready' }` or `503 { status: 'not_ready', reason }` with
+`reason` one of `restore_in_progress`, `database_closed`, `schema_behind`,
+`data_dir_not_writable`, checked in this order. Both are unauthenticated and neither tells a
+version or a path; `/readyz` does not write to the database and sits before the session
+middleware, so a session cookie cannot turn its answer into an error. No shipped descriptor points
+its healthcheck at `/readyz`.
+
+**Backup status.** The scheduler keeps the outcome of the last local backup in `sync_config`:
+`backup_last_attempt` and `backup_last_success` (ISO timestamps) and `backup_last_reason`, present
+only while the last run failed and one of `backup_dir_not_writable`, `disk_full`,
+`backup_verify_failed`, `unknown`. The values survive a restart, and a restore keeps those of the
+installation it runs on rather than those inside the restored file. `GET /api/v1/backup/status`
+shows them as `scheduler.lastBackup`, `scheduler.lastSuccess`, `scheduler.lastError`
+(`{ timestamp, reason, message }`, `null` after a success) and `scheduler.nextRun`; `message` is
+the fixed sentence of the reason, the text of the error is in the server log only. A client
+translates by `reason` (`settings.backupSchedulerReason*`). `POST /api/v1/backup/trigger` answers a
+failed run with `200` and `success: false`.
+
+**Diagnostics.** `GET /api/v1/system/diagnostics` (admin, not cached) returns a fixed set of
+fields: `version`, `build_revision`, `node`, `platform`, `arch`, `sqlite` (`version`, `encrypted`),
+`schema_version`, `last_migration_at`, `database_bytes`, `wal_bytes`, `data_dir_free_bytes`,
+`uptime_seconds`, `backup` (`last_attempt`, `last_success`, `reason`, `next_run`, and the booleans
+`local` and `webdav`), `key_source` (where the database key comes from, never the key), `ready`
+(what `/readyz` answers at that moment) and `modules_installed`. It never returns a secret, a
+path, a hostname, the value of an environment variable or anything about a member. Members,
+signed-in devices and API tokens with scopes are refused. A single value that cannot be read is
+`null`.
+
+---
+
 ## Design System
 
 ### Colors (CSS Custom Properties)
