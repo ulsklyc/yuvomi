@@ -17,7 +17,6 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import express from 'express';
 
-const dbmod = await import('../server/db.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 
 const actor = { userId: 1, role: 'member' };
