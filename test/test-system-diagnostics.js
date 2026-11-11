@@ -24,6 +24,8 @@ import { dirname, join } from 'node:path';
 import express from 'express';
 import { startTestServer } from './server-ready.js';
 import { tempDir } from './tmp-dir.js';
+import { secretOrigin } from '../server/utils/auto-secrets.js';
+import { moduleForPath, tokenAllows } from '../server/scopes.js';
 
 const dataDir = tempDir('yuvomi-test-diagnostics-data-');
 const backupDir = tempDir('yuvomi-test-diagnostics-backups-');
@@ -115,8 +117,8 @@ test('the values are those of this process and this database', async () => {
   assert.ok(Number.isInteger(d.data_dir_free_bytes) && d.data_dir_free_bytes > 0);
   assert.ok(Number.isInteger(d.uptime_seconds) && d.uptime_seconds >= 0);
   assert.ok(Number.isInteger(d.modules_installed) && d.modules_installed >= 0);
-  // The secrets handshake does not run in a test process: the origin is unknown.
-  assert.ok(d.key_source === null || ['env', 'file', 'stored', 'generated'].includes(d.key_source));
+  // The same value the backup page gets as `database_key.origin`.
+  assert.equal(d.key_source, secretOrigin('DB_ENCRYPTION_KEY'));
   assert.deepEqual(d.ready, { status: 'ready' });
 });
 
@@ -135,13 +137,25 @@ test('backup: never before the first run, then the last run and its success', as
   assert.equal(after.reason, null);
 });
 
+test('a scoped API token does not reach the path, whatever its scopes', () => {
+  // The scope gate in server/index.js judges by the module of the path. /system
+  // belongs to none, and a token with scopes is refused for a path without a
+  // module - an admin's token included. A `system` module in the scope table
+  // would open the path to such tokens; this is where that shows.
+  assert.equal(moduleForPath('/system/diagnostics'), null);
+  for (const scopes of [['backup:write'], ['tasks:read', 'documents:write'], []]) {
+    assert.equal(tokenAllows(scopes, moduleForPath('/system/diagnostics'), 'read'), false);
+  }
+  assert.equal(tokenAllows(null, moduleForPath('/system/diagnostics'), 'read'), true, 'an unscoped token is judged by its role');
+});
+
 test('a member gets 403 and none of the fields', async () => {
   const res = await diagnostics({ role: 'member' });
   assert.equal(res.status, 403);
   assert.deepEqual(res.body, { error: 'Permission denied.', code: 403 });
 });
 
-test('a signed-in device gets 403 with its reason, also when its person is an admin elsewhere', async () => {
+test('a device credential gets 403 with its reason', async () => {
   const res = await diagnostics({ role: 'member', deviceId: 7 });
   assert.equal(res.status, 403);
   assert.equal(res.body.reason, 'device_credential');
@@ -171,7 +185,8 @@ test('negative list: no key, no path, no hostname, no environment value', async 
     .filter(([, value]) => typeof value === 'string' && value.length >= 12 && text.includes(value))
     .map(([name]) => name);
   assert.deepEqual(leaked, [], 'environment variables whose value is in the answer');
-  assert.doesNotMatch(text, /[A-Za-z]:\\|\/(?:home|Users|var|tmp|data|app|private)\//, 'nothing that looks like a path');
+  assert.doesNotMatch(text, /[A-Za-z]:\\|\/(?:home|Users|var|tmp|data|app|private|opt|srv|mnt|root|etc|usr|volume\d*|backups?)\//,
+    'nothing that looks like a path');
   assert.doesNotMatch(text, /password|secret|token|cookie|username|email/i, 'no field about credentials or members');
 });
 

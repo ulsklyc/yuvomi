@@ -12,9 +12,10 @@
  *          whether a target is on, not where it is. test:system-diagnostics
  *          holds both lists.
  *
- *          Every read is on its own: a diagnosis that fails as a whole when one
- *          part cannot be read would be missing exactly when it is needed. A
- *          value that cannot be read is `null` (`schema_version`: 0).
+ *          Every read is on its own: one part that cannot be read does not
+ *          take the rest with it. Such a value is `null` (`schema_version`: 0).
+ *          Without a database connection the request does not get this far in
+ *          the real app - the login and the restore gate answer first.
  * Dependencies: express, server/db.js, readiness, backup scheduler, modules
  */
 
@@ -28,6 +29,9 @@ import { checkReadiness } from '../services/readiness.js';
 import { getStatus as getBackupStatus } from '../services/backup-scheduler.js';
 import { listModules } from '../services/modules.js';
 import { secretOrigin } from '../utils/auto-secrets.js';
+import { createLogger } from '../logger.js';
+
+const log = createLogger('System');
 
 const router = express.Router();
 
@@ -95,11 +99,17 @@ async function freeBytes(/** @type {string | null} */ dir) {
 router.get('/diagnostics', requireAdmin, async (/** @type {unknown} */ _req, /** @type {any} */ res) => {
   // Everything that reads the database first, in one go; the waits come after.
   const facts = databaseFacts();
+  // A part that cannot be read becomes null in the answer, and a line in the
+  // log: a broken backup block must not look like "no backup yet" for good.
   const backup = orElse(getBackupStatus, null);
+  if (backup === null) log.warn('Diagnostics: the backup status could not be read.');
   const ready = await checkReadiness();
   const [dataDirFreeBytes, modules] = await Promise.all([
     freeBytes(facts.dataDir),
-    listModules({ admin: true }).catch(() => null),
+    listModules({ admin: true }).catch((err) => {
+      log.warn('Diagnostics: the module list could not be read:', err);
+      return null;
+    }),
   ]);
   const revision = process.env.APP_BUILD_REVISION;
   const encrypted = Boolean(process.env.DB_ENCRYPTION_KEY);

@@ -393,6 +393,29 @@ describe('Backup status survives a restart', () => {
     assert.deepStrictEqual((await fs.readdir(TEST_BACKUP_DIR)).sort(), before, 'nothing left behind');
   });
 
+  it('the status names the next scheduled run while the schedule is on, and null without one', async () => {
+    assert.strictEqual(backupScheduler.getStatus().nextRun, null, 'the suite runs with BACKUP_ENABLED=false');
+    const env = { BACKUP_ENABLED: process.env.BACKUP_ENABLED, BACKUP_SCHEDULE: process.env.BACKUP_SCHEDULE };
+    process.env.BACKUP_ENABLED = 'true';
+    process.env.BACKUP_SCHEDULE = '0 3 * * *';
+    // The schedule is read when the module loads: a fresh instance sees it.
+    const fresh = await afterRestart();
+    try {
+      fresh.startScheduler();
+      const { nextRun } = fresh.getStatus();
+      assert.match(nextRun, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      const ahead = Date.parse(nextRun) - Date.now();
+      assert.ok(ahead > 0 && ahead <= 24 * 60 * 60 * 1000, `a daily schedule fires within a day, got ${nextRun}`);
+    } finally {
+      fresh.stopScheduler();
+      for (const [name, value] of Object.entries(env)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+    assert.strictEqual(fresh.getStatus().nextRun, null, 'stopped: no next run');
+  });
+
   it('a success after a failure clears the reason, also after a restart', async () => {
     assert.strictEqual((await backupScheduler.triggerBackup()).success, true);
     assert.strictEqual(backupScheduler.getStatus().lastError, null);
