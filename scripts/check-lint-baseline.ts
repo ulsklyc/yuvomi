@@ -97,7 +97,10 @@ const baseline: Counts = exists ? JSON.parse(readFileSync(baselinePath, 'utf8'))
 const hard = Object.entries(current).filter(([key]) => HARD.has(ruleOf(key)));
 if (hard.length > 0) {
   console.error(`Hard rules have no baseline; fix these (${hard.length} keys):`);
-  for (const [key, n] of hard) console.error(`  ${key.replace('\t', '  ')}  ${n}`);
+  for (const [key, n] of hard) {
+    const [file, rule] = key.split('\t');
+    console.error(`  ${file}  ${rule}  ${n}`);
+  }
   process.exit(1);
 }
 

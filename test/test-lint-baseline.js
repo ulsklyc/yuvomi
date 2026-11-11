@@ -167,14 +167,14 @@ test('the fixture gives exactly its ten findings, and nothing for the allowed li
       .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
       .sort();
     assert.deepEqual(found, [
-      'a.js:10 HTML-STRING-WRITE', // bracket access, outerHTML, plain assignment
-      'a.js:11 HTML-STRING-WRITE', // bracket access, innerHTML, +=
-      'a.js:12 HTML-STRING-WRITE', // dot access, outerHTML, ||=
-      'a.js:13 HTML-STRING-WRITE', // dot access, innerHTML, ??=
-      'a.js:19 UTC-DAY-KEY', // toISOString().slice(0, 10)
-      'a.js:20 UTC-DAY-KEY', // toISOString().substring(0, 10)
-      'a.js:23 LOG-PLUS-500', // catch block answering 500
-      'a.js:9 HTML-STRING-WRITE', // dot access, innerHTML, plain assignment
+      'a.js:10 HTML-STRING-WRITE', // dot access, innerHTML, plain assignment
+      'a.js:11 HTML-STRING-WRITE', // bracket access, outerHTML, plain assignment
+      'a.js:12 HTML-STRING-WRITE', // bracket access with a backtick name, innerHTML, +=
+      'a.js:13 HTML-STRING-WRITE', // dot access, outerHTML, ||=
+      'a.js:14 HTML-STRING-WRITE', // dot access, innerHTML, ??=
+      'a.js:20 UTC-DAY-KEY', // toISOString().slice(0, 10)
+      'a.js:21 UTC-DAY-KEY', // toISOString().substring(0, 10)
+      'a.js:24 LOG-PLUS-500', // catch block answering 500
       'tx.js:5 TX-ASYNC-FN', // async transaction function
       'tx.js:7 TX-AWAIT-INSIDE', // await nested in a synchronous transaction body
     ]);

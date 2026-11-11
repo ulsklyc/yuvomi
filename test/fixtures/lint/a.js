@@ -2,13 +2,14 @@
 // one per marked line, and the cases it must leave alone. test:lint-baseline
 // lints this file with the real .oxlintrc.json and expects exactly these lines.
 // The five HTML lines cover every AST form the old text guard in
-// test-frontend-audit.js tested (dot and bracket access, innerHTML and
-// outerHTML, the operators =, +=, ||= and ??=); whitespace does not matter to
-// an AST, so `el.innerHTML=""` is the same node as line "html-1".
+// test-frontend-audit.js tested (dot access, bracket access with a quoted or a
+// backtick name, innerHTML and outerHTML, the operators =, +=, ||= and ??=);
+// single and double quotes are the same Literal node, and whitespace does not
+// matter to an AST, so `el.innerHTML=""` is the same node as line "html-1".
 const root = document.body; const el = root; const html = '<p></p>'; const row = '<li></li>';
 root.innerHTML = `<div>`;                 // html-1
 el['outerHTML'] = html;                   // html-2
-el["innerHTML"] += row;                   // html-3
+el[`innerHTML`] += row;                   // html-3
 el.outerHTML ||= html;                    // html-4
 el.innerHTML ??= html;                    // html-5
 const read = el['outerHTML'];             // reading is allowed

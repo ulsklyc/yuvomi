@@ -44,6 +44,10 @@
         "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
       },
       {
+        "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.type='TemplateLiteral'][left.property.expressions.length=0][left.property.quasis.0.value.cooked=/^(innerHTML|outerHTML)$/]",
+        "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+      },
+      {
         "selector": "CallExpression[callee.property.name=/^(slice|substring|substr)$/][callee.object.type='CallExpression'][callee.object.callee.property.name='toISOString'][arguments.0.value=0][arguments.1.value=10]",
         "message": "UTC-DAY-KEY: toISOString().slice(0, 10) is the UTC day, not the household's; use the helpers in server/utils/timezone.js."
       },
@@ -79,6 +83,10 @@
           },
           {
             "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.value=/^(innerHTML|outerHTML)$/]",
+            "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+          },
+          {
+            "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.type='TemplateLiteral'][left.property.expressions.length=0][left.property.quasis.0.value.cooked=/^(innerHTML|outerHTML)$/]",
             "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
           },
           {
