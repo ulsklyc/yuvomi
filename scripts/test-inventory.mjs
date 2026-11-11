@@ -1036,7 +1036,7 @@ function main() {
     for (const g of gaps.unlisted) console.log(`no entry      ${g.suite}: ${g.paths.length} paths in ${folders(g.paths)}`);
     for (const g of gaps.uncovered) console.log(`not covered   ${g.suite}: ${g.paths.length <= 3 ? g.paths.join(' ') : `${g.paths.length} paths in ${folders(g.paths)}`}`);
     console.log(`${gaps.traced} suites read source text in the trace: ${gaps.unlisted.length} without an entry, ${gaps.uncovered.length} with reads their targets do not cover; `
-      + `${gaps.silent.length} entries without a traced read (suites outside the chain).`);
+      + `${gaps.silent.length} entries without a traced read (suites this run did not include).`);
     if (gaps.unlisted.length + gaps.uncovered.length > 0) process.exitCode = 1;
     return;
   }
