@@ -846,3 +846,75 @@ Der erste Lauf lieferte zwei Ursachen für 39 × 2 × 2 Zustände. Erstens: `res
 - **Jede Sonde beginnt auf demselben Stand (#1104).** Die Sonden teilen einen Server, und bis dahin trug jede drei Dinge an die nächste weiter: das API-Limit (300 Anfragen pro Minute je IP, und jede Sonde ist 127.0.0.1), liegengebliebene Daten und über einen 429 auf `/auth/me` eine Seite, die auf `/login` steht. In #1044 war derselbe Probe-Code auf demselben Rechner in derselben Laufart einmal grün und einmal rot. Seitdem ruft ein `beforeEach` `harness.reset()` auf: ein frischer Browser-Kontext (Cookies, localStorage und Cache gehen mit) und, sobald die vorige Sonde den Server über eine Seite erreicht hat, ein Neustart auf dem Snapshot nach Seed und Anmeldung - gemessen unter einer Sekunde. Gegenprobe: eine Sonde, die das Limit verbraucht, eine Notiz liegen lässt und vor dem Aufräumen wirft, macht ohne Reset die Folgesonde rot (`/auth/me` antwortet 429); mit Reset bleibt die Folgesonde grün, ohne Restnotiz. Zwei Folgen: ein gezielter Lauf (`--test-name-pattern`) misst dieselben Vorbedingungen wie der volle, und eine Sonde, die eine vollere Instanz braucht, bekommt sie über den Seed, nicht über ihre Vorgänger. `stopServer()` kehrt dafür erst nach dem echten Prozessende zurück, auch nach SIGKILL - ein noch sterbender Server hielte sonst den Port oder schriebe in die Kopie.
 
 **Entwicklung:** `DOCUMENT_GUARDS_BASE_URL=http://localhost:PORT npm run test:document-guards` misst gegen einen bereits laufenden Server und spart Migration und Seed. Dort gibt es nichts neu zu starten: `reset()` erneuert nur den Browser-Kontext, Limit und Daten laufen von Sonde zu Sonde weiter, und ein solcher Lauf taugt deshalb nicht als Beleg. Ohne die Variable legt der Harness eine temporäre SQLite-Datei an, migriert sie, seedet sie über `scripts/seed-demo.js` und räumt am Ende auf. Vor dem Snapshot gleicht er einmal als die angemeldete Person ab (`GET /reminders/pending` legt die Geburtstagstermine und ihre Erinnerungen an) und verwirft danach jede Erinnerung (`dismissAllReminders`, #1160): der Seed trägt Geburtstage mit festem Datum, der Harness seedet am Lauftag, und an diesem Tag lag der Toast einer fälligen Erinnerung über dem Speichern-Knopf eines offenen Dialogs - am 12.09.2026 drei rote Kalender-Sonden, die tags darauf zufällig grün gewesen wären. Verworfen statt gelöscht, und die Geburtstage bleiben unangetastet: ein leerer Vorlauf hätte auch ihre Kalendertermine verhindert. Der Oberflächenfehler dahinter ist #1160, und seine Sonde ist `test:toast-dialog-browser`: sie legt ihre fällige Erinnerung selbst an und hängt damit nicht am Lauftag.
+
+## Text-Leser-Inventar (welche Suite hängt an der Schreibweise)
+
+```bash
+npm run test:text-reader-inventory  # Das Inventar `test/text-reader-inventory.json` ist vollständig und sinkt nur: eine Suite, die Quelltext unter `public/` oder `server/` als Text liest und keinen Eintrag hat, ist rot (die Meldung nennt die einzufügende Zeile mit den gemessenen Zieldateien), ebenso ein Eintrag ohne Suite, eine Zieldatei, die es nicht mehr gibt, und jede Summe über der Obergrenze (`ceiling`: Schreibweise-Blöcke und Suiten, die welche tragen). Die weite Zähleinheit läuft als Kontrollwert mit: wer einen Lese-Aufruf und einen Pfad unter `public/` oder `server/` nennt, ohne dass der Detektor ein Lesen sieht, steht von Hand entschieden unter `wideOnly`. Dazu der Detektor `scripts/test-inventory.mjs` an einem Baum im Temp-Verzeichnis: lokaler Wrapper, Pfadkonstante, Default-Parameter, Schleifen- und Callback-Variable, Alias-Import, Lese-Helfer aus `test/` zählen; Kommentar, String, Regex, Import-Pfad, Temp-Verzeichnis und Locale-JSON zählen nicht. Rot gegen ein leeres Inventar (nennt den Bestand) und je Fähigkeit gegen einen Detektor ohne sie.
+```
+
+**Wozu.** Eine Suite, die `public/pages/tasks.js` mit `readFileSync` liest und per Regex prüft, wie eine Stelle geschrieben ist, bricht, sobald die Datei umgebaut wird (TypeScript, Schnitt in mehrere Dateien, Renderer), obwohl sich für niemanden etwas ändert. Der Umbaufahrplan baut genau diese Dateien um. Das Inventar sagt vorher, welche Suite an welcher Datei hängt, wie viele ihrer Blöcke nur die Schreibweise prüfen und was mit ihnen geschieht. Es ist keine Liste verbotener Tests: was Verhalten prüft, bleibt.
+
+**Zähleinheiten.** Eine *Suite* ist eine Datei `test/test-*.js`. Ein *Block* ist ein Aufruf `test(...)` oder `it(...)` (auch die Handläufer `asyncTest`, `atest`, `testAsync`). *Text-Leser, enge Einheit:* eine Suite mit mindestens einem Lese-Aufruf (`readFileSync`, `readFile`, `readdirSync` und die übrigen Verzeichnis-Leser, ein lokaler Wrapper darum, ein lesender Helfer unter `test/`), dessen Ziel nach Auflösung der Pfadkonstanten unter `public/` oder `server/` liegt und keine Locale-JSON ist. *Weite Einheit:* eine Suite, die außerhalb von Kommentaren und Import-Pfaden einen Lese-Aufruf und einen Pfad unter `public/` oder `server/` nennt. Weit minus eng ist die Menge, in der der Detektor kein Lesen sieht; jede dieser Suiten ist von Hand zugeordnet. Das Maß für den Abbau ist der Anteil der Schreibweise-Blöcke an allen Blöcken, nicht der Anteil der Dateien: die meisten Text-Leser prüfen daneben auch Verhalten.
+
+**Klassifikation.** Beurteilt wird je Block, und nur, was er mit Quelltext aus `public/` oder `server/` tut (`.js`, `.css`, `.html`).
+
+- **S, Schreibweise:** mindestens eine Zusicherung des Blocks hängt daran, wie eine Stelle in einer Quelldatei geschrieben ist: `assert.match(src, ...)`, `includes`, `indexOf`, Treffer einer Regex zählen, einen Ausschnitt aus dem Quelltext schneiden und darauf prüfen, eine CSS-Deklaration wörtlich verlangen. Probe: würde der Block rot, wenn jemand die Datei gleichwertig umschreibt?
+- **V, Verhalten:** jeder andere Block. Wo er Quelltext anfasst, hat er einen dieser Gründe, und der steht als `stays:<grund>` im Inventar:
+  - `executed`: der gelesene Text wird als Ganzes ausgeführt oder gerendert (als Modul, in `vm`, als Stylesheet im Browser, als SQL), geprüft wird das Ergebnis.
+  - `contract`: der Text ist selbst das, was ein Nutzer, ein Client oder ein zweites Programm liest (Manifest, OpenAPI-Dokument, eine Datendatei, ein aufgezeichneter Schnittstellen-Stand).
+  - `coupling`: der Block gewinnt aus zwei Quellen je eine Menge von Namen oder Werten und verlangt, dass sie zueinander passen (jeder benutzte Schlüssel steht in der Locale, jede Route im OpenAPI-Dokument, dieselbe Konstante in Client und Server). Er verlangt keine bestimmte Stelle.
+  - `cascade`: CSS über `eachRule()`, wenn der Block aus den Regeln einen Wert ausrechnet (Token auflösen, Kontrast, gewinnende Regel) und das Ergebnis prüft.
+- **Klasse der Suite:** `V` ohne S-Block, `S` wenn jeder Block ein S-Block ist, `M` (gemischt) dazwischen. `sBlocks` ist die Zahl der S-Blöcke.
+
+**Grauzonen, je mit fester Zuordnung.**
+
+| Fall | Zuordnung |
+|---|---|
+| Reihenfolge per `indexOf` oder Trefferposition | S |
+| Eine Funktion oder ein Stück aus dem Quelltext schneiden und ausführen | S (der Schnitt bricht bei jedem Umbau); nur die ganze Datei auszuführen ist `executed` |
+| CSS-Deklaration wörtlich verlangt, auch über `eachRule()` | S; nur ein ausgerechneter Wert ist `cascade` |
+| Baumweiter Scanner, der ein Muster verbietet oder zählt, mit oder ohne Sperrklinken-Liste | S; ein Zähler gegen eine aufgezeichnete Zahl ist eine Ratsche, keine Kopplung |
+| Block führt Verhalten aus und prüft daneben eine Schreibweise | S (die eine Zusicherung macht ihn beim Umbau rot) |
+| `public/index.html` und andere `.html`-Quellen per Regex | S (ausgeliefert wird `dist/`) |
+| Selbsttest eines Scanners an einem Fixture-String | kein S-Block (liest keine Datei) |
+| Nur die Dateiliste eines Verzeichnisses mit einer zweiten Liste verglichen | `coupling` |
+| Locale-JSON, `dist/`, `docs/`, `tools/`, `package.json`, Testdateien | zählt nicht, weder als Text-Leser noch als S-Block |
+| Zweifel zwischen S und `coupling` | verlangt der Block eine konkrete Zeichenfolge an einer Stelle, auch "kommt mindestens einmal vor": S |
+
+**Die Datei.** `test/text-reader-inventory.json`, Schlüssel sortiert, eine Zeile je Suite:
+
+```json
+"test-tasks-ui.js": {"class":"M","sBlocks":12,"targets":["public/pages/tasks.js","public/styles/tasks.css"],"fate":"falls-with:public/pages/tasks.js"}
+```
+
+`targets` sind die als Text gelesenen Dateien unter `public/` oder `server/`; ein Verzeichnis endet auf `/` und steht für alles darunter. `fate` hat drei Formen: `lint:<regel>` (eine Lint-Regel aus Phase 1b Abschnitt D ersetzt die S-Blöcke wörtlich), `falls-with:<zieldatei>` (die S-Blöcke fallen oder werden zu Verhaltenstests in dem PR, der diese Datei umbaut) und `stays:<grund>` (für jede V-Suite, und für S-Blöcke, die bis zum Ende des Fahrplans mit Begründung stehen bleiben). `wideOnly` nennt die Suiten der weiten Einheit ohne Quelltext-Lesen, je mit dem, was sie stattdessen lesen. `sections` teilt `test-frontend-audit.js` in seine Themenblöcke: Titel, Zeilenbereich zum Zeitpunkt der Messung, Blöcke, S-Blöcke, Schicksal; die Datei wird in Phase 1b nur klassifiziert, nicht geteilt, und die Zeilenbereiche wandern mit jedem PR, der sie anfasst (verbindlich ist die Summe).
+
+**Was der Guard verlangt.**
+
+- *Neue Suite liest Quelltext:* sie braucht ihre Zeile. Die Meldung nennt sie fertig mit den gemessenen Zieldateien, offen ist nur der Grund: `"fate":"stays:<executed|contract|coupling|cascade>"`. Eine neue Suite prüft Verhalten, ihre Klasse ist `V`.
+- *Neue S-Blöcke:* die Summe `sBlocks` und die Zahl der Suiten mit S-Blöcken stehen als `ceiling` in der Datei und sinken nur. Wer einen Schreibweise-Block hinzufügt, baut im selben PR mindestens einen anderen ab oder prüft das Verhalten (Code ausführen, `dist/` oder das DOM lesen). `node scripts/test-inventory.mjs --update` senkt die Obergrenze auf den Stand und entfernt Zeilen gelöschter Suiten; es hebt nie einen Wert.
+- *Zieldatei verschwunden:* der Eintrag wird im selben PR abgearbeitet (siehe unten) oder auf die neue Datei gezeigt.
+- *Weite Einheit:* nennt eine Suite einen Lese-Aufruf und einen Pfad unter `public/` oder `server/`, ohne dass der Detektor ein Lesen sieht, entscheidet ein Mensch: Eintrag unter `suites`, wenn sie doch Quelltext liest, sonst eine Zeile unter `wideOnly`.
+
+**Wie ein Umbau seine Text-Leser abarbeitet (Phase 2 und 4).** Vor dem Umbau einer Datei:
+
+```bash
+node scripts/test-inventory.mjs --target public/pages/tasks.js   # wer liest sie, mit wie vielen S-Blöcken, mit welchem Schicksal
+```
+
+Je Eintrag entscheidet `fate`: `falls-with:` auf diese Datei heißt, die S-Blöcke werden im Umbau-PR gelöscht (Begründung im PR-Text: welches Verhalten sie meinten und welcher Test es jetzt hält) oder durch einen Verhaltenstest ersetzt; `lint:` heißt, die Regel hält es bereits, die Blöcke gehen; `stays:` heißt, der Block bleibt und liest nach dem Umbau die neue Datei, `dist/` oder das DOM. Der PR senkt `sBlocks` der Einträge und die Obergrenze im selben Zug (`--update`) und zeigt `targets` auf die neuen Dateien. Ein Umbau, der S-Blöcke nur auf den neuen Pfad umbiegt, hat sie nicht abgearbeitet.
+
+**Abbau je Phase.** Aus `fate` und `targets`, gemessen mit `node scripts/test-inventory.mjs --phases`: ein S-Block fällt spätestens in der Phase, die seine Zieldatei umbaut (Phase 2: `server/`, Phase 4: `public/`). Ende Phase 5 steht S auf 0 oder auf `stays:` mit Grund.
+
+| Phase | Was sie umbaut | Suiten mit S-Blöcken | S-Blöcke |
+|---|---|---|---|
+| 1b, Abschnitt D | eine Lint-Regel ersetzt die Blöcke wörtlich (`lint:`) | 3 | 7 |
+| 2 | `server/` | 49 | 77 |
+| 4 | `public/` (Seiten, Stylesheets, Router, Modal) | 187 | 2.312 |
+| bleibt (`stays:`) | - | 0 | 0 |
+| Summe | | 239 | 2.396 |
+
+Stand der Messung: 11.11.2026 auf `4ec5e3eb9`. 681 Suiten (dieser Guard mitgezählt) mit 16.953 Blöcken; Text-Leser 258 (eng) und 280 (weit), 22 davon nur weit; im Inventar 19 V, 8 S, 231 M. Die 2.396 S-Blöcke sind 14,1 % aller Blöcke. 204 Suiten lesen Quelltext unter `public/`, 189 davon mit S-Blöcken. Die laufenden Zahlen nennt `node scripts/test-inventory.mjs` ohne Argument; eine Suite mit Themenblöcken (`sections`) zählt in der Tabelle je Themenblock.
+
+**Was der Guard nicht sieht.** `class` und `sBlocks` sind Urteile, keine Messung: ein neuer Schreibweise-Block in einer Suite, die schon im Inventar steht, hebt keine Zahl von allein. Mechanisch gehalten sind die neue Suite, die verschwundene Zieldatei und die Summen der eingetragenen Werte. Die Erstklassifikation ist Block für Block gelesen, an 140 Blöcken und 40 Suiten nachgeprüft; an der Grenze zwischen S und `coupling` (Reichweiten-Proben, Konstanten aus dem Quelltext gegen eine zweite Quelle) bleibt eine Unschärfe von einigen Dutzend Blöcken.
