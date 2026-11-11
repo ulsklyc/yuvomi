@@ -27,7 +27,7 @@ import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
 import { guardedFetch } from '../services/notification-providers/guarded-fetch.js';
-import { PROVIDER_TIMEOUT_MS } from '../services/notifications.js';
+import { PROVIDER_TIMEOUT_MS } from '../services/channel-delivery.js';
 import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 
 const log = createLogger('Shopping');
