@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './tmp-dir.js';
 import {
-  INVENTORY_FILE, analyzeSuite, entryLine, formatInventory, phases, readInventory, readersOf, scan, sums, verify,
+  INVENTORY_FILE, analyzeSuite, entryLine, formatInventory, phases, readInventory, readersOf, scan, sums, traceGaps, verify,
 } from '../scripts/test-inventory.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -145,6 +145,16 @@ test('a read helper from test/ counts where it is called, a text helper only wit
   assert.equal(reads.narrow, true);
   assert.deepEqual(reads.targets, ['public/styles/a.css']);
   // eachRule() on a string of the test itself touches no file.
+  // The same helper through a dynamic import: destructured, renamed, called on the import
+  // itself, and under the other spelling of the way to it.
+  const destructured = measure("const { globalHiddenRule } = await import('./css-rules.js');\nconst rule = globalHiddenRule();\n");
+  assert.deepEqual(destructured.targets, ['public/styles/a.css']);
+  const renamed = measure("const { eachRule, globalHiddenRule: hidden } = await import('./css-rules.js');\nconst rule = hidden();\n");
+  assert.deepEqual(renamed.targets, ['public/styles/a.css']);
+  const member = measure("const rule = (await import('../test/css-rules.js')).globalHiddenRule();\n");
+  assert.deepEqual(member.targets, ['public/styles/a.css']);
+  const unused = measure("const { eachRule } = await import('./css-rules.js');\nconst rules = [...eachRule('.a { color: red }')];\n");
+  assert.equal(unused.narrow, false, 'the import alone reads nothing, only the call does');
   const fixture = measure("import { eachRule } from './css-rules.js';\nconst rules = [...eachRule('.a { color: red }')];\n");
   assert.equal(fixture.narrow, false);
   assert.equal(fixture.wide, false);
@@ -317,6 +327,49 @@ test('an entry without its suite, a target without its file and a wrong shape ar
     inventory({});
     assert.deepEqual(problemsOf(root), []);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('an entry the run-time trace found survives --update, and only "trace" marks one', () => {
+  const root = tree({ 'test-walker.js': "import { readdirSync } from 'node:fs';\nconst walk = (dir) => readdirSync(dir);\nwalk(process.cwd());\n" });
+  try {
+    const entry = { class: 'V', sBlocks: 0, targets: ['server/'], fate: 'stays:coupling' };
+    writeInventory(root, { ceiling: { sBlocks: 0, suites: 0 }, suites: { 'test-walker.js': { ...entry, seenBy: 'trace' } } });
+    assert.deepEqual(problemsOf(root), []);
+    run(root, '--update');
+    assert.deepEqual(Object.keys(readInventory(root).suites), ['test-walker.js'], 'the detector does not see the read, the entry stays');
+    writeInventory(root, { ceiling: { sBlocks: 0, suites: 0 }, suites: { 'test-walker.js': entry } });
+    run(root, '--update');
+    assert.deepEqual(Object.keys(readInventory(root).suites), [], 'without the mark the line of a suite that reads nothing goes');
+    writeInventory(root, { ceiling: { sBlocks: 0, suites: 0 }, suites: { 'test-walker.js': { ...entry, seenBy: 'hand' } } });
+    assert.match(problemsOf(root).join('\n'), /seenBy is "hand", the only value is "trace"/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a run-time trace is compared with the inventory: no entry, read not covered, covered', () => {
+  /** @type {import('../scripts/test-inventory.mjs').Inventory} */
+  const inv = {
+    ceiling: { sBlocks: 0, suites: 0 },
+    sections: {},
+    suites: {
+      'test-a.js': { class: 'V', sBlocks: 0, targets: ['server/index.js'], fate: 'stays:coupling' },
+      'test-b.js': { class: 'V', sBlocks: 0, targets: ['public/'], fate: 'stays:executed' },
+      'test-quiet.js': { class: 'V', sBlocks: 0, targets: ['public/sw.js'], fate: 'stays:executed' },
+    },
+    wideOnly: {},
+  };
+  const trace = [
+    'test-a.js\tserver/index.js', 'test-a.js\tserver/routes/y.js', 'test-a.js\tserver/routes/',
+    'test-b.js\tpublic/pages/a.js', 'test-b.js\tpublic/locales/de.json',
+    'test-new.js\tpublic/router.js', 'test-locale.js\tpublic/locales/de.json', '',
+  ].join('\n');
+  assert.deepEqual(traceGaps(inv, trace), {
+    traced: 3,
+    unlisted: [{ suite: 'test-new.js', paths: ['public/router.js'] }],
+    uncovered: [{ suite: 'test-a.js', paths: ['server/routes/', 'server/routes/y.js'] }],
+    silent: ['test-quiet.js'],
+  });
+  inv.suites['test-a.js']?.targets.push('server/');
+  assert.deepEqual(traceGaps(inv, trace).uncovered, [], 'a directory target covers what the walk read below it');
 });
 
 test('--target and the phase table answer from the inventory', () => {
