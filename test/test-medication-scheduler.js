@@ -6,6 +6,7 @@
  * Ausführen: node --test test/test-medication-scheduler.js
  */
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
 
@@ -597,4 +598,82 @@ test('ein entfernter Betreuer bekommt nichts mehr, weder per Push noch ueber ein
     push: pushed.map((p) => [p.userId, p.payload.body]),
     channel: channelSent.map((c) => [c.channel.name, c.payload.body]),
   }, { push: [[anna, 'Ibuprofen']], channel: [] });
+});
+
+// --------------------------------------------------------
+// The person's own channel is reached through the SSRF guard
+// --------------------------------------------------------
+// The person's own channel is reached through the guarded fetch that
+// channel-delivery.js sets as the one default for every sender. Real providers
+// and the real default here: no `fetchImpl`, no `providers`.
+
+/**
+ * @param {import('node:http').RequestListener} handler
+ * @returns {Promise<{ base: string, close: () => Promise<unknown> }>}
+ */
+function startLocalServer(handler) {
+  const server = http.createServer(handler);
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve({
+      base: `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`,
+      close: () => new Promise((done) => {
+        server.close(done);
+        // A kept-alive socket would hold close() open.
+        server.closeAllConnections();
+      }),
+    }));
+  });
+}
+
+test('ohne fetchImpl geht die Erinnerung an den eigenen Kanal ueber den SSRF-Schutz - ein privates Ziel bleibt unerreicht', async () => {
+  /** @type {string[]} */
+  const hits = [];
+  const { base, close } = await startLocalServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      hits.push(String(req.url));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  });
+  // One fresh household per run: a dose is announced once, a second run over
+  // the same database would have nothing left to send.
+  const runOnce = async () => {
+    const db = buildTestDb();
+    const user = seedUser(db, 'alice');
+    seedSchedule(db, seedMed(db, user), { time: '08:00' });
+    const run = await processDueMedications({
+      database: db, now: MONDAY_0900,
+      // Push reaches nobody, so `sent` counts the channel alone.
+      pushService: { async sendPushToUser() { return 0; } },
+      channelStore: {
+        listEnabledChannelsForUser() {
+          return [{ id: 7, provider: 'webhook', name: 'Alice', scope: 'user', config: { baseUrl: `${base}/hook` }, secrets: {} }];
+        },
+      },
+    });
+    if (!('sent' in run)) assert.fail('the run was skipped, nothing was measured');
+    return { created: run.created, sent: run.sent, failed: run.failed };
+  };
+  const before = process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+  try {
+    delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    const guarded = await runOnce();
+    assert.deepEqual(hits, [], 'the local server must not have been reached');
+    assert.deepEqual(
+      guarded, { created: 1, sent: 0, failed: 1 },
+      'the refused delivery counts as failed, the dose log is written all the same',
+    );
+
+    // Counter-check: the deployment switch opens the private network for this
+    // path as for every other channel delivery, and the same run arrives.
+    process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = 'true';
+    const opened = await runOnce();
+    assert.deepEqual(hits, ['/hook'], 'with the switch set exactly one request arrives');
+    assert.deepEqual(opened, { created: 1, sent: 1, failed: 0 });
+  } finally {
+    if (before === undefined) delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    else process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = before;
+    await close();
+  }
 });

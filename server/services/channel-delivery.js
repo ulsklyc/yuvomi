@@ -58,7 +58,8 @@ async function withTimeout(fn, timeoutMs = PROVIDER_TIMEOUT_MS) {
  * @param {Object} opts
  * @param {{ provider: string }} opts.channel
  * @param {Object} opts.payload
- * @param {Function} [opts.fetchImpl] - the caller's fetch (tests inject one)
+ * @param {Function} [opts.fetchImpl] - tests inject one. The SSRF-guarded fetch is the one
+ *   default for every sender and is set here; a caller passes its own on, never a default
  * @param {Record<string, { send: Function }>} [opts.providers] - { [provider]: { send } }; tests inject fakes
  * @returns {Promise<unknown>} what the provider's send() returns
  */
