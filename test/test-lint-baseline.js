@@ -267,7 +267,10 @@ test('each of the other layer rules fires, and an unresolved local import is key
       ['server/services/p.js', 'server-not-to-public-except-shared'],
       ['public/utils/s.js', 'public-not-to-server'],
       ['server/services/gone.js', 'unresolved-import'],
-    ]) assert.match(r.out, new RegExp(`${file.replace(/[./]/g, '\\$&')}\\s+depcruise/${rule}\\s+0 -> 1`), `${file} ${rule}`);
+    ]) {
+      const lines = r.out.split('\n').map((l) => l.trim().split(/\s+/).join(' '));
+      assert.ok(lines.includes(`${file} depcruise/${rule} 0 -> 1`), `${file} ${rule}:\n${r.out}`);
+    }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
