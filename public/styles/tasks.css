@@ -1316,7 +1316,8 @@
   min-width: 0;
 }
 
-.task-card__meta > .task-card__docs {
+.task-card__meta > .task-card__docs,
+.task-card__meta > .task-card__reminder {
   flex-shrink: 0;
 }
 

@@ -42,6 +42,7 @@ import {
 } from '../utils/task-tags.js';
 import * as v from '../middleware/validate.js';
 import { personAvatarUrlSql } from '../services/person-avatar.js';
+import { ownReminderIds } from '../services/reminder-flags.js';
 
 const log = createLogger('Tasks');
 
@@ -250,6 +251,21 @@ function attachDocumentCounts(tasks, viewer) {
   `).all({ me: viewer.userId });
   const map = new Map(counts.map((r) => [r.id, r.n]));
   for (const task of tasks) task.document_count = map.get(task.id) ?? 0;
+  return tasks;
+}
+
+/**
+ * Die Glocke in der Liste: `has_reminder`, wenn der Betrachter an der Aufgabe
+ * eine eigene, nicht verworfene Erinnerung hat - dieselbe Frage, die die
+ * Leseansicht an `GET /reminders` stellt (services/reminder-flags.js). Eine
+ * Abfrage für die ganze Liste, aus demselben Grund wie attachDocumentCounts.
+ * @param {any[]} tasks
+ * @param {number} userId
+ */
+function attachReminderFlags(tasks, userId) {
+  if (!tasks.length) return tasks;
+  const ids = ownReminderIds(db.get(), 'task', tasks.map((t) => t.id), userId);
+  for (const task of tasks) task.has_reminder = ids.has(Number(task.id));
   return tasks;
 }
 
@@ -1222,7 +1238,7 @@ router.get('/', (req, res) => {
     `;
 
     const rows = db.get().prepare(sql).all(...params).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
-    res.json({ data: attachRotation(attachTags(attachDocumentCounts(rows, documentViewer(req)))) });
+    res.json({ data: attachReminderFlags(attachRotation(attachTags(attachDocumentCounts(rows, documentViewer(req)))), me) });
   } catch (err) {
     log.error('GET / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

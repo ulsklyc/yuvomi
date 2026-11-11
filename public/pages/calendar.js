@@ -768,6 +768,22 @@ function calendarRepeatIconHtml(event) {
 }
 
 /**
+ * DIE GLOCKE: der Betrachter hat an diesem Termin eine Erinnerung
+ * (`has_reminder`, services/reminder-flags.js auf dem Server - dieselbe Frage
+ * wie die Glocken-Zeile der Leseansicht). Bis hierher stand die Erinnerung nur
+ * unten im Formular und in der Leseansicht; aus der Liste heraus war nicht zu
+ * sehen, ob ein Termin sich meldet.
+ *
+ * Der Name ist das Wort der Leseansicht (`reminders.sectionTitle`), wie die
+ * Serienmarke das Wort der Serie traegt - kein neuer Schluessel.
+ * @param {{ has_reminder?: boolean } | null | undefined} event
+ */
+function calendarReminderIconHtml(event) {
+  if (event?.has_reminder !== true) return '';
+  return `<span class="calendar-reminder-icon" role="img" aria-label="${esc(t('reminders.sectionTitle'))}"><i data-lucide="bell" class="icon-sm" aria-hidden="true"></i></span>`;
+}
+
+/**
  * Die Glyphen vor einem Termintitel, in JEDER Ansicht dieselben: das Icon nur,
  * wenn jemand eines gewaehlt hat (hasEventIcon()), die Serienmarke immer bei
  * einer Serie. Beide in der Tinte des Titels (calendar.css), nicht im Vollton
@@ -776,11 +792,19 @@ function calendarRepeatIconHtml(event) {
  * `compact` (12px) im Raster, 16px in der Listenzeile neben dem groesseren
  * Titel.
  */
-function eventGlyphsHtml(ev, { compact = true } = {}) {
+//
+// DIE GLOCKE IST DIE AUSNAHME VON "IN JEDER ANSICHT DIESELBEN" und steht nur,
+// wo der Aufrufer `reminder` setzt: in den Listenzeilen (Agenda, Tagesliste
+// unter dem Monat, Suche) und in der Tagesansicht, wo der Block die volle
+// Breite hat. Im Monats- und Wochenraster nicht: dort kostet jede Marke den
+// Titel Zeichen (siehe die Serienmarke, die im schmalen Monat schon weicht),
+// und eine Erinnerung ist eine Auskunft fuer die eine Person, nicht ein
+// Merkmal des Termins wie Serie und Icon.
+function eventGlyphsHtml(ev, { compact = true, reminder = false } = {}) {
   const icon = hasEventIcon(ev.icon)
     ? eventIconHtml(ev.icon, compact ? 'event-icon event-icon--compact' : 'event-icon')
     : '';
-  return `${calendarCancelledMarkHtml(ev, { compact })}${icon}${calendarRepeatIconHtml(ev)}`;
+  return `${calendarCancelledMarkHtml(ev, { compact })}${icon}${calendarRepeatIconHtml(ev)}${reminder ? calendarReminderIconHtml(ev) : ''}`;
 }
 
 /** Vom Anbieter abgesagt (#2499), per STATUS:CANCELLED aus ICS-Abo, CalDAV oder iCloud. */
@@ -5419,7 +5443,10 @@ function allDayChipTimeHtml(timeText) {
  * (vorher zwei zeichengleiche Kopien). Sichtbar steht die Rasterfassung der
  * Uhrzeit, Tooltip und gesprochener Name tragen die Listenfassung.
  */
-function renderAllDayEvent(ev, dayStr) {
+// `reminder` setzt nur die Tagesansicht: dort hat der Balken die volle Breite
+// wie die Zeitbloecke darunter, und die Glocke steht an beiden gleich. Die
+// Woche laesst sie weg (eventGlyphsHtml).
+function renderAllDayEvent(ev, dayStr, { reminder = false } = {}) {
   const timeText = allDayChipTimeText(ev, dayStr);
   // Ein mehrtaegiger Termin ist in der Tagesansicht ein STUECK seines Bands:
   // offene Kante zu den Nachbartagen, im Namen Spanne, „Tag 2 von 3" und
@@ -5437,8 +5464,8 @@ function renderAllDayEvent(ev, dayStr) {
   // title-Attribut und im gesprochenen Namen bleibt.
   return `
     <div class="${segment ? bandClasses('allday-event', segment) : 'allday-event'}" data-id="${ev.id}"
-         style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken || t('calendar.allDay'), dayStr)}${occurrenceAttr(ev)}
-         title="${allDayChipTitle(ev, allDayChipTimeText(ev, dayStr, { suffix: true }))}">${segment?.continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev)}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span>${segment?.continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
+         style="${eventSurfaceStyle(ev)}"${eventBlockAttrs(ev, spoken || t('calendar.allDay'), dayStr, { reminder })}${occurrenceAttr(ev)}
+         title="${allDayChipTitle(ev, allDayChipTimeText(ev, dayStr, { suffix: true }))}">${segment?.continuesBefore ? bandContinuationHtml('before') : ''}${eventGlyphsHtml(ev, { reminder })}<span class="allday-event__line"><span class="allday-event__label"><span>${esc(ev.title)}</span>${allDayChipTimeHtml(timeText)}</span>${chipAssigneeStack(ev, { size: 14, maxVisible: 2 })}</span>${segment?.continuesAfter ? bandContinuationHtml('after') : ''}</div>`;
 }
 
 /**
@@ -5650,7 +5677,7 @@ function renderDayView(container) {
           `).join('')}
           ${scheduleChips.map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
           ${dayWaste.map((occ) => renderWasteChip(occ)).join('')}
-          ${allday.map((ev) => renderAllDayEvent(ev, state.cursor)).join('')}
+          ${allday.map((ev) => renderAllDayEvent(ev, state.cursor, { reminder: true })).join('')}
           ${tasksOnDay(state.cursor).map(renderTaskChip).join('')}
         </div>
       </div>` : ''}
@@ -6115,9 +6142,9 @@ function renderDayEvent(ev, layout = null, dayStr = null, bandLanes = 0) {
   return `
     <div class="day-event${roomy ? '' : ' day-event--tight'}" data-id="${ev.id}"
          style="top:${top};height:${height};left:${left};width:${width};${bandInsetStyle(bandLanes)}${eventSurfaceStyle(ev)}"
-         title="${esc(ev.title)}${ev.location ? ' · ' + esc(fmtLocation(ev.location)) : ''}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr), dayStr)}${occurrenceAttr(ev)}>
+         title="${esc(ev.title)}${ev.location ? ' · ' + esc(fmtLocation(ev.location)) : ''}${chipAssigneeTitleSuffix(ev)}"${eventBlockAttrs(ev, eventTimeText(ev, dayStr), dayStr, { reminder: true })}${occurrenceAttr(ev)}>
       <span class="day-event__text">
-        <span class="day-event__title">${eventGlyphsHtml(ev)}<span class="day-event__name">${esc(ev.title)}</span></span>
+        <span class="day-event__title">${eventGlyphsHtml(ev, { reminder: true })}<span class="day-event__name">${esc(ev.title)}</span></span>
         <span class="day-event__meta">${timeText}${place}</span>
       </span>
       ${roomy ? chipAssigneeStack(ev, { size: 20, maxVisible: 2 }) : ''}
@@ -7560,6 +7587,7 @@ export const __test = {
   canonicalReminderOffsets,
   reminderOffsetFromEvent,
   reminderOwnerId,
+  calendarReminderIconHtml,
   // Die Erinnerung nach dem Terminbeginn (#1260): der Abschnitt, der sie
   // benennt, die Regel, die sie nach einer Verschiebung neu bewertet, und die
   // Leseansicht, die denselben Zeitpunkt nennen muss. Gemessen wird am
@@ -7646,9 +7674,9 @@ function renderAgendaEvent(ev, dayStr) {
   // die Seitenwurzel aus, statt auf der Zeile zu bleiben (#1083).
   return `
     <div class="list-row agenda-event" data-id="${ev.id}" data-date="${esc(day)}"${agendaMdIdAttr(ev, day)}${occurrenceAttr(ev)} role="button" tabindex="0"
-         style="${eventSurfaceStyle(ev)}" aria-label="${esc(agendaEventAriaLabel(ev, [timeStr, position].filter(Boolean).join(', ')))}">
+         style="${eventSurfaceStyle(ev)}" aria-label="${esc(agendaEventAriaLabel(ev, [timeStr, position].filter(Boolean).join(', '), '', { reminder: true }))}">
       <div class="agenda-event__body">
-        <div class="agenda-event__title">${eventGlyphsHtml(ev, { compact: false })}<span>${esc(ev.title)}</span></div>
+        <div class="agenda-event__title">${eventGlyphsHtml(ev, { compact: false, reminder: true })}<span>${esc(ev.title)}</span></div>
         <div class="agenda-event__meta">
           <span class="calendar-meta-item calendar-meta-item--time">${calendarMetaIconHtml('clock')}<span>${esc(timeStr)}</span>${position ? `<span class="calendar-meta-item__day">${esc(position)}</span>` : ''}</span>
           ${ev.location ? `<span class="calendar-meta-item calendar-meta-item--place">${calendarMetaIconHtml('map-pin')}<span>${esc(fmtLocation(ev.location))}</span></span>` : ''}
@@ -7661,10 +7689,13 @@ function renderAgendaEvent(ev, dayStr) {
   `;
 }
 
-function agendaEventAriaLabel(ev, timeStr, dayText = '') {
+// `reminder`: die Glocke steht sichtbar in dieser Zeile, also nennt der Name
+// sie auch - das aria-label ueberschreibt die Kinder, wie bei der Serie.
+function agendaEventAriaLabel(ev, timeStr, dayText = '', { reminder = false } = {}) {
   return [
     isProviderCancelled(ev) ? t('calendar.cancelled') : '',
     (ev.recurrence_rule || ev.is_recurring_instance) ? t('calendar.recurringEvent') : '',
+    reminder && ev.has_reminder === true ? t('reminders.sectionTitle') : '',
     ev.title,
     timeStr,
     dayText,
@@ -7689,9 +7720,9 @@ function agendaEventAriaLabel(ev, timeStr, dayText = '') {
 // zu erfahren, an welchem der sieben Tage. `dayStr` ist die Spalte, in der
 // der Block steht, gesprochen wie die Monatszelle ("Montag, 28.09.2026") -
 // HINTER der Uhrzeit, damit "Titel, Zeit" in jeder Ansicht gleich beginnt.
-function eventBlockAttrs(ev, timeText, dayStr = null) {
+function eventBlockAttrs(ev, timeText, dayStr = null, { reminder = false } = {}) {
   const dayText = dayStr ? dayHeadingText(dayStr, { long: true }) : '';
-  return ` role="button" tabindex="0" aria-label="${esc(agendaEventAriaLabel(ev, timeText, dayText))}"`;
+  return ` role="button" tabindex="0" aria-label="${esc(agendaEventAriaLabel(ev, timeText, dayText, { reminder }))}"`;
 }
 
 // Sichtbarkeits-Indikator (#474): nur bei eingeschränkten Terminen ein dezentes

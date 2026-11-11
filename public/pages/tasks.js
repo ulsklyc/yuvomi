@@ -490,6 +490,25 @@ function renderLockedBadge(task) {
   return `<span class="due-date" role="img" aria-label="${label}" title="${label}"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i></span>`;
 }
 
+/** DIE GLOCKE: der Betrachter hat an der Aufgabe eine Erinnerung
+ * (`has_reminder` aus GET /tasks, services/reminder-flags.js - dieselbe Frage
+ * wie die Glocken-Zeile der Leseansicht). Bis hierher sah man das nur, wenn man
+ * die Aufgabe oeffnete.
+ *
+ * AUCH AN ERLEDIGTEN AUFGABEN, weil die Leseansicht die Erinnerung dort ebenso
+ * zeigt und In-App-Meldung und Push sie weiter zustellen (nur `/upcoming` fuer
+ * nativ geplante Meldungen laesst erledigte aus, OPEN_TASK_REMINDER_SQL). Nicht
+ * ohne Zugang zu den Erinnerungen (reminderAccess): wo die Leseansicht die
+ * Zeile nicht zeigt, zeigt die Liste keine Glocke.
+ *
+ * `role="img"` und das Wort der Leseansicht als Name, wie die Serienmarke
+ * daneben - kein neuer Schluessel.
+ * @param {{ has_reminder?: boolean }} task */
+function renderReminderBadge(task) {
+  if (task.has_reminder !== true || reminderAccess() === 'none') return '';
+  return `<span class="due-date task-card__reminder" role="img" aria-label="${esc(t('reminders.sectionTitle'))}"><i data-lucide="bell" class="icon-sm" aria-hidden="true"></i></span>`;
+}
+
 /**
  * EINE Metazeile, und sie bricht nicht um.
  *
@@ -675,6 +694,7 @@ function renderTaskCard(task, opts = {}) {
                 hier standen zwei Kopien ohne Rolle (PR-Review #754). */ ''}
             ${task.is_recurring ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.recurring'))}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${task.is_recurring ? '' : renderForeignSeriesBadge(task)}
+            ${renderReminderBadge(task)}
             ${task.document_count > 0 ? `<span class="due-date task-card__docs" role="img" aria-label="${esc(t('tasks.documentsCount', { count: task.document_count }))}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${renderLockedBadge(task)}
             ${renderVisibilityBadge(task.visibility)}
@@ -3468,6 +3488,7 @@ function renderKanbanCard(task) {
       <div class="kanban-card__meta">
         ${renderPriorityBadge(task.priority)}
         ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${due.label}</span>` : ''}
+        ${renderReminderBadge(task)}
         ${renderLockedBadge(task)}
         ${renderTagBadges(task.tags, TAG_BADGES_VISIBLE, task.priority)}
       </div>

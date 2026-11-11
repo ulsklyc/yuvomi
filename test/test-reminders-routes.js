@@ -19,9 +19,16 @@ import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
+// Der Kalender-Router (Glocke, unten) zieht die Auth-Schicht mit, die ohne
+// Geheimnis nicht laedt.
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-reminders-routes-secret';
 
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+// Die Glocke in den Listen (`has_reminder`) liest dieselben Zeilen wie GET /
+// und GET /all - sie wird deshalb hier gemessen, an den echten Listenrouten.
+const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { default: calendarRouter } = await import('../server/routes/calendar.js');
 
 // --------------------------------------------------------
 // Test-DB via vollständige Migrationskette
@@ -129,6 +136,8 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/api/v1/reminders', remindersRouter);
+app.use('/api/v1/tasks', tasksRouter);
+app.use('/api/v1/calendar', calendarRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/reminders`;
@@ -637,4 +646,118 @@ test('GET /?entity_type= antwortet 403 statt den Titel zu verraten', async () =>
   } finally {
     currentScopes = null;
   }
+});
+
+// --------------------------------------------------------
+// DIE GLOCKE IN DEN LISTEN: `has_reminder` an GET /tasks und GET /calendar
+// folgt derselben Regel wie GET / und GET /all - eigene Zeile, nicht
+// verworfen, je Betrachter. Ein Vorkommen einer Serie fragt beim
+// Erinnerungs-Eigner, wie die Leseansicht (reminderOwnerId() im Client).
+// --------------------------------------------------------
+
+/**
+ * @param {string} path  Pfad unter /api/v1, etwa `/tasks`
+ * @param {number | bigint} uid
+ * @returns {Promise<any[]>}
+ */
+async function listAs(path, uid) {
+  const before = currentUid;
+  currentUid = uid;
+  try {
+    const res = await fetch(`http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}/api/v1${path}`);
+    assert.equal(res.status, 200, `${path}: ${res.status}`);
+    return (await res.json()).data;
+  } finally {
+    currentUid = before;
+  }
+}
+
+/**
+ * @param {number | bigint} owner
+ * @param {Record<string, string | number | null>} fields
+ * @returns {number}
+ */
+function makeEventWith(owner, fields) {
+  const f = {
+    title: 'Termin', start_datetime: '2035-04-02T14:00', end_datetime: '2035-04-02T15:00',
+    recurrence_rule: null, recurrence_parent_id: null, recurrence_id: null, overridden_fields: null,
+    ...fields, created_by: owner,
+  };
+  return Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, created_by, visibility, external_source,
+       recurrence_rule, recurrence_parent_id, recurrence_id, overridden_fields)
+    VALUES (@title, @start_datetime, @end_datetime, @created_by, 'all', 'local',
+       @recurrence_rule, @recurrence_parent_id, @recurrence_id, @overridden_fields)
+  `).run(f).lastInsertRowid);
+}
+
+test('GET /tasks: has_reminder je Betrachter - eigene, nicht verworfene Erinnerung', async () => {
+  const anna = freshUser();
+  const ben = freshUser();
+  const mine = Number(makeTask(anna, 'Muell rausbringen'));
+  const bens = Number(makeTask(anna, 'Rasen maehen'));
+  const gone = Number(makeTask(anna, 'Verworfen'));
+  const quiet = Number(makeTask(anna, 'Ohne Glocke'));
+  insertReminder(anna, 'task', mine, FUTURE);
+  insertReminder(ben, 'task', bens, FUTURE);
+  insertReminder(anna, 'task', gone, PAST, 1);
+  // Dieselbe Zahl als Termin ist keine Erinnerung an die Aufgabe.
+  insertReminder(anna, 'event', quiet, FUTURE);
+
+  const forAnna = new Map((await listAs('/tasks', anna)).map((t) => [t.id, t.has_reminder]));
+  assert.equal(forAnna.get(mine), true);
+  assert.equal(forAnna.get(bens), false, 'Bens Erinnerung meldet sich bei Ben, nicht bei Anna');
+  assert.equal(forAnna.get(gone), false, 'verworfen zaehlt nicht - GET / liefert sie auch nicht');
+  assert.equal(forAnna.get(quiet), false);
+  const forBen = new Map((await listAs('/tasks', ben)).map((t) => [t.id, t.has_reminder]));
+  assert.equal(forBen.get(mine), false);
+  assert.equal(forBen.get(bens), true);
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'event' AND entity_id = ?").run(quiet);
+});
+
+test('GET /calendar: has_reminder je Betrachter, auch in der Suche', async () => {
+  const anna = freshUser();
+  const ben = freshUser();
+  const dentist = makeEventWith(anna, { title: 'Zahnarzt Glocke' });
+  const football = makeEventWith(anna, { title: 'Fussball Glocke', start_datetime: '2035-04-02T17:00', end_datetime: '2035-04-02T18:00' });
+  insertReminder(anna, 'event', dentist, FUTURE);
+  insertReminder(anna, 'event', football, PAST, 1);
+
+  const forAnna = new Map((await listAs('/calendar?from=2035-04-01&to=2035-04-03', anna)).map((e) => [e.id, e.has_reminder]));
+  assert.equal(forAnna.get(dentist), true);
+  assert.equal(forAnna.get(football), false, 'verworfen zaehlt nicht');
+  const forBen = new Map((await listAs('/calendar?from=2035-04-01&to=2035-04-03', ben)).map((e) => [e.id, e.has_reminder]));
+  assert.equal(forBen.get(dentist), false);
+  const search = await listAs('/calendar/search?q=Zahnarzt', anna);
+  assert.equal(search.find((e) => e.id === dentist)?.has_reminder, true, 'die Suche zeichnet dieselben Agenda-Zeilen');
+});
+
+test('GET /calendar: ein Vorkommen fragt bei der Serie, ein Vorkommen mit eigenen Erinnerungen bei sich', async () => {
+  const anna = freshUser();
+  const series = makeEventWith(anna, {
+    title: 'Klavier Glocke', start_datetime: '2035-05-07T16:00', end_datetime: '2035-05-07T17:00',
+    recurrence_rule: 'FREQ=WEEKLY;COUNT=4',
+  });
+  insertReminder(anna, 'event', series, FUTURE);
+  // Das dritte Vorkommen ist verschoben und fuehrt eigene Erinnerungen - und
+  // hat keine. Die Leseansicht fragt dort, die Glocke auch.
+  db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)').run(series, '2035-05-21');
+  const moved = makeEventWith(anna, {
+    title: 'Klavier Glocke', start_datetime: '2035-05-22T16:00', end_datetime: '2035-05-22T17:00',
+    recurrence_parent_id: series, recurrence_id: '2035-05-21',
+    overridden_fields: '["start_datetime","end_datetime","reminders"]',
+  });
+
+  const rows = (await listAs('/calendar?from=2035-05-01&to=2035-05-31', anna)).filter((e) => e.series_id === series);
+  const plain = rows.filter((e) => e.id !== moved);
+  assert.equal(plain.length, 3, 'Vorbedingung: drei regulaere Vorkommen');
+  for (const occurrence of plain) {
+    assert.equal(occurrence.reminder_owner_id, series);
+    assert.equal(occurrence.has_reminder, true, `${occurrence.start_datetime}: die Erinnerung der Serie gilt`);
+  }
+  assert.equal(rows.find((e) => e.id === moved)?.has_reminder, false, 'das Vorkommen fuehrt eigene Erinnerungen und hat keine');
+  insertReminder(anna, 'event', moved, FUTURE);
+  const again = await listAs('/calendar?from=2035-05-01&to=2035-05-31', anna);
+  assert.equal(again.find((e) => e.id === moved)?.has_reminder, true);
 });

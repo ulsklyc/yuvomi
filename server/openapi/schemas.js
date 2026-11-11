@@ -292,6 +292,11 @@ const {
   ...dashboardTaskProperties
 } = taskProperties;
 
+const HAS_REMINDER_FIELD = {
+  type: 'boolean',
+  description: 'True when the caller has a reminder on this entry that is not dismissed - the same reminders `GET /reminders` and `GET /reminders/all` return for it. Reminders belong to one person, so two members can get different values for the same entry.',
+};
+
 const DOCUMENT_COUNT_FIELD = {
   type: ['integer', 'null'],
   minimum: 0,
@@ -938,13 +943,14 @@ export const schemas = {
         TaskListItem: {
           type: 'object',
           description: 'A top-level task in `GET /tasks`. Subtasks the caller may not see count nowhere.',
-          required: [...taskRequired, 'subtask_total', 'subtask_done', 'subtasks', 'document_count'],
+          required: [...taskRequired, 'subtask_total', 'subtask_done', 'subtasks', 'document_count', 'has_reminder'],
           properties: {
             ...taskProperties,
             subtask_total: { type: 'integer', minimum: 0 },
             subtask_done: { type: 'integer', minimum: 0 },
             subtasks: { type: 'array', items: { $ref: '#/components/schemas/TaskSubtaskSummary' } },
             document_count: DOCUMENT_COUNT_FIELD,
+            has_reminder: HAS_REMINDER_FIELD,
           },
         },
         TaskLinkedDocument: {
@@ -1276,6 +1282,10 @@ export const schemas = {
             attachment_data: {
               type: ['string', 'null'],
               description: 'Legacy attachment data URL. Null for attachments linked through attachment_document_id.',
+            },
+            has_reminder: {
+              ...HAS_REMINDER_FIELD,
+              description: `${HAS_REMINDER_FIELD.description} Asked at \`reminder_owner_id\` for an occurrence of a series. Present in the answers that know the caller.`,
             },
             ...calendarOccurrenceProperties,
           },

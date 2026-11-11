@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would, migrates it to the code under test and starts the server on it. A migration that
   breaks an older database now fails in CI, and the run is also red when the newest release
   changed the schema but has no frozen database. Nothing changes for an installation.
+- **Calendar and task lists show a bell when you have a reminder on an entry.** Until now a
+  reminder only showed at the bottom of the edit form and in the detail view, so a list did not
+  tell which appointments and tasks would notify you. The bell stands before the title in the
+  agenda, in the day list under the month, in search results and in the day view, and next to
+  the recurrence mark on task rows and Kanban cards. The month and week grids leave it out,
+  because every mark there costs the title characters. It shows your own reminders only, like
+  the detail view. API answers for tasks and events carry the same information as
+  `has_reminder`.
 
 ### Changed
 - **The container image of a release is now built from its tag alone.** Until now a release
