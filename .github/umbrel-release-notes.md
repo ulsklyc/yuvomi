@@ -1,14 +1,10 @@
-<!-- version: 2.88.0 -->
-This update renews what Yuvomi is built on. It brings no new feature; pages, data and settings look and work as before.
+<!-- version: 2.88.1 -->
+This update closes a gap in medication reminders. A reminder sent to a person's own notification channel (Gotify, ntfy or a webhook) now passes the same protection against requests into the local network as every other reminder. Nothing changes on screen.
 
-The app now arrives pre-built. Pages and modules the app already holds on your device open from that copy without asking the server first, and what is available offline stays the same.
+If such a channel lives in your local network, medication reminders to it now need the setting `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true`, as every other reminder to that channel already does. If your other reminders arrive there today, the setting is in place and there is nothing to do.
 
-Yuvomi now needs Chrome or Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4 on iPhone and iPad). An older browser shows a short page that names these versions instead of an empty app; update the browser or the device's system, or use another browser. On Firefox ESR 115 and Safari 15.4 to 16, the menus behind a button, the account menu, filters and the date picker now open; they stayed closed there before.
+The next update will be a foundation release. It changes how Yuvomi is tested and operated, adds a readiness check for monitoring and keeps the status of the last backup across a restart. It brings no visible change and does not touch the database.
 
-Three fixes come along. Birthdays no longer rewrite their calendar entries every minute, which spares the disk constant small writes. The in-app changelog shows a summary whole when it runs over two lines. On a phone, the tool row above recipes, pantry, meals and shopping folds away on scroll in every supported browser.
+This update does not change the database. No action is needed from you.
 
-If you added a module of your own, it may now import only `/api.js`, `/i18n.js` and `/utils/html.js`; a module that imports another app file stops loading until it is changed.
-
-This update does not change the database, and the way back to 2.87.0 was tried before the release. No action is needed from you.
-
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.88.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.88.1

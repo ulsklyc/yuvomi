@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.88.1] - 2026-11-11
+
+### Security
+- **Medication reminders to a person's own notification channel now go through the same SSRF
+  guard as every other channel delivery.** Until now they were sent with an unguarded request.
+  The deployment switch `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` applies to them as it does to
+  the other channels: a person whose own Gotify, ntfy or webhook channel lives in the local
+  network needs that switch for medication reminders too, as it was already needed for every
+  other reminder.
+
+### Upcoming: foundation release 2.89.0 (quality and operations)
+- **The next release changes how Yuvomi is tested and operated, not what it does.** It is
+  planned for Friday, 13 November 2026, at the earliest, and carries no new feature; pages,
+  data and the database stay as they are. This note is the advance notice for it.
+- **A readiness endpoint `/readyz` next to `/health`.** It answers `503` with a reason while
+  the instance cannot serve, for a load balancer or an uptime monitor. The existing `/health`
+  does not change, and neither does any shipped healthcheck.
+- **The status of the last backup survives a restart.** Today the backup page says "never"
+  after a restart until the next scheduled run.
+- **The way back stays open.** The release does not change the database, so pinning the image
+  tag `2.88.1` returns to this version with your data untouched (installation guide, "Pinning a
+  version"). That way is tried once before the release is tagged.
+
 ## [2.88.0] - 2026-11-10
 
 ### Foundation
