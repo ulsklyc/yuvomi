@@ -255,7 +255,7 @@ jobs:
         run: npm run lint
 
       # The action fetches exactly this zizmor version, checked against the hashes it
-      # ships; offline audits only (no API calls, no token use), findings as
+      # ships; offline audits only (no API calls), findings as
       # annotations, accepted findings with their reason in .github/zizmor.yml. Runs
       # even when the step above failed, so both reports come in one run.
       - name: Audit the workflows (zizmor)

@@ -364,6 +364,9 @@ test('dead code is keyed per file and issue type, under the same ratchet', () =>
   const dir = project(NONE);
   try {
     knipProject(dir);
+    // With a CODEOWNERS file knip adds an `owners` list to every report row; it is no finding.
+    mkdirSync(join(dir, '.github'));
+    writeFileSync(join(dir, '.github', 'CODEOWNERS'), '/server/ @someone\n*.js @someone-else\n');
     assert.equal(run(dir, '--init').code, 0);
     assert.deepEqual(baselineOf(dir), {}, 'no dead code yet');
     writeFileSync(join(dir, 'server', 'x.js'), `${NONE}export const g = 1;\n`);
@@ -373,6 +376,7 @@ test('dead code is keyed per file and issue type, under the same ratchet', () =>
     const lines = r.out.split('\n').map((l) => l.trim().split(/\s+/).join(' '));
     assert.ok(lines.includes('server/x.js knip/exports 0 -> 1'), r.out);
     assert.ok(lines.includes('server/orphan.js knip/files 0 -> 1'), r.out);
+    assert.doesNotMatch(r.out, /knip\/owners/, 'the CODEOWNERS list on a report row is no finding');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -426,6 +430,40 @@ test('the knip fixture gives exactly its six findings with the real knip.json', 
       'server/services/unlisted.js unlisted chalk',
       'server/services/x.js exports unused',
     ]);
+    // The same six through the ratchet: every issue type is keyed, not only exports and files.
+    // The named entries the fixture does not have exist as empty files (the script stops on a
+    // missing one).
+    for (const entry of JSON.parse(readFileSync(join(dir, 'knip.json'), 'utf8')).entry) {
+      if (/[*?{]/.test(entry) || existsSync(join(dir, entry))) continue;
+      mkdirSync(join(dir, entry, '..'), { recursive: true });
+      writeFileSync(join(dir, entry), '');
+    }
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    const init = run(dir, '--init');
+    assert.equal(init.code, 0, init.out);
+    assert.deepEqual(Object.fromEntries(Object.entries(baselineOf(dir)).filter(([key]) => key.includes('\tknip/'))), {
+      'package.json\tknip/dependencies': 1,
+      'public/orphan.js\tknip/files': 1,
+      'public/utils/y.js\tknip/duplicates': 1,
+      'public/utils/y.js\tknip/exports': 1,
+      'server/services/unlisted.js\tknip/unlisted': 1,
+      'server/services/x.js\tknip/exports': 1,
+    });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a JSDoc tag that makes knip skip an export is counted like a disable comment', () => {
+  const dir = project(NONE);
+  try {
+    knipProject(dir);
+    assert.equal(run(dir, '--init').code, 0);
+    // knip ignores an export tagged @public, @beta or @alias without a switch to turn that off.
+    // The tags are built from parts so that this file does not carry them itself.
+    writeFileSync(join(dir, 'server', 'x.js'), `${NONE}/** Kept for later. ${'@'}public */\nexport const g = 1;\n/** ${'@'}beta */\nexport const h = 1;\n`);
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    const lines = r.out.split('\n').map((l) => l.trim().split(/\s+/).join(' '));
+    assert.ok(lines.includes('server/x.js directive/knip-tag 0 -> 2'), r.out);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

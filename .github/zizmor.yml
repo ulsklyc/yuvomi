@@ -3,15 +3,19 @@
 # (11 Nov 2026) and is accepted for the reason given next to it. A fix changes what a
 # workflow does and belongs in a pull request of its own, which then removes the entry.
 #
-# Entries name a whole file: a line number would move with every edit above it and turn
-# the lint job red for an unrelated change. The price: a second finding of the same audit
-# in the same file passes as well, so a new checkout or trigger in these files needs the
-# reviewer's eye.
+# Most entries name a whole file: a line number would move with every edit above it and
+# turn the lint job red for an unrelated change. The price: a second finding of the same
+# audit in the same file passes as well, so a new checkout in these files needs the
+# reviewer's eye. The two audits where a second finding would matter most (a dangerous
+# trigger, an expression expanded into a shell) name the line; those lines sit where
+# edits are rare, and a moved line fails loudly, never silently.
 rules:
   artipacked:
     ignore:
       # actions/checkout keeps the job token in .git/config. None of these jobs uploads the
-      # checkout: ci.yml uploads only $RUNNER_TEMP/test-logs, the others upload nothing.
+      # checkout: ci.yml uploads only $RUNNER_TEMP/test-logs, the others upload no
+      # artifact. docker-publish.yml builds a public image from the checkout; .dockerignore
+      # leaves out .git, which is what keeps the token out of it.
       - ci.yml
       - claude.yml
       - claude-code-review.yml
@@ -20,10 +24,11 @@ rules:
 
   dangerous-triggers:
     ignore:
-      # issue_comment and pull_request_review(_comment) run in the base repository's
-      # context. The job runs only on an @claude mention, and claude-code-action acts only
-      # for users with write access to the repository (its default, not overridden here).
-      - claude.yml
+      # issue_comment runs in the base repository's context, also for a comment on a pull
+      # request from a fork. The job runs only on an @claude mention, and
+      # claude-code-action acts only for users with write access to the repository (its
+      # default, not overridden here).
+      - claude.yml:4
 
   self-repository:
     ignore:
@@ -36,7 +41,8 @@ rules:
     ignore:
       # Informational: steps.ver.outputs.version, which the "Resolve version" step sets
       # only after checking it against a version pattern; no free text reaches the shell.
-      - umbrel-publish.yml
+      - umbrel-publish.yml:195
+      - umbrel-publish.yml:220
 
   dependabot-cooldown:
     ignore:
