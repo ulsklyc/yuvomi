@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to open that page. The notification carries no technical error text - that belongs in the log
   and in the app - and two failed nights replace one notification instead of stacking up. A
   successful run afterwards clears the warning by itself.
+- **A restore drill checks that a release database restores and migrates on this version.**
+  `scripts/restore-drill.mjs` restores a database through the same restore command an operator
+  uses, migrates it to the current schema and checks its integrity, foreign keys, schema and row
+  counts before it starts the server on it and reads every module. The rollback probe that
+  tries the way back before a foundation release moved into the repository as
+  `scripts/rollback-probe/`. Nothing changes for an installation.
+- **Releases that change the database schema carry a frozen demo database.** A new workflow
+  attaches `yuvomi-<version>-corpus.db` and its `.sha256` to every release whose schema differs
+  from the last one with such a file, and to every foundation release. It is the demo seed of
+  that release, encrypted with a public test key, and the restore drill migrates each of them
+  to the current version. Nothing changes for an installation.
+- **Every night and in every pull request, all of those databases are restored and migrated.**
+  A new workflow downloads each release's frozen database, restores it the way an operator
+  would, migrates it to the code under test and starts the server on it. A migration that
+  breaks an older database now fails in CI, and the run is also red when the newest release
+  changed the schema but has no frozen database. Nothing changes for an installation.
 
 ### Changed
 - **The container image of a release is now built from its tag alone.** Until now a release

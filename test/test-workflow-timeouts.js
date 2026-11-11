@@ -11,10 +11,12 @@
  *        stillschweigend am Guard vorbeiläuft. Jobs aus GitHubs Default-Setups
  *        (CodeQL: `Analyze`, `CodeQL`) haben dort keine Datei - sie behalten
  *        den 6-Stunden-Default, und dieser Guard kann sie nicht sehen.
- * Bekannte Grenze: ein Job, der ein wiederverwendbares Workflow aufruft
- *        (`uses:` auf Job-Ebene), darf laut GitHub KEIN `timeout-minutes`
- *        tragen - der Parser lehnt den Schlüssel dort ab. Das Repo hat heute
- *        keinen solchen Job; der erste braucht hier eine benannte Ausnahme.
+ * Ausnahme: ein Job, der ein wiederverwendbares Workflow aufruft (`uses:` auf
+ *        Job-Ebene), darf laut GitHub KEIN `timeout-minutes` tragen - der
+ *        Parser lehnt den Schlüssel dort ab. Erlaubt ist das nur für einen
+ *        Workflow aus DIESEM Ordner (`uses: ./.github/workflows/<datei>`): der
+ *        liegt hier und wird selbst geprüft, sein Job trägt den Deckel. Erster
+ *        Fall: `restore-drill` in ci.yml (Phase 1b, Abschnitt B).
  * Ausführen: node --test test/test-workflow-timeouts.js
  */
 
@@ -59,11 +61,14 @@ function jobsOf(source, file) {
       // Anführungszeichen, optionaler Kommentar dahinter.
       const jobKey = line.match(/^ {2}(?:"([\w-]+)"|'([\w-]+)'|([\w-]+)):\s*(?:#.*)?$/);
       assert.ok(jobKey, `${file}: unverstandene Zeile auf Job-Ebene: "${line}"`);
-      current = { name: jobKey[1] ?? jobKey[2] ?? jobKey[3], timeout: null };
+      current = { name: jobKey[1] ?? jobKey[2] ?? jobKey[3], timeout: null, calls: null };
       jobs.push(current);
       continue;
     }
     if (!current) continue;
+
+    const calls = line.match(/^ {4}uses:\s*\.\/\.github\/workflows\/([\w.-]+\.ya?ml)\s*(?:#.*)?$/);
+    if (calls) current.calls = calls[1];
 
     const timeout = line.match(/^ {4}timeout-minutes:\s*(\d+)\s*(?:#.*)?$/);
     if (timeout) current.timeout = Number(timeout[1]);
@@ -88,6 +93,12 @@ for (const file of files) {
     );
 
     for (const job of jobs) {
+      if (job.calls) {
+        // Der gerufene Workflow liegt hier und läuft durch diese Schleife.
+        assert.ok(files.includes(job.calls), `${file}, Job "${job.name}": ruft ${job.calls}, das hier fehlt`);
+        assert.strictEqual(job.timeout, null, `${file}, Job "${job.name}": GitHub lehnt timeout-minutes an einem Aufruf ab`);
+        continue;
+      }
       assert.notStrictEqual(
         job.timeout,
         null,
