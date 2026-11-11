@@ -10,6 +10,9 @@
  *      app path by test/test-browser-loader.mjs, and every suite that runs through that
  *      loader would fail before its first test.
  *      node scripts/test-inventory.mjs --trace <file>     (compares with the inventory)
+ *      Every process of the run appends to the file, so nothing here can empty it:
+ *      remove it before a run (`rm -f <file>`), or the reads of an earlier run stay in
+ *      it and the comparison reports files no suite reads any more.
  * Without TEXT_READER_TRACE the module does nothing.
  *
  * WHAT COUNTS. A call of readFileSync, readFile, readdirSync, readdir, opendirSync or

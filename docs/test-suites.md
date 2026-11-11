@@ -925,6 +925,7 @@ Stand der Messung: 11.11.2026 auf `cc119e33b`. 682 Suiten mit 16.972 Blöcken; T
 **Nachmessung zur Laufzeit.** `scripts/trace-test-reads.mjs` ist ein Preload, der während eines Laufs der Kette aufzeichnet, was Testcode unter `public/` und `server/` wirklich liest (`readFileSync`, `readFile`, `readdirSync` und ihre Verwandten, aufgerufen aus einer Datei unter `test/`; was die App beim Testen selbst liest, zählt nicht, ebenso wenig der Browser-Loader):
 
 ```bash
+rm -f /tmp/reads.tsv   # der Mitschnitt hängt nur an: ohne das bleiben die Zugriffe eines früheren Laufs stehen
 TEXT_READER_TRACE=/tmp/reads.tsv NODE_OPTIONS="--import file://$PWD/scripts/trace-test-reads.mjs" npm run test-parallel
 node scripts/test-inventory.mjs --trace /tmp/reads.tsv   # Exit 1 bei einer Lücke
 ```
