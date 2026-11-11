@@ -13,8 +13,9 @@
  *          the real tree has no hard finding (this runs in the required test jobs, next to the
  *          lint job); the real lint-baseline.json is sorted, carries no hard rule and names no
  *          missing file. The fixture test/fixtures/lint/error-text/ must give exactly its
- *          sixteen ERROR-TEXT findings (the self-test cases of the text reader the rule
- *          replaced, phase 1b section E) and nothing for the lines it must leave alone. A
+ *          thirty-three ERROR-TEXT findings (the self-test cases of the text reader the rule
+ *          replaced, phase 1b section E, and the spellings a probe against that reader
+ *          found) and nothing for the lines it must leave alone. A
  *          baseline key of that rule needs a reason in lint-baseline-reasons.json, and a
  *          reason needs its key.
  * Run:     npm run test:lint-baseline
@@ -386,7 +387,7 @@ test('the fixture gives exactly its ten findings, and nothing for the allowed li
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('the error-text fixture gives exactly its sixteen findings, and nothing for the lines to leave alone', () => {
+test('the error-text fixture gives exactly its thirty-three findings, and nothing for the lines to leave alone', () => {
   const dir = tempDir('yuvomi-lint-error-text-');
   try {
     writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
@@ -394,7 +395,7 @@ test('the error-text fixture gives exactly its sixteen findings, and nothing for
     // The fixture marks every line that must be reported with `et-N`.
     const marked = readFileSync(join(dir, 'cases.js'), 'utf8').split('\n')
       .flatMap((line, i) => (/\/\/ et-\d+:/.test(line) ? [i + 1] : []));
-    assert.equal(marked.length, 16, 'the fixture marks sixteen lines');
+    assert.equal(marked.length, 33, 'the fixture marks thirty-three lines');
     const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
     const found = JSON.parse(r.stdout).diagnostics
       .map((/** @type {{ message: string, labels: { span: { line: number } }[] }} */ d) => ({ line: d.labels[0].span.line, tag: d.message.split(':')[0] }))

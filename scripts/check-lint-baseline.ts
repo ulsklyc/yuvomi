@@ -22,6 +22,9 @@
  *          characters in lint-baseline-reasons.json (same key -> why the finding is no debt to
  *          pay off, e.g. the text is our own behind an instanceof gate). A missing or short
  *          reason is exit 1, and so is a reason whose key is not in the baseline.
+ *          Limits: a key is a file, not a function, so a new place in a file that has a key
+ *          stays green while the count does not rise; and the reason is free text, nothing
+ *          checks it against the places it names.
  * Run:     node scripts/check-lint-baseline.ts [--update | --init] [--root <dir>]
  *   --update  writes back ONLY lower or vanished counts, never higher ones; the reason of a
  *             key it removes goes with it.

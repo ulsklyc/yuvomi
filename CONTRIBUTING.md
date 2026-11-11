@@ -210,7 +210,11 @@ of exceptions rather than a debt list: each of its baseline keys needs a reason 
 characters under the same key in `lint-baseline-reasons.json` - why the text is our own and behind
 which gate. A reason without a baseline key fails as well, and `--update` drops the reason of a key
 it removes. The spellings the rule sees, and the ones it cannot, are the fixture
-`test/fixtures/lint/error-text/`.
+`test/fixtures/lint/error-text/`. Two limits: a key is a file, not a function, so a new place in a
+file that already has a key stays green as long as the count does not rise, and nothing checks the
+reason against the places it names - read both in review. And through a variable the rule does not
+follow the name: it reports where the text is read into one in a function that sends a body, also
+when the variable only goes to the log.
 
 ### Build
 
@@ -273,7 +277,7 @@ docs/                  # Product spec, screenshots
 
 **Key patterns:**
 
-- Every API route lives in `server/routes/` and follows the same `try/catch` → JSON response pattern
+- Every API route lives in `server/routes/` and answers JSON; an error it does not expect is not caught there but reaches the central error handler (see [Backend](#backend))
 - Every frontend page is an ES module in `public/pages/` that exports `render()`
 - All design values come from `tokens.css` - never hardcode colors, radii, or shadows
 - Database migrations are appended to the `MIGRATIONS` array in `server/db.js` - never modify existing entries
@@ -469,7 +473,7 @@ without this repository's private tooling.
 
 - ES modules everywhere (`import`/`export`, never `require`)
 - Semicolons: **yes**
-- `try/catch` in every route handler - no unhandled promise rejections
+- No `try/catch` around a whole route handler: Express 5 passes a rejected promise on to the central error handler. Catch only to translate an error you know into a 4xx, or to clean up
 - No dynamic code execution. Never write user data directly into an HTML string - use `esc()` from `public/utils/html.js` in template literals, or DOM API (`createElement`, `textContent`). Use `insertAdjacentHTML` to append HTML fragments, `replaceChildren()` to replace content. Direct `innerHTML` and `outerHTML` assignments are rejected by `npm run lint` (see [Linting](#linting)); `npm test` checks the same hard rules through `test:lint-baseline`.
 - Hyphens, not dashes: write `-`, never `—` or `–`. This holds for text people read rather than execute: the READMEs, the CHANGELOG, commit messages, UI strings and locale values. `npm run test:readme-consistency` enforces it for `README.md` and `README.de.md`; everywhere else it is on you. Existing code comments on `main` are inconsistent about this and are deliberately left alone, so `git grep` is not a reliable guide here.
 
