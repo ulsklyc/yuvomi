@@ -57,7 +57,7 @@
       },
       {
         "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-        "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver commits an async one at its first await."
+        "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
       },
       {
         "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
@@ -95,7 +95,7 @@
           },
           {
             "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver commits an async one at its first await."
+            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
           },
           {
             "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",

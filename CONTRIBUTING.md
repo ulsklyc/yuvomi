@@ -187,6 +187,10 @@ household's zone), no catch block that answers 500 itself, no `async` function o
 Everything else works like the type baseline: a count that rises or a new key fails, a change that
 fixes findings runs `node scripts/check-lint-baseline.ts --update`, which only lowers counts. The
 rules themselves are tested on the fixture `test/fixtures/lint/` (`npm run test:lint-baseline`).
+An `eslint-disable` or `oxlint-disable` comment counts as a finding of its own (`directive/disable`),
+so a suppression needs the same review as the finding it hides; one without a rule list or one that
+names `no-restricted-syntax` is a hard finding. A file that is renamed or split takes its keys
+along by hand: move them to the new path in `lint-baseline.json` with the same or lower counts.
 
 ### Build
 
@@ -446,7 +450,7 @@ without this repository's private tooling.
 - ES modules everywhere (`import`/`export`, never `require`)
 - Semicolons: **yes**
 - `try/catch` in every route handler - no unhandled promise rejections
-- No dynamic code execution. Never write user data directly into an HTML string - use `esc()` from `public/utils/html.js` in template literals, or DOM API (`createElement`, `textContent`). Use `insertAdjacentHTML` to append HTML fragments, `replaceChildren()` to replace content. Direct `innerHTML` assignments are rejected by the frontend audit (`npm run test:frontend-audit`), which runs as part of `npm test`.
+- No dynamic code execution. Never write user data directly into an HTML string - use `esc()` from `public/utils/html.js` in template literals, or DOM API (`createElement`, `textContent`). Use `insertAdjacentHTML` to append HTML fragments, `replaceChildren()` to replace content. Direct `innerHTML` and `outerHTML` assignments are rejected by `npm run lint` (see [Linting](#linting)); `npm test` checks the same hard rules through `test:lint-baseline`.
 - Hyphens, not dashes: write `-`, never `—` or `–`. This holds for text people read rather than execute: the READMEs, the CHANGELOG, commit messages, UI strings and locale values. `npm run test:readme-consistency` enforces it for `README.md` and `README.de.md`; everywhere else it is on you. Existing code comments on `main` are inconsistent about this and are deliberately left alone, so `git grep` is not a reliable guide here.
 
 ### Frontend

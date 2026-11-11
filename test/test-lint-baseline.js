@@ -5,8 +5,11 @@
  *          (.oxlintrc.json, copied with the plugin path made absolute): an extra finding gives
  *          exit 1 naming file and rule, a fixed one exit 0 with "Baseline can sink", --update
  *          lowers and never raises, a hard rule fails even with --init, a broken tool run is
- *          exit 2. The fixture test/fixtures/lint/ must give exactly its ten findings, and the
- *          real lint-baseline.json is sorted, carries no hard rule and names no missing file.
+ *          exit 2, a disable comment is a finding of its own (hard without a rule list or for
+ *          no-restricted-syntax). The fixture test/fixtures/lint/ must give exactly its ten
+ *          findings; the real tree has no hard finding (this runs in the required test jobs,
+ *          next to the lint job); the real lint-baseline.json is sorted, carries no hard rule
+ *          and names no missing file.
  * Run:     npm run test:lint-baseline
  */
 
@@ -23,7 +26,7 @@ const SCRIPT = join(REPO, 'scripts', 'check-lint-baseline.ts');
 const OXLINT = join(REPO, 'node_modules', 'oxlint', 'bin', 'oxlint');
 const FIXTURE = join(REPO, 'test', 'fixtures', 'lint');
 const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
-const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE'];
+const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'blanket-disable', 'disable-no-restricted-syntax'];
 
 /** The real rule set for a directory outside the repo: no fixture ignore, plugin by absolute URL. */
 function portableConfig() {
@@ -58,6 +61,8 @@ function run(dir, ...args) {
 /** @param {string} dir */
 const baselineOf = (dir) => JSON.parse(readFileSync(join(dir, 'lint-baseline.json'), 'utf8'));
 const MANUAL = 'server/x.js\toxlint/no-restricted-syntax/TX-MANUAL';
+// Built from parts so that this file does not carry a directive itself.
+const DISABLE = `// ${'eslint'}-disable-next-line`;
 
 test('without a baseline file: exit 2 instead of a silent green', () => {
   const dir = project();
@@ -157,6 +162,50 @@ test('a broken lint run is exit 2 and leaves the baseline alone', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a disable comment is counted: a new one fails, a blanket one or one for no-restricted-syntax is hard', () => {
+  const dir = project(NONE);
+  try {
+    run(dir, '--init');
+    writeFileSync(join(dir, 'server', 'y.js'), `${DISABLE} no-unused-vars\nconst unused = 1;\nexport {};\n`);
+    const plain = run(dir);
+    assert.equal(plain.code, 1, plain.out);
+    assert.match(plain.out, /server\/y\.js\s+directive\/disable\s+0 -> 1/);
+    for (const [line, kind] of [
+      [`${DISABLE}\n`, 'blanket-disable'],
+      [`${DISABLE} eslint-js/no-restricted-syntax -- why\n`, 'disable-no-restricted-syntax'],
+      [`/* ${'oxlint'}-disable */\n`, 'blanket-disable'],
+    ]) {
+      writeFileSync(join(dir, 'server', 'y.js'), `${line}export function g(el) { el.innerHTML = '<b></b>'; }\n`);
+      const r = run(dir, '--init');
+      assert.equal(r.code, 1, `${line}: ${r.out}`);
+      assert.match(r.out, new RegExp(`Hard rules[\\s\\S]*server/y\\.js\\s+directive/${kind}`));
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a file oxlint cannot parse is keyed as a parse error, not as an unknown rule', () => {
+  const dir = project(NONE);
+  try {
+    run(dir, '--init');
+    writeFileSync(join(dir, 'server', 'y.js'), 'export function (\n');
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /server\/y\.js\s+oxlint\/parse-error\s+0 -> [1-9]/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the size rules stand at the planned limits', () => {
+  assert.deepEqual(CONFIG.rules['max-lines'], ['error', { max: 1500 }]);
+  assert.deepEqual(CONFIG.rules['max-lines-per-function'], ['error', { max: 200 }]);
+});
+
+test('the real tree has no hard finding (runs in the required test jobs)', () => {
+  const r = spawnSync(process.execPath, [SCRIPT], { cwd: REPO, encoding: 'utf8' });
+  const out = `${r.stdout}${r.stderr}`;
+  assert.notEqual(r.status, 2, out);
+  assert.doesNotMatch(out, /Hard rules have no baseline/, out);
+});
+
 test('the fixture gives exactly its ten findings, and nothing for the allowed lines', () => {
   const dir = tempDir('yuvomi-lint-fixture-');
   try {
@@ -207,7 +256,7 @@ test('the real lint-baseline.json is sorted, has no hard rule and names only exi
   const stale = [];
   for (const key of keys) {
     const [file, rule] = key.split('\t');
-    assert.match(rule, /^oxlint\/[\w/-]+$/, `key without a tool and rule: ${key}`);
+    assert.match(rule, /^(oxlint|directive)\/[\w/-]+$/, `key without a tool and rule: ${key}`);
     assert.ok(Number.isInteger(baseline[key]) && baseline[key] > 0, `count invalid: ${key}`);
     assert.ok(!HARD_RULES.some((h) => rule.endsWith(`/${h}`)), `hard rule in the baseline: ${key}`);
     assert.ok(!file.includes('/vendor/') && !file.startsWith('test/fixtures/lint/'), `excluded file in the baseline: ${file}`);

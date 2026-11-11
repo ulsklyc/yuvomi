@@ -4,10 +4,13 @@
  * Purpose: Runs the lint tools, counts findings per `file<TAB>tool/rule` and compares them with
  *          lint-baseline.json. Exit 1 when a key rises or is new, or when a hard rule fires at
  *          all; exit 2 when a tool did not run. The baseline is a debt register, not a licence.
- *          One mechanism for every tool, independent of the tools' own suppressions
- *          (pattern: scripts/check-tsc-baseline.ts).
+ *          One mechanism for every tool (pattern: scripts/check-tsc-baseline.ts).
  * Tools:   oxlint (`.oxlintrc.json`, rules with `no-restricted-syntax` are keyed by the tag at the
  *          start of their message, e.g. `oxlint/no-restricted-syntax/LOG-PLUS-500`).
+ * Inline:  oxlint obeys `eslint-disable` and `oxlint-disable` comments and has no switch to
+ *          ignore them, so a comment would hide a finding from this gate. Every such directive
+ *          in a linted file is counted as `directive/disable` under the same ratchet; one without
+ *          a rule list or one naming `no-restricted-syntax` is a hard key.
  * Run:     node scripts/check-lint-baseline.ts [--update | --init] [--root <dir>]
  *   --update  writes back ONLY lower or vanished counts, never higher ones.
  *   --init    fills a missing or empty baseline completely (one-time start).
@@ -30,13 +33,23 @@ const baselinePath = resolve(root, 'lint-baseline.json');
 const oxlintBin = resolve(repo, 'node_modules', 'oxlint', 'bin', 'oxlint');
 
 // Rules with no debt: they stand at zero, and no baseline may ever carry them.
-// The transaction rules guard a driver behaviour (better-sqlite3 commits an async
-// transaction function at its first await); the HTML rule is hard constraint 1.
+// The transaction rules guard a driver behaviour (better-sqlite3 throws on a returned
+// promise and rolls back; code after the first await runs outside any transaction);
+// the HTML rule is hard constraint 1. A blanket or no-restricted-syntax suppression
+// would switch them off, so it is hard as well.
 const HARD = new Set([
   'oxlint/no-restricted-syntax/HTML-STRING-WRITE',
   'oxlint/no-restricted-syntax/TX-ASYNC-FN',
   'oxlint/no-restricted-syntax/TX-AWAIT-INSIDE',
+  'directive/blanket-disable',
+  'directive/disable-no-restricted-syntax',
 ]);
+
+// Line and block comments with eslint-disable, -line or -next-line (or oxlint-...); the rule list is
+// what follows the directive up to `--`, the end of the comment or the end of the line.
+// Matched as text over the files oxlint lints: wider than the tool's own parser (a directive
+// spelled inside a string counts too), which errs on the side of a red gate.
+const DIRECTIVE = /(?:\/\/|\/\*)\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?![\w-])([^\n]*)/g;
 
 function fail(message: string): never {
   console.error(message);
@@ -54,8 +67,26 @@ function oxlintRule(code: string, message: string): string {
   return tag ? `${name}/${tag[1]}` : name;
 }
 
+const posix = (file: string) => relative(root, resolve(root, file)).split(sep).join('/');
+
+function directives(counts: Counts) {
+  const run = spawnSync(process.execPath, [oxlintBin, '--debug=files', '.'], {
+    cwd: root, encoding: 'utf8', maxBuffer: 1 << 29,
+  });
+  const files = `${run.stdout}`.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (run.status !== 0 || files.length === 0) fail(`oxlint listed no files (exit ${run.status}): ${`${run.stderr}`.slice(0, 400)}`);
+  for (const file of files) {
+    for (const m of readFileSync(resolve(root, file), 'utf8').matchAll(DIRECTIVE)) {
+      const rules = String(m[1]).split('--')[0]!.split('*/')[0]!.trim();
+      const kind = rules === '' ? 'blanket-disable'
+        : /(^|[\s,/])no-restricted-syntax\b/.test(rules) ? 'disable-no-restricted-syntax' : 'disable';
+      const key = `${posix(file)}\tdirective/${kind}`;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+  }
+}
+
 function oxlint(counts: Counts) {
-  if (!existsSync(oxlintBin)) fail(`oxlint is not installed (${oxlintBin}); run npm ci.`);
   const run = spawnSync(process.execPath, [oxlintBin, '--format', 'json', '.'], {
     cwd: root, encoding: 'utf8', maxBuffer: 1 << 29,
   });
@@ -67,15 +98,18 @@ function oxlint(counts: Counts) {
   }
   if (!Array.isArray(report.diagnostics)) fail('oxlint gave no diagnostics list.');
   for (const d of report.diagnostics) {
-    const file = relative(root, resolve(root, String(d.filename))).split(sep).join('/');
-    const key = `${file}\toxlint/${oxlintRule(String(d.code), String(d.message ?? ''))}`;
+    // A parse error or a crashed JS plugin comes without a rule code.
+    const rule = d.code ? oxlintRule(String(d.code), String(d.message ?? '')) : 'parse-error';
+    const key = `${posix(String(d.filename))}\toxlint/${rule}`;
     counts[key] = (counts[key] ?? 0) + 1;
   }
 }
 
 function measure(): Counts {
+  if (!existsSync(oxlintBin)) fail(`oxlint is not installed (${oxlintBin}); run npm ci.`);
   const counts: Counts = {};
   oxlint(counts);
+  directives(counts);
   return counts;
 }
 
