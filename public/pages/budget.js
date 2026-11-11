@@ -5246,7 +5246,7 @@ function bindEntryAccountCurrency(panel) {
  * @param {{title: string, absVal: number, category: string, subcategory: string, date: string, original: number|null}} values
  * @returns {Array<[Element|null, string]|false>}
  */
-export function entryFormErrors(panel, { title, category, subcategory, date, original = null }) {
+export function entryFormErrors(panel, { category, subcategory, date, original = null }) {
   return [
     // Kein Titelcheck: leerer Titel ist gueltig; der Server oder der Dialog ersetzt
     // ihn durch den lokalisierten Unterkategorie-/Kategorienamen (#2403).
