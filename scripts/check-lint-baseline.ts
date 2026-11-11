@@ -46,10 +46,11 @@ const HARD = new Set([
 ]);
 
 // Line and block comments with eslint-disable, -line or -next-line (or oxlint-...); the rule list is
-// what follows the directive up to `--`, the end of the comment or the end of the line.
+// what follows the directive up to `--` and the end of the comment: the end of the line for `//`,
+// the closing `*/` for a block, which may span lines.
 // Matched as text over the files oxlint lints: wider than the tool's own parser (a directive
 // spelled inside a string counts too), which errs on the side of a red gate.
-const DIRECTIVE = /(?:\/\/|\/\*)\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?![\w-])([^\n]*)/g;
+const DIRECTIVE = /\/\/\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?![\w-])([^\n]*)|\/\*\s*(?:eslint|oxlint)-disable(?:-next-line|-line)?(?![\w-])([\s\S]*?)(?:\*\/|$(?![\s\S]))/g;
 
 function fail(message: string): never {
   console.error(message);
@@ -77,7 +78,7 @@ function directives(counts: Counts) {
   if (run.status !== 0 || files.length === 0) fail(`oxlint listed no files (exit ${run.status}): ${`${run.stderr}`.slice(0, 400)}`);
   for (const file of files) {
     for (const m of readFileSync(resolve(root, file), 'utf8').matchAll(DIRECTIVE)) {
-      const rules = String(m[1]).split('--')[0]!.split('*/')[0]!.trim();
+      const rules = String(m[1] ?? m[2]).split('--')[0]!.trim();
       const kind = rules === '' ? 'blanket-disable'
         : /(^|[\s,/])no-restricted-syntax\b/.test(rules) ? 'disable-no-restricted-syntax' : 'disable';
       const key = `${posix(file)}\tdirective/${kind}`;

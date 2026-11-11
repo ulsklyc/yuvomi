@@ -174,6 +174,7 @@ test('a disable comment is counted: a new one fails, a blanket one or one for no
       [`${DISABLE}\n`, 'blanket-disable'],
       [`${DISABLE} eslint-js/no-restricted-syntax -- why\n`, 'disable-no-restricted-syntax'],
       [`/* ${'oxlint'}-disable */\n`, 'blanket-disable'],
+      [`/* ${'eslint'}-disable no-await-in-loop,\n   eslint-js/no-restricted-syntax */\n`, 'disable-no-restricted-syntax'],
     ]) {
       writeFileSync(join(dir, 'server', 'y.js'), `${line}export function g(el) { el.innerHTML = '<b></b>'; }\n`);
       const r = run(dir, '--init');
