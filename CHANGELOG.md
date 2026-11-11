@@ -55,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.secrets/` next to the database, in the same order as the server. Until now it stopped on an
   encrypted database unless the key was in the environment or in `.env`.
 
+### Security
+- **Medication reminders to a person's own notification channel now go through the same SSRF
+  guard as every other channel delivery.** Until now they were sent with an unguarded request.
+  The deployment switch `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` applies to them as it does to
+  the other channels: a person whose own Gotify or ntfy channel lives in the local network needs
+  that switch for medication reminders too, as it was already needed for every other reminder.
+
 ## [2.88.0] - 2026-11-10
 
 ### Foundation

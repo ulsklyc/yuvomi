@@ -9,7 +9,6 @@ import { activeAccountSql } from './account-state.js';
 import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
 import { defaultProviders, sendToChannel } from './channel-delivery.js';
-import { guardedFetch } from './notification-providers/guarded-fetch.js';
 import { syncAllBirthdayReminders } from './birthdays.js';
 import { resolveHouseholdFormats, formatDateKey, translate } from '../utils/i18n.js';
 import { moveNoticeFields } from './shopping-move-notices.js';
@@ -399,20 +398,31 @@ function allKnownDeliveriesComplete(database, reminderId, expectedTargets) {
 }
 
 export function createNotificationService({ providers = defaultProviders, channelStore } = {}) {
-  async function testChannel({ channel, payload, fetchImpl = guardedFetch } = {}) {
+  /**
+   * @param {{ channel?: any, payload?: any, fetchImpl?: Function }} [opts] - `fetchImpl`
+   *   carries no default here: channel-delivery.js holds the only one.
+   */
+  async function testChannel({ channel, payload, fetchImpl } = {}) {
     return sendToChannel({ channel, payload, fetchImpl, providers });
   }
 
   return { providers, channelStore, testChannel };
 }
 
+/**
+ * @param {{
+ *   database?: any, pushService?: typeof defaultPushService, channelStore?: any,
+ *   providers?: typeof defaultProviders, now?: Date, fetchImpl?: Function,
+ * }} [opts] - `fetchImpl` is for tests; without it the delivery takes the SSRF-guarded
+ *   fetch that channel-delivery.js sets as the default for every sender.
+ */
 export async function processDueNotifications({
   database,
   pushService = defaultPushService,
   channelStore,
   providers = defaultProviders,
   now = new Date(),
-  fetchImpl = guardedFetch,
+  fetchImpl,
 } = {}) {
   const getDb = () => (database || dbModule.get());
   const activeDb = getDb();

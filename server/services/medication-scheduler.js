@@ -95,7 +95,8 @@ function mayHearAboutHealth(database, userId) {
  * @param {Object} [opts.channelStore] - { listEnabledChannelsForUser }
  * @param {Object} [opts.providers]    - { [provider]: { send } }
  * @param {Date}   [opts.now]
- * @param {Function} [opts.fetchImpl]
+ * @param {Function} [opts.fetchImpl] - tests inject one; without it the delivery takes
+ *   the SSRF-guarded fetch that channel-delivery.js sets as the default for every sender
  * @returns {Promise<{ due:number, created:number, notified:number, sent:number, failed:number }>}
  */
 /**
@@ -107,13 +108,21 @@ export function processDueMedications(options) {
   return runExternalJob(() => processDueMedicationsUntracked(options));
 }
 
+/**
+ * @param {{
+ *   database?: any, pushService?: typeof defaultPushService, channelStore?: any,
+ *   providers?: typeof defaultProviders, now?: Date, fetchImpl?: Function,
+ * }} [opts] - described at processDueMedications()
+ */
 async function processDueMedicationsUntracked({
   database,
   pushService = defaultPushService,
   channelStore,
   providers = defaultProviders,
   now = new Date(),
-  fetchImpl = fetch,
+  // No default of its own: `undefined` falls through to the guarded fetch of
+  // sendToChannel(), the one default for every sender.
+  fetchImpl,
 } = {}) {
   const activeDb = database || dbModule.get();
 
