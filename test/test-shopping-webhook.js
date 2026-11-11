@@ -26,10 +26,14 @@ delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { register } from 'node:module';
 import express from 'express';
 
+register('./test-browser-loader.mjs', import.meta.url);
+
 const dbmod = await import('../server/db.js');
-const { default: shoppingRouter } = await import('../server/routes/shopping.js');
+const { CASE_MESSAGES } = await import('../public/utils/friendly-error.js');
+const { default: shoppingRouter, __setWebhookTimeoutForTests } = await import('../server/routes/shopping.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 const db = dbmod.get();
 
@@ -144,11 +148,10 @@ test('PUT /preferences: die abgewiesene Adresse nennt ihren Grund (#1909)', asyn
   assert.equal(r.status, 400);
   assert.equal(r.body.reason, 'shopping_webhook_url_invalid');
 
-  const { readFileSync } = await import('node:fs');
-  const map = readFileSync('public/utils/friendly-error.js', 'utf8');
-  assert.match(map, /\['shopping_webhook_url_invalid',\s*'settings\.shoppingWebhookUrlInvalid'\]/,
+  assert.equal(CASE_MESSAGES.get('shopping_webhook_url_invalid'), 'settings.shoppingWebhookUrlInvalid',
     'der Grund braucht seinen Satz in CASE_MESSAGES, sonst zeigt die Seite den Allgemeinsatz');
 
+  const { readFileSync } = await import('node:fs');
   const locale = JSON.parse(readFileSync('public/locales/en.json', 'utf8'));
   assert.ok(locale.settings.shoppingWebhookUrlInvalid, 'und den Schluessel in den Sprachdateien');
 });
@@ -271,19 +274,25 @@ test('POST send-webhook: die Nutzlast traegt nur die offenen Artikel, in der For
 });
 
 test('der Aufruf traegt ein Zeitlimit', async () => {
-  // Nicht gegen die Uhr geprueft: WEBHOOK_TIMEOUT_MS sind 8 Sekunden (derselbe
-  // Wert wie PROVIDER_TIMEOUT_MS der Benachrichtigungswege, aber eine eigene
-  // Konstante - channel-delivery.js' Export ist per depcruise-Regel nur
-  // notifications.js und medication-scheduler.js erlaubt), und ein Test, der
-  // die abwartet, ist seine Laufzeit nicht wert. Geprueft wird, DASS ein
-  // Signal mitgeht - `safeRequest` bringt von sich aus keines mit, ein
-  // stummes Ziel haelt den Request sonst offen.
-  const { readFileSync } = await import('node:fs');
-  const source = readFileSync('server/routes/shopping.js', 'utf8');
-  assert.match(source, /const WEBHOOK_TIMEOUT_MS = 8_000;/,
-    'die Webhook-Route braucht ihre eigene 8s-Zeitlimit-Konstante');
-  const callSite = source.match(/const response = await guardedFetch\(webhookUrl, \{[\s\S]*?\}\);/)?.[0];
-  assert.ok(callSite, 'der guardedFetch-Aufruf der Webhook-Route wurde nicht gefunden');
-  assert.match(callSite, /signal:\s*AbortSignal\.timeout\(WEBHOOK_TIMEOUT_MS\)/,
-    'der Aufruf braucht ein Zeitlimit, und zwar dasselbe wie die Benachrichtigungswege');
+  // Gegen ein echtes, stummes Ziel statt gegen den Quelltext: `safeRequest`
+  // bringt von sich aus kein Zeitlimit mit, und ohne eines haelt ein Ziel, das
+  // nie antwortet, den Request offen. `__setWebhookTimeoutForTests` setzt die
+  // sonst 8 Sekunden lange Frist auf wenige Millisekunden herunter, damit der
+  // Test nicht selbst 8 Sekunden braucht.
+  const slow = http.createServer(() => { /* nie antworten, nie enden */ });
+  await new Promise((r) => slow.listen(0, '127.0.0.1', r));
+  const slowUrl = `http://127.0.0.1:${slow.address().port}/hook`;
+  process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = 'true';
+  __setWebhookTimeoutForTests(20);
+  try {
+    const listId = seedList('Zeitlimit', [{ name: 'Brot' }]);
+    await setUrl(slowUrl, asAdmin);
+    const r = await call('POST', `/api/v1/shopping/${listId}/send-webhook`, { as: asMember, body: {} });
+    assert.equal(r.status, 502, 'ein nie antwortendes Ziel darf den Request nicht offen halten');
+  } finally {
+    __setWebhookTimeoutForTests();
+    delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    await new Promise((r) => slow.close(r));
+    await setUrl(targetUrl, asAdmin);
+  }
 });
