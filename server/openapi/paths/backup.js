@@ -8,7 +8,7 @@ export function backupPaths() {
         tag: 'Backup',
         admin: true,
         description: '`database_key` (see DatabaseKeyStatus) says where the database key comes from, never its value; `GET /api/v1/backup/database-key` returns a generated one. '
-          + '`scheduler.lastBackup` is the last local run (`timestamp`, `success`, and on a failure `reason` and `error`), `scheduler.lastSuccess` the time of the last run that wrote a verified backup, and `scheduler.lastError` is `null` after a successful run and `{ timestamp, reason, message }` after a failed one. '
+          + '`scheduler.lastBackup` is the last local run (`timestamp`, `success`, and on a failure `reason` and `error`), `scheduler.lastSuccess` the time of the last run that wrote a verified backup, `scheduler.nextRun` when the schedule fires next (`null` without a running schedule), and `scheduler.lastError` is `null` after a successful run and `{ timestamp, reason, message }` after a failed one. '
           + '`reason` is always one of `backup_dir_not_writable`, `disk_full`, `backup_verify_failed`, `unknown`, and `message` (like `lastBackup.error`) is the fixed English sentence of that reason, never the text of the error - that is in the server log. A client shows its own sentence per `reason`. '
           + 'The three values are stored in the database: they survive a restart, and a restore keeps the ones of this installation.',
       }),

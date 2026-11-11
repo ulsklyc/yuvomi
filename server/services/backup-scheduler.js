@@ -24,6 +24,7 @@ const BACKUP_DIR = process.env.BACKUP_DIR || './backups';
 const BACKUP_KEEP = parseInt(process.env.BACKUP_KEEP || '7', 10); // Default: keep last 7 backups
 const BACKUP_ENABLED = process.env.BACKUP_ENABLED !== 'false'; // Default: enabled
 
+/** @type {import('node-cron').ScheduledTask | null} */
 let scheduledTask = null;
 /** @type {{ timestamp: string, success: boolean, file?: string, error?: string, reason?: string, webdav?: object } | null} */
 let lastBackup = null;
@@ -328,6 +329,8 @@ export function getStatus() {
     lastBackup,
     lastError,
     lastSuccess,
+    // When the schedule fires next, or null without a running schedule.
+    nextRun: scheduledTask?.getNextRun()?.toISOString() ?? null,
     webdav: webdav.getStatus(),
   };
 }

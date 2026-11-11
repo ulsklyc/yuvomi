@@ -37,7 +37,7 @@ const LATEST_KNOWN_VERSION = Math.max(0, ...db.MIGRATIONS.map((m) => m.version))
  * The result is the body of the answer; every reason is written out where it is decided.
  * @returns {Promise<{ status: 'ready' } | { status: 'not_ready', reason: NotReadyReason }>}
  */
-async function checkReadiness() {
+export async function checkReadiness() {
   if (db.isRestoreRunning()) return { status: 'not_ready', reason: 'restore_in_progress' };
   if (!db.isDatabaseOpen()) return { status: 'not_ready', reason: 'database_closed' };
   if (db.currentVersion() < LATEST_KNOWN_VERSION) return { status: 'not_ready', reason: 'schema_behind' };
