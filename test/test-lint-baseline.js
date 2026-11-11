@@ -8,16 +8,18 @@
  *          exit 2, a disable comment is a finding of its own (hard without a rule list or for
  *          no-restricted-syntax). The fixture test/fixtures/lint/ must give exactly its ten
  *          findings, the TypeScript layer fixture test/fixtures/lint/layers/ exactly its three
- *          dependency-cruiser violations; the real tree has no hard finding (this runs in the required test jobs,
- *          next to the lint job); the real lint-baseline.json is sorted, carries no hard rule
- *          and names no missing file.
+ *          dependency-cruiser violations, the knip fixture test/fixtures/lint/knip/ (run with the
+ *          real knip.json) exactly its six findings; a knip entry that names no file is exit 2;
+ *          the real tree has no hard finding (this runs in the required test jobs, next to the
+ *          lint job); the real lint-baseline.json is sorted, carries no hard rule and names no
+ *          missing file.
  * Run:     npm run test:lint-baseline
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './tmp-dir.js';
@@ -28,6 +30,7 @@ const OXLINT = join(REPO, 'node_modules', 'oxlint', 'bin', 'oxlint');
 const FIXTURE = join(REPO, 'test', 'fixtures', 'lint');
 const DEPCRUISE = join(REPO, 'node_modules', 'dependency-cruiser', 'bin', 'dependency-cruiser.mjs');
 const DEPCRUISE_CONFIG = join(REPO, '.dependency-cruiser.mjs');
+const KNIP = join(REPO, 'node_modules', 'knip', 'bin', 'knip.js');
 const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
 const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'blanket-disable', 'disable-no-restricted-syntax'];
 
@@ -346,6 +349,86 @@ test('oxlint reaches the source tree, but not vendor code or the fixture', () =>
     || f.startsWith('test/fixtures/lint/') || f.startsWith('dist/')), []);
 });
 
+/**
+ * A knip setup for a fixture project: one entry, the server tree as project.
+ * @param {string} dir
+ * @param {string[]} [entry]
+ */
+function knipProject(dir, entry = ['server/index.js']) {
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'fixture', private: true, type: 'module' }));
+  writeFileSync(join(dir, 'knip.json'), JSON.stringify({ entry, project: ['server/**/*.js'] }));
+  writeFileSync(join(dir, 'server', 'index.js'), "import { f } from './x.js';\nexport const start = f;\n");
+}
+
+test('dead code is keyed per file and issue type, under the same ratchet', () => {
+  const dir = project(NONE);
+  try {
+    knipProject(dir);
+    assert.equal(run(dir, '--init').code, 0);
+    assert.deepEqual(baselineOf(dir), {}, 'no dead code yet');
+    writeFileSync(join(dir, 'server', 'x.js'), `${NONE}export const g = 1;\n`);
+    writeFileSync(join(dir, 'server', 'orphan.js'), 'export const o = 1;\n');
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    const lines = r.out.split('\n').map((l) => l.trim().split(/\s+/).join(' '));
+    assert.ok(lines.includes('server/x.js knip/exports 0 -> 1'), r.out);
+    assert.ok(lines.includes('server/orphan.js knip/files 0 -> 1'), r.out);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a broken knip config, a failing plugin or a missing entry file is exit 2', () => {
+  const dir = project(NONE);
+  try {
+    knipProject(dir);
+    run(dir, '--init');
+    writeFileSync(join(dir, 'knip.json'), '{"entry": [\n');
+    assert.equal(run(dir).code, 2, 'broken config');
+    writeFileSync(join(dir, 'knip.json'), JSON.stringify({ entry: ['server/index.js'], project: ['server/**/*.js'], bogus: 1 }));
+    assert.equal(run(dir).code, 2, 'config knip rejects');
+    // A plugin that cannot load its config: knip still prints a report, but exits 2.
+    knipProject(dir);
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'fixture', private: true, type: 'module', devDependencies: { vite: '8.3.7' } }));
+    writeFileSync(join(dir, 'vite.config.js'), "import { defineConfig } from 'vite';\nexport default defineConfig({});\n");
+    assert.equal(run(dir).code, 2, 'plugin config that does not load');
+    // knip skips an entry that names no file without a word; every file behind it would
+    // then count as dead, or, for a CLI entry, its own exports would go unchecked.
+    rmSync(join(dir, 'vite.config.js'));
+    knipProject(dir, ['server/index.js', 'server/gone.js']);
+    const r = run(dir);
+    assert.equal(r.code, 2, r.out);
+    assert.match(r.out, /server\/gone\.js/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the knip fixture gives exactly its six findings with the real knip.json', () => {
+  const dir = tempDir('yuvomi-knip-fixture-');
+  try {
+    cpSync(join(FIXTURE, 'knip'), dir, { recursive: true });
+    copyFileSync(join(REPO, 'knip.json'), join(dir, 'knip.json'));
+    const r = spawnSync(process.execPath, [KNIP, '--reporter', 'json', '--no-exit-code', '--no-progress'], { cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    /** @type {string[]} */
+    const found = [];
+    for (const issue of JSON.parse(r.stdout).issues) {
+      for (const [type, list] of Object.entries(issue)) {
+        if (!Array.isArray(list)) continue;
+        for (const item of list) {
+          const names = (Array.isArray(item) ? item : [item]).map((/** @type {{ name: string }} */ i) => i.name).join('+');
+          found.push(`${issue.file} ${type} ${names}`);
+        }
+      }
+    }
+    assert.deepEqual(found.sort(), [
+      'package.json dependencies left-pad',
+      'public/orphan.js files public/orphan.js',
+      'public/utils/y.js duplicates escapeText+default',
+      'public/utils/y.js exports default',
+      'server/services/unlisted.js unlisted chalk',
+      'server/services/x.js exports unused',
+    ]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('the real lint-baseline.json is sorted, has no hard rule and names only existing files', () => {
   const baseline = JSON.parse(readFileSync(join(REPO, 'lint-baseline.json'), 'utf8'));
   const keys = Object.keys(baseline);
@@ -354,7 +437,7 @@ test('the real lint-baseline.json is sorted, has no hard rule and names only exi
   const stale = [];
   for (const key of keys) {
     const [file, rule] = key.split('\t');
-    assert.match(rule, /^(oxlint|directive|depcruise)\/[\w/-]+$/, `key without a tool and rule: ${key}`);
+    assert.match(rule, /^(oxlint|directive|depcruise|knip)\/[\w/-]+$/, `key without a tool and rule: ${key}`);
     assert.ok(Number.isInteger(baseline[key]) && baseline[key] > 0, `count invalid: ${key}`);
     assert.ok(!HARD_RULES.some((h) => rule.endsWith(`/${h}`)), `hard rule in the baseline: ${key}`);
     assert.ok(!file.includes('/vendor/') && !file.startsWith('test/fixtures/lint/'), `excluded file in the baseline: ${file}`);
