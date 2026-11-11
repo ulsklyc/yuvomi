@@ -225,3 +225,28 @@ jobs:
 
       - name: Type check against the baseline
         run: npm run typecheck
+
+  # Lint (phase 1b, section D): oxlint with the rule set in .oxlintrc.json, compared
+  # with lint-baseline.json, which only sinks (scripts/check-lint-baseline.ts). Hard
+  # rules (innerHTML/outerHTML writes, async or await in a db.transaction() body)
+  # have no baseline at all. Own job, parallel to the tests; one Node version is
+  # enough, the rules read source text, not the runtime.
+  lint:
+    name: Lint (Node.js 24.x)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24.x
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint against the baseline
+        run: npm run lint
