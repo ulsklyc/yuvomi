@@ -207,6 +207,67 @@ test('deleting a non-default calendar reassigns events to the default calendar',
   assert.equal((await call('GET', `/${event.id}`)).body.data.local_calendar_id, defaultCalendar.id);
 });
 
+test('deleting a non-default calendar with an explicit target moves events there (#2570)', async () => {
+  const temp = await createCalendar('Temporary', '#8844AA');
+  const target = await createCalendar('Target', '#114477');
+  const event = await createEvent('Move me on purpose', temp.id);
+  const del = await call('DELETE', `/calendars/${temp.id}`, { body: { mode: 'move', target_calendar_id: target.id } });
+  assert.equal(del.status, 204);
+
+  const row = db.prepare('SELECT local_calendar_id FROM calendar_events WHERE id = ?').get(event.id);
+  assert.equal(row.local_calendar_id, target.id);
+  assert.equal(resolveLocalCalendarId(db, event.id), target.id);
+});
+
+test('deleting a non-default calendar refuses a target the same as the calendar itself (#2570)', async () => {
+  const temp = await createCalendar('Self target', '#8844AA');
+  const del = await call('DELETE', `/calendars/${temp.id}`, { body: { mode: 'move', target_calendar_id: temp.id } });
+  assert.equal(del.status, 400);
+  assert.equal(del.body.reason, 'calendar_move_target_same');
+  assert.ok(await call('GET', '/calendars').then((r) => r.body.data.some((c) => c.id === temp.id)), 'calendar is not deleted');
+});
+
+test('deleting a non-default calendar refuses a target that does not exist (#2570)', async () => {
+  const temp = await createCalendar('Bad target', '#8844AA');
+  const del = await call('DELETE', `/calendars/${temp.id}`, { body: { mode: 'move', target_calendar_id: 999999 } });
+  assert.equal(del.status, 400);
+  assert.equal(del.body.reason, 'calendar_selected_calendar_not_found');
+});
+
+test('deleting a non-default calendar with mode "delete" removes its events, their reminders, and itself (#2570)', async () => {
+  const temp = await createCalendar('To be emptied', '#8844AA');
+  const kept = await createCalendar('Untouched', '#223344');
+  const doomed = await createEvent('Goes away', temp.id);
+  const spared = await createEvent('Stays put', kept.id);
+  db.prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('event', ?, '2035-05-01T08:00:00Z', 1)
+  `).run(doomed.id);
+
+  const del = await call('DELETE', `/calendars/${temp.id}`, { body: { mode: 'delete' } });
+  assert.equal(del.status, 204);
+
+  assert.equal(db.prepare('SELECT id FROM calendar_events WHERE id = ?').get(doomed.id), undefined, 'event is gone');
+  assert.equal(
+    db.prepare("SELECT id FROM reminders WHERE entity_type = 'event' AND entity_id = ?").get(doomed.id),
+    undefined,
+    'its reminder is gone too',
+  );
+  assert.ok(db.prepare('SELECT id FROM calendar_events WHERE id = ?').get(spared.id), 'event in another calendar is untouched');
+  assert.equal(
+    (await call('GET', '/calendars')).body.data.some((c) => c.id === temp.id),
+    false,
+    'the emptied calendar itself is gone',
+  );
+});
+
+test('deleting an empty calendar with mode "delete" just removes the calendar (#2570)', async () => {
+  const empty = await createCalendar('Nothing in here', '#8844AA');
+  const del = await call('DELETE', `/calendars/${empty.id}`, { body: { mode: 'delete' } });
+  assert.equal(del.status, 204);
+  assert.equal((await call('GET', '/calendars')).body.data.some((c) => c.id === empty.id), false);
+});
+
 const MEMBER = { id: Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('member','Member','x','member')").run().lastInsertRowid), role: 'member' };
 
 test('member write access manages calendars; feeds and linked deletion require admin', async () => {
