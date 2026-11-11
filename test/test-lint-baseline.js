@@ -32,6 +32,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync,
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tempDir } from './tmp-dir.js';
+import { pushSenders } from '../scripts/generate-oxlint-overrides.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(REPO, 'scripts', 'check-lint-baseline.ts');
@@ -499,8 +500,41 @@ async function exemptPaths(/** @type {string} */ ruleName) {
   assert.ok(rule, `no rule ${ruleName}`);
   return [rule.from.pathNot].flat().map((/** @type {string} */ p) => new RegExp(p));
 }
-// The four push senders, as the lint exception lists them (push.js itself apart).
-const PUSH_SENDERS = ['server/services/notifications.js', 'server/services/medication-scheduler.js', 'server/routes/tasks.js', 'server/routes/push.js'];
+// The push senders as push-service-importers names them (push.js itself apart). The
+// generator reads the same list, so a new sender is named once, in .dependency-cruiser.mjs.
+const PUSH_SENDERS = await pushSenders(REPO);
+const GENERATOR = join(REPO, 'scripts', 'generate-oxlint-overrides.mjs');
+
+test('the push senders are read from push-service-importers', () => {
+  assert.deepEqual([...PUSH_SENDERS].sort(), [
+    'server/routes/push.js', 'server/routes/tasks.js',
+    'server/services/medication-scheduler.js', 'server/services/notifications.js',
+  ]);
+});
+
+test('the overrides in .oxlintrc.json are what the generator writes', () => {
+  const r = spawnSync(process.execPath, [GENERATOR, '--check'], { cwd: REPO, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  // Counter-check on a copy: a sender named in .dependency-cruiser.mjs but missing from
+  // the lint exceptions is out of date, and a run of the generator brings it in.
+  const dir = tempDir('yuvomi-oxlint-overrides-');
+  try {
+    const depcruise = readFileSync(DEPCRUISE_CONFIG, 'utf8');
+    const named = "'^server/routes/push\\\\.[jt]s$',";
+    assert.ok(depcruise.includes(named), 'push.js is not named in push-service-importers as expected');
+    writeFileSync(join(dir, '.dependency-cruiser.mjs'), depcruise.replace(named, () => `${named} '^server/services/sixth\\\\.[jt]s$',`));
+    copyFileSync(join(REPO, '.oxlintrc.json'), join(dir, '.oxlintrc.json'));
+    const stale = spawnSync(process.execPath, [GENERATOR, '--check', '--root', dir], { encoding: 'utf8' });
+    assert.equal(stale.status, 1, 'a new push sender must make the overrides stale');
+    const write = spawnSync(process.execPath, [GENERATOR, '--root', dir], { encoding: 'utf8' });
+    assert.equal(write.status, 0, write.stderr);
+    const regenerated = JSON.parse(readFileSync(join(dir, '.oxlintrc.json'), 'utf8'));
+    const senders = regenerated.overrides.find((/** @type {Override} */ o) => o.files.includes('server/routes/push.js'));
+    assert.ok(senders.files.includes('server/services/sixth.js'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('the lint exceptions name exactly the senders the import rules let through', async () => {
   const pushOverride = CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes('server/routes/push.js'));
