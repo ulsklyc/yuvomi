@@ -7,13 +7,15 @@
  *          number of spelling blocks, fate); this script carries what can be measured
  *          (who reads what, how many blocks a suite has).
  * Run: node scripts/test-inventory.mjs [--root <dir>] [--json | --missing | --phases |
- *      --target <file> | --update]
+ *      --target <file> | --trace <file> | --update]
  *   (no flag)        summary: suites, narrow and wide unit, blocks, state of the
  *                    inventory; exit 1 with what is wrong, as the guard reports it
  *   --json           the measurement per suite as JSON
  *   --missing        the lines a suite without an entry has to add
  *   --phases         spelling blocks and suites per phase that removes them
  *   --target <file>  inventory entries that read this file (or a directory above it)
+ *   --trace <file>   compares the inventory with what the suites read at run time
+ *                    (scripts/trace-test-reads.mjs wrote the file); exit 1 on a gap
  *   --update         lowers the ceiling to the current sums and drops the lines of
  *                    suites that are gone or read nothing any more; it never raises
  *                    a value
@@ -32,8 +34,10 @@
  * LIMITS. This is a lexer with constant folding, not a parser. It resolves `const`
  * initialisers, loop and callback variables, parameters of named functions and helpers
  * imported from test/. It does not follow object properties, destructured constants,
- * re-exports or paths built at run time from data. What it cannot resolve shows up in
- * the wide unit, which is why that unit is guarded as well.
+ * re-exports or paths built at run time from data (a walk over the routers, an import
+ * graph). What it cannot resolve shows up in the wide unit, which is why that unit is
+ * guarded as well; what a walk reads at run time shows `--trace`, and those targets
+ * are entered by hand.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -597,8 +601,20 @@ function importsOf(code, pieces) {
       .map(([a, b]) => /** @type {[string, string]} */ ([a, b ?? a]));
     list.push({ from: spec.v, names });
   }
+  // `const { eachRule, globalHiddenRule: hidden } = await import('./css-rules.js')`
+  for (const m of code.matchAll(/(?<![\w$.])(?:const|let|var)\s*(\{[^}]*\})\s*=\s*(?:await\s+)?import\s*\(\s*(['"])/g)) {
+    const spec = pieces.find((p) => p.s === m.index + m[0].length);
+    if (!spec) continue;
+    const names = String(m[1]).slice(1, -1).split(',').map((n) => n.trim()).filter(Boolean)
+      .map((n) => /** @type {[string, string]} */ (n.split(/\s*:\s*/).map((x) => x.trim())))
+      .map(([a, b]) => /** @type {[string, string]} */ ([a, b ?? a]));
+    list.push({ from: spec.v, names });
+  }
   return list;
 }
+
+/** @param {string} specifier a helper is `./name.js`, however a suite spells the way to it */
+const helperKey = (specifier) => specifier.replace(/^\.\.\/test\//, './');
 
 /** @param {string} code @param {{ s: number, e: number, v: string }[]} pieces positions of import specifiers */
 function importSpecifiers(code, pieces) {
@@ -621,7 +637,7 @@ export function analyzeSuite(src, { root, helpers = new Map() }) {
   /** @type {Map<string, Fn>} */
   const imported = new Map();
   for (const imp of importsOf(file.code, [...file.specifiers])) {
-    const helper = helpers.get(imp.from);
+    const helper = helpers.get(helperKey(imp.from));
     if (!helper) continue;
     for (const [name, local] of imp.names) {
       const fn = helper.exports.get(name);
@@ -631,7 +647,12 @@ export function analyzeSuite(src, { root, helpers = new Map() }) {
   const terminal = reads(file, imported);
   // A helper that reads while it loads reads for everyone who imports it.
   for (const spec of file.specifiers) {
-    for (const items of helpers.get(spec.v)?.onImport ?? []) terminal.push({ at: spec.s, items });
+    const helper = helpers.get(helperKey(spec.v));
+    if (!helper) continue;
+    for (const items of helper.onImport) terminal.push({ at: spec.s, items });
+    // `(await import('./css-rules.js')).globalHiddenRule()`: a call on the import itself.
+    const member = /^.\s*\)\s*\)\s*\.\s*([A-Za-z_$][\w$]*)\s*\(/.exec(file.code.slice(spec.e, spec.e + 120));
+    for (const items of helper.exports.get(String(member?.[1]))?.fixed ?? []) terminal.push({ at: spec.s, items });
   }
   /** @type {Set<string>} */
   const targets = new Set();
@@ -744,7 +765,9 @@ export function scan(root) {
 /* ---------- inventory ---------- */
 
 /**
- * @typedef {{ class: 'V' | 'S' | 'M', sBlocks: number, targets: string[], fate: string }} Entry
+ * @typedef {{ class: 'V' | 'S' | 'M', sBlocks: number, targets: string[], fate: string, seenBy?: 'trace' }} Entry
+ *   `seenBy: 'trace'` marks a suite the detector cannot see reading (a walk at run time);
+ *   the run-time trace found it, and the entry is kept by hand.
  * @typedef {{ title: string, lines: [number, number], blocks: number, sBlocks: number, fate: string }} Section
  * @typedef {{ ceiling: { sBlocks: number, suites: number }, sections: Record<string, Section[]>, suites: Record<string, Entry>, wideOnly: Record<string, string> }} Inventory
  * @typedef {ReturnType<typeof scan>} Measured
@@ -827,6 +850,37 @@ export function readersOf(inv, file) {
 }
 
 /**
+ * What test code read while the chain ran (scripts/trace-test-reads.mjs), against the
+ * inventory: suites that read source text and have no entry, and entries whose targets
+ * do not cover a read. Locale JSON is no source text here either.
+ * @param {Inventory} inv
+ * @param {string} trace lines `<suite>\t<path>`
+ */
+export function traceGaps(inv, trace) {
+  /** @type {Map<string, Set<string>>} */
+  const read = new Map();
+  for (const line of trace.split('\n')) {
+    const [suite, path] = line.split('\t');
+    if (!suite || !path || path.startsWith('public/locales/')) continue;
+    read.set(suite, (read.get(suite) ?? new Set()).add(path));
+  }
+  /** @type {{ suite: string, paths: string[] }[]} */
+  const unlisted = [];
+  /** @type {{ suite: string, paths: string[] }[]} */
+  const uncovered = [];
+  for (const [suite, paths] of [...read].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const entry = inv.suites[suite];
+    if (!entry) {
+      unlisted.push({ suite, paths: [...paths].sort() });
+      continue;
+    }
+    const missing = [...paths].filter((p) => !entry.targets.some((t) => t === p || (t.endsWith('/') && p.startsWith(t)))).sort();
+    if (missing.length > 0) uncovered.push({ suite, paths: missing });
+  }
+  return { traced: read.size, unlisted, uncovered, silent: Object.keys(inv.suites).filter((f) => !read.has(f)).sort() };
+}
+
+/**
  * What the inventory lacks or carries too much, compared with the tree.
  * @param {Inventory} inv
  * @param {Measured} measured
@@ -842,7 +896,7 @@ export function compare(inv, measured) {
     gone: [...Object.keys(inv.suites), ...Object.keys(inv.wideOnly)].filter((f) => !measured[f]),
     both: Object.keys(inv.wideOnly).filter((f) => measured[f]?.narrow || inv.suites[f]),
     idle: [
-      ...Object.keys(inv.suites).filter((f) => measured[f] && !measured[f].wide),
+      ...Object.keys(inv.suites).filter((f) => measured[f] && !measured[f].wide && inv.suites[f]?.seenBy !== 'trace'),
       ...Object.keys(inv.wideOnly).filter((f) => measured[f] && !measured[f].wide),
     ],
   };
@@ -878,6 +932,8 @@ export function verify(inv, measured, root) {
   for (const [name, e] of Object.entries(inv.suites)) {
     const where = `${name}:`;
     if (!['V', 'S', 'M'].includes(e.class)) problems.push(`${where} class is "${e.class}", expected V, S or M.`);
+    if (e.seenBy !== undefined && e.seenBy !== 'trace') problems.push(`${where} seenBy is "${e.seenBy}", the only value is "trace".`);
+    if (e.seenBy === 'trace' && measured[name]?.narrow) hints.push(`${name}: the detector sees its reads now, "seenBy" can go.`);
     if (!Number.isInteger(e.sBlocks) || e.sBlocks < 0) problems.push(`${where} sBlocks is not a count.`);
     if ((e.class === 'V') !== (e.sBlocks === 0)) problems.push(`${where} class ${e.class} with ${e.sBlocks} spelling blocks. V means none, S and M mean at least one.`);
     const blocks = measured[name]?.blocks;
@@ -936,6 +992,16 @@ function main() {
     process.exit(2);
   }
   const inv = readInventory(root);
+  if (args.includes('--trace')) {
+    const gaps = traceGaps(inv, readFileSync(String(value('--trace')), 'utf8'));
+    const folders = (/** @type {string[]} */ paths) => [...new Set(paths.map((p) => p.replace(/[^/]*$/, '')))].join(' ');
+    for (const g of gaps.unlisted) console.log(`no entry      ${g.suite}: ${g.paths.length} paths in ${folders(g.paths)}`);
+    for (const g of gaps.uncovered) console.log(`not covered   ${g.suite}: ${g.paths.length <= 3 ? g.paths.join(' ') : `${g.paths.length} paths in ${folders(g.paths)}`}`);
+    console.log(`${gaps.traced} suites read source text in the trace: ${gaps.unlisted.length} without an entry, ${gaps.uncovered.length} with reads their targets do not cover; `
+      + `${gaps.silent.length} entries without a traced read (suites outside the chain).`);
+    if (gaps.unlisted.length + gaps.uncovered.length > 0) process.exitCode = 1;
+    return;
+  }
   if (args.includes('--target')) {
     const file = String(value('--target')).replace(/^\.\//, '');
     const found = readersOf(inv, file);
