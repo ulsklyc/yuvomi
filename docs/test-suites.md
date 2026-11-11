@@ -906,7 +906,7 @@ npm run test:text-reader-inventory  # Das Inventar `test/text-reader-inventory.j
 node scripts/test-inventory.mjs --target public/pages/tasks.js   # wer liest sie, mit wie vielen S-Blöcken, mit welchem Schicksal
 ```
 
-Je Eintrag entscheidet `fate`: `falls-with:` auf diese Datei heißt, die S-Blöcke werden im Umbau-PR gelöscht (Begründung im PR-Text: welches Verhalten sie meinten und welcher Test es jetzt hält) oder durch einen Verhaltenstest ersetzt; `lint:` heißt, die Regel hält es bereits, die Blöcke gehen; `stays:` heißt, der Block bleibt und liest nach dem Umbau die neue Datei, `dist/` oder das DOM. Der PR senkt `sBlocks` der Einträge und die Obergrenze im selben Zug (`--update`) und zeigt `targets` auf die neuen Dateien. Ein Umbau, der S-Blöcke nur auf den neuen Pfad umbiegt, hat sie nicht abgearbeitet.
+Je Eintrag entscheidet `fate`: `falls-with:` auf diese Datei heißt, die S-Blöcke werden im Umbau-PR gelöscht (Begründung im PR-Text: welches Verhalten sie meinten und welcher Test es jetzt hält) oder durch einen Verhaltenstest ersetzt; `lint:` heißt, die Regel hält es bereits, die Blöcke gehen; `stays:` heißt, der Block bleibt und liest nach dem Umbau die neue Datei, `dist/` oder das DOM. Der PR senkt `sBlocks` der Einträge und die Obergrenze im selben Zug (`--update`) und zeigt `targets` auf die neuen Dateien. Dabei liest er Klasse und `sBlocks` der Einträge, die er anfasst, am Quelltext nach: die Erstklassifikation ist ein Urteil aus dem November 2026, und der Guard hält nur die Mechanik. Ein Umbau, der S-Blöcke nur auf den neuen Pfad umbiegt, hat sie nicht abgearbeitet.
 
 **Abbau je Phase.** Aus `fate` und `targets`, gemessen mit `node scripts/test-inventory.mjs --phases`: ein S-Block fällt spätestens in der Phase, die seine Zieldatei umbaut (Phase 2: `server/`, Phase 4: `public/`). Ende Phase 5 steht S auf 0 oder auf `stays:` mit Grund.
 
@@ -925,9 +925,11 @@ Stand der Messung: 11.11.2026 auf `cc119e33b`. 682 Suiten mit 16.972 Blöcken; T
 **Nachmessung zur Laufzeit.** `scripts/trace-test-reads.mjs` ist ein Preload, der während eines Laufs der Kette aufzeichnet, was Testcode unter `public/` und `server/` wirklich liest (`readFileSync`, `readFile`, `readdirSync` und ihre Verwandten, aufgerufen aus einer Datei unter `test/`; was die App beim Testen selbst liest, zählt nicht, ebenso wenig der Browser-Loader):
 
 ```bash
-rm -f /tmp/reads.tsv   # der Mitschnitt hängt nur an: ohne das bleiben die Zugriffe eines früheren Laufs stehen
-TEXT_READER_TRACE=/tmp/reads.tsv NODE_OPTIONS="--import file://$PWD/scripts/trace-test-reads.mjs" npm run test-parallel
-node scripts/test-inventory.mjs --trace /tmp/reads.tsv   # Exit 1 bei einer Lücke
+rm -rf /tmp/reads   # ein Lauf legt nur Dateien dazu: ohne das bleiben die Zugriffe eines früheren Laufs stehen
+TEXT_READER_TRACE=/tmp/reads NODE_OPTIONS="--import file://$PWD/scripts/trace-test-reads.mjs" npm run test-parallel
+node scripts/test-inventory.mjs --trace /tmp/reads   # Exit 1 bei einer Lücke
 ```
+
+Jeder Prozess schreibt seine eigene Datei in das Verzeichnis (`<suite>.<pid>.tsv`), kein Prozess teilt eine Datei mit einem anderen. Wer gerufen hat, liest das Preload aus den Call-Sites von V8, nicht aus dem Text eines Stack-Trace; liefert ein Node keine Call-Sites, bricht es beim Laden ab, statt still nichts aufzuzeichnen.
 
 Der Vergleich nennt Suiten, die Quelltext lesen und keinen Eintrag haben, und Einträge, deren `targets` einen Lesezugriff nicht decken. Solche Ziele werden von Hand nachgetragen (ein Verzeichnis genügt); der Guard verlangt nur, dass `targets` mindestens nennt, was der Detektor sieht. Eine Suite, die nur der Mitschnitt findet, trägt `"seenBy":"trace"`, damit `--update` ihre Zeile nicht für verwaist hält. Die Nachmessung gehört vor den Beginn von Phase 2 und Phase 4 und nach jedem neuen Baumläufer in einer Suite; sie läuft nicht in der Kette, weil sie die Kette selbst fährt. Die Browser-Suiten außerhalb der Kette sieht sie nicht. Erster Lauf am 11.11.2026: 255 Suiten mit Lesezugriffen, 1 ohne Eintrag (`test-installer-prereq.js`), 15 Einträge mit ungedeckten Zugriffen (Baumläufer in `test-db-isolation.js`, `test-node-runtime.js`, `test-unknown-route.js`, den beiden OpenAPI-Suiten und anderen), danach 0 und 0.

@@ -7,15 +7,15 @@
  *          number of spelling blocks, fate); this script carries what can be measured
  *          (who reads what, how many blocks a suite has).
  * Run: node scripts/test-inventory.mjs [--root <dir>] [--json | --missing | --phases |
- *      --target <file> | --trace <file> | --update]
+ *      --target <file> | --trace <dir> | --update]
  *   (no flag)        summary: suites, narrow and wide unit, blocks, state of the
  *                    inventory; exit 1 with what is wrong, as the guard reports it
  *   --json           the measurement per suite as JSON
  *   --missing        the lines a suite without an entry has to add
  *   --phases         spelling blocks and suites per phase that removes them
  *   --target <file>  inventory entries that read this file (or a directory above it)
- *   --trace <file>   compares the inventory with what the suites read at run time
- *                    (scripts/trace-test-reads.mjs wrote the file); exit 1 on a gap
+ *   --trace <dir>    compares the inventory with what the suites read at run time
+ *                    (scripts/trace-test-reads.mjs wrote the directory); exit 1 on a gap
  *   --update         lowers the ceiling to the current sums and drops the lines of
  *                    suites that are gone or read nothing any more; it never raises
  *                    a value
@@ -87,6 +87,12 @@ export function lex(src) {
   };
   if (i > 0) blank(0, i);
   // Reads template text from `from` up to the closing backtick or the next `${`.
+  // TEMPLATE NESTING. A template literal is text with code inside `${ }`, and that code
+  // may hold another template. `templates` is a stack with one counter per open `${`: it
+  // counts the braces opened inside that expression, so the `}` that closes the
+  // expression (counter 0) is told apart from the `}` of an object literal within it.
+  // templateText() reads text up to the closing backtick or the next `${`; on `${` it
+  // pushes a counter and hands back to the main loop, which reads code again.
   const templateText = (/** @type {number} */ from) => {
     let j = from;
     while (j < n && src[j] !== '`' && !(src[j] === '$' && src[j + 1] === '{')) j += src[j] === '\\' ? 2 : 1;
@@ -132,6 +138,15 @@ export function lex(src) {
       lastWord = '';
       continue;
     }
+    // REGEX OR DIVISION. Without a parser a `/` is ambiguous. The rule here: it starts a
+    // regex literal where an expression may begin, that is at the start of the file,
+    // after an operator or an opening bracket, or after a keyword such as `return`. After
+    // a name, a number, `)` or `]` it is a division. The one known miss is a regex right
+    // after `)` or `}` (`if (x) /re/.test(y)`), which the tree does not use; a regex taken
+    // for a division is harmless unless it holds a quote, and then the fixture "a regex
+    // with slashes and quotes does not derail the lexer" is the alarm. A regex literal
+    // ends on its line: a `/` with no closing `/` before the line end stays a division.
+    // Inside a character class (`[/]`) a slash does not close it.
     if (c === '/' && (lastSig === '' || '(,=:[!&|?{};+-*%<>~^'.includes(lastSig) || REGEX_AFTER_WORD.has(lastWord))) {
       let j = i + 1;
       let inClass = false;
@@ -188,7 +203,9 @@ export function lex(src) {
 function brackets(code) {
   /** @type {Map<number, number>} */
   const match = new Map();
-  // The opening brace of the innermost block around each position, -1 at top level.
+  // The opening brace of the innermost block around each position, -1 at top level. One
+  // pass with a stack; resolveDecl() reads a declaration's scope from this table instead
+  // of searching the blocks (the largest suite has 24,000 lines).
   const inner = new Int32Array(code.length).fill(-1);
   /** @type {number[]} */
   const stack = [];
@@ -397,6 +414,16 @@ function index(src) {
 }
 
 /**
+ * SCOPE RESOLUTION. There is no symbol table, only ranges: every `const`, loop variable
+ * and callback parameter carries the range it is visible in (the innermost `{ }` block
+ * around a `const`, the loop body, the callback), and a name at a position resolves to
+ * the declaration with the smallest range that contains the position. That is enough to
+ * keep a `css` read in one test apart from a `css` string in the next. It is not
+ * JavaScript scoping: hoisting, `var`, shadowing by a destructured name and names that
+ * come from an import are not modelled; such a name resolves to nothing and adds no
+ * evidence, which errs towards "not a text reader" and is caught by the wide unit or
+ * the run-time trace.
+ *
  * The declaration a name refers to at a position: the innermost scope wins, and a name
  * inside its own initialiser is not that declaration.
  * @param {{ decls: Map<string, Decl[]> }} file
@@ -850,6 +877,17 @@ export function readersOf(inv, file) {
 }
 
 /**
+ * The lines of a run-time trace: scripts/trace-test-reads.mjs writes one file per
+ * process into a directory; a single file is read as it is.
+ * @param {string} path
+ */
+export function readTrace(path) {
+  if (!statSync(path).isDirectory()) return readFileSync(path, 'utf8');
+  return readdirSync(path).filter((name) => name.endsWith('.tsv')).sort()
+    .map((name) => readFileSync(join(path, name), 'utf8')).join('\n');
+}
+
+/**
  * What test code read while the chain ran (scripts/trace-test-reads.mjs), against the
  * inventory: suites that read source text and have no entry, and entries whose targets
  * do not cover a read. Locale JSON is no source text here either.
@@ -993,7 +1031,7 @@ function main() {
   }
   const inv = readInventory(root);
   if (args.includes('--trace')) {
-    const gaps = traceGaps(inv, readFileSync(String(value('--trace')), 'utf8'));
+    const gaps = traceGaps(inv, readTrace(String(value('--trace'))));
     const folders = (/** @type {string[]} */ paths) => [...new Set(paths.map((p) => p.replace(/[^/]*$/, '')))].join(' ');
     for (const g of gaps.unlisted) console.log(`no entry      ${g.suite}: ${g.paths.length} paths in ${folders(g.paths)}`);
     for (const g of gaps.uncovered) console.log(`not covered   ${g.suite}: ${g.paths.length <= 3 ? g.paths.join(' ') : `${g.paths.length} paths in ${folders(g.paths)}`}`);
