@@ -58,12 +58,21 @@ const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.
 // Rules with no debt: they stand at zero, and no baseline may ever carry them.
 // The transaction rules guard a driver behaviour (better-sqlite3 throws on a returned
 // promise and rolls back; code after the first await runs outside any transaction);
-// the HTML rule is hard constraint 1. A blanket or no-restricted-syntax suppression
-// would switch them off, so it is hard as well.
+// the HTML rule is hard constraint 1. The sender rules keep household data from
+// reaching a device or an outside service past a recipient check (#2602, #2598): who
+// sends is named in .dependency-cruiser.mjs, the calls are held by CHANNEL-SEND and
+// PUSH-SEND. A blanket or no-restricted-syntax suppression would switch them off, so
+// it is hard as well.
 const HARD = new Set([
   'oxlint/no-restricted-syntax/HTML-STRING-WRITE',
   'oxlint/no-restricted-syntax/TX-ASYNC-FN',
   'oxlint/no-restricted-syntax/TX-AWAIT-INSIDE',
+  'oxlint/no-restricted-syntax/CHANNEL-SEND',
+  'oxlint/no-restricted-syntax/PUSH-SEND',
+  'depcruise/push-service-importers',
+  'depcruise/web-push-only-in-push-service',
+  'depcruise/channel-delivery-importers',
+  'depcruise/providers-only-in-channel-delivery',
   'directive/blanket-disable',
   'directive/disable-no-restricted-syntax',
 ]);
