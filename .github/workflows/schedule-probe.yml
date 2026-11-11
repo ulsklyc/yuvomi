@@ -1,0 +1,22 @@
+name: Schedule Probe
+
+# TEMPORARY (2026-11-11). restore-drill.yml never started on its schedule
+# (03:23 and 09:13 UTC on 2026-11-11, no run by 15:30), although it is active
+# and dispatches pass. This file carries nothing but a cron: if it starts
+# within the hour, the schedule of restore-drill.yml is the problem (its `on:`
+# also holds workflow_call); if not, scheduled runs do not reach this repository.
+# Removed again once that is answered.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions: {}
+
+jobs:
+  probe:
+    name: Schedule probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "schedule fired at $(date -u +%H:%M:%S) UTC"
