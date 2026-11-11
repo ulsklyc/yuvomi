@@ -20,15 +20,26 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
+import { register } from 'node:module';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
 import express from 'express';
+
+register('./test-browser-loader.mjs', import.meta.url);
+globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
+globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
+globalThis.localStorage = globalThis.localStorage ?? {
+  getItem() { return null; }, setItem() {}, removeItem() {}, clear() {},
+};
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'tasks-creator-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { __test: tasksPage } = await import('../public/pages/tasks.js');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
@@ -74,9 +85,11 @@ app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
+  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, { id: actor.id, role: actor.role }));
   next();
 });
 app.use('/api/v1/tasks', tasksRouter);
+app.use('/api/v1/dashboard', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}/api/v1`;
@@ -195,16 +208,22 @@ test('der Ersteller einer gelisteten Aufgabe kann nie fehlen: created_by ist NOT
 
 test('das Dashboard traegt die Ersteller-Felder an den dringenden Aufgaben', async () => {
   // Die Dashboard-Karte ist dieselbe wie in der Liste; der JOIN fehlte dort
-  // zuerst, und die Karte blieb genau auf dem Dashboard namenlos.
-  const source = await import('node:fs').then((fs) => fs.readFileSync('server/routes/dashboard.js', 'utf8'));
-  const urgent = source.match(/result\.urgentTasks = d\.prepare\(`([\s\S]*?)`\)/)?.[1];
-  assert.ok(urgent, 'die urgentTasks-Abfrage wurde nicht gefunden - Muster veraltet?');
+  // zuerst, und die Karte blieb genau auf dem Dashboard namenlos. Gegen den
+  // echten Endpunkt statt gegen den Quelltext: ein LEFT JOIN, der fehlt,
+  // liesse das Feld fehlen oder NULL bleiben, nicht nur anders geschrieben
+  // sein.
+  const created = await createTask('dringend fuer das Dashboard', { as: asAdmin });
+
+  const dashboard = await call('GET', '/dashboard', { as: asAdmin });
+  assert.equal(dashboard.status, 200);
+  const row = dashboard.body.urgentTasks.find((t) => t.id === created.id);
+  assert.ok(row, 'die angelegte Aufgabe steht unter den dringenden - die Dashboard-Karte bliebe sonst leer');
+
   for (const field of CREATOR_FIELDS) {
-    assert.match(urgent, new RegExp(`AS ${field}`),
-      `${field} fehlt in der urgentTasks-Abfrage - die Dashboard-Karte bliebe namenlos`);
+    assert.ok(field in row, `${field} fehlt am Dashboard - ohne den JOIN bliebe die Karte namenlos`);
   }
-  assert.match(urgent, /LEFT JOIN users cu ON t\.created_by = cu\.id/,
-    'der Ersteller-JOIN ist ein LEFT JOIN: eine Aufgabe ohne Ersteller faellt sonst vom Dashboard');
+  assert.equal(row.created_by_name, 'admin',
+    'der Ersteller-JOIN ist ein LEFT JOIN auf t.created_by = cu.id: der Name muss am Dashboard stehen');
 });
 
 test('der Ersteller-Filter engt die Liste auf eine Person ein', async () => {
@@ -229,9 +248,20 @@ test('der Client-Filter vergleicht created_by, nicht den Namen', async () => {
   // Der Filterwert ist eine id (`state.filters.creator`), und der Vergleich
   // muss auf `created_by` gehen: auf den Namen verglichen trennten zwei
   // Mitglieder gleichen Namens nicht, und ein umbenanntes Mitglied verlor
-  // seine Aufgaben aus dem Filter.
-  const { readFileSync } = await import('node:fs');
-  const source = readFileSync('public/pages/tasks.js', 'utf8');
-  assert.match(source, /base\s*=\s*base\.filter\(\(task\) => task\.created_by === state\.filters\.creator\)/,
-    'der Ersteller-Filter vergleicht task.created_by mit state.filters.creator');
+  // seine Aufgaben aus dem Filter. Gegen die echte Funktion statt gegen den
+  // Quelltext: zwei Mitglieder namens "Sam", nur eines gefiltert.
+  const samOne = { id: 901, created_by: 901, title: 'Sam A' };
+  const samTwo = { id: 902, created_by: 902, title: 'Sam B' };
+  tasksPage.state.tasks = [samOne, samTwo];
+  tasksPage.state.dueToday = false;
+  tasksPage.state.searchQuery = '';
+  tasksPage.state.filters = { ...tasksPage.state.filters, creator: 901 };
+  try {
+    const result = tasksPage.filteredTasks();
+    assert.deepEqual(result.map((t) => t.id), [901],
+      'der Ersteller-Filter muss nach created_by trennen, nicht nach Namen - beide heissen Sam');
+  } finally {
+    tasksPage.state.filters = { ...tasksPage.state.filters, creator: null };
+    tasksPage.state.tasks = [];
+  }
 });
