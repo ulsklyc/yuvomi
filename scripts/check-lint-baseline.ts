@@ -18,8 +18,13 @@
  *          in a linted file is counted as `directive/disable` under the same ratchet; one without
  *          a rule list or one naming `no-restricted-syntax` is a hard key. knip skips an export
  *          whose JSDoc tags it public, beta or alias; each such tag is `directive/knip-tag`.
+ * Reasons: a baseline key of a rule in REASONED may stand only with a reason of at least twenty
+ *          characters in lint-baseline-reasons.json (same key -> why the finding is no debt to
+ *          pay off, e.g. the text is our own behind an instanceof gate). A missing or short
+ *          reason is exit 1, and so is a reason whose key is not in the baseline.
  * Run:     node scripts/check-lint-baseline.ts [--update | --init] [--root <dir>]
- *   --update  writes back ONLY lower or vanished counts, never higher ones.
+ *   --update  writes back ONLY lower or vanished counts, never higher ones; the reason of a
+ *             key it removes goes with it.
  *   --init    fills a missing or empty baseline completely (one-time start).
  * Erasable TS syntax only (runs through type stripping on Node 24.12+ and 26, no build).
  */
@@ -37,6 +42,7 @@ const args = process.argv.slice(2);
 const rootIdx = args.indexOf('--root');
 const root = rootIdx >= 0 ? resolve(String(args[rootIdx + 1])) : repo;
 const baselinePath = resolve(root, 'lint-baseline.json');
+const reasonsPath = resolve(root, 'lint-baseline-reasons.json');
 const oxlintBin = resolve(repo, 'node_modules', 'oxlint', 'bin', 'oxlint');
 const depcruiseBin = resolve(repo, 'node_modules', 'dependency-cruiser', 'bin', 'dependency-cruiser.mjs');
 const DEPCRUISE_CONFIG = '.dependency-cruiser.mjs';
@@ -58,6 +64,14 @@ const HARD = new Set([
   'directive/blanket-disable',
   'directive/disable-no-restricted-syntax',
 ]);
+
+// Rules whose baseline is not a debt list but a list of exceptions: every key says in
+// lint-baseline-reasons.json why it may stand. ERROR-TEXT took over the allow-list of
+// test-client-error-text-guard.js (phase 1b, section E): the text in the response is our own.
+const REASONED = new Set([
+  'oxlint/no-restricted-syntax/ERROR-TEXT',
+]);
+const MIN_REASON = 20;
 
 // Line and block comments with eslint-disable, -line or -next-line (or oxlint-...); the rule list is
 // what follows the directive up to `--` and the end of the comment: the end of the line for `//`,
@@ -250,6 +264,35 @@ function write(counts: Counts) {
 const ruleOf = (key: string) => key.slice(key.indexOf('\t') + 1);
 const total = (counts: Counts) => Object.values(counts).reduce((a, b) => a + b, 0);
 
+type Reasons = Record<string, unknown>;
+
+function readReasons(): Reasons {
+  if (!existsSync(reasonsPath)) return {};
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(reasonsPath, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Reasons;
+  } catch { /* reported below */ }
+  return fail('lint-baseline-reasons.json is not a JSON object.');
+}
+
+/** Exit 1 when a key of a reasoned rule has no reason, or a reason has no key. */
+function checkReasons(counts: Counts, reasons: Reasons) {
+  const problems: string[] = [];
+  for (const key of Object.keys(counts)) {
+    if (!REASONED.has(ruleOf(key))) continue;
+    const reason = reasons[key];
+    if (typeof reason !== 'string' || reason.trim().length < MIN_REASON) problems.push(`${key.split('\t').join('  ')}  no reason`);
+  }
+  for (const key of Object.keys(reasons)) {
+    if (!(key in counts)) problems.push(`${key.split('\t').join('  ')}  reason without a baseline key`);
+  }
+  if (problems.length === 0) return;
+  console.error(`lint-baseline-reasons.json does not match the baseline (${problems.length} keys):`);
+  for (const line of problems) console.error(`  ${line}`);
+  console.error(`A key of ${[...REASONED].join(', ')} needs a reason of at least ${MIN_REASON} characters; a reason needs its key (CONTRIBUTING.md, "Linting").`);
+  process.exit(1);
+}
+
 const current = measure();
 const exists = existsSync(baselinePath);
 const baseline: Counts = exists ? JSON.parse(readFileSync(baselinePath, 'utf8')) : {};
@@ -268,9 +311,11 @@ if (args.includes('--init')) {
   if (Object.keys(baseline).length > 0) fail('--init only fills a missing or empty baseline; --update lowers an existing one.');
   write(current);
   console.log(`Baseline created: ${Object.keys(current).length} keys, ${total(current)} findings.`);
+  checkReasons(current, readReasons());
   process.exit(0);
 }
 if (!exists) fail('lint-baseline.json is missing (one-time: --init).');
+const reasons = readReasons();
 
 const worse = Object.entries(current).filter(([key, n]) => n > (baseline[key] ?? 0));
 const better = Object.entries(baseline).filter(([key, n]) => (current[key] ?? 0) < n);
@@ -290,8 +335,13 @@ if (args.includes('--update')) {
   const next: Counts = {};
   for (const key of Object.keys(baseline)) if ((current[key] ?? 0) > 0) next[key] = current[key] as number;
   write(next);
+  // The reason of a key that just sank away goes with it; any other stray reason stays red.
+  const kept = Object.fromEntries(Object.entries(reasons).filter(([key]) => !(key in baseline) || key in next));
+  if (Object.keys(kept).length < Object.keys(reasons).length) writeFileSync(reasonsPath, `${JSON.stringify(kept, null, 1)}\n`);
   console.log(`Baseline lowered: ${better.length} keys changed or removed.`);
-} else if (better.length > 0) {
-  console.log(`Baseline can sink: ${better.length} keys (node scripts/check-lint-baseline.ts --update).`);
+  checkReasons(next, kept);
+} else {
+  if (better.length > 0) console.log(`Baseline can sink: ${better.length} keys (node scripts/check-lint-baseline.ts --update).`);
+  checkReasons(baseline, reasons);
 }
 console.log(`Lint ok: ${Object.keys(current).length} keys, ${total(current)} findings (baseline ${Object.keys(baseline).length} keys, ${total(baseline)}).`);

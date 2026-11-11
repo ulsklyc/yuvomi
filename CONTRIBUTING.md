@@ -205,6 +205,13 @@ so a suppression needs the same review as the finding it hides; one without a ru
 names `no-restricted-syntax` is a hard finding. A file that is renamed or split takes its keys
 along by hand: move them to the new path in `lint-baseline.json` with the same or lower counts.
 
+The `ERROR-TEXT` rule (no text of an exception in a response, see [Backend](#backend)) keeps a list
+of exceptions rather than a debt list: each of its baseline keys needs a reason of at least twenty
+characters under the same key in `lint-baseline-reasons.json` - why the text is our own and behind
+which gate. A reason without a baseline key fails as well, and `--update` drops the reason of a key
+it removes. The spellings the rule sees, and the ones it cannot, are the fixture
+`test/fixtures/lint/error-text/`.
+
 ### Build
 
 `npm run build` runs Vite 8 (Rolldown) over `public/` and writes `dist/`: hashed chunks under
@@ -525,6 +532,7 @@ stops being one.
 - Database migrations: append to the `MIGRATIONS` array in `server/db.js` - **never modify existing entries**
 - New entity tables: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO 8601). Key/value and join tables (`sync_config`, `task_tags`, …) deviate deliberately
 - Any server-side fetch of a URL stored from user/admin input (WebDAV targets, ICS feed URLs, subscription logos, recipe provider `base_url`s, ...) goes through `server/utils/ssrf.js` (`isBlockedAddress`/`createGuardedLookup`), not a bare `fetch()`. This is one classifier so DNS-rebinding and private-network edge cases aren't reimplemented per subsystem; `npm run test:ssrf` pins both the classification logic and which known modules actually call it, and runs as part of `npm test`.
+- Errors: a route does not answer an unexpected error itself - it lets the error reach the central error handler (`server/middleware/error-handler.js`), or throws an `HttpError` (`server/utils/http-error.js`) for a 4xx the client may read. The client only ever gets a sentence of our own, in English, plus `reason`, never the `err.message` of a foreign error; the lint rules `ERROR-TEXT` and `LOG-PLUS-500` hold this.
 
 ### Testing
 

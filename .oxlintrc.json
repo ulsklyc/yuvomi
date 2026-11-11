@@ -66,6 +66,18 @@
       {
         "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
         "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+      },
+      {
+        "selector": "CallExpression:matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression[property.name=/^(message|stack)$/][object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]:not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), CallExpression[callee.name='String'][arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
+        "message": "ERROR-TEXT: the text of an exception goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
+      },
+      {
+        "selector": "CatchClause CallExpression:matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) MemberExpression[property.name=/^(message|stack)$/][object.type='Identifier']:not([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *)",
+        "message": "ERROR-TEXT: inside a catch block the text of a caught value goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
+      },
+      {
+        "selector": ":matches(VariableDeclaration, ExpressionStatement:has(> AssignmentExpression)):has(:matches(MemberExpression[property.name=/^(message|stack)$/][object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]:not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), CallExpression[callee.name='String'][arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])):not(:has(:function)):not(Program > *) ~ * :matches(CallExpression[callee.property.name=/^(json|send|end)$/] > Identifier.arguments, CallExpression[callee.property.name=/^(json|send|end)$/] > ObjectExpression.arguments > Property[key.name=/^(error|message|detail|details|description|text|msg|hint)$/][value.type='Identifier'])",
+        "message": "ERROR-TEXT: a variable goes into a response after the text of an exception was read into a variable in the same block; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
       }
     ]
   },
@@ -104,6 +116,18 @@
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
             "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression[property.name=/^(message|stack)$/][object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]:not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), CallExpression[callee.name='String'][arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
+            "message": "ERROR-TEXT: the text of an exception goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
+          },
+          {
+            "selector": "CatchClause CallExpression:matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) MemberExpression[property.name=/^(message|stack)$/][object.type='Identifier']:not([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *)",
+            "message": "ERROR-TEXT: inside a catch block the text of a caught value goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
+          },
+          {
+            "selector": ":matches(VariableDeclaration, ExpressionStatement:has(> AssignmentExpression)):has(:matches(MemberExpression[property.name=/^(message|stack)$/][object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]:not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), CallExpression[callee.name='String'][arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])):not(:has(:function)):not(Program > *) ~ * :matches(CallExpression[callee.property.name=/^(json|send|end)$/] > Identifier.arguments, CallExpression[callee.property.name=/^(json|send|end)$/] > ObjectExpression.arguments > Property[key.name=/^(error|message|detail|details|description|text|msg|hint)$/][value.type='Identifier'])",
+            "message": "ERROR-TEXT: a variable goes into a response after the text of an exception was read into a variable in the same block; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
           }
         ]
       }
