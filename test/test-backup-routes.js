@@ -474,6 +474,38 @@ test('POST /restore: valides Backup wird wiederhergestellt (Roundtrip)', async (
   assert.doesNotThrow(() => database().prepare('SELECT MAX(version) FROM schema_migrations').get());
 });
 
+// Phase 1b section F (E12): the three status keys in `sync_config` describe the
+// backups of THIS installation. The restored file carries the status of the
+// moment it was written; the restore puts this installation's values back.
+test('POST /restore: the status of the last backup survives the restore, the status inside the file does not', async () => {
+  const stored = () => Object.fromEntries(database()
+    .prepare("SELECT key, value FROM sync_config WHERE key IN ('backup_last_attempt', 'backup_last_success', 'backup_last_reason')")
+    .all().map((/** @type {any} */ row) => [row.key, row.value]));
+
+  // The file to restore is written while the last run counts as failed ...
+  assert.equal((await call('POST', '/trigger', { actor: ADM })).body.data.success, true);
+  database().prepare("INSERT INTO sync_config (key, value) VALUES ('backup_last_reason', 'disk_full')").run();
+  const inFile = stored();
+  assert.equal(inFile.backup_last_reason, 'disk_full', 'precondition: the file carries a failed status');
+  const dl = await call('GET', '/database', { actor: ADM });
+  assert.equal(dl.status, 200);
+
+  // ... and after it this installation runs a backup that succeeds.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal((await call('POST', '/trigger', { actor: ADM })).body.data.success, true);
+  const before = stored();
+  assert.notEqual(before.backup_last_success, inFile.backup_last_success, 'precondition: the installation is ahead of the file');
+  assert.equal(before.backup_last_reason, undefined, 'precondition: the success cleared the reason');
+
+  const r = await call('POST', '/restore', { actor: ADM, raw: dl.buf });
+  assert.equal(r.status, 200);
+  assert.deepEqual(stored(), before, 'the restored database holds this installation\'s status, not the file\'s');
+
+  const status = (await call('GET', '/status', { actor: ADM })).body.data.scheduler;
+  assert.equal(status.lastSuccess, before.backup_last_success);
+  assert.equal(status.lastError, null);
+});
+
 test('POST /restore: ein zweiter Restore, waehrend der erste laeuft → 409 restore_in_progress (#1431)', async () => {
   const dl = await call('GET', '/database', { actor: ADM });
   assert.equal(dl.status, 200);

@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the data folder refuses writes. It needs no login, tells nothing else about the instance and
   does not write to the database. `/health` and every shipped healthcheck stay as they are; the
   new path is for a load balancer or an uptime monitor.
+- **The status of the last backup survives a restart.** After a restart the backup page said
+  "never" until the next scheduled run, because the last attempt lived in memory only. The time of
+  the last attempt, the time of the last success and the reason of a failed attempt are now kept
+  in the database, without a schema change, and a restore keeps the values of the installation it
+  runs on rather than those inside the restored file. `GET /api/v1/backup/status` gains
+  `scheduler.lastSuccess`.
 
 ### Changed
 - **Unexpected errors are answered and logged in one place.** The central error handler now
@@ -56,6 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite no longer hides the ones after it: the job log ends with every red suite and its log,
   and when one is red, the logs are attached to the run. Contributors run `npm run test-parallel` before a push.
   A new push to a pull request cancels the run it replaces.
+- **A failed backup says why, with a reason instead of the text of the error** (from #2525,
+  the `reason` on the last error proposed by @nomi25home in #2540). `scheduler.lastError` in
+  `GET /api/v1/backup/status` now always carries `reason`, one of `backup_dir_not_writable`,
+  `disk_full`, `backup_verify_failed` and `unknown`, and its `message` is the fixed sentence of
+  that reason. Until now `message` was the raw text of the error, with the absolute path of the
+  backup folder in it; that text is in the server log only now, where it still names the folder
+  and what to check. `POST /api/v1/backup/trigger` answers a failed run as before with `200` and
+  `success: false`, and carries the same `reason`. The backup page does not show the reason yet.
 
 ### Fixed
 - **The demo seed finds the database key the server stored itself.** `scripts/seed-demo.js
