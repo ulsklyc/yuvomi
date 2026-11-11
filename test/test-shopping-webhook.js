@@ -271,14 +271,19 @@ test('POST send-webhook: die Nutzlast traegt nur die offenen Artikel, in der For
 });
 
 test('der Aufruf traegt ein Zeitlimit', async () => {
-  // Nicht gegen die Uhr geprueft: PROVIDER_TIMEOUT_MS sind 8 Sekunden, und ein
-  // Test, der die abwartet, ist seine Laufzeit nicht wert. Geprueft wird, DASS
-  // ein Signal mitgeht - `safeRequest` bringt von sich aus keines mit, ein
+  // Nicht gegen die Uhr geprueft: WEBHOOK_TIMEOUT_MS sind 8 Sekunden (derselbe
+  // Wert wie PROVIDER_TIMEOUT_MS der Benachrichtigungswege, aber eine eigene
+  // Konstante - channel-delivery.js' Export ist per depcruise-Regel nur
+  // notifications.js und medication-scheduler.js erlaubt), und ein Test, der
+  // die abwartet, ist seine Laufzeit nicht wert. Geprueft wird, DASS ein
+  // Signal mitgeht - `safeRequest` bringt von sich aus keines mit, ein
   // stummes Ziel haelt den Request sonst offen.
   const { readFileSync } = await import('node:fs');
   const source = readFileSync('server/routes/shopping.js', 'utf8');
+  assert.match(source, /const WEBHOOK_TIMEOUT_MS = 8_000;/,
+    'die Webhook-Route braucht ihre eigene 8s-Zeitlimit-Konstante');
   const callSite = source.match(/const response = await guardedFetch\(webhookUrl, \{[\s\S]*?\}\);/)?.[0];
   assert.ok(callSite, 'der guardedFetch-Aufruf der Webhook-Route wurde nicht gefunden');
-  assert.match(callSite, /signal:\s*AbortSignal\.timeout\(PROVIDER_TIMEOUT_MS\)/,
+  assert.match(callSite, /signal:\s*AbortSignal\.timeout\(WEBHOOK_TIMEOUT_MS\)/,
     'der Aufruf braucht ein Zeitlimit, und zwar dasselbe wie die Benachrichtigungswege');
 });
