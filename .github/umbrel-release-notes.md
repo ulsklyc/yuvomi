@@ -1,12 +1,8 @@
-<!-- version: 2.89.0 -->
-This update is a foundation release: it changes how Yuvomi is tested and operated, not what it does. It brings no new feature; pages, data and settings look and work as before.
+<!-- version: 2.89.1 -->
+This update closes a gap for signed-in devices. A phone that is signed in to Yuvomi with the app could change the email address stored for its own household member, and that address is where a password reset is sent. A signed-in device can no longer change it; everything else on the contact stays editable from the device, and the address can still be changed in the browser.
 
-For monitoring there is a new readiness check at `/readyz` next to `/health`. It says whether Yuvomi can serve right now and answers with a reason while a restore is running or the data folder refuses writes. The existing `/health` does not change.
+If you use the app on a phone, nothing else changes there. If nobody in your household does, this update changes nothing you would notice.
 
-The status of the last backup now survives a restart. Until now the backup page said "never" after a restart until the next scheduled run.
+This update does not change the database. No action is needed from you.
 
-Requests the server has to refuse, such as a corrupt upload, are now answered as a client error instead of a server error, and the details stay in the server log.
-
-This update does not change the database, and the way back to 2.88.1 was tried before the release. No action is needed from you.
-
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.89.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.89.1

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.89.1] - 2026-11-12
+
 ### Security
 - **A signed-in device can no longer change the email addresses of a household member.**
   SECURITY.md says that a device credential changes neither password, email nor second factor.
