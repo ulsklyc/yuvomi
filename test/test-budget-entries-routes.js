@@ -1837,8 +1837,6 @@ test('#1742: PUT /:id/series deletes future non-pending entries past end_date', 
 });
 
 test('#1742: PUT /:id/series keeps booked entries before today even when past end_date', async () => {
-  const { todayKey: todayKeyT } = await import('../server/utils/timezone.js');
-  const today = todayKeyT(db);
   // Create a past entry (before today) manually
   const anchor = insertEntry({ title: 'gym', amount: -50, category: 'personal_health', subcategory: 'gym_sports', date: '2020-01-01', is_recurring: 1, recurrence_interval: 'monthly' });
   db.prepare('INSERT OR IGNORE INTO budget_series (anchor_id, title, amount, category, subcategory, start_date, visibility) VALUES (?, ?, ?, ?, ?, ?, ?)').run(anchor, 'gym', -50, 'personal_health', 'gym_sports', '2020-01-01', 'shared');
