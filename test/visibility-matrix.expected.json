@@ -416,15 +416,14 @@
           "note.child.all",
           "note.member.all"
         ],
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.all",
-            "task.admin.assignees",
-            "task.admin.private",
-            "task.admin.private.legacy-assigned-member"
-          ]
-        }
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.admin.private",
+          "task.admin.private.legacy-assigned-member",
+          "task.child.all",
+          "task.member.all"
+        ]
       }
     },
     "caregiver": {
@@ -785,10 +784,12 @@
           "note.child.all",
           "note.member.all"
         ],
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": []
-        }
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.member.all"
+        ]
       }
     },
     "child": {
@@ -1184,14 +1185,14 @@
           "note.child.private",
           "note.member.all"
         ],
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.child.all",
-            "task.child.assignees",
-            "task.child.private"
-          ]
-        }
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.child.private",
+          "task.member.all",
+          "task.member.assignees"
+        ]
       }
     },
     "display": {
@@ -1918,15 +1919,14 @@
           "note.member.all",
           "note.member.private"
         ],
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.private.legacy-assigned-member",
-            "task.member.all",
-            "task.member.assignees",
-            "task.member.private"
-          ]
-        }
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
       }
     },
     "member_none": {
@@ -2843,15 +2843,14 @@
           "note.member.all",
           "note.member.private"
         ],
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.private.legacy-assigned-member",
-            "task.member.all",
-            "task.member.assignees",
-            "task.member.private"
-          ]
-        }
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
       }
     },
     "token_unscoped": {
@@ -3263,15 +3262,14 @@
           "note.member.all",
           "note.member.private"
         ],
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.private.legacy-assigned-member",
-            "task.member.all",
-            "task.member.assignees",
-            "task.member.private"
-          ]
-        }
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
       }
     },
     "token_write": {
@@ -3683,15 +3681,14 @@
           "note.member.all",
           "note.member.private"
         ],
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.private.legacy-assigned-member",
-            "task.member.all",
-            "task.member.assignees",
-            "task.member.private"
-          ]
-        }
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
       }
     }
   },
