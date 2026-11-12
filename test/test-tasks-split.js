@@ -58,9 +58,7 @@ function openInPane(extra = {}) {
   globalThis.__openDetailView = (options) => { gesehen = options; };
   const pane = { isPane: true };
   const onClose = () => {};
-  /** @type {any[]} */
-  const standaloneCalls = [];
-  const standalone = (/** @type {any} */ live) => { standaloneCalls.push(live); };
+  const standalone = () => {};
   try {
     openTaskDetail({
       task: { ...BASIS, status: 'open' },
@@ -75,19 +73,15 @@ function openInPane(extra = {}) {
     delete globalThis.__openDetailView;
   }
   assert.ok(gesehen, 'die Leseansicht wurde gar nicht geoeffnet');
-  return { options: gesehen, pane, onClose, standalone, standaloneCalls };
+  return { options: gesehen, pane, onClose, standalone };
 }
 
 test('die Leseansicht reicht Spalte, Abmeldung und Bearbeiten-Weg an detail-view durch', () => {
-  const { options, pane, onClose, standaloneCalls } = openInPane();
+  const { options, pane, onClose, standalone } = openInPane();
   assert.equal(options.pane, pane, 'ohne `pane` oeffnete sie ein Sheet ueber der Spalte');
   assert.equal(options.onClose, onClose, 'ohne `onClose` erfaehrt die Liste nicht, dass eine Aktion lief');
-  // Seit „Faelligkeit entfernen" reicht die Ansicht den Weg umhuellt weiter: er
-  // bekommt ihren aktuellen Erinnerungsstand mit (`{ reminder }`).
-  assert.equal(typeof options.edit?.standalone, 'function',
+  assert.equal(options.edit?.standalone, standalone,
     'ohne `standalone` fehlt in der Spalte der Bearbeiten-Knopf (openInPane baut ihn nur damit)');
-  /** @type {any} */ (options).edit.standalone();
-  assert.deepEqual(standaloneCalls, [{ reminder: null }], 'der Aufruf landet beim gereichten Weg, mit dem Stand der Ansicht');
 });
 
 for (const [id, label] of [['task-detail-finish', 'Erledigen'], ['task-detail-start', 'Starten'], ['task-detail-archive', 'Ablegen']]) {

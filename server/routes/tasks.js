@@ -1621,8 +1621,19 @@ router.put('/:id', (req, res) => {
     let undone  = 0;
     let spawned = false;
     let nextDueDate = null;
+    let remindersRemovedOthers = 0;
     let updated;
     db.get().transaction(() => {
+      // DAS DATUM GEHT, DIE ERINNERUNGEN GEHEN MIT (#2705, Trigger
+      // trg_reminders_tasks_due_cleared, Migration 283). Gezaehlt wird vorher,
+      // wie viele davon ANDEREN gehoeren: „Rueckgaengig" kann nur die eigene
+      // zurueckholen, und die Oberflaeche sagt es, wenn mehr gegangen ist.
+      if (task.due_date && !due_date) {
+        remindersRemovedOthers = db.get().prepare(`
+          SELECT COUNT(*) AS n FROM reminders
+          WHERE entity_type = 'task' AND entity_id = ? AND created_by != ?
+        `).get(task.id, req.authUserId || req.session.userId).n;
+      }
       db.get().prepare(`
         UPDATE tasks SET
           title = ?, description = ?, category = ?, priority = ?,
@@ -1718,6 +1729,7 @@ router.put('/:id', (req, res) => {
     addAssignedUsers(updated);
     updated.subtasks = loadSubtasks(updated.id, req.authUserId || req.session.userId);
     updated.next_due_date = nextDueDate;
+    Object.assign(/** @type {any} */ (updated), { reminders_removed_others: remindersRemovedOthers });
 
     res.json({ data: updated });
 

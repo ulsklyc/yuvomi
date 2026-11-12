@@ -951,23 +951,11 @@ function taskReminderSummary(reminders) {
  * `detailHeadEl`): wann sie faellig ist, in den Worten der Liste ("Heute
  * faellig", "Ueberfaellig · 11.08."), und wer sie hat - als Avatare mit Namen.
  */
-/**
- * @param {any} task
- * @param {{clearDue?: ((arg: {button: HTMLButtonElement}) => void) | null}} [options]
- */
-function taskDetailHead(task, { clearDue = null } = {}) {
+function taskDetailHead(task) {
   const due = formatDueDate(task.due_date, task.due_time, task.status === 'done' || isArchived(task));
   return {
     subtitle: due?.label ?? '',
     subtitleLabel: t('tasks.dueDateLabel'),
-    // Direkt hinter der Angabe, die er entfernt (Entwurf: Faelligkeit ohne
-    // Umweg ueber das Formular). `mayClearDueHere` entscheidet, ob es ihn gibt.
-    subtitleAction: clearDue ? {
-      id: CLEAR_DUE_BUTTON_ID,
-      label: t('tasks.clearDue'),
-      icon: 'calendar-x',
-      onClick: clearDue,
-    } : null,
     people: task.assigned_users ?? [],
     peopleLabel: t('tasks.assignedLabel'),
   };
@@ -1006,70 +994,49 @@ function mayClearDueHere(task, reminders, { canEdit }) {
 }
 
 /**
- * Entfernt die Faelligkeit aus der Leseansicht - samt Countdown und eigener
- * Erinnerung (utils/task-due.js) - und bietet „Rueckgaengig" an.
+ * Entfernt die Faelligkeit aus der Leseansicht (Eintrag im Menue „Mehr") und
+ * bietet „Rueckgaengig" an. Der Server nimmt Countdown und ALLE Erinnerungen
+ * der Aufgabe mit (#2705, utils/task-due.js); „Rueckgaengig" holt nur die
+ * eigene zurueck, und der Toast sagt es, wenn auch fremde gegangen sind.
  *
- * DIE ANSICHT BLEIBT OFFEN. Anders als Status und Ablage verschiebt das die
- * Aufgabe nicht in eine andere Liste; wer eben noch Teilaufgaben ergaenzt hat,
- * soll danach weitermachen koennen. Kopf und Zeilen zeichnen sich mit dem neuen
- * Stand neu (`live.render`), die Umgebung zieht nach (`ctx.onChanged`).
- *
- * @typedef {{
- *   reminders: object|object[]|null,
- *   view?: {update: (sections: Array<any>, opts?: {head?: Object}) => boolean} | null,
- *   head: () => object,
- *   render: () => void,
- * }} TaskDetailLive
+ * Danach wie jede Fuss-Aktion (Status, Ablage): Ansicht abmelden, Umgebung
+ * nachladen (`afterConfirmedWrite`). In der Spalte malt das Detail frisch vom
+ * Server, mit neuem Kopf - die Ansicht zeichnet ihn nicht selbst nach.
  *
  * @param {any} task
- * @param {TaskDetailLive} live
+ * @param {object|object[]|null} reminders  die eigenen Erinnerungen an der Aufgabe
  * @param {any} button
- * @param {{onChanged: () => (void|Promise<void>), onStale?: () => void}} ctx
+ * @param {any} ctx
+ * @param {Function} [close]
  */
-async function clearDueFromDetail(task, live, button, ctx) {
+async function clearDueFromDetail(task, reminders, button, ctx, close = closeDetailView) {
   const stop = btnLoading(button);
-  const before = { due_date: task.due_date ?? null, due_time: task.due_time ?? null, countdown: task.countdown };
-  const remindersBefore = live.reminders;
   let result;
   try {
-    result = await clearTaskDue(api, task, remindersBefore);
+    result = await clearTaskDue(api, task, reminders);
   } catch (err) {
     stop();
-    window.yuvomi.showToast(errorSentence(err), 'danger');
+    await sayWriteFailed(err, ctx, close);
     return;
   }
-  Object.assign(task, { due_date: null, due_time: null, ...(task.countdown ? { countdown: 0 } : {}) });
-  if (result.reminderGone) {
-    // null, nicht []: das Formular fragt `!!reminder` (renderReminderSection),
-    // und eine leere Liste schaltete dort den Erinnerungs-Schalter wieder ein.
-    live.reminders = null;
-    refreshReminders();
-  }
-  live.render();
-  if (result.reminderError) {
-    // Die Faelligkeit ist weg, die Erinnerung nicht: den halben Erfolg sagen,
-    // statt ihn zu verschweigen. Das Formular zeigt sie weiter an.
-    window.yuvomi.showToast(errorSentence(result.reminderError), 'danger');
-  } else {
-    offerUndo({
-      message: result.reminderGone ? t('tasks.dueAndReminderCleared') : t('tasks.dueCleared'),
-      undo: async () => {
-        await result.restore();
-        Object.assign(task, before);
-        live.reminders = remindersBefore;
-        if (result.reminderGone) refreshReminders();
-        live.render();
-        await ctx.onChanged();
-      },
-      onError: (/** @type {any} */ err) => window.yuvomi.showToast(errorSentence(err), 'danger'),
-    });
-  }
-  try {
-    await ctx.onChanged();
-  } catch {
-    window.yuvomi.showToast(t('tasks.listLoadError'), 'danger');
-    ctx.onStale?.();
-  }
+  if (result.ownReminderGone || result.othersRemoved) refreshReminders();
+  let message = t('tasks.dueCleared');
+  if (result.othersRemoved) message = t('tasks.dueClearedOthers');
+  else if (result.ownReminderGone) message = t('tasks.dueAndReminderCleared');
+  offerUndo({
+    message,
+    undo: async () => {
+      await result.restore();
+      if (result.ownReminderGone) refreshReminders();
+      await ctx.onChanged();
+      // In der Spalte laedt `onChanged` still nach und laesst das Detail stehen
+      // (es kam ja aus ihm); hier hat sich die Ansicht aber schon abgemeldet und
+      // zeigt den Stand OHNE Datum. `onStale` zeichnet sie frisch vom Server.
+      ctx.onStale?.();
+    },
+    onError: (/** @type {any} */ err) => window.yuvomi.showToast(errorSentence(err), 'danger'),
+  });
+  await afterConfirmedWrite(ctx, close);
 }
 
 /**
@@ -1285,8 +1252,8 @@ async function toggleDescriptionCheck(task, box) {
  *   categories?: object[],
  *   container?: HTMLElement|null,
  *   onChanged?: () => (void|Promise<void>),
- *   edit?: {mount?: (panel: HTMLElement, pane: HTMLElement, live?: {reminder?: object|object[]|null}) => void,
- *           standalone?: (live?: {reminder?: object|object[]|null}) => void}|null,
+ *   edit?: {mount?: (panel: HTMLElement, pane: HTMLElement) => void,
+ *           standalone?: () => void}|null,
  *   pane?: HTMLElement|null,
  *   onClose?: () => void,
  *   onStale?: () => void,
@@ -1340,6 +1307,19 @@ export function openTaskDetail({
       deleteTaskWithUndo(String(task.id), ctx);
     },
   }] : [];
+
+  // FAELLIGKEIT ENTFERNEN (#2705): selten gebraucht, deshalb im Menue „Mehr"
+  // und nicht im Kopf, der auffaelligsten Stelle der Ansicht (Antwort des
+  // Maintainers). `mayClearDueHere` sagt, wann es den Eintrag gibt.
+  if (mayClearDueHere(task, reminder, { canEdit })) {
+    actions.push(/** @type {any} */ ({
+      id: CLEAR_DUE_BUTTON_ID,
+      label: t('tasks.clearDue'),
+      variant: 'ghost',
+      icon: 'calendar-x',
+      onClick: (/** @type {{button: any, close: Function}} */ { button, close }) => clearDueFromDetail(task, reminder, button, ctx, close),
+    }));
+  }
 
   // Ablegen und Zurückholen sind derselbe Schalter - was er tut, hängt daran, wo
   // die Aufgabe gerade liegt.
@@ -1399,33 +1379,16 @@ export function openTaskDetail({
   // „Erledigen", das keiner als Frage las. Im Menue steht er als erster
   // Eintrag mit Wort („Erledigt von ..."); die Personen gehen ueber dem
   // Mehr-Knopf auf.
-  const overflowIds = [DOER_BUTTON_ID, 'task-detail-start', 'task-detail-archive', 'task-detail-delete'];
+  const overflowIds = [DOER_BUTTON_ID, 'task-detail-start', CLEAR_DUE_BUTTON_ID, 'task-detail-archive', 'task-detail-delete'];
   if (actions.some((a) => overflowIds.includes(a.id))) {
     actions.push({ id: MORE_BUTTON_ID, label: '', variant: 'ghost', icon: 'more-horizontal' });
   }
 
-  // DER STAND, DEN DIE ANSICHT SELBST AENDERN KANN (Faelligkeit samt
-  // Erinnerung). `render` zeichnet Kopf und Zeilen damit neu; das Formular
-  // bekommt `reminders` mit, damit es nach dem Entfernen keine Erinnerung von
-  // gestern anzeigt.
-  /** @type {TaskDetailLive} */
-  const live = {
-    reminders: reminder,
-    view: null,
-    head: () => taskDetailHead(task, {
-      clearDue: mayClearDueHere(task, live.reminders, { canEdit })
-        ? ({ button }) => clearDueFromDetail(task, live, button, ctx)
-        : null,
-    }),
-    render: () => { live.view?.update(renderTaskDetail(task, /** @type {any} */ (live.reminders), ctx), { head: live.head() }); },
-  };
-  const standalone = edit?.standalone;
-
-  live.view = openDetailView({
+  openDetailView({
     title: task.title,
     key: `task:${task.id}`,
     size: 'lg',
-    head: live.head(),
+    head: taskDetailHead(task),
     // DIE DETAILSPALTE (Liste + Detail, utils/master-detail.js): dieselbe
     // Ansicht, nur in der rechten Spalte statt im Sheet. Bearbeiten fuehrt dort
     // ins eigene Formular-Modal (`edit.standalone`), weil die Spalte ein
@@ -1439,8 +1402,8 @@ export function openTaskDetail({
     edit: canEdit && edit ? {
       label: t('common.edit'),
       title: t('tasks.editTask'),
-      mount: (/** @type {HTMLElement} */ panel, /** @type {HTMLElement} */ formPane) => edit.mount?.(panel, formPane, { reminder: live.reminders }),
-      standalone: standalone ? () => standalone({ reminder: live.reminders }) : undefined,
+      mount: (panel, formPane) => edit.mount?.(panel, formPane),
+      standalone: edit.standalone,
     } : undefined,
   });
 
@@ -1802,4 +1765,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { mayClearDueHere, clearDueFromDetail, taskDetailHead, CLEAR_DUE_BUTTON_ID, subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit, rotationDetailRow };
+export const __test = { mayClearDueHere, clearDueFromDetail, CLEAR_DUE_BUTTON_ID, subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit, rotationDetailRow };

@@ -212,10 +212,6 @@ export function assignedRow(users, label, fallbackName = '') {
  *                ("Heute, 20:00 - 22:00", "Heute faellig"); `subtitleLabel`
  *                nennt sie Screenreadern beim Namen ("Wann"), wie es die
  *                Zeile tat, die sie abloest
- *   - `subtitleAction` einen leisen Knopf direkt hinter der Unterzeile, der
- *                sie betrifft ("Faelligkeit entfernen" an der Aufgabe) - dieselbe
- *                Form wie die `action` einer Zeile (detailRowEl): ein Wort, kein
- *                Link auf den Text selbst. Ohne Unterzeile gibt es ihn nicht.
  *   - `facts`    hoechstens zwei Kennzahlen ("wird 41", "in 26 Tagen")
  *   - `people`   Personen als Avatar mit Namen statt als Kommatext
  *
@@ -223,9 +219,7 @@ export function assignedRow(users, label, fallbackName = '') {
  * dieser Komponente, kein Markup-String. Ohne einen einzigen Teil entsteht
  * kein Kopf.
  *
- * @param {{media?: HTMLElement, dot?: string, subtitle?: string, subtitleLabel?: string,
- *   subtitleAction?: {id?: string, label: string, icon?: string, onClick: Function},
- *   facts?: string[],
+ * @param {{media?: HTMLElement, dot?: string, subtitle?: string, subtitleLabel?: string, facts?: string[],
  *   people?: Array<{display_name?: string, color?: string, avatar_data?: string}>, peopleLabel?: string}} [head]
  * @returns {HTMLElement|null}
  */
@@ -266,23 +260,6 @@ export function detailHeadEl(head) {
     const text = document.createElement('span');
     text.textContent = subtitle;
     line.appendChild(text);
-    const action = head.subtitleAction;
-    if (action && typeof action.onClick === 'function') {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn btn--ghost btn--sm detail-head__action';
-      if (action.id) btn.id = action.id;
-      if (action.icon) {
-        const i = document.createElement('i');
-        i.className = 'icon-sm';
-        i.dataset.lucide = action.icon;
-        i.setAttribute('aria-hidden', 'true');
-        btn.appendChild(i);
-      }
-      btn.append(document.createTextNode(action.label ?? ''));
-      btn.addEventListener('click', () => action.onClick({ button: btn }));
-      line.appendChild(btn);
-    }
     el.appendChild(line);
   }
 
@@ -1139,7 +1116,7 @@ function openInPane(opts, token) {
  * @param {Object} opts
  * @param {string} opts.title            - Kopfzeile (Titel der Entität)
  * @param {string} [opts.accentColor]    - Farbstreifen oben (Kalenderfarbe o. Ä.)
- * @param {Object} [opts.head]           - Kopf ueber den Zeilen: { media?, dot?, subtitle?, subtitleLabel?, subtitleAction?, facts?, people?, peopleLabel? },
+ * @param {Object} [opts.head]           - Kopf ueber den Zeilen: { media?, dot?, subtitle?, subtitleLabel?, facts?, people?, peopleLabel? },
  *                                         siehe detailHeadEl. Mit `dot` entfaellt der Farbstreifen.
  * @param {HTMLElement} [opts.anchor]    - Auslöser; ab 768px wird daran verankert
  * @param {HTMLElement} [opts.pane]      - Koerper der Detailspalte (Liste + Detail); hat Vorrang
@@ -1156,7 +1133,7 @@ function openInPane(opts, token) {
  * @param {Function} [opts.onClose]
  * @param {string} [opts.key]            - Wessen Leseansicht (z.B. `contact:42`). Oeffnet
  *                                         dieselbe in der Detailspalte, geht ihr offenes Blatt zu.
- * @returns {{update: (sections: Array<any>, opts?: {head?: Object}) => boolean, isOpen: () => boolean}}
+ * @returns {{update: (sections: Array) => boolean, isOpen: () => boolean}}
  *          Handle zum Nachreichen von Zeilen, die beim Öffnen noch nicht da
  *          waren. Siehe `update`.
  */
@@ -1211,17 +1188,10 @@ export function openDetailView(opts = {}) {
      * Prüfung schriebe eine verspätete Antwort in die Ansicht, die der Nutzer
      * inzwischen geöffnet hat - der Termin von eben in die Karte von jetzt.
      *
-     * Mit `{ head }` kommt auch ein neuer Kopf - fuer eine Aktion der Ansicht,
-     * die die Angabe im Kopf selbst aendert (die Faelligkeit einer Aufgabe).
-     * Ohne bleibt der Kopf, mit dem die Ansicht geoeffnet wurde.
-     *
-     * @param {Array<any>} sections
-     * @param {{head?: Object}} [options]
      * @returns {boolean} ob die Aktualisierung angekommen ist
      */
-    update(sections, { head } = {}) {
+    update(sections) {
       if (activeViewToken !== token) return false;
-      if (head !== undefined) opts.head = head;
       applySections(sections);
       return true;
     },

@@ -1,19 +1,20 @@
 /**
- * Modul: Faelligkeit einer Aufgabe mit EINER Aktion entfernen
+ * Modul: Faelligkeit einer Aufgabe mit EINER Aktion entfernen (#2705)
  * Zweck: Wer eine Aufgabe ohne Faelligkeit haben wollte, leerte im Formular
  *        Datum und Uhrzeit einzeln und schaltete die Erinnerung ab - vergass er
  *        sie, verweigerte das Speichern mit einer Meldung ganz unten im Dialog,
  *        unter der Falz. Gemessen wird hier an den echten Nahten:
- *          - der Baustein (utils/task-due.js): welche Schreibwege er geht, in
- *            welcher Reihenfolge, was er mitnimmt und was „Rueckgaengig" damit
- *            wiederherstellt;
- *          - die Leseansicht: wann sie den Knopf im Kopf anbietet (nicht bei
- *            Serien, nicht ohne Faelligkeit, nicht wenn eine Erinnerung
- *            mitgehen muesste, die nicht gehen darf), und dass sie nach dem
- *            Entfernen offen bleibt und dem Formular den neuen Stand reicht;
- *          - das Formular: der Knopf unter Datum und Uhrzeit leert beide, nimmt
- *            die Erinnerung mit und sagt das, und die Meldungen zur Faelligkeit
- *            stehen am Feld statt unten.
+ *          - der Baustein (utils/task-due.js): EIN PUT (die Erinnerungen raeumt
+ *            der Server, Trigger aus Migration 283, gemessen in
+ *            test:tasks-routes), was er von der Antwort liest und was
+ *            „Rueckgaengig" wiederherstellt - nur die EIGENE Erinnerung;
+ *          - die Leseansicht: wann sie den Eintrag im Menue „Mehr" anbietet
+ *            (nicht bei Serien, nicht ohne Faelligkeit, nicht wenn eine
+ *            Erinnerung mitgehen muesste, die nicht gehen darf), was der Toast
+ *            sagt und dass sie sich danach wie jede Fuss-Aktion abmeldet;
+ *          - das Formular: der Knopf unter Datum und Uhrzeit, der Hinweis, wann
+ *            die Erinnerung ohne Uhrzeit kommt, die Quittung, wenn fremde
+ *            Erinnerungen mitgingen, und die Meldungen am Feld statt unten.
  * Ausfuehren: npm run test:task-clear-due
  */
 import test from 'node:test';
@@ -49,16 +50,18 @@ const TASK = { id: 7, title: 'Stromrechnung bezahlen', status: 'open', visibilit
 const REMINDER = { id: 3, entity_type: 'task', entity_id: 7, remind_at: '2026-11-13T16:00:00' };
 
 /**
- * Ein API-Doppel, das jeden Aufruf mitschreibt und auf Wunsch scheitert.
+ * Ein API-Doppel, das jeden Aufruf mitschreibt, auf Wunsch scheitert und auf
+ * PUT /tasks die Zahl fremder Erinnerungen meldet, die der Server mitnahm.
  *
- * @param {{failOn?: ((method: string, url: string) => boolean) | null}} [options]
+ * @param {{failOn?: ((method: string, url: string) => boolean) | null, othersRemoved?: number}} [options]
  */
-function apiLog({ failOn = null } = {}) {
+function apiLog({ failOn = null, othersRemoved = 0 } = {}) {
   /** @type {Array<[string, string, unknown]>} */
   const calls = [];
   const record = (/** @type {string} */ method) => async (/** @type {string} */ url, /** @type {unknown} */ body) => {
     calls.push([method, url, body]);
     if (failOn && failOn(method, url)) throw Object.assign(new Error('boom'), { status: 500 });
+    if (method === 'PUT' && url.startsWith('/tasks/')) return { data: { reminders_removed_others: othersRemoved } };
     return { data: {} };
   };
   return { calls, put: record('PUT'), delete: record('DELETE'), post: record('POST'), patch: record('PATCH'), get: record('GET') };
@@ -83,15 +86,13 @@ test('die eigenen Erinnerungen kommen als Objekt, Liste oder gar nicht', () => {
   assert.deepEqual(ownRemindAts([]), []);
 });
 
-test('erst die Aufgabe, dann die eigene Erinnerung - und „Rueckgaengig" stellt beides wieder her', async () => {
-  const api = apiLog();
+test('ein PUT - die Erinnerungen raeumt der Server; „Rueckgaengig" holt nur die eigene zurueck', async () => {
+  const api = apiLog({ othersRemoved: 2 });
   const result = await clearTaskDue(api, { ...TASK }, REMINDER);
-  assert.deepEqual(api.calls, [
-    ['PUT', '/tasks/7', { due_date: null, due_time: null, countdown: 0 }],
-    ['DELETE', '/reminders?entity_type=task&entity_id=7', undefined],
-  ]);
-  assert.equal(result.reminderGone, true);
-  assert.equal(result.reminderError, null);
+  assert.deepEqual(api.calls, [['PUT', '/tasks/7', { due_date: null, due_time: null, countdown: 0 }]],
+    'kein eigenes DELETE /reminders mehr: der Trigger nimmt alle mit');
+  assert.equal(result.ownReminderGone, true);
+  assert.equal(result.othersRemoved, 2, 'die Zahl kommt aus der Antwort');
 
   api.calls.length = 0;
   await result.restore();
@@ -102,25 +103,25 @@ test('erst die Aufgabe, dann die eigene Erinnerung - und „Rueckgaengig" stellt
   ]);
 });
 
-test('ohne Erinnerung fragt der Baustein keine Loeschung an, und „Rueckgaengig" legt keine an', async () => {
+test('ohne eigene Erinnerung legt „Rueckgaengig" keine an; eine fehlende Zahl zaehlt als 0', async () => {
   const api = apiLog();
   const result = await clearTaskDue(api, { ...TASK, countdown: 0 }, null);
   assert.deepEqual(api.calls, [['PUT', '/tasks/7', { due_date: null, due_time: null }]]);
-  assert.equal(result.reminderGone, false);
+  assert.equal(result.ownReminderGone, false);
+  assert.equal(result.othersRemoved, 0);
   api.calls.length = 0;
   await result.restore();
   assert.deepEqual(api.calls, [['PUT', '/tasks/7', { due_date: '2026-11-13', due_time: '18:00' }]]);
+  // Eine Uhrzeit ohne Datum: der Server-Trigger fragt nach dem DATUM, die
+  // eigene Erinnerung bleibt also stehen und gilt nicht als mitgenommen.
+  const timeOnly = await clearTaskDue(apiLog(), { ...TASK, due_date: null }, REMINDER);
+  assert.equal(timeOnly.ownReminderGone, false);
 });
 
-test('scheitert die Aufgabe, ist nichts passiert; scheitert danach die Erinnerung, sagt das Ergebnis es', async () => {
-  const failTask = apiLog({ failOn: (m, url) => m === 'PUT' && url.startsWith('/tasks/') });
-  await assert.rejects(() => clearTaskDue(failTask, { ...TASK }, REMINDER));
-  assert.equal(failTask.calls.length, 1, 'nach der gescheiterten Aufgabe geht keine Loeschung mehr raus');
-
-  const failReminder = apiLog({ failOn: (m) => m === 'DELETE' });
-  const result = await clearTaskDue(failReminder, { ...TASK }, REMINDER);
-  assert.equal(result.reminderGone, false);
-  assert.ok(result.reminderError, 'der halbe Erfolg wird nicht verschwiegen');
+test('scheitert das PUT, geht der Fehler an den Aufrufer', async () => {
+  const fail = apiLog({ failOn: (m, url) => m === 'PUT' && url.startsWith('/tasks/') });
+  await assert.rejects(() => clearTaskDue(fail, { ...TASK }, REMINDER));
+  assert.equal(fail.calls.length, 1);
 });
 
 // --------------------------------------------------------
@@ -131,21 +132,24 @@ test('scheitert die Aufgabe, ist nichts passiert; scheitert danach die Erinnerun
  * Die Ansicht oeffnen und die Optionen einsammeln, die sie an openDetailView gibt.
  *
  * @param {any} task
- * @param {{reminder?: object|null, edit?: any}} [options]
+ * @param {{reminder?: object|null}} [options]
  * @returns {any}
  */
-function viewOptions(task, { reminder = null, edit = null } = {}) {
+function viewOptions(task, { reminder = null } = {}) {
   /** @type {any} */
   let seen = null;
   g.__openDetailView = (/** @type {any} */ options) => { seen = options; };
   try {
-    openTaskDetail({ task, reminder, currentUserId: 2, edit });
+    openTaskDetail({ task, reminder, currentUserId: 2 });
   } finally {
     delete g.__openDetailView;
   }
   assert.ok(seen, 'die Leseansicht wurde gar nicht geoeffnet');
   return seen;
 }
+
+/** @param {any} options */
+const clearAction = (options) => (options.actions ?? []).find((/** @type {any} */ a) => a.id === detail.CLEAR_DUE_BUTTON_ID) ?? null;
 
 /**
  * @param {Record<string, string>} modules
@@ -156,16 +160,19 @@ function withAccess(modules, fn) {
   try { return fn(); } finally { clearPermissions(); }
 }
 
-test('der Knopf steht im Kopf hinter der Faelligkeit', () => {
-  const head = viewOptions({ ...TASK }).head;
-  assert.ok(head.subtitle, 'die Faelligkeit steht im Kopf');
-  assert.equal(head.subtitleAction?.id, detail.CLEAR_DUE_BUTTON_ID);
-  assert.equal(head.subtitleAction.label, 'tasks.clearDue');
-  assert.equal(head.subtitleAction.icon, 'calendar-x');
-  assert.equal(typeof head.subtitleAction.onClick, 'function');
+test('der Eintrag steht im Menue „Mehr" des Fusses, nicht im Kopf', () => {
+  const options = viewOptions({ ...TASK });
+  const action = clearAction(options);
+  assert.ok(action, 'die Aktion ist da');
+  assert.equal(action.label, 'tasks.clearDue');
+  assert.equal(action.icon, 'calendar-x');
+  assert.equal(action.variant, 'ghost');
+  assert.equal(options.head.subtitleAction, undefined, 'der Kopf bleibt, wie er war');
+  const ids = options.actions.map((/** @type {any} */ a) => a.id);
+  assert.ok(ids.includes('task-detail-more'), 'es gibt das Menue, in das sie faellt');
 });
 
-test('kein Knopf, wo es nichts zu entfernen gibt oder das Entfernen nicht hierher gehoert', () => {
+test('kein Eintrag, wo es nichts zu entfernen gibt oder das Entfernen nicht hierher gehoert', () => {
   const cases = {
     'ohne Faelligkeit': { ...TASK, due_date: null, due_time: null },
     'Serie (die naechste Instanz rechnet von der Faelligkeit)': { ...TASK, is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY' },
@@ -173,92 +180,79 @@ test('kein Knopf, wo es nichts zu entfernen gibt oder das Entfernen nicht hierhe
     'gesperrt und nicht die eigene (#830)': { ...TASK, locked: 1, created_by: 9 },
   };
   for (const [name, task] of Object.entries(cases)) {
-    assert.equal(viewOptions(task).head.subtitleAction, null, name);
+    assert.equal(clearAction(viewOptions(task)), null, name);
   }
-  assert.ok(viewOptions({ ...TASK, due_date: null, due_time: '18:00' }).head.subtitleAction,
+  assert.ok(clearAction(viewOptions({ ...TASK, due_date: null, due_time: '18:00' })),
     'eine Uhrzeit allein ist auch eine Faelligkeit, die man loswerden will');
 });
 
-test('kein Knopf ohne Schreibrecht auf Aufgaben - und keiner, wenn die Erinnerung nicht mitgehen darf', () => {
+test('kein Eintrag ohne Schreibrecht auf Aufgaben - und keiner, wenn die Erinnerung nicht mitgehen darf', () => {
   withAccess({ tasks: 'read' }, () => {
-    assert.equal(viewOptions({ ...TASK }).head.subtitleAction, null, 'tasks: read');
+    assert.equal(clearAction(viewOptions({ ...TASK })), null, 'tasks: read');
   });
   withAccess({ calendar: 'read' }, () => {
-    assert.equal(viewOptions({ ...TASK }, { reminder: REMINDER }).head.subtitleAction, null,
+    assert.equal(clearAction(viewOptions({ ...TASK }, { reminder: REMINDER })), null,
       'calendar: read mit eigener Erinnerung - das Formular verweigert genau diesen Uebergang');
-    assert.ok(viewOptions({ ...TASK }).head.subtitleAction,
-      'ohne Erinnerung haengt nichts am Kalenderrecht');
+    assert.ok(clearAction(viewOptions({ ...TASK })), 'ohne Erinnerung haengt nichts am Kalenderrecht');
   });
 });
 
-test('nach dem Entfernen bleibt die Ansicht offen, zeichnet sich neu und bietet „Rueckgaengig" an', async () => {
-  const api = apiLog();
+/**
+ * Faehrt den Eintrag mit einem API-Doppel und sammelt Toasts, Abmeldungen und
+ * Nachladen ein.
+ *
+ * @param {{task?: any, reminder?: object|null, othersRemoved?: number}} options
+ */
+async function runClear({ task = { ...TASK }, reminder = REMINDER, othersRemoved = 0 }) {
+  const api = apiLog({ othersRemoved });
   g.__apiStub = api;
   /** @type {any[]} */
   const toasts = [];
+  /** @type {any[]} */
+  const closes = [];
+  let changed = 0;
+  let stale = 0;
   const saved = g.window.yuvomi;
   g.window.yuvomi = { showToast: (/** @type {string} */ msg, /** @type {string} */ type, /** @type {number} */ duration, /** @type {any} */ action) => { toasts.push({ msg, type, action }); return true; } };
-  let changed = 0;
-  /** @type {any[]} */
-  const renders = [];
-  const task = { ...TASK };
-  /** @type {any} */
-  const live = { reminders: REMINDER, render: () => renders.push(live.reminders) };
+  const ctx = { onChanged: async () => { changed += 1; }, onStale: () => { stale += 1; }, inPane: true };
   try {
-    await detail.clearDueFromDetail(task, live, {}, { onChanged: async () => { changed += 1; } });
-    assert.deepEqual(api.calls.map(([m, url]) => `${m} ${url}`), ['PUT /tasks/7', 'DELETE /reminders?entity_type=task&entity_id=7']);
-    assert.equal(task.due_date, null);
-    assert.equal(task.due_time, null);
-    assert.equal(task.countdown, 0);
-    // null, nicht []: das Formular fragt `!!reminder`, und eine leere Liste
-    // schaltete dort den Erinnerungs-Schalter wieder ein (im Browser gesehen).
-    assert.deepEqual(renders, [null], 'Kopf und Zeilen zeichnen sich mit dem neuen Stand neu');
-    assert.equal(changed, 1, 'die Umgebung zieht nach');
-    assert.equal(toasts.length, 1);
-    assert.equal(toasts[0].msg, 'tasks.dueAndReminderCleared');
-    assert.equal(typeof toasts[0].action, 'function', 'der Toast traegt „Rueckgaengig"');
-
-    api.calls.length = 0;
-    await toasts[0].action();
-    assert.deepEqual(api.calls.map(([m, url]) => `${m} ${url}`), ['PUT /tasks/7', 'PUT /reminders?entity_type=task&entity_id=7']);
-    assert.equal(task.due_date, '2026-11-13');
-    assert.equal(task.due_time, '18:00');
-    assert.equal(live.reminders, REMINDER, 'die Erinnerung ist wieder da - auch fuer das Formular');
-    assert.equal(renders.length, 2);
+    await detail.clearDueFromDetail(task, reminder, { classList: { add() {}, remove() {} } }, ctx, (/** @type {any} */ opts) => { closes.push(opts); return Promise.resolve(); });
   } finally {
     delete g.__apiStub;
     g.window.yuvomi = saved;
   }
-});
+  return { api, toasts, closes, changed: () => changed, stale: () => stale, restoreApi: () => { g.__apiStub = api; } };
+}
 
-test('ohne Erinnerung sagt der Toast nur die Faelligkeit', async () => {
-  g.__apiStub = apiLog();
-  /** @type {any[]} */
-  const toasts = [];
-  const saved = g.window.yuvomi;
-  g.window.yuvomi = { showToast: (/** @type {string} */ msg) => { toasts.push(msg); return true; } };
+test('nach dem Entfernen meldet sich die Ansicht ab wie jede Fuss-Aktion und bietet „Rueckgaengig" an', async () => {
+  const r = await runClear({});
+  assert.deepEqual(r.api.calls.map(([m, url]) => `${m} ${url}`), ['PUT /tasks/7']);
+  assert.deepEqual(r.closes, [{ force: true }], 'ueber das gereichte close, ohne Verwerfen-Frage');
+  assert.equal(r.changed(), 1, 'die Umgebung zieht nach (in der Spalte frisch vom Server, mit neuem Kopf)');
+  assert.equal(r.stale(), 0, 'das Entfernen selbst braucht keinen Neuaufbau ueber onStale - das macht das Abmelden');
+  assert.equal(r.toasts.length, 1);
+  assert.equal(r.toasts[0].msg, 'tasks.dueAndReminderCleared');
+  assert.equal(typeof r.toasts[0].action, 'function', 'der Toast traegt „Rueckgaengig"');
+
+  r.api.calls.length = 0;
+  r.restoreApi();
   try {
-    /** @type {any} */
-    const live = { reminders: null, render() {} };
-    await detail.clearDueFromDetail({ ...TASK, countdown: 0 }, live, {}, { onChanged: async () => {} });
-    assert.deepEqual(toasts, ['tasks.dueCleared']);
+    await r.toasts[0].action();
   } finally {
     delete g.__apiStub;
-    g.window.yuvomi = saved;
   }
+  assert.deepEqual(r.api.calls.map(([m, url]) => `${m} ${url}`), ['PUT /tasks/7', 'PUT /reminders?entity_type=task&entity_id=7']);
+  assert.equal(r.changed(), 2, 'nach „Rueckgaengig" zieht die Umgebung noch einmal nach');
+  // Die Spalte laedt still nach und liesse das Detail ohne Datum stehen (im
+  // Browser gesehen): `onStale` zeichnet es frisch vom Server.
+  assert.equal(r.stale(), 1, 'und die Spalte zeichnet das Detail neu');
 });
 
-test('das Formular aus der Leseansicht bekommt den aktuellen Erinnerungsstand mit', () => {
-  /** @type {any[]} */
-  const mounts = [];
-  const options = viewOptions({ ...TASK }, {
-    reminder: REMINDER,
-    edit: { mount: (/** @type {any[]} */ ...args) => mounts.push(args), standalone: (/** @type {any} */ live) => mounts.push(['standalone', live]) },
-  });
-  options.edit.mount('panel', 'pane');
-  options.edit.standalone();
-  assert.deepEqual(mounts[0], ['panel', 'pane', { reminder: REMINDER }]);
-  assert.deepEqual(mounts[1], ['standalone', { reminder: REMINDER }]);
+test('der Toast sagt, was gegangen ist - und dass Rueckgaengig fremde Erinnerungen nicht zurueckholt', async () => {
+  assert.equal((await runClear({ reminder: null, task: { ...TASK, countdown: 0 } })).toasts[0].msg, 'tasks.dueCleared');
+  assert.equal((await runClear({ othersRemoved: 1 })).toasts[0].msg, 'tasks.dueClearedOthers');
+  assert.equal((await runClear({ reminder: null, othersRemoved: 2 })).toasts[0].msg, 'tasks.dueClearedOthers',
+    'auch ohne eigene Erinnerung: die fremden sind trotzdem weg');
 });
 
 // --------------------------------------------------------
@@ -398,13 +392,14 @@ test('ein gesperrter Schalter wird nicht angefasst, und ohne Abschnitt geht es a
  * Server ging.
  *
  * @param {{dueDate?: string, dueTime?: string, reminderChecked?: boolean, modules?: Record<string, string>,
- *          dueDateWhenOpened?: string, offset?: string}} options
+ *          dueDateWhenOpened?: string, offset?: string, rotationMode?: string, othersRemoved?: number}} options
  */
-async function submitWith({ dueDate = '', dueTime = '', reminderChecked = true, modules = {}, dueDateWhenOpened = '', offset = 'offset_1d' }) {
+async function submitWith({ dueDate = '', dueTime = '', reminderChecked = true, modules = {}, dueDateWhenOpened = '', offset = 'offset_1d', rotationMode = '', othersRemoved = 0 }) {
   /** @type {any[]} */
   const calls = [];
   const record = (/** @type {string} */ method) => async (/** @type {string} */ path, /** @type {unknown} */ body) => {
     calls.push({ method, path, body });
+    if (method === 'put' && path === '/tasks/7') return { data: { reminders_removed_others: othersRemoved } };
     return { data: null };
   };
   g.__apiStub = { get: record('get'), post: record('post'), put: record('put'), patch: record('patch'), delete: record('delete') };
@@ -427,7 +422,9 @@ async function submitWith({ dueDate = '', dueTime = '', reminderChecked = true, 
     addEventListener() {},
   };
   const savedYuvomi = g.window.yuvomi;
-  g.window.yuvomi = { showToast() {} };
+  /** @type {string[]} */
+  const toasts = [];
+  g.window.yuvomi = { showToast: (/** @type {string} */ msg) => { toasts.push(msg); } };
   const dateField = { id: 'task-due-date', value: dueDate };
   const timeField = { id: 'task-due-time', value: dueTime };
   /** @type {Record<string, any>} */
@@ -438,6 +435,7 @@ async function submitWith({ dueDate = '', dueTime = '', reminderChecked = true, 
     '#reminder-offset': { value: offset },
     '#task-visibility': { value: 'all' },
     '.reminder-section[data-locked-due]': dueDateWhenOpened ? { dataset: { lockedDue: dueDateWhenOpened } } : null,
+    '#task-rotation-mode': rotationMode ? { value: rotationMode } : null,
   };
   /** @type {Record<string, any>} */
   const form = { querySelector: (/** @type {string} */ sel) => byId[sel] ?? null };
@@ -457,7 +455,7 @@ async function submitWith({ dueDate = '', dueTime = '', reminderChecked = true, 
     g.window.yuvomi = savedYuvomi;
   }
   return { calls, fieldErrors, dateField, timeField, bottom: errorNode.hidden ? null : errorNode.textContent, scrolled,
-    button: nodes['task-submit-btn'] };
+    button: nodes['task-submit-btn'], toasts };
 }
 
 test('Erinnerung an, Datum leer: die Meldung steht am Datumsfeld, nicht unten - und nichts geht raus', async () => {
@@ -475,11 +473,10 @@ test('die gesperrte Erinnerung meldet sich ebenfalls am Datumsfeld', async () =>
 });
 
 test('Meldungen, die kein Feld haben, bleiben unten - und rollen ins Bild', async () => {
-  // Erinnerung an, Vorlauf „Keine": die Meldung ist (noch) dieselbe wie ohne
-  // Datum, obwohl eins da ist - Frage an den Maintainer, hier nur der Ort.
-  const r = await submitWith({ dueDate: '2026-11-13', offset: 'offset_none' });
+  // Eine Rotation ohne Wiederholung: die Meldung gehoert keinem Datumsfeld.
+  const r = await submitWith({ dueDate: '2026-11-13', reminderChecked: false, rotationMode: 'round_robin' });
   assert.equal(r.fieldErrors.length, 0);
-  assert.equal(r.bottom, 'tasks.reminderNeedsDueDate');
+  assert.equal(r.bottom, 'tasks.rotationNeedsRecurring');
   assert.equal(r.scrolled, 1, 'die Zeile unten rollt ins Bild, statt unter der Falz zu warten');
 });
 
@@ -490,4 +487,82 @@ test('ohne Faelligkeit und ohne Erinnerung speichert der Dialog beide Felder als
   assert.ok(put, 'die Aufgabe geht raus');
   assert.equal(put.body.due_date, null);
   assert.equal(put.body.due_time, null);
+});
+
+test('gingen fremde Erinnerungen mit dem Datum, sagt es die Quittung', async () => {
+  const quiet = await submitWith({ dueDate: '', reminderChecked: false });
+  assert.deepEqual(quiet.toasts, ['tasks.savedToast']);
+  const others = await submitWith({ dueDate: '', reminderChecked: false, othersRemoved: 1 });
+  assert.deepEqual(others.toasts, ['tasks.savedOthersRemindersRemoved']);
+});
+
+// --------------------------------------------------------
+// Nur die Uhrzeit geht: der Hinweis, wann die Erinnerung jetzt kommt
+// --------------------------------------------------------
+
+/**
+ * Ein Dialog-Doppel fuer wireReminderArrival: Felder mit Wert und Ereignissen.
+ *
+ * @param {{date?: string, time?: string, toggle?: boolean, offset?: string}} [options]
+ */
+function arrivalPanel({ date = '2026-11-13', time = '18:00', toggle = true, offset = 'offset_1h' } = {}) {
+  /** @type {Record<string, any>} */
+  const els = {
+    '#task-due-date': Object.assign(new EventTarget(), { value: date }),
+    '#task-due-time': Object.assign(new EventTarget(), { value: time }),
+    '#task-due-time-reminder': { hidden: true, textContent: '' },
+    '#reminder-toggle': Object.assign(new EventTarget(), { checked: toggle, disabled: false }),
+    '#reminder-offset': Object.assign(new EventTarget(), { value: offset }),
+    '#reminder-custom-amount': Object.assign(new EventTarget(), { value: '1' }),
+    '#reminder-custom-unit': Object.assign(new EventTarget(), { value: 'days' }),
+    '#reminder-stored-at': { value: '' },
+  };
+  return { els, panel: { querySelector: (/** @type {string} */ sel) => els[sel] ?? null } };
+}
+
+/** @param {any} field @param {string} value */
+function setValue(field, value) {
+  field.value = value;
+  field.dispatchEvent(new Event('input'));
+}
+
+test('wer nur die Uhrzeit leert, liest am Feld, wann die Erinnerung jetzt kommt - mit ihrem Vorlauf', () => {
+  const { els, panel } = arrivalPanel();
+  tasks.wireReminderArrival(panel);
+  const hint = els['#task-due-time-reminder'];
+  assert.equal(hint.hidden, true, 'mit Uhrzeit gibt es nichts zu sagen');
+  setValue(els['#task-due-time'], '');
+  assert.equal(hint.hidden, false);
+  // Dieselbe Rechnung wie beim Speichern: Tagesende minus 1 Stunde.
+  const expected = tasks.reminderRemindAtFromForm(panel, /** @type {any} */ ({ dueDate: '2026-11-13', dueTime: null }));
+  assert.ok(expected, 'die Rechnung ergibt einen Zeitpunkt');
+  // Der Stub haengt die Werte an den Schluessel: `when` ist gesetzt.
+  assert.match(hint.textContent, /^tasks\.reminderArrivesAt\{"when":"[^"]+"\}$/);
+  const oneHour = hint.textContent;
+  // Ein anderer Vorlauf: der Hinweis rechnet neu, statt stehenzubleiben.
+  setValue(els['#reminder-offset'], 'offset_1d');
+  assert.equal(hint.hidden, false);
+  assert.notEqual(hint.textContent, oneHour, 'ein Tag vorher ist ein anderer Zeitpunkt als eine Stunde vorher');
+  // Erinnerung aus, Uhrzeit zurueck, Datum weg: jedes Mal kein Hinweis.
+  els['#reminder-toggle'].checked = false;
+  els['#reminder-toggle'].dispatchEvent(new Event('change'));
+  assert.equal(hint.hidden, true);
+  els['#reminder-toggle'].checked = true;
+  els['#reminder-toggle'].dispatchEvent(new Event('change'));
+  assert.equal(hint.hidden, false);
+  setValue(els['#task-due-time'], '09:00');
+  assert.equal(hint.hidden, true);
+  setValue(els['#task-due-time'], '');
+  setValue(els['#task-due-date'], '');
+  assert.equal(hint.hidden, true, 'ohne Datum keine Erinnerung, also auch kein Zeitpunkt');
+});
+
+test('kein Hinweis aufs Tagesende fuer eine Aufgabe, die nie eine Uhrzeit hatte, und keiner bei Vorlauf „Keine"', () => {
+  const never = arrivalPanel({ time: '' });
+  tasks.wireReminderArrival(never.panel);
+  assert.equal(never.els['#task-due-time-reminder'].hidden, true);
+  const none = arrivalPanel({ offset: 'offset_none' });
+  tasks.wireReminderArrival(none.panel);
+  setValue(none.els['#task-due-time'], '');
+  assert.equal(none.els['#task-due-time-reminder'].hidden, true);
 });

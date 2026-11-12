@@ -1533,6 +1533,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
           <label class="label" for="task-due-time">${t('tasks.dueTimeLabel')}</label>
           <yuvomi-datepicker type="time" id="task-due-time" name="due_time"
                  value="${esc(formatTimeInput(task?.due_time ?? ''))}"></yuvomi-datepicker>
+          <p class="task-field-hint" id="task-due-time-reminder" role="status" hidden></p>
         </div>
       </div>
       ${renderDueClear(task, reminder)}
@@ -2456,6 +2457,49 @@ function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel
 }
 
 /**
+ * Wann kommt die Erinnerung, wenn die Uhrzeit geht? (#2705, Frage 3)
+ *
+ * Ohne Uhrzeit gilt das Tagesende (23:59:59), und die Erinnerung behaelt ihren
+ * Vorlauf: aus „1 Stunde vor 18:00" wird 22:59. Das war richtig gerechnet, aber
+ * still - wer nur die Uhrzeit leerte, merkte nicht, dass die Erinnerung in die
+ * Nacht rutscht. Der Hinweis am Uhrzeit-Feld nennt den neuen Zeitpunkt, mit
+ * derselben Rechnung, die auch speichert (`reminderRemindAtFromForm`), kein
+ * zweiter Rechenweg.
+ *
+ * Er antwortet auf den UEBERGANG: nur wenn die Aufgabe beim Oeffnen eine
+ * Uhrzeit hatte, die jetzt leer ist, ein Datum bleibt und die Erinnerung an
+ * und bedienbar ist. Eine Aufgabe, die nie eine Uhrzeit hatte, bekommt keinen
+ * Hinweis aufs Tagesende, das sie immer schon hatte.
+ *
+ * @param {{querySelector: (selector: string) => any}} panel
+ */
+function wireReminderArrival(panel) {
+  const time = panel.querySelector('#task-due-time');
+  const date = panel.querySelector('#task-due-date');
+  const hint = panel.querySelector('#task-due-time-reminder');
+  if (!time || !date || !hint) return;
+  const hadTime = !!time.value;
+  const toggle = panel.querySelector('#reminder-toggle');
+  const sync = () => {
+    hint.hidden = true;
+    if (!hadTime || time.value || !toggle?.checked || toggle.disabled) return;
+    const dueDate = parseDateInput(date.value || '');
+    if (!dueDate) return;
+    const when = reminderWhenText({ remind_at: reminderRemindAtFromForm(panel, /** @type {any} */ ({ dueDate, dueTime: null })) });
+    if (!when) return;
+    hint.textContent = t('tasks.reminderArrivesAt', { when });
+    hint.hidden = false;
+  };
+  for (const sel of ['#task-due-date', '#task-due-time', '#reminder-offset', '#reminder-custom-amount', '#reminder-custom-unit']) {
+    const field = panel.querySelector(sel);
+    field?.addEventListener('input', sync);
+    field?.addEventListener('change', sync);
+  }
+  toggle?.addEventListener('change', sync);
+  sync();
+}
+
+/**
  * „Faelligkeit entfernen" unter Datum und Uhrzeit.
  *
  * EINE AKTION STATT DREIER. Wer eine Aufgabe ohne Faelligkeit haben wollte,
@@ -2887,6 +2931,7 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
     syncReminderAfterDue(panel);
   });
   wireReminderAfterDue(panel);
+  wireReminderArrival(panel);
   // Form-Events
   panel.querySelector('#task-form')
     ?.addEventListener('submit', (e) => handleFormSubmit(e, { container, onChanged }));
@@ -3283,7 +3328,11 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
       // PUT liefert `next_due_date` nur beim Uebergang nach „erledigt".
       const response = await api.put(`/tasks/${taskId}`, body);
       const seriesText = body.status === 'done' ? seriesDoneText(response, { title: body.title }) : null;
-      window.yuvomi.showToast(seriesText ?? t('tasks.savedToast'), 'success');
+      // Mit dem Datum gehen ALLE Erinnerungen der Aufgabe (#2705, Trigger aus
+      // Migration 283) - auch die anderer Mitglieder, die dieser Dialog nie
+      // gezeigt hat. Das sagt die Quittung, statt sie still verschwinden zu lassen.
+      const othersGone = Number(response?.data?.reminders_removed_others) > 0;
+      window.yuvomi.showToast(seriesText ?? t(othersGone ? 'tasks.savedOthersRemindersRemoved' : 'tasks.savedToast'), 'success');
     } else {
       const res = await api.post('/tasks', body);
       savedTaskId = res.data?.id;
@@ -6433,18 +6482,16 @@ function openTaskView(task, reminder, container, { pane = null } = {}) {
     // hier spart den Umweg und sagt es an der Stelle, an der das Formular
     // eingehaengt wuerde.
     edit: readOnly() ? null : {
-      // `live` ist der Stand der Leseansicht: hat sie die Faelligkeit samt
-      // Erinnerung entfernt, ist `reminder` hier von gestern.
-      mount: (panel, pane, live = {}) => {
+      mount: (panel, pane) => {
         // Working-Set VOR dem Rendern setzen: renderTagChips in wireTaskForm
         // liest ihn direkt danach.
         modalTags = normalizeTagList(task.tags);
-        pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder: 'reminder' in live ? live.reminder : reminder }));
+        pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder }));
         wireTaskForm(panel, { task, container });
       },
       // Aus der Detailspalte: das regulaere Formular-Modal, mit Fusszeile,
       // Verwerfen-Frage und Fokusfuehrung (detail-view.js, openInPane).
-      standalone: pane ? (live = {}) => openTaskModal({ task, users: state.users, reminder: 'reminder' in live ? live.reminder : reminder }, container) : undefined,
+      standalone: pane ? () => openTaskModal({ task, users: state.users, reminder }, container) : undefined,
     },
   });
 }
@@ -6948,9 +6995,9 @@ export async function openTaskById(taskId, { user = null, container = null, onCh
     container,
     onChanged,
     edit: !canOfferEdit ? null : {
-      mount: (panel, pane, live = {}) => {
+      mount: (panel, pane) => {
         modalTags = normalizeTagList(task.tags);
-        pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder: 'reminder' in live ? live.reminder : reminder }));
+        pane.insertAdjacentHTML('beforeend', renderModalContent({ task, users: state.users, reminder }));
         // `container` reist MIT, obwohl es hier die Uebersicht ist und keine
         // Aufgabenliste haelt: sein zweiter Zweck ist das Ausblenden der Zeile
         // beim Loeschen. Ohne ihn haette derselbe Loeschbefehl zwei Verhalten -
@@ -7271,8 +7318,9 @@ export const __test = {
   // Faelligkeit. Was der Abschnitt dabei sagt, ist der halbe Fix - die andere
   // Haelfte ist, dass das Speichern daraus nicht rechnet.
   renderReminderSection, reminderRemindAtFromForm, afterDueResolution,
-  // Faelligkeit mit einer Aktion entfernen (Knopf unter Datum und Uhrzeit).
-  renderDueClear, wireDueClear,
+  // Faelligkeit mit einer Aktion entfernen (Knopf unter Datum und Uhrzeit) und
+  // der Hinweis, wann die Erinnerung ohne Uhrzeit kommt (#2705).
+  renderDueClear, wireDueClear, wireReminderArrival,
   // Die Verdrahtung steht mit hier: die Regel allein zu messen hiesse, den
   // haeufigsten Ausfall auszulassen - einen Listener, den niemand anhaengt.
   syncReminderAfterDue, wireReminderAfterDue,

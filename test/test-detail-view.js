@@ -491,9 +491,7 @@ test('die Aufgaben-Verdrahtung ist zweigeteilt und behält die Tag-Reihenfolge',
   // liest - es muss VOR renderModalContent gesetzt werden. Der Mount-Block
   // steht seit #918 in dieser Datei und nicht mehr in der Ansicht: das Formular
   // gehört dem Modul, die Leseansicht bekommt es gereicht.
-  // Seit dem Knopf „Faelligkeit entfernen" reicht die Ansicht ihren Stand als
-  // drittes Argument mit (`live`): die Erinnerung kann dort schon weg sein.
-  const mountStart = src.indexOf('mount: (panel, pane, live = {}) =>');
+  const mountStart = src.indexOf('mount: (panel, pane) =>');
   const mount = src.slice(mountStart, src.indexOf('wireTaskForm(panel, { task, container });', mountStart));
   assert.ok(mount.length > 0, 'der Mount-Block muss auffindbar sein');
   const tags = mount.indexOf('modalTags =');
@@ -675,10 +673,7 @@ test('die Aufgaben-Detailansicht führt die Leseinformationen der Karte', async 
   assert.match(head, /subtitle: due\?\.label \?\? ''/, 'die Faelligkeit in den Worten der Liste');
   assert.match(head, /subtitleLabel: t\('tasks\.dueDateLabel'\)/);
   assert.match(head, /people: task\.assigned_users \?\? \[\]/, 'Zugewiesene als Avatare im Kopf');
-  // Der Kopf entsteht ueber `live.head()`: dieselbe Funktion, mit dem Stand,
-  // den die Ansicht selbst aendern kann (Faelligkeit entfernen).
-  assert.match(src, /head: live\.head\(\),/);
-  assert.match(src, /head: \(\) => taskDetailHead\(task, \{/);
+  assert.match(src, /head: taskDetailHead\(task\),/);
   // Erledigen ist die Hauptaktion: der EINE Primaerknopf im Fuss - fuer eine
   // erledigte Aufgabe seit R19 (Ulas 2026-10-16) entsprechend Wieder oeffnen.
   const steps = src.slice(src.indexOf('const STATUS_ACTIONS = {'), src.indexOf('/** Prioritätsbadge'));
@@ -1285,7 +1280,8 @@ test('R19: Bearbeiten ist ueberall der eine Primaerknopf am Ende des Fusses', as
   // Erledigen (Ulas 2026-10-16).
   const task = readFileSync(new URL('../public/components/task-detail.js', import.meta.url), 'utf8');
   // Seit R22 (D17) steht auch „Wer hat erledigt?" im Menue, als erster Eintrag.
-  assert.match(task, /const overflowIds = \[DOER_BUTTON_ID, 'task-detail-start', 'task-detail-archive', 'task-detail-delete'\];/);
+  // Seit #2705 steht „Faelligkeit entfernen" (CLEAR_DUE_BUTTON_ID) im selben Menue.
+  assert.match(task, /const overflowIds = \[DOER_BUTTON_ID, 'task-detail-start', CLEAR_DUE_BUTTON_ID, 'task-detail-archive', 'task-detail-delete'\];/);
   const more = task.slice(task.indexOf('function wireDetailMoreMenu('), task.indexOf('const DOER_BUTTON_ID'));
   assert.match(more, /popover-menu__item--danger/, 'Loeschen bleibt im Menue destruktiv');
   const css = await detailCss();
@@ -1360,77 +1356,4 @@ test('R24 S13: das Detail-Popover traegt als Fokusziel keinen Ring - Mahlzeit wi
   assert.match(quiet.body, /outline:\s*none/);
   const js = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
   assert.match(js, /popover\.tabIndex = -1;/, 'die Regel gilt nur dem Behaelter als Fokusziel');
-});
-
-/* DIE AKTION HINTER DER UNTERZEILE (`subtitleAction`). Die Aufgabe entfernt
- * damit ihre Faelligkeit, ohne ueber das Formular zu gehen. Gemessen wird der
- * laufende Renderer im Schein-DOM: ein echter Knopf mit Wort, in derselben
- * Zeile wie die Angabe, und nur dort, wo es eine Unterzeile gibt. */
-test('der Kopf traegt eine Aktion hinter der Unterzeile', async () => {
-  const { register } = await import('node:module');
-  register('./test-browser-loader.mjs', import.meta.url);
-  /**
-   * Ein Knoten des Schein-DOM: genau das, was detailHeadEl anfasst.
-   * @param {string} tag
-   * @returns {any}
-   */
-  const el = (tag) => {
-    /** @type {any} */
-    const node = {
-      tagName: tag.toUpperCase(), children: [], attrs: {}, className: '', textContent: '', type: '', id: '',
-      style: { setProperty() {} }, dataset: {}, listeners: {},
-    };
-    node.classList = { add: (/** @type {string} */ c) => { node.className = `${node.className} ${c}`.trim(); } };
-    node.setAttribute = (/** @type {string} */ k, /** @type {unknown} */ v) => { node.attrs[k] = String(v); };
-    node.appendChild = (/** @type {any} */ c) => { node.children.push(c); return c; };
-    node.append = (/** @type {any[]} */ ...cs) => { cs.forEach((c) => node.children.push(c)); };
-    node.addEventListener = (/** @type {string} */ type, /** @type {Function} */ fn) => { node.listeners[type] = fn; };
-    node.find = (/** @type {string} */ cls) => {
-      if (String(node.className).split(/\s+/).includes(cls)) return node;
-      for (const c of node.children) { const hit = c.find?.(cls); if (hit) return hit; }
-      return null;
-    };
-    Object.defineProperty(node, 'text', {
-      get: () => node.textContent + node.children.map((/** @type {any} */ c) => c.text ?? '').join(''),
-    });
-    return node;
-  };
-  const g = /** @type {any} */ (globalThis);
-  /** @type {Record<string, PropertyDescriptor|undefined>} */
-  const saved = {};
-  for (const k of ['document', 'HTMLElement']) saved[k] = Object.getOwnPropertyDescriptor(globalThis, k);
-  Object.assign(globalThis, {
-    document: { createElement: el, createTextNode: (/** @type {string} */ text) => ({ text: String(text) }) },
-    HTMLElement: class {},
-  });
-  try {
-    const { detailHeadEl } = await import('../public/components/detail-view.js');
-    /** @type {any[]} */
-    const clicks = [];
-    const head = /** @type {any} */ (detailHeadEl({
-      subtitle: '13.11., 18:00', subtitleLabel: 'Faelligkeit',
-      subtitleAction: { id: 'task-detail-clear-due', label: 'Faelligkeit entfernen', icon: 'calendar-x', onClick: (/** @type {any} */ arg) => clicks.push(arg) },
-    }));
-    const line = head.find('detail-head__subtitle');
-    const btn = line.find('detail-head__action');
-    assert.ok(btn, 'der Knopf steht in der Zeile der Angabe');
-    assert.equal(btn.tagName, 'BUTTON');
-    assert.equal(btn.type, 'button', 'kein Absenden, wenn die Ansicht einmal in einem Formular steht');
-    assert.equal(btn.id, 'task-detail-clear-due');
-    assert.match(btn.className, /\bbtn--ghost\b/, 'leise - die Angabe bleibt die Hauptsache');
-    assert.equal(btn.children[0].dataset.lucide, 'calendar-x');
-    assert.equal(btn.children[0].attrs['aria-hidden'], 'true');
-    assert.equal(btn.text, 'Faelligkeit entfernen', 'ein Wort, nicht nur ein Symbol');
-    btn.listeners.click();
-    assert.deepEqual(clicks, [{ button: btn }]);
-
-    const plain = /** @type {any} */ (detailHeadEl({ subtitle: 'Heute faellig' }));
-    assert.equal(plain.find('detail-head__action'), null, 'ohne Aktion kein Knopf');
-    const noLine = /** @type {any} */ (detailHeadEl({ subtitle: '', people: [{ display_name: 'Leo' }], subtitleAction: { label: 'x', onClick() {} } }));
-    assert.equal(noLine.find('detail-head__action'), null, 'ohne Unterzeile gibt es nichts, wohinter er stehen koennte');
-  } finally {
-    for (const [k, d] of Object.entries(saved)) {
-      if (d) Object.defineProperty(globalThis, k, d); else delete g[k];
-    }
-  }
 });

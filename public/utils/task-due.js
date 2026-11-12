@@ -1,18 +1,19 @@
 /**
- * Die Faelligkeit einer Aufgabe ausserhalb des Formulars aendern.
+ * Die Faelligkeit einer Aufgabe ausserhalb des Formulars entfernen.
  *
  * EINE AKTION FUER ALLES, WAS AN DER FAELLIGKEIT HAENGT. Wer eine Aufgabe
  * „ohne Datum" haben wollte, musste im Formular das Datum leeren, die Uhrzeit
  * leeren und die Erinnerung abschalten - drei Felder an zwei Enden des Dialogs,
  * und wer die Erinnerung vergass, bekam die Meldung ganz unten, unter der Falz.
  * Hier ist das ein Aufruf: Datum und Uhrzeit gehen zusammen, der Countdown
- * (ohne Faelligkeit zaehlt er auf nichts, `wireCountdownGate`) und die eigene
- * Erinnerung (ohne Datum lehnt das Formular sie ab) gehen mit.
+ * (ohne Faelligkeit zaehlt er auf nichts, `wireCountdownGate`) geht mit.
  *
- * NUR DIE EIGENEN ERINNERUNGEN. Erinnerungen gehoeren einer Person
- * (`server/routes/reminders.js` filtert GET, Upsert und DELETE nach
- * `created_by`); die eines anderen Mitglieds kann dieser Aufruf weder sehen noch
- * loeschen - dieselbe Grenze wie beim Speichern des Formulars.
+ * DIE ERINNERUNGEN RAEUMT DER SERVER (#2705): wird `due_date` leer, loescht
+ * der Trigger aus Migration 283 alle Erinnerungen der Aufgabe, die eigenen und
+ * die der anderen Mitglieder. „Rueckgaengig" kann nur die EIGENE zurueckholen -
+ * die fremden hat dieser Nutzer nie gesehen (`server/routes/reminders.js`
+ * filtert nach `created_by`), also kennt er sie nicht. Wie viele es waren, sagt
+ * die Antwort (`reminders_removed_others`), damit die Oberflaeche es nennen kann.
  *
  * Kein DOM, kein i18n: der Aufrufer reicht `api` herein, damit die Naht ohne
  * Browser messbar bleibt (test:task-clear-due).
@@ -39,21 +40,20 @@ export function dueClearBody(task) {
  */
 export function ownRemindAts(reminders) {
   const list = Array.isArray(reminders) ? reminders : (reminders ? [reminders] : []);
-  return list.map((r) => r?.remind_at).filter((at) => typeof at === 'string' && at.length > 0);
+  return list
+    .map((r) => /** @type {{remind_at?: unknown}|null} */ (r)?.remind_at)
+    .filter((at) => typeof at === 'string' && at.length > 0)
+    .map((at) => /** @type {string} */ (at));
 }
 
 /**
- * Entfernt die Faelligkeit einer Aufgabe samt Countdown und eigener Erinnerung.
+ * Entfernt die Faelligkeit einer Aufgabe; der Server nimmt Countdown-Feld und
+ * alle Erinnerungen der Aufgabe im selben Schritt mit.
  *
- * Reihenfolge: erst die Aufgabe, dann die Erinnerung. Scheitert die Aufgabe,
- * ist nichts passiert (der Fehler geht an den Aufrufer). Scheitert danach das
- * Loeschen der Erinnerung, ist die Faelligkeit trotzdem weg - das Ergebnis sagt
- * es mit `reminderError`, statt den halben Erfolg zu verschweigen.
- *
- * @param {{put: Function, delete: Function}} api
+ * @param {{put: Function}} api
  * @param {{id: number|string, due_date?: string|null, due_time?: string|null, countdown?: number|boolean}} task
  * @param {object|object[]|null} reminders  die eigenen Erinnerungen an der Aufgabe
- * @returns {Promise<{reminderGone: boolean, reminderError: Error|null, restore: () => Promise<void>}>}
+ * @returns {Promise<{ownReminderGone: boolean, othersRemoved: number, restore: () => Promise<void>}>}
  */
 export async function clearTaskDue(api, task, reminders) {
   const before = {
@@ -62,26 +62,18 @@ export async function clearTaskDue(api, task, reminders) {
     countdown: task.countdown ? 1 : 0,
   };
   const remindAts = ownRemindAts(reminders);
-  await api.put(`/tasks/${task.id}`, dueClearBody(task));
-
-  let reminderGone = false;
-  let reminderError = null;
-  if (remindAts.length) {
-    try {
-      await api.delete(`/reminders?entity_type=task&entity_id=${task.id}`);
-      reminderGone = true;
-    } catch (err) {
-      reminderError = err instanceof Error ? err : new Error(String(err));
-    }
-  }
+  const response = await api.put(`/tasks/${task.id}`, dueClearBody(task));
+  const othersRemoved = Math.max(0, Number(response?.data?.reminders_removed_others) || 0);
+  const ownReminderGone = remindAts.length > 0 && !!before.due_date;
 
   return {
-    reminderGone,
-    reminderError,
+    ownReminderGone,
+    othersRemoved,
     /**
      * Der Gegenweg fuer „Rueckgaengig": die alte Faelligkeit und, wenn sie mit
-     * weg war, die alte Erinnerung. PUT /reminders ersetzt die Menge in einem
-     * Zug, auch wenn es mehr als eine war.
+     * weg war, die eigene Erinnerung. PUT /reminders ersetzt die Menge in einem
+     * Zug, auch wenn es mehr als eine war. Die Erinnerungen der anderen kommen
+     * nicht zurueck - der Toast sagt das vorher.
      */
     restore: async () => {
       await api.put(`/tasks/${task.id}`, {
@@ -89,7 +81,7 @@ export async function clearTaskDue(api, task, reminders) {
         due_time: before.due_time,
         ...(before.countdown ? { countdown: 1 } : {}),
       });
-      if (reminderGone) {
+      if (ownReminderGone) {
         await api.put(`/reminders?entity_type=task&entity_id=${task.id}`, { remind_ats: remindAts });
       }
     },
