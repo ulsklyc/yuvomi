@@ -250,6 +250,7 @@
   "test-sw-network-first.js": {"class":"M","sBlocks":1,"targets":["public/sw.js"],"fate":"falls-with:public/sw.js"},
   "test-sw-precache.js": {"class":"M","sBlocks":3,"targets":["public/i18n.js","public/index.html","public/settings/registry.js","public/sw.js"],"fate":"falls-with:public/sw.js"},
   "test-sync-target.js": {"class":"M","sBlocks":1,"targets":["public/pages/calendar.js"],"fate":"falls-with:public/pages/calendar.js"},
+  "test-table-ownership.js": {"class":"V","sBlocks":0,"targets":["server/","server/db-schema-test.js","server/db.js"],"fate":"stays:coupling"},
   "test-task-completion-writers.js": {"class":"M","sBlocks":2,"targets":["server/","server/services/caldav-reminders-sync.js"],"fate":"falls-with:server/"},
   "test-task-filters.js": {"class":"M","sBlocks":2,"targets":["public/pages/tasks.js","public/styles/tasks.css"],"fate":"falls-with:public/pages/tasks.js"},
   "test-task-groups.js": {"class":"M","sBlocks":4,"targets":["public/components/task-detail.js","public/pages/tasks.js","public/styles/detail-view.css","public/styles/reset.css"],"fate":"falls-with:public/pages/tasks.js"},
