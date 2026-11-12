@@ -1,0 +1,105 @@
+name: Restore Drill
+
+# Restores every corpus database of the releases through the real restore path
+# and migrates it to the head of this checkout (phase 1b, section B; F10, F11).
+# corpus.yml attaches `yuvomi-<version>-corpus.db` plus `.sha256` to releases
+# whose schema changed; the release list is the manifest.
+#
+# Per database (scripts/restore-drill.mjs): checksum, server/check-backup.js,
+# restore into an empty data directory with scripts/restore-backup.js, schema
+# version at the head, integrity_check, foreign_key_check, schema hash equal to
+# a database migrated from zero, no table of the head schema with fewer rows,
+# and the server starting on it with every endpoint of the API probe at 200.
+#
+# RED when a database fails, when a release carries half a pair, or when the
+# newest release has a different schema than the newest corpus database and no
+# database of its own (scripts/corpus-assets.mjs). The databases that are there
+# are drilled even then, so one gap does not hide a broken migration.
+#
+# WHEN: once a day on main (09:13 UTC; the first 03:23 schedule never fired),
+# by hand, and from ci.yml for every pull request and every push to main (the
+# job `restore-drill` there). It is not a required check; branch protection
+# names only the tests and the typecheck.
+#
+# RIGHTS: read only. GH_TOKEN sits on the two steps that call `gh` (release list,
+# downloads), which run no project code; the corpus databases are public assets
+# encrypted with the public corpus test key (CORPUS_TEST_KEY).
+
+on:
+  schedule:
+    - cron: '13 9 * * *'
+  workflow_dispatch:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  drill:
+    name: Restore every corpus database
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # npm ci and the build take two to three minutes, the drill about five
+    # seconds a database (six databases: 26 s locally on 2026-11-11). 20 leaves
+    # room for a slow runner and a growing corpus without hiding a hang.
+    timeout-minutes: 20
+    env:
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24.x
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Install dependencies
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+        run: npm ci
+
+      # The server step serves the built dist/.
+      - name: Build the web app
+        run: npm run build
+
+      - name: List the published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/releases?per_page=100" --paginate \
+            --jq '.[] | select(.draft | not) | {tag: .tag_name, assets: [.assets[].name]}' > "$RUNNER_TEMP/releases.jsonl"
+          wc -l < "$RUNNER_TEMP/releases.jsonl"
+
+      - name: Choose the corpus databases
+        id: choose
+        run: |
+          set -uo pipefail
+          GAP=0
+          node scripts/corpus-assets.mjs "$RUNNER_TEMP/releases.jsonl" --repo "$GH_REPO" --out "$RUNNER_TEMP/corpus.txt" || GAP=$?
+          touch "$RUNNER_TEMP/corpus.txt"
+          echo "count=$(grep -c '\.db$' "$RUNNER_TEMP/corpus.txt" || true)" >> "$GITHUB_OUTPUT"
+          exit "${GAP:-0}"
+
+      - name: Download the corpus databases
+        if: ${{ !cancelled() && steps.choose.outputs.count > 0 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/corpus"
+          while read -r TAG NAME; do
+            gh release download "$TAG" --pattern "$NAME" --dir "$RUNNER_TEMP/corpus"
+          done < "$RUNNER_TEMP/corpus.txt"
+          ls -l "$RUNNER_TEMP/corpus"
+
+      - name: Restore, migrate and check every corpus database
+        if: ${{ !cancelled() && steps.choose.outputs.count > 0 }}
+        run: |
+          set -euo pipefail
+          node scripts/restore-drill.mjs "$RUNNER_TEMP"/corpus/*.db

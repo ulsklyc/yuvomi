@@ -13,6 +13,10 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
+import {
+  recordingLog, withTableGone, withWriteRefused, requestLogged, assertFixed500, REFUSED_WRITE_TEXT,
+} from './helpers/forced-db-error.js';
 
 const dbmod = await import('../server/db.js');
 const { default: locationsRouter } = await import('../server/routes/inventory/locations.js');
@@ -21,6 +25,9 @@ const db = dbmod.get();
 const app = express();
 app.use(express.json());
 app.use('/locations', locationsRouter);
+// Wie server/index.js: der zentrale Fehlerhandler steht hinter dem Router.
+const handlerLog = recordingLog();
+app.use(createErrorHandler(handlerLog));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -115,4 +122,51 @@ test('PATCH /locations/reorder: sortiert nur die Top-Ebene', async () => {
   assert.equal(r.status, 200);
   const order = r.body.data.map((l) => l.id).filter((id) => id === a.body.data.id || id === b.body.data.id);
   assert.deepEqual(order, [b.body.data.id, a.body.data.id]);
+});
+
+// --------------------------------------------------------
+// Datenbankfehler (Phase 1b Abschnitt E, Pilot des zentralen Fehlerhandlers).
+// Jede Route antwortet auf einen SQLite-Fehler mit 500 und dem festen Satz,
+// ohne SQLite-Text im Rumpf, und der Fehler steht genau einmal im Log - gleich,
+// ob die Route selbst antwortet oder ihn dem Handler ueberlaesst.
+// --------------------------------------------------------
+const BROKEN_ROUTES = [
+  { method: 'GET', path: '/locations' },
+  { method: 'POST', path: '/locations', body: { name: 'Kaputt' } },
+  { method: 'PUT', path: '/locations/1', body: { name: 'Kaputt' } },
+  { method: 'DELETE', path: '/locations/1' },
+  { method: 'PATCH', path: '/locations/reorder', body: { order: [1] } },
+  { method: 'POST', path: '/locations/1/subcategories', body: { name: 'Kaputt' } },
+  { method: 'PUT', path: '/locations/1/subcategories/2', body: { name: 'Kaputt' } },
+  { method: 'DELETE', path: '/locations/1/subcategories/2' },
+  { method: 'PATCH', path: '/locations/1/subcategories/reorder', body: { order: [2] } },
+];
+for (const { method, path, body } of BROKEN_ROUTES) {
+  test(`${method} ${path}: Datenbankfehler -> 500 mit festem Satz, kein SQLite-Text im Rumpf`, async () => {
+    const answer = await withTableGone(db, 'inventory_locations', () => requestLogged(baseUrl, handlerLog, method, path, body));
+    assertFixed500(answer, 'no such table: inventory_locations', `${method} ${path}`);
+  });
+}
+
+test('POST /locations: scheitert das Einfuegen -> 500 mit festem Satz, nichts angelegt', async () => {
+  const before = db.prepare('SELECT COUNT(*) AS c FROM inventory_locations').get().c;
+  const answer = await withWriteRefused(db, 'inventory_locations', 'INSERT',
+    () => requestLogged(baseUrl, handlerLog, 'POST', '/locations', { name: 'Abgelehnt' }));
+  assertFixed500(answer, REFUSED_WRITE_TEXT, 'POST /locations');
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM inventory_locations').get().c, before);
+});
+
+test('PATCH /locations/reorder: scheitert die zweite Zeile, rollt die Transaktion die erste zurueck', async () => {
+  const a = await call('POST', '/locations', { name: 'Rollback A' });
+  const b = await call('POST', '/locations', { name: 'Rollback B' });
+  const ids = [a.body.data.id, b.body.data.id];
+  const sortOrders = () => ids.map((id) => db.prepare('SELECT sort_order FROM inventory_locations WHERE id = ?').get(id).sort_order);
+  const before = sortOrders();
+
+  // Die erste Zeile (b) ist schon geschrieben, wenn die zweite (a) scheitert.
+  const answer = await withWriteRefused(db, 'inventory_locations', 'UPDATE',
+    () => requestLogged(baseUrl, handlerLog, 'PATCH', '/locations/reorder', { order: [ids[1], ids[0]] }),
+    `NEW.id = ${Number(ids[0])}`);
+  assertFixed500(answer, REFUSED_WRITE_TEXT, 'PATCH /locations/reorder');
+  assert.deepEqual(sortOrders(), before, 'die Reihenfolge ist unveraendert');
 });

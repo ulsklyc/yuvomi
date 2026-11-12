@@ -903,6 +903,8 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/split-expenses.js: err.reason', { sites: 1, at403: [],
     why: 'Refusal: ein Grund nur an 409 (email_in_use, group_archived); die 403 dort tragen keinen' }],
   ['auth.js: err.code', { sites: 1, at403: [], why: 'feste 409 (2FA)' }],
+  ['routes/system.js: backup?.lastError?.reason ?? null', { sites: 1, at403: [],
+    why: 'Diagnose (Phase 1b F): Feld `backup.reason` einer festen 200, der Grund des letzten Backup-Fehlschlags aus der geschlossenen Menge' }],
   // Gravatar-Import: GravatarError traegt seinen Grund, die Route schlaegt den
   // Status nach (400/404/413/415/502, 500 bei falsch gesetzter GRAVATAR_BASE_URL)
   // - eine 403 baut sie daraus nie. Ihre eigene 403 (not_a_household_member)
@@ -971,7 +973,10 @@ const REASONS_PASSED_THROUGH = new Map([
   ['services/recipe-providers/failure.js: failure?.reason ?? null', { sites: 1, at403: [], why: 'probeFailure: Feld im Ergebnis des Verbindungstests' }],
   ['services/recipe-providers/failure.js: probe.reason', { sites: 1, at403: [], why: 'classifyProbe: reicht den Fall des Adapters weiter' }],
   ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
-  ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
+  // Zentraler Fehlerhandler (Phase 1b, Abschnitt E): die feste 503 eines
+  // Restores und der Grund einer 4xx mit `expose` (HttpError). Heute wirft
+  // keine Stelle eine HttpError mit 403; wer es tut, traegt den Grund hier ein.
+  ['middleware/error-handler.js: err.reason', { sites: 2, at403: [], why: 'feste 503 (Restore) und die 4xx einer HttpError, heute keine 403' }],
   ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
   ['routes/weather.js: WEATHER_REASON.NOT_CONFIGURED', { sites: 1, at403: [], why: 'Antwort 200 ohne Daten' }],
   ['routes/weather.js: WEATHER_REASON.UPSTREAM_ERROR', { sites: 5, at403: [], why: 'Antwort 200 ohne Daten (Wetter 3x, Ortssuche 2x)' }],

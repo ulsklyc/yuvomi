@@ -89,9 +89,12 @@ the last tag is an interface release.
    Announcements discussion), its CHANGELOG block starts with `### Foundation`, and before its
    tag the way back is tried once: the previous image and the foundation build run in turn on a
    copy of the same database (the demo seed does), a backup made on the new build restores on
-   the previous one, and the service worker switches both ways without an error screen. The
-   result goes into the release notes. The foundation does not change the database, so an
-   operator can pin the previous tag (installation.md, "Pinning a version").
+   the previous one, and the service worker switches both ways without an error screen.
+   `scripts/rollback-probe/run.sh <previous-image> <new-image>` runs exactly that (Docker, curl and
+   `npm ci` in the checkout; it prints a protocol per stage and keeps fingerprints, API snapshots
+   and screenshots in its work directory). The result goes into the release notes. The
+   foundation does not change the database, so an operator can pin the previous tag
+   (installation.md, "Pinning a version").
 8. **Handrail, interface releases only.** If the diff since the last tag touches the interface
    paths above, run the browser suite once, and read its exit code from a file rather than a
    pipe (`| tail` reports the status of `tail`):
@@ -147,7 +150,10 @@ the last tag is an interface release.
     ```
 
     YunoHost's daily bump PR (`ulsklyc/yuvomi_ynh`) and the Proxmox script pick the asset up from
-    there. Then look the Umbrel PR up rather than
+    there. The asset job also starts `corpus.yml`, which attaches `yuvomi-X.Y.Z-corpus.db` (plus
+    `.sha256`) when the release changes the database schema or is a foundation release; check it
+    with `gh run list --repo ulsklyc/yuvomi --workflow=corpus.yml --limit 1`. A red run does not
+    touch the release; the restore drill names the missing database. Then look the Umbrel PR up rather than
     assuming a number - the workflow renames the open PR if there is one and opens a new one only
     once the previous one was merged:
 
@@ -190,9 +196,12 @@ CVE requested through GitHub. The response times this has to fit are in
 - The image names in `docker-publish.yml` follow `github.repository` and
   `github.repository_owner`, so a fork publishes under its own account without edits; the `oikos`
   mirror line then publishes `<owner>/oikos`, which a fork can drop.
-- `umbrel-publish.yml` needs the `UMBREL_FORK_TOKEN` secret (a token with `repo` scope on a fork of
-  `getumbrel/umbrel-apps`) and pushes to that fork; without the secret the job fails and nothing
-  else is affected.
+- `umbrel-publish.yml` needs the `UMBREL_FORK_TOKEN` secret (a classic token with the `public_repo`
+  scope and nothing else; a fine-grained token cannot open the pull request in
+  `getumbrel/umbrel-apps`) and pushes to a fork of that repository; without the secret the job fails and nothing
+  else is affected. Only its last job, `publish`, sees the token: the catalog's linter and its npm
+  dependencies run in a job of their own with no secret and no rights. A manual run with
+  `-f dry_run=true` prepares and lints without pushing.
 - `release-assets.yml` needs no secret: the workflow token uploads the assets, and the
   attestation is signed through GitHub's OIDC token and Sigstore. Attestations are free for public
   repositories only; a private fork has to drop that step.

@@ -11,7 +11,7 @@ import {
   WEBHOOK_TEMPLATE_PLACEHOLDERS,
   renderPayloadTemplate,
   unknownTemplatePlaceholders,
-} from './notification-providers/webhook.js';
+} from './notification-providers/webhook-template.js';
 
 export const NOTIFICATION_PROVIDERS = [
   { id: 'gotify', name: 'Gotify' },

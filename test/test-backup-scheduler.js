@@ -3,7 +3,7 @@
  * Purpose: Verify automated backup scheduling functionality
  */
 
-import { describe, it } from 'node:test';
+import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
@@ -39,7 +39,26 @@ process.env.BACKUP_ENABLED = 'false'; // Disable scheduler for tests
 process.env.BACKUP_DIR = TEST_BACKUP_DIR;
 process.env.BACKUP_KEEP = '3';
 
+/**
+ * Run `fn` and return what it logged at error level next to its result.
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<{ result: T, log: string }>}
+ */
+async function withErrorLog(fn) {
+  /** @type {string[]} */
+  const logged = [];
+  const realError = console.error;
+  console.error = (...args) => { logged.push(args.map((a) => (a instanceof Error ? a.message : String(a))).join(' ')); };
+  try {
+    return { result: await fn(), log: logged.join('\n') };
+  } finally {
+    console.error = realError;
+  }
+}
+
 describe('Backup Scheduler', () => {
+  /** @type {any} the module; its status fields are nullable, the suite asserts on them directly */
   let backupScheduler;
 
   it('should load the backup scheduler module', async () => {
@@ -152,7 +171,7 @@ describe('Backup Scheduler', () => {
     await fs.chmod(TEST_BACKUP_ROOT, 0o500);
 
     try {
-      const result = await backupScheduler.triggerBackup();
+      const { result, log } = await withErrorLog(() => backupScheduler.triggerBackup());
 
       assert.strictEqual(result.success, false, 'backup must fail on an unwritable directory');
       // VERANKERT AN DEN ANFUEHRUNGSZEICHEN DER MELDUNG. Der relative BACKUP_DIR fuehrt
@@ -160,17 +179,30 @@ describe('Backup Scheduler', () => {
       // Treffer auf den absoluten Pfad fand ihn deshalb auch in einer Meldung, die den
       // RELATIVEN Wert nennt: `${BACKUP_DIR}` statt `${path.resolve(BACKUP_DIR)}` im
       // Server blieb gruen (Review auf #1229).
+      // Since Phase 1b section F the text with the path goes to the LOG only.
+      // What an admin reads over the API is a reason and a fixed sentence.
       const absolute = path.resolve(TEST_BACKUP_DIR);
       assert.ok(
-        result.error.includes(`"${absolute}"`),
-        `error must name the absolute path in quotes: ${result.error}`
+        log.includes(`"${absolute}"`),
+        `the log must name the absolute path in quotes: ${log}`
       );
       assert.ok(
-        !result.error.includes(`"${TEST_BACKUP_DIR}"`),
-        `error must not name the relative path: ${result.error}`
+        !log.includes(`"${TEST_BACKUP_DIR}"`),
+        `the log must not name the relative path: ${log}`
       );
-      assert.match(result.error, /BACKUP_DIR/, 'error must point at the BACKUP_DIR setting');
-      assert.match(result.error, /EACCES|EPERM|EROFS/, 'error must keep the original errno');
+      assert.match(log, /BACKUP_DIR/, 'the log must point at the BACKUP_DIR setting');
+      assert.match(log, /EACCES|EPERM|EROFS/, 'the log must keep the original errno');
+
+      const status = backupScheduler.getStatus();
+      assert.strictEqual(result.reason, 'backup_dir_not_writable');
+      assert.strictEqual(status.lastError.reason, 'backup_dir_not_writable');
+      assert.strictEqual(status.lastError.message, result.error, 'one sentence in both places');
+      assert.match(result.error, /BACKUP_DIR/, 'the sentence still points at the BACKUP_DIR setting');
+      for (const text of [result.error, status.lastError.message]) {
+        assert.ok(!text.includes(absolute) && !text.includes(TEST_BACKUP_ABSOLUTE) && !text.includes(TEST_BACKUP_DIR),
+          `no path in what the API shows: ${text}`);
+        assert.doesNotMatch(text, /EACCES|EPERM|EROFS/, 'no errno in what the API shows');
+      }
     } finally {
       await fs.chmod(TEST_BACKUP_ROOT, 0o755);
     }
@@ -207,6 +239,9 @@ describe('Backup Scheduler', () => {
       const status = backupScheduler.getStatus();
       assert.ok(status.lastError, 'the failure must show in the scheduler status');
       assert.match(status.lastError.message, /integrity check/);
+      assert.strictEqual(status.lastError.reason, 'backup_verify_failed');
+      assert.doesNotMatch(status.lastError.message, /missing from index|probe_2520/,
+        'the finding of the check stays in the log');
       assert.deepStrictEqual((await fs.readdir(TEST_BACKUP_DIR)).sort(), before,
         'no damaged file left behind, no good backup rotated away');
       await assert.rejects(backupScheduler.createLocalBackup(), { reason: 'backup_verify_failed' },
@@ -220,5 +255,172 @@ describe('Backup Scheduler', () => {
 
   it('should cleanup test directory', async () => {
     await fs.rm(TEST_BACKUP_ROOT, { recursive: true, force: true });
+  });
+});
+
+describe('Backup status survives a restart', () => {
+  // ── Phase 1b section F (E12): the status outlives the process ──────────────
+  //
+  // A restart is a fresh instance of the module on the same database: the query
+  // string gives the import its own module record, with empty memory.
+  let restarts = 0;
+  const afterRestart = async () => import(`../server/services/backup-scheduler.js?restart=${++restarts}`);
+  /** @type {any} the module; its status fields are nullable, the suite asserts on them directly */
+  let backupScheduler;
+  before(async () => { backupScheduler = await import('../server/services/backup-scheduler.js'); });
+
+  /**
+   * Make the next backup fail before anything is written.
+   * @param {Error} error
+   */
+  async function failingBackup(error) {
+    const realMkdir = fs.mkdir;
+    fs.mkdir = async () => { throw error; };
+    const realError = console.error;
+    console.error = () => {};
+    try {
+      return await backupScheduler.triggerBackup();
+    } finally {
+      fs.mkdir = realMkdir;
+      console.error = realError;
+    }
+  }
+
+  it('the status of a successful run is there after a restart', async () => {
+    const result = await backupScheduler.triggerBackup();
+    assert.strictEqual(result.success, true);
+    const earlier = backupScheduler.getStatus();
+    assert.strictEqual(earlier.lastSuccess, earlier.lastBackup.timestamp);
+
+    const status = (await afterRestart()).getStatus();
+    assert.ok(status.lastBackup, 'after a restart the last backup is not "never"');
+    assert.strictEqual(status.lastBackup.timestamp, earlier.lastBackup.timestamp);
+    assert.strictEqual(status.lastBackup.success, true);
+    assert.strictEqual(status.lastSuccess, earlier.lastSuccess);
+    assert.strictEqual(status.lastError, null);
+  });
+
+  it('the status of a failed run is there after a restart, with the last success before it', async () => {
+    const lastSuccess = backupScheduler.getStatus().lastSuccess;
+    const result = await failingBackup(Object.assign(
+      new Error("ENOSPC: no space left on device, mkdir '/srv/secret/backups'"), { code: 'ENOSPC' }));
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.reason, 'disk_full');
+    const earlier = backupScheduler.getStatus();
+
+    const status = (await afterRestart()).getStatus();
+    assert.strictEqual(status.lastBackup.success, false);
+    assert.strictEqual(status.lastBackup.timestamp, earlier.lastBackup.timestamp);
+    assert.deepStrictEqual(status.lastError, earlier.lastError);
+    assert.strictEqual(status.lastError.reason, 'disk_full');
+    assert.strictEqual(status.lastSuccess, lastSuccess, 'a failure does not move the last success');
+    assert.ok(Date.parse(status.lastSuccess) <= Date.parse(status.lastError.timestamp));
+  });
+
+  it('a failure the scheduler cannot name is "unknown", and its text reaches neither the API nor the database', async () => {
+    const result = await failingBackup(new Error("something broke at /srv/secret/backups on host nas.internal"));
+    const status = backupScheduler.getStatus();
+    assert.strictEqual(result.reason, 'unknown');
+    assert.strictEqual(status.lastError.reason, 'unknown');
+    for (const text of [result.error, status.lastError.message]) {
+      assert.doesNotMatch(text, /secret|nas\.internal|something broke/);
+    }
+    const { get } = await import('../server/db.js');
+    const stored = get().prepare("SELECT key, value FROM sync_config WHERE key LIKE 'backup\\_last\\_%' ESCAPE '\\' ORDER BY key").all();
+    assert.deepStrictEqual(stored.map((/** @type {any} */ row) => row.key), ['backup_last_attempt', 'backup_last_reason', 'backup_last_success']);
+    assert.doesNotMatch(JSON.stringify(stored), /secret|nas\.internal|something broke/);
+    assert.strictEqual(stored.find((/** @type {any} */ row) => row.key === 'backup_last_reason').value, 'unknown');
+  });
+
+  it('the reason is a closed set: every reason has its sentence, and a stored value outside it reads as "unknown"', async () => {
+    const reasons = {
+      backup_dir_not_writable: Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }),
+      disk_full: Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' }),
+      unknown: new Error('?'),
+    };
+    const sentences = new Set();
+    for (const [reason, error] of Object.entries(reasons)) {
+      const result = await failingBackup(error);
+      assert.strictEqual(result.reason, reason);
+      assert.ok(result.error.length > 20, `${reason} has a sentence`);
+      sentences.add(result.error);
+    }
+    assert.strictEqual(sentences.size, 3, 'one sentence per reason');
+
+    const { get } = await import('../server/db.js');
+    get().prepare("UPDATE sync_config SET value = 'made_up_reason' WHERE key = 'backup_last_reason'").run();
+    const status = (await afterRestart()).getStatus();
+    assert.strictEqual(status.lastError.reason, 'unknown');
+  });
+
+  it('a fresh process whose first run fails keeps the last success from the database', async () => {
+    assert.strictEqual((await backupScheduler.triggerBackup()).success, true);
+    const lastSuccess = backupScheduler.getStatus().lastSuccess;
+    // No status call before the run: the failure itself has to look the success up.
+    const fresh = await afterRestart();
+    const realMkdir = fs.mkdir;
+    fs.mkdir = async () => { throw Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' }); };
+    try {
+      const { result } = await withErrorLog(() => fresh.triggerBackup());
+      assert.strictEqual(result.success, false);
+    } finally {
+      fs.mkdir = realMkdir;
+    }
+    assert.strictEqual(fresh.getStatus().lastSuccess, lastSuccess);
+    assert.strictEqual((await afterRestart()).getStatus().lastSuccess, lastSuccess, 'and it is still stored');
+  });
+
+  it('a backup directory that exists but refuses writes is "backup_dir_not_writable", not "unknown"', async (t) => {
+    // The commonest container case: BACKUP_DIR is a mounted folder of another
+    // user. mkdir succeeds on a directory that exists; the driver then fails
+    // with SQLITE_CANTOPEN, which says nothing about why.
+    if ((typeof process.getuid === 'function' && process.getuid() === 0) || process.platform === 'win32') {
+      t.skip('needs directory permissions that hold for this user');
+      return;
+    }
+    await fs.mkdir(TEST_BACKUP_DIR, { recursive: true });
+    const before = (await fs.readdir(TEST_BACKUP_DIR)).sort();
+    await fs.chmod(TEST_BACKUP_DIR, 0o500);
+    try {
+      const { result, log } = await withErrorLog(() => backupScheduler.triggerBackup());
+      assert.strictEqual(result.success, false);
+      assert.strictEqual(result.reason, 'backup_dir_not_writable');
+      assert.match(log, /BACKUP_DIR/, 'the log points at the setting');
+      assert.ok(log.includes(`"${path.resolve(TEST_BACKUP_DIR)}"`), 'the log names the absolute path');
+    } finally {
+      await fs.chmod(TEST_BACKUP_DIR, 0o700);
+    }
+    assert.deepStrictEqual((await fs.readdir(TEST_BACKUP_DIR)).sort(), before, 'nothing left behind');
+  });
+
+  it('the status names the next scheduled run while the schedule is on, and null without one', async () => {
+    assert.strictEqual(backupScheduler.getStatus().nextRun, null, 'the suite runs with BACKUP_ENABLED=false');
+    const env = { BACKUP_ENABLED: process.env.BACKUP_ENABLED, BACKUP_SCHEDULE: process.env.BACKUP_SCHEDULE };
+    process.env.BACKUP_ENABLED = 'true';
+    process.env.BACKUP_SCHEDULE = '0 3 * * *';
+    // The schedule is read when the module loads: a fresh instance sees it.
+    const fresh = await afterRestart();
+    try {
+      fresh.startScheduler();
+      const { nextRun } = fresh.getStatus();
+      assert.match(nextRun, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      const ahead = Date.parse(nextRun) - Date.now();
+      assert.ok(ahead > 0 && ahead <= 24 * 60 * 60 * 1000, `a daily schedule fires within a day, got ${nextRun}`);
+    } finally {
+      fresh.stopScheduler();
+      for (const [name, value] of Object.entries(env)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+    assert.strictEqual(fresh.getStatus().nextRun, null, 'stopped: no next run');
+  });
+
+  it('a success after a failure clears the reason, also after a restart', async () => {
+    assert.strictEqual((await backupScheduler.triggerBackup()).success, true);
+    assert.strictEqual(backupScheduler.getStatus().lastError, null);
+    const status = (await afterRestart()).getStatus();
+    assert.strictEqual(status.lastError, null);
+    assert.strictEqual(status.lastBackup.success, true);
   });
 });

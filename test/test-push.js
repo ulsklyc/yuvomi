@@ -379,10 +379,15 @@ test('PUT /wall-mode aendert nur das eigene Abo - nicht das eines anderen Nutzer
  * Innerhalb eines `test()`-Callbacks bindet der Hook an genau diesen Test und
  * laeuft direkt danach - auch nach einer geworfenen Assertion.
  */
-async function startApp(db, webpush, userId = 1) {
+async function startApp(db, webpush, userId = 1, { viaSession = false } = {}) {
   const app = express();
   app.use(express.json());
-  app.use((req, _res, next) => { req.authUserId = userId; next(); });
+  // Token requests carry `authUserId`, browser requests only the session.
+  app.use((req, _res, next) => {
+    if (viaSession) req.session = { userId };
+    else req.authUserId = userId;
+    next();
+  });
   const { createPushService } = await import('../server/services/push.js');
   const pushService = createPushService({ db, webpush });
   app.use('/', buildRouter({ pushService, database: db }));
@@ -480,6 +485,23 @@ test('POST /test only counts the current user devices', async () => {
   const json = await res.json();
   assert.equal(json.data.devices, 0);
 });
+
+for (const via of ['token', 'session']) {
+  test(`POST /test goes only to the requester (${via}), never to another member's devices`, async () => {
+    // The test push is the one sender whose recipient check is "the requester
+    // themself": it carries the text the client sent, so it must not reach anyone
+    // else. Both members have a device; only the requester's may get the push.
+    const db = makeDb();
+    const webpush = makeWebpushMock();
+    db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/alice','p','a'),(2,'https://push/bob','p','a')").run();
+    const app = await startApp(db, webpush, 2, { viaSession: via === 'session' });
+    const res = await fetchRetry(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Nur Bob' }) });
+    const json = await res.json();
+    assert.equal(res.status, 200);
+    assert.deepEqual(json.data, { sent: 1, devices: 1 });
+    assert.deepEqual(webpush.calls.map((c) => c.endpoint), ['https://push/bob']);
+  });
+}
 
 function pastIso() { return new Date(Date.now() - 60_000).toISOString(); }
 function futureIso() { return new Date(Date.now() + 3_600_000).toISOString(); }
