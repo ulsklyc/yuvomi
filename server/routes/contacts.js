@@ -1093,43 +1093,38 @@ router.get('/:id', (req, res) => {
  * für Browser-Caching (kein separater Upload-Endpunkt nötig).
  */
 router.get('/:id/photo', (req, res) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    const row = db.get().prepare('SELECT photo FROM contacts WHERE id = ?').get(id);
-    if (!row) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
-    if (!row.photo) return res.status(404).json({ error: 'Contact has no photo.', code: 404, reason: 'contacts_no_photo' });
+  const id = parseInt(req.params.id, 10);
+  const row = db.get().prepare('SELECT photo FROM contacts WHERE id = ?').get(id);
+  if (!row) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
+  if (!row.photo) return res.status(404).json({ error: 'Contact has no photo.', code: 404, reason: 'contacts_no_photo' });
 
-    // Beide Formen, nicht nur die mit Praefix: ein vor #2128 synchronisiertes
-    // Foto liegt als nackte Base64-Zeichen da (siehe decodeStoredPhoto).
-    const decoded = decodeStoredPhoto(row.photo);
-    // 422, nicht 500: ein Spaltenwert, der kein Bild ist, ist kein Fehler DIESES
-    // Servers - er benennt den Fall und laesst die Liste weiterlaufen.
-    if (!decoded) {
-      return res.status(422).json({
-        error: 'Stored photo is not a readable image.', code: 422, reason: 'contacts_photo_unreadable',
-      });
-    }
-
-    const { mime, buffer: buf } = decoded;
-    // DER ETAG IST EIN INHALTS-HASH, KEINE LAENGE. Vorher stand hier die
-    // Bytelaenge: zwei verschiedene Fotos gleicher Groesse galten damit als
-    // dasselbe Bild, und `If-None-Match` beantwortete das eine mit dem anderen.
-    const etag = `"${createHash('sha256').update(buf).digest('hex').slice(0, 32)}"`;
-
-    if (req.headers['if-none-match'] === etag) return res.status(304).end();
-    res.setHeader('Content-Type', mime);
-    // `no-cache` HEISST NICHT "nicht zwischenspeichern", sondern "vor dem
-    // Benutzen nachfragen" - der Browser behaelt das Bild und bekommt auf den
-    // bedingten GET ein 304, solange der Hash gleich bleibt. Vorher stand hier
-    // `max-age=31536000, immutable` auf einer Adresse, die sich NIE aendert:
-    // ein neues Foto desselben Kontakts blieb damit ein Jahr unsichtbar.
-    res.setHeader('Cache-Control', 'private, no-cache');
-    res.setHeader('ETag', etag);
-    res.send(buf);
-  } catch (err) {
-    log.error('GET /:id/photo', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+  // Beide Formen, nicht nur die mit Praefix: ein vor #2128 synchronisiertes
+  // Foto liegt als nackte Base64-Zeichen da (siehe decodeStoredPhoto).
+  const decoded = decodeStoredPhoto(row.photo);
+  // 422, nicht 500: ein Spaltenwert, der kein Bild ist, ist kein Fehler DIESES
+  // Servers - er benennt den Fall und laesst die Liste weiterlaufen.
+  if (!decoded) {
+    return res.status(422).json({
+      error: 'Stored photo is not a readable image.', code: 422, reason: 'contacts_photo_unreadable',
+    });
   }
+
+  const { mime, buffer: buf } = decoded;
+  // DER ETAG IST EIN INHALTS-HASH, KEINE LAENGE. Vorher stand hier die
+  // Bytelaenge: zwei verschiedene Fotos gleicher Groesse galten damit als
+  // dasselbe Bild, und `If-None-Match` beantwortete das eine mit dem anderen.
+  const etag = `"${createHash('sha256').update(buf).digest('hex').slice(0, 32)}"`;
+
+  if (req.headers['if-none-match'] === etag) return res.status(304).end();
+  res.setHeader('Content-Type', mime);
+  // `no-cache` HEISST NICHT "nicht zwischenspeichern", sondern "vor dem
+  // Benutzen nachfragen" - der Browser behaelt das Bild und bekommt auf den
+  // bedingten GET ein 304, solange der Hash gleich bleibt. Vorher stand hier
+  // `max-age=31536000, immutable` auf einer Adresse, die sich NIE aendert:
+  // ein neues Foto desselben Kontakts blieb damit ein Jahr unsichtbar.
+  res.setHeader('Cache-Control', 'private, no-cache');
+  res.setHeader('ETag', etag);
+  res.send(buf);
 });
 
 /**
