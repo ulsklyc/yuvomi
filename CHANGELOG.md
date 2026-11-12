@@ -14,6 +14,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The end date is also accepted by `PUT /api/v1/budget/{id}/series` and
   `POST /api/v1/budget` for new recurring entries. An empty string clears the date.
   (Refs #1742)
+- **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
+  system information there is a section with what the installation runs on: version and build,
+  whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema
+  version and the last migration, the size of the database and the free disk space, whether the
+  database is encrypted and where its key comes from, and the state of the last backup. One
+  button copies all of it as plain text with the field names of the API and the raw values, the
+  same in every language, so that whoever reads the report does not have to know yours. The
+  text contains no password, key or path and nothing about members. Copying also works over
+  plain http in the home network; where a browser refuses it, the text stands selected in a
+  field instead of claiming a copy that did not happen.
+- **The backup page now shows why the last scheduled run failed** (#2525). Settings > Household >
+  Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
+  in your language - a full disk, an unwritable backup folder, a failed integrity check, or an
+  unrecognised cause - from `scheduler.lastError.reason`. A successful run clears the row.
+- **The backup card keeps telling you when a backup last succeeded, and warns when that is too
+  long ago.** After a failed run, "Last backup" showed only the date of the failure, and the date
+  of the last backup you can actually restore from was gone. "Last backup" is now always the
+  last one that succeeded; a failed run adds its own "Last attempt" row above the reason and
+  leaves again with the next success. If the last success is older than two intervals of the
+  schedule (daily, weekly, monthly or every N hours), or no run has succeeded yet although one
+  was tried, the row turns amber and says that at least two scheduled backups have been missed -
+  also when nothing failed and the schedule simply stood still. A schedule the page cannot read
+  as one of those patterns never warns about age. The card also names the next scheduled run
+  ("Next backup") below those rows, because after a failure the next question is when it will
+  try again. And "Active" is green only while nothing on the card asks for attention: after a
+  failed run or with an overdue backup the word stays, since the schedule is still running, but
+  without the green that would say all is well next to a red line.
+
+### Fixed
+- **"Create backup now" no longer reports success when the backup failed.** The server answers
+  a failed manual run with `200` and `success: false`, and the page showed "Backup created
+  successfully." without reading the answer. It now shows the reason in your language, the
+  same sentence as the "Last error" row, and the card reloads either way.
+- **A backup schedule over several weekdays is no longer shown as "Every Monday".** With
+  `BACKUP_SCHEDULE` set to a range or a list of weekday names, such as `0 2 * * mon-fri` or
+  `0 2 * * mon,wed,fri`, the backup card read only the first name: it said "Every Monday at
+  02:00" for a schedule that runs on five days. The backups themselves always ran as
+  configured - only the description was wrong. Such a schedule now stands there as the
+  expression itself, like every other list or range; a single weekday is still spelled out,
+  as a number or as a short or full name (`mon`, `Monday`).
 
 ## [2.89.1] - 2026-11-12
 
