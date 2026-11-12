@@ -4,25 +4,38 @@
  * Purpose: ONE place builds the actor every permission question starts from.
  *          Held here through the module's interface (server/authorize/index.ts),
  *          against real SQLite with every migration:
- *            1. `kind` is the narrowest kind that applies, in this order:
- *               display cookie -> split guest -> display account -> token -> session.
+ *            1. `kind` is the narrowest kind that applies, one test per line of
+ *               the order in kindOf() (server/authorize/actor.ts): display cookie,
+ *               display account, guest (or failed guest lookup), failed display
+ *               lookup, token, session. Both lookups always run, except for the
+ *               display cookie, which needs neither.
  *            2. A failed lookup counts as the narrower kind (guest, display).
- *            3. A missing user id reads as `display`, the one kind that keeps both
- *               of today's callers as they were (the /api/v1 guest gate: not a
- *               guest; /mcp: every tool closed).
+ *            3. A missing user id, or a request requireAuth never saw, reads as
+ *               `display` without a query: the one kind that keeps both of today's
+ *               callers as they were (the /api/v1 guest gate: not a guest; /mcp:
+ *               every tool closed).
  *            4. A device token of an admin is a member, as requireAuth decides.
  *            5. `actorFromRequest` builds once per request; a second call runs no
  *               query and returns the same object.
  *            6. `actorForUser` is `null` for an unknown account and does NOT
  *               classify a display account (see the comment at that test).
  *            7. `householdAudience` is the actor without an account.
+ *            8. server/authorize/ never loads server/db.js, which opens a database
+ *               on import - checked in a child process, for the module itself and
+ *               for server/openapi.js, which reaches it through
+ *               services/reminder-origins.js.
  *
  * Run: npm run test:authorize-actor
  */
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { tempDir } from './tmp-dir.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'authorize-actor-test-secret-32chars!';
@@ -31,7 +44,7 @@ process.env.LOG_LEVEL = 'error';
 // server/db.js opens `:memory:` on import and runs every migration on it, on the
 // production driver; the actor reads through that same connection.
 const { get } = await import('../server/db.js');
-const { actorFromRequest, actorForUser, householdAudience } = await import('../server/authorize/index.ts');
+const { actorFromRequest, actorForUser, householdAudience, resolveRequestModuleAccess } = await import('../server/authorize/index.ts');
 const { requireAuth } = await import('../server/auth.js');
 
 const db = get();
@@ -51,7 +64,7 @@ const MEMBER = seedUser('member', 'parent');
 const KID = seedUser('member', 'child');
 const GUEST = seedUser('member');
 const DISPLAY = seedUser('member');
-const BOTH = seedUser('member'); // guest row AND display row: guest is narrower
+const BOTH = seedUser('member'); // guest row AND display row: the display row wins
 
 const groupId = db.prepare('INSERT INTO expense_groups (name, created_by) VALUES (?, ?)').run('Trip', ADMIN).lastInsertRowid;
 for (const id of [GUEST, BOTH]) {
@@ -71,17 +84,26 @@ db.prepare(`
  *   authDeviceId?: number|null, sessionModuleAccess?: Record<string, 'none'|'read'>|null,
  *   headers?: Record<string, string> }} Req
  */
+/**
+ * What the end of requireAuth does: resolve the module rights and hand the
+ * connection to server/authorize/ (applyRoleModuleAccess in server/auth.js).
+ * @param {Req} req @returns {Req}
+ */
+function authed(req) {
+  req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
+  return req;
+}
 /** @param {number|null} userId @param {string} [role] @returns {Req} */
 function sessionReq(userId, role = 'member') {
-  return { authMethod: 'session', authUserId: userId, authRole: role, authScopes: null, sessionModuleAccess: null };
+  return authed({ authMethod: 'session', authUserId: userId, authRole: role, authScopes: null });
 }
 /** @param {number|null} userId @param {string} [role] @returns {Req} */
 function tokenReq(userId, role = 'member') {
-  return { authMethod: 'api_token', authUserId: userId, authRole: role, authScopes: null, authDeviceId: null, sessionModuleAccess: null };
+  return authed({ authMethod: 'api_token', authUserId: userId, authRole: role, authScopes: null, authDeviceId: null });
 }
 /** @param {number} userId @returns {Req} */
 function displayReq(userId) {
-  return { authMethod: 'display', authUserId: userId, authRole: 'member', authScopes: ['tasks:read'], sessionModuleAccess: { tasks: 'read' } };
+  return authed({ authMethod: 'display', authUserId: userId, authRole: 'member', authScopes: ['tasks:read'] });
 }
 
 /**
@@ -125,62 +147,86 @@ function withTableMissing(table, fn) {
 // The order of `kind`
 // --------------------------------------------------------------------------
 
-test('kind: the display cookie wins over everything, even over a guest row', () => {
-  assert.equal(actorFromRequest(displayReq(DISPLAY)).kind, 'display');
-  assert.equal(actorFromRequest(displayReq(GUEST)).kind, 'display');
+test('kind 1: the display cookie is a display, without either lookup', () => {
+  for (const id of [DISPLAY, GUEST, MEMBER]) {
+    const req = displayReq(id);
+    const { result, queries } = countQueries(() => actorFromRequest(req));
+    assert.equal(result.kind, 'display');
+    assert.deepEqual(queries, []);
+  }
 });
 
-test('kind: a split guest is a guest, by session and by token', () => {
+test('kind 2: a display account is a display, by token or session, even with a guest row', () => {
+  assert.equal(actorFromRequest(tokenReq(DISPLAY)).kind, 'display');
+  assert.equal(actorFromRequest(sessionReq(DISPLAY)).kind, 'display');
+  assert.equal(actorFromRequest(tokenReq(BOTH)).kind, 'display');
+});
+
+test('kind 2: a display account stays a display when the guest lookup fails', () => {
+  const req = tokenReq(DISPLAY);
+  const actor = withTableMissing('split_expense_guest_users', () => actorFromRequest(req));
+  assert.equal(actor.kind, 'display');
+});
+
+test('kind 3: a split guest is a guest, by session and by token', () => {
   assert.equal(actorFromRequest(sessionReq(GUEST)).kind, 'guest');
   assert.equal(actorFromRequest(tokenReq(GUEST)).kind, 'guest');
 });
 
-test('kind: a guest row outranks a display account row', () => {
-  assert.equal(actorFromRequest(tokenReq(BOTH)).kind, 'guest');
-});
-
-test('kind: a display account reached by token or session is a display', () => {
-  assert.equal(actorFromRequest(tokenReq(DISPLAY)).kind, 'display');
-  assert.equal(actorFromRequest(sessionReq(DISPLAY)).kind, 'display');
-});
-
-test('kind: a plain token is a token, a plain session a session', () => {
-  assert.equal(actorFromRequest(tokenReq(MEMBER)).kind, 'token');
-  assert.equal(actorFromRequest(sessionReq(MEMBER)).kind, 'session');
-  assert.equal(actorFromRequest(sessionReq(ADMIN, 'admin')).kind, 'session');
-});
-
-test('kind: the guest lookup runs first and a guest skips the display lookup', () => {
-  const { queries } = countQueries(() => actorFromRequest(sessionReq(GUEST)));
-  assert.equal(queries.length, 1);
-  assert.match(queries[0], /split_expense_guest_users/);
-  const plain = countQueries(() => actorFromRequest(sessionReq(MEMBER))).queries;
-  assert.equal(plain.length, 2);
-  assert.match(plain[0], /split_expense_guest_users/);
-  assert.match(plain[1], /display_accounts/);
-});
-
-// --------------------------------------------------------------------------
-// When in doubt, closed
-// --------------------------------------------------------------------------
-
-test('a failed guest lookup counts as a guest', () => {
-  const actor = withTableMissing('split_expense_guest_users', () => actorFromRequest(tokenReq(MEMBER)));
+test('kind 3: a failed guest lookup counts as a guest', () => {
+  const req = tokenReq(MEMBER);
+  const actor = withTableMissing('split_expense_guest_users', () => actorFromRequest(req));
   assert.equal(actor.kind, 'guest');
 });
 
-test('a failed display lookup counts as a display', () => {
-  const actor = withTableMissing('display_accounts', () => actorFromRequest(tokenReq(MEMBER)));
+test('kind 3: a guest whose display lookup fails is a guest (the one change from before B1)', () => {
+  // Before B1 /mcp closed every tool here (its display lookup said true on a
+  // failure); now the three bridge tools stay open, and they call back into
+  // /api/v1, whose guest gate refuses everything outside /split-expenses.
+  const req = tokenReq(GUEST);
+  const actor = withTableMissing('display_accounts', () => actorFromRequest(req));
+  assert.equal(actor.kind, 'guest');
+});
+
+test('kind 4: a failed display lookup counts as a display', () => {
+  const req = tokenReq(MEMBER);
+  const actor = withTableMissing('display_accounts', () => actorFromRequest(req));
   assert.equal(actor.kind, 'display');
+});
+
+test('kind 5 and 6: a plain token is a token, a plain session a session', () => {
+  assert.equal(actorFromRequest(tokenReq(MEMBER)).kind, 'token');
+  assert.equal(actorFromRequest(sessionReq(MEMBER)).kind, 'session');
+  assert.equal(actorFromRequest(sessionReq(ADMIN, 'admin')).kind, 'session');
+  assert.equal(actorFromRequest(tokenReq(ADMIN, 'admin')).kind, 'token');
+});
+
+test('both lookups always run, guest first, on the connection requireAuth handed in', () => {
+  for (const id of [GUEST, MEMBER, DISPLAY]) {
+    const req = sessionReq(id);
+    const { queries } = countQueries(() => actorFromRequest(req));
+    assert.equal(queries.length, 2, `user ${id}`);
+    assert.match(queries[0], /split_expense_guest_users/);
+    assert.match(queries[1], /display_accounts/);
+  }
 });
 
 test('a missing user id reads as a display, without a query', () => {
   // Today the /api/v1 guest gate lets such a request through (isSplitGuestAccount
   // says false on null) and /mcp closes every tool (its own lookups said true for
   // both). `display` is the one kind that keeps both answers.
-  const { result, queries } = countQueries(() => actorFromRequest(tokenReq(null)));
+  const req = tokenReq(null);
+  const { result, queries } = countQueries(() => actorFromRequest(req));
   assert.equal(result.kind, 'display');
   assert.equal(result.userId, null);
+  assert.equal(queries.length, 0);
+});
+
+test('a request requireAuth never saw reads as a display, without a query', () => {
+  /** @type {Req} */
+  const req = { authMethod: 'api_token', authUserId: MEMBER, authRole: 'member', authScopes: null };
+  const { result, queries } = countQueries(() => actorFromRequest(req));
+  assert.equal(result.kind, 'display');
   assert.equal(queries.length, 0);
 });
 
@@ -189,14 +235,13 @@ test('a missing user id reads as a display, without a query', () => {
 // --------------------------------------------------------------------------
 
 test('the fields come from what requireAuth set', () => {
-  /** @type {Req} */
-  const req = { ...tokenReq(KID), authScopes: ['tasks:read'], sessionModuleAccess: { tasks: 'none' } };
+  const req = authed({ authMethod: 'api_token', authUserId: KID, authRole: 'member', authScopes: ['tasks:read'], authDeviceId: null });
   const actor = actorFromRequest(req);
   assert.deepEqual({ ...actor }, {
     kind: 'token',
     userId: KID,
     role: 'member',
-    familyRole: null,
+    familyRole: 'child',
     scopes: ['tasks:read'],
     moduleAccess: { tasks: 'none' },
     deviceId: null,
@@ -295,4 +340,41 @@ test('householdAudience: no account, nothing else', () => {
     scopes: null, moduleAccess: null, deviceId: null,
   });
   assert.ok(Object.isFrozen(householdAudience()));
+});
+
+// --------------------------------------------------------------------------
+// No database on import
+// --------------------------------------------------------------------------
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+
+/**
+ * Imports `file` in a fresh process whose DB_PATH points into an empty directory,
+ * and returns what is in that directory afterwards. server/db.js opens (and
+ * creates) its database on import, so any file there means db.js was loaded.
+ * @param {string} file path from the repository root
+ * @returns {string[]}
+ */
+function filesAfterImport(file) {
+  const dir = tempDir('authorize-no-db');
+  const run = spawnSync(process.execPath, [
+    '--input-type=module', '-e', `await import(${JSON.stringify(pathToFileURL(join(ROOT, file)).href)});`,
+  ], {
+    env: { ...process.env, DB_PATH: join(dir, 'never.db'), LOG_LEVEL: 'error', DB_ENCRYPTION_AUTO_KEY: 'false' },
+    encoding: 'utf8',
+  });
+  assert.equal(run.status, 0, `import of ${file} failed:\n${run.stderr}`);
+  return readdirSync(dir);
+}
+
+test('the probe sees a database: importing server/db.js creates one', () => {
+  assert.ok(filesAfterImport('server/db.js').includes('never.db'));
+});
+
+test('server/authorize/ does not load server/db.js', () => {
+  assert.deepEqual(filesAfterImport('server/authorize/index.ts'), []);
+});
+
+test('server/openapi.js does not load server/db.js (it reaches server/authorize/)', () => {
+  assert.deepEqual(filesAfterImport('server/openapi.js'), []);
 });

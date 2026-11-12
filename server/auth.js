@@ -1107,7 +1107,9 @@ function applyRoleModuleAccess(req) {
   // The role- and member-based module rights (#467). The resolution lives in
   // server/authorize/actor.ts since phase 2 (B1), next to the actor it feeds;
   // `req.sessionModuleAccess` stays the field every gate reads.
-  req.sessionModuleAccess = resolveRequestModuleAccess(req);
+  // `db.get()` cannot throw here: every branch of requireAuth has just read
+  // through it in the same tick.
+  req.sessionModuleAccess = resolveRequestModuleAccess(db.get(), req);
 }
 
 /**

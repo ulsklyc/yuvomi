@@ -12,25 +12,29 @@
  *     feeds), from the `users` row and the permission matrix.
  *   - householdAudience(): the household as a whole, no account behind it.
  *
- * resolveRequestModuleAccess(req) is the module-rights resolution requireAuth runs
- * for every branch; it moved here from `applyRoleModuleAccess` in server/auth.js,
- * which still sets `req.sessionModuleAccess` from its result.
+ * resolveRequestModuleAccess(database, req) is the module-rights resolution
+ * requireAuth runs for every branch; it moved here from `applyRoleModuleAccess` in
+ * server/auth.js, which still sets `req.sessionModuleAccess` from its result.
  *
  * `req.authRole`, `req.authUserId` and their siblings stay where they are: B1 adds
  * the actor next to them and moves no reader over.
  *
- * Dependencies: server/db.js, server/logger.js, server/middleware/require-admin.js,
- *   server/permissions.js,
- *   server/split-guest-scope.js, server/services/display-accounts.js.
+ * THIS MODULE NEVER LOADS server/db.js, NOT EVEN TRANSITIVELY. db.js opens the
+ * database on import, and server/openapi.js reaches this file through
+ * services/reminder-origins.js: a static import here would open (or create) a
+ * database for every importer of the OpenAPI spec. The connection comes in as a
+ * parameter - from requireAuth for a request, from the caller for actorForUser().
+ * test:authorize-actor holds this in a child process.
+ *
+ * Dependencies: server/logger.js, server/middleware/require-admin.js,
+ *   server/permissions.js, server/split-guest-scope.js (none of them loads db.js).
  * Erasable TS syntax only (runs through type stripping, no build).
  */
 
-import * as dbModule from '../db.js';
 import { createLogger } from '../logger.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { buildSessionModuleAccess, resolvePermissions, userForRequest } from '../permissions.js';
 import { isSplitGuestAccount } from '../split-guest-scope.js';
-import { isDisplayAccount } from '../services/display-accounts.js';
 
 // The logger of server/auth.js: the resolution moved, its log line did not change.
 const log = createLogger('Auth');
@@ -71,9 +75,11 @@ type Database = Parameters<typeof resolvePermissions>[0];
 type UserRow = { id: number; role: string; family_role?: string };
 
 // Kept per request object, not as a field on it: nothing else can read or overwrite
-// them, and they go with the request.
+// them, and they go with the request. `requests` is written by
+// resolveRequestModuleAccess(), i.e. by requireAuth: the connection the request was
+// authenticated on, and the family role from its `users` lookup.
 const actors = new WeakMap<object, Actor>();
-const familyRoles = new WeakMap<object, string | null>();
+const requests = new WeakMap<object, { database: Database; familyRole: string | null }>();
 
 function roleOf(role: string | null | undefined): Actor['role'] {
   return role === 'admin' || role === 'member' ? role : null;
@@ -93,22 +99,25 @@ function roleOf(role: string | null | undefined): Actor['role'] {
  * A failure is logged and answers `null`, as before the move: requireAuth does not
  * turn a failed resolution into a refused request.
  *
- * THE FAMILY ROLE IS RECORDED HERE, from the one `users` lookup this already makes.
+ * THE CONNECTION AND THE FAMILY ROLE ARE RECORDED HERE, for actorFromRequest():
+ * the connection for every request, admins included; the family role from the one
+ * `users` lookup this already makes.
  * For an admin there is no lookup, so an admin's actor carries `familyRole: null`;
  * reading it would cost a further query per request. Merging this lookup into the
  * session branch's own `SELECT u.role FROM users` is not done: that one is not
  * guarded, and a failure there (a database without `family_role`) would turn
  * today's swallowed error into a 500.
  */
-export function resolveRequestModuleAccess(req: AuthenticatedRequest): ModuleAccess | null {
+export function resolveRequestModuleAccess(database: Database, req: AuthenticatedRequest): ModuleAccess | null {
+  const entry = { database, familyRole: null as string | null };
+  requests.set(req, entry);
   if (isAdminRequest(req)) return null;
   try {
-    const database = dbModule.get();
     const user = database
       .prepare('SELECT id, role, family_role FROM users WHERE id = ?')
       .get(req.authUserId) as UserRow | undefined;
     if (!user) return null;
-    familyRoles.set(req, user.family_role ?? null);
+    entry.familyRole = user.family_role ?? null;
     return buildSessionModuleAccess(
       resolvePermissions(database, userForRequest(req, user), { isDisplay: req.authMethod === 'display' }),
     );
@@ -118,51 +127,66 @@ export function resolveRequestModuleAccess(req: AuthenticatedRequest): ModuleAcc
   }
 }
 
-/** A split guest? A failure counts as yes (see isSplitGuestAccount); so does no database. */
-function isGuest(userId: number): boolean {
-  let database;
+/**
+ * A display account? `failed` when the lookup throws.
+ *
+ * The table belongs to the display module (services/display-accounts.js), whose
+ * isDisplayAccount() asks the same question through the db.js singleton. It is
+ * asked here with the request's own connection, so this module does not load
+ * db.js (see the header).
+ */
+function displayAccountLookup(database: Database, userId: number): 'yes' | 'no' | 'failed' {
   try {
-    database = dbModule.get();
-  } catch {
-    return true;
-  }
-  return isSplitGuestAccount(database, userId);
-}
-
-/** A display account? A failure counts as yes: when in doubt, closed. */
-function isDisplay(userId: number): boolean {
-  try {
-    return isDisplayAccount(userId);
+    return database.prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(userId) ? 'yes' : 'no';
   } catch (err) {
     log.error('Display lookup failed:', (err as Error).message);
-    return true;
+    return 'failed';
   }
 }
 
 /**
- * The narrowest kind that applies, in this order: the display cookie, a split
- * guest, a display account, a token, a session. The guest lookup runs first; when
- * it says yes, the display lookup is skipped.
+ * The narrowest kind that applies. Both lookups always run (split guest first,
+ * then display account), except for the display cookie, which needs neither:
  *
- * NO ACCOUNT ID READS AS `display`, without a lookup. The two callers answered it
- * differently before B1 and still do: the /api/v1 guest gate let such a request
- * through (isSplitGuestAccount says false on null), /mcp closed every tool (its own
+ *   1. display cookie                                 -> display
+ *   2. display-account lookup says yes                -> display
+ *   3. guest lookup says yes OR fails                 -> guest
+ *   4. display-account lookup failed                  -> display
+ *   5. api token                                      -> token
+ *   6. otherwise                                      -> session
+ *
+ * So the /api/v1 guest gate closes on a guest or a failed guest lookup, as before
+ * B1, and /mcp closes a display account entirely even when the guest lookup fails.
+ * ONE CASE DIFFERS FROM BEFORE B1: the display lookup fails AND the account is a
+ * guest. /mcp then closed every tool; now the account is a guest, and the three
+ * bridge tools stay open - they call back into /api/v1, whose guest gate refuses
+ * everything outside /split-expenses.
+ *
+ * NO ACCOUNT ID, OR NO CONNECTION (requireAuth did not run), READS AS `display`,
+ * without a lookup. For a missing id the two callers answered differently before
+ * B1 and still do: the /api/v1 guest gate let such a request through
+ * (isSplitGuestAccount says false on null), /mcp closed every tool (its own
  * lookups said true for guest and display alike, and display closes everything).
  * `display` is the one kind that keeps both answers: it is not `guest`, and
  * toolAllowed() refuses a display every tool.
  */
 function kindOf(req: AuthenticatedRequest, userId: number | null): ActorKind {
   if (req.authMethod === 'display') return 'display';
-  if (userId == null) return 'display';
-  if (isGuest(userId)) return 'guest';
-  if (isDisplay(userId)) return 'display';
+  const entry = requests.get(req);
+  if (userId == null || !entry) return 'display';
+  const guest = isSplitGuestAccount(entry.database, userId);
+  const display = displayAccountLookup(entry.database, userId);
+  if (display === 'yes') return 'display';
+  if (guest) return 'guest';
+  if (display === 'failed') return 'display';
   if (req.authMethod === 'api_token') return 'token';
   return 'session';
 }
 
 /**
  * The actor of an authenticated request. Built once per request and remembered;
- * call it only after requireAuth, which sets every field read here.
+ * call it only after requireAuth, which sets every field read here and hands in
+ * the connection (see resolveRequestModuleAccess).
  */
 export function actorFromRequest(req: AuthenticatedRequest): Actor {
   const known = actors.get(req);
@@ -172,7 +196,7 @@ export function actorFromRequest(req: AuthenticatedRequest): Actor {
     kind: kindOf(req, userId),
     userId,
     role: roleOf(req.authRole),
-    familyRole: familyRoles.get(req) ?? null,
+    familyRole: requests.get(req)?.familyRole ?? null,
     scopes: req.authScopes ?? null,
     moduleAccess: req.sessionModuleAccess ?? null,
     deviceId: req.authDeviceId ?? null,
@@ -192,11 +216,6 @@ export function actorFromRequest(req: AuthenticatedRequest): Actor {
  * The visibility matrix holds this as `divergent` in four cells (due_reminders /
  * medications and ics_feed / events, for display and split_guest); a later
  * behaviour PR turns it. B1 only moves the place, not the answer.
- *
- * No caller in the running server yet besides test:authorize-actor: switching
- * recipientDeniedModules() (services/reminder-origins.js) over would make
- * server/openapi.js load server/db.js through this file, and db.js opens a database
- * on import (it would create one in the repository for the OpenAPI suites).
  */
 export function actorForUser(database: Database, userId: number | null | undefined): Actor | null {
   const user = database

@@ -9,13 +9,14 @@
  *          all; until #1289 it did not ask about the recipient's permissions.
  *          The medication scheduler, which sends without `reminders` rows,
  *          asks the same recipient verdict since #2602.
- * Dependencies: server/services/household-modules.js, server/permissions.js
+ * Dependencies: server/services/household-modules.js, server/permissions.js,
+ *   server/authorize/ (actorForUser; it loads no server/db.js either)
  */
 import { householdDisabledModules } from './household-modules.js';
-// Only the resolution, not server/db.js: the delivery passes in its own
-// connection, and permissions.js deliberately depends on nothing beyond
-// scopes.js/display-scopes.js (see its header comment).
-import { resolvePermissions, buildSessionModuleAccess, deniedModules } from '../permissions.js';
+// The delivery passes in its own connection; the actor without a request
+// (server/authorize/, phase 2 B1) reads through exactly that connection.
+import { deniedModules } from '../permissions.js';
+import { actorForUser } from '../authorize/index.ts';
 
 /* ONE MAP OVER ALL ORIGINS, WITH NO EXCEPTION FOR THE NEWEST ONE.
  *
@@ -119,7 +120,9 @@ export function withoutSwitchedOffModules(database, rows) {
  * THE SAME TWO STEPS AS IN THE ROUTER, not a second spelling:
  * `resolvePermissions()` -> `buildSessionModuleAccess()` -> `deniedModules()`
  * is exactly the path `req.sessionModuleAccess` takes in server/auth.js and
- * that `mayTouchOrigin()` in server/routes/reminders.js evaluates. So here as
+ * that `mayTouchOrigin()` in server/routes/reminders.js evaluates. The first
+ * two run in `actorForUser()` (server/authorize/), the actor without a request;
+ * it does not classify display or guest accounts (see there). So here as
  * there only `none` counts, not `read`: whoever may read a module may also
  * hear from it - a filter that took the message away would turn a read
  * permission into a lock. An admin falls through `buildSessionModuleAccess()`
@@ -144,9 +147,9 @@ export function withoutSwitchedOffModules(database, rows) {
  * @returns {Set<string>|null}
  */
 export function recipientDeniedModules(database, userId) {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return null;
-  return deniedModules(buildSessionModuleAccess(resolvePermissions(database, user)));
+  const actor = actorForUser(database, userId);
+  if (!actor) return null;
+  return deniedModules(actor.moduleAccess);
 }
 
 /**
