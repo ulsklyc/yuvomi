@@ -294,6 +294,9 @@ const SERVER_REASONS = [
   'contacts_email_entry_invalid', 'contacts_email_invalid', 'contacts_emails_too_many', 'contacts_email_label_too_long',
   'contacts_address_entry_invalid', 'contacts_addresses_too_many', 'contacts_address_label_too_long',
   'contacts_address_part_too_long',
+  // Das Kontaktfoto (#2128); die echte Antwort misst test:contacts-routes.
+  'contacts_photo_too_large', 'contacts_photo_not_an_image', 'contacts_photo_type_mismatch',
+  'contacts_photo_unreadable',
 ];
 
 test('jeder Grund dieser Module hat einen Satz, und jeder "gibt es nicht mehr" ist als solcher bekannt', () => {

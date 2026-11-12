@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "One of the addresses is incomplete or invalid.",
         "errorAddressesTooMany": "This contact has too many addresses. The maximum is {{limit}}.",
         "errorAddressLabelTooLong": "The label of an address can be at most {{limit}} characters long.",
-        "errorAddressPartTooLong": "Street, city, region, postal code and country of an address can each be at most {{limit}} characters long."
+        "errorAddressPartTooLong": "Street, city, region, postal code and country of an address can each be at most {{limit}} characters long.",
+        "errorPhotoTooLarge": "The photo is too large.",
+        "errorPhotoNotAnImage": "The photo must be an image.",
+        "errorPhotoTypeMismatch": "The photo does not match the image type it claims to be.",
+        "errorPhotoUnreadable": "This photo cannot be read."
     },
     "budget": {
         "title": "Budget",

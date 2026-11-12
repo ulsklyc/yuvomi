@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "Uno degli indirizzi è incompleto o non valido.",
         "errorAddressesTooMany": "Questo contatto ha troppi indirizzi. Il massimo è {{limit}}.",
         "errorAddressLabelTooLong": "L’etichetta di un indirizzo può avere al massimo {{limit}} caratteri.",
-        "errorAddressPartTooLong": "Via, città, regione, CAP e paese di un indirizzo possono avere ciascuno al massimo {{limit}} caratteri."
+        "errorAddressPartTooLong": "Via, città, regione, CAP e paese di un indirizzo possono avere ciascuno al massimo {{limit}} caratteri.",
+        "errorPhotoTooLarge": "La foto è troppo grande.",
+        "errorPhotoNotAnImage": "La foto deve essere un’immagine.",
+        "errorPhotoTypeMismatch": "La foto non corrisponde al tipo di immagine dichiarato.",
+        "errorPhotoUnreadable": "Questa foto non può essere letta."
     },
     "budget": {
         "title": "Bilancio",

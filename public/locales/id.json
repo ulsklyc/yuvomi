@@ -1511,7 +1511,11 @@
         "errorAddressEntryInvalid": "Salah satu alamat tidak lengkap atau tidak valid.",
         "errorAddressesTooMany": "Kontak ini memiliki terlalu banyak alamat. Maksimal {{limit}}.",
         "errorAddressLabelTooLong": "Label alamat paling banyak {{limit}} karakter.",
-        "errorAddressPartTooLong": "Jalan, kota, wilayah, kode pos, dan negara pada alamat masing-masing paling banyak {{limit}} karakter."
+        "errorAddressPartTooLong": "Jalan, kota, wilayah, kode pos, dan negara pada alamat masing-masing paling banyak {{limit}} karakter.",
+        "errorPhotoTooLarge": "Foto terlalu besar.",
+        "errorPhotoNotAnImage": "Foto harus berupa gambar.",
+        "errorPhotoTypeMismatch": "Foto tidak sesuai dengan tipe gambar yang dinyatakan.",
+        "errorPhotoUnreadable": "Foto ini tidak dapat dibaca."
     },
     "budget": {
         "title": "Anggaran",

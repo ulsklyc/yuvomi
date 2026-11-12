@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "Az egyik cím hiányos vagy érvénytelen.",
         "errorAddressesTooMany": "Ennek a névjegynek túl sok címe van. Legfeljebb ennyi lehet: {{limit}}.",
         "errorAddressLabelTooLong": "Egy cím címkéje legfeljebb {{limit}} karakter lehet.",
-        "errorAddressPartTooLong": "Egy cím utcája, települése, régiója, irányítószáma és országa egyenként legfeljebb {{limit}} karakter lehet."
+        "errorAddressPartTooLong": "Egy cím utcája, települése, régiója, irányítószáma és országa egyenként legfeljebb {{limit}} karakter lehet.",
+        "errorPhotoTooLarge": "A fotó túl nagy.",
+        "errorPhotoNotAnImage": "A fotónak képnek kell lennie.",
+        "errorPhotoTypeMismatch": "A fotó nem egyezik a megadott képtípussal.",
+        "errorPhotoUnreadable": "Ez a fotó nem olvasható."
     },
     "budget": {
         "title": "Költségvetés",

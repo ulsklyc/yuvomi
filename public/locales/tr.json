@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "Adreslerden biri eksik veya geçersiz.",
         "errorAddressesTooMany": "Bu kişinin çok fazla adresi var. En fazla {{limit}} olabilir.",
         "errorAddressLabelTooLong": "Bir adresin etiketi en fazla {{limit}} karakter olabilir.",
-        "errorAddressPartTooLong": "Bir adresin sokak, şehir, bölge, posta kodu ve ülke bilgilerinin her biri en fazla {{limit}} karakter olabilir."
+        "errorAddressPartTooLong": "Bir adresin sokak, şehir, bölge, posta kodu ve ülke bilgilerinin her biri en fazla {{limit}} karakter olabilir.",
+        "errorPhotoTooLarge": "Fotoğraf çok büyük.",
+        "errorPhotoNotAnImage": "Fotoğraf bir resim olmalı.",
+        "errorPhotoTypeMismatch": "Fotoğraf belirttiği resim türüne uymuyor.",
+        "errorPhotoUnreadable": "Bu fotoğraf okunamıyor."
     },
     "budget": {
         "title": "Bütçe",
