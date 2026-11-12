@@ -2285,7 +2285,9 @@ reset finds the account by `contacts.email` and sends the link there, and the SS
 account by a verified address matching either column. Only the linked person or an admin may change
 them, and only in a session or with an unscoped token: a token scoped to modules (for example
 `contacts:write`) is refused even for the admin or the person themselves, because the addresses are
-the key to the account and not part of the module. `PUT /api/v1/contacts/:id` refuses anyone else
+the key to the account and not part of the module. A signed-in device is refused the same way: its
+credential carries no scopes, but a device changes neither password, email nor second factor
+(SECURITY.md), and these addresses are where the password reset goes. `PUT /api/v1/contacts/:id` refuses anyone else
 with 403 when the request would change the primary address or the set of addresses. Addresses are
 compared without regard to letter case, as the SSO link compares them; sending them unchanged or only
 in another case is not a change, and the stored spelling is kept. The CardDAV sync
@@ -6840,6 +6842,44 @@ A stateless [Model Context Protocol](https://modelcontextprotocol.io) endpoint i
 - **Role/member module permissions apply here too (#823).** Scopes and [access permissions](#access-permissions-migration-v74) are two independent limits and both must agree: a member configured with `tasks: none` is refused `list_tasks` and `create_task` no matter what the token's scopes say, and a member on `tasks: read` may list but not create. A scope can only narrow what the member already has — issuing a token can never widen it. `tools/list` hides what the account may not call, so an agent is never offered a tool its next request would refuse. **Split-expense guest accounts** reach no core tool at all, mirroring the `/api/v1` guard that confines them to `/split-expenses`. Until this fix the core tools ran in-process against SQLite and never met the `/api/v1` middleware, so MCP answered a request that REST denied for the same person — the rule itself now lives in `server/permissions.js` (`moduleAccessVerdict`) and both surfaces call it rather than each spelling it out.
 - Binary responses through the bridge (e.g. document/backup downloads) are inlined as base64 up to **5 MiB**; larger downloads are rejected and should use the dedicated streaming REST route directly.
 - **Optional:** `MCP_INTERNAL_BASE_URL` overrides the base URL the bridge calls back into; it defaults to `BASE_URL`, otherwise to `http://<BIND_ADDRESS>:<PORT>` (`127.0.0.1` while `BIND_ADDRESS` is unset or `0.0.0.0`, `[::1]` for `::`), and is only needed when neither reaches the app.
+
+---
+
+## Operations
+
+Three surfaces tell an operator how the installation is doing (Phase 1b, section F). None of them
+changes the database schema.
+
+**Health and readiness.** `GET /health` answers `200 { status: 'ok', timestamp }` whenever the
+process answers, also during a restore: container healthchecks use it, and a 503 there would make
+Docker restart the container in the middle of a restore. `GET /readyz` says whether the instance
+can serve right now: `200 { status: 'ready' }` or `503 { status: 'not_ready', reason }` with
+`reason` one of `restore_in_progress`, `database_closed`, `schema_behind`,
+`data_dir_not_writable`, checked in this order. Both are unauthenticated and neither tells a
+version or a path; `/readyz` does not write to the database and sits before the session
+middleware, so a session cookie cannot turn its answer into an error. No shipped descriptor points
+its healthcheck at `/readyz`.
+
+**Backup status.** The scheduler keeps the outcome of the last local backup in `sync_config`:
+`backup_last_attempt` and `backup_last_success` (ISO timestamps) and `backup_last_reason`, present
+only while the last run failed and one of `backup_dir_not_writable`, `disk_full`,
+`backup_verify_failed`, `unknown`. The values survive a restart, and a restore keeps those of the
+installation it runs on rather than those inside the restored file. `GET /api/v1/backup/status`
+shows them as `scheduler.lastBackup`, `scheduler.lastSuccess`, `scheduler.lastError`
+(`{ timestamp, reason, message }`, `null` after a success) and `scheduler.nextRun`; `message` is
+the fixed sentence of the reason, the text of the error is in the server log only. A client
+translates by `reason` (`settings.backupSchedulerReason*`). `POST /api/v1/backup/trigger` answers a
+failed run with `200` and `success: false`.
+
+**Diagnostics.** `GET /api/v1/system/diagnostics` (admin, not cached) returns a fixed set of
+fields: `version`, `build_revision`, `node`, `platform`, `arch`, `sqlite` (`version`, `encrypted`),
+`schema_version`, `last_migration_at`, `database_bytes`, `wal_bytes`, `data_dir_free_bytes`,
+`uptime_seconds`, `backup` (`last_attempt`, `last_success`, `reason`, `next_run`, and the booleans
+`local` and `webdav`), `key_source` (where the database key comes from, never the key), `ready`
+(what `/readyz` answers at that moment) and `modules_installed`. It never returns a secret, a
+path, a hostname, the value of an environment variable or anything about a member. Members,
+signed-in devices and API tokens with scopes are refused. A single value that cannot be read is
+`null`.
 
 ---
 

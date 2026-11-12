@@ -204,54 +204,11 @@ function assertRuleUsesToken(css, selector, property, token, file) {
   assert.match(body, new RegExp(`${property}:\\s*var\\(${token}\\)`), `${file} ${selector} ${property} should use ${token}`);
 }
 
-// `innerHTML` ist eine der harten Invarianten, und der Guard dafuer war eine
-// Liste von sieben Dateien: jede NEUE Seite kam ungeprueft durch, und genau die
-// neue ist die, in der es passiert. Der Bestand haelt die Regel ohnehin schon
-// ueberall - die Liste war also nie eine Ausnahmegenehmigung, nur ein zu enger
-// Suchbereich. Vendor-Code ist ausgenommen: der wird von Hand kopiert und nicht
-// nach unseren Regeln geschrieben.
-//
-// `outerHTML =` gehoert dazu: es parst denselben String als Markup, nur ersetzt
-// es das Element selbst statt seines Inhalts. Die zwei Stellen, die es gab
-// (schedule.js), laufen seitdem ueber insertAdjacentHTML('afterend') + remove().
-//
-// Verbundzuweisungen (`+=`, `||=`, `??=` ...) und die Klammerschreibweise
-// (`el['outerHTML'] =`) rufen denselben Setter auf und zaehlen deshalb mit.
-// Die Grenze eines Text-Guards: einen Namen aus einer Variablen,
-// `Object.assign(el, { innerHTML })` oder `Reflect.set` sieht er nicht - das
-// bleibt beim Review. Lucide ist Vendor-Code, liegt aber aus historischen
-// Gruenden als public/lucide.min.js ausserhalb von vendor/ (siehe
-// public/vendor/lucide/README.md) und ist deshalb einzeln ausgenommen.
+// innerHTML/outerHTML writes are a lint rule since phase 1b (section D): the selectors
+// HTML-STRING-WRITE in .oxlintrc.json, the forms this text guard tested are the fixture
+// test/fixtures/lint/a.js (npm run test:lint-baseline), the gate is npm run lint.
+// Vendor code is copied by hand and not written to our rules; later scans skip it.
 const VENDOR_PREFIX = '../public/vendor/';
-const VENDOR_FILES = new Set(['../public/lucide.min.js']);
-const HTML_STRING_WRITE = /(?:\.(?:innerHTML|outerHTML)|\[\s*(['"`])(?:innerHTML|outerHTML)\1\s*\])\s*(?:[-+*/%&|^]|\*\*|<<|>>>?|&&|\|\||\?\?)?=(?!=)/;
-
-test('kein innerHTML- oder outerHTML-Schreibzugriff irgendwo unter public/ (ausser vendor/)', () => {
-  const files = walkJsFiles('../public/').filter((f) => !f.startsWith(VENDOR_PREFIX) && !VENDOR_FILES.has(f));
-  const offenders = files.filter((file) => HTML_STRING_WRITE.test(read(file)));
-  assert.deepEqual(offenders, [],
-    'anhaengen mit insertAdjacentHTML oder ueber die DOM-API, User-Daten durch esc()');
-
-  // Ohne diese Schranke waere der Guard auch dann gruen, wenn walkJsFiles nach
-  // einem Umbau eine leere Liste liefert - gruen ueber nichts.
-  assert.ok(files.length >= 100, `nur ${files.length} Frontend-Dateien gefunden - der Scan greift nicht mehr`);
-});
-
-test('der innerHTML-Guard erkennt das Muster, das er verbietet', () => {
-  const pattern = HTML_STRING_WRITE;
-  assert.ok(pattern.test('root.innerHTML = `<div>`;'), 'Zuweisung wird nicht erkannt');
-  assert.ok(pattern.test('el.innerHTML=""'), 'Zuweisung ohne Leerzeichen wird nicht erkannt');
-  assert.ok(pattern.test('existing.outerHTML = html;'), 'outerHTML-Zuweisung wird nicht erkannt');
-  assert.ok(pattern.test('list.innerHTML += row;'), 'Verbundzuweisung += wird nicht erkannt');
-  assert.ok(pattern.test('el.outerHTML ||= html;'), 'logische Zuweisung ||= wird nicht erkannt');
-  assert.ok(pattern.test('el.innerHTML ??= html;'), 'logische Zuweisung ??= wird nicht erkannt');
-  assert.ok(pattern.test("el['outerHTML'] = html;"), 'Klammerschreibweise wird nicht erkannt');
-  assert.ok(pattern.test('el["innerHTML"] += row;'), 'Klammerschreibweise mit += wird nicht erkannt');
-  assert.ok(!pattern.test("const html = el['outerHTML'];"), 'ein Lesezugriff in Klammern wird faelschlich beanstandet');
-  assert.ok(!pattern.test('if (el.innerHTML === x)'), 'ein Vergleich wird faelschlich beanstandet');
-  assert.ok(!pattern.test('if (el.innerHTML !== x)'), 'eine Ungleichheit wird faelschlich beanstandet');
-  assert.ok(!pattern.test('return emptyStateEl(opts).outerHTML;'), 'ein Lesezugriff wird faelschlich beanstandet');
-});
 
 /**
  * Ein Backtick in einem HTML-Kommentar sprengt das Template-Literal, in dem er

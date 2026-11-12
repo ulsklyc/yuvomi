@@ -1364,6 +1364,92 @@ export const schemas = {
           },
           required: ['status', 'timestamp'],
         },
+        ReadinessResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['ready'] },
+          },
+          required: ['status'],
+          additionalProperties: false,
+        },
+        NotReadyResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['not_ready'] },
+            reason: {
+              type: 'string',
+              enum: ['restore_in_progress', 'database_closed', 'schema_behind', 'data_dir_not_writable'],
+            },
+          },
+          required: ['status', 'reason'],
+          additionalProperties: false,
+        },
+        SystemDiagnostics: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            version: { type: 'string', description: 'The application version.' },
+            build_revision: { type: ['string', 'null'], description: 'The revision the image was built from (`APP_BUILD_REVISION`), or `null`.' },
+            node: { type: 'string', description: 'The Node.js version, as in `process.version`.' },
+            platform: { type: 'string', example: 'linux' },
+            arch: { type: 'string', example: 'x64' },
+            sqlite: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                version: { type: ['string', 'null'] },
+                encrypted: { type: 'boolean', description: 'Whether the database is encrypted with a key.' },
+              },
+              required: ['version', 'encrypted'],
+            },
+            schema_version: { type: 'integer', description: 'The highest applied migration; 0 when it cannot be read.' },
+            last_migration_at: { type: ['string', 'null'], format: 'date-time' },
+            database_bytes: { type: ['integer', 'null'], description: 'Size of the database file.' },
+            wal_bytes: { type: ['integer', 'null'], description: 'Size of the write-ahead log next to it; 0 without one.' },
+            data_dir_free_bytes: { type: ['integer', 'null'], description: 'Free space on the volume of the database file.' },
+            uptime_seconds: { type: 'integer' },
+            backup: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                last_attempt: { type: ['string', 'null'], format: 'date-time', description: 'The last local backup run, whatever its outcome.' },
+                last_success: { type: ['string', 'null'], format: 'date-time', description: 'The last run that wrote a verified backup.' },
+                reason: {
+                  type: ['string', 'null'],
+                  enum: ['backup_dir_not_writable', 'disk_full', 'backup_verify_failed', 'unknown', null],
+                  description: 'Why the last run failed; `null` after a success or before the first run.',
+                },
+                next_run: { type: ['string', 'null'], format: 'date-time', description: 'When the schedule fires next; `null` without a running schedule.' },
+                local: { type: ['boolean', 'null'], description: 'Whether scheduled local backups are on.' },
+                webdav: { type: ['boolean', 'null'], description: 'Whether a WebDAV target is switched on and complete.' },
+              },
+              required: ['last_attempt', 'last_success', 'reason', 'next_run', 'local', 'webdav'],
+            },
+            key_source: {
+              type: ['string', 'null'],
+              enum: ['env', 'file', 'stored', 'generated', null],
+              description: 'Where the database key comes from, as `origin` in DatabaseKeyStatus. Never the key.',
+            },
+            ready: {
+              oneOf: [
+                { $ref: '#/components/schemas/ReadinessResponse' },
+                { $ref: '#/components/schemas/NotReadyResponse' },
+              ],
+              description: 'What `GET /readyz` answers at this moment.',
+            },
+            modules_installed: { type: ['integer', 'null'], description: 'Number of installed extension modules.' },
+          },
+          required: [
+            'version', 'build_revision', 'node', 'platform', 'arch', 'sqlite', 'schema_version', 'last_migration_at',
+            'database_bytes', 'wal_bytes', 'data_dir_free_bytes', 'uptime_seconds', 'backup', 'key_source', 'ready',
+            'modules_installed',
+          ],
+        },
+        SystemDiagnosticsResponse: {
+          type: 'object',
+          properties: { data: { $ref: '#/components/schemas/SystemDiagnostics' } },
+          required: ['data'],
+        },
         VersionResponse: {
           type: 'object',
           properties: {

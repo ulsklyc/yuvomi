@@ -27,6 +27,7 @@ import { acquireInstanceLock } from './utils/instance-lock.js';
 import { resolveDbPath, secretsDirFor } from './utils/db-path.js';
 import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
 import { setRestoreRunning, activeWriters, restoreWaitTimeoutMs, waitUntilIdle } from './utils/restore-state.js';
+import { BACKUP_STATUS_KEYS } from './utils/backup-status.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
 import { toE164, defaultCountryFromConfig } from './utils/phone.js';
 import { todayKey } from './utils/timezone.js';
@@ -13592,6 +13593,55 @@ function removeRestoreStaging() {
   }
 }
 
+/**
+ * The stored status of the last local backup (Phase 1b section F, E12), read
+ * from the database a restore is about to replace. It describes the backups of
+ * THIS installation - when the scheduler last ran here and why it failed - and
+ * the restored file brings the status of the moment it was written, or that of
+ * another installation. `null` for a key means "no row".
+ * @param {any} database
+ * @returns {Record<string, string | null> | null} null when it cannot be read
+ */
+function readBackupStatus(database) {
+  try {
+    const read = database.prepare('SELECT value FROM sync_config WHERE key = ?');
+    return Object.fromEntries(Object.values(BACKUP_STATUS_KEYS).map((key) => [key, read.get(key)?.value ?? null]));
+  } catch (err) {
+    log.warn(`Could not read the backup status before the restore: ${/** @type {any} */ (err)?.code ?? 'unknown error'}`);
+    return null;
+  }
+}
+
+/**
+ * Put the carried status into the restored database: each key gets the value
+ * this installation had, a key it did not have is removed. Without a carried
+ * status (a restore onto an empty or unreadable database, as the CLI does on a
+ * new server) the keys of the restored file are removed as well - this
+ * installation has not made a backup yet. A failure here is logged and never
+ * fails the restore: the next backup run writes the status anew.
+ * @param {any} database
+ * @param {Record<string, string | null> | null} carried
+ */
+function writeBackupStatus(database, carried) {
+  try {
+    const upsert = database.prepare(`
+      INSERT INTO sync_config (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                     updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    `);
+    const remove = database.prepare('DELETE FROM sync_config WHERE key = ?');
+    database.transaction(() => {
+      for (const key of Object.values(BACKUP_STATUS_KEYS)) {
+        const value = carried?.[key] ?? null;
+        if (value === null) remove.run(key);
+        else upsert.run(key, value);
+      }
+    })();
+  } catch (err) {
+    log.warn(`Could not carry the backup status into the restored database: ${/** @type {any} */ (err)?.code ?? 'unknown error'}`);
+  }
+}
+
 async function restoreValidatedFile(sourcePath) {
   const backupVersion = validateBackupFile(sourcePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -13611,6 +13661,8 @@ async function restoreValidatedFile(sourcePath) {
   let swapped = false;
   // Die Rollback-Kopie ist per rename zurueck an DB_PATH.
   let rolledBack = false;
+  /** @type {Record<string, string | null> | null} */
+  let carriedBackupStatus = null;
 
   try {
     await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
@@ -13629,6 +13681,7 @@ async function restoreValidatedFile(sourcePath) {
       await waitForQuietOrGiveUp();
     } while (activeBackups.size > 0 || activeWriters().length > 0);
     if (db) {
+      carriedBackupStatus = readBackupStatus(get());
       try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
       db.close();
       db = null;
@@ -13692,6 +13745,7 @@ async function restoreValidatedFile(sourcePath) {
     // jedem Restore erneut anhäufen und die Zusage „verschlüsselt at rest"
     // unterlaufen, ohne dass die Backup-UI davon berichtet.
     init({ plaintextBackup: false });
+    writeBackupStatus(get(), carriedBackupStatus);
     log.info(`Database restored from backup. Schema v${backupVersion}${rollbackCreated ? ` | rollback: ${rollbackPath}` : ''}`);
 
     return {

@@ -7,6 +7,7 @@ name: Umbrel Catalog Publish
 # Requirements:
 #   - Secret UMBREL_FORK_TOKEN: a classic PAT with `repo` scope (push to the
 #     <owner>/umbrel-apps fork + open a cross-repo PR to getumbrel/umbrel-apps).
+#     Only the job `publish` sees it, see "THREE JOBS" below.
 #   - The fork <owner>/umbrel-apps must exist (created during the initial submission).
 #   - Only acts once Yuvomi is already in upstream master (after the initial
 #     submission PR is merged); before that it skips to avoid re-submitting.
@@ -33,6 +34,30 @@ name: Umbrel Catalog Publish
 #   3. Ihr Linter (`node .tools/lint-apps.mjs <app> --check-images`) läuft vor
 #      dem Push. Sein Urteil ist verbindlich; nur seine Einrichtung (ein
 #      `npm install` in ihrem Repo) darf den Release nicht rot machen.
+#
+# THREE JOBS, AND THE TOKEN SITS IN THE LAST ONE ONLY. The catalog repo is
+# foreign code at a moving branch: its linter, its npm dependencies and their
+# install scripts run whatever that branch holds on the day of our release.
+# Until 2.89.0 all of this ran in one step next to UMBREL_FORK_TOKEN (in the
+# environment and in `fork/.git/config`), and that token writes to more than
+# the fork. Now:
+#
+#   prepare  reads our release, clones the catalog WITHOUT a token and edits
+#            the two files as text. It runs no code from the catalog. It hands
+#            the edited files on as an artifact and names their checksum and
+#            the catalog commit they were made on as job outputs.
+#   lint     has no secret and no rights (`permissions: {}`). It checks the
+#            artifact against that checksum, installs the catalog's
+#            dependencies with `npm ci --ignore-scripts` and runs its linter.
+#            Whatever that code does, there is nothing here to take.
+#   publish  holds the token and runs no npm, no node and nothing from the
+#            catalog: it checks the artifact against the same checksum, puts
+#            the two files on the commit `prepare` named, pushes the branch
+#            and opens or updates the PR.
+#
+# A job cannot change another job's outputs, so the checksum is what ties
+# `publish` to the files `prepare` wrote, whatever happened in between.
+# `dry_run` stops before `publish`: prepare and lint run, nothing is pushed.
 
 on:
   release:
@@ -42,17 +67,32 @@ on:
       version:
         description: "Version without leading v (e.g. 0.65.1). Defaults to the latest release."
         required: false
+      dry_run:
+        description: "Prepare and lint only: push nothing, open no PR."
+        type: boolean
+        default: false
 
-permissions:
-  contents: read
+# No right at the top: each job names what it needs.
+permissions: {}
 
 concurrency:
   group: umbrel-publish
   cancel-in-progress: false
 
 jobs:
-  publish:
+  prepare:
+    name: Prepare the catalog update (no secret, no catalog code)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      proceed: ${{ steps.edit.outputs.proceed }}
+      version: ${{ steps.ver.outputs.version }}
+      digest: ${{ steps.digest.outputs.digest }}
+      platforms: ${{ steps.arch.outputs.platforms }}
+      old_version: ${{ steps.edit.outputs.old_version }}
+      base_sha: ${{ steps.edit.outputs.base_sha }}
+      bundle_sha256: ${{ steps.edit.outputs.bundle_sha256 }}
     # 30 statt der 15, mit denen dieser Deckel zuerst dastand: der
     # Digest-Schritt wartet ABSICHTLICH bis zu 20 Minuten auf das
     # Release-Image (40 Versuche x 30 s), und ein Deckel darunter haette den
@@ -64,6 +104,9 @@ jobs:
     steps:
       - name: Check out (for the authored Umbrel release notes)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The job token stays out of .git/config: nothing here pushes.
+          persist-credentials: false
       - name: Resolve version
         id: ver
         env:
@@ -190,9 +233,12 @@ jobs:
       - name: Resolve multi-arch image digest (wait for the image to publish)
         id: digest
         if: steps.gate.outputs.skip != 'true'
+        env:
+          OWNER: ${{ github.repository_owner }}
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
-          IMG="ghcr.io/${{ github.repository_owner }}/yuvomi:${{ steps.ver.outputs.version }}"
+          IMG="ghcr.io/$OWNER/yuvomi:$VERSION"
           for i in $(seq 1 40); do
             # `|| true` keeps a not-yet-published image (pipefail makes inspect's
             # failure propagate) from tripping `set -e` and aborting the retry loop.
@@ -215,9 +261,12 @@ jobs:
       - name: Verify the image covers amd64 and arm64
         id: arch
         if: steps.gate.outputs.skip != 'true'
+        env:
+          OWNER: ${{ github.repository_owner }}
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
-          IMG="ghcr.io/${{ github.repository_owner }}/yuvomi:${{ steps.ver.outputs.version }}"
+          IMG="ghcr.io/$OWNER/yuvomi:$VERSION"
           PLATFORMS="$(docker buildx imagetools inspect "$IMG" --raw \
             | jq -r '[.manifests[]? | select(.platform.os != "unknown") | "\(.platform.os)/\(.platform.architecture)"] | unique | join(", ")')"
           echo "Plattformen: ${PLATFORMS:-<keine>}"
@@ -229,45 +278,28 @@ jobs:
           done
           echo "platforms=$PLATFORMS" >> "$GITHUB_OUTPUT"
 
-      - name: Open / update PR on getumbrel/umbrel-apps
+      # The catalog is cloned without a token (it is public) and edited as text.
+      # Nothing from it is executed in this job: no npm, no node, none of its
+      # scripts. Its linter runs in the job `lint`, which has nothing to lose.
+      - name: Edit the catalog files
+        id: edit
         if: steps.gate.outputs.skip != 'true'
         env:
-          GH_TOKEN: ${{ secrets.UMBREL_FORK_TOKEN }}
           NOTES_FILE: ${{ steps.notes.outputs.path }}
-          PLATFORMS: ${{ steps.arch.outputs.platforms }}
           VERSION: ${{ steps.ver.outputs.version }}
           DIGEST: ${{ steps.digest.outputs.digest }}
           OWNER: ${{ github.repository_owner }}
-          ACTOR: ${{ github.actor }}
         run: |
           set -euo pipefail
-          FORK="$OWNER/umbrel-apps"
           UPSTREAM="getumbrel/umbrel-apps"
-          BRANCH="yuvomi-update"
 
-          git config --global user.name "$OWNER"
-          git config --global user.email "$ACTOR@users.noreply.github.com"
-
-          # Check the credential once, before anything uses it. `gh repo fork`
-          # below ends in `|| true`, so a bad token used to be swallowed there and
-          # surfaced two lines later as git's "URL rejected: Malformed input to a
-          # URL function" - which points at the clone URL, not at the secret
-          # (2026-08-05). Reporting the login also catches a token that is valid
-          # but belongs to the wrong account.
-          TOKEN_USER="$(gh api user --jq .login 2>/dev/null || true)"
-          if [ -z "$TOKEN_USER" ]; then
-            echo "::error::UMBREL_FORK_TOKEN was rejected by the API. A stray newline or space in the secret value is the usual cause (piping it through 'echo' adds one). Re-set it with: gh auth token | tr -d '[:space:]' | gh secret set UMBREL_FORK_TOKEN --repo $OWNER/yuvomi"
-            exit 1
-          fi
-          echo "UMBREL_FORK_TOKEN authenticates as: $TOKEN_USER"
-
-          gh repo fork "$UPSTREAM" --clone=false || true
-
-          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/$FORK.git" fork
-          cd fork
-          git remote add upstream "https://github.com/$UPSTREAM.git"
-          git fetch --depth 1 upstream master
-          git checkout -B "$BRANCH" upstream/master
+          git clone --depth 1 --branch master "https://github.com/$UPSTREAM.git" catalog
+          cd catalog
+          # The commit these edits are made on. `lint` and `publish` take
+          # exactly this one, so what is linted is what is pushed, also when
+          # master moves between the jobs.
+          BASE_SHA="$(git rev-parse HEAD)"
+          echo "Katalog-Stand: $BASE_SHA"
 
           # Guard: only update once Yuvomi is already in upstream master. Before the
           # initial submission is merged there is nothing to edit — skip.
@@ -390,25 +422,177 @@ jobs:
             exit 0
           fi
 
-          # IHR LINTER, NICHT UNSERE VORSTELLUNG DAVON. `umbrel-update-app`
-          # verlangt ihn vor dem Testen; er prüft Pflichtfelder, Kategorien,
-          # Hooks und mit `--check-images` auch, dass die Images ziehbar und
-          # digest-gepinnt sind. Sein URTEIL ist verbindlich - seine EINRICHTUNG
-          # darf den Release nicht rot machen: `npm install` in einem fremden
-          # Repo ist eine Netzabhängigkeit, die uns nicht gehört.
+          # Only the two files go on, as one archive with a checksum. The
+          # checksum travels as a job output, which no other job can change;
+          # the archive travels as an artifact, which `lint` and `publish`
+          # check against it before they use it.
+          case "$OLD_VERSION" in
+            ''|*[!0-9A-Za-z.+-]*) OLD_VERSION="unknown" ;;
+          esac
+          BUNDLE="$RUNNER_TEMP/umbrel-update.tar.gz"
+          tar -czf "$BUNDLE" yuvomi/umbrel-app.yml yuvomi/docker-compose.yml
+          SUM="$(sha256sum "$BUNDLE" | cut -d' ' -f1)"
+          {
+            echo "proceed=true"
+            echo "base_sha=$BASE_SHA"
+            echo "old_version=$OLD_VERSION"
+            echo "bundle_sha256=$SUM"
+          } >> "$GITHUB_OUTPUT"
+          echo "Bundle: $SUM"
+
+      - name: Hand the edited files to the next jobs
+        if: steps.edit.outputs.proceed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: umbrel-update
+          path: ${{ runner.temp }}/umbrel-update.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  lint:
+    name: Run the catalog's linter (no secret, no rights)
+    needs: prepare
+    if: needs.prepare.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    # Foreign code runs here and only here, so this job gets nothing: no
+    # secret, no right for its job token, no checkout of this repository.
+    permissions: {}
+    # A shallow clone, one small install and the linter, which pulls the
+    # manifest of each image it checks.
+    timeout-minutes: 10
+    outputs:
+      result: ${{ steps.lint.outputs.result }}
+    steps:
+      - name: Take over the edited files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: umbrel-update
+
+      # IHR LINTER, NICHT UNSERE VORSTELLUNG DAVON. `umbrel-update-app`
+      # verlangt ihn vor dem Testen; er prüft Pflichtfelder, Kategorien,
+      # Hooks und mit `--check-images` auch, dass die Images ziehbar und
+      # digest-gepinnt sind. Sein URTEIL ist verbindlich - seine EINRICHTUNG
+      # darf den Release nicht rot machen: `npm install` in einem fremden
+      # Repo ist eine Netzabhängigkeit, die uns nicht gehört.
+      #
+      # Its dependencies come from its lockfile and their install scripts stay
+      # off (`npm ci --ignore-scripts`).
+      - name: Lint the edited app in the catalog
+        id: lint
+        env:
+          BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          BUNDLE_SHA256: ${{ needs.prepare.outputs.bundle_sha256 }}
+        run: |
+          set -euo pipefail
+          echo "$BUNDLE_SHA256  umbrel-update.tar.gz" | sha256sum -c -
+
+          mkdir catalog && cd catalog
+          git init -q
+          git remote add origin "https://github.com/getumbrel/umbrel-apps.git"
+          git fetch -q --depth 1 origin "$BASE_SHA"
+          git checkout -q FETCH_HEAD
+          tar -xzf ../umbrel-update.tar.gz yuvomi/umbrel-app.yml yuvomi/docker-compose.yml
+
           if [ -f package.json ] && [ -f .tools/lint-apps.mjs ]; then
-            if npm install --no-audit --no-fund --silent; then
-              echo "--- npm run lint:apps -- yuvomi --check-images ---"
+            if npm ci --ignore-scripts --no-audit --no-fund --silent; then
+              echo "--- node .tools/lint-apps.mjs yuvomi --check-images ---"
               node .tools/lint-apps.mjs yuvomi --check-images
-              LINT_NOTE="passed (\`node .tools/lint-apps.mjs yuvomi --check-images\`)"
+              echo "result=passed" >> "$GITHUB_OUTPUT"
             else
-              echo "::warning::npm install im Katalog-Repo ist fehlgeschlagen - der Linter lief nicht. Der PR sagt das."
-              LINT_NOTE="not run (dependency install failed on the runner)"
+              echo "::warning::npm ci im Katalog-Repo ist fehlgeschlagen - der Linter lief nicht. Der PR sagt das."
+              echo "result=install_failed" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "::warning::Kein Linter im Katalog-Repo gefunden - Pfad geändert?"
-            LINT_NOTE="not run (\`.tools/lint-apps.mjs\` not found)"
+            echo "result=not_found" >> "$GITHUB_OUTPUT"
           fi
+
+  publish:
+    name: Push the branch and open the PR (fork token)
+    needs: [prepare, lint]
+    if: needs.prepare.outputs.proceed == 'true' && github.event.inputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    # The fork token is the only credential this job uses; its job token gets
+    # no right. No npm, no node and nothing from the catalog runs here.
+    permissions: {}
+    # A shallow clone, one push and two API calls.
+    timeout-minutes: 10
+    steps:
+      - name: Take over the edited files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: umbrel-update
+
+      - name: Open / update PR on getumbrel/umbrel-apps
+        env:
+          GH_TOKEN: ${{ secrets.UMBREL_FORK_TOKEN }}
+          PLATFORMS: ${{ needs.prepare.outputs.platforms }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          DIGEST: ${{ needs.prepare.outputs.digest }}
+          OLD_VERSION: ${{ needs.prepare.outputs.old_version }}
+          BASE_SHA: ${{ needs.prepare.outputs.base_sha }}
+          BUNDLE_SHA256: ${{ needs.prepare.outputs.bundle_sha256 }}
+          LINT_RESULT: ${{ needs.lint.outputs.result }}
+          OWNER: ${{ github.repository_owner }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          # Before the token is used for anything: these are the files
+          # `prepare` wrote, not something a later job put in their place.
+          echo "$BUNDLE_SHA256  umbrel-update.tar.gz" | sha256sum -c -
+          BUNDLE="$PWD/umbrel-update.tar.gz"
+
+          FORK="$OWNER/umbrel-apps"
+          UPSTREAM="getumbrel/umbrel-apps"
+          BRANCH="yuvomi-update"
+
+          git config --global user.name "$OWNER"
+          git config --global user.email "$ACTOR@users.noreply.github.com"
+
+          # Check the credential once, before anything uses it. `gh repo fork`
+          # below ends in `|| true`, so a bad token used to be swallowed there and
+          # surfaced two lines later as git's "URL rejected: Malformed input to a
+          # URL function" - which points at the clone URL, not at the secret
+          # (2026-08-05). Reporting the login also catches a token that is valid
+          # but belongs to the wrong account.
+          TOKEN_USER="$(gh api user --jq .login 2>/dev/null || true)"
+          if [ -z "$TOKEN_USER" ]; then
+            echo "::error::UMBREL_FORK_TOKEN was rejected by the API. A stray newline or space in the secret value is the usual cause (piping it through 'echo' adds one). Re-set it with: gh auth token | tr -d '[:space:]' | gh secret set UMBREL_FORK_TOKEN --repo $OWNER/yuvomi"
+            exit 1
+          fi
+          echo "UMBREL_FORK_TOKEN authenticates as: $TOKEN_USER"
+
+          gh repo fork "$UPSTREAM" --clone=false || true
+
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/$FORK.git" fork
+
+          cd fork
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch --depth 1 upstream "$BASE_SHA"
+          git checkout -B "$BRANCH" FETCH_HEAD
+          echo "Katalog steht auf: $OLD_VERSION"
+
+          # The two files, by name: the archive cannot bring anything else.
+          tar -xzf "$BUNDLE" yuvomi/umbrel-app.yml yuvomi/docker-compose.yml
+          OTHER="$(git status --porcelain | grep -vE '^ M yuvomi/(umbrel-app\.yml|docker-compose\.yml)$' || true)"
+          if [ -n "$OTHER" ]; then
+            echo "::error::Unerwartete Aenderungen ausserhalb der zwei Katalog-Dateien:"
+            echo "$OTHER"
+            exit 1
+          fi
+          if git diff --quiet -- yuvomi/; then
+            echo "Catalog already at v$VERSION - nothing to do."
+            exit 0
+          fi
+
+          # The verdict of their linter, from the job that ran it. A red
+          # linter never gets here: `publish` needs `lint`.
+          case "$LINT_RESULT" in
+            passed) LINT_NOTE="passed (\`node .tools/lint-apps.mjs yuvomi --check-images\`)" ;;
+            install_failed) LINT_NOTE="not run (dependency install failed on the runner)" ;;
+            not_found) LINT_NOTE="not run (\`.tools/lint-apps.mjs\` not found)" ;;
+            *) LINT_NOTE="not run" ;;
+          esac
 
           # Genau die Dateien, die sich geändert haben - für den PR-Body, damit
           # „was am Paket geändert wurde" eine Messung ist und keine Behauptung.
