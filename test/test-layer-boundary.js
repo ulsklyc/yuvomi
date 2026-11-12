@@ -37,7 +37,7 @@ const SERVER_DIR = path.join(ROOT, 'server');
 // TypeScript in phase 2 is no new target.
 const SHARED_ISOMORPHIC = new Set(SERVER_PUBLIC_IMPORT_NAMES.map((name) => `public/utils/${name}`));
 
-const SOURCE_EXT = /\.(js|mjs)$/;
+const SOURCE_EXT = /\.(js|mjs|ts)$/;
 
 /** Alle .js/.mjs-Dateien unter dir (rekursiv), als absolute Pfade. */
 function sourceFiles(dir) {
