@@ -70,6 +70,9 @@ export const TASK_CATEGORY_OF = Object.freeze({ admin: 'household', member: 'sch
 /** Accounts that log in with a password (the helper `member_read` is no matrix role). */
 const SESSION_ACCOUNTS = ['admin', 'member', 'child', 'caregiver', 'member_none', 'member_read', 'split_guest'];
 
+/** Accounts without seed rows of their own that still own one private medication. */
+const MEDICATION_ONLY_OWNERS = ['caregiver', 'member_none', 'split_guest', 'display'];
+
 /** Accounts that get one due reminder per task, event and document row. */
 const REMINDER_ACCOUNTS = ['admin', 'member', 'child', 'caregiver', 'member_none', 'split_guest', 'display'];
 
@@ -318,6 +321,14 @@ function seedOtherRows(db, ids, dates, remember) {
       remember('medications', name,
         insertMedication.get(ids[owner], `${name} ${groupToken('medications', owner)}`, level).id, owner);
     }
+  }
+  // Every other account owns one private medication, so the production dose
+  // run can address it as an owner (test-visibility-matrix.js,
+  // measureMedicationDelivery).
+  for (const owner of MEDICATION_ONLY_OWNERS) {
+    const name = `medication.${owner}.private`;
+    remember('medications', name,
+      insertMedication.get(ids[owner], `${name} ${groupToken('medications', owner)}`, 'private').id, owner);
   }
 }
 

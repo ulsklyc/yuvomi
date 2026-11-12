@@ -41,6 +41,14 @@ const { baseUrl: BASE } = await startTestServer({
     // In-memory database on the cipher driver: overrides the file path that
     // startTestServer() set.
     DB_PATH: ':memory:',
+    // The seed has two ICS subscriptions with an http:// loopback URL. The
+    // first sync tick fires 10 s after boot (server/index.js, runSync); on a
+    // slow runner it can land mid-run. With the private-network opt-in off,
+    // normalizeUrl() rejects http:// before any connection is made, and
+    // syncOne() (services/ics-subscription.js) catches every fetch failure and
+    // returns before its first write - the seeded subscription events stay as
+    // they are. Pinned to off here so a developer's own .env cannot open it.
+    ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: 'false',
   },
 });
 // The MCP bridge loops back to this server. `internalBaseUrl()` reads the
@@ -54,6 +62,8 @@ const { MODULE_KEYS } = await import('../server/scopes.js');
 const { DISPLAY_COOKIE } = await import('../server/services/display-accounts.js');
 const { recipientDeniedModules } = await import('../server/services/reminder-origins.js');
 const { lacksHealth } = await import('../server/services/cycle-reminders.js');
+const { processDueMedications } = await import('../server/services/medication-scheduler.js');
+const { SEARCH_LIMIT } = await import('../server/services/search.js');
 
 // --------------------------------------------------------------------------
 // HTTP with a client address per bucket
@@ -61,6 +71,18 @@ const { lacksHealth } = await import('../server/services/cycle-reminders.js');
 
 /** @type {string[]} */
 const seen429 = [];
+/**
+ * Answers no measurement expected: a status outside the route's known set, or
+ * a 200 without the field the cell is read from. They never fold into a value;
+ * a test lists them by role / path / type and fails.
+ * @type {string[]}
+ */
+const unexpected = [];
+/**
+ * @param {string} where  `role / path / type[ / row]`
+ * @param {string} what
+ */
+function flag(where, what) { unexpected.push(`${where}: ${what}`); }
 let requestCount = 0;
 
 /**
@@ -224,12 +246,29 @@ const LIST_ROUTES = {
 };
 
 /**
+ * The list a 200 answer carries in `key`. A 200 without it is no empty list:
+ * it is flagged and becomes a status value, so the cell changes too.
+ * @param {any} container
+ * @param {string} key
+ * @param {string} where
+ * @returns {{ list: any[] } | { value: { status: number, reason: string } }}
+ */
+function listField(container, key, where) {
+  const list = container && typeof container === 'object' ? container[key] : undefined;
+  if (Array.isArray(list)) return { list };
+  flag(where, `200 without a list in "${key}"`);
+  return { value: { status: 200, reason: `no list in ${key}` } };
+}
+
+/**
  * @param {string} type
  * @param {{ status: number, body: any }} res
+ * @param {string} where
  */
-function listValue(type, res) {
+function listValue(type, res, where) {
   if (res.status !== 200) return statusValue(res);
-  return rowNames(type, res.body?.data);
+  const field = listField(res.body, 'data', where);
+  return 'list' in field ? rowNames(type, field.list) : field.value;
 }
 
 /**
@@ -241,27 +280,48 @@ async function measureList(role) {
   const out = {};
   for (const type of TYPES) {
     const route = LIST_ROUTES[type];
-    if (typeof route === 'string') out[type] = listValue(type, await apiGet(role, 'list', route));
+    const where = `${role} / list / ${type}`;
+    if (typeof route === 'string') out[type] = listValue(type, await apiGet(role, 'list', route), where);
     else {
       out[type] = {};
-      for (const [scope, url] of Object.entries(route)) out[type][scope] = listValue(type, await apiGet(role, 'list', url));
+      for (const [scope, url] of Object.entries(route)) {
+        out[type][scope] = listValue(type, await apiGet(role, 'list', url), `${where} / ${scope}`);
+      }
     }
   }
   return out;
 }
 
 /**
- * Detail: one request per seed row. Documents go through `/thumbnail`: it runs
- * the same visibility lookup as preview/download and then answers 415 for a
- * non-DMS document without reading any content - a seed row needs no file.
+ * Detail: one request per seed row, and each route has exactly three answers
+ * it may give - its success status (visible), its 404 (not visible) and the
+ * gate's 403 (refused). Documents go through `/thumbnail`: it runs the same
+ * visibility lookup as preview/download and then answers 415 for a non-DMS
+ * document without reading any content - a seed row needs no file, and 415
+ * IS the success status there. Anything else (a 500, a 401, the thumbnail's
+ * 502) is flagged with role / path / type / row / status and fails the suite.
+ * @type {Record<string, { route: (id: number) => string, visible: number }>}
  */
-/** @type {Record<string, (id: number) => string>} */
 const DETAIL_ROUTES = {
-  tasks: (id) => `/tasks/${id}`,
-  events: (id) => `/calendar/${id}`,
-  documents: (id) => `/documents/${id}/thumbnail`,
-  medications: (id) => `/health/medications/${id}/schedules`,
+  tasks: { route: (id) => `/tasks/${id}`, visible: 200 },
+  events: { route: (id) => `/calendar/${id}`, visible: 200 },
+  documents: { route: (id) => `/documents/${id}/thumbnail`, visible: 415 },
+  medications: { route: (id) => `/health/medications/${id}/schedules`, visible: 200 },
 };
+
+/**
+ * One detail answer classified: a forced 500 must come back as
+ * `unexpected`, never as `visible`.
+ * @param {{ status: number }} res
+ * @param {number} visibleStatus
+ * @returns {'visible' | 'hidden' | 'refused' | 'unexpected'}
+ */
+function classifyDetail(res, visibleStatus) {
+  if (res.status === visibleStatus) return 'visible';
+  if (res.status === 404) return 'hidden';
+  if (res.status === 403) return 'refused';
+  return 'unexpected';
+}
 
 /**
  * @param {string} role
@@ -273,24 +333,36 @@ async function measureDetail(role) {
     notes: NA('notes have no read-by-id route'),
     budget: NA('budget entries have no read-by-id route'),
   };
-  for (const [type, route] of Object.entries(DETAIL_ROUTES)) {
+  for (const [type, { route, visible: visibleStatus }] of Object.entries(DETAIL_ROUTES)) {
     /** @type {string[]} */
     const visible = [];
-    /** @type {Map<string, { status: number, reason: string }>} */
-    const refused = new Map();
+    /** @type {Record<string, { status: number, reason: string }>} */
+    const refused = {};
+    /** @type {Record<string, number>} */
+    const odd = {};
     for (const row of seed.rows[type]) {
       const res = await apiGet(role, 'detail', route(row.id));
-      if (res.status === 404) continue;
-      if (res.status === 403) {
-        const value = statusValue(res);
-        refused.set(JSON.stringify(value), value);
-        continue;
+      const kind = classifyDetail(res, visibleStatus);
+      if (kind === 'visible') visible.push(row.name);
+      else if (kind === 'refused') refused[row.name] = statusValue(res);
+      else if (kind === 'unexpected') {
+        odd[row.name] = res.status;
+        flag(`${role} / detail / ${type} / ${row.name}`, `status ${res.status}`);
       }
-      visible.push(row.name);
     }
-    // A gate refusal is the same for every row: record it as the cell's value.
-    if (!visible.length && refused.size === 1) out[type] = [...refused.values()][0];
-    else out[type] = visible.sort();
+    const refusals = new Set(Object.values(refused).map((value) => JSON.stringify(value)));
+    const refusedAll = Object.keys(refused).length === seed.rows[type].length && refusals.size === 1;
+    if (refusedAll) {
+      // The gate refused every row the same way: that refusal is the cell.
+      out[type] = Object.values(refused)[0];
+    } else if (Object.keys(refused).length || Object.keys(odd).length) {
+      // Refusals next to visible rows (or odd answers) stay in the cell by row.
+      out[type] = {
+        visible: visible.sort(),
+        ...(Object.keys(refused).length ? { refused } : {}),
+        ...(Object.keys(odd).length ? { unexpected: odd } : {}),
+      };
+    } else out[type] = visible.sort();
   }
   return out;
 }
@@ -309,10 +381,23 @@ function capped(list, total, ids) {
 }
 const EVENTS_LIMIT = 12;
 
-/** @param {any[] | undefined} wall @returns {number[]} */
-const wallIds = (wall) => (wall || []).flatMap((m) => [...(m.open || []), ...(m.done || [])].map((t) => t.id));
-/** @param {any[] | undefined} list @param {string} source @returns {number[]} */
-const countdownIds = (list, source) => (list || []).filter((c) => c.source === source).map((c) => c.id);
+/** @param {any[]} wall @returns {number[]} */
+const wallIds = (wall) => wall.flatMap((m) => [...(m.open || []), ...(m.done || [])].map((/** @type {any} */ t) => t.id));
+/** @param {any[]} list @param {string} source @returns {number[]} */
+const countdownIds = (list, source) => list.filter((c) => c.source === source).map((c) => c.id);
+
+/**
+ * A dashboard block that must be there. A missing block is flagged, not read
+ * as empty.
+ * @param {any} body
+ * @param {string} key
+ * @param {string} where
+ * @returns {any[]}
+ */
+function block(body, key, where) {
+  const field = listField(body, key, where);
+  return 'list' in field ? field.list : [];
+}
 
 /**
  * Overview: the full dashboard once, plus once per task category. `urgentTasks`
@@ -325,6 +410,7 @@ const countdownIds = (list, source) => (list || []).filter((c) => c.source === s
  */
 async function measureOverview(role, path) {
   const audience = path === 'overview_household' ? '&audience=household' : '';
+  const where = `${role} / ${path}`;
   const full = await apiGet(role, path, `/dashboard?events_limit=${EVENTS_LIMIT}${audience}`);
   if (full.status !== 200) return Object.fromEntries(TYPES.map((type) => [type, statusValue(full)]));
   const d = full.body;
@@ -335,29 +421,36 @@ async function measureOverview(role, path) {
   let urgentCapped = 0;
   for (const owner of OWNERS) {
     const res = await apiGet(role, path, `/dashboard?events_limit=${EVENTS_LIMIT}&tasks_category=${TASK_CATEGORY_OF[owner]}${audience}`);
-    assert.equal(res.status, 200, `${role} ${path}: category dashboard`);
-    const list = res.body.urgentTasks || [];
+    if (res.status !== 200) {
+      flag(`${where} / tasks`, `category read ${TASK_CATEGORY_OF[owner]} answered ${res.status}, the full read 200`);
+      continue;
+    }
+    const list = block(res.body, 'urgentTasks', `${where} / tasks`);
     // `openTaskCount` counts the same filtered set without the cap of five.
     if ((res.body.openTaskCount ?? 0) > list.length) urgentCapped = Math.max(urgentCapped, list.length);
     urgent.push(...list.map((/** @type {any} */ t) => t.id));
-    wall.push(...wallIds(res.body.wallTasks));
+    wall.push(...wallIds(block(res.body, 'wallTasks', `${where} / tasks`)));
   }
   const urgentNames = namesOf('tasks', urgent);
+  const countdowns = block(d, 'countdowns', `${where} / countdowns`);
+  const countdownTotal = d.countdownTotal ?? 0;
+  const upcoming = block(d, 'upcomingEvents', `${where} / events`);
+  const pinned = block(d, 'pinnedNotes', `${where} / notes`);
   return {
     tasks: {
-      countdowns: capped(d.countdowns || [], d.countdownTotal ?? 0, namesOf('tasks', countdownIds(d.countdowns, 'task'))),
+      countdowns: capped(countdowns, countdownTotal, namesOf('tasks', countdownIds(countdowns, 'task'))),
       urgentTasks: urgentCapped ? { capped: urgentCapped, ids: urgentNames } : urgentNames,
       wallTasks: namesOf('tasks', wall),
     },
     events: {
-      countdowns: capped(d.countdowns || [], d.countdownTotal ?? 0, namesOf('events', countdownIds(d.countdowns, 'event'))),
-      familyEvents: namesOf('events', (d.familyEvents || []).map((/** @type {any} */ e) => e.id)),
-      upcomingEvents: capped(d.upcomingEvents || [], (d.upcomingEvents || []).length >= EVENTS_LIMIT ? Infinity : 0,
-        namesOf('events', (d.upcomingEvents || []).map((/** @type {any} */ e) => e.id))),
-      weekEvents: namesOf('events', (d.weekEvents || []).map((/** @type {any} */ e) => e.id)),
+      countdowns: capped(countdowns, countdownTotal, namesOf('events', countdownIds(countdowns, 'event'))),
+      familyEvents: namesOf('events', block(d, 'familyEvents', `${where} / events`).map((e) => e.id)),
+      upcomingEvents: capped(upcoming, upcoming.length >= EVENTS_LIMIT ? Infinity : 0,
+        namesOf('events', upcoming.map((e) => e.id))),
+      weekEvents: namesOf('events', block(d, 'weekEvents', `${where} / events`).map((e) => e.id)),
     },
-    notes: { pinnedNotes: capped(d.pinnedNotes || [], d.notesTotal ?? 0, namesOf('notes', (d.pinnedNotes || []).map((/** @type {any} */ n) => n.id))) },
-    documents: { countdowns: capped(d.countdowns || [], d.countdownTotal ?? 0, namesOf('documents', countdownIds(d.countdowns, 'document'))) },
+    notes: { pinnedNotes: capped(pinned, d.notesTotal ?? 0, namesOf('notes', pinned.map((n) => n.id))) },
+    documents: { countdowns: capped(countdowns, countdownTotal, namesOf('documents', countdownIds(countdowns, 'document'))) },
     // Budget and health carry aggregates, not rows.
     budget: { 'budget.entryCount': d.budget?.entryCount ?? null },
     medications: { 'health.hasMeds': d.health?.hasMeds ?? null },
@@ -366,6 +459,15 @@ async function measureOverview(role, path) {
 
 /** @type {Record<string, string>} */
 const SEARCH_BUCKET = { tasks: 'tasks', events: 'events', notes: 'notes', documents: 'documents', budget: 'budget', medications: 'meds' };
+
+/**
+ * The owners that have rows of a type: one search group each.
+ * @param {string} type
+ * @returns {string[]}
+ */
+function groupOwners(type) {
+  return [...new Set(seed.rows[type].map((row) => row.owner))];
+}
 
 /**
  * @param {string} role
@@ -379,10 +481,12 @@ async function measureSearch(role) {
     const found = [];
     /** @type {{ status: number, reason: string } | null} */
     let refused = null;
-    for (const owner of OWNERS) {
+    for (const owner of groupOwners(type)) {
       const res = await apiGet(role, 'search', `/search?q=${groupToken(type, owner)}`);
       if (res.status !== 200) { refused = statusValue(res); break; }
-      found.push(...(res.body[SEARCH_BUCKET[type]] || []));
+      const field = listField(res.body, SEARCH_BUCKET[type], `${role} / search / ${type}`);
+      if (!('list' in field)) { refused = field.value; break; }
+      found.push(...field.list);
     }
     out[type] = refused ?? rowNames(type, found);
   }
@@ -407,7 +511,24 @@ async function mcpCall(role, path, name, args) {
   if (!result) return { error: { status: 'rpc_error', reason: errorClass(res.body?.error?.message) } };
   const text = result.content?.[0]?.text ?? '';
   if (result.isError) return { error: { status: 'tool_error', reason: errorClass(text) } };
-  return { data: JSON.parse(text) };
+  try { return { data: JSON.parse(text) }; } catch {
+    flag(`${role} / ${path} / ${name}`, 'tool result is no JSON');
+    return { error: { status: 'tool_result', reason: 'not JSON' } };
+  }
+}
+
+/**
+ * A tool answer that must be a list (`list_tasks`, `list_upcoming_events`) or
+ * carry one in `key` (the bridge's `{ data: [...] }`).
+ * @param {string} type
+ * @param {{ error?: any, data?: any }} answer
+ * @param {string} where
+ * @param {string | null} key
+ */
+function toolList(type, answer, where, key) {
+  if (answer.error) return answer.error;
+  const field = key ? listField(answer.data, key, where) : listField({ list: answer.data }, 'list', where);
+  return 'list' in field ? rowNames(type, field.list) : field.value;
 }
 
 /**
@@ -419,8 +540,8 @@ async function measureMcpCore(role) {
   const events = await mcpCall(role, 'mcp_core', 'list_upcoming_events', { limit: 100 });
   const none = NA('no core MCP tool reads this type');
   return {
-    tasks: tasks.error ?? rowNames('tasks', tasks.data),
-    events: events.error ?? rowNames('events', events.data),
+    tasks: toolList('tasks', tasks, `${role} / mcp_core / tasks`, null),
+    events: toolList('events', events, `${role} / mcp_core / events`, null),
     notes: none, documents: none, budget: none, medications: none,
   };
 }
@@ -429,12 +550,13 @@ async function measureMcpCore(role) {
  * @param {string} role
  * @param {string} type
  * @param {string} url
+ * @param {string} where
  */
-async function bridgeList(role, type, url) {
+async function bridgeList(role, type, url, where) {
   const [pathPart, queryPart] = url.split('?');
   const query = Object.fromEntries(new URLSearchParams(queryPart || ''));
   const res = await mcpCall(role, 'mcp_bridge', 'call_api_operation', { method: 'GET', path: `/api/v1${pathPart}`, query });
-  return res.error ?? rowNames(type, res.data?.data);
+  return toolList(type, res, where, 'data');
 }
 
 /**
@@ -446,10 +568,11 @@ async function measureMcpBridge(role) {
   const out = {};
   for (const type of TYPES) {
     const route = LIST_ROUTES[type];
-    if (typeof route === 'string') out[type] = await bridgeList(role, type, route);
+    const where = `${role} / mcp_bridge / ${type}`;
+    if (typeof route === 'string') out[type] = await bridgeList(role, type, route, where);
     else {
       out[type] = {};
-      for (const [scope, url] of Object.entries(route)) out[type][scope] = await bridgeList(role, type, url);
+      for (const [scope, url] of Object.entries(route)) out[type][scope] = await bridgeList(role, type, url, `${where} / ${scope}`);
     }
   }
   return out;
@@ -467,26 +590,19 @@ async function measureIcsFeed(role) {
     return { ...base, tasks: own, events: own };
   }
   const res = await http(xffOf(role, 'ics_feed'), 'GET', `/feed/calendar/${seed.feedTokens[ACCOUNT_OF[role]]}.ics`, { raw: true });
-  const events = res.status !== 200
-    ? { status: res.status, reason: String(res.body).slice(0, 40) }
-    : namesOf('events', [...String(res.body).matchAll(/^UID:event-(\d+)@yuvomi\r?$/gm)].map((m) => m[1]));
+  const body = String(res.body);
+  /** @type {any} */
+  let events;
+  if (res.status !== 200) events = { status: res.status, reason: body.slice(0, 40) };
+  else if (!body.startsWith('BEGIN:VCALENDAR')) {
+    flag(`${role} / ics_feed / events`, '200 without a calendar');
+    events = { status: 200, reason: 'no calendar' };
+  } else events = namesOf('events', [...body.matchAll(/^UID:event-(\d+)@yuvomi\r?$/gm)].map((m) => m[1]));
   return { ...base, tasks: eventsOnly, events };
 }
 
 /** @type {Record<string, string>} */
 const REMINDER_ENTITY = { tasks: 'task', events: 'event', documents: 'document_expiry' };
-
-/**
- * `mayHearAboutHealth` is module-private in services/medication-scheduler.js
- * (~82). Its body is exactly `denied !== null && !denied.has('health')` over
- * the exported `recipientDeniedModules`; that expression is read here.
- *
- * @param {number} userId
- */
-function healthPredicates(userId) {
-  const denied = recipientDeniedModules(db, userId);
-  return { mayHearAboutHealth: denied !== null && !denied.has('health'), notLacksHealth: !lacksHealth(db, userId) };
-}
 
 /**
  * @param {string} role
@@ -497,7 +613,9 @@ async function measureDueReminders(role) {
   const out = {
     notes: NA('notes have no reminder origin'),
     budget: NA('the budget reminder origin is the subscription, not the entry'),
-    medications: healthPredicates(seed.ids[ACCOUNT_OF[role]]),
+    // Filled after every other measurement by measureMedicationDelivery():
+    // the run writes medication_logs, nothing measured afterwards reads them.
+    medications: null,
   };
   /** @type {Record<string, { status: number, body: any }>} */
   const answers = {
@@ -507,9 +625,11 @@ async function measureDueReminders(role) {
   for (const [type, entity] of Object.entries(REMINDER_ENTITY)) {
     out[type] = {};
     for (const [key, res] of Object.entries(answers)) {
-      out[type][key] = res.status !== 200
-        ? statusValue(res)
-        : namesOf(type, (res.body?.data || []).filter((/** @type {any} */ r) => r.entity_type === entity).map((/** @type {any} */ r) => r.entity_id));
+      if (res.status !== 200) { out[type][key] = statusValue(res); continue; }
+      const field = listField(res.body, 'data', `${role} / due_reminders / ${type} / ${key}`);
+      out[type][key] = 'list' in field
+        ? namesOf(type, field.list.filter((r) => r.entity_type === entity).map((r) => r.entity_id))
+        : field.value;
     }
   }
   return out;
@@ -529,6 +649,62 @@ const MEASURE = {
 };
 
 // --------------------------------------------------------------------------
+// Medication delivery: the production scheduler, once, at the very end
+// --------------------------------------------------------------------------
+
+/**
+ * Who hears about a due dose, measured on the production path: one run of
+ * `processDueMedications()` with a push spy, no channels and no providers.
+ * Every seeded medication gets one active schedule at 00:00 without a day
+ * mask - due today at any time of day and in any zone, so `now` stays the
+ * real clock. The schedules are written in the same synchronous turn that
+ * starts the run: the server's own scheduler tick (15 s after boot, then every
+ * 60 s) cannot create the logs first, because it never runs between the
+ * insert and the run's first await.
+ *
+ * Runs AFTER every other measurement: it writes `medication_logs`, and the
+ * dashboard (`dosesTaken`, `nextDose`) and the schedule route would see them.
+ *
+ * @returns {Promise<Record<string, any>>} cell per account
+ */
+async function measureMedicationDelivery() {
+  const insertSchedule = db.prepare(`
+    INSERT INTO medication_schedules (medication_id, time_of_day, days_mask, active) VALUES (?, '00:00', NULL, 1)
+  `);
+  for (const row of seed.rows.medications) insertSchedule.run(row.id);
+  /** @type {Array<{ userId: number, tag: string }>} */
+  const pushes = [];
+  const run = processDueMedications({
+    database: db,
+    pushService: { sendPushToUser: async (/** @type {number} */ userId, /** @type {any} */ payload) => { pushes.push({ userId, tag: payload.tag }); return 0; } },
+    channelStore: { listEnabledChannelsForUser: () => [] },
+    providers: {},
+  });
+  const counters = await run;
+  assert.ok(counters && 'created' in counters && counters.created === seed.rows.medications.length,
+    `every seeded medication had one new due dose (${JSON.stringify(counters)})`);
+
+  /** @type {Map<number, number>} medication id -> owner id */
+  const ownerOfMedication = new Map(seed.rows.medications.map((row) => [row.id, seed.ids[row.owner]]));
+  const caregivers = new Set(db.prepare('SELECT caregiver_id FROM health_care_grants').all().map((/** @type {any} */ r) => r.caregiver_id));
+  /** @type {Record<string, any>} */
+  const out = {};
+  for (const account of new Set(Object.values(ACCOUNT_OF))) {
+    const userId = seed.ids[account];
+    const received = pushes.filter((p) => p.userId === userId)
+      .map((p) => ownerOfMedication.get(Number(/^medication-(\d+)-/.exec(p.tag)?.[1])));
+    out[account] = {
+      hearsOwnDose: received.some((ownerId) => ownerId === userId),
+      hearsCaredForDose: caregivers.has(userId)
+        ? received.some((ownerId) => ownerId !== userId)
+        : NA('no health_care_grants row names this account as caregiver'),
+      notLacksHealth: !lacksHealth(db, userId),
+    };
+  }
+  return out;
+}
+
+// --------------------------------------------------------------------------
 // Module level: the nine other permission modules under none / read / write
 // --------------------------------------------------------------------------
 
@@ -544,11 +720,12 @@ const MODULE_PROBES = {
   rewards: '/rewards/catalog',
   schedule: '/schedule/shift-types',
 };
+const MODULE_LEVELS = { none: 'member_none', read: 'member_read', write: 'member' };
 
 /**
  * The write probe for `read`: a DELETE on an id that cannot exist. Refused by
  * the module gate it is `module_read_only`; let through it would be a 404 and
- * change nothing.
+ * change nothing. Its answer is always recorded as `{ status, reason }`.
  */
 const WRITE_PROBE_ID = 999999999;
 
@@ -563,20 +740,16 @@ function shapeOf(res) {
 async function measureModules() {
   /** @type {Record<string, any>} */
   const out = {};
-  const levels = { none: 'member_none', read: 'member_read', write: 'member' };
   let n = 0;
   for (const [moduleKey, url] of Object.entries(MODULE_PROBES)) {
     out[moduleKey] = {};
-    for (const [level, account] of Object.entries(levels)) {
+    for (const [level, account] of Object.entries(MODULE_LEVELS)) {
       const session = seed.sessions[account];
       const headers = { Cookie: session.cookie, 'X-CSRF-Token': session.csrf };
       n += 1;
       const xff = `10.9.240.${n}`;
       out[moduleKey][level] = shapeOf(await http(xff, 'GET', `/api/v1${url}`, { headers }));
-      if (level === 'read') {
-        const write = await http(xff, 'DELETE', `/api/v1${url}/${WRITE_PROBE_ID}`, { headers });
-        out[moduleKey].read_write_probe = write.status === 403 ? statusValue(write) : NA(`write probe was not refused by the gate (status ${write.status})`);
-      }
+      if (level === 'read') out[moduleKey].read_write_probe = statusValue(await http(xff, 'DELETE', `/api/v1${url}/${WRITE_PROBE_ID}`, { headers }));
     }
   }
   return out;
@@ -594,8 +767,19 @@ for (const role of ROLES) {
   for (const path of PATHS) measured[role][path] = await MEASURE[path](role);
 }
 const measuredModules = await measureModules();
+// Last: the scheduler run writes medication_logs.
+const delivery = await measureMedicationDelivery();
+for (const role of ROLES) measured[role].due_reminders.medications = delivery[ACCOUNT_OF[role]];
+// The scheduler has no path for an account that does not exist (owner and
+// caregiver are foreign keys); recorded is what the two exported production
+// functions say about such an id.
 const unknownAccountId = Number(db.prepare('SELECT COALESCE(MAX(id), 0) + 1000 AS id FROM users').get().id);
-const measuredUnknown = { health_predicates: healthPredicates(unknownAccountId) };
+const measuredUnknown = {
+  health_predicates: {
+    recipientDeniedModulesIsNull: recipientDeniedModules(db, unknownAccountId) === null,
+    notLacksHealth: !lacksHealth(db, unknownAccountId),
+  },
+};
 const measureMs = Date.now() - started;
 
 // --------------------------------------------------------------------------
@@ -649,10 +833,12 @@ try { expected = JSON.parse(readFileSync(DATA_FILE, 'utf8')); } catch { expected
 const meta = {
   budget_mode: 'personal (sync_config.budget_mode; in shared mode the budget visibility rule is off)',
   database: ':memory: on better-sqlite3-multiple-ciphers (DB_PATH override after freshTestDbPath)',
-  detail_documents_route: 'GET /documents/:id/thumbnail - same visibility lookup as preview/download, answers 415 for a non-DMS document without reading content; 404 = not visible',
+  detail_documents_route: 'GET /documents/:id/thumbnail - same visibility lookup as preview/download, answers 415 for a non-DMS document without reading content; 415 = visible, 404 = not visible, 403 = refused, anything else fails the suite',
+  detail_statuses: 'per route exactly three answers: its success status (200; thumbnail 415) = visible, 404 = not visible, 403 = refused; refusals next to visible rows stay in the cell as { visible, refused: { row: status } }',
   dashboard_reads: 'once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read',
   due_reminders: 'one due reminder per task, event and document row for each of these accounts (created_by = caller): ' + seed.facts.reminderAccounts.join(', ') + '; document_expiry rows are seeded directly like the others; token roles read the member\'s rows',
-  health_predicates: 'mayHearAboutHealth = recipientDeniedModules(db, id) !== null && !has(health) (module-private in medication-scheduler.js ~82, expression read here); notLacksHealth = !lacksHealth(db, id) (cycle-reminders.js ~71)',
+  health_delivery: 'due_reminders / medications is measured on the production path: one processDueMedications() run (medication-scheduler.js) after every other measurement, every seeded medication with one active 00:00 schedule, push spy, no channels; hearsOwnDose = the account received a push for a medication it owns, hearsCaredForDose = for one it does not own (n/a without a care grant); notLacksHealth = !lacksHealth(db, id) (cycle-reminders.js ~71). caregiver, member_none, split_guest and display own one private medication each so they can be addressed',
+  health_unknown_account: 'unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded are the two exported production answers for such an id: recipientDeniedModulesIsNull (reminder-origins.js, null = drop the recipient) and notLacksHealth',
   mcp: 'list_tasks with include_future=true, list_upcoming_events with limit=100; the bridge calls call_api_operation with method GET and the /api/v1 path of each list route; a refused call is { status: tool_error, reason }',
   role_accounts: 'token_read / token_write / token_unscoped act for the member account',
   seed_counts: Object.fromEntries(TYPES.map((type) => [type, seed.rows[type].length])),
@@ -672,7 +858,11 @@ if (UPDATE) {
       }
     }
   }
-  const file = sortKeys({ _meta: meta, cells, modules: measuredModules, unknown_account: measuredUnknown });
+  // Annotations survive on the module entries and the unknown-account entry too.
+  const modules = Object.fromEntries(Object.entries(measuredModules)
+    .map(([key, value]) => [key, withAnnotations(expected?.modules?.[key], value)]));
+  const unknownAccount = withAnnotations(expected?.unknown_account, measuredUnknown);
+  const file = sortKeys({ _meta: meta, cells, modules, unknown_account: unknownAccount });
   writeFileSync(DATA_FILE, `${JSON.stringify(file, null, 2)}\n`);
   expected = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
 }
@@ -718,16 +908,38 @@ test('precondition: the unrestricted view is not empty for any type', () => {
   has(list.medications, [...adminRows('medications'), ...openRows('medications', ['family'])], 'medications');
 });
 
-test('the data file names every role x path x type cell (540)', () => {
+test('no measurement met an answer outside its known set', () => {
+  assert.deepEqual(unexpected, []);
+});
+
+test('the data file has exactly the measured keys at every level (540 cells, no leftovers)', () => {
   assert.ok(expected, 'test/visibility-matrix.expected.json is missing - run with UPDATE_VISIBILITY_MATRIX=1');
-  const missing = [];
+  /** @param {any} value */
+  const keys = (value) => Object.keys(value && typeof value === 'object' ? value : {}).sort();
+  assert.deepEqual(keys(expected), ['_meta', 'cells', 'modules', 'unknown_account']);
+  assert.deepEqual(keys(expected.cells), [...ROLES].sort(), 'roles');
   for (const role of ROLES) {
-    for (const path of PATHS) {
-      for (const type of TYPES) if (!(expected.cells?.[role]?.[path] && type in expected.cells[role][path])) missing.push(`${role} / ${path} / ${type}`);
+    assert.deepEqual(keys(expected.cells[role]), [...PATHS].sort(), `${role}: paths`);
+    for (const path of PATHS) assert.deepEqual(keys(expected.cells[role][path]), [...TYPES].sort(), `${role} / ${path}: types`);
+  }
+  assert.deepEqual(keys(expected.modules), keys(measuredModules), 'modules');
+  for (const moduleKey of Object.keys(measuredModules)) {
+    assert.deepEqual(keys(stripAnnotations(expected.modules[moduleKey])), keys(measuredModules[moduleKey]), `modules / ${moduleKey}: levels`);
+  }
+  assert.deepEqual(keys(stripAnnotations(expected.unknown_account)), keys(measuredUnknown), 'unknown_account');
+});
+
+test('the _meta block of the data file matches this seed', () => {
+  assert.deepStrictEqual(sortKeys(expected?._meta), sortKeys(meta));
+});
+
+test('every search group stays within the search cap (SEARCH_LIMIT, services/search.js)', () => {
+  for (const type of TYPES) {
+    for (const owner of groupOwners(type)) {
+      const size = seed.rows[type].filter((row) => row.owner === owner).length;
+      assert.ok(size <= SEARCH_LIMIT, `${groupToken(type, owner)}: ${size} rows, cap ${SEARCH_LIMIT}`);
     }
   }
-  assert.deepEqual(missing, []);
-  assert.equal(Object.keys(expected.cells).length, ROLES.length);
 });
 
 for (const role of ROLES) {
@@ -763,7 +975,7 @@ test('module level: a read-only member is refused every write by the gate', () =
   }
 });
 
-test('health predicates for an account id that does not exist', () => {
+test('health answers for an account id that does not exist', () => {
   assert.deepStrictEqual(sortKeys(measuredUnknown), sortKeys(stripAnnotations(expected?.unknown_account)));
 });
 
