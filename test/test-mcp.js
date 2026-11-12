@@ -78,7 +78,7 @@ const listId = db.prepare(
 
 const in3days = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
 
-const actor = { id: uid, role: 'admin' };
+const actor = { kind: 'token', userId: uid, role: 'admin' };
 
 // Hilfsfunktion: JSON-RPC-Request absetzen und Antwort zurückgeben.
 let internalErrors = [];
@@ -319,7 +319,7 @@ test('tools/call list_tasks: private Aufgaben anderer bleiben verborgen (#474)',
   const seenByAnna = await callTool({ db, actor }, 'list_tasks', {});
   assert.equal(seenByAnna.some((t) => t.title === 'Geschenk für Anna'), false);
   // Gegenprobe: die Ersteller:in sieht sie sehr wohl.
-  const seenByBob = await callTool({ db, actor: { id: other, role: 'member' } }, 'list_tasks', {});
+  const seenByBob = await callTool({ db, actor: { kind: 'token', userId: other, role: 'member' } }, 'list_tasks', {});
   assert.equal(seenByBob.some((t) => t.title === 'Geschenk für Anna'), true);
 });
 
@@ -847,11 +847,11 @@ function restrictedActor(modules) {
   }
   const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(uid);
   return {
-    id: uid,
+    kind: 'token',
+    userId: uid,
     role: 'member',
     scopes: null,
     moduleAccess: buildSessionModuleAccess(resolvePermissions(db, user)),
-    splitGuest: false,
   };
 }
 
@@ -922,7 +922,7 @@ test('Split-Guest erreicht kein Kern-Tool (#823)', async () => {
   // Gast-Konten für geteilte Ausgaben kommen unter /api/v1 nur an
   // /split-expenses; /mcp liegt außerhalb dieses Guards und hatte die Sperre
   // deshalb gar nicht.
-  const guest = { id: uid, role: 'member', scopes: null, moduleAccess: null, splitGuest: true };
+  const guest = { kind: 'guest', userId: uid, role: 'member', scopes: null, moduleAccess: null };
   await assert.rejects(
     () => callTool({ db, actor: guest }, 'list_tasks', {}),
     /not permitted/i,

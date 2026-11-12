@@ -92,7 +92,8 @@ import displaysRouter from './routes/displays.js';
 import { pairingRouter } from './routes/displays.js';
 import { peopleRouter } from './routes/displays.js';
 import { displayMayAct } from './display-scopes.js';
-import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
+import { splitGuestMayReach } from './split-guest-scope.js';
+import { actorFromRequest } from './authorize/index.ts';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -725,7 +726,9 @@ app.use('/api/v1', trackAdmittedWrite);
 app.use('/api/v1/changelog', changelogRouter);
 app.use('/api/v1', (req, res, next) => {
   try {
-    if (!isSplitGuestAccount(db.get(), req.authUserId)) return next();
+    // Die Art des Akteurs entscheidet (server/authorize/, Phase 2 B1): ein
+    // Lesefehler zaehlt dort als Gast, ein Konto ohne id nicht - wie zuvor hier.
+    if (actorFromRequest(req).kind !== 'guest') return next();
     // Die Liste steht in server/split-guest-scope.js, weil der Auth-Router sie
     // ebenso fragt (GHSA-q7gc-2cc9-w8fj): er haengt vor diesem Gate, eine
     // `/auth`-Anfrage kommt hier nie an. Die frueheren Eintraege fuer
