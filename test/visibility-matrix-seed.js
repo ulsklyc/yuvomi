@@ -1,6 +1,6 @@
 /**
  * Module: Seed for the visibility matrix (test/test-visibility-matrix.js)
- * Purpose: builds the household the matrix measures - ten roles, six row
+ * Purpose: builds the household the matrix measures - ten roles, seven row
  *          types, every row with a speaking name - against the REAL server.
  *
  * Where production state arises through a route, the seed takes that route:
@@ -52,8 +52,8 @@ export const PATHS = Object.freeze([
   'mcp_core', 'mcp_bridge', 'ics_feed', 'due_reminders',
 ]);
 
-/** The six row types. */
-export const TYPES = Object.freeze(['tasks', 'events', 'notes', 'documents', 'budget', 'medications']);
+/** The seven row types. */
+export const TYPES = Object.freeze(['tasks', 'events', 'notes', 'documents', 'budget', 'medications', 'activities']);
 
 /** Owners of seed rows and the one other account each owner assigns to. */
 export const OWNERS = Object.freeze(['admin', 'member', 'child']);
@@ -77,7 +77,9 @@ const MEDICATION_ONLY_OWNERS = ['caregiver', 'member_none', 'split_guest', 'disp
 const REMINDER_ACCOUNTS = ['admin', 'member', 'child', 'caregiver', 'member_none', 'split_guest', 'display'];
 
 /** @type {Record<string, string>} */
-const TYPE_SHORT = { tasks: 'task', events: 'evt', notes: 'note', documents: 'doc', budget: 'budget', medications: 'med' };
+const TYPE_SHORT = {
+  tasks: 'task', events: 'evt', notes: 'note', documents: 'doc', budget: 'budget', medications: 'med', activities: 'act',
+};
 
 /**
  * Group token of a type and owner, e.g. `mxtaskadmin`.
@@ -266,7 +268,7 @@ function seedTasksAndEvents(db, ids, dates, remember) {
 }
 
 /**
- * Notes, documents, budget entries and medications per owner.
+ * Notes, documents, budget entries, medications and health activities per owner.
  *
  * @param {Database} db
  * @param {Record<string, number>} ids
@@ -295,6 +297,12 @@ function seedOtherRows(db, ids, dates, remember) {
   const insertMedication = db.prepare(`
     INSERT INTO medications (user_id, name, active, visibility) VALUES (?, ?, 1, ?) RETURNING id
   `);
+  // The search reads an activity by type and note; the name and the group
+  // token stand in the note, the type is the same for every row.
+  const insertActivity = db.prepare(`
+    INSERT INTO health_activities (user_id, type, performed_at, note, visibility)
+    VALUES (?, 'matrix', ?, ?, ?) RETURNING id
+  `);
   for (const owner of OWNERS) {
     for (const level of ['all', 'private']) {
       const name = `note.${owner}.${level}`;
@@ -320,6 +328,11 @@ function seedOtherRows(db, ids, dates, remember) {
       const name = `medication.${owner}.${level}`;
       remember('medications', name,
         insertMedication.get(ids[owner], `${name} ${groupToken('medications', owner)}`, level).id, owner);
+    }
+    for (const level of ['private', 'family']) {
+      const name = `activity.${owner}.${level}`;
+      remember('activities', name,
+        insertActivity.get(ids[owner], `${dates.today}T08:00`, `${name} ${groupToken('activities', owner)}`, level).id, owner);
     }
   }
   // Every other account owns one private medication, so the production dose

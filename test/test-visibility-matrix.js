@@ -1,7 +1,7 @@
 /**
  * Test: Visibility matrix - which rows each role reads on each read path (phase 2, section A)
  * Purpose: a CHARACTERISATION, not a target. For ten roles, nine read paths
- *          and six row types the suite records which seed rows come back
+ *          and seven row types the suite records which seed rows come back
  *          TODAY and compares that against `test/visibility-matrix.expected.json`.
  *          A changed rule anywhere turns exactly the cells red that it moves.
  *
@@ -12,7 +12,7 @@
  *
  *          A non-200 answer is a value of its own ({ status, reason }), an
  *          empty list is `[]`, and a cell that has no such path is
- *          { "n/a": "<reason>" }. Every one of the 540 cells is explicit.
+ *          { "n/a": "<reason>" }. Every one of the 630 cells is explicit.
  *
  *          Rate limits: `apiLimiter` (300/min) and `feedLimiter` (30/min) key
  *          on the client address, and `trust proxy` is one hop, so every
@@ -243,6 +243,7 @@ const LIST_ROUTES = {
   documents: '/documents',
   budget: { mine: `/budget?month=${dates.month}`, household: `/budget?month=${dates.month}&scope=household` },
   medications: '/health/medications',
+  activities: '/health/activities',
 };
 
 /**
@@ -332,6 +333,7 @@ async function measureDetail(role) {
   const out = {
     notes: NA('notes have no read-by-id route'),
     budget: NA('budget entries have no read-by-id route'),
+    activities: NA('health activities have no read-by-id route'),
   };
   for (const [type, { route, visible: visibleStatus }] of Object.entries(DETAIL_ROUTES)) {
     /** @type {string[]} */
@@ -454,11 +456,15 @@ async function measureOverview(role, path) {
     // Budget and health carry aggregates, not rows.
     budget: { 'budget.entryCount': d.budget?.entryCount ?? null },
     medications: { 'health.hasMeds': d.health?.hasMeds ?? null },
+    activities: NA('the overview carries no health activities'),
   };
 }
 
 /** @type {Record<string, string>} */
-const SEARCH_BUCKET = { tasks: 'tasks', events: 'events', notes: 'notes', documents: 'documents', budget: 'budget', medications: 'meds' };
+const SEARCH_BUCKET = {
+  tasks: 'tasks', events: 'events', notes: 'notes', documents: 'documents', budget: 'budget', medications: 'meds',
+  activities: 'activities',
+};
 
 /**
  * The owners that have rows of a type: one search group each.
@@ -542,7 +548,7 @@ async function measureMcpCore(role) {
   return {
     tasks: toolList('tasks', tasks, `${role} / mcp_core / tasks`, null),
     events: toolList('events', events, `${role} / mcp_core / events`, null),
-    notes: none, documents: none, budget: none, medications: none,
+    notes: none, documents: none, budget: none, medications: none, activities: none,
   };
 }
 
@@ -584,7 +590,7 @@ async function measureMcpBridge(role) {
  */
 async function measureIcsFeed(role) {
   const eventsOnly = NA('the calendar feed carries events only');
-  const base = { notes: eventsOnly, documents: eventsOnly, budget: eventsOnly, medications: eventsOnly };
+  const base = { notes: eventsOnly, documents: eventsOnly, budget: eventsOnly, medications: eventsOnly, activities: eventsOnly };
   if (role.startsWith('token_')) {
     const own = NA('the feed token belongs to the account, see member');
     return { ...base, tasks: own, events: own };
@@ -613,6 +619,7 @@ async function measureDueReminders(role) {
   const out = {
     notes: NA('notes have no reminder origin'),
     budget: NA('the budget reminder origin is the subscription, not the entry'),
+    activities: NA('health activities have no reminder origin'),
     // Filled after every other measurement by measureMedicationDelivery():
     // the run writes medication_logs, nothing measured afterwards reads them.
     medications: null,
@@ -906,13 +913,14 @@ test('precondition: the unrestricted view is not empty for any type', () => {
   has(list.documents, [...adminRows('documents'), ...openRows('documents', ['family'])], 'documents');
   has([...list.budget.mine, ...list.budget.household], [...adminRows('budget'), ...openRows('budget', ['shared'])], 'budget');
   has(list.medications, [...adminRows('medications'), ...openRows('medications', ['family'])], 'medications');
+  has(list.activities, [...adminRows('activities'), ...openRows('activities', ['family'])], 'activities');
 });
 
 test('no measurement met an answer outside its known set', () => {
   assert.deepEqual(unexpected, []);
 });
 
-test('the data file has exactly the measured keys at every level (540 cells, no leftovers)', () => {
+test('the data file has exactly the measured keys at every level (630 cells, no leftovers)', () => {
   assert.ok(expected, 'test/visibility-matrix.expected.json is missing - run with UPDATE_VISIBILITY_MATRIX=1');
   /** @param {any} value */
   const keys = (value) => Object.keys(value && typeof value === 'object' ? value : {}).sort();
