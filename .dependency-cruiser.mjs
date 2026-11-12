@@ -14,6 +14,39 @@ import { existsSync } from 'node:fs';
 
 const BROWSER_PATHS = 'public/tsconfig.json';
 
+// Every file under public/ the server imports today (decision E16), measured with this
+// tool on 12 Nov 2026: 25 modules under public/utils/, none under public/locales/ (the
+// server reads the locale files through fs, which is no import). Frozen on purpose until
+// the move to shared/ at the start of phase 4: a new target is a design decision, not a
+// list edit. `.[jt]s` so that the rename to TypeScript in phase 2 is no new target.
+const SERVER_PUBLIC_IMPORTS = [
+  'budget-chart-category',
+  'budget-recurrence',
+  'contact-limits',
+  'contact-name',
+  'currency-codes',
+  'dashboard-event-limit',
+  'digits',
+  'display-device-settings',
+  'document-expiry',
+  'event-color',
+  'folder-tree',
+  'health-cycle',
+  'html-escape',
+  'ingredient-match-key',
+  'interval-date',
+  'korean-particles',
+  'markdown-checklist',
+  'mentions',
+  'note-access',
+  'note-category-name',
+  'pantry-units',
+  'quick-link-url',
+  'recipe-meal-types',
+  'sync-target',
+  'vital-units',
+].map((name) => `^public/utils/${name}\\.[jt]s$`);
+
 export default {
   forbidden: [
     {
@@ -105,10 +138,10 @@ export default {
     },
     {
       name: 'server-not-to-public-except-shared',
-      comment: 'The server reads only utils/ and locales/ from public/, until phase 2 moves them to shared/.',
+      comment: 'The server imports from public/ only the frozen list SERVER_PUBLIC_IMPORTS, until phase 4 moves them to shared/.',
       severity: 'error',
       from: { path: '^server/' },
-      to: { path: '^public/', pathNot: ['^public/utils/', '^public/locales/'] },
+      to: { path: '^public/', pathNot: SERVER_PUBLIC_IMPORTS },
     },
     {
       name: 'public-not-to-server',
