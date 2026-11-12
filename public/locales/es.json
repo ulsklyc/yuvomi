@@ -2431,6 +2431,7 @@
         "backupSchedulerNever": "Aún no se ha creado ninguna copia de seguridad",
         "backupSchedulerLastError": "Último error",
         "backupSchedulerLastAttempt": "Último intento",
+        "backupSchedulerNextRun": "Próxima copia de seguridad",
         "backupSchedulerOverdue": "Desde entonces han faltado al menos dos copias de seguridad programadas.",
         "backupSchedulerSchedule": "Programación",
         "backupSchedulerCronDaily": "A diario a las {{time}}",

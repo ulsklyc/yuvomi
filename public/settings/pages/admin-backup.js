@@ -97,6 +97,7 @@ export function backupErrorRow(lastError) {
  *   lastBackup?: { timestamp?: string, success?: boolean, reason?: string } | null,
  *   lastError?: { timestamp?: string, reason?: string | null, message?: string } | null,
  *   lastSuccess?: string | null,
+ *   nextRun?: string | null,
  * }} BackupSchedulerStatus
  */
 
@@ -199,6 +200,43 @@ function backupOutcomeRows(scheduler, now) {
   const errorRow = backupErrorRow(scheduler.lastError ?? null);
   if (errorRow) rows.push(errorRow);
   return rows;
+}
+
+/**
+ * Der Ton an "Aktiv". Der TEXT stimmt immer, solange der Zeitplan läuft; das
+ * GRÜN sagt mehr, nämlich "hier ist nichts zu tun". Neben einer roten
+ * Fehlerzeile oder einer Warnung am letzten Backup widerspräche es der Karte,
+ * auf der es steht. Der Erfolgston bleibt deshalb nur, solange der letzte Lauf
+ * nicht fehlschlug und kein Backup überfällig ist; sonst steht "Aktiv" ohne
+ * Ton da. Kein dritter Ton an dieser Zeile: Fehler und Warnung haben ihre
+ * eigene.
+ * Exportiert für Tests.
+ *
+ * @param {BackupSchedulerStatus} scheduler
+ * @param {number} now
+ * @returns {'success' | null}
+ */
+export function backupStatusTone(scheduler, now) {
+  if (!scheduler?.enabled) return null;
+  if (scheduler.lastError || scheduler.lastBackup?.success === false) return null;
+  return backupSuccessOverdue(scheduler, now) ? null : 'success';
+}
+
+/**
+ * Die Zeile zum nächsten geplanten Lauf, oder null. `nextRun` ist null,
+ * solange kein Zeitplan läuft; ein Wert, der kein Zeitpunkt ist, ergäbe eine
+ * leere Zeile und bleibt deshalb ebenfalls weg.
+ *
+ * @param {BackupSchedulerStatus} scheduler
+ * @returns {HTMLDivElement | null}
+ */
+function backupNextRunRow(scheduler) {
+  const { nextRun } = scheduler;
+  if (!nextRun || Number.isNaN(Date.parse(nextRun))) return null;
+  return createInfoRow({
+    label: t('settings.backupSchedulerNextRun'),
+    value: dateTimeText(nextRun),
+  });
 }
 
 function showError(element, message) {
@@ -394,12 +432,15 @@ async function loadBackupSchedulerStatus(container) {
 
     renderDatabaseKeyCard(container, res.data?.database_key);
     const { enabled, schedule, keepCount } = scheduler;
+    // EIN "jetzt" für die ganze Karte: der Ton an "Aktiv" und die Warnung am
+    // letzten Backup messen dasselbe und dürfen sich nicht widersprechen.
+    const now = Date.now();
 
     const rows = [
       createInfoRow({
         label: t('settings.backupSchedulerStatus'),
         value: enabled ? t('settings.backupSchedulerEnabled') : t('settings.backupSchedulerDisabled'),
-        tone: enabled ? 'success' : null,
+        tone: backupStatusTone(scheduler, now),
       }),
     ];
 
@@ -409,7 +450,14 @@ async function loadBackupSchedulerStatus(container) {
         label: t('settings.backupSchedulerKeep'),
         value: t('settings.backupSchedulerKeepCount', { count: keepCount }),
       }));
-      rows.push(...backupOutcomeRows(scheduler, Date.now()));
+      rows.push(...backupOutcomeRows(scheduler, now));
+      // NACH DEN ERGEBNISSEN, NICHT BEIM ZEITPLAN: die Karte liest sich von
+      // gestern nach morgen, und "wann versucht er es wieder" ist die Frage,
+      // die ein Fehlschlag aufwirft - die Antwort steht direkt darunter, über
+      // dem Knopf, der die Alternative zum Warten ist. Neben "Täglich um
+      // 02:00" stünde zweimal fast dasselbe.
+      const nextRunRow = backupNextRunRow(scheduler);
+      if (nextRunRow) rows.push(nextRunRow);
 
       const actions = document.createElement('div');
       actions.className = 'settings-form-actions';

@@ -2541,6 +2541,7 @@
         "backupSchedulerNever": "No backup created yet",
         "backupSchedulerLastError": "Last error",
         "backupSchedulerLastAttempt": "Last attempt",
+        "backupSchedulerNextRun": "Next backup",
         "backupSchedulerOverdue": "At least two scheduled backups have been missed since then.",
         "backupSchedulerTrigger": "Create backup now",
         "backupSchedulerTriggering": "Creating backup...",

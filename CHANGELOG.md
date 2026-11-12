@@ -30,13 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schedule (daily, weekly, monthly or every N hours), or no run has succeeded yet although one
   was tried, the row turns amber and says that at least two scheduled backups have been missed -
   also when nothing failed and the schedule simply stood still. A schedule the page cannot read
-  as one of those patterns never warns about age.
+  as one of those patterns never warns about age. The card also names the next scheduled run
+  ("Next backup") below those rows, because after a failure the next question is when it will
+  try again. And "Active" is green only while nothing on the card asks for attention: after a
+  failed run or with an overdue backup the word stays, since the schedule is still running, but
+  without the green that would say all is well next to a red line.
 
 ### Fixed
 - **"Create backup now" no longer reports success when the backup failed.** The server answers
   a failed manual run with `200` and `success: false`, and the page showed "Backup created
   successfully." without reading the answer. It now shows the reason in your language, the
   same sentence as the "Last error" row, and the card reloads either way.
+- **A backup schedule over several weekdays is no longer shown as "Every Monday".** With
+  `BACKUP_SCHEDULE` set to a range or a list of weekday names, such as `0 2 * * mon-fri` or
+  `0 2 * * mon,wed,fri`, the backup card read only the first name: it said "Every Monday at
+  02:00" for a schedule that runs on five days. The backups themselves always ran as
+  configured - only the description was wrong. Such a schedule now stands there as the
+  expression itself, like every other list or range; a single weekday is still spelled out,
+  as a number or as a short or full name (`mon`, `Monday`).
 
 ## [2.89.1] - 2026-11-12
 

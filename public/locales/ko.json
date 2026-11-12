@@ -2548,6 +2548,7 @@
         "backupSchedulerNever": "아직 백업이 생성되지 않음",
         "backupSchedulerLastError": "마지막 오류",
         "backupSchedulerLastAttempt": "마지막 시도",
+        "backupSchedulerNextRun": "다음 백업",
         "backupSchedulerOverdue": "그 이후 예약된 백업이 두 번 이상 생성되지 않았습니다.",
         "backupSchedulerTrigger": "지금 백업 생성",
         "backupSchedulerTriggering": "백업 생성 중...",

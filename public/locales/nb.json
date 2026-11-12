@@ -2541,6 +2541,7 @@
         "backupSchedulerNever": "Ingen sikkerhetskopi opprettet ennå",
         "backupSchedulerLastError": "Siste feil",
         "backupSchedulerLastAttempt": "Siste forsøk",
+        "backupSchedulerNextRun": "Neste sikkerhetskopi",
         "backupSchedulerOverdue": "Siden da har minst to planlagte sikkerhetskopier uteblitt.",
         "backupSchedulerTrigger": "Opprett sikkerhetskopi nå",
         "backupSchedulerTriggering": "Oppretter sikkerhetskopi...",

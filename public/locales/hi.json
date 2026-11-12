@@ -2431,6 +2431,7 @@
         "backupSchedulerNever": "अभी तक कोई बैकअप नहीं बना",
         "backupSchedulerLastError": "अंतिम त्रुटि",
         "backupSchedulerLastAttempt": "पिछला प्रयास",
+        "backupSchedulerNextRun": "अगला बैकअप",
         "backupSchedulerOverdue": "तब से कम से कम दो निर्धारित बैकअप नहीं बने हैं।",
         "backupSchedulerSchedule": "समय-सारणी",
         "backupSchedulerCronDaily": "प्रतिदिन {{time}} बजे",

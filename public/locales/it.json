@@ -2431,6 +2431,7 @@
         "backupSchedulerNever": "Nessun backup ancora creato",
         "backupSchedulerLastError": "Ultimo errore",
         "backupSchedulerLastAttempt": "Ultimo tentativo",
+        "backupSchedulerNextRun": "Prossimo backup",
         "backupSchedulerOverdue": "Da allora sono saltati almeno due backup pianificati.",
         "backupSchedulerSchedule": "Pianificazione",
         "backupSchedulerCronDaily": "Ogni giorno alle {{time}}",

@@ -13,17 +13,28 @@ const NUMBER = /^\d+$/;
 const STEP = /^\*\/(\d+)$/;
 
 // Cron zählt Wochentage ab Sonntag und lässt 7 als zweiten Sonntag zu.
-const WEEKDAY_NAMES = {
-  sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
-};
+// node-cron nimmt Kurz- und Langnamen in jeder Schreibung (`sun`, `Sunday`).
+const WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
+/**
+ * Der EINE Wochentag eines Felds, 0 (Sonntag) bis 6, oder null.
+ *
+ * DAS GANZE FELD MUSS DER TAG SEIN: `mon-fri` und `mon,wed,fri` fangen mit
+ * einem Namen an, laufen aber an mehreren Tagen. Am Anfang abgeschnitten,
+ * stand dort "Jeden Montag", und "überfällig" maß an sieben Tagen statt an
+ * einem.
+ *
+ * @param {string} field
+ * @returns {number | null}
+ */
 function parseWeekday(field) {
   if (NUMBER.test(field)) {
     const value = Number(field);
     return value >= 0 && value <= 7 ? value % 7 : null;
   }
-  const named = WEEKDAY_NAMES[field.slice(0, 3).toLowerCase()];
-  return named ?? null;
+  const name = field.toLowerCase();
+  const index = WEEKDAY_NAMES.findIndex((day) => name === day || name === day.slice(0, 3));
+  return index === -1 ? null : index;
 }
 
 function timeLabel(hour, minute) {
