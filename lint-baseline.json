@@ -411,7 +411,7 @@
  "server/services/reward-money.js\tknip/exports": 6,
  "server/services/rewards.js\tknip/exports": 2,
  "server/services/schedule-ics.js\toxlint/no-unused-vars": 1,
- "server/services/search.js\tknip/exports": 5,
+ "server/services/search.js\tknip/exports": 4,
  "server/services/subscription-budget-projection.js\tknip/exports": 1,
  "server/services/subscription-logo.js\tknip/exports": 1,
  "server/services/sync-assignment.js\tdepcruise/lower-layers-not-to-routes": 1,
