@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
+  system information there is a section with what the installation runs on: version and build,
+  whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema
+  version and the last migration, the size of the database and the free disk space, whether the
+  database is encrypted and where its key comes from, and the state of the last backup. One
+  button copies all of it as plain text with the field names of the API and the raw values, the
+  same in every language, so that whoever reads the report does not have to know yours. The
+  text contains no password, key or path and nothing about members. Copying also works over
+  plain http in the home network; where a browser refuses it, the text stands selected in a
+  field instead of claiming a copy that did not happen.
 - **The backup page now shows why the last scheduled run failed** (#2525). Settings > Household >
   Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
   in your language - a full disk, an unwritable backup folder, a failed integrity check, or an

@@ -2647,6 +2647,41 @@
   gap: var(--space-1);
 }
 
+/* --------------------------------------------------------
+   Diagnose (Blatt "System"): vier Gruppen von Info-Zeilen in EINER Karte,
+   darunter der Knopf und - nur wo der Browser nicht kopieren kann - der
+   Bericht als Feld.
+   -------------------------------------------------------- */
+
+/* Mehr Luft UEBER dem Gruppentitel als darunter: er gehoert zu seinen Zeilen.
+ * Auch die erste Gruppe - ihr Abstand faellt mit dem der Beschreibung zusammen. */
+.settings-diagnostics__group {
+  margin-top: var(--space-6);
+}
+
+.settings-diagnostics__actions {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: var(--space-px) solid var(--color-border);
+}
+
+/* Feldnamen und rohe Werte sind Daten, keine Prosa - wie der Datenbankschluessel.
+ * Das Feld zeigt den ganzen Bericht: `rows` traegt die Zeilenzahl, und wo eine
+ * Zeile am Telefon umbricht, waechst es mit dem Inhalt (wo der Browser
+ * `field-sizing` kennt; sonst rollt es). */
+.settings-diagnostics__text {
+  margin-top: var(--space-3);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  resize: vertical;
+  field-sizing: content;
+}
+
+.settings-diagnostics__text + .form-hint {
+  margin: var(--space-2) 0 0;
+}
+
 .document-storage-status {
   margin-top: var(--space-4);
   padding-top: var(--space-4);

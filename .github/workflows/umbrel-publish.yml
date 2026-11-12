@@ -5,8 +5,10 @@ name: Umbrel Catalog Publish
 # bot (unlike TrueNAS), so this is what keeps the store entry current.
 #
 # Requirements:
-#   - Secret UMBREL_FORK_TOKEN: a classic PAT with `repo` scope (push to the
-#     <owner>/umbrel-apps fork + open a cross-repo PR to getumbrel/umbrel-apps).
+#   - Secret UMBREL_FORK_TOKEN: a classic PAT with the `public_repo` scope and
+#     nothing else (push to the <owner>/umbrel-apps fork + open a cross-repo PR
+#     to getumbrel/umbrel-apps). Classic, because a fine-grained token cannot
+#     write to a public repository its owner is not a member of.
 #     Only the job `publish` sees it, see "THREE JOBS" below.
 #   - The fork <owner>/umbrel-apps must exist (created during the initial submission).
 #   - Only acts once Yuvomi is already in upstream master (after the initial
