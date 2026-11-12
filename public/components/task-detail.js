@@ -35,7 +35,7 @@ import { dateText } from '/utils/date-format.js';
 import { openDetailView, closeDetailView, visibilityRow } from '/components/detail-view.js';
 import { closeModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { recurrenceRow } from '/rrule-ui.js';
-import { scheduleUndoableDelete, acknowledgeCheck, isImeComposing } from '/utils/ux.js';
+import { scheduleUndoableDelete, acknowledgeCheck, isImeComposing, offerUndo } from '/utils/ux.js';
 import { rowActionEl } from '/utils/row-action.js';
 import { renderMarkdownLight } from '/utils/html.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
@@ -43,7 +43,8 @@ import { errorSentence, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { splitMentions, applyMention } from '/utils/mentions.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
-import { isNavModuleReadOnly } from '/permissions.js';
+import { isNavModuleReadOnly, navModuleAccess } from '/permissions.js';
+import { clearTaskDue, ownRemindAts } from '/utils/task-due.js';
 import { pathAccess } from '/utils/module-access.js';
 import { installPopoverMenus, showPopoverMenuAt } from '/utils/popover-menu.js';
 import { zonedDateKey } from '/utils/timezone.js';
@@ -960,6 +961,84 @@ function taskDetailHead(task) {
   };
 }
 
+const CLEAR_DUE_BUTTON_ID = 'task-detail-clear-due';
+
+/**
+ * Darf die Leseansicht die Faelligkeit selbst entfernen?
+ *
+ * Nur dort, wo dasselbe auch im Formular ginge, und nur dort, wo es mit einem
+ * Tipp FERTIG ist:
+ *   - es gibt eine Faelligkeit (Datum oder Uhrzeit);
+ *   - die Aufgabendefinition darf geaendert werden (`canEdit`, gesperrte
+ *     Aufgaben #830, `tasks: read`) und sie liegt nicht in der Ablage;
+ *   - KEINE SERIE: eine wiederkehrende Aufgabe rechnet ihre naechste Instanz
+ *     von der Faelligkeit aus. Das ist eine Entscheidung, die man mit der
+ *     Wiederholung vor Augen trifft - im Formular, wo es den Knopf weiter gibt;
+ *   - KEINE ERINNERUNG, DIE MITGEHEN MUESSTE UND NICHT DARF: ohne Schreibrecht
+ *     auf den Kalender bleibt die eigene Erinnerung stehen, und das Formular
+ *     verweigert genau diesen Uebergang (`tasks.reminderLockedNeedsDueDate`).
+ *     Ein Knopf, der dann eine Aufgabe ohne Datum mit Erinnerung hinterliesse,
+ *     braeche die Regel, die das Formular schuetzt.
+ *
+ * @param {any} task
+ * @param {object|object[]|null} reminders
+ * @param {{canEdit: boolean}} viewer
+ * @returns {boolean}
+ */
+function mayClearDueHere(task, reminders, { canEdit }) {
+  if (!canEdit) return false;
+  if (!task?.due_date && !task?.due_time) return false;
+  if (isArchived(task) || task.is_recurring) return false;
+  if (ownRemindAts(reminders).length && navModuleAccess('calendar') !== 'write') return false;
+  return true;
+}
+
+/**
+ * Entfernt die Faelligkeit aus der Leseansicht (Eintrag im Menue „Mehr") und
+ * bietet „Rueckgaengig" an. Der Server nimmt Countdown und ALLE Erinnerungen
+ * der Aufgabe mit (#2705, utils/task-due.js); „Rueckgaengig" holt nur die
+ * eigene zurueck, und der Toast sagt es, wenn auch fremde gegangen sind.
+ *
+ * Danach wie jede Fuss-Aktion (Status, Ablage): Ansicht abmelden, Umgebung
+ * nachladen (`afterConfirmedWrite`). In der Spalte malt das Detail frisch vom
+ * Server, mit neuem Kopf - die Ansicht zeichnet ihn nicht selbst nach.
+ *
+ * @param {any} task
+ * @param {object|object[]|null} reminders  die eigenen Erinnerungen an der Aufgabe
+ * @param {any} button
+ * @param {any} ctx
+ * @param {Function} [close]
+ */
+async function clearDueFromDetail(task, reminders, button, ctx, close = closeDetailView) {
+  const stop = btnLoading(button);
+  let result;
+  try {
+    result = await clearTaskDue(api, task, reminders);
+  } catch (err) {
+    stop();
+    await sayWriteFailed(err, ctx, close);
+    return;
+  }
+  if (result.ownReminderGone || result.othersRemoved) refreshReminders();
+  let message = t('tasks.dueCleared');
+  if (result.othersRemoved) message = t('tasks.dueClearedOthers');
+  else if (result.ownReminderGone) message = t('tasks.dueAndReminderCleared');
+  offerUndo({
+    message,
+    undo: async () => {
+      await result.restore();
+      if (result.ownReminderGone) refreshReminders();
+      await ctx.onChanged();
+      // In der Spalte laedt `onChanged` still nach und laesst das Detail stehen
+      // (es kam ja aus ihm); hier hat sich die Ansicht aber schon abgemeldet und
+      // zeigt den Stand OHNE Datum. `onStale` zeichnet sie frisch vom Server.
+      ctx.onStale?.();
+    },
+    onError: (/** @type {any} */ err) => window.yuvomi.showToast(errorSentence(err), 'danger'),
+  });
+  await afterConfirmedWrite(ctx, close);
+}
+
 /**
  * Die Rotationszeile der Leseansicht: "Rotation: Abloesung - als naechstes:
  * Leon". Der Nachfolger steht schon am Task (`rotation_next_user`): der Server
@@ -1229,6 +1308,19 @@ export function openTaskDetail({
     },
   }] : [];
 
+  // FAELLIGKEIT ENTFERNEN (#2705): selten gebraucht, deshalb im Menue „Mehr"
+  // und nicht im Kopf, der auffaelligsten Stelle der Ansicht (Antwort des
+  // Maintainers). `mayClearDueHere` sagt, wann es den Eintrag gibt.
+  if (mayClearDueHere(task, reminder, { canEdit })) {
+    actions.push(/** @type {any} */ ({
+      id: CLEAR_DUE_BUTTON_ID,
+      label: t('tasks.clearDue'),
+      variant: 'ghost',
+      icon: 'calendar-x',
+      onClick: (/** @type {{button: any, close: Function}} */ { button, close }) => clearDueFromDetail(task, reminder, button, ctx, close),
+    }));
+  }
+
   // Ablegen und Zurückholen sind derselbe Schalter - was er tut, hängt daran, wo
   // die Aufgabe gerade liegt.
   if (canEdit) {
@@ -1287,7 +1379,7 @@ export function openTaskDetail({
   // „Erledigen", das keiner als Frage las. Im Menue steht er als erster
   // Eintrag mit Wort („Erledigt von ..."); die Personen gehen ueber dem
   // Mehr-Knopf auf.
-  const overflowIds = [DOER_BUTTON_ID, 'task-detail-start', 'task-detail-archive', 'task-detail-delete'];
+  const overflowIds = [DOER_BUTTON_ID, 'task-detail-start', CLEAR_DUE_BUTTON_ID, 'task-detail-archive', 'task-detail-delete'];
   if (actions.some((a) => overflowIds.includes(a.id))) {
     actions.push({ id: MORE_BUTTON_ID, label: '', variant: 'ghost', icon: 'more-horizontal' });
   }
@@ -1673,4 +1765,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit, rotationDetailRow };
+export const __test = { mayClearDueHere, clearDueFromDetail, CLEAR_DUE_BUTTON_ID, subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit, rotationDetailRow };

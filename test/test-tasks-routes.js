@@ -1799,3 +1799,79 @@ test('Serie: Original und Kopie einer Teilaufgabe zahlen auch in umgekehrter Rei
   await tick(s1, 'done');
   assert.equal(balanceOf(kid), 5, 'S1 zahlt nicht noch einmal: die Serie ist für heute über S2 vergütet');
 });
+
+// --------------------------------------------------------
+// #2705: Das Faelligkeitsdatum geht, die Erinnerungen gehen mit
+// --------------------------------------------------------
+// Eine Erinnerung braucht ein Datum. Die Regel stand nur im Formular; der
+// Trigger aus Migration 283 haelt sie fuer jeden Schreibweg - auch fuer die
+// Erinnerungen ANDERER Mitglieder, die kein Formular je loeschen konnte.
+
+/**
+ * @param {number|bigint} taskId
+ * @param {number|bigint} userId
+ * @param {string} [entityType]
+ */
+function seedReminder(taskId, userId, entityType = 'task') {
+  db.prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES (?, ?, '2026-11-13T16:00:00', ?)
+  `).run(entityType, taskId, userId);
+}
+
+/** @param {number|bigint} taskId */
+function taskReminderOwners(taskId) {
+  return db.prepare("SELECT created_by FROM reminders WHERE entity_type = 'task' AND entity_id = ? ORDER BY created_by")
+    .all(taskId).map((/** @type {any} */ r) => Number(r.created_by));
+}
+
+/** @param {string} title */
+async function dueTask(title) {
+  const r = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title, due_date: '2026-11-13', due_time: '18:00' } });
+  assert.equal(r.status, 201);
+  return r.body.data.id;
+}
+
+test('#2705: PUT ohne due_date loescht alle Erinnerungen der Aufgabe und nennt die der anderen', async () => {
+  const id = await dueTask('Stromrechnung bezahlen');
+  seedReminder(id, ALICE);
+  seedReminder(id, BOB);
+  // Dieselbe Zahl als Id einer anderen Art: die bleibt unberuehrt.
+  seedReminder(id, BOB, 'event');
+  const r = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { due_date: null, due_time: null } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.due_date, null);
+  assert.deepEqual(taskReminderOwners(id), [], 'die eigene und die fremde Erinnerung sind weg');
+  assert.equal(r.body.data.reminders_removed_others, 1, 'eine davon gehoerte Bob');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'event' AND entity_id = ?").get(id).n, 1);
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'event' AND entity_id = ?").run(id);
+});
+
+test('#2705: bleibt das Datum, bleiben die Erinnerungen - auch wenn nur die Uhrzeit geht', async () => {
+  const id = await dueTask('Reifen wechseln');
+  seedReminder(id, ALICE);
+  seedReminder(id, BOB);
+  const title = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { title: 'Reifen wechseln (Winter)' } });
+  assert.equal(title.body.data.reminders_removed_others, 0);
+  const time = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { due_time: null } });
+  assert.equal(time.status, 200);
+  assert.equal(time.body.data.due_time, null);
+  assert.deepEqual(taskReminderOwners(id), [Number(ALICE), Number(BOB)].sort((a, b) => a - b));
+  assert.equal(time.body.data.reminders_removed_others, 0);
+});
+
+test('#2705: der Trigger gilt fuer jeden Schreibweg - gemessen wird der Uebergang, nicht der Zustand', () => {
+  const id = Number(db.prepare(`
+    INSERT INTO tasks (title, category, due_date, created_by) VALUES ('Aus CalDAV', 'misc', '2026-11-13', ?)
+  `).run(ALICE).lastInsertRowid);
+  seedReminder(id, BOB);
+  // So schreibt ein CalDAV-Abruf ein entferntes DUE: direkt in die Zeile.
+  db.prepare('UPDATE tasks SET due_date = NULL, due_time = NULL WHERE id = ?').run(id);
+  assert.deepEqual(taskReminderOwners(id), []);
+  // Eine Aufgabe, die schon ohne Datum dasteht, verliert bei einer anderen
+  // Aenderung nichts: der Trigger fragt nach dem Uebergang.
+  seedReminder(id, BOB);
+  db.prepare("UPDATE tasks SET title = 'Aus CalDAV (neu)', due_date = NULL WHERE id = ?").run(id);
+  assert.deepEqual(taskReminderOwners(id), [Number(BOB)]);
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'task' AND entity_id = ?").run(id);
+});

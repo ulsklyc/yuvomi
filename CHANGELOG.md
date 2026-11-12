@@ -35,6 +35,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   try again. And "Active" is green only while nothing on the card asks for attention: after a
   failed run or with an overdue backup the word stays, since the schedule is still running, but
   without the green that would say all is well next to a red line.
+- **A task's due date goes in one step, and its reminders go with it.** The task read view
+  has a "Remove due date" entry in its "More" menu, and the edit dialog a "Remove due date"
+  button under date and time; both clear date and time together, with the countdown flag. When
+  a task's due date is cleared, on any path (the app, the API, MCP or a CalDAV client), the server
+  now removes every reminder of that task, also those of other members, since a reminder needs a
+  due date (`PUT /tasks/{id}` reports them as `reminders_removed_others`). Undo in the read view
+  brings back the date and your own reminder and says when other members' reminders went too.
+  Clearing only the time keeps the reminder's lead time, counted from the end of the day, and the
+  time field now says when the reminder will arrive. A message about the due date (a reminder
+  without a date, a date or time it cannot read) stands under that field, and the dialog moves
+  there, instead of at the bottom below the fold; the other messages at the bottom scroll into view.
 
 ### Fixed
 - **"Create backup now" no longer reports success when the backup failed.** The server answers
