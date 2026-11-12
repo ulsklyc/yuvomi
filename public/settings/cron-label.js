@@ -40,11 +40,19 @@ function weekdayLabel(dow) {
 }
 
 /**
- * Übersetzt die geläufigen Backup-Rhythmen in einen Satz. Alles darüber hinaus
- * (Listen, Bereiche, Monatsfelder) liefert null - dort bleibt der Ausdruck
- * selbst die ehrlichste Auskunft.
+ * Das erkannte Muster eines Cron-Ausdrucks. EINE Zerlegung für den Klartext
+ * und für den Abstand zweier Läufe: was der Satz "Täglich um 02:00" nennt, ist
+ * dann auch das, woran die Backup-Karte "überfällig" misst. Alles außerhalb
+ * der vier Muster (Listen, Bereiche, Monatsfelder) ist null.
+ *
+ * @typedef {{ kind: 'hourly', count: number, minute: number }
+ *   | { kind: 'daily', hour: number, minute: number }
+ *   | { kind: 'weekly', weekday: number, hour: number, minute: number }
+ *   | { kind: 'monthly', day: number, hour: number, minute: number }} CronPattern
+ * @param {unknown} expression
+ * @returns {CronPattern | null}
  */
-export function formatCronSchedule(expression) {
+function parseCronSchedule(expression) {
   const fields = String(expression ?? '').trim().split(/\s+/);
   if (fields.length !== 5) return null;
 
@@ -55,24 +63,74 @@ export function formatCronSchedule(expression) {
   if (stepHour && NUMBER.test(minute) && dom === '*' && dow === '*') {
     const count = Number(stepHour[1]);
     if (count < 1 || count > 23) return null;
-    return t('settings.backupSchedulerCronHourly', { count, minute: String(Number(minute)).padStart(2, '0') });
+    return { kind: 'hourly', count, minute: Number(minute) };
   }
 
   if (!NUMBER.test(minute) || !NUMBER.test(hour)) return null;
-  const time = timeLabel(Number(hour), Number(minute));
+  const at = { hour: Number(hour), minute: Number(minute) };
 
-  if (dom === '*' && dow === '*') {
-    return t('settings.backupSchedulerCronDaily', { time });
-  }
+  if (dom === '*' && dow === '*') return { kind: 'daily', ...at };
   if (dom === '*' && dow !== '*') {
     const weekday = parseWeekday(dow);
     if (weekday == null) return null;
-    return t('settings.backupSchedulerCronWeekly', { weekday: weekdayLabel(weekday), time });
+    return { kind: 'weekly', weekday, ...at };
   }
   if (dow === '*' && NUMBER.test(dom)) {
     const day = Number(dom);
     if (day < 1 || day > 31) return null;
-    return t('settings.backupSchedulerCronMonthly', { day, time });
+    return { kind: 'monthly', day, ...at };
   }
   return null;
+}
+
+/**
+ * Übersetzt die geläufigen Backup-Rhythmen in einen Satz. Alles darüber hinaus
+ * (Listen, Bereiche, Monatsfelder) liefert null - dort bleibt der Ausdruck
+ * selbst die ehrlichste Auskunft.
+ *
+ * @param {unknown} expression
+ * @returns {string | null}
+ */
+export function formatCronSchedule(expression) {
+  const pattern = parseCronSchedule(expression);
+  if (!pattern) return null;
+
+  if (pattern.kind === 'hourly') {
+    return t('settings.backupSchedulerCronHourly', {
+      count: pattern.count,
+      minute: String(pattern.minute).padStart(2, '0'),
+    });
+  }
+
+  const time = timeLabel(pattern.hour, pattern.minute);
+  if (pattern.kind === 'daily') return t('settings.backupSchedulerCronDaily', { time });
+  if (pattern.kind === 'weekly') {
+    return t('settings.backupSchedulerCronWeekly', { weekday: weekdayLabel(pattern.weekday), time });
+  }
+  return t('settings.backupSchedulerCronMonthly', { day: pattern.day, time });
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * Der längste Abstand zwischen zwei Läufen eines erkannten Zeitplans, in
+ * Millisekunden; null für alles, was `formatCronSchedule` auch nicht nennt.
+ *
+ * DER LÄNGSTE, NICHT DER ÜBLICHE: wer hieran "überfällig" misst, darf nie zu
+ * früh warnen. Ein Monat zählt deshalb 31 Tage. Ein Lauf am 29., 30. oder 31.
+ * fällt in kurzen Monaten aus (Cron holt ihn nicht nach), der Abstand reicht
+ * dann über zwei Monate: höchstens 61 Tage (31. Oktober bis 31. Dezember),
+ * hier 62.
+ *
+ * @param {unknown} expression
+ * @returns {number | null}
+ */
+export function cronScheduleIntervalMs(expression) {
+  const pattern = parseCronSchedule(expression);
+  if (!pattern) return null;
+  if (pattern.kind === 'hourly') return pattern.count * HOUR_MS;
+  if (pattern.kind === 'daily') return DAY_MS;
+  if (pattern.kind === 'weekly') return 7 * DAY_MS;
+  return (pattern.day > 28 ? 62 : 31) * DAY_MS;
 }

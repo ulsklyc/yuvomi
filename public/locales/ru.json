@@ -2618,6 +2618,8 @@
         "backupSchedulerLastSuccess": "{{date}} (успешно)",
         "backupSchedulerNever": "Резервных копий пока нет",
         "backupSchedulerLastError": "Последняя ошибка",
+        "backupSchedulerLastAttempt": "Последняя попытка",
+        "backupSchedulerOverdue": "С тех пор не создано как минимум две запланированные резервные копии.",
         "backupSchedulerSchedule": "Расписание",
         "backupSchedulerCronDaily": "Ежедневно в {{time}}",
         "backupSchedulerCronWeekly": "Еженедельно: {{weekday}}, {{time}}",

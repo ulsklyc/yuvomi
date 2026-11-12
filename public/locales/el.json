@@ -2430,6 +2430,8 @@
         "backupSchedulerLastSuccess": "{{date}} (επιτυχές)",
         "backupSchedulerNever": "Δεν έχει δημιουργηθεί ακόμη αντίγραφο ασφαλείας",
         "backupSchedulerLastError": "Τελευταίο σφάλμα",
+        "backupSchedulerLastAttempt": "Τελευταία προσπάθεια",
+        "backupSchedulerOverdue": "Έκτοτε δεν έγιναν τουλάχιστον δύο προγραμματισμένα αντίγραφα ασφαλείας.",
         "backupSchedulerSchedule": "Χρονοδιάγραμμα",
         "backupSchedulerCronDaily": "Καθημερινά στις {{time}}",
         "backupSchedulerCronWeekly": "Κάθε {{weekday}} στις {{time}}",

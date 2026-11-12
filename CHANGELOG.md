@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
   in your language - a full disk, an unwritable backup folder, a failed integrity check, or an
   unrecognised cause - from `scheduler.lastError.reason`. A successful run clears the row.
+- **The backup card keeps telling you when a backup last succeeded, and warns when that is too
+  long ago.** After a failed run, "Last backup" showed only the date of the failure, and the date
+  of the last backup you can actually restore from was gone. "Last backup" is now always the
+  last one that succeeded; a failed run adds its own "Last attempt" row above the reason and
+  leaves again with the next success. If the last success is older than two intervals of the
+  schedule (daily, weekly, monthly or every N hours), or no run has succeeded yet although one
+  was tried, the row turns amber and says that at least two scheduled backups have been missed -
+  also when nothing failed and the schedule simply stood still. A schedule the page cannot read
+  as one of those patterns never warns about age.
+
+### Fixed
+- **"Create backup now" no longer reports success when the backup failed.** The server answers
+  a failed manual run with `200` and `success: false`, and the page showed "Backup created
+  successfully." without reading the answer. It now shows the reason in your language, the
+  same sentence as the "Last error" row, and the card reloads either way.
 
 ## [2.89.1] - 2026-11-12
 

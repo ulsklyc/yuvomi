@@ -2578,6 +2578,8 @@
         "backupSchedulerLastFail": "{{date}} (sikertelen)",
         "backupSchedulerNever": "Még nem történt biztonsági mentés",
         "backupSchedulerLastError": "Utolsó hiba",
+        "backupSchedulerLastAttempt": "Utolsó kísérlet",
+        "backupSchedulerOverdue": "Azóta legalább két ütemezett biztonsági mentés elmaradt.",
         "backupSchedulerTrigger": "Biztonsági mentés létrehozása most",
         "backupSchedulerTriggering": "Biztonsági mentés létrehozása...",
         "backupSchedulerTriggeredToast": "Biztonsági mentés sikeresen létrehozva.",

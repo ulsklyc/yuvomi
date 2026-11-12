@@ -2430,6 +2430,8 @@
         "backupSchedulerLastSuccess": "{{date}} (सफल)",
         "backupSchedulerNever": "अभी तक कोई बैकअप नहीं बना",
         "backupSchedulerLastError": "अंतिम त्रुटि",
+        "backupSchedulerLastAttempt": "पिछला प्रयास",
+        "backupSchedulerOverdue": "तब से कम से कम दो निर्धारित बैकअप नहीं बने हैं।",
         "backupSchedulerSchedule": "समय-सारणी",
         "backupSchedulerCronDaily": "प्रतिदिन {{time}} बजे",
         "backupSchedulerCronWeekly": "हर {{weekday}} को {{time}} बजे",

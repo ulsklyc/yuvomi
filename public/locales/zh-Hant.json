@@ -2430,6 +2430,8 @@
         "backupSchedulerLastSuccess": "{{date}}（成功）",
         "backupSchedulerNever": "尚未建立備份",
         "backupSchedulerLastError": "上次錯誤",
+        "backupSchedulerLastAttempt": "上次嘗試",
+        "backupSchedulerOverdue": "此後至少有兩次計劃備份未完成。",
         "backupSchedulerSchedule": "計劃",
         "backupSchedulerCronDaily": "每天 {{time}}",
         "backupSchedulerCronWeekly": "每週{{weekday}} {{time}}",

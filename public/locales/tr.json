@@ -2430,6 +2430,8 @@
         "backupSchedulerLastSuccess": "{{date}} (başarılı)",
         "backupSchedulerNever": "Henüz yedek oluşturulmadı",
         "backupSchedulerLastError": "Son hata",
+        "backupSchedulerLastAttempt": "Son deneme",
+        "backupSchedulerOverdue": "O zamandan beri planlanan en az iki yedek oluşturulmadı.",
         "backupSchedulerSchedule": "Zamanlama",
         "backupSchedulerCronDaily": "Her gün {{time}}",
         "backupSchedulerCronWeekly": "Her {{weekday}} {{time}}",

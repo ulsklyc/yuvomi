@@ -2430,6 +2430,8 @@
         "backupSchedulerLastSuccess": "{{date}} (lyckad)",
         "backupSchedulerNever": "Ingen säkerhetskopia har skapats ännu",
         "backupSchedulerLastError": "Senaste fel",
+        "backupSchedulerLastAttempt": "Senaste försök",
+        "backupSchedulerOverdue": "Sedan dess har minst två schemalagda säkerhetskopior uteblivit.",
         "backupSchedulerSchedule": "Schema",
         "backupSchedulerCronDaily": "Dagligen kl. {{time}}",
         "backupSchedulerCronWeekly": "Varje {{weekday}} kl. {{time}}",

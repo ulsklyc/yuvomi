@@ -2631,6 +2631,20 @@
   overflow-wrap: anywhere;
 }
 
+/* `-ink` wie `.form-hint--warning` (layout.css): der Ton steht hier als
+   Schrift in 14px, und das Ink-Token beantwortet "was ist hier lesbar"
+   (tokens.css §Ink). Die Zeile trägt einen Satz, kein Wort: neben dem Etikett
+   bleibt ihm mobil die halbe Breite, ein langes Wort trennt dann an der Silbe
+   (test:typography W1). */
+.settings-info-value--warning {
+  color: var(--color-warning-ink);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+}
+
 .settings-info-value code {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
