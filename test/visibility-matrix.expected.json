@@ -11,6 +11,7 @@
     "mcp": "list_tasks with include_future=true, list_upcoming_events with limit=100; the bridge calls call_api_operation with method GET and the /api/v1 path of each list route; a refused call is { status: tool_error, reason }",
     "role_accounts": "token_read / token_write / token_unscoped act for the member account",
     "seed_counts": {
+      "activities": 6,
       "budget": 9,
       "documents": 9,
       "events": 11,
@@ -24,6 +25,9 @@
   "cells": {
     "admin": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -61,6 +65,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -108,6 +115,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -140,6 +150,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.admin.private",
+          "activity.child.family",
+          "activity.member.family"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -192,6 +208,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.admin.private",
+          "activity.child.family",
+          "activity.member.family"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -244,6 +266,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -274,6 +299,9 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -340,6 +368,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -379,6 +410,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.admin.private",
+          "activity.child.family",
+          "activity.member.family"
+        ],
         "budget": {
           "ids": [
             "budget.admin.private",
@@ -428,6 +465,9 @@
     },
     "caregiver": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -462,6 +502,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -503,6 +546,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -535,6 +581,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -579,6 +631,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -623,6 +681,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -650,6 +711,9 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -710,6 +774,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -749,6 +816,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -770,15 +843,13 @@
           "event.member.all",
           "event.member.ics-shared"
         ],
-        "medications": {
-          "divergent": "search uses an inline rule without care grants (server/services/search.js:556); list and detail show the cared-for person's private medication",
-          "ids": [
-            "medication.admin.family",
-            "medication.caregiver.private",
-            "medication.child.family",
-            "medication.member.family"
-          ]
-        },
+        "medications": [
+          "medication.admin.family",
+          "medication.caregiver.private",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
         "notes": [
           "note.admin.all",
           "note.child.all",
@@ -794,6 +865,9 @@
     },
     "child": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -833,6 +907,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -882,6 +959,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -914,6 +994,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "household": {
             "reason": "module_access_denied",
@@ -963,6 +1049,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "household": {
             "reason": "module_access_denied",
@@ -1012,6 +1104,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -1043,6 +1138,9 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -1116,6 +1214,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -1155,6 +1256,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": [],
         "documents": [
           "document.admin.family",
@@ -1197,6 +1304,9 @@
     },
     "display": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -1224,6 +1334,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -1261,6 +1374,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -1293,6 +1409,10 @@
         }
       },
       "list": {
+        "activities": {
+          "reason": "token_scope",
+          "status": 403
+        },
         "budget": {
           "household": {
             "reason": "token_scope",
@@ -1328,6 +1448,10 @@
         ]
       },
       "mcp_bridge": {
+        "activities": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
         "budget": {
           "household": {
             "reason": "tool_not_permitted",
@@ -1360,6 +1484,9 @@
         }
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -1382,6 +1509,9 @@
         }
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -1432,6 +1562,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -1471,6 +1604,10 @@
         }
       },
       "search": {
+        "activities": {
+          "reason": "token_scope",
+          "status": 403
+        },
         "budget": {
           "reason": "token_scope",
           "status": 403
@@ -1499,6 +1636,9 @@
     },
     "member": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -1539,6 +1679,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -1589,6 +1732,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -1622,6 +1768,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -1677,6 +1829,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -1732,6 +1890,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -1764,6 +1925,9 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -1840,6 +2004,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -1879,6 +2046,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -1931,6 +2104,9 @@
     },
     "member_none": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -1955,6 +2131,9 @@
         }
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -2000,6 +2179,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2018,6 +2200,10 @@
         }
       },
       "list": {
+        "activities": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
         "budget": {
           "household": {
             "reason": "module_access_denied",
@@ -2050,6 +2236,10 @@
         }
       },
       "mcp_bridge": {
+        "activities": {
+          "reason": "module_access_denied",
+          "status": "tool_error"
+        },
         "budget": {
           "household": {
             "reason": "module_access_denied",
@@ -2082,6 +2272,9 @@
         }
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -2104,6 +2297,9 @@
         }
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -2132,6 +2328,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -2158,6 +2357,7 @@
         }
       },
       "search": {
+        "activities": [],
         "budget": [],
         "documents": [],
         "events": [],
@@ -2168,6 +2368,9 @@
     },
     "split_guest": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -2192,6 +2395,9 @@
         }
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -2238,6 +2444,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2270,6 +2479,10 @@
         }
       },
       "list": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
         "budget": {
           "household": {
             "reason": "split_guest_scope",
@@ -2302,6 +2515,10 @@
         }
       },
       "mcp_bridge": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": "tool_error"
+        },
         "budget": {
           "household": {
             "reason": "split_guest_scope",
@@ -2334,6 +2551,9 @@
         }
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -2356,6 +2576,10 @@
         }
       },
       "overview": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
         "budget": {
           "reason": "split_guest_scope",
           "status": 403
@@ -2382,6 +2606,10 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
         "budget": {
           "reason": "split_guest_scope",
           "status": 403
@@ -2408,6 +2636,10 @@
         }
       },
       "search": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
         "budget": {
           "reason": "split_guest_scope",
           "status": 403
@@ -2436,6 +2668,9 @@
     },
     "token_read": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -2476,6 +2711,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -2526,6 +2764,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2546,6 +2787,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -2601,6 +2848,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -2656,6 +2909,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -2688,6 +2944,9 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -2764,6 +3023,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -2803,6 +3065,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -2855,6 +3123,9 @@
     },
     "token_unscoped": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -2895,6 +3166,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -2945,6 +3219,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2965,6 +3242,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -3020,6 +3303,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -3075,6 +3364,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -3107,6 +3399,9 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -3183,6 +3478,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -3222,6 +3520,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -3274,6 +3578,9 @@
     },
     "token_write": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -3314,6 +3621,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -3364,6 +3674,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -3384,6 +3697,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -3439,6 +3758,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -3494,6 +3819,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -3526,6 +3854,9 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
           "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
@@ -3602,6 +3933,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -3641,6 +3975,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
