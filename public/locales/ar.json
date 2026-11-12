@@ -6818,7 +6818,8 @@
         "previousMonth": "الشهر السابق",
         "nextMonth": "الشهر التالي",
         "today": "اليوم",
-        "clear": "مسح"
+        "clear": "مسح",
+        "typeIn": "اكتب"
     },
     "pantry": {
         "badgeExpiredDays_one": "انتهت صلاحيته منذ يوم واحد",

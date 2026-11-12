@@ -36,6 +36,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failed run or with an overdue backup the word stays, since the schedule is still running, but
   without the green that would say all is well next to a red line.
 
+### Changed
+- **Picking a time takes two taps: hour and minute stand side by side.** The clock button of a
+  time field used to open one list of every time in 15-minute steps (96 rows, and 18:05 was not
+  in it). It now opens an hour column and a minute column in 5-minute steps, with an AM/PM column
+  for the 12-hour format; the hour keeps the picker open, the minute closes it. A minute typed
+  outside the steps (18:07) shows up marked in its column (#2671).
+- **On a phone, a tap into a date or time field opens its picker instead of the keyboard.** A
+  "Type" button in the picker closes it and brings the keyboard for typing as before. With a
+  mouse or a keyboard the field stays a text field: the button and the arrow key down open the
+  picker. While the picker is open, typing moves it along: `18` marks 18 in the hour column,
+  `24122026` turns the calendar to that day (#2671).
+
 ### Fixed
 - **"Create backup now" no longer reports success when the backup failed.** The server answers
   a failed manual run with `200` and `success: false`, and the page showed "Backup created
@@ -48,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured - only the description was wrong. Such a schedule now stands there as the
   expression itself, like every other list or range; a single weekday is still spelled out,
   as a number or as a short or full name (`mon`, `Monday`).
+- **Escape in a date or time picker returns the focus to where it came from.** It stayed on a row
+  of the closed picker, so the next Tab started from nowhere.
 
 ## [2.89.1] - 2026-11-12
 

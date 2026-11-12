@@ -6372,7 +6372,8 @@
         "previousMonth": "이전 달",
         "nextMonth": "다음 달",
         "today": "오늘",
-        "clear": "지우기"
+        "clear": "지우기",
+        "typeIn": "직접 입력"
     },
     "pantry": {
         "badgeExpiredDays_one": "{{count}}일 전 만료",

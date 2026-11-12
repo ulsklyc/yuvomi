@@ -6372,7 +6372,8 @@
         "previousMonth": "पिछला महीना",
         "nextMonth": "अगला महीना",
         "today": "आज",
-        "clear": "साफ़ करें"
+        "clear": "साफ़ करें",
+        "typeIn": "टाइप करें"
     },
     "pantry": {
         "badgeExpiredDays_one": "{{count}} दिन पहले समाप्त",

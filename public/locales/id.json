@@ -6372,7 +6372,8 @@
         "previousMonth": "Bulan sebelumnya",
         "nextMonth": "Bulan berikutnya",
         "today": "Hari ini",
-        "clear": "Hapus"
+        "clear": "Hapus",
+        "typeIn": "Ketik"
     },
     "pantry": {
         "badgeExpiredDays_one": "Kedaluwarsa {{count}} hari lalu",

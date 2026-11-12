@@ -6372,7 +6372,8 @@
         "previousMonth": "Nakaraang buwan",
         "nextMonth": "Susunod na buwan",
         "today": "Ngayon",
-        "clear": "I-clear"
+        "clear": "I-clear",
+        "typeIn": "I-type"
     },
     "pantry": {
         "badgeExpiredDays_one": "Nag-expire {{count}} araw na ang nakalipas",

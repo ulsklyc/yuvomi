@@ -48,6 +48,58 @@ test('Nutzt die zentralen i18n-Parser/Formatter (kein eigenes Datumsparsing)', (
   assert(/formatDateInput/.test(comp) && /formatTimeInput/.test(comp), 'Muss formatDateInput/formatTimeInput nutzen');
 });
 
+// ── Zeit-Spalten und das Feld am Finger (#2671) ──────────────────────────
+// Statt EINER Liste aller Zeiten im 15-Minuten-Raster (96 Zeilen) stehen
+// Stunde und Minute nebeneinander. Am Finger oeffnet ein Tipp ins Feld das
+// Blatt, "Eintippen" holt die Tastatur; mit Maus und Tastatur bleibt das Feld
+// ein Textfeld (Knopf und Pfeil runter oeffnen). Tippen bleibt der schnelle Pfad.
+const inputHandler = comp.match(/sub\.input\.addEventListener\('input',[\s\S]*?\n {4}\}\);/)?.[0] ?? '';
+test('Die Zeit-Auswahl hat Spalten statt einer Liste aller Zeiten', () => {
+  assert(/_renderTimeColumns\(el, sub\)/.test(comp), 'Zeit-Popover muss die Spalten zeichnen');
+  assert(!/mins < 24 \* 60/.test(comp), 'die alte Liste aller Zeiten darf nicht mehr gebaut werden');
+  assert(/data-part="\$\{part\}"/.test(comp) && /role="listbox"/.test(comp), 'jede Spalte ist eine Listbox mit data-part');
+});
+test('Spaltennamen kommen aus Intl (keine eigenen Locale-Keys)', () => {
+  assert(/Intl\.DisplayNames\(getLocale\(\), \{ type: 'dateTimeField' \}\)/.test(comp), 'Intl.DisplayNames dateTimeField noetig');
+});
+test('Mit Maus oder Tastatur oeffnet ein Klick ins Feld das Blatt nicht, Pfeil runter schon', () => {
+  const click = comp.match(/sub\.input\.addEventListener\('click',[\s\S]*?\n {4}\}\);/)?.[0] ?? '';
+  assert(click, 'click-Handler am Feld nicht gefunden');
+  assert(/if \(!byTap \|\|/.test(click), 'ohne Finger-Tipp muss der click-Handler sofort aussteigen');
+  assert(!/fromField/.test(comp), 'den Maus-Pfad (fromField) gibt es nicht mehr');
+  assert(/e\.key === 'ArrowDown'[\s\S]*?this\._openPopover\(sub, \{ returnTo: sub\.input \}\)/.test(comp),
+    'Pfeil runter muss das zugeklappte Blatt oeffnen und den Fokus danach ins Feld geben');
+});
+test('Am Finger geht das Blatt ohne Tastatur auf (je Tipp entschieden)', () => {
+  assert(/e\.pointerType === 'touch' \|\| e\.pointerType === 'pen'/.test(comp), 'Entscheidung nach pointerType');
+  assert(/sub\.input\.addEventListener\('pointerdown'[\s\S]*?e\.preventDefault\(\); \/\/ kein Fokus/.test(comp),
+    'Finger-Tipp darf das Feld nicht fokussieren');
+});
+test('Getipptes zieht das offene Blatt mit und das Feld wird nicht umgeschrieben', () => {
+  assert(inputHandler, 'input-Handler nicht gefunden');
+  assert(/this\._syncPopover\(sub\)/.test(inputHandler), 'input muss das Blatt nachziehen');
+  assert(!/sub\.input\.value\s*=/.test(inputHandler), 'input darf das Feld nicht umschreiben');
+});
+test('Am Finger traegt das Blatt "Eintippen": Blatt zu, Fokus ins Feld', () => {
+  assert(/if \(byTap\) \{[\s\S]*?t\('datepicker\.typeIn'\)/.test(comp), '"Eintippen" nur im am Finger geoeffneten Blatt');
+  assert(/\.ydp-type'\)\?\.addEventListener\('click', \(\) => \{\s*this\._closePopover\(\);\s*sub\.input\.focus\(\);/.test(comp),
+    '"Eintippen" schliesst das Blatt und fokussiert das Feld');
+  assert(/if \(this\._activeSub === sub\) \{ this\._closePopover\(\); return; \}/.test(comp),
+    'ein Tipp ins Feld bei offenem Blatt tut dasselbe');
+  assert(/this\._returnTo = returnTo \|\| sub\.trigger;/.test(comp), 'nach einer Wahl am Finger zurueck auf den Knopf, nicht ins Feld (keine Tastatur)');
+});
+test('Esc und eine fertige Wahl geben den Fokus dorthin zurueck, woher das Blatt kam', () => {
+  // Regression: vorher fragte Esc `_activeSub` erst NACH dem Schliessen ab, und
+  // der Fokus blieb auf einer Zeile des verborgenen Blatts.
+  assert(/const target = this\._returnTo;\s*this\._closePopover\(\);\s*target\?\.focus\(\);/.test(comp), '_returnFocus muss das Ziel VOR dem Schliessen lesen');
+  assert(!/this\._closePopover\(\); this\._activeSub\?\.trigger\.focus\(\)/.test(comp), 'Esc darf _activeSub nicht nach dem Schliessen lesen');
+});
+test('CSS: Spalten rasten ein und messen ihre Zeilen selbst', () => {
+  assert(/\.ydp-time__list\s*\{[^}]*position:\s*relative/.test(css), 'Liste ist offsetParent ihrer Zeilen');
+  assert(/\.ydp-time__list\s*\{[^}]*scroll-snap-type:\s*y proximity/.test(css), 'Spalten rasten ein (proximity)');
+  assert(/\.ydp-time__opt\s*\{[^}]*scroll-snap-align:\s*center/.test(css), 'Zeilen rasten mittig ein');
+});
+
 // ── Interaktion & Plattform ─────────────────────────────────────────────
 test('Öffnet Popover über die native Popover-API (Top-Layer)', () => {
   assert(/setAttribute\('popover'/.test(comp), 'Muss popover-Attribut setzen');
@@ -166,7 +218,7 @@ test('CSS enthält keine Hex-Farben (nur Tokens)', () => {
 // ── i18n-Vollständigkeit über alle Locales ──────────────────────────────
 const localesDir = new URL('../public/locales/', import.meta.url);
 const localeFiles = readdirSync(localesDir).filter((f) => f.endsWith('.json'));
-const REQUIRED_KEYS = ['openCalendar', 'openTimePicker', 'previousMonth', 'nextMonth', 'today', 'clear'];
+const REQUIRED_KEYS = ['openCalendar', 'openTimePicker', 'previousMonth', 'nextMonth', 'today', 'clear', 'typeIn'];
 
 // Erwartete Anzahl aus SUPPORTED_LOCALES lesen statt sie hier zu doppeln: eine
 // fest verdrahtete Zahl bricht bei jeder neuen Sprache, obwohl am Datepicker
@@ -341,6 +393,67 @@ test('Keine Locale hat überschüssige datepicker-Keys', () => {
         `Kopfzeile ${run.labels.join(' ')}, erwartet ${wantLabels.join(' ')}`);
     });
   }
+}
+
+// ── Zeit-Spalten als Programm ────────────────────────────────────────────
+// timeColumns()/pickTime() sind die reine Logik hinter den Spalten: was
+// angeboten und markiert wird, und welcher Wert nach einem Tipp gilt.
+{
+  /** @type {Record<string, PropertyDescriptor|undefined>} */
+  const saved = {};
+  for (const k of ['HTMLElement', 'customElements', 'document', 'window']) {
+    saved[k] = Object.getOwnPropertyDescriptor(globalThis, k);
+  }
+  Object.assign(globalThis, {
+    HTMLElement: class {},
+    customElements: { get: () => undefined, define() {} },
+    document: { createElement: () => ({}), addEventListener() {}, removeEventListener() {} },
+    window: { addEventListener() {}, removeEventListener() {}, matchMedia: () => ({ matches: false }) },
+  });
+  /** @type {any} */
+  let mod = null;
+  /** @type {unknown} */
+  let error = null;
+  try { mod = await import('../public/components/datepicker.js'); }
+  catch (err) { error = err; }
+  finally {
+    for (const [k, d] of Object.entries(saved)) {
+      if (d) Object.defineProperty(globalThis, k, d); else delete /** @type {any} */ (globalThis)[k];
+    }
+  }
+  /** @param {unknown} a @param {unknown} b @param {string} msg */
+  const eq = (a, b, msg) => assert(JSON.stringify(a) === JSON.stringify(b), `${msg}: ${JSON.stringify(a)} statt ${JSON.stringify(b)}`);
+  test('timeColumns: 24h bietet 0-23 und Minuten im 5er-Raster, markiert 18:07 samt 07', () => {
+    assert(!error && mod?.timeColumns, `Import fehlgeschlagen: ${error}`);
+    const c = mod.timeColumns('18:07');
+    eq(c.parts, ['hour', 'minute'], 'Spalten');
+    assert(c.values.hour.length === 24 && c.values.hour[0] === 0, '24 Stunden ab 0');
+    eq(c.values.minute, [0, 5, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], 'Minuten mit der getippten 07');
+    eq(c.selected, { hour: 18, minute: 7 }, 'Markierung');
+    eq(mod.timeColumns('').selected, { hour: null, minute: null }, 'ohne Wert nichts markiert');
+    eq(mod.timeColumns('', { step: 15 }).values.minute, [0, 15, 30, 45], 'step 15');
+  });
+  test('timeColumns: 12h bietet 12, 1-11 und AM/PM', () => {
+    const c = mod.timeColumns('18:30', { use12h: true });
+    eq(c.parts, ['hour', 'minute', 'period'], 'Spalten');
+    eq(c.values.hour, [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 'Stunden');
+    eq(c.selected, { hour: 6, minute: 30, period: 1 }, '18:30 = 6 PM');
+    eq(mod.timeColumns('00:05', { use12h: true }).selected, { hour: 12, minute: 5, period: 0 }, '00:05 = 12 AM');
+  });
+  test('pickTime: Stunde und Minute setzen ihren Teil, ohne Wert gilt die laufende Stunde', () => {
+    assert(mod.pickTime('', 'hour', 18, { nowHour: 9 }) === '18:00', 'Stunde ohne Wert');
+    assert(mod.pickTime('18:00', 'minute', 45) === '18:45', 'Minute');
+    assert(mod.pickTime('', 'minute', 15, { nowHour: 9 }) === '09:15', 'Minute ohne Wert: laufende Stunde');
+    assert(mod.pickTime('18:07', 'hour', 7) === '07:07', 'Stunde behaelt die Minute');
+  });
+  test('pickTime: 12h haelt AM/PM beim Stundenwechsel und schaltet es um', () => {
+    const o = { use12h: true };
+    assert(mod.pickTime('18:00', 'hour', 7, o) === '19:00', '7 am Nachmittag bleibt PM');
+    assert(mod.pickTime('06:30', 'period', 1, o) === '18:30', 'AM -> PM');
+    assert(mod.pickTime('18:30', 'period', 0, o) === '06:30', 'PM -> AM');
+    assert(mod.pickTime('13:00', 'hour', 12, o) === '12:00', '12 PM ist Mittag');
+    assert(mod.pickTime('00:10', 'hour', 12, o) === '00:10', '12 AM ist Mitternacht');
+  });
 }
 
 console.log(`\n  ${passed} bestanden, ${failed} fehlgeschlagen\n`);

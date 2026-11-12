@@ -6372,7 +6372,8 @@
         "previousMonth": "上个月",
         "nextMonth": "下个月",
         "today": "今天",
-        "clear": "清除"
+        "clear": "清除",
+        "typeIn": "手动输入"
     },
     "pantry": {
         "badgeExpiredDays_one": "{{count}} 天前过期",

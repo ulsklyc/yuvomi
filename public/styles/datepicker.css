@@ -288,7 +288,8 @@ yuvomi-datepicker {
   background: transparent;
 }
 
-.ydp-cal__foot {
+.ydp-cal__foot,
+.ydp-time__foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -309,7 +310,10 @@ yuvomi-datepicker {
   transition: background-color var(--transition-fast);
 }
 
-.ydp-textbtn--today {
+/* "Heute" und "Eintippen" (am Finger der Weg vom Blatt zur Tastatur, Issue
+ * 2671) sind beide eine Handlung des Blatts, nicht seine Zuruecknahme. */
+.ydp-textbtn--today,
+.ydp-textbtn--type {
   color: var(--color-accent);
 }
 
@@ -317,34 +321,69 @@ yuvomi-datepicker {
   color: var(--color-text-tertiary);
 }
 
+/* Unter den Zeit-Spalten steht "Eintippen" allein und mittig. */
+.ydp-time__foot {
+  justify-content: center;
+}
+
 .ydp-textbtn:hover {
   background: var(--color-surface-hover);
 }
 
 /* --------------------------------------------------------
- * Zeit-Liste
+ * Zeit-Spalten: Stunde | Minute (| AM/PM), je eine Liste zum Antippen.
+ * Die Spalten rasten beim Scrollen ein (proximity, nicht mandatory: ein
+ * gesetzter scrollTop wird nicht ueberstimmt). position: relative macht
+ * die Liste zum offsetParent ihrer Zeilen, so mittet _syncTimeColumns die
+ * Markierung ohne die Kopfzeile mitzurechnen.
  * -------------------------------------------------------- */
+.ydp-time {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(4rem, 1fr);
+  gap: var(--space-1);
+}
+
+.ydp-time__col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ydp-time__col + .ydp-time__col {
+  border-inline-start: 1px solid var(--color-border);
+  padding-inline-start: var(--space-1);
+}
+
+.ydp-time__head {
+  padding: 0 0 var(--space-1);
+  font-size: var(--type-caption);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
 .ydp-time__list {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-0h);
   max-height: 15rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y proximity;
   scrollbar-width: thin;
-  scroll-behavior: smooth;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ydp-time__list { scroll-behavior: auto; }
 }
 
 .ydp-time__opt {
-  padding: var(--space-2) var(--space-4);
+  flex: none;
+  scroll-snap-align: center;
+  padding: var(--space-2) var(--space-3);
   border: 0;
   background: transparent;
   color: var(--color-text-primary);
   font-size: var(--text-sm);
-  text-align: left;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color var(--transition-fast);
