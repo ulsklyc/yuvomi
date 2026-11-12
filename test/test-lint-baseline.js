@@ -318,17 +318,21 @@ test('each of the other layer rules fires, and an unresolved local import is key
     writeFileSync(join(dir, 'node_modules', 'web-push', 'package.json'), JSON.stringify({ name: 'web-push', version: '0.0.0', main: 'index.js' }));
     writeFileSync(join(dir, 'node_modules', 'web-push', 'index.js'), 'export const sendNotification = () => {};\n');
     writeFileSync(join(dir, 'public', 'pages', 'p.js'), 'export const p = 1;\n');
+    writeFileSync(join(dir, 'public', 'utils', 'digits.js'), 'export const d = 1;\n');
     writeFileSync(join(dir, 'public', 'utils', 'u.js'), 'export const u = 1;\n');
-    writeFileSync(join(dir, 'server', 'services', 'ok.js'), "import { u } from '../../public/utils/u.js';\nexport const ok = () => u;\n");
+    writeFileSync(join(dir, 'server', 'services', 'ok.js'), "import { d } from '../../public/utils/digits.js';\nexport const ok = () => d;\n");
     assert.equal(run(dir, '--init').code, 0);
-    assert.deepEqual(baselineOf(dir), {}, 'reading public/utils/ is allowed');
+    assert.deepEqual(baselineOf(dir), {}, 'importing a target on the frozen list (SERVER_PUBLIC_IMPORTS) is allowed');
     writeFileSync(join(dir, 'server', 'services', 'p.js'), "import { p } from '../../public/pages/p.js';\nexport const q = p;\n");
+    // The list is frozen (decision E16): a module under public/utils/ that is not on it is a violation.
+    writeFileSync(join(dir, 'server', 'services', 'fresh.js'), "import { u } from '../../public/utils/u.js';\nexport const f = u;\n");
     writeFileSync(join(dir, 'public', 'utils', 's.js'), "import { ok } from '../../server/services/ok.js';\nexport const s = ok;\n");
     writeFileSync(join(dir, 'server', 'services', 'gone.js'), "import { x } from './missing.js';\nexport const g = x;\n");
     const r = run(dir);
     assert.equal(r.code, 1, r.out);
     for (const [file, rule] of [
       ['server/services/p.js', 'server-not-to-public-except-shared'],
+      ['server/services/fresh.js', 'server-not-to-public-except-shared'],
       ['public/utils/s.js', 'public-not-to-server'],
       ['server/services/gone.js', 'unresolved-import'],
     ]) {
