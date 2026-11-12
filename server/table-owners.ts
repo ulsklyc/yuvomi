@@ -13,18 +13,24 @@
  * Name rule, as applied (first match wins):
  *   1. Decided by name: users, sync_config, sessions, schema_migrations, search_index and
  *      its FTS5 shadow tables search_index_* -> core; reminders, notification_deliveries ->
- *      delivery; api_tokens -> auth; health_care_grants -> health; contacts -> contacts.
+ *      delivery; api_tokens, split_expense_guest_users -> auth (a guest is an account kind
+ *      that decides what an account may reach); health_care_grants -> health;
+ *      contacts -> contacts.
  *   2. The table's stem names a module: budget_*, expense_*, expenses, recurring_expenses,
  *      settlement*, subscription_* -> budget (split expenses and subscriptions sit in the
- *      budget scope, server/scopes.js); calendar_*, caldav_*, event_*, external_calendar*,
- *      google_calendar_*, ics_subscription*, local_calendars, outlook_* -> calendar;
+ *      budget scope, server/scopes.js; their guest accounts are decided in rule 1);
+ *      calendar_*, caldav_*, event_*, external_calendar*, google_calendar_*,
+ *      ics_subscription*, local_calendars, outlook_* -> calendar;
  *      contact_*, carddav_* -> contacts; cycle_*, health_*, medication* -> health;
  *      family_document*, dms_* -> documents; meal_*, meals, recipe_*, recipes -> meals;
  *      note_*, notes -> notes; task_*, tasks -> tasks; display_* -> display;
  *      notification_*, push_* -> delivery; housekeeping_*, inventory_*, pantry_*, reward_*,
  *      schedule_*, shopping_*, waste_* -> the module of that name.
  *   3. A table named after a nav id goes to the module that lists it: birthdays -> calendar.
- *   4. No clear answer from the name: chosen by what the table is, marked `// disputed:`.
+ *   4. No clear answer from the name: decided on 2026-11-12 by what the table is
+ *      (access_permissions, device_pairing_codes, invites, password_resets,
+ *      user_recovery_codes, user_totp -> auth; idempotency_keys -> core;
+ *      holiday_cache -> calendar; quick_links -> dashboard).
  * Not listed: temp.search_vocab (server/services/search.js) is an fts5vocab view over
  * search_index in the temp schema of one connection; it holds no data of its own.
  * Erasable TS syntax only (runs through type stripping, no build).
@@ -52,7 +58,7 @@ type Owner = (typeof OWNERS)[number];
 
 /** Table -> owner, sorted by table name, one line per table. */
 export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
-  access_permissions: 'auth', // disputed: no module stem; the per-member module rights permissions.js resolves
+  access_permissions: 'auth', // the per-member module rights permissions.js resolves
   api_tokens: 'auth',
   birthdays: 'calendar',
   budget_accounts: 'budget',
@@ -90,7 +96,7 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   cycle_periods: 'health',
   cycle_reminder_anchors: 'health',
   cycle_settings: 'health',
-  device_pairing_codes: 'auth', // disputed: no module stem; a code that signs a person in on a phone
+  device_pairing_codes: 'auth', // a code that signs a person in on a phone
   display_accounts: 'display',
   display_devices: 'display',
   display_pairing_codes: 'display',
@@ -122,7 +128,7 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   health_prevention_types: 'health',
   health_visibility_defaults: 'health',
   health_vitals: 'health',
-  holiday_cache: 'calendar', // disputed: no module stem; the public holidays the calendar shows
+  holiday_cache: 'calendar', // the public holidays the calendar shows
   housekeeping_decay_tasks: 'housekeeping',
   housekeeping_maintenance_log: 'housekeeping',
   housekeeping_supply_requests: 'housekeeping',
@@ -130,7 +136,7 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   housekeeping_workers: 'housekeeping',
   ics_subscription_assignees: 'calendar',
   ics_subscriptions: 'calendar',
-  idempotency_keys: 'core', // disputed: no module stem; request replay keys of middleware/idempotency.js
+  idempotency_keys: 'core', // request replay keys of middleware/idempotency.js
   inventory_categories: 'inventory',
   inventory_item_dates: 'inventory',
   inventory_item_documents: 'inventory',
@@ -138,7 +144,7 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   inventory_item_service_log: 'inventory',
   inventory_items: 'inventory',
   inventory_locations: 'inventory',
-  invites: 'auth', // disputed: no module stem; an invitation creates an account
+  invites: 'auth', // an invitation creates an account
   local_calendars: 'calendar',
   meal_ingredients: 'meals',
   meal_recurrence_exceptions: 'meals',
@@ -159,9 +165,9 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   pantry_items: 'pantry',
   pantry_locations: 'pantry',
   pantry_products: 'pantry',
-  password_resets: 'auth', // disputed: no module stem; sign-in recovery
+  password_resets: 'auth',
   push_subscriptions: 'delivery',
-  quick_links: 'dashboard', // disputed: no module stem; scopes.js gates its route under the dashboard key
+  quick_links: 'dashboard', // server/scopes.js gates its route under the dashboard key
   recipe_ingredient_pantry_matches: 'meals',
   recipe_ingredients: 'meals',
   recipe_provider_accounts: 'meals',
@@ -201,7 +207,7 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   shopping_move_notices: 'shopping',
   shopping_purchases: 'shopping',
   shopping_stores: 'shopping',
-  split_expense_guest_users: 'budget', // disputed: stem says budget, but the row is an account kind read mostly by auth
+  split_expense_guest_users: 'auth', // an account kind, not budget data
   subscription_categories: 'budget',
   subscription_exchange_rates: 'budget',
   subscription_payment_methods: 'budget',
@@ -215,8 +221,8 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   task_rotation_pool: 'tasks',
   task_tags: 'tasks',
   tasks: 'tasks',
-  user_recovery_codes: 'auth', // disputed: user_ is not users; second-factor recovery codes
-  user_totp: 'auth', // disputed: user_ is not users; the second factor
+  user_recovery_codes: 'auth', // second-factor recovery codes, not users
+  user_totp: 'auth', // the second factor, not users
   users: 'core',
   waste_imported_pickups: 'waste',
   waste_one_off_pickups: 'waste',
