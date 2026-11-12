@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text contains no password, key or path and nothing about members. Copying also works over
   plain http in the home network; where a browser refuses it, the text stands selected in a
   field instead of claiming a copy that did not happen.
+- **The backup page now shows why the last scheduled run failed** (#2525). Settings > Household >
+  Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
+  in your language - a full disk, an unwritable backup folder, a failed integrity check, or an
+  unrecognised cause - from `scheduler.lastError.reason`. A successful run clears the row.
 
 ## [2.89.1] - 2026-11-12
 
