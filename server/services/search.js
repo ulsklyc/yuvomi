@@ -519,15 +519,14 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     }, q, [event.description, event.location]));
   }
 
+  // The row rule of the note list (GET /notes, #1514): `all` notes of anyone
+  // and the viewer's own. Nothing narrower, nothing wider - a note the list
+  // shows is a note the search finds.
   if (allows('notes')) results.notes = database.prepare(`
     SELECT n.id, n.title, n.content
     FROM search_index s
     JOIN notes n ON n.id = s.entity_id
     WHERE s.entity = 'note' AND s.search_index MATCH @match
-      AND n.created_by = @userId
-      -- Die Sichtbarkeitsregel (#1514) steht auch hier, obwohl die Suche heute
-      -- nur eigene Notizen findet: wer die engere Klausel loest, soll die
-      -- private Notiz eines anderen nicht mit freigeben.
       AND ${noteVisibleWhere('n', '@userId')}
     ORDER BY n.pinned DESC, n.updated_at DESC
     LIMIT @limit

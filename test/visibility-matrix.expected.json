@@ -410,13 +410,12 @@
           "medication.child.family",
           "medication.member.family"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.admin.all",
-            "note.admin.private"
-          ]
-        },
+        "notes": [
+          "note.admin.all",
+          "note.admin.private",
+          "note.child.all",
+          "note.member.all"
+        ],
         "tasks": [
           "task.admin.all",
           "task.admin.assignees",
@@ -780,10 +779,11 @@
             "medication.member.family"
           ]
         },
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": []
-        },
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all"
+        ],
         "tasks": [
           "task.admin.all",
           "task.child.all",
@@ -1179,13 +1179,12 @@
           "medication.child.private",
           "medication.member.family"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.child.all",
-            "note.child.private"
-          ]
-        },
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.child.private",
+          "note.member.all"
+        ],
         "tasks": [
           "task.admin.all",
           "task.child.all",
@@ -1914,13 +1913,12 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.member.all",
-            "note.member.private"
-          ]
-        },
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
         "tasks": [
           "task.admin.all",
           "task.admin.assignees",
@@ -2839,13 +2837,12 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.member.all",
-            "note.member.private"
-          ]
-        },
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
         "tasks": [
           "task.admin.all",
           "task.admin.assignees",
@@ -3259,13 +3256,12 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.member.all",
-            "note.member.private"
-          ]
-        },
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
         "tasks": [
           "task.admin.all",
           "task.admin.assignees",
@@ -3679,13 +3675,12 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.member.all",
-            "note.member.private"
-          ]
-        },
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
         "tasks": [
           "task.admin.all",
           "task.admin.assignees",

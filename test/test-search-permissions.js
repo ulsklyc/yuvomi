@@ -485,3 +485,21 @@ test('Task search follows the task list: all, creator, assignment rows - never t
     `${marker} fremd zugewiesen`,
   ], 'what GET /tasks shows the kid, nothing else');
 });
+
+test('Note search follows the note list: all notes of anyone, private ones only of the viewer', async () => {
+  clearModuleDenials(KID);
+  const marker = 'Zettelprobe';
+  const insert = db.prepare('INSERT INTO notes (title, content, visibility, created_by) VALUES (?, ?, ?, ?)');
+  insert.run(`${marker} fremd alle`, 'Text', 'all', PARENT);
+  insert.run(`${marker} fremd privat`, 'Text', 'private', PARENT);
+  insert.run(`${marker} eigen alle`, 'Text', 'all', KID);
+  insert.run(`${marker} eigen privat`, 'Text', 'private', KID);
+
+  const titleOf = (/** @type {{ title: string }} */ row) => row.title;
+  const titles = (await searchAs(KID, marker)).notes.map(titleOf).sort();
+  assert.deepEqual(titles, [
+    `${marker} eigen alle`,
+    `${marker} eigen privat`,
+    `${marker} fremd alle`,
+  ], 'what GET /notes shows the kid, nothing else');
+});

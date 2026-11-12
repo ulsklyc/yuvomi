@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   created yourself or that named you in the old single-assignee field. A task someone else
   shared with everyone, or one you were assigned to together with others, stood in your list
   and was missing from the search. The search now applies the rule of the list.
+- **The global search finds the notes your notes page shows.** It only found notes you had
+  written yourself. A note someone else shared with everyone stood on your notes page and was
+  missing from the search. The search now applies the rule of the page: notes visible to
+  everyone, and your own. A note set to "only me" is still found by nobody but its author.
 
 ### Security
 - **The global search no longer finds a private task of someone else.** A task set to "only
