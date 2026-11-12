@@ -6,8 +6,9 @@
  *        Publish-Lauf verwarf `npm ci --omit=dev` sie auf linux/arm64 still
  *        (120 statt 137 Pakete), der Build lief gruen durch.
  *        Vier Proben:
- *          1. Jedes Fremdpaket, das server/ importiert, steht in
- *             `dependencies` - nicht optional, nicht dev.
+ *          1. Jedes Fremdpaket, das server/ importiert (.js wie .ts; ein
+ *             reiner Typ-Import laedt nichts), steht in `dependencies` -
+ *             nicht optional, nicht dev.
  *          2. Das Lockfile installiert jede dieser Abhaengigkeiten ohne
  *             optional-/dev-Markierung.
  *          3. scripts/check-runtime-deps.mjs laeuft auf dieser Installation
@@ -47,6 +48,9 @@ function packageName(specifier) {
 function thirdPartyImports(source) {
   const specifiers = [];
   for (const m of source.matchAll(/^(?:import|export)\s+(?:[\w$*{},\s]+?\sfrom\s*)?['"]([^'"\n]+)['"]/gm)) {
+    // `import type ...` / `export type ... from` is stripped by Node and loads
+    // nothing; `import type from 'x'` is a default import named `type`.
+    if (/^(?:import|export)\s+type(?:\s*[{*]|\s+(?!from\s*['"])[\w$]+\s+from\b)/.test(m[0])) continue;
     specifiers.push(m[1]);
   }
   for (const line of source.split('\n')) {
@@ -63,8 +67,30 @@ function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) return walk(full);
-    return /\.(?:js|mjs|cjs)$/.test(entry.name) ? [full] : [];
+    return /\.(?:js|mjs|cjs|ts)$/.test(entry.name) ? [full] : [];
   });
+}
+
+/**
+ * Every third-party package the source files under `dir` load, checked against
+ * the given package.json. The real test and the fixture test both call this, so
+ * the fixture proves what the guard over server/ does, not a copy of it.
+ * @param {string} dir
+ * @param {{ dependencies?: Record<string, string>, devDependencies?: Record<string, string>, optionalDependencies?: Record<string, string> }} manifest
+ */
+function runtimeImportOffenders(dir, manifest) {
+  const offenders = [];
+  const seen = new Set();
+  for (const file of walk(dir)) {
+    for (const name of thirdPartyImports(readFileSync(file, 'utf8'))) {
+      seen.add(name);
+      const where = relative(ROOT, file);
+      if (manifest.optionalDependencies?.[name]) offenders.push(`${name} (${where}) is in optionalDependencies - npm may drop it silently`);
+      else if (manifest.devDependencies?.[name] && !manifest.dependencies?.[name]) offenders.push(`${name} (${where}) is a devDependency - npm ci --omit=dev leaves it out`);
+      else if (!manifest.dependencies?.[name]) offenders.push(`${name} (${where}) is not declared - it is only there as someone else's dependency`);
+    }
+  }
+  return { offenders, seen };
 }
 
 test('the import scanner sees static, multi-line and dynamic imports and skips types, builtins and relatives', () => {
@@ -82,22 +108,42 @@ test('the import scanner sees static, multi-line and dynamic imports and skips t
     "  const { createDAVClient } = await import('dynamic-pkg');",
     " * @param {import('typed-only').Database} conn",
     "// await import('commented-out')",
+    // TypeScript: Node strips a type-only statement and loads nothing ...
+    "import type { Shape } from 'ts-type-only';",
+    "import type Default from 'ts-type-default';",
+    "export type { Shape } from 'ts-type-reexport';",
+    'import type {',
+    '  Multi,',
+    "} from 'ts-type-multiline';",
+    // ... but an inline `type` specifier keeps the statement, even with no value left.
+    "import { type A, b } from 'ts-mixed';",
+    "import { type OnlyType } from 'ts-inline-type-only';",
+    "export { type X } from 'ts-inline-reexport';",
+    // A default import named `type` is a value import.
+    "import type from 'ts-default-named-type';",
   ].join('\n'));
-  assert.deepEqual(found.sort(), ['@scope/pkg', 'dynamic-pkg', 'express', 're-export', 'side-effect']);
+  assert.deepEqual(found.sort(), [
+    '@scope/pkg', 'dynamic-pkg', 'express', 're-export', 'side-effect',
+    'ts-default-named-type', 'ts-inline-reexport', 'ts-inline-type-only', 'ts-mixed',
+  ]);
+});
+
+test('the guard reads TypeScript files: an undeclared package imported from a .ts file is reported', () => {
+  // server/ holds .ts files since phase 2 (table-owners.ts, authorize/); a walk that
+  // only lists .js would pass over them without a word.
+  const dir = tempDir('yuvomi-runtime-deps-ts-');
+  mkdirSync(join(dir, 'nested'));
+  writeFileSync(join(dir, 'nested', 'loads.ts'), "import { type Options, create } from 'b0-undeclared-pkg';\nexport const x: Options = create();\n");
+  writeFileSync(join(dir, 'types-only.ts'), "import type { Shape } from 'b0-type-only-pkg';\nexport type Alias = Shape;\n");
+  const { offenders, seen } = runtimeImportOffenders(dir, { dependencies: {} });
+  assert.ok(seen.has('b0-undeclared-pkg'), `the .ts import must be seen; seen: ${[...seen].join(', ')}`);
+  assert.ok(!seen.has('b0-type-only-pkg'), 'a type-only import loads nothing at runtime');
+  assert.equal(offenders.length, 1, offenders.join('\n'));
+  assert.match(offenders[0], /^b0-undeclared-pkg \(.*nested\/loads\.ts\) is not declared/);
 });
 
 test('every third-party package the server loads is a runtime dependency, not optional or dev', () => {
-  const offenders = [];
-  const seen = new Set();
-  for (const file of walk(join(ROOT, 'server'))) {
-    for (const name of thirdPartyImports(readFileSync(file, 'utf8'))) {
-      seen.add(name);
-      const where = relative(ROOT, file);
-      if (pkg.optionalDependencies?.[name]) offenders.push(`${name} (${where}) is in optionalDependencies - npm may drop it silently`);
-      else if (pkg.devDependencies?.[name] && !pkg.dependencies?.[name]) offenders.push(`${name} (${where}) is a devDependency - npm ci --omit=dev leaves it out`);
-      else if (!pkg.dependencies?.[name]) offenders.push(`${name} (${where}) is not declared - it is only there as someone else's dependency`);
-    }
-  }
+  const { offenders, seen } = runtimeImportOffenders(join(ROOT, 'server'), pkg);
   // Ein blinder Scanner faende nichts und waere gruen.
   assert.ok(seen.has('express'), 'the scanner must find the server\'s express import');
   assert.deepEqual(offenders, []);
