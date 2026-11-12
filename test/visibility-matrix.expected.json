@@ -1,0 +1,3913 @@
+{
+  "_meta": {
+    "budget_mode": "personal (sync_config.budget_mode; in shared mode the budget visibility rule is off)",
+    "dashboard_reads": "once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read",
+    "database": ":memory: on better-sqlite3-multiple-ciphers (DB_PATH override after freshTestDbPath)",
+    "detail_documents_route": "GET /documents/:id/thumbnail - same visibility lookup as preview/download, answers 415 for a non-DMS document without reading content; 415 = visible, 404 = not visible, 403 = refused, anything else fails the suite",
+    "detail_statuses": "per route exactly three answers: its success status (200; thumbnail 415) = visible, 404 = not visible, 403 = refused; refusals next to visible rows stay in the cell as { visible, refused: { row: status } }",
+    "due_reminders": "one due reminder per task, event and document row for each of these accounts (created_by = caller): admin, member, child, caregiver, member_none, split_guest, display; document_expiry rows are seeded directly like the others; token roles read the member's rows",
+    "health_delivery": "due_reminders / medications is measured on the production path: one processDueMedications() run (medication-scheduler.js) after every other measurement, every seeded medication with one active 00:00 schedule, push spy, no channels; hearsOwnDose = the account received a push for a medication it owns, hearsCaredForDose = for one it does not own (n/a without a care grant); notLacksHealth = !lacksHealth(db, id) (cycle-reminders.js ~71). caregiver, member_none, split_guest and display own one private medication each so they can be addressed",
+    "health_unknown_account": "unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded are the two exported production answers for such an id: recipientDeniedModulesIsNull (reminder-origins.js, null = drop the recipient) and notLacksHealth",
+    "mcp": "list_tasks with include_future=true, list_upcoming_events with limit=100; the bridge calls call_api_operation with method GET and the /api/v1 path of each list route; a refused call is { status: tool_error, reason }",
+    "role_accounts": "token_read / token_write / token_unscoped act for the member account",
+    "seed_counts": {
+      "budget": 9,
+      "documents": 9,
+      "events": 11,
+      "medications": 10,
+      "notes": 6,
+      "tasks": 10
+    },
+    "seed_shape": "tasks and events per owner all/private/assignees (all and assignees assigned to one other account via the assignment table, legacy assigned_to NULL); task.admin.private.legacy-assigned-member sets only tasks.assigned_to = member; task.admin.assignees.secondary-member is not seeded because task.admin.assignees already is \"assignment row only\"; event.member.ics-unshared / ics-shared come from two subscriptions of the member; countdown flag on task.member.assignees and event.member.assignees; document expiry (today+10, lead 30 days) on the member's three documents and on document.admin.private; tasks due today, events all-day in two days, budget entries today",
+    "tokens": "minted via POST /auth/api-tokens with subject_user_id = member: {\"token_read\":\"19 scopes, every module read\",\"token_write\":\"19 scopes, every module write\",\"token_unscoped\":\"scopes NULL\"}"
+  },
+  "cells": {
+    "admin": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.private",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.admin.private",
+          "event.child.all",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.admin.private",
+          "medication.child.family",
+          "medication.member.family"
+        ],
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.admin.private",
+          "task.admin.private.legacy-assigned-member",
+          "task.child.all",
+          "task.member.all"
+        ]
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": [
+            "document.admin.family",
+            "document.admin.private",
+            "document.admin.restricted",
+            "document.child.family",
+            "document.member.family"
+          ],
+          "household": []
+        },
+        "events": {
+          "default": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "household": []
+        },
+        "medications": {
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.admin.private",
+            "task.admin.private.legacy-assigned-member",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "household": []
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ],
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the calendar feed carries events only"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount (masked)"
+          ],
+          "mine": [
+            "budget.admin.private",
+            "budget.admin.shared",
+            "budget.admin.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.private",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.admin.private",
+          "event.child.all",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.admin.private",
+          "medication.child.family",
+          "medication.member.family"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.admin.private",
+          "note.child.all",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.admin.private",
+          "task.admin.private.legacy-assigned-member",
+          "task.child.all",
+          "task.member.all"
+        ]
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount (masked)"
+          ],
+          "mine": [
+            "budget.admin.private",
+            "budget.admin.shared",
+            "budget.admin.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.private",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.admin.private",
+          "event.child.all",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.admin.private",
+          "medication.child.family",
+          "medication.member.family"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.admin.private",
+          "note.child.all",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.admin.private",
+          "task.admin.private.legacy-assigned-member",
+          "task.child.all",
+          "task.member.all"
+        ]
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.admin.private",
+          "event.child.all",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.admin.private",
+          "task.admin.private.legacy-assigned-member",
+          "task.child.all",
+          "task.member.all"
+        ]
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": [
+            "document.admin.private",
+            "document.member.family"
+          ]
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all"
+          ],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ]
+        },
+        "medications": {
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": [
+            "note.admin.all",
+            "note.admin.private",
+            "note.child.all",
+            "note.member.all"
+          ]
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.admin.private",
+            "task.admin.private.legacy-assigned-member",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "search": {
+        "budget": {
+          "ids": [
+            "budget.admin.private",
+            "budget.admin.shared",
+            "budget.admin.shared_amount",
+            "budget.child.shared",
+            "budget.member.shared"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.private",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.admin.private",
+          "event.child.all",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.admin.private",
+          "medication.child.family",
+          "medication.member.family"
+        ],
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.admin.all",
+            "note.admin.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.admin.private",
+            "task.admin.private.legacy-assigned-member"
+          ]
+        }
+      }
+    },
+    "caregiver": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.child.family",
+          "document.child.restricted",
+          "document.member.family"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.caregiver.private",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.member.all"
+        ]
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": [
+            "document.admin.family",
+            "document.child.family",
+            "document.child.restricted",
+            "document.member.family"
+          ],
+          "household": []
+        },
+        "events": {
+          "default": [
+            "event.admin.all",
+            "event.child.all",
+            "event.child.assignees",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "household": []
+        },
+        "medications": {
+          "hearsCaredForDose": true,
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": [
+            "task.admin.all",
+            "task.child.all",
+            "task.child.assignees",
+            "task.member.all"
+          ],
+          "household": []
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ],
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the calendar feed carries events only"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount (masked)"
+          ],
+          "mine": []
+        },
+        "documents": [
+          "document.admin.family",
+          "document.child.family",
+          "document.child.restricted",
+          "document.member.family"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.caregiver.private",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.member.all"
+        ]
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount (masked)"
+          ],
+          "mine": []
+        },
+        "documents": [
+          "document.admin.family",
+          "document.child.family",
+          "document.child.restricted",
+          "document.member.family"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.caregiver.private",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.member.all"
+        ]
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.member.all"
+        ]
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 0,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": [
+            "document.member.family"
+          ]
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.child.assignees",
+            "event.member.all"
+          ],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.child.assignees",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.child.assignees",
+            "event.member.all",
+            "event.member.ics-shared"
+          ]
+        },
+        "medications": {
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": [
+            "note.admin.all",
+            "note.child.all",
+            "note.member.all"
+          ]
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.child.assignees",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "search": {
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.shared"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.child.family",
+          "document.child.restricted",
+          "document.member.family"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": {
+          "divergent": "search uses an inline rule without care grants (server/services/search.js:556); list and detail show the cared-for person's private medication",
+          "ids": [
+            "medication.admin.family",
+            "medication.caregiver.private",
+            "medication.child.family",
+            "medication.member.family"
+          ]
+        },
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": []
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": []
+        }
+      }
+    },
+    "child": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.child.family",
+          "document.child.private",
+          "document.child.restricted",
+          "document.member.family",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.child.private",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.child.private",
+          "task.member.all",
+          "task.member.assignees"
+        ]
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": [
+            "document.admin.family",
+            "document.child.family",
+            "document.child.private",
+            "document.child.restricted",
+            "document.member.family",
+            "document.member.restricted"
+          ],
+          "household": []
+        },
+        "events": {
+          "default": [
+            "event.admin.all",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared"
+          ],
+          "household": []
+        },
+        "medications": {
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": [
+            "task.admin.all",
+            "task.child.all",
+            "task.child.assignees",
+            "task.child.private",
+            "task.member.all",
+            "task.member.assignees"
+          ],
+          "household": []
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ],
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the calendar feed carries events only"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": {
+            "reason": "module_access_denied",
+            "status": 403
+          },
+          "mine": {
+            "reason": "module_access_denied",
+            "status": 403
+          }
+        },
+        "documents": [
+          "document.admin.family",
+          "document.child.family",
+          "document.child.private",
+          "document.child.restricted",
+          "document.member.family",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.child.private",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.child.private",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.child.private",
+          "task.member.all",
+          "task.member.assignees"
+        ]
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": {
+            "reason": "module_access_denied",
+            "status": "tool_error"
+          },
+          "mine": {
+            "reason": "module_access_denied",
+            "status": "tool_error"
+          }
+        },
+        "documents": [
+          "document.admin.family",
+          "document.child.family",
+          "document.child.private",
+          "document.child.restricted",
+          "document.member.family",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.child.private",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.child.private",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.child.private",
+          "task.member.all",
+          "task.member.assignees"
+        ]
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.child.private",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared"
+        ],
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.child.private",
+          "task.member.all",
+          "task.member.assignees"
+        ]
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 0,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": [
+            "document.member.family",
+            "document.member.restricted"
+          ]
+        },
+        "events": {
+          "countdowns": [
+            "event.member.assignees"
+          ],
+          "familyEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.child.assignees",
+            "event.member.all",
+            "event.member.assignees"
+          ],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared"
+          ]
+        },
+        "medications": {
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": [
+            "note.admin.all",
+            "note.child.all",
+            "note.child.private",
+            "note.member.all"
+          ]
+        },
+        "tasks": {
+          "countdowns": [
+            "task.member.assignees"
+          ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.child.assignees",
+            "task.child.private",
+            "task.member.all",
+            "task.member.assignees"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "search": {
+        "budget": [],
+        "documents": [
+          "document.admin.family",
+          "document.child.family",
+          "document.child.private",
+          "document.child.restricted",
+          "document.member.family",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.child.assignees",
+          "event.child.private",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.child.all",
+            "note.child.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.child.all",
+            "task.child.assignees",
+            "task.child.private"
+          ]
+        }
+      }
+    },
+    "display": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.member.all"
+        ]
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": [],
+          "household": []
+        },
+        "events": {
+          "default": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "household": []
+        },
+        "medications": {
+          "divergent": "the delivery predicates resolve without the display flag and without the guest gate (server/services/reminder-origins.js:146): they say yes while every REST health path refuses this account",
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "household": []
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "divergent": "feedModuleDenied resolves without the display flag and without the guest gate (server/index.js:578): the feed carries the whole calendar while the app refuses or narrows it; the token was set in the database, the app offers this account no way to mint one",
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ]
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the calendar feed carries events only"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": {
+            "reason": "token_scope",
+            "status": 403
+          },
+          "mine": {
+            "reason": "token_scope",
+            "status": 403
+          }
+        },
+        "documents": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "events": [
+          "event.admin.all",
+          "event.child.all",
+          "event.member.all",
+          "event.member.ics-shared"
+        ],
+        "medications": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "notes": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.member.all"
+        ]
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": {
+            "reason": "tool_not_permitted",
+            "status": "tool_error"
+          },
+          "mine": {
+            "reason": "tool_not_permitted",
+            "status": "tool_error"
+          }
+        },
+        "documents": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
+        "events": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
+        "medications": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
+        "notes": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
+        "tasks": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        }
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        }
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 0,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all"
+          ],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ]
+        },
+        "medications": {
+          "health.hasMeds": false,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "search": {
+        "budget": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "documents": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "events": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "medications": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "notes": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "tasks": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      }
+    },
+    "member": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": [
+            "document.admin.family",
+            "document.admin.restricted",
+            "document.child.family",
+            "document.member.family",
+            "document.member.private",
+            "document.member.restricted"
+          ],
+          "household": []
+        },
+        "events": {
+          "default": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "household": []
+        },
+        "medications": {
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.child.all",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ],
+          "household": []
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the calendar feed carries events only"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "mine": [
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "mine": [
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": [
+            "document.member.family",
+            "document.member.private",
+            "document.member.restricted"
+          ]
+        },
+        "events": {
+          "countdowns": [
+            "event.member.assignees"
+          ],
+          "familyEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees"
+          ],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "weekEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ]
+        },
+        "medications": {
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": [
+            "note.admin.all",
+            "note.child.all",
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "countdowns": [
+            "task.member.assignees"
+          ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.child.all",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "search": {
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.private.legacy-assigned-member",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ]
+        }
+      }
+    },
+    "member_none": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "events": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "medications": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": {
+          "reason": "module_access_denied",
+          "status": 403
+        }
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": {
+            "reason": "module_access_denied",
+            "status": 403
+          },
+          "household": {
+            "reason": "module_access_denied",
+            "status": 403
+          }
+        },
+        "events": {
+          "default": {
+            "reason": "module_access_denied",
+            "status": 403
+          },
+          "household": {
+            "reason": "module_access_denied",
+            "status": 403
+          }
+        },
+        "medications": {
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": false,
+          "notLacksHealth": false
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": {
+            "reason": "module_access_denied",
+            "status": 403
+          },
+          "household": {
+            "reason": "module_access_denied",
+            "status": 403
+          }
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": [],
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the calendar feed carries events only"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": {
+            "reason": "module_access_denied",
+            "status": 403
+          },
+          "mine": {
+            "reason": "module_access_denied",
+            "status": 403
+          }
+        },
+        "documents": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "events": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "medications": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "notes": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "tasks": {
+          "reason": "module_access_denied",
+          "status": 403
+        }
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": {
+            "reason": "module_access_denied",
+            "status": "tool_error"
+          },
+          "mine": {
+            "reason": "module_access_denied",
+            "status": "tool_error"
+          }
+        },
+        "documents": {
+          "reason": "module_access_denied",
+          "status": "tool_error"
+        },
+        "events": {
+          "reason": "module_access_denied",
+          "status": "tool_error"
+        },
+        "medications": {
+          "reason": "module_access_denied",
+          "status": "tool_error"
+        },
+        "notes": {
+          "reason": "module_access_denied",
+          "status": "tool_error"
+        },
+        "tasks": {
+          "reason": "module_access_denied",
+          "status": "tool_error"
+        }
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        }
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 0,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [],
+          "wallTasks": []
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [],
+          "wallTasks": []
+        }
+      },
+      "search": {
+        "budget": [],
+        "documents": [],
+        "events": [],
+        "medications": [],
+        "notes": [],
+        "tasks": []
+      }
+    },
+    "split_guest": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "events": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "medications": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": {
+            "reason": "split_guest_scope",
+            "status": 403
+          },
+          "household": {
+            "reason": "split_guest_scope",
+            "status": 403
+          }
+        },
+        "events": {
+          "default": {
+            "reason": "split_guest_scope",
+            "status": 403
+          },
+          "household": {
+            "reason": "split_guest_scope",
+            "status": 403
+          }
+        },
+        "medications": {
+          "divergent": "the delivery predicates resolve without the display flag and without the guest gate (server/services/reminder-origins.js:146): they say yes while every REST health path refuses this account",
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": {
+            "reason": "split_guest_scope",
+            "status": 403
+          },
+          "household": {
+            "reason": "split_guest_scope",
+            "status": 403
+          }
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "divergent": "feedModuleDenied resolves without the display flag and without the guest gate (server/index.js:578): the feed carries the whole calendar while the app refuses or narrows it; the token was set in the database, the app offers this account no way to mint one",
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ]
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the calendar feed carries events only"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": {
+            "reason": "split_guest_scope",
+            "status": 403
+          },
+          "mine": {
+            "reason": "split_guest_scope",
+            "status": 403
+          }
+        },
+        "documents": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "events": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "medications": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "notes": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "tasks": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": {
+            "reason": "split_guest_scope",
+            "status": "tool_error"
+          },
+          "mine": {
+            "reason": "split_guest_scope",
+            "status": "tool_error"
+          }
+        },
+        "documents": {
+          "reason": "split_guest_scope",
+          "status": "tool_error"
+        },
+        "events": {
+          "reason": "split_guest_scope",
+          "status": "tool_error"
+        },
+        "medications": {
+          "reason": "split_guest_scope",
+          "status": "tool_error"
+        },
+        "notes": {
+          "reason": "split_guest_scope",
+          "status": "tool_error"
+        },
+        "tasks": {
+          "reason": "split_guest_scope",
+          "status": "tool_error"
+        }
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        }
+      },
+      "overview": {
+        "budget": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "documents": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "events": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "medications": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "notes": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "tasks": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "documents": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "events": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "medications": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "notes": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "tasks": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "search": {
+        "budget": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "documents": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "events": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "medications": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "notes": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "tasks": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      }
+    },
+    "token_read": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": [
+            "document.admin.family",
+            "document.admin.restricted",
+            "document.child.family",
+            "document.member.family",
+            "document.member.private",
+            "document.member.restricted"
+          ],
+          "household": []
+        },
+        "events": {
+          "default": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "household": []
+        },
+        "medications": {
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.child.all",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ],
+          "household": []
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "n/a": "the feed token belongs to the account, see member"
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the feed token belongs to the account, see member"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "mine": [
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "mine": [
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": [
+            "document.member.family",
+            "document.member.private",
+            "document.member.restricted"
+          ]
+        },
+        "events": {
+          "countdowns": [
+            "event.member.assignees"
+          ],
+          "familyEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees"
+          ],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "weekEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ]
+        },
+        "medications": {
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": [
+            "note.admin.all",
+            "note.child.all",
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "countdowns": [
+            "task.member.assignees"
+          ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.child.all",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "search": {
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.private.legacy-assigned-member",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ]
+        }
+      }
+    },
+    "token_unscoped": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": [
+            "document.admin.family",
+            "document.admin.restricted",
+            "document.child.family",
+            "document.member.family",
+            "document.member.private",
+            "document.member.restricted"
+          ],
+          "household": []
+        },
+        "events": {
+          "default": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "household": []
+        },
+        "medications": {
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.child.all",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ],
+          "household": []
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "n/a": "the feed token belongs to the account, see member"
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the feed token belongs to the account, see member"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "mine": [
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "mine": [
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": [
+            "document.member.family",
+            "document.member.private",
+            "document.member.restricted"
+          ]
+        },
+        "events": {
+          "countdowns": [
+            "event.member.assignees"
+          ],
+          "familyEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees"
+          ],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "weekEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ]
+        },
+        "medications": {
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": [
+            "note.admin.all",
+            "note.child.all",
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "countdowns": [
+            "task.member.assignees"
+          ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.child.all",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "search": {
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.private.legacy-assigned-member",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ]
+        }
+      }
+    },
+    "token_write": {
+      "detail": {
+        "budget": {
+          "n/a": "budget entries have no read-by-id route"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": {
+          "n/a": "notes have no read-by-id route"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "due_reminders": {
+        "budget": {
+          "n/a": "the budget reminder origin is the subscription, not the entry"
+        },
+        "documents": {
+          "default": [
+            "document.admin.family",
+            "document.admin.restricted",
+            "document.child.family",
+            "document.member.family",
+            "document.member.private",
+            "document.member.restricted"
+          ],
+          "household": []
+        },
+        "events": {
+          "default": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "household": []
+        },
+        "medications": {
+          "hearsCaredForDose": {
+            "n/a": "no health_care_grants row names this account as caregiver"
+          },
+          "hearsOwnDose": true,
+          "notLacksHealth": true
+        },
+        "notes": {
+          "n/a": "notes have no reminder origin"
+        },
+        "tasks": {
+          "default": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.child.all",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ],
+          "household": []
+        }
+      },
+      "ics_feed": {
+        "budget": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "documents": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "events": {
+          "n/a": "the feed token belongs to the account, see member"
+        },
+        "medications": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "notes": {
+          "n/a": "the calendar feed carries events only"
+        },
+        "tasks": {
+          "n/a": "the feed token belongs to the account, see member"
+        }
+      },
+      "list": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "mine": [
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "mcp_bridge": {
+        "budget": {
+          "household": [
+            "budget.admin.shared",
+            "budget.admin.shared_amount (masked)",
+            "budget.child.shared",
+            "budget.child.shared_amount (masked)",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "mine": [
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ]
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "mcp_core": {
+        "budget": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "documents": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "notes": {
+          "n/a": "no core MCP tool reads this type"
+        },
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
+      },
+      "overview": {
+        "budget": {
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+        },
+        "documents": {
+          "countdowns": [
+            "document.member.family",
+            "document.member.private",
+            "document.member.restricted"
+          ]
+        },
+        "events": {
+          "countdowns": [
+            "event.member.assignees"
+          ],
+          "familyEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees"
+          ],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "weekEvents": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.child.all",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ]
+        },
+        "medications": {
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+        },
+        "notes": {
+          "pinnedNotes": [
+            "note.admin.all",
+            "note.child.all",
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "countdowns": [
+            "task.member.assignees"
+          ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.child.all",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "overview_household": {
+        "budget": {
+          "budget.entryCount": 0
+        },
+        "documents": {
+          "countdowns": []
+        },
+        "events": {
+          "countdowns": [],
+          "familyEvents": [],
+          "upcomingEvents": [
+            "event.admin.all",
+            "event.child.all",
+            "event.member.all",
+            "event.member.ics-shared"
+          ],
+          "weekEvents": []
+        },
+        "medications": {
+          "health.hasMeds": false
+        },
+        "notes": {
+          "pinnedNotes": []
+        },
+        "tasks": {
+          "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "urgentTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ],
+          "wallTasks": [
+            "task.admin.all",
+            "task.child.all",
+            "task.member.all"
+          ]
+        }
+      },
+      "search": {
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
+        "documents": [
+          "document.admin.family",
+          "document.admin.restricted",
+          "document.child.family",
+          "document.member.family",
+          "document.member.private",
+          "document.member.restricted"
+        ],
+        "events": [
+          "event.admin.all",
+          "event.admin.assignees",
+          "event.child.all",
+          "event.member.all",
+          "event.member.assignees",
+          "event.member.ics-shared",
+          "event.member.ics-unshared",
+          "event.member.private"
+        ],
+        "medications": [
+          "medication.admin.family",
+          "medication.child.family",
+          "medication.member.family",
+          "medication.member.private"
+        ],
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.private.legacy-assigned-member",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ]
+        }
+      }
+    }
+  },
+  "modules": {
+    "contacts": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      }
+    },
+    "housekeeping": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      }
+    },
+    "inventory": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      }
+    },
+    "meals": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data",
+          "weekEnd",
+          "weekStart"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data",
+          "weekEnd",
+          "weekStart"
+        ],
+        "status": 200
+      }
+    },
+    "pantry": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      }
+    },
+    "rewards": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      }
+    },
+    "schedule": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      }
+    },
+    "shopping": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      }
+    },
+    "waste": {
+      "none": {
+        "reason": "module_access_denied",
+        "status": 403
+      },
+      "read": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      },
+      "read_write_probe": {
+        "reason": "module_read_only",
+        "status": 403
+      },
+      "write": {
+        "keys": [
+          "data"
+        ],
+        "status": 200
+      }
+    }
+  },
+  "unknown_account": {
+    "health_predicates": {
+      "notLacksHealth": false,
+      "recipientDeniedModulesIsNull": true
+    }
+  }
+}
