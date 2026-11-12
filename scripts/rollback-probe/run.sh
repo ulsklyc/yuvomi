@@ -72,11 +72,19 @@ BK="backups/$NEW"; echo "backup of the new build: $BK"
 node_ api.mjs write "after-backup-on-new-build"; node_ api.mjs snap 22-new-after-write | head -1
 probe down 20-new; snapdb 21-after-new
 node_ fpdiff.mjs 13-after-prev-again 21-after-new
+# The backup above made the new build store its status (three keys in
+# sync_config). Step 6 is therefore also the case "backup status written, back
+# to the previous image": it must start and answer without a word about them.
+need node_ backup-status.mjs copies/21-after-new.db present
 
 step "6 WAY BACK new build -> previous image"
 need probe up prev; node_ api.mjs snap 30-prev-back; node_ apidiff.mjs 22-new-after-write 30-prev-back; node_ sw.mjs 30-prev-back | tail -6
 probe down 30-prev-back; snapdb 31-after-prev-back
 node_ fpdiff.mjs 21-after-new 31-after-prev-back
+need node_ backup-status.mjs copies/31-after-prev-back.db present
+NOISE="$(grep -c -E '"level":"(warn|error)"|backup_last' logs/30-prev-back.log || true)"
+echo "previous image on a database with a backup status: $NOISE log lines at warn or error level or naming the keys (expected 0)"
+[ "$NOISE" = 0 ] || { echo "ABORTED: the previous image has something to say about a database with a backup status"; grep -E '"level":"(warn|error)"|backup_last' logs/30-prev-back.log | cut -c1-200 | head -5; exit 1; }
 
 step "7 restore of the new build's backup on the previous image"
 cp "$BK" copies/backup.db; node_ fp.mjs backup copies/backup.db

@@ -2464,7 +2464,7 @@ test('ein unveraenderter, inzwischen geloeschter Kategorie-Schluessel bricht das
   assert.equal(moved.status, 400, 'den geloeschten Schluessel neu waehlen bleibt verboten');
 });
 
-// Phase 0 section H (test:client-error-text-guard): the create catch takes our
+// Phase 0 section H (lint rule ERROR-TEXT): the create catch takes our
 // own refusals AND every SQLite error, and guessed the status from the text
 // (`message.includes('Internal')`). A database error therefore went out as a
 // 400 carrying SQL text. A trigger that writes into a missing table breaks the

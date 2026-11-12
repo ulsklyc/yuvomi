@@ -8,13 +8,16 @@ import { runExternalJob } from '../utils/restore-state.js';
 import cron from 'node-cron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { backupToFile, get as getDb } from '../db.js';
+import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import * as webdav from './backup-webdav.js';
-import { pushService as defaultPushService } from './push.js';
-import { householdMemberSql } from './household-members.js';
+import { notifyAdmins } from './admin-notices.js';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
 import { remoteFailure } from '../utils/http.js';
+import {
+  BACKUP_FAILURE_LOCALE_KEYS, BACKUP_FAILURE_SENTENCES, BACKUP_STATUS_KEYS,
+  backupFailureReason, knownBackupFailureReason,
+} from '../utils/backup-status.js';
 
 const log = createLogger('BackupScheduler');
 
@@ -24,9 +27,87 @@ const BACKUP_DIR = process.env.BACKUP_DIR || './backups';
 const BACKUP_KEEP = parseInt(process.env.BACKUP_KEEP || '7', 10); // Default: keep last 7 backups
 const BACKUP_ENABLED = process.env.BACKUP_ENABLED !== 'false'; // Default: enabled
 
+/** @type {import('node-cron').ScheduledTask | null} */
 let scheduledTask = null;
+/** @type {{ timestamp: string, success: boolean, file?: string, error?: string, reason?: string, webdav?: object } | null} */
 let lastBackup = null;
+/** @type {{ timestamp: string, reason: string, message: string } | null} */
 let lastError = null;
+/**
+ * ISO timestamp of the last run that wrote a verified backup, or null.
+ * @type {string | null}
+ */
+let lastSuccess = null;
+
+// ── The status outlives the process (Phase 1b section F, E12) ────────────────
+//
+// Until then it lived in the three variables above, and after a restart the
+// backup page said "never". Three keys in `sync_config` (where the WebDAV
+// target keeps its status too) hold the last attempt, the last success and the
+// reason of a failed attempt. Written after every run, read once before the
+// first answer. What is stored and shown is the reason and a fixed sentence;
+// the text of the error names absolute paths and goes to the log only.
+
+let statusLoaded = false;
+
+/** Read the stored status once. With no connection (a restore) it is tried again next time. */
+function loadStoredStatus() {
+  if (statusLoaded) return;
+  /** @type {{ attempt: string | null, success: string | null, failure: string | null }} */
+  let stored;
+  try {
+    const read = db.get().prepare('SELECT value FROM sync_config WHERE key = ?');
+    stored = {
+      attempt: read.get(BACKUP_STATUS_KEYS.attempt)?.value ?? null,
+      success: read.get(BACKUP_STATUS_KEYS.success)?.value ?? null,
+      failure: read.get(BACKUP_STATUS_KEYS.reason)?.value ?? null,
+    };
+  } catch {
+    return;
+  }
+  statusLoaded = true;
+  // A run in this process is newer than anything stored.
+  if (lastBackup) return;
+  lastSuccess = stored.success;
+  if (!stored.attempt) return;
+  if (stored.failure === null) {
+    lastBackup = { timestamp: stored.attempt, success: true };
+    return;
+  }
+  const reason = knownBackupFailureReason(stored.failure);
+  const message = BACKUP_FAILURE_SENTENCES[reason];
+  lastBackup = { timestamp: stored.attempt, success: false, error: message, reason };
+  lastError = { timestamp: stored.attempt, reason, message };
+}
+
+/**
+ * Store the outcome of a run. A status that cannot be stored must not turn a
+ * written backup into a failed one: it is logged, and memory still has it.
+ * @param {string} timestamp ISO timestamp of the run
+ * @param {string | null} reason null for a success
+ */
+function storeStatus(timestamp, reason) {
+  try {
+    const database = db.get();
+    const upsert = database.prepare(`
+      INSERT INTO sync_config (key, value)
+      VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                     updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    `);
+    database.transaction(() => {
+      upsert.run(BACKUP_STATUS_KEYS.attempt, timestamp);
+      if (reason === null) {
+        upsert.run(BACKUP_STATUS_KEYS.success, timestamp);
+        database.prepare('DELETE FROM sync_config WHERE key = ?').run(BACKUP_STATUS_KEYS.reason);
+      } else {
+        upsert.run(BACKUP_STATUS_KEYS.reason, reason);
+      }
+    })();
+  } catch (err) {
+    log.warn('Could not store the backup status; it is kept in memory until the next restart:', err);
+  }
+}
 
 // New backups use the `yuvomi-` prefix; pre-rebrand files use `oikos-`.
 // Both are still recognised for listing/rotation so legacy backups are not
@@ -54,6 +135,10 @@ function backupFileName() {
 async function ensureBackupDir() {
   try {
     await fs.mkdir(BACKUP_DIR, { recursive: true });
+    // mkdir succeeds on a directory that exists, also on one this user may not
+    // write to (a mounted folder owned by someone else). The driver would then
+    // fail with SQLITE_CANTOPEN, which names neither the folder nor the cause.
+    await fs.access(BACKUP_DIR, fs.constants.W_OK);
   } catch (err) {
     // Häufigster Praxisfall im Container: BACKUP_DIR zeigt auf einen Pfad ausserhalb
     // des gemounteten Volumes (z. B. den relativen Default './backups' unter /app),
@@ -139,7 +224,7 @@ export async function createLocalBackup() {
   const fileName = backupFileName();
   const filePath = path.join(BACKUP_DIR, fileName);
 
-  await backupToFile(filePath);
+  await db.backupToFile(filePath);
   log.info(`Backup created: ${fileName}`);
 
   // Rotate old local backups
@@ -155,56 +240,37 @@ export async function createLocalBackup() {
  * das erst, wenn jemand Einstellungen > Sicherung aufschlaegt - also meistens
  * dann, wenn die Sicherung gebraucht wird.
  *
- * DER TEXT DES FEHLERS STEHT NICHT IM PUSH. Er gehoert ins Log, und - seit
- * #2540 - als uebersetzter Satz in Einstellungen > Sicherung. Eine
- * Push-Mitteilung steht auf einem Sperrbildschirm, in der Sprache des
- * Haushalts, und "EACCES: permission denied, open
- * '/backups/yuvomi-backup-...'" ist dort kein Satz - sie sagt DASS und WO
- * nachzusehen ist, der Grund steht in der App.
+ * DER GRUND STEHT IM PUSH, NICHT DER FEHLERTEXT. Seit #2540 ist der Grund
+ * einer von vier festen, unbedenklichen Saetzen (BACKUP_FAILURE_LOCALE_KEYS,
+ * dieselben, die die Karte in Einstellungen > Sicherung zeigt) - nie die
+ * rohe Fehlermeldung mit ihrem absoluten Pfad oder errno, die nur ins Log
+ * gehoert.
  *
- * DIE ADMINS ALS HAUSHALTSMITGLIEDER (#1207, householdMemberSql): ein
- * Admin-Konto, das ein Wandtablett oder ein Gast ist, bekommt keine
- * Sicherungsmeldung auf den Flurbildschirm.
- *
- * Best effort: ein Fehler beim Melden wird geloggt und nie weitergeworfen -
- * er darf den Sicherungslauf nicht zusaetzlich zum Scheitern bringen.
+ * Wer die Meldung bekommt, loest admin-notices.js. Diese Funktion baut nur
+ * die Nachricht fuer den Sicherungsfall.
  *
  * @param {Object} [opts]
  * @param {import('better-sqlite3-multiple-ciphers').Database} [opts.database]
- * @param {Object} [opts.pushService] - { sendPushToUser }
+ * @param {import('./admin-notices.js').PushService} [opts.pushService] - { sendPushToUser }
+ * @param {keyof typeof BACKUP_FAILURE_LOCALE_KEYS} [opts.reason]
  * @returns {Promise<number>} Zahl der Admins, bei denen tatsaechlich eine
- *   Push-Mitteilung zugestellt wurde (sendPushToUser liefert 0 ohne
- *   Abonnement, nicht nur die Zahl der erfuellten Promises)
+ *   Push-Mitteilung zugestellt wurde
  */
-async function notifyAdminsOfBackupFailure({ database, pushService = defaultPushService } = {}) {
+async function notifyAdminsOfBackupFailure({ database, pushService, reason = 'unknown' } = {}) {
   try {
-    const activeDb = database ?? getDb();
-    const admins = activeDb.prepare(`
-      SELECT u.id FROM users u
-      WHERE u.role = 'admin' AND ${householdMemberSql('u')}
-      ORDER BY u.id ASC
-    `).all();
-    if (!admins.length) return 0;
-
+    const activeDb = database ?? db.get();
     const locale = resolveHouseholdLocale(activeDb);
-    const path = [
-      translate(locale, 'settings.title'),
-      translate(locale, 'settings.domainHousehold'),
-      translate(locale, 'settings.pageBackupRestore'),
-    ].join(' > ');
+    const reasonKey = BACKUP_FAILURE_LOCALE_KEYS[reason] ?? BACKUP_FAILURE_LOCALE_KEYS.unknown;
     const payload = {
       title: translate(locale, 'settings.backupSchedulerFailedPushTitle'),
-      body: translate(locale, 'settings.backupSchedulerFailedPushBody', { path }),
+      body: translate(locale, reasonKey),
       url: '/settings/admin/backup',
       // EIN EINTRAG, NICHT EINER JE LAUF: zwei Naechte hintereinander
       // gescheitert soll eine Meldung ersetzen, keine zweite daneben legen.
       tag: 'backup-failure',
       priority: 'default',
     };
-    const results = await Promise.allSettled(
-      admins.map((u) => pushService.sendPushToUser(u.id, payload)),
-    );
-    return results.reduce((sum, r) => sum + (r.status === 'fulfilled' ? r.value : 0), 0);
+    return await notifyAdmins({ database: activeDb, payload, pushService });
   } catch (err) {
     log.error('Could not notify the administrators about the failed backup:', err);
     return 0;
@@ -213,6 +279,8 @@ async function notifyAdminsOfBackupFailure({ database, pushService = defaultPush
 
 /**
  * Perform automated backup
+ * @param {Object} [opts]
+ * @param {boolean} [opts.notify]
  */
 async function performBackup(opts = {}) {
   try {
@@ -221,12 +289,16 @@ async function performBackup(opts = {}) {
     const filePath = await createLocalBackup();
     const fileName = path.basename(filePath);
 
+    const timestamp = new Date().toISOString();
     lastBackup = {
-      timestamp: new Date().toISOString(),
+      timestamp,
       file: fileName,
       success: true,
     };
     lastError = null;
+    lastSuccess = timestamp;
+    statusLoaded = true;
+    storeStatus(timestamp, null);
 
     // ── WebDAV upload (optional, non-fatal) ──────────────────────────────────
     if (webdav.isEnabled()) {
@@ -242,20 +314,23 @@ async function performBackup(opts = {}) {
       }
     }
   } catch (err) {
+    // The text of the error stays here, in the log. The API and the database
+    // get the reason and its fixed sentence (#2525, the `reason` on `lastError`
+    // was proposed in #2540).
     log.error('Scheduled backup failed:', err);
-    lastError = {
-      timestamp: new Date().toISOString(),
-      message: err.message,
-    };
-    lastBackup = {
-      timestamp: new Date().toISOString(),
-      success: false,
-      error: err.message,
-    };
+    const timestamp = new Date().toISOString();
+    const reason = backupFailureReason(err);
+    const message = BACKUP_FAILURE_SENTENCES[reason];
+    // The last success may still be in the database only.
+    loadStoredStatus();
+    lastError = { timestamp, reason, message };
+    lastBackup = { timestamp, success: false, error: message, reason };
+    statusLoaded = true;
+    storeStatus(timestamp, reason);
     // Nach dem Setzen von lastError: die Meldung verweist auf die Seite, die
     // ihn zeigt, also muss er dort schon stehen. Nur automatische Laeufe
     // benachrichtigen - ein manueller Klick landet sofort auf der Seite.
-    if (opts.notify) await notifyAdminsOfBackupFailure(opts);
+    if (opts.notify) await notifyAdminsOfBackupFailure({ ...opts, reason });
   }
 }
 
@@ -300,6 +375,7 @@ export const _notifyAdminsOfBackupFailure = notifyAdminsOfBackupFailure;
  * Get scheduler status
  */
 export function getStatus() {
+  loadStoredStatus();
   return {
     enabled: BACKUP_ENABLED,
     schedule: BACKUP_SCHEDULE,
@@ -308,6 +384,9 @@ export function getStatus() {
     running: scheduledTask !== null,
     lastBackup,
     lastError,
+    lastSuccess,
+    // When the schedule fires next, or null without a running schedule.
+    nextRun: scheduledTask?.getNextRun()?.toISOString() ?? null,
     webdav: webdav.getStatus(),
   };
 }

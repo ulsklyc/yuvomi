@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **A failed automatic backup now tells the administrators (#2519).** When the nightly backup
-  does not run, every administrator gets a push notification pointing at Settings > Household >
-  Backup and restore. Until now the failure was silent and only visible to someone who happened
-  to open that page. The notification carries no technical error text - that belongs in the log
-  and in the app - and two failed nights replace one notification instead of stacking up. A
-  successful run afterwards clears the warning by itself.
+  does not run, every administrator gets a push notification naming why, in one of the same four
+  sentences Settings > Household > Backup and restore already shows on its "Last error" row -
+  never the raw error text, which stays in the log. Until now the failure was silent and only
+  visible to someone who happened to open that page, and two failed nights replace one
+  notification instead of stacking up. A successful run afterwards clears the warning by itself.
 - **A restore drill checks that a release database restores and migrates on this version.**
   `scripts/restore-drill.mjs` restores a database through the same restore command an operator
   uses, migrates it to the current schema and checks its integrity, foreign keys, schema and row

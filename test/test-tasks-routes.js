@@ -22,6 +22,7 @@ process.env.SESSION_SECRET = 'tasks-routes-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { pushService } = await import('../server/services/push.js');
 const { pendingCreations, processPendingCreations, todoUidFor } =
   await import('../server/services/caldav-todo-outbound.js');
 
@@ -1143,32 +1144,81 @@ test('Kommentare: eine beim Bearbeiten dazugekommene Erwähnung wird gemeldet', 
   assert.deepEqual(nachher.filter((id) => !nachher.includes(id)), []);
 });
 
+/**
+ * Wem notifyMentions() während `fn` einen Push übergibt. Der Versand läuft
+ * synchron nach res.json() im selben Handler an (runExternalJob ruft sofort
+ * auf), die Aufrufe sind also gezählt, wenn die Antwort da ist.
+ *
+ * @param {() => Promise<void>} fn
+ * @returns {Promise<number[]>}
+ */
+async function mentionPushes(fn) {
+  /** @type {number[]} */
+  const pushed = [];
+  const original = pushService.sendPushToUser;
+  pushService.sendPushToUser = async (userId) => { pushed.push(Number(userId)); return 1; };
+  try { await fn(); } finally { pushService.sendPushToUser = original; }
+  return pushed;
+}
+
 test('Kommentare: wem das Modul entzogen ist, bekommt keine Erwähnungs-Meldung', async () => {
   // Sichtbarkeit der Zeile ist nicht die einzige Hürde: wem das Aufgaben-Modul
   // auf `none` steht, der kommt an die Aufgabe gar nicht heran - und bekäme mit
   // dem Push trotzdem ihren Titel und den Anfang des Kommentars zugestellt.
   const { resolvePermissions } = await import('../server/permissions.js');
+  const bob = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(BOB);
+  // Die Aufgabe selbst bleibt für ihn sichtbar (visibility `all`) - genau
+  // deshalb reicht `findVisibleTask` als Prüfung nicht aus.
+  const task = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Ohne Modulzugriff', visibility: 'all' } });
   // subject_id wird als TEXT gehalten und auch so abgefragt (`loadSubjectRows`)
   db.prepare(`
     INSERT OR REPLACE INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
     VALUES ('user', ?, 'module', 'tasks', 'none')
   `).run(String(BOB));
-
-  const bob = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(BOB);
-  const perms = resolvePermissions(db, bob);
-  assert.equal(perms.modules.tasks, 'none', 'Vorbedingung: Bob darf die Aufgaben nicht sehen');
-
-  // Die Aufgabe selbst bleibt für ihn sichtbar (visibility `all`) - genau
-  // deshalb reicht `findVisibleTask` als Prüfung nicht aus.
-  const task = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Ohne Modulzugriff' } });
-  const posted = await call('POST', `/${task.body.data.id}/comments`, {
-    as: { id: ALICE, role: 'admin' }, body: { comment: '@bob liest das nicht' },
-  });
-  assert.equal(posted.status, 201);
-
-  db.prepare("DELETE FROM access_permissions WHERE subject_id = ? AND resource_key = 'tasks'").run(String(BOB));
+  try {
+    const perms = resolvePermissions(db, bob);
+    assert.equal(perms.modules.tasks, 'none', 'Vorbedingung: Bob darf die Aufgaben nicht sehen');
+    const gesperrt = await mentionPushes(async () => {
+      const posted = await call('POST', `/${task.body.data.id}/comments`, {
+        as: { id: ALICE, role: 'admin' }, body: { comment: '@bob liest das nicht' },
+      });
+      assert.equal(posted.status, 201);
+    });
+    assert.deepEqual(gesperrt, [], 'Bob ist das Aufgaben-Modul entzogen: kein Push');
+  } finally {
+    // Auch nach einem roten Befund: sonst erben die folgenden Tests Bobs Sperre.
+    db.prepare("DELETE FROM access_permissions WHERE subject_id = ? AND resource_key = 'tasks'").run(String(BOB));
+  }
   const wieder = resolvePermissions(db, bob);
   assert.notEqual(wieder.modules.tasks, 'none', 'Aufräumen: Bobs Zugriff ist wiederhergestellt');
+  // Gegenprobe in derselben Aufgabe: mit Zugriff kommt die Meldung an, die
+  // Stille oben lag also an der Modulprüfung und nicht am Aufbau des Tests.
+  const offen = await mentionPushes(async () => {
+    const posted = await call('POST', `/${task.body.data.id}/comments`, {
+      as: { id: ALICE, role: 'admin' }, body: { comment: '@bob jetzt schon' },
+    });
+    assert.equal(posted.status, 201);
+  });
+  assert.deepEqual(offen, [BOB]);
+});
+
+test('Kommentare: eine Erwähnung erreicht niemanden, der die Aufgabe nicht sieht', async () => {
+  // Eine Erwähnung ist kein Weg, jemandem den Titel einer privaten Aufgabe
+  // zuzustellen (findVisibleTask in notifyMentions). Bob hat Zugriff auf das
+  // Modul, sieht aber Alices private Aufgabe nicht.
+  const privat = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Geheimer Umzug', visibility: 'private' } });
+  const offen = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Offener Umzug', visibility: 'all' } });
+  /** @type {[typeof privat, number[], string][]} */
+  const faelle = [[privat, [], 'private Aufgabe'], [offen, [BOB], 'Gegenprobe: sichtbare Aufgabe']];
+  for (const [task, erwartet, label] of faelle) {
+    const pushed = await mentionPushes(async () => {
+      const posted = await call('POST', `/${task.body.data.id}/comments`, {
+        as: { id: ALICE, role: 'admin' }, body: { comment: '@bob kannst du?' },
+      });
+      assert.equal(posted.status, 201);
+    });
+    assert.deepEqual(pushed, erwartet, label);
+  }
 });
 
 // --------------------------------------------------------

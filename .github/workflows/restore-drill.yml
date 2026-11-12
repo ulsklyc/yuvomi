@@ -16,9 +16,10 @@ name: Restore Drill
 # database of its own (scripts/corpus-assets.mjs). The databases that are there
 # are drilled even then, so one gap does not hide a broken migration.
 #
-# WHEN: every night (UTC) on main, by hand, and from ci.yml for every pull
-# request and every push to main (the job `restore-drill` there). It is not a
-# required check; branch protection names only the tests and the typecheck.
+# WHEN: once a day on main (09:13 UTC; the first 03:23 schedule never fired),
+# by hand, and from ci.yml for every pull request and every push to main (the
+# job `restore-drill` there). It is not a required check; branch protection
+# names only the tests and the typecheck.
 #
 # RIGHTS: read only. GH_TOKEN sits on the two steps that call `gh` (release list,
 # downloads), which run no project code; the corpus databases are public assets
@@ -26,7 +27,7 @@ name: Restore Drill
 
 on:
   schedule:
-    - cron: '23 3 * * *'
+    - cron: '13 9 * * *'
   workflow_dispatch:
   workflow_call:
 

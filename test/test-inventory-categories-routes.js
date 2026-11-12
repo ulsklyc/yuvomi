@@ -13,6 +13,10 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
+import {
+  recordingLog, withTableGone, withWriteRefused, requestLogged, assertFixed500, REFUSED_WRITE_TEXT,
+} from './helpers/forced-db-error.js';
 
 const dbmod = await import('../server/db.js');
 const { default: categoriesRouter } = await import('../server/routes/inventory/categories.js');
@@ -21,6 +25,9 @@ const db = dbmod.get();
 const app = express();
 app.use(express.json());
 app.use('/categories', categoriesRouter);
+// Wie server/index.js: der zentrale Fehlerhandler steht hinter dem Router.
+const handlerLog = recordingLog();
+app.use(createErrorHandler(handlerLog));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -160,4 +167,45 @@ test('PATCH /categories/reorder: unbekannter Key -> 400, Reihenfolge unveraender
 
   const after = await call('GET', '/categories');
   assert.deepEqual(after.body.data.map((c) => c.key), beforeOrder);
+});
+
+// --------------------------------------------------------
+// Datenbankfehler (Phase 1b Abschnitt E, Pilot des zentralen Fehlerhandlers).
+// Jede Route antwortet auf einen SQLite-Fehler mit 500 und dem festen Satz,
+// ohne SQLite-Text im Rumpf, und der Fehler steht genau einmal im Log - gleich,
+// ob die Route selbst antwortet oder ihn dem Handler ueberlaesst.
+// --------------------------------------------------------
+const BROKEN_ROUTES = [
+  { method: 'GET', path: '/categories' },
+  { method: 'POST', path: '/categories', body: { name: 'Kaputt' } },
+  { method: 'PUT', path: '/categories/sports', body: { name: 'Kaputt' } },
+  { method: 'DELETE', path: '/categories/sports' },
+  { method: 'PATCH', path: '/categories/reorder', body: { order: ['other'] } },
+];
+for (const { method, path, body } of BROKEN_ROUTES) {
+  test(`${method} ${path}: Datenbankfehler -> 500 mit festem Satz, kein SQLite-Text im Rumpf`, async () => {
+    const answer = await withTableGone(db, 'inventory_categories', () => requestLogged(baseUrl, handlerLog, method, path, body));
+    assertFixed500(answer, 'no such table: inventory_categories', `${method} ${path}`);
+  });
+}
+
+test('POST /categories: scheitert das Einfuegen -> 500 mit festem Satz, nichts angelegt', async () => {
+  const before = db.prepare('SELECT COUNT(*) AS c FROM inventory_categories').get().c;
+  const answer = await withWriteRefused(db, 'inventory_categories', 'INSERT',
+    () => requestLogged(baseUrl, handlerLog, 'POST', '/categories', { name: 'Abgelehnt' }));
+  assertFixed500(answer, REFUSED_WRITE_TEXT, 'POST /categories');
+  assert.equal(db.prepare('SELECT COUNT(*) AS c FROM inventory_categories').get().c, before);
+});
+
+test('DELETE /categories/:key: scheitert das Loeschen, rollt die Transaktion das Umhaengen zurueck', async () => {
+  const cat = await call('POST', '/categories', { name: 'Rollback' });
+  const key = cat.body.data.key;
+  db.prepare("INSERT INTO inventory_items (name, category) VALUES ('Z', ?)").run(key);
+
+  const answer = await withWriteRefused(db, 'inventory_categories', 'DELETE',
+    () => requestLogged(baseUrl, handlerLog, 'DELETE', `/categories/${key}`));
+  assertFixed500(answer, REFUSED_WRITE_TEXT, 'DELETE /categories/:key');
+
+  assert.equal(db.prepare("SELECT category FROM inventory_items WHERE name = 'Z'").get().category, key, 'der Gegenstand bleibt in seiner Kategorie');
+  assert.ok(db.prepare('SELECT 1 FROM inventory_categories WHERE key = ?').get(key), 'die Kategorie bleibt');
 });
