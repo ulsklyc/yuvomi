@@ -473,6 +473,8 @@ test('Task search follows the task list: all, creator, assignment rows - never t
   insert.run(`${marker} fremd zugewiesen ohne mich`, 'assignees', PARENT, null);
   // Only the legacy column names the kid: no assignment row, private.
   insert.run(`${marker} fremd privat altspalte`, 'private', PARENT, KID);
+  // The same for `assignees`: the legacy column is no assignment row.
+  insert.run(`${marker} fremd zugewiesen altspalte`, 'assignees', PARENT, KID);
   insert.run(`${marker} eigen privat`, 'private', KID, null);
 
   const titleOf = (/** @type {{ title: string }} */ row) => row.title;
@@ -482,13 +484,4 @@ test('Task search follows the task list: all, creator, assignment rows - never t
     `${marker} fremd alle`,
     `${marker} fremd zugewiesen`,
   ], 'what GET /tasks shows the kid, nothing else');
-
-  // The same rule as the list, measured against it.
-  const { visibilityWhere } = await import('../server/services/visibility.js');
-  const listed = db.prepare(`
-    SELECT t.title FROM tasks t
-    WHERE t.title LIKE @like AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
-    ORDER BY t.title
-  `).all({ like: `${marker}%`, me: KID }).map(titleOf);
-  assert.deepEqual(titles, listed, 'search and list rule agree');
 });

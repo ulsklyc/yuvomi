@@ -57,10 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The global search no longer finds a private task of someone else.** A task set to "only
   me" was found by a second person if the old single-assignee field still named them - a
   field the task list ignores for a private task. Title, status, priority and due date of that
-  task appeared in the search results, and a matching word from its description as an excerpt.
-  The task list, the detail view and the overview never showed it. The search now asks the
-  same rule as the list: visible to everyone, created by you, or shared with the assigned
-  people and you are one of them.
+  task appeared in the search results, with a matching word from its description or tags as an
+  excerpt. The task list, the detail view and the overview never showed it. The search now
+  asks the same rule as the list: visible to everyone, created by you, or shared with the
+  assigned people and you are one of them.
 
 ## [2.89.1] - 2026-11-12
 
