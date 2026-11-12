@@ -65,7 +65,19 @@ export function noteVisibleWhere(alias, bind = '?') {
 // the same SQL as before.
 // --------------------------------------------------------
 
-/** The open value the health tables write: the household may read along. */
+/**
+ * Der OFFENE Wert eines Bereichs - das Gegenstueck zu 'private'.
+ *
+ * Die Gesundheit schreibt seit jeher 'family'. Ein Bereich, der nach
+ * docs/DECISIONS.md Abschnitt 5 neu dazukommt, nimmt den kanonischen Satz von
+ * Anfang an und schreibt dort 'all'; Abschnitt 5 nennt das Lesen als die
+ * Stelle, an der beide Schreibweisen zusammenkommen ("der Lesepfad bildet
+ * `family` und `shared` auf `all` ab"), und genau das ist dieser Parameter.
+ *
+ * Er steht als Vorgabewert auf 'family', damit jede bestehende Aufrufstelle
+ * unveraendert dasselbe SQL bekommt wie vorher - ein neuer Bereich muss den
+ * Wert nennen, ein alter merkt nichts.
+ */
 export const OPEN_FAMILY = 'family';
 
 // Betreute Personen als Subquery statt als aufgelöste ID-Liste: die Zahl der

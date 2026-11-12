@@ -553,28 +553,32 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   // binds positionally, so these two queries do as a whole: match, the
   // clause's parameters, limit - in the order of the placeholders.
   // Medications: hits on name and dosage text.
-  const medsVisible = careAwareClause('m', userId, null);
-  if (allows('meds')) results.meds = database.prepare(`
-    SELECT m.id, m.name AS title, m.dosage_text, m.active
-    FROM search_index s
-    JOIN medications m ON m.id = s.entity_id
-    WHERE s.entity = 'medication' AND s.search_index MATCH ?
-      AND ${medsVisible.sql}
-    ORDER BY m.active DESC, m.name ASC
-    LIMIT ?
-  `).all(match, ...medsVisible.params, limit);
+  if (allows('meds')) {
+    const visible = careAwareClause('m', userId, null);
+    results.meds = database.prepare(`
+      SELECT m.id, m.name AS title, m.dosage_text, m.active
+      FROM search_index s
+      JOIN medications m ON m.id = s.entity_id
+      WHERE s.entity = 'medication' AND s.search_index MATCH ?
+        AND ${visible.sql}
+      ORDER BY m.active DESC, m.name ASC
+      LIMIT ?
+    `).all(match, ...visible.params, limit);
+  }
 
   // Activities: hits on type and note, the same row rule.
-  const activitiesVisible = careAwareClause('a', userId, null);
-  if (allows('activities')) results.activities = database.prepare(`
-    SELECT a.id, a.type AS title, a.note, a.performed_at
-    FROM search_index s
-    JOIN health_activities a ON a.id = s.entity_id
-    WHERE s.entity = 'activity' AND s.search_index MATCH ?
-      AND ${activitiesVisible.sql}
-    ORDER BY a.performed_at DESC
-    LIMIT ?
-  `).all(match, ...activitiesVisible.params, limit).map((row) => withExcerpt(row, q, [row.note]));
+  if (allows('activities')) {
+    const visible = careAwareClause('a', userId, null);
+    results.activities = database.prepare(`
+      SELECT a.id, a.type AS title, a.note, a.performed_at
+      FROM search_index s
+      JOIN health_activities a ON a.id = s.entity_id
+      WHERE s.entity = 'activity' AND s.search_index MATCH ?
+        AND ${visible.sql}
+      ORDER BY a.performed_at DESC
+      LIMIT ?
+    `).all(match, ...visible.params, limit).map((row) => withExcerpt(row, q, [row.note]));
+  }
 
   // Waste: nur der Typ-Katalog ist indiziert (Migration 206) - nie die von
   // waste-domain.js berechneten, potenziell unbegrenzten Termine (siehe dortige

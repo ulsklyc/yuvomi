@@ -26,19 +26,6 @@ export const log = createLogger('Health');
 
 export const VISIBILITIES = ['private', 'family'];
 
-/**
- * Der OFFENE Wert eines Bereichs - das Gegenstueck zu 'private'.
- *
- * Die Gesundheit schreibt seit jeher 'family'. Ein Bereich, der nach
- * docs/DECISIONS.md Abschnitt 5 neu dazukommt, nimmt den kanonischen Satz von
- * Anfang an und schreibt dort 'all'; Abschnitt 5 nennt das Lesen als die
- * Stelle, an der beide Schreibweisen zusammenkommen ("der Lesepfad bildet
- * `family` und `shared` auf `all` ab"), und genau das ist dieser Parameter.
- *
- * Er steht als Vorgabewert auf 'family', damit jede bestehende Aufrufstelle
- * unveraendert dasselbe SQL bekommt wie vorher - ein neuer Bereich muss den
- * Wert nennen, ein alter merkt nichts.
- */
 // OPEN_FAMILY and careAwareClause() live in services/visibility.js, where the
 // global search reaches them too (a service must not import a route module).
 // Every health route keeps importing them from here.
