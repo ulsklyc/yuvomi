@@ -2992,7 +2992,7 @@ const PRE_R10_LEAVES = Object.freeze({
   '/settings/admin/backup': { id: 'admin-backup', adminOnly: true, labelKey: 'settings.pageBackupRestore', options: ['settings.backupDownloadTitle', 'settings.backupRestoreTitle', 'settings.backupSchedulerTitle', 'settings.backupWebdavEnabled'] },
   '/settings/admin/email': { id: 'admin-email', adminOnly: true, labelKey: 'settings.pageEmail', options: ['email.host'] },
   '/settings/admin/immich': { id: 'admin-immich', adminOnly: true, labelKey: 'settings.pageImmich', options: ['settings.immichServerUrl'] },
-  '/settings/admin/system': { id: 'admin-system', adminOnly: true, labelKey: 'settings.pageSystem', options: ['settings.appNameLabel', 'settings.systemVersionLabel'] },
+  '/settings/admin/system': { id: 'admin-system', adminOnly: true, labelKey: 'settings.pageSystem', options: ['settings.appNameLabel', 'settings.systemVersionLabel', 'settings.diagnosticsTitle'] },
 });
 
 /** Alias-Pfade aelterer Umbauten, die vor R10 schon umleiteten -> Abschnitt heute. */

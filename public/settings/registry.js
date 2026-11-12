@@ -291,6 +291,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     options: [
       'settings.appNameLabel',
       'settings.systemVersionLabel',
+      'settings.diagnosticsTitle',
     ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-system.js'),
