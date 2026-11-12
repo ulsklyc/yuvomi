@@ -109,18 +109,21 @@
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": [
-          "event.admin.all",
-          "event.admin.assignees",
-          "event.admin.private",
-          "event.child.all",
-          "event.child.assignees",
-          "event.child.private",
-          "event.member.all",
-          "event.member.assignees",
-          "event.member.ics-shared",
-          "event.member.private"
-        ],
+        "events": {
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ],
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+        },
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -267,7 +270,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 3
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -301,7 +305,8 @@
           ]
         },
         "medications": {
-          "health.hasMeds": true
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -313,6 +318,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -354,6 +360,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -367,13 +374,16 @@
         }
       },
       "search": {
-        "budget": [
-          "budget.admin.private",
-          "budget.admin.shared",
-          "budget.admin.shared_amount",
-          "budget.child.shared",
-          "budget.member.shared"
-        ],
+        "budget": {
+          "ids": [
+            "budget.admin.private",
+            "budget.admin.shared",
+            "budget.admin.shared_amount",
+            "budget.child.shared",
+            "budget.member.shared"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
         "documents": [
           "document.admin.family",
           "document.admin.private",
@@ -395,16 +405,22 @@
           "medication.child.family",
           "medication.member.family"
         ],
-        "notes": [
-          "note.admin.all",
-          "note.admin.private"
-        ],
-        "tasks": [
-          "task.admin.all",
-          "task.admin.assignees",
-          "task.admin.private",
-          "task.admin.private.legacy-assigned-member"
-        ]
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.admin.all",
+            "note.admin.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.all",
+            "task.admin.assignees",
+            "task.admin.private",
+            "task.admin.private.legacy-assigned-member"
+          ]
+        }
       }
     },
     "caregiver": {
@@ -488,18 +504,21 @@
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": [
-          "event.admin.all",
-          "event.admin.assignees",
-          "event.admin.private",
-          "event.child.all",
-          "event.child.assignees",
-          "event.child.private",
-          "event.member.all",
-          "event.member.assignees",
-          "event.member.ics-shared",
-          "event.member.private"
-        ],
+        "events": {
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ],
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+        },
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -625,7 +644,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 0
+          "budget.entryCount": 0,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -656,7 +676,8 @@
           ]
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -667,6 +688,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -706,6 +728,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -719,11 +742,14 @@
         }
       },
       "search": {
-        "budget": [
-          "budget.admin.shared",
-          "budget.child.shared",
-          "budget.member.shared"
-        ],
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.shared"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
         "documents": [
           "document.admin.family",
           "document.child.family",
@@ -737,13 +763,22 @@
           "event.member.all",
           "event.member.ics-shared"
         ],
-        "medications": [
-          "medication.admin.family",
-          "medication.child.family",
-          "medication.member.family"
-        ],
-        "notes": [],
-        "tasks": []
+        "medications": {
+          "divergent": "search uses an inline rule without care grants (server/services/search.js:556); list and detail show the cared-for person's private medication",
+          "ids": [
+            "medication.admin.family",
+            "medication.child.family",
+            "medication.member.family"
+          ]
+        },
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": []
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": []
+        }
       }
     },
     "child": {
@@ -839,18 +874,21 @@
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": [
-          "event.admin.all",
-          "event.admin.assignees",
-          "event.admin.private",
-          "event.child.all",
-          "event.child.assignees",
-          "event.child.private",
-          "event.member.all",
-          "event.member.assignees",
-          "event.member.ics-shared",
-          "event.member.private"
-        ],
+        "events": {
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ],
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+        },
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -992,7 +1030,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 0
+          "budget.entryCount": 0,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -1031,7 +1070,8 @@
           ]
         },
         "medications": {
-          "health.hasMeds": true
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -1045,6 +1085,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1086,6 +1127,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1123,15 +1165,21 @@
           "medication.child.private",
           "medication.member.family"
         ],
-        "notes": [
-          "note.child.all",
-          "note.child.private"
-        ],
-        "tasks": [
-          "task.child.all",
-          "task.child.assignees",
-          "task.child.private"
-        ]
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.child.all",
+            "note.child.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.child.all",
+            "task.child.assignees",
+            "task.child.private"
+          ]
+        }
       }
     },
     "display": {
@@ -1180,6 +1228,7 @@
           "household": []
         },
         "medications": {
+          "divergent": "the delivery predicates resolve without the display flag and without the guest gate (server/services/reminder-origins.js:146): they say yes while every REST health path refuses this account",
           "mayHearAboutHealth": true,
           "notLacksHealth": true
         },
@@ -1202,18 +1251,21 @@
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": [
-          "event.admin.all",
-          "event.admin.assignees",
-          "event.admin.private",
-          "event.child.all",
-          "event.child.assignees",
-          "event.child.private",
-          "event.member.all",
-          "event.member.assignees",
-          "event.member.ics-shared",
-          "event.member.private"
-        ],
+        "events": {
+          "divergent": "feedModuleDenied resolves without the display flag and without the guest gate (server/index.js:578): the feed carries the whole calendar while the app refuses or narrows it; the token was set in the database, the app offers this account no way to mint one",
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ]
+        },
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -1315,7 +1367,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 0
+          "budget.entryCount": 0,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": []
@@ -1341,13 +1394,15 @@
           ]
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1386,6 +1441,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1520,19 +1576,22 @@
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": [
-          "event.admin.all",
-          "event.admin.assignees",
-          "event.admin.private",
-          "event.child.all",
-          "event.child.assignees",
-          "event.child.private",
-          "event.member.all",
-          "event.member.assignees",
-          "event.member.ics-shared",
-          "event.member.ics-unshared",
-          "event.member.private"
-        ],
+        "events": {
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.ics-unshared",
+            "event.member.private"
+          ],
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+        },
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -1687,7 +1746,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 3
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -1729,7 +1789,8 @@
           ]
         },
         "medications": {
-          "health.hasMeds": true
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -1743,6 +1804,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -1784,6 +1846,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1797,13 +1860,16 @@
         }
       },
       "search": {
-        "budget": [
-          "budget.admin.shared",
-          "budget.child.shared",
-          "budget.member.private",
-          "budget.member.shared",
-          "budget.member.shared_amount"
-        ],
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
         "documents": [
           "document.admin.family",
           "document.admin.restricted",
@@ -1828,16 +1894,22 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": [
-          "note.member.all",
-          "note.member.private"
-        ],
-        "tasks": [
-          "task.admin.private.legacy-assigned-member",
-          "task.member.all",
-          "task.member.assignees",
-          "task.member.private"
-        ]
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.private.legacy-assigned-member",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ]
+        }
       }
     },
     "member_none": {
@@ -2013,7 +2085,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 0
+          "budget.entryCount": 0,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": []
@@ -2025,13 +2098,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [],
           "wallTasks": []
         }
@@ -2057,6 +2132,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [],
           "wallTasks": []
         }
@@ -2120,6 +2196,7 @@
           }
         },
         "medications": {
+          "divergent": "the delivery predicates resolve without the display flag and without the guest gate (server/services/reminder-origins.js:146): they say yes while every REST health path refuses this account",
           "mayHearAboutHealth": true,
           "notLacksHealth": true
         },
@@ -2144,18 +2221,21 @@
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": [
-          "event.admin.all",
-          "event.admin.assignees",
-          "event.admin.private",
-          "event.child.all",
-          "event.child.assignees",
-          "event.child.private",
-          "event.member.all",
-          "event.member.assignees",
-          "event.member.ics-shared",
-          "event.member.private"
-        ],
+        "events": {
+          "divergent": "feedModuleDenied resolves without the display flag and without the guest gate (server/index.js:578): the feed carries the whole calendar while the app refuses or narrows it; the token was set in the database, the app offers this account no way to mint one",
+          "ids": [
+            "event.admin.all",
+            "event.admin.assignees",
+            "event.admin.private",
+            "event.child.all",
+            "event.child.assignees",
+            "event.child.private",
+            "event.member.all",
+            "event.member.assignees",
+            "event.member.ics-shared",
+            "event.member.private"
+          ]
+        },
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2583,7 +2663,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 3
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -2625,7 +2706,8 @@
           ]
         },
         "medications": {
-          "health.hasMeds": true
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -2639,6 +2721,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -2680,6 +2763,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -2693,13 +2777,16 @@
         }
       },
       "search": {
-        "budget": [
-          "budget.admin.shared",
-          "budget.child.shared",
-          "budget.member.private",
-          "budget.member.shared",
-          "budget.member.shared_amount"
-        ],
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
         "documents": [
           "document.admin.family",
           "document.admin.restricted",
@@ -2724,16 +2811,22 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": [
-          "note.member.all",
-          "note.member.private"
-        ],
-        "tasks": [
-          "task.admin.private.legacy-assigned-member",
-          "task.member.all",
-          "task.member.assignees",
-          "task.member.private"
-        ]
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.private.legacy-assigned-member",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ]
+        }
       }
     },
     "token_unscoped": {
@@ -2988,7 +3081,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 3
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -3030,7 +3124,8 @@
           ]
         },
         "medications": {
-          "health.hasMeds": true
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3044,6 +3139,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3085,6 +3181,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -3098,13 +3195,16 @@
         }
       },
       "search": {
-        "budget": [
-          "budget.admin.shared",
-          "budget.child.shared",
-          "budget.member.private",
-          "budget.member.shared",
-          "budget.member.shared_amount"
-        ],
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
         "documents": [
           "document.admin.family",
           "document.admin.restricted",
@@ -3129,16 +3229,22 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": [
-          "note.member.all",
-          "note.member.private"
-        ],
-        "tasks": [
-          "task.admin.private.legacy-assigned-member",
-          "task.member.all",
-          "task.member.assignees",
-          "task.member.private"
-        ]
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.private.legacy-assigned-member",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ]
+        }
       }
     },
     "token_write": {
@@ -3393,7 +3499,8 @@
       },
       "overview": {
         "budget": {
-          "budget.entryCount": 3
+          "budget.entryCount": 3,
+          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -3435,7 +3542,8 @@
           ]
         },
         "medications": {
-          "health.hasMeds": true
+          "health.hasMeds": true,
+          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3449,6 +3557,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3490,6 +3599,7 @@
         },
         "tasks": {
           "countdowns": [],
+          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -3503,13 +3613,16 @@
         }
       },
       "search": {
-        "budget": [
-          "budget.admin.shared",
-          "budget.child.shared",
-          "budget.member.private",
-          "budget.member.shared",
-          "budget.member.shared_amount"
-        ],
+        "budget": {
+          "ids": [
+            "budget.admin.shared",
+            "budget.child.shared",
+            "budget.member.private",
+            "budget.member.shared",
+            "budget.member.shared_amount"
+          ],
+          "note": "deliberate (#659): search follows budgetDetailsVisibleWhere, so others' shared_amount rows (masked in the list) are not found"
+        },
         "documents": [
           "document.admin.family",
           "document.admin.restricted",
@@ -3534,16 +3647,22 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": [
-          "note.member.all",
-          "note.member.private"
-        ],
-        "tasks": [
-          "task.admin.private.legacy-assigned-member",
-          "task.member.all",
-          "task.member.assignees",
-          "task.member.private"
-        ]
+        "notes": {
+          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
+          "ids": [
+            "note.member.all",
+            "note.member.private"
+          ]
+        },
+        "tasks": {
+          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
+          "ids": [
+            "task.admin.private.legacy-assigned-member",
+            "task.member.all",
+            "task.member.assignees",
+            "task.member.private"
+          ]
+        }
       }
     }
   },
