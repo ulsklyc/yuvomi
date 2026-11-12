@@ -282,6 +282,7 @@
   "test-waste-ui.js": {"class":"M","sBlocks":23,"targets":["public/pages/waste.js","public/styles/tokens.css","public/styles/waste.css"],"fate":"falls-with:public/pages/waste.js"}
  },
  "wideOnly": {
+  "test-authorize-actor.js": "imports server modules in a child process and lists the files a DB_PATH directory holds afterwards",
   "test-birthday-localization.js": "locale JSON",
   "test-budget-categories-routes.js": "locale JSON",
   "test-budget-loans-order.js": "locale JSON",

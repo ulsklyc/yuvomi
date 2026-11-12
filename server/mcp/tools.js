@@ -556,7 +556,8 @@ async function internalApiRequest(ctx, method, path, { query, payload, contentDa
 
 // --------------------------------------------------------
 // Registry: Definition + Handler je Tool an EINER Stelle.
-// `handler(ctx, args)` mit ctx = { db, actor: { id, role }, requestHeaders }.
+// `handler(ctx, args)` mit ctx = { db, actor, requestHeaders }; der Akteur kommt
+// aus server/authorize/ (`actorFromRequest`), die Handler lesen `actor.userId`.
 // --------------------------------------------------------
 
 const CORE_TOOLS = [
@@ -576,7 +577,7 @@ const CORE_TOOLS = [
         },
       },
     },
-    handler: (ctx, args) => listTasks(ctx.db, ctx.actor.id, args),
+    handler: (ctx, args) => listTasks(ctx.db, ctx.actor.userId, args),
   },
   {
     name: 'create_task',
@@ -599,7 +600,7 @@ const CORE_TOOLS = [
       },
       required: ['title'],
     },
-    handler: (ctx, args) => createTask(ctx.db, ctx.actor.id, args),
+    handler: (ctx, args) => createTask(ctx.db, ctx.actor.userId, args),
   },
   {
     name: 'list_shopping_items',
@@ -627,7 +628,7 @@ const CORE_TOOLS = [
       },
       required: ['name'],
     },
-    handler: (ctx, args) => addShoppingItem(ctx.db, ctx.actor.id, args),
+    handler: (ctx, args) => addShoppingItem(ctx.db, ctx.actor.userId, args),
   },
   {
     name: 'list_upcoming_events',
@@ -639,7 +640,7 @@ const CORE_TOOLS = [
         limit: { type: 'integer', description: 'Max number of events (1-100, default 20).' },
       },
     },
-    handler: (ctx, args) => listUpcomingEvents(ctx.db, ctx.actor.id, args),
+    handler: (ctx, args) => listUpcomingEvents(ctx.db, ctx.actor.userId, args),
   },
   {
     name: 'create_event',
@@ -657,7 +658,7 @@ const CORE_TOOLS = [
       },
       required: ['title', 'start_datetime'],
     },
-    handler: (ctx, args) => createEvent(ctx.db, ctx.actor.id, args),
+    handler: (ctx, args) => createEvent(ctx.db, ctx.actor.userId, args),
   },
 ];
 
@@ -792,7 +793,7 @@ const TOOL_MAP = new Map(ALL_TOOLS.map((t) => [t.name, t]));
  * Guest-Guard vom echten Middleware-Stapel. Ausnahme sind Split-Guests, die
  * gar keinen Haushaltszugriff haben — für sie sind alle Kern-Tools zu.
  *
- * @param {{ scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean, display?: boolean }|null} actor
+ * @param {{ kind?: string, userId?: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }|null} actor
  * @param {{ scope?: { module: string, access: 'read'|'write' } }} tool
  * @returns {boolean}
  */
@@ -817,12 +818,15 @@ function toolAllowed(actor, tool) {
   // OFFEN UND NICHT HIER ENTSCHIEDEN: dass ein Gast ueber die beiden anderen
   // den vollstaendigen OpenAPI-Katalog liest, obwohl `/openapi.json` ueber REST
   // administratorgesperrt ist. Das ist ein eigener Befund, aelter als #1208.
-  if (actor && actor.display) return false;
+  // `unresolved`: a lookup that decides the kind failed or contradicts the other
+  // (server/authorize/) - closed like a display, as the old lookups said true then.
+  if (actor && (actor.kind === 'display' || actor.unresolved)) return false;
   if (!tool.scope) return true;
   // Gast-Konten für geteilte Ausgaben erreichen unter /api/v1 nur
   // /split-expenses; kein Kern-Tool liegt dort, also alle gesperrt.
-  if (actor && actor.splitGuest) return false;
-  const scopes = actor ? (actor.scopes ?? null) : null;
+  if (actor && actor.kind === 'guest') return false;
+  // The actor's scopes are read-only; tokenAllows() only reads them.
+  const scopes = /** @type {string[]|null} */ (actor ? (actor.scopes ?? null) : null);
   if (!tokenAllows(scopes, tool.scope.module, tool.scope.access)) return false;
   const moduleAccess = actor ? (actor.moduleAccess ?? null) : null;
   return moduleAccessVerdict(moduleAccess, tool.scope.module, tool.scope.access) === MODULE_ACCESS_ALLOW;
@@ -831,7 +835,7 @@ function toolAllowed(actor, tool) {
 /**
  * Tool-Definitionen für `tools/list`, gefiltert auf das, was der Akteur wirklich
  * aufrufen darf — ein LLM sieht kein Tool, das ihm der nächste Aufruf verweigert.
- * @param {{ scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean, display?: boolean }|null} actor
+ * @param {{ kind?: string, userId?: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }|null} actor
  * @returns {Array<{ name: string, description: string, inputSchema: object }>}
  */
 function listToolDefinitions(actor = null) {
@@ -842,7 +846,7 @@ function listToolDefinitions(actor = null) {
 
 /**
  * Führt ein Tool aus.
- * @param {{ db: object, actor: { id: number, role?: string, scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean }, requestHeaders?: object }} ctx
+ * @param {{ db: object, actor: { kind?: string, userId: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }, requestHeaders?: object }} ctx
  * @param {string} name  - Tool-Name
  * @param {object} args  - Tool-Argumente
  * @returns {Promise<any>} rohes Ergebnis (wird vom Protokoll-Layer serialisiert)

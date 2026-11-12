@@ -347,6 +347,26 @@ test('each of the other layer rules fires, and an unresolved local import is key
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('server/authorize/ reaching server/db.js, also through another module, is a finding', () => {
+  // db.js opens the database on import; the permission module takes the connection
+  // as a parameter instead (phase 2, B1). The indirect case is the one that happened.
+  const dir = project(NONE);
+  try {
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
+    for (const d of ['server/authorize', 'server/services']) mkdirSync(join(dir, d), { recursive: true });
+    writeFileSync(join(dir, 'server', 'db.js'), 'export const get = () => null;\n');
+    writeFileSync(join(dir, 'server', 'services', 'uses-db.js'), "import { get } from '../db.js';\nexport const u = get;\n");
+    writeFileSync(join(dir, 'server', 'authorize', 'clean.ts'), 'export const c = 1;\n');
+    writeFileSync(join(dir, 'server', 'x.js'), "import { c } from './authorize/clean.ts';\nimport { get } from './db.js';\nexport const x = [c, get];\n");
+    assert.equal(run(dir, '--init').code, 0);
+    assert.deepEqual(baselineOf(dir), {}, 'a module outside server/authorize/ may load db.js');
+    writeFileSync(join(dir, 'server', 'authorize', 'actor.ts'), "import { u } from '../services/uses-db.js';\nexport const a = u;\n");
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /server\/authorize\/actor\.ts\s+depcruise\/authorize-not-to-db\s+0 -> 1/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('a broken dependency-cruiser config is exit 2', () => {
   const dir = project(NONE);
   try {

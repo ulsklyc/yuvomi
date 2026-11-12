@@ -196,6 +196,14 @@ export default {
       to: { path: '^web-push(/|$)|(^|/)node_modules/web-push/' },
     },
     {
+      name: 'authorize-not-to-db',
+      comment: 'server/authorize/ never reaches server/db.js, not even transitively: db.js opens the database '
+        + 'on import, and server/openapi.js imports the permission module (phase 2, B1). The connection is a parameter.',
+      severity: 'error',
+      from: { path: '^server/authorize/' },
+      to: { path: '^server/db\\.[jt]s$', reachable: true },
+    },
+    {
       name: 'server-not-to-public-except-shared',
       comment: 'The server imports from public/ only the frozen list SERVER_PUBLIC_IMPORTS, until phase 4 moves them to shared/.',
       severity: 'error',

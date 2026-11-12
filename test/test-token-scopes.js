@@ -123,12 +123,12 @@ const uid = db.prepare(
 db.prepare(`INSERT INTO shopping_lists (name, created_by) VALUES ('Wocheneinkauf', ?)`).run(uid);
 
 function listToolNames(scopes) {
-  return handleMcpRequest(db, { id: uid, role: 'admin', scopes },
+  return handleMcpRequest(db, { kind: 'token', userId: uid, role: 'admin', scopes },
     { jsonrpc: '2.0', id: 1, method: 'tools/list' })
     .then((res) => res.result.tools.map((t) => t.name));
 }
 function callToolRes(scopes, name, args = {}) {
-  return handleMcpRequest(db, { id: uid, role: 'admin', scopes },
+  return handleMcpRequest(db, { kind: 'token', userId: uid, role: 'admin', scopes },
     { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
 }
 
