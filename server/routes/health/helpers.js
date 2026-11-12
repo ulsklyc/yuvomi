@@ -20,25 +20,16 @@
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
+import { CARED_FOR_SUBQUERY, OPEN_FAMILY, careAwareClause } from '../../services/visibility.js';
 
 export const log = createLogger('Health');
 
 export const VISIBILITIES = ['private', 'family'];
 
-/**
- * Der OFFENE Wert eines Bereichs - das Gegenstueck zu 'private'.
- *
- * Die Gesundheit schreibt seit jeher 'family'. Ein Bereich, der nach
- * docs/DECISIONS.md Abschnitt 5 neu dazukommt, nimmt den kanonischen Satz von
- * Anfang an und schreibt dort 'all'; Abschnitt 5 nennt das Lesen als die
- * Stelle, an der beide Schreibweisen zusammenkommen ("der Lesepfad bildet
- * `family` und `shared` auf `all` ab"), und genau das ist dieser Parameter.
- *
- * Er steht als Vorgabewert auf 'family', damit jede bestehende Aufrufstelle
- * unveraendert dasselbe SQL bekommt wie vorher - ein neuer Bereich muss den
- * Wert nennen, ein alter merkt nichts.
- */
-export const OPEN_FAMILY = 'family';
+// OPEN_FAMILY and careAwareClause() live in services/visibility.js, where the
+// global search reaches them too (a service must not import a route module).
+// Every health route keeps importing them from here.
+export { OPEN_FAMILY, careAwareClause };
 export const OPEN_ALL    = 'all';
 export const NUTRITION_VISIBILITIES = ['private', OPEN_ALL];
 
@@ -75,11 +66,6 @@ export function viewerId(req) {
   return req.authUserId || req.session.userId;
 }
 
-// Betreute Personen als Subquery statt als aufgelöste ID-Liste: die Zahl der
-// Platzhalter bliebe sonst von den Daten abhängig, und jede aufrufende Route
-// müsste die Liste selbst beschaffen.
-const CARED_FOR_SUBQUERY = 'SELECT subject_id FROM health_care_grants WHERE caregiver_id = ?';
-
 /**
  * Baut eine WHERE-Teilbedingung für Sichtbarkeit/Personen-Filter: Eigentümer
  * oder `visibility = 'family'`. Betreuung spielt hier bewusst KEINE Rolle -
@@ -101,33 +87,6 @@ export function visibilityClause(alias, viewer, personId, open = OPEN_FAMILY) {
     return { sql: `${alias}.user_id = ? AND ${alias}.visibility = ?`, params: [personId, open] };
   }
   return { sql: `(${alias}.user_id = ? OR ${alias}.visibility = ?)`, params: [viewer, open] };
-}
-
-/**
- * Wie `visibilityClause()`, zusätzlich mit den Daten betreuter Personen - auch
- * deren privaten (#584). Gilt für Vitalwerte, Medikamente, Laborbefunde,
- * Aktivitäten, Vorsorge und die Naehrwerte (#1326).
- *
- * `open` ist der Wert, den DIESE Tabelle fuer "der Haushalt darf mitlesen"
- * schreibt. Er wandert als Bind-Parameter ins SQL statt als eingebautes
- * 'family', weil die Naehrwert-Tabelle den kanonischen Satz fuehrt und dort
- * 'all' steht - ein fest verdrahtetes 'family' haette dort NIE getroffen, und
- * zwar lautlos: die Abfrage bliebe gueltig und lieferte einfach nichts.
- */
-export function careAwareClause(alias, viewer, personId, open = OPEN_FAMILY) {
-  if (personId) {
-    if (personId === viewer) return { sql: `${alias}.user_id = ?`, params: [viewer] };
-    // Betreute Person: volle Sicht wie der Eigentümer. Für alle anderen bleibt
-    // es beim Familien-Filter.
-    return {
-      sql: `${alias}.user_id = ? AND (${alias}.visibility = ? OR ? IN (${CARED_FOR_SUBQUERY}))`,
-      params: [personId, open, personId, viewer],
-    };
-  }
-  return {
-    sql: `(${alias}.user_id = ? OR ${alias}.visibility = ? OR ${alias}.user_id IN (${CARED_FOR_SUBQUERY}))`,
-    params: [viewer, open, viewer],
-  };
 }
 
 // --------------------------------------------------------

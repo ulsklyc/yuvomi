@@ -20,7 +20,8 @@ const router = express.Router();
 /**
  * GET /api/v1/search?q=<query>
  * Durchsucht Aufgaben, Kalender-Events, Notizen, Kontakte, Einkaufsartikel,
- * Gesundheits-Medikamente und -Aktivitäten (Health: nur eigene oder family-sichtbare Zeilen).
+ * Gesundheits-Medikamente und -Aktivitäten. Je Trefferart gilt die Zeilenregel der
+ * Liste desselben Typs (Health: eigene, family-sichtbare und die betreuter Personen).
  * Response: { tasks, events, notes, contacts, items, meds, activities, waste,
  *            recipes, pantry, inventory, documents, birthdays, budget }
  *

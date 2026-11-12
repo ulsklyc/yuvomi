@@ -1026,6 +1026,20 @@ const MIGRATIONS_SQL = {
       WHERE accepted_at IS NULL AND revoked_at IS NULL;
   `,
 
+  // SQL string for migration v130 (mirrored from db.js MIGRATIONS):
+  // care grants - the health row rule reads them (#584).
+  130: `
+    CREATE TABLE IF NOT EXISTS health_care_grants (
+      subject_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      caregiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (subject_id, caregiver_id),
+      CHECK (subject_id <> caregiver_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_health_care_grants_caregiver
+      ON health_care_grants(caregiver_id);
+  `,
+
   // SQL-String für Migration v160 (gespiegelt aus db.js MIGRATIONS):
   // Schnellzugriffe als Kachelreihe auf der Übersicht (#469).
   160: `

@@ -485,3 +485,69 @@ test('Task search follows the task list: all, creator, assignment rows - never t
     `${marker} fremd zugewiesen`,
   ], 'what GET /tasks shows the kid, nothing else');
 });
+
+test('Note search follows the note list: all notes of anyone, private ones only of the viewer', async () => {
+  clearModuleDenials(KID);
+  const marker = 'Zettelprobe';
+  const insert = db.prepare('INSERT INTO notes (title, content, visibility, created_by) VALUES (?, ?, ?, ?)');
+  insert.run(`${marker} fremd alle`, 'Text', 'all', PARENT);
+  insert.run(`${marker} fremd privat`, 'Text', 'private', PARENT);
+  insert.run(`${marker} eigen alle`, 'Text', 'all', KID);
+  insert.run(`${marker} eigen privat`, 'Text', 'private', KID);
+
+  const titleOf = (/** @type {{ title: string }} */ row) => row.title;
+  const titles = (await searchAs(KID, marker)).notes.map(titleOf).sort();
+  assert.deepEqual(titles, [
+    `${marker} eigen alle`,
+    `${marker} eigen privat`,
+    `${marker} fremd alle`,
+  ], 'what GET /notes shows the kid, nothing else');
+});
+
+// --------------------------------------------------------------------------
+// The row axis for Health. The search answers with the rows the health lists
+// answer with (GET /health/medications, GET /health/activities): the viewer's
+// own, `family` rows, and every row of a person whose care an admin has
+// granted to the viewer - the private ones too (#584). Markers of their own,
+// so the fourteen-bucket precondition above keeps its exact count.
+// --------------------------------------------------------------------------
+test('Health search follows the health lists: a care grant opens the private rows, the admin role does not', async () => {
+  clearModuleDenials(KID);
+  const marker = 'Pflegeprobe';
+  const carer = seedUser('carer', 'member', 'parent');
+  db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)').run(KID, carer);
+  const med = db.prepare("INSERT INTO medications (user_id, name, dosage_text, visibility) VALUES (?, ?, '5 ml', ?)");
+  const activity = db.prepare(`
+    INSERT INTO health_activities (user_id, type, performed_at, note, visibility)
+    VALUES (?, ?, '2030-01-02T08:00', 'Notiz', ?)
+  `);
+  med.run(KID, `${marker} Saft privat`, 'private');
+  med.run(KID, `${marker} Saft familie`, 'family');
+  med.run(PARENT, `${marker} Tablette privat`, 'private');
+  activity.run(KID, `${marker} Lauf privat`, 'private');
+  activity.run(KID, `${marker} Lauf familie`, 'family');
+  activity.run(PARENT, `${marker} Yoga privat`, 'private');
+
+  const titleOf = (/** @type {{ title: string }} */ row) => row.title;
+  /** @param {number} userId */
+  const found = async (userId) => {
+    const body = await searchAs(userId, marker);
+    return { meds: body.meds.map(titleOf).sort(), activities: body.activities.map(titleOf).sort() };
+  };
+
+  assert.deepEqual(await found(carer), {
+    meds: [`${marker} Saft familie`, `${marker} Saft privat`],
+    activities: [`${marker} Lauf familie`, `${marker} Lauf privat`],
+  }, 'the caregiver finds what the lists show them: the cared-for person\'s private rows too');
+
+  // Admin replaces no care grant (docs/DECISIONS.md, section 1).
+  assert.deepEqual(await found(PARENT), {
+    meds: [`${marker} Saft familie`, `${marker} Tablette privat`],
+    activities: [`${marker} Lauf familie`, `${marker} Yoga privat`],
+  }, 'the admin without a grant finds family rows and their own');
+
+  assert.deepEqual(await found(KID), {
+    meds: [`${marker} Saft familie`, `${marker} Saft privat`],
+    activities: [`${marker} Lauf familie`, `${marker} Lauf privat`],
+  }, 'the owner finds their own rows, not the private ones of others');
+});

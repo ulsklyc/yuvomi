@@ -14,6 +14,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never the raw error text, which stays in the log. Until now the failure was silent and only
   visible to someone who happened to open that page, and two failed nights replace one
   notification instead of stacking up. A successful run afterwards clears the warning by itself.
+- **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
+  system information there is a section with what the installation runs on: version and build,
+  whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema
+  version and the last migration, the size of the database and the free disk space, whether the
+  database is encrypted and where its key comes from, and the state of the last backup. One
+  button copies all of it as plain text with the field names of the API and the raw values, the
+  same in every language, so that whoever reads the report does not have to know yours. The
+  text contains no password, key or path and nothing about members. Copying also works over
+  plain http in the home network; where a browser refuses it, the text stands selected in a
+  field instead of claiming a copy that did not happen.
+- **The backup page now shows why the last scheduled run failed** (#2525). Settings > Household >
+  Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
+  in your language - a full disk, an unwritable backup folder, a failed integrity check, or an
+  unrecognised cause - from `scheduler.lastError.reason`. A successful run clears the row.
+- **The backup card keeps telling you when a backup last succeeded, and warns when that is too
+  long ago.** After a failed run, "Last backup" showed only the date of the failure, and the date
+  of the last backup you can actually restore from was gone. "Last backup" is now always the
+  last one that succeeded; a failed run adds its own "Last attempt" row above the reason and
+  leaves again with the next success. If the last success is older than two intervals of the
+  schedule (daily, weekly, monthly or every N hours), or no run has succeeded yet although one
+  was tried, the row turns amber and says that at least two scheduled backups have been missed -
+  also when nothing failed and the schedule simply stood still. A schedule the page cannot read
+  as one of those patterns never warns about age. The card also names the next scheduled run
+  ("Next backup") below those rows, because after a failure the next question is when it will
+  try again. And "Active" is green only while nothing on the card asks for attention: after a
+  failed run or with an overdue backup the word stays, since the schedule is still running, but
+  without the green that would say all is well next to a red line.
+
+### Fixed
+- **"Create backup now" no longer reports success when the backup failed.** The server answers
+  a failed manual run with `200` and `success: false`, and the page showed "Backup created
+  successfully." without reading the answer. It now shows the reason in your language, the
+  same sentence as the "Last error" row, and the card reloads either way.
+- **A backup schedule over several weekdays is no longer shown as "Every Monday".** With
+  `BACKUP_SCHEDULE` set to a range or a list of weekday names, such as `0 2 * * mon-fri` or
+  `0 2 * * mon,wed,fri`, the backup card read only the first name: it said "Every Monday at
+  02:00" for a schedule that runs on five days. The backups themselves always ran as
+  configured - only the description was wrong. Such a schedule now stands there as the
+  expression itself, like every other list or range; a single weekday is still spelled out,
+  as a number or as a short or full name (`mon`, `Monday`).
+- **The global search finds the tasks your task list shows.** It only found tasks you had
+  created yourself or that named you in the old single-assignee field. A task someone else
+  shared with everyone, or one you were assigned to together with others, stood in your list
+  and was missing from the search. The search now applies the rule of the list.
+- **The global search finds the notes your notes page shows.** It only found notes you had
+  written yourself. A note someone else shared with everyone stood on your notes page and was
+  missing from the search. The search now applies the rule of the page: notes visible to
+  everyone, and your own. A note set to "only me" is still found by nobody but its author.
+- **The global search finds the medications and activities of a person you care for.** If an
+  admin has entered you as someone's caregiver, the Health pages show you that person's
+  entries, including the ones marked private. The search left those out: it only knew your
+  own entries and the ones shared with the family. It now applies the rule of the Health
+  pages. Nothing else changes - without a care grant nobody finds another person's private
+  entry, an admin included.
+
+### Security
+- **The global search no longer finds a private task of someone else.** A task set to "only
+  me" was found by a second person if the old single-assignee field still named them - a
+  field the task list ignores for a private task. Title, status, priority and due date of that
+  task appeared in the search results, with a matching word from its description or tags as an
+  excerpt. The task list, the detail view and the overview never showed it. The search now
+  asks the same rule as the list: visible to everyone, created by you, or shared with the
+  assigned people and you are one of them.
+
+## [2.89.1] - 2026-11-12
+
+### Security
+- **A signed-in device can no longer change the email addresses of a household member.**
+  SECURITY.md says that a device credential changes neither password, email nor second factor.
+  The addresses of the contact that belongs to an account were outside that rule, and they are
+  where a password reset is sent. A device is now refused there like a module-scoped token
+  (`403`, `contact_email_protected`), for the person's own contact too. The other fields of the
+  contact stay editable from a device, and a browser session or a full-access token changes
+  the addresses as before.
+- **The Umbrel catalog workflow no longer runs foreign code next to its token.** On every
+  release it ran the catalog repository's linter and installed its npm dependencies in the step
+  that held the token for the catalog fork. It now has three jobs: one edits the catalog files
+  as text, one runs the linter with no secret and no rights and installs with
+  `npm ci --ignore-scripts`, and only the last one holds the token and pushes. Nothing changes
+  for an installation.
+
+## [2.89.0] - 2026-11-12
+
+### Foundation
+- **A readiness endpoint `/readyz` next to `/health`.** `/health` only says that the process
+  answers, and it stays `200` during a restore so that Docker does not restart the container in
+  the middle of one. `/readyz` says whether the instance can serve right now: `200` with
+  `{"status":"ready"}`, or `503` with `{"status":"not_ready","reason":"..."}` while a restore is
+  running, the database connection is closed, the database is older than this version expects or
+  the data folder refuses writes. It needs no login, tells nothing else about the instance and
+  does not write to the database. `/health` and every shipped healthcheck stay as they are; the
+  new path is for a load balancer or an uptime monitor.
+- **Unexpected errors are answered and logged in one place.** The central error handler now
+  keeps the status of a client error that is marked as safe to show; until now every error
+  that reached it was a 500. Its sentence and `reason` reach the client only from a
+  `HttpError` (`server/utils/http-error.js`), whose text we write ourselves; a 4xx of the HTTP
+  libraries gets a fixed sentence such as "The request was refused (Bad Request).", because
+  body-parser wraps foreign text (zlib) that way. Requests the HTTP layer refuses now get their
+  4xx instead of a 500: a corrupt compressed body, an aborted upload or a body shorter than its
+  `Content-Length` 400, a form nested too deep 400, too many form fields 413, an unsupported
+  `Content-Encoding` or charset 415. A path parameter that does not decode (`%ZZ`) is a 400.
+  Everything else stays a 500 with the fixed sentence, and the raw text stays in the log. The
+  log line names the method, the route pattern and the status instead of the path, and the
+  raw segment of an undecodable parameter is no longer written, so a calendar feed token in the
+  URL no longer lands in the log. The cause of an error is logged with it.
+- **The status of the last backup survives a restart.** After a restart the backup page said
+  "never" until the next scheduled run, because the last attempt lived in memory only. The time of
+  the last attempt, the time of the last success and the reason of a failed attempt are now kept
+  in the database, without a schema change, and a restore keeps the values of the installation it
+  runs on rather than those inside the restored file. `GET /api/v1/backup/status` gains
+  `scheduler.lastSuccess`.
 - **A restore drill checks that a release database restores and migrates on this version.**
   `scripts/restore-drill.mjs` restores a database through the same restore command an operator
   uses, migrates it to the current schema and checks its integrity, foreign keys, schema and row
