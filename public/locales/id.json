@@ -2548,6 +2548,7 @@
         "backupSchedulerNever": "Belum ada cadangan dibuat",
         "backupSchedulerLastError": "Kesalahan terakhir",
         "backupSchedulerLastAttempt": "Percobaan terakhir",
+        "backupSchedulerNextRun": "Cadangan berikutnya",
         "backupSchedulerOverdue": "Sejak itu, setidaknya dua cadangan terjadwal tidak dibuat.",
         "backupSchedulerTrigger": "Buat cadangan sekarang",
         "backupSchedulerTriggering": "Membuat cadangan...",

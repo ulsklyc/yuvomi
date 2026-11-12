@@ -2740,6 +2740,7 @@
         "backupSchedulerNever": "Jeszcze nie utworzono kopii",
         "backupSchedulerLastError": "Ostatni błąd",
         "backupSchedulerLastAttempt": "Ostatnia próba",
+        "backupSchedulerNextRun": "Następna kopia",
         "backupSchedulerOverdue": "Od tego czasu nie powstały co najmniej dwie zaplanowane kopie.",
         "backupSchedulerTrigger": "Utwórz kopię teraz",
         "backupSchedulerTriggering": "Tworzenie kopii...",

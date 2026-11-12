@@ -2504,6 +2504,7 @@
         "backupSchedulerNever": "Chưa tạo bản sao lưu nào",
         "backupSchedulerLastError": "Lỗi gần nhất",
         "backupSchedulerLastAttempt": "Lần thử gần nhất",
+        "backupSchedulerNextRun": "Lần sao lưu tiếp theo",
         "backupSchedulerOverdue": "Từ đó đến nay, ít nhất hai bản sao lưu theo lịch đã không được tạo.",
         "backupSchedulerTrigger": "Tạo bản sao lưu ngay",
         "backupSchedulerTriggering": "Đang tạo sao lưu...",

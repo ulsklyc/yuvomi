@@ -2504,6 +2504,7 @@
         "backupSchedulerNever": "Nog geen back-up aangemaakt",
         "backupSchedulerLastError": "Laatste fout",
         "backupSchedulerLastAttempt": "Laatste poging",
+        "backupSchedulerNextRun": "Volgende back-up",
         "backupSchedulerOverdue": "Sindsdien zijn minstens twee geplande back-ups uitgebleven.",
         "backupSchedulerTrigger": "Nu back-up aanmaken",
         "backupSchedulerTriggering": "Back-up aanmaken...",

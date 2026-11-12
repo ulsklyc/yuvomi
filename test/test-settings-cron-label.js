@@ -13,7 +13,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 // Der Loader stubbt /i18n.js mit `t(key, params) => key + JSON.stringify(params)`.
 // Geprüft wird damit die Musterzuordnung und die Parameterbelegung; die Texte
 // selbst deckt die Locale-Vollständigkeit weiter unten ab.
-const { formatCronSchedule } = await import('../public/settings/cron-label.js');
+const { formatCronSchedule, cronScheduleIntervalMs } = await import('../public/settings/cron-label.js');
 
 const parse = (expr) => {
   const out = formatCronSchedule(expr);
@@ -37,6 +37,50 @@ test('wöchentlich: Wochentag als Name, nicht als Zahl', () => {
   assert.equal(parse('0 4 * * 0').params.weekday, 'Sonntag');
   assert.equal(parse('0 4 * * 7').params.weekday, 'Sonntag');
   assert.equal(parse('0 4 * * SUN').params.weekday, 'Sonntag');
+});
+
+test('wöchentlich: Kurz- und Langname, ohne Unterschied zwischen Groß und Klein', () => {
+  // node-cron nimmt `sun`..`sat` und `sunday`..`saturday` in jeder Schreibung.
+  const faelle = {
+    sun: 'Sonntag', mon: 'Montag', tue: 'Dienstag', wed: 'Mittwoch', thu: 'Donnerstag', fri: 'Freitag', sat: 'Samstag',
+    sunday: 'Sonntag', monday: 'Montag', tuesday: 'Dienstag', wednesday: 'Mittwoch',
+    thursday: 'Donnerstag', friday: 'Freitag', saturday: 'Samstag',
+    Fri: 'Freitag', WEDNESDAY: 'Mittwoch', Saturday: 'Samstag',
+  };
+  for (const [name, weekday] of Object.entries(faelle)) {
+    const result = parse(`0 2 * * ${name}`);
+    assert.equal(result?.key, 'settings.backupSchedulerCronWeekly', name);
+    assert.equal(result?.params.weekday, weekday, name);
+  }
+});
+
+test('wöchentlich ist nur EIN Wochentag: Liste, Bereich und Namensrest sind kein Muster', () => {
+  // `mon-fri` läuft an fünf Tagen. Als "Jeden Montag" gelesen, stünde ein
+  // falscher Satz auf der Karte, und "überfällig" mäße an sieben Tagen statt
+  // an einem.
+  for (const expr of [
+    '0 2 * * mon-fri', // Bereich aus Namen
+    '0 2 * * mon,wed', // Liste aus Namen
+    '0 2 * * mon,wed,fri',
+    '0 2 * * monday-friday',
+    '0 2 * * monx', // kein Name, nur ein Anfang davon
+    '0 2 * * mo',
+    '0 2 * * mondays',
+    '0 2 * * mon/2', // Schritt
+    '0 2 * * 1-5', // Bereich aus Zahlen
+    '0 2 * * 1,3',
+    '0 2 * * 1#2', // zweiter Montag im Monat
+    '0 2 * * 5L', // letzter Freitag im Monat
+  ]) {
+    assert.equal(formatCronSchedule(expr), null, `${expr} ist kein einzelner Wochentag`);
+    assert.equal(cronScheduleIntervalMs(expr), null, `${expr} hat keinen ablesbaren Abstand`);
+  }
+
+  // Gegenprobe: der einzelne Tag behält seine sieben Tage, als Zahl wie als Name.
+  const week = 7 * 24 * 60 * 60 * 1000;
+  for (const expr of ['0 2 * * 1', '0 2 * * mon', '0 2 * * Monday', '0 2 * * 7']) {
+    assert.equal(cronScheduleIntervalMs(expr), week, expr);
+  }
 });
 
 test('monatlich: Tag im Monat', () => {

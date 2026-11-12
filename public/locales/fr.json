@@ -2431,6 +2431,7 @@
         "backupSchedulerNever": "Aucune sauvegarde créée pour l'instant",
         "backupSchedulerLastError": "Dernière erreur",
         "backupSchedulerLastAttempt": "Dernière tentative",
+        "backupSchedulerNextRun": "Prochaine sauvegarde",
         "backupSchedulerOverdue": "Depuis, au moins deux sauvegardes planifiées n'ont pas eu lieu.",
         "backupSchedulerSchedule": "Planification",
         "backupSchedulerCronDaily": "Chaque jour à {{time}}",

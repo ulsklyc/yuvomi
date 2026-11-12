@@ -2579,6 +2579,7 @@
         "backupSchedulerNever": "Még nem történt biztonsági mentés",
         "backupSchedulerLastError": "Utolsó hiba",
         "backupSchedulerLastAttempt": "Utolsó kísérlet",
+        "backupSchedulerNextRun": "Következő biztonsági mentés",
         "backupSchedulerOverdue": "Azóta legalább két ütemezett biztonsági mentés elmaradt.",
         "backupSchedulerTrigger": "Biztonsági mentés létrehozása most",
         "backupSchedulerTriggering": "Biztonsági mentés létrehozása...",

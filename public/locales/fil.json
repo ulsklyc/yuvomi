@@ -2585,6 +2585,7 @@
         "backupSchedulerNever": "Wala pang nagawang backup",
         "backupSchedulerLastError": "Huling error",
         "backupSchedulerLastAttempt": "Huling pagsubok",
+        "backupSchedulerNextRun": "Susunod na backup",
         "backupSchedulerOverdue": "Mula noon, hindi nagawa ang hindi bababa sa dalawang nakaiskedyul na backup.",
         "backupSchedulerTrigger": "Gumawa ng backup ngayon",
         "backupSchedulerTriggering": "Gumagawa ng backup...",

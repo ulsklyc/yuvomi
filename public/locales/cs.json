@@ -2629,6 +2629,7 @@
         "backupSchedulerNever": "Ještě nebyla vytvořena žádná záloha",
         "backupSchedulerLastError": "Poslední chyba",
         "backupSchedulerLastAttempt": "Poslední pokus",
+        "backupSchedulerNextRun": "Příští záloha",
         "backupSchedulerOverdue": "Od té doby neproběhly nejméně dvě naplánované zálohy.",
         "backupSchedulerTrigger": "Vytvořit zálohu nyní",
         "backupSchedulerTriggering": "Vytváří se záloha...",

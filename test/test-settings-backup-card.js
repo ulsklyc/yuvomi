@@ -11,7 +11,10 @@
  *    der reinen Entscheidung dahinter (`backupSuccessOverdue`, "jetzt" als
  *    Parameter),
  *  - der Toast nach einem ausgelösten Lauf, der mit 200 und `success: false`
- *    antwortet.
+ *    antwortet,
+ *  - der Erfolgston an "Aktiv", der nur steht, solange nichts auf der Karte
+ *    warnt (`backupStatusTone`),
+ *  - die Zeile zum nächsten geplanten Lauf.
  *
  * Nichts hier liest den Quelltext des Blatts.
  *
@@ -63,7 +66,7 @@ class LiveElement extends MiniElement {
 }
 /** @type {any} */ (globalThis.document).createElement = (/** @type {string} */ tag) => new LiveElement(tag);
 
-const { backupErrorRow, backupSuccessOverdue, render } = await import('../public/settings/pages/admin-backup.js');
+const { backupErrorRow, backupStatusTone, backupSuccessOverdue, render } = await import('../public/settings/pages/admin-backup.js');
 const { cronScheduleIntervalMs } = await import('../public/settings/cron-label.js');
 const { dateTimeText } = await import('../public/utils/date-format.js');
 
@@ -226,6 +229,7 @@ test('nach einem Fehlschlag bleibt stehen, wann zuletzt ein Backup gelang', asyn
     'settings.backupSchedulerLastBackup',
     'settings.backupSchedulerLastAttempt',
     'settings.backupSchedulerLastError',
+    'settings.backupSchedulerNextRun',
   ]);
 
   const success = dateTimeText(state.lastSuccess);
@@ -250,6 +254,7 @@ test('nach einem Fehlschlag bleibt stehen, wann zuletzt ein Backup gelang', asyn
     'settings.backupSchedulerSchedule',
     'settings.backupSchedulerKeep',
     'settings.backupSchedulerLastBackup',
+    'settings.backupSchedulerNextRun',
   ]);
   const last = rowOf(healthy, 'settings.backupSchedulerLastBackup');
   assert.equal(last?.value, `settings.backupSchedulerLastSuccess${JSON.stringify({ date: dateTimeText(HEALTHY.lastSuccess) })}`);
@@ -364,6 +369,97 @@ test('noch nie gelungen nach einem Versuch: "noch kein Backup" im Warnton, ohne 
   const freshRow = rowOf(fresh, 'settings.backupSchedulerLastBackup');
   assert.equal(freshRow?.value, 'settings.backupSchedulerNever');
   assert.equal(freshRow?.valueClass, 'settings-info-value');
+});
+
+// ── Der Zeitplan in der Karte ────────────────────────────────────────────────
+
+test('ein Zeitplan über mehrere Wochentage steht als Ausdruck da und warnt nie über das Alter', async () => {
+  // `mon-fri` läuft an fünf Tagen: kein "Jeden Montag", und kein Abstand von
+  // sieben Tagen, an dem "überfällig" gemessen würde.
+  for (const schedule of ['0 2 * * mon-fri', '0 2 * * mon,wed,fri']) {
+    const old = { ...HEALTHY, schedule, lastSuccess: ago(400 * DAY), lastBackup: { timestamp: ago(400 * DAY), success: true } };
+    assert.equal(backupSuccessOverdue(old, NOW), false, schedule);
+    const info = await renderCard({ statuses: [old] });
+    assert.equal(rowOf(info, 'settings.backupSchedulerSchedule')?.value, schedule);
+    assert.equal(rowOf(info, 'settings.backupSchedulerLastBackup')?.valueClass, 'settings-info-value', schedule);
+  }
+
+  // Gegenprobe: ein einzelner Wochentag bleibt Klartext mit sieben Tagen Abstand.
+  const weekly = { ...HEALTHY, schedule: '0 2 * * mon' };
+  const info = await renderCard({ statuses: [weekly] });
+  assert.ok(rowOf(info, 'settings.backupSchedulerSchedule')?.value.startsWith('settings.backupSchedulerCronWeekly'));
+  assert.equal(cronScheduleIntervalMs(weekly.schedule), 7 * DAY);
+});
+
+// ── Der Ton an "Aktiv" ───────────────────────────────────────────────────────
+
+test('"Aktiv" trägt den Erfolgston nur, solange nichts auf der Karte warnt', async () => {
+  const silent = { ...HEALTHY, lastBackup: { timestamp: ago(5 * DAY), success: true }, lastSuccess: ago(5 * DAY) };
+  /** @type {[string, object, 'success' | null][]} */
+  const faelle = [
+    ['gesund', HEALTHY, 'success'],
+    ['vor dem ersten Lauf', { ...HEALTHY, lastBackup: null, lastSuccess: null }, 'success'],
+    // Ein alter Erfolg bei nicht erkanntem Zeitplan warnt nicht - dann bleibt auch das Grün.
+    ['nicht erkannter Zeitplan', { ...silent, schedule: '0 2,14 * * *' }, 'success'],
+    ['ein Fehlschlag nach einem Erfolg von gestern', failed(), null],
+    ['Fehlschlag, noch nie gelungen', failed({ successAgo: null }), null],
+    ['überfällig nach Fehlschlägen', failed({ attemptAgo: 8 * HOUR, successAgo: 5 * DAY }), null],
+    ['überfällig ohne Fehlschlag', silent, null],
+    // Nur `lastError` gesetzt: die Fehlerzeile steht, also kein Grün daneben.
+    ['Fehler ohne `lastBackup`', { ...HEALTHY, lastBackup: null, lastError: failed().lastError }, null],
+  ];
+  for (const [name, state, tone] of faelle) {
+    assert.equal(backupStatusTone(state, NOW), tone, name);
+
+    // Die Karte setzt, was die Entscheidung sagt - und der Text bleibt "Aktiv":
+    // der Zeitplan läuft ja.
+    const row = rowOf(await renderCard({ statuses: [state] }), 'settings.backupSchedulerStatus');
+    assert.equal(row?.value, 'settings.backupSchedulerEnabled', name);
+    assert.equal(
+      row?.valueClass,
+      tone ? 'settings-info-value settings-info-value--success' : 'settings-info-value',
+      name,
+    );
+  }
+});
+
+test('ein abgeschalteter Zeitplan steht ohne Ton da, was auch immer zuletzt war', async () => {
+  for (const state of [{ ...HEALTHY, enabled: false }, { ...failed(), enabled: false }]) {
+    assert.equal(backupStatusTone(state, NOW), null);
+    const row = rowOf(await renderCard({ statuses: [state] }), 'settings.backupSchedulerStatus');
+    assert.equal(row?.value, 'settings.backupSchedulerDisabled');
+    assert.equal(row?.valueClass, 'settings-info-value');
+  }
+});
+
+// ── Der nächste geplante Lauf ────────────────────────────────────────────────
+
+test('die Karte nennt den nächsten geplanten Lauf, nach einem Fehlschlag gleich unter dem Fehler', async () => {
+  const next = dateTimeText(HEALTHY.nextRun);
+  assert.notEqual(next, dateTimeText(HEALTHY.lastSuccess), 'Vorbedingung: nächster Lauf und letzter Erfolg sehen verschieden aus');
+
+  const healthy = await renderCard({ statuses: [HEALTHY] });
+  assert.equal(rowOf(healthy, 'settings.backupSchedulerNextRun')?.value, next);
+  // Ein Zeitpunkt, kein Befund: ohne Ton.
+  assert.equal(rowOf(healthy, 'settings.backupSchedulerNextRun')?.valueClass, 'settings-info-value');
+  assert.equal(labelsOf(healthy).at(-1), 'settings.backupSchedulerNextRun', 'Vergangenes zuerst, der nächste Lauf am Ende');
+
+  // "Wann versucht er es wieder" ist die Frage nach dem Fehler.
+  const afterFailure = await renderCard({ statuses: [failed()] });
+  assert.deepEqual(labelsOf(afterFailure).slice(-2), ['settings.backupSchedulerLastError', 'settings.backupSchedulerNextRun']);
+  assert.equal(rowOf(afterFailure, 'settings.backupSchedulerNextRun')?.value, next);
+});
+
+test('ohne Zeitpunkt und ohne aktiven Zeitplan gibt es keine Zeile zum nächsten Lauf', async () => {
+  // `nextRun` ist null, solange kein Zeitplan läuft; ein unlesbarer Wert ist
+  // keine Auskunft und darf nicht als leere Zeile dastehen.
+  for (const nextRun of [null, undefined, '', 'kein Datum']) {
+    const info = await renderCard({ statuses: [{ ...HEALTHY, nextRun }] });
+    assert.ok(!labelsOf(info).includes('settings.backupSchedulerNextRun'), JSON.stringify(nextRun));
+    assert.ok(labelsOf(info).includes('settings.backupSchedulerLastBackup'), 'die übrigen Zeilen bleiben');
+  }
+  const disabled = await renderCard({ statuses: [{ ...HEALTHY, enabled: false }] });
+  assert.deepEqual(labelsOf(disabled), ['settings.backupSchedulerStatus']);
 });
 
 // ── "Jetzt Backup erstellen" ─────────────────────────────────────────────────

@@ -2714,6 +2714,7 @@
         "backupSchedulerNever": "لم تُنشأ أي نسخة احتياطية بعد",
         "backupSchedulerLastError": "آخر خطأ",
         "backupSchedulerLastAttempt": "آخر محاولة",
+        "backupSchedulerNextRun": "النسخة الاحتياطية التالية",
         "backupSchedulerOverdue": "منذ ذلك الحين فاتت نسختان احتياطيتان مجدولتان على الأقل.",
         "backupSchedulerSchedule": "الجدول الزمني",
         "backupSchedulerCronDaily": "يوميًا في {{time}}",

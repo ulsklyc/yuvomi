@@ -2431,6 +2431,7 @@
         "backupSchedulerNever": "バックアップはまだ作成されていません",
         "backupSchedulerLastError": "最終エラー",
         "backupSchedulerLastAttempt": "最後の試行",
+        "backupSchedulerNextRun": "次回のバックアップ",
         "backupSchedulerOverdue": "それ以降、スケジュールされたバックアップが少なくとも2回作成されていません。",
         "backupSchedulerSchedule": "スケジュール",
         "backupSchedulerCronDaily": "毎日 {{time}}",
