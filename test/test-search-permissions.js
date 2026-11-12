@@ -455,6 +455,56 @@ test('Die Suchoberflaeche kennt genau die Trefferarten der Antwort, jede mit Sie
 });
 
 // --------------------------------------------------------------------------
+// The row axis. The search answers with the rows the list of the same type
+// answers with (test:visibility-matrix holds every role; this is the plain
+// statement per level). Markers of their own, so the fourteen-bucket
+// precondition above keeps its exact count.
+// --------------------------------------------------------------------------
+test('Task search follows the task list: all, creator, assignment rows - never the legacy column', async () => {
+  clearModuleDenials(KID);
+  const marker = 'Zeilenprobe';
+  const insert = db.prepare(`
+    INSERT INTO tasks (title, priority, status, visibility, created_by, assigned_to)
+    VALUES (?, 'medium', 'open', ?, ?, ?)
+  `);
+  const assign = db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)');
+  insert.run(`${marker} fremd alle`, 'all', PARENT, null);
+  assign.run(insert.run(`${marker} fremd zugewiesen`, 'assignees', PARENT, null).lastInsertRowid, KID);
+  insert.run(`${marker} fremd zugewiesen ohne mich`, 'assignees', PARENT, null);
+  // Only the legacy column names the kid: no assignment row, private.
+  insert.run(`${marker} fremd privat altspalte`, 'private', PARENT, KID);
+  // The same for `assignees`: the legacy column is no assignment row.
+  insert.run(`${marker} fremd zugewiesen altspalte`, 'assignees', PARENT, KID);
+  insert.run(`${marker} eigen privat`, 'private', KID, null);
+
+  const titleOf = (/** @type {{ title: string }} */ row) => row.title;
+  const titles = (await searchAs(KID, marker)).tasks.map(titleOf).sort();
+  assert.deepEqual(titles, [
+    `${marker} eigen privat`,
+    `${marker} fremd alle`,
+    `${marker} fremd zugewiesen`,
+  ], 'what GET /tasks shows the kid, nothing else');
+});
+
+test('Note search follows the note list: all notes of anyone, private ones only of the viewer', async () => {
+  clearModuleDenials(KID);
+  const marker = 'Zettelprobe';
+  const insert = db.prepare('INSERT INTO notes (title, content, visibility, created_by) VALUES (?, ?, ?, ?)');
+  insert.run(`${marker} fremd alle`, 'Text', 'all', PARENT);
+  insert.run(`${marker} fremd privat`, 'Text', 'private', PARENT);
+  insert.run(`${marker} eigen alle`, 'Text', 'all', KID);
+  insert.run(`${marker} eigen privat`, 'Text', 'private', KID);
+
+  const titleOf = (/** @type {{ title: string }} */ row) => row.title;
+  const titles = (await searchAs(KID, marker)).notes.map(titleOf).sort();
+  assert.deepEqual(titles, [
+    `${marker} eigen alle`,
+    `${marker} eigen privat`,
+    `${marker} fremd alle`,
+  ], 'what GET /notes shows the kid, nothing else');
+});
+
+// --------------------------------------------------------------------------
 // The row axis for Health. The search answers with the rows the health lists
 // answer with (GET /health/medications, GET /health/activities): the viewer's
 // own, `family` rows, and every row of a person whose care an admin has

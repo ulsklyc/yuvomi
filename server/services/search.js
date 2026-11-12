@@ -444,13 +444,17 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   const results = emptySearchResults();
   const allows = bucketFilter({ hiddenModules, disabledNav });
 
+  // The row rule of the task list (GET /tasks): `all`, the creator, and for
+  // `assignees` a row in task_assignments. The legacy column `assigned_to` is
+  // no access path: a private task that only names someone there stays with
+  // its creator.
   if (allows('tasks')) results.tasks = database.prepare(`
     SELECT t.id, t.title, t.status, t.priority, t.due_date, s.body AS _body
     FROM search_index s
     JOIN tasks t ON t.id = s.entity_id
     WHERE s.entity = 'task' AND s.search_index MATCH @match
       AND t.parent_task_id IS NULL
-      AND (t.created_by = @userId OR t.assigned_to = @userId)
+      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@userId')}
     ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
              t.due_date ASC NULLS LAST
     LIMIT @limit
@@ -515,15 +519,14 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     }, q, [event.description, event.location]));
   }
 
+  // The row rule of the note list (GET /notes, #1514): `all` notes of anyone
+  // and the viewer's own. Nothing narrower, nothing wider - a note the list
+  // shows is a note the search finds.
   if (allows('notes')) results.notes = database.prepare(`
     SELECT n.id, n.title, n.content
     FROM search_index s
     JOIN notes n ON n.id = s.entity_id
     WHERE s.entity = 'note' AND s.search_index MATCH @match
-      AND n.created_by = @userId
-      -- Die Sichtbarkeitsregel (#1514) steht auch hier, obwohl die Suche heute
-      -- nur eigene Notizen findet: wer die engere Klausel loest, soll die
-      -- private Notiz eines anderen nicht mit freigeben.
       AND ${noteVisibleWhere('n', '@userId')}
     ORDER BY n.pinned DESC, n.updated_at DESC
     LIMIT @limit

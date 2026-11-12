@@ -68,8 +68,10 @@ db.prepare(`INSERT INTO tasks (title, description, priority, status, created_by)
   VALUES ('Buy birthday cake', 'chocolate sponge', 'high', 'open', ?)`).run(uid);
 db.prepare(`INSERT INTO tasks (title, description, priority, status, created_by)
   VALUES ('Mow the lawn', 'garden chores', 'low', 'open', ?)`).run(uid);
-db.prepare(`INSERT INTO tasks (title, description, priority, status, created_by)
-  VALUES ('Secret cake plan', 'hidden', 'low', 'open', ?)`).run(otherUid);
+// Private: the task search follows the task list, and another person's `all`
+// task is a hit there. What stays out is what the list keeps out.
+db.prepare(`INSERT INTO tasks (title, description, priority, status, visibility, created_by)
+  VALUES ('Secret cake plan', 'hidden', 'low', 'open', 'private', ?)`).run(otherUid);
 
 const list = db.prepare(`INSERT INTO shopping_lists (name, created_by) VALUES ('Groceries', ?)`).run(uid);
 db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'cake mix')`).run(list.lastInsertRowid);
@@ -147,7 +149,7 @@ test('Suche respektiert Besitzer-Filter bei Aufgaben', () => {
   const r = runSearch(db, 'cake', uid);
   const titles = r.tasks.map((t) => t.title);
   assert(titles.includes('Buy birthday cake'), 'Eigene Aufgabe gefunden');
-  assert(!titles.includes('Secret cake plan'), 'Fremde Aufgabe ausgeschlossen');
+  assert(!titles.includes('Secret cake plan'), 'Fremde private Aufgabe ausgeschlossen');
 });
 
 test('Suche deckt alle Entitäten ab', () => {
@@ -545,8 +547,8 @@ test('Leere/kurze Query liefert leere Ergebnisse', () => {
 // --------------------------------------------------------------------------
 db.prepare(`INSERT INTO tasks (title, priority, status, created_by)
   VALUES ('Vollmilch holen', 'low', 'open', ?)`).run(uid);
-db.prepare(`INSERT INTO tasks (title, priority, status, created_by)
-  VALUES ('Fremde Hafermilch', 'low', 'open', ?)`).run(otherUid);
+db.prepare(`INSERT INTO tasks (title, priority, status, visibility, created_by)
+  VALUES ('Fremde Hafermilch', 'low', 'open', 'private', ?)`).run(otherUid);
 db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'Tiefkühlerbsen')`).run(list.lastInsertRowid);
 db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'Gießkanne')`).run(list.lastInsertRowid);
 
