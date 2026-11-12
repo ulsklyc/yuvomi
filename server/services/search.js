@@ -448,14 +448,19 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   // `assignees` a row in task_assignments. The legacy column `assigned_to` is
   // no access path: a private task that only names someone there stays with
   // its creator.
+  // The archive is a wish of the viewer at the list, no limit of what the list
+  // may hold (services/task-scope.js): an archived task stays a hit, as does
+  // one that starts later. It says so (`archived`) and stands last.
   if (allows('tasks')) results.tasks = database.prepare(`
-    SELECT t.id, t.title, t.status, t.priority, t.due_date, s.body AS _body
+    SELECT t.id, t.title, t.status, t.priority, t.due_date,
+           t.archived_at IS NOT NULL AS archived, s.body AS _body
     FROM search_index s
     JOIN tasks t ON t.id = s.entity_id
     WHERE s.entity = 'task' AND s.search_index MATCH @match
       AND t.parent_task_id IS NULL
       AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@userId')}
-    ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
+    ORDER BY t.archived_at IS NOT NULL,
+             CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
              t.due_date ASC NULLS LAST
     LIMIT @limit
   `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row._body]));

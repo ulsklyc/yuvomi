@@ -706,6 +706,31 @@ test('Tabellensuche: gesperrte Module und abgeschaltete Eintraege bleiben leer',
   assert(d.birthdays.length === 0, 'Geburtstage abgeschaltet');
 });
 
+// --------------------------------------------------------------------------
+// The archive axis. The search finds what the list reaches in any filter
+// state, so an archived task stays a hit - but it says so and stands last,
+// behind the done ones.
+// --------------------------------------------------------------------------
+test('Task search finds an archived task, flags it and ranks it last', () => {
+  const insert = db.prepare(`
+    INSERT INTO tasks (title, priority, status, due_date, archived_at, created_by)
+    VALUES (?, 'low', ?, ?, ?, ?)
+  `);
+  insert.run('Ablageprobe archiviert', 'open', '2026-01-01', '2026-02-01T10:00:00Z', uid);
+  insert.run('Ablageprobe erledigt', 'done', '2026-01-02', null, uid);
+  insert.run('Ablageprobe offen', 'open', '2026-01-03', null, uid);
+
+  /** @type {{ title: string, archived: number }[]} */
+  const hits = runSearch(db, 'Ablageprobe', Number(uid)).tasks;
+  const got = JSON.stringify(hits.map((t) => [t.title, t.archived]));
+  const want = JSON.stringify([
+    ['Ablageprobe offen', 0],
+    ['Ablageprobe erledigt', 0],
+    ['Ablageprobe archiviert', 1],
+  ]);
+  assert(got === want, `Reihenfolge und Kennzeichen: ${got}`);
+});
+
 full.close();
 
 console.log(`\n[Search-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

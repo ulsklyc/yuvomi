@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own entries and the ones shared with the family. It now applies the rule of the Health
   pages. Nothing else changes - without a care grant nobody finds another person's private
   entry, an admin included.
+- **An archived task says so in the search results.** The global search finds archived tasks,
+  so that a task you put away can be found again - but the hit looked like any open task. It
+  now reads "Archived" before the due date and stands at the end of the task hits, after the
+  done ones.
 
 ### Security
 - **The global search no longer finds a private task of someone else.** A task set to "only
