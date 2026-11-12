@@ -27,14 +27,13 @@
  * test:authorize-actor holds this in a child process.
  *
  * Dependencies: server/logger.js, server/middleware/require-admin.js,
- *   server/permissions.js, server/split-guest-scope.js (none of them loads db.js).
+ *   server/permissions.js (none of them loads db.js).
  * Erasable TS syntax only (runs through type stripping, no build).
  */
 
 import { createLogger } from '../logger.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { buildSessionModuleAccess, resolvePermissions, userForRequest } from '../permissions.js';
-import { isSplitGuestAccount } from '../split-guest-scope.js';
 
 // The logger of server/auth.js: the resolution moved, its log line did not change.
 const log = createLogger('Auth');
@@ -57,6 +56,13 @@ type Actor = Readonly<{
   /** null = unrestricted (admin, or nothing restricted). */
   moduleAccess: ModuleAccess | null;
   deviceId: number | null;
+  /**
+   * A lookup that decides the kind failed, the two lookups contradict each other
+   * (a split guest that is also a display), or the request carries no account /
+   * never passed requireAuth. A caller that must fail closed treats it as closed.
+   * Always false for actorForUser() and householdAudience().
+   */
+  unresolved: boolean;
 }>;
 
 /** The fields requireAuth sets on a request; nothing else is read here. */
@@ -127,6 +133,25 @@ export function resolveRequestModuleAccess(database: Database, req: Authenticate
   }
 }
 
+type Lookup = 'yes' | 'no' | 'failed';
+
+/**
+ * A split guest? `failed` when the lookup throws.
+ *
+ * The table belongs to auth (server/table-owners.ts). isSplitGuestAccount()
+ * (server/split-guest-scope.js) asks the same question for the auth router, which
+ * runs before requireAuth; it answers a failure with `true` and cannot tell it
+ * apart, and the actor needs the third state for `unresolved`.
+ */
+function guestLookup(database: Database, userId: number): Lookup {
+  try {
+    return database.prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(userId) ? 'yes' : 'no';
+  } catch (err) {
+    log.error('Split-guest lookup failed:', (err as Error).message);
+    return 'failed';
+  }
+}
+
 /**
  * A display account? `failed` when the lookup throws.
  *
@@ -135,7 +160,7 @@ export function resolveRequestModuleAccess(database: Database, req: Authenticate
  * asked here with the request's own connection, so this module does not load
  * db.js (see the header).
  */
-function displayAccountLookup(database: Database, userId: number): 'yes' | 'no' | 'failed' {
+function displayAccountLookup(database: Database, userId: number): Lookup {
   try {
     return database.prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(userId) ? 'yes' : 'no';
   } catch (err) {
@@ -145,42 +170,49 @@ function displayAccountLookup(database: Database, userId: number): 'yes' | 'no' 
 }
 
 /**
- * The narrowest kind that applies. Both lookups always run (split guest first,
- * then display account), except for the display cookie, which needs neither:
+ * The kind of a request, and whether it is `unresolved`.
  *
- *   1. display cookie                                 -> display
- *   2. display-account lookup says yes                -> display
- *   3. guest lookup says yes OR fails                 -> guest
- *   4. display-account lookup failed                  -> display
- *   5. api token                                      -> token
- *   6. otherwise                                      -> session
+ *   1. guest lookup (always, also for the display cookie): yes or failed -> guest
+ *   2. display cookie                                                     -> display
+ *   3. display-account lookup (not for the cookie): yes or failed        -> display
+ *   4. api token                                                          -> token
+ *   5. otherwise                                                          -> session
  *
- * So the /api/v1 guest gate closes on a guest or a failed guest lookup, as before
- * B1, and /mcp closes a display account entirely even when the guest lookup fails.
- * ONE CASE DIFFERS FROM BEFORE B1: the display lookup fails AND the account is a
- * guest. /mcp then closed every tool; now the account is a guest, and the three
- * bridge tools stay open - they call back into /api/v1, whose guest gate refuses
- * everything outside /split-expenses.
+ * The display-account lookup runs for a guest as well, so that its failure is
+ * seen. `unresolved` is true when a lookup failed, and when a guest is also a
+ * display (cookie or display row) - a row that cannot exist by construction.
+ * No account id, or no connection (requireAuth did not run): `display`,
+ * unresolved, without a lookup.
  *
- * NO ACCOUNT ID, OR NO CONNECTION (requireAuth did not run), READS AS `display`,
- * without a lookup. For a missing id the two callers answered differently before
- * B1 and still do: the /api/v1 guest gate let such a request through
- * (isSplitGuestAccount says false on null), /mcp closed every tool (its own
- * lookups said true for guest and display alike, and display closes everything).
- * `display` is the one kind that keeps both answers: it is not `guest`, and
- * toolAllowed() refuses a display every tool.
+ * THE TWO CALLERS READ IT LIKE THIS, AND GIVE THE ANSWERS THEY GAVE BEFORE B1:
+ *   - the /api/v1 guest gate (server/index.js) closes on `kind === 'guest'`:
+ *     guest lookup yes or failed, whatever the display side says; no account id
+ *     stays open (isSplitGuestAccount said false on null);
+ *   - /mcp (toolAllowed in server/mcp/tools.js) closes every tool on `display`
+ *     or `unresolved`, and the core tools on `guest`: every tool closed for the
+ *     display cookie, a display row, a failed display lookup or no account id;
+ *     otherwise the core tools closed for a guest.
+ * test:authorize-actor holds every combination against both old rules.
+ *
+ * WHERE IT DIFFERS FROM BEFORE B1 (only under a read error, or for a request that
+ * never passed requireAuth - both callers sit behind it):
+ *   a. guest lookup failed, display lookup no: /mcp closed the core tools and left
+ *      the three bridge tools open; now every tool is closed. Narrower, and the
+ *      bridge would have been refused at the guest gate anyway.
+ *   c. an account id without a requireAuth entry: no lookup can run. /mcp closes
+ *      every tool; the guest gate stays open for it, also for an account that is
+ *      a guest (logged as an error in actorFromRequest).
  */
-function kindOf(req: AuthenticatedRequest, userId: number | null): ActorKind {
-  if (req.authMethod === 'display') return 'display';
+function kindOf(req: AuthenticatedRequest, userId: number | null): { kind: ActorKind; unresolved: boolean } {
   const entry = requests.get(req);
-  if (userId == null || !entry) return 'display';
-  const guest = isSplitGuestAccount(entry.database, userId);
-  const display = displayAccountLookup(entry.database, userId);
-  if (display === 'yes') return 'display';
-  if (guest) return 'guest';
-  if (display === 'failed') return 'display';
-  if (req.authMethod === 'api_token') return 'token';
-  return 'session';
+  if (userId == null || !entry) return { kind: 'display', unresolved: true };
+  const cookie = req.authMethod === 'display';
+  const guest = guestLookup(entry.database, userId);
+  const display: Lookup = cookie ? 'yes' : displayAccountLookup(entry.database, userId);
+  const unresolved = guest === 'failed' || display === 'failed' || (guest === 'yes' && display === 'yes');
+  if (guest !== 'no') return { kind: 'guest', unresolved };
+  if (display !== 'no') return { kind: 'display', unresolved };
+  return { kind: req.authMethod === 'api_token' ? 'token' : 'session', unresolved };
 }
 
 /**
@@ -192,14 +224,19 @@ export function actorFromRequest(req: AuthenticatedRequest): Actor {
   const known = actors.get(req);
   if (known) return known;
   const userId = req.authUserId ?? null;
+  if (userId != null && !requests.has(req)) {
+    log.error('actorFromRequest called before requireAuth: the actor stays closed (display, unresolved).');
+  }
+  const { kind, unresolved } = kindOf(req, userId);
   const actor: Actor = Object.freeze({
-    kind: kindOf(req, userId),
+    kind,
     userId,
     role: roleOf(req.authRole),
     familyRole: requests.get(req)?.familyRole ?? null,
     scopes: req.authScopes ?? null,
     moduleAccess: req.sessionModuleAccess ?? null,
     deviceId: req.authDeviceId ?? null,
+    unresolved,
   });
   actors.set(req, actor);
   return actor;
@@ -230,6 +267,7 @@ export function actorForUser(database: Database, userId: number | null | undefin
     scopes: null,
     moduleAccess: buildSessionModuleAccess(resolvePermissions(database, user)),
     deviceId: null,
+    unresolved: false,
   });
 }
 
@@ -241,6 +279,7 @@ const HOUSEHOLD: Actor = Object.freeze({
   scopes: null,
   moduleAccess: null,
   deviceId: null,
+  unresolved: false,
 });
 
 /** The household as a whole: no account, no role, no rights of its own. */

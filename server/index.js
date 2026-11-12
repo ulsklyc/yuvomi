@@ -726,8 +726,10 @@ app.use('/api/v1', trackAdmittedWrite);
 app.use('/api/v1/changelog', changelogRouter);
 app.use('/api/v1', (req, res, next) => {
   try {
-    // Die Art des Akteurs entscheidet (server/authorize/, Phase 2 B1): ein
-    // Lesefehler zaehlt dort als Gast, ein Konto ohne id nicht - wie zuvor hier.
+    // Die Art des Akteurs entscheidet (server/authorize/, Phase 2 B1): `guest`
+    // heisst Gast-Abfrage ja oder fehlgeschlagen, gleich was die Display-Seite
+    // sagt, auch beim Display-Cookie; ein Konto ohne id ist kein Gast - wie
+    // zuvor hier mit isSplitGuestAccount.
     if (actorFromRequest(req).kind !== 'guest') return next();
     // Die Liste steht in server/split-guest-scope.js, weil der Auth-Router sie
     // ebenso fragt (GHSA-q7gc-2cc9-w8fj): er haengt vor diesem Gate, eine

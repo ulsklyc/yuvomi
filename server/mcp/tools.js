@@ -793,7 +793,7 @@ const TOOL_MAP = new Map(ALL_TOOLS.map((t) => [t.name, t]));
  * Guest-Guard vom echten Middleware-Stapel. Ausnahme sind Split-Guests, die
  * gar keinen Haushaltszugriff haben — für sie sind alle Kern-Tools zu.
  *
- * @param {{ kind?: string, userId?: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null }|null} actor
+ * @param {{ kind?: string, userId?: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }|null} actor
  * @param {{ scope?: { module: string, access: 'read'|'write' } }} tool
  * @returns {boolean}
  */
@@ -818,7 +818,9 @@ function toolAllowed(actor, tool) {
   // OFFEN UND NICHT HIER ENTSCHIEDEN: dass ein Gast ueber die beiden anderen
   // den vollstaendigen OpenAPI-Katalog liest, obwohl `/openapi.json` ueber REST
   // administratorgesperrt ist. Das ist ein eigener Befund, aelter als #1208.
-  if (actor && actor.kind === 'display') return false;
+  // `unresolved`: a lookup that decides the kind failed or contradicts the other
+  // (server/authorize/) - closed like a display, as the old lookups said true then.
+  if (actor && (actor.kind === 'display' || actor.unresolved)) return false;
   if (!tool.scope) return true;
   // Gast-Konten für geteilte Ausgaben erreichen unter /api/v1 nur
   // /split-expenses; kein Kern-Tool liegt dort, also alle gesperrt.
@@ -833,7 +835,7 @@ function toolAllowed(actor, tool) {
 /**
  * Tool-Definitionen für `tools/list`, gefiltert auf das, was der Akteur wirklich
  * aufrufen darf — ein LLM sieht kein Tool, das ihm der nächste Aufruf verweigert.
- * @param {{ kind?: string, userId?: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null }|null} actor
+ * @param {{ kind?: string, userId?: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }|null} actor
  * @returns {Array<{ name: string, description: string, inputSchema: object }>}
  */
 function listToolDefinitions(actor = null) {
@@ -844,7 +846,7 @@ function listToolDefinitions(actor = null) {
 
 /**
  * Führt ein Tool aus.
- * @param {{ db: object, actor: { kind?: string, userId: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null }, requestHeaders?: object }} ctx
+ * @param {{ db: object, actor: { kind?: string, userId: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }, requestHeaders?: object }} ctx
  * @param {string} name  - Tool-Name
  * @param {object} args  - Tool-Argumente
  * @returns {Promise<any>} rohes Ergebnis (wird vom Protokoll-Layer serialisiert)

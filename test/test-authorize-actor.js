@@ -46,6 +46,7 @@ process.env.LOG_LEVEL = 'error';
 const { get } = await import('../server/db.js');
 const { actorFromRequest, actorForUser, householdAudience, resolveRequestModuleAccess } = await import('../server/authorize/index.ts');
 const { requireAuth } = await import('../server/auth.js');
+const { listToolDefinitions } = await import('../server/mcp/tools.js');
 
 const db = get();
 test.after(() => db.close());
@@ -64,7 +65,7 @@ const MEMBER = seedUser('member', 'parent');
 const KID = seedUser('member', 'child');
 const GUEST = seedUser('member');
 const DISPLAY = seedUser('member');
-const BOTH = seedUser('member'); // guest row AND display row: the display row wins
+const BOTH = seedUser('member'); // guest row AND display row: a guest, unresolved
 
 const groupId = db.prepare('INSERT INTO expense_groups (name, created_by) VALUES (?, ?)').run('Trip', ADMIN).lastInsertRowid;
 for (const id of [GUEST, BOTH]) {
@@ -147,87 +148,176 @@ function withTableMissing(table, fn) {
 // The order of `kind`
 // --------------------------------------------------------------------------
 
-test('kind 1: the display cookie is a display, without either lookup', () => {
+test('kind: the guest lookup runs first, also for the display cookie; the display lookup never for it', () => {
   for (const id of [DISPLAY, GUEST, MEMBER]) {
     const req = displayReq(id);
-    const { result, queries } = countQueries(() => actorFromRequest(req));
-    assert.equal(result.kind, 'display');
-    assert.deepEqual(queries, []);
+    const { queries } = countQueries(() => actorFromRequest(req));
+    assert.equal(queries.length, 1, `cookie, user ${id}`);
+    assert.match(queries[0], /split_expense_guest_users/);
   }
-});
-
-test('kind 2: a display account is a display, by token or session, even with a guest row', () => {
-  assert.equal(actorFromRequest(tokenReq(DISPLAY)).kind, 'display');
-  assert.equal(actorFromRequest(sessionReq(DISPLAY)).kind, 'display');
-  assert.equal(actorFromRequest(tokenReq(BOTH)).kind, 'display');
-});
-
-test('kind 2: a display account stays a display when the guest lookup fails', () => {
-  const req = tokenReq(DISPLAY);
-  const actor = withTableMissing('split_expense_guest_users', () => actorFromRequest(req));
-  assert.equal(actor.kind, 'display');
-});
-
-test('kind 3: a split guest is a guest, by session and by token', () => {
-  assert.equal(actorFromRequest(sessionReq(GUEST)).kind, 'guest');
-  assert.equal(actorFromRequest(tokenReq(GUEST)).kind, 'guest');
-});
-
-test('kind 3: a failed guest lookup counts as a guest', () => {
-  const req = tokenReq(MEMBER);
-  const actor = withTableMissing('split_expense_guest_users', () => actorFromRequest(req));
-  assert.equal(actor.kind, 'guest');
-});
-
-test('kind 3: a guest whose display lookup fails is a guest (the one change from before B1)', () => {
-  // Before B1 /mcp closed every tool here (its display lookup said true on a
-  // failure); now the three bridge tools stay open, and they call back into
-  // /api/v1, whose guest gate refuses everything outside /split-expenses.
-  const req = tokenReq(GUEST);
-  const actor = withTableMissing('display_accounts', () => actorFromRequest(req));
-  assert.equal(actor.kind, 'guest');
-});
-
-test('kind 4: a failed display lookup counts as a display', () => {
-  const req = tokenReq(MEMBER);
-  const actor = withTableMissing('display_accounts', () => actorFromRequest(req));
-  assert.equal(actor.kind, 'display');
-});
-
-test('kind 5 and 6: a plain token is a token, a plain session a session', () => {
-  assert.equal(actorFromRequest(tokenReq(MEMBER)).kind, 'token');
-  assert.equal(actorFromRequest(sessionReq(MEMBER)).kind, 'session');
-  assert.equal(actorFromRequest(sessionReq(ADMIN, 'admin')).kind, 'session');
-  assert.equal(actorFromRequest(tokenReq(ADMIN, 'admin')).kind, 'token');
-});
-
-test('both lookups always run, guest first, on the connection requireAuth handed in', () => {
-  for (const id of [GUEST, MEMBER, DISPLAY]) {
+  for (const id of [GUEST, MEMBER, DISPLAY, BOTH]) {
     const req = sessionReq(id);
     const { queries } = countQueries(() => actorFromRequest(req));
-    assert.equal(queries.length, 2, `user ${id}`);
+    assert.equal(queries.length, 2, `session, user ${id}`);
     assert.match(queries[0], /split_expense_guest_users/);
     assert.match(queries[1], /display_accounts/);
   }
 });
 
-test('a missing user id reads as a display, without a query', () => {
-  // Today the /api/v1 guest gate lets such a request through (isSplitGuestAccount
-  // says false on null) and /mcp closes every tool (its own lookups said true for
-  // both). `display` is the one kind that keeps both answers.
+test('kind: guest, display cookie, display account, token, session', () => {
+  /** @param {Req} req */
+  const of = (req) => { const a = actorFromRequest(req); return `${a.kind}${a.unresolved ? '/unresolved' : ''}`; };
+  assert.equal(of(sessionReq(GUEST)), 'guest');
+  assert.equal(of(tokenReq(GUEST)), 'guest');
+  assert.equal(of(displayReq(GUEST)), 'guest/unresolved', 'a guest behind the display cookie contradicts itself');
+  assert.equal(of(tokenReq(BOTH)), 'guest/unresolved', 'a guest with a display row contradicts itself');
+  assert.equal(of(displayReq(DISPLAY)), 'display');
+  assert.equal(of(displayReq(MEMBER)), 'display');
+  assert.equal(of(tokenReq(DISPLAY)), 'display');
+  assert.equal(of(sessionReq(DISPLAY)), 'display');
+  assert.equal(of(tokenReq(MEMBER)), 'token');
+  assert.equal(of(sessionReq(MEMBER)), 'session');
+  assert.equal(of(sessionReq(ADMIN, 'admin')), 'session');
+  assert.equal(of(tokenReq(ADMIN, 'admin')), 'token');
+});
+
+test('a missing user id reads as a display, unresolved, without a query', () => {
   const req = tokenReq(null);
   const { result, queries } = countQueries(() => actorFromRequest(req));
   assert.equal(result.kind, 'display');
+  assert.equal(result.unresolved, true);
   assert.equal(result.userId, null);
   assert.equal(queries.length, 0);
 });
 
-test('a request requireAuth never saw reads as a display, without a query', () => {
+test('a request requireAuth never saw reads as a display, unresolved, without a query', () => {
   /** @type {Req} */
   const req = { authMethod: 'api_token', authUserId: MEMBER, authRole: 'member', authScopes: null };
   const { result, queries } = countQueries(() => actorFromRequest(req));
   assert.equal(result.kind, 'display');
+  assert.equal(result.unresolved, true);
   assert.equal(queries.length, 0);
+});
+
+// --------------------------------------------------------------------------
+// Every combination against the two old rules
+// --------------------------------------------------------------------------
+
+/*
+ * THE TWO ANSWERS BEFORE B1, written out as they were decided, not derived from
+ * the new code:
+ *   - the /api/v1 guest gate (server/index.js) closed exactly when the guest
+ *     lookup said yes or failed (isSplitGuestAccount), whatever the display side,
+ *     also for the display cookie; no account id: open.
+ *   - /mcp (server/mcp/server.js) closed every tool for the display cookie, a
+ *     display lookup that said yes or failed, or no account id; otherwise it
+ *     closed the core tools for a guest lookup that said yes or failed.
+ */
+/** @typedef {'yes'|'no'|'failed'} Lookup */
+/** @param {{ guest: Lookup, display: Lookup, cookie: boolean, noUser?: boolean }} c */
+function oldGateClosed({ guest, noUser }) {
+  return !noUser && guest !== 'no';
+}
+/** @param {{ guest: Lookup, display: Lookup, cookie: boolean, noUser?: boolean }} c */
+function oldMcp({ guest, display, cookie, noUser }) {
+  if (cookie || display !== 'no' || noUser) return 'all_closed';
+  return guest !== 'no' ? 'core_closed' : 'open';
+}
+
+/** What the new code answers, through the real gate predicate and the real toolAllowed. */
+/** @param {ReturnType<typeof actorFromRequest>} actor */
+function newGateClosed(actor) { return actor.kind === 'guest'; }
+/** @param {ReturnType<typeof actorFromRequest>} actor */
+function newMcp(actor) {
+  const names = listToolDefinitions(actor).map((/** @type {{ name: string }} */ t) => t.name);
+  const bridge = names.includes('call_api_operation');
+  const core = names.includes('list_tasks');
+  if (!bridge && !core) return 'all_closed';
+  if (bridge && !core) return 'core_closed';
+  if (bridge && core) return 'open';
+  return 'core_only';
+}
+
+/**
+ * The differences that are allowed, by name. Every other difference fails.
+ *   a. guest lookup failed, display lookup no: /mcp left the bridge open (as for a
+ *      guest), now every tool is closed - narrower, and the bridge would be refused
+ *      at the guest gate anyway.
+ */
+/** @param {{ guest: Lookup, display: Lookup, cookie: boolean }} c @param {string} where */
+function allowedDifference(c, where) {
+  if (where === 'mcp' && c.guest === 'failed' && c.display === 'no' && !c.cookie) return 'a';
+  return null;
+}
+
+/** Account for a guest/display state: a row exists exactly when the state is `yes`. */
+/** @param {Lookup} guest @param {Lookup} display */
+function accountFor(guest, display) {
+  if (guest === 'yes') return display === 'yes' ? BOTH : GUEST;
+  return display === 'yes' ? DISPLAY : MEMBER;
+}
+
+/**
+ * Runs `fn` with the lookups that should fail made to fail, by renaming the table
+ * away - the real query fails, nothing under test is replaced.
+ * @template T @param {Lookup} guest @param {Lookup} display @param {() => T} fn @returns {T}
+ */
+function withLookups(guest, display, fn) {
+  const inner = display === 'failed' ? () => withTableMissing('display_accounts', fn) : fn;
+  return guest === 'failed' ? withTableMissing('split_expense_guest_users', inner) : inner();
+}
+
+test('every combination gives the old gate answer and the old /mcp answer, apart from the named differences', () => {
+  /** @type {string[]} */
+  const wrong = [];
+  /** @type {string[]} */
+  const allowed = [];
+  /** @type {Lookup[]} */
+  const states = ['yes', 'no', 'failed'];
+  for (const guest of states) {
+    for (const display of states) {
+      for (const method of ['display', 'api_token', 'session']) {
+        const cookie = method === 'display';
+        const userId = accountFor(guest, display);
+        const req = authed({ authMethod: method, authUserId: userId, authRole: 'member', authScopes: null, authDeviceId: null });
+        const actor = withLookups(guest, display, () => actorFromRequest(req));
+        const c = { guest, display, cookie };
+        const label = `guest ${guest}, display ${display}, ${method}`;
+        const checks = /** @type {const} */ ([
+          ['gate', oldGateClosed(c), newGateClosed(actor)],
+          ['mcp', oldMcp(c), newMcp(actor)],
+        ]);
+        for (const [where, before, after] of checks) {
+          if (before === after) continue;
+          const name = allowedDifference(c, where);
+          (name ? allowed : wrong).push(`${label}: ${where} ${before} -> ${after}${name ? ` (${name})` : ''}`);
+        }
+      }
+    }
+  }
+  // No account id: the old rules answer without any lookup.
+  const noUser = actorFromRequest(tokenReq(null));
+  const c = { guest: /** @type {Lookup} */ ('no'), display: /** @type {Lookup} */ ('no'), cookie: false, noUser: true };
+  if (oldGateClosed(c) !== newGateClosed(noUser)) wrong.push(`no user id: gate ${oldGateClosed(c)} -> ${newGateClosed(noUser)}`);
+  if (oldMcp(c) !== newMcp(noUser)) wrong.push(`no user id: mcp ${oldMcp(c)} -> ${newMcp(noUser)}`);
+  assert.deepEqual(wrong, []);
+  assert.deepEqual(allowed, [
+    'guest failed, display no, api_token: mcp core_closed -> all_closed (a)',
+    'guest failed, display no, session: mcp core_closed -> all_closed (a)',
+  ]);
+});
+
+test('a request requireAuth never saw: every tool closed, and the gate cannot see a guest (difference c)', () => {
+  // Not reachable in the running server: the guest gate and /mcp both sit behind
+  // requireAuth. Without its entry no lookup can run; /mcp closes, the gate
+  // stays open even for a guest. actorFromRequest logs it as an error.
+  for (const id of [MEMBER, GUEST]) {
+    /** @type {Req} */
+    const req = { authMethod: 'api_token', authUserId: id, authRole: 'member', authScopes: null };
+    const actor = actorFromRequest(req);
+    assert.equal(newMcp(actor), 'all_closed');
+    assert.equal(newGateClosed(actor), false);
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -245,6 +335,7 @@ test('the fields come from what requireAuth set', () => {
     scopes: ['tasks:read'],
     moduleAccess: { tasks: 'none' },
     deviceId: null,
+    unresolved: false,
   });
   assert.ok(Object.isFrozen(actor));
 });
@@ -311,7 +402,7 @@ test('actorForUser: an unknown account has no actor', () => {
 test('actorForUser: role, family role and module rights from users and the matrix', () => {
   assert.deepEqual({ ...actorForUser(db, KID) }, {
     kind: 'system', userId: KID, role: 'member', familyRole: 'child',
-    scopes: null, moduleAccess: { tasks: 'none' }, deviceId: null,
+    scopes: null, moduleAccess: { tasks: 'none' }, deviceId: null, unresolved: false,
   });
   const admin = actorForUser(db, ADMIN);
   assert.ok(admin);
@@ -337,7 +428,7 @@ test('actorForUser: a display account is a plain system actor with the matrix ri
 test('householdAudience: no account, nothing else', () => {
   assert.deepEqual({ ...householdAudience() }, {
     kind: 'household', userId: null, role: null, familyRole: null,
-    scopes: null, moduleAccess: null, deviceId: null,
+    scopes: null, moduleAccess: null, deviceId: null, unresolved: false,
   });
   assert.ok(Object.isFrozen(householdAudience()));
 });
