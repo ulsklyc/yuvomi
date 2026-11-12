@@ -444,13 +444,17 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   const results = emptySearchResults();
   const allows = bucketFilter({ hiddenModules, disabledNav });
 
+  // The row rule of the task list (GET /tasks): `all`, the creator, and for
+  // `assignees` a row in task_assignments. The legacy column `assigned_to` is
+  // no access path: a private task that only names someone there stays with
+  // its creator.
   if (allows('tasks')) results.tasks = database.prepare(`
     SELECT t.id, t.title, t.status, t.priority, t.due_date, s.body AS _body
     FROM search_index s
     JOIN tasks t ON t.id = s.entity_id
     WHERE s.entity = 'task' AND s.search_index MATCH @match
       AND t.parent_task_id IS NULL
-      AND (t.created_by = @userId OR t.assigned_to = @userId)
+      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@userId')}
     ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
              t.due_date ASC NULLS LAST
     LIMIT @limit
