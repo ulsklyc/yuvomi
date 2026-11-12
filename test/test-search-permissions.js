@@ -453,3 +453,42 @@ test('Die Suchoberflaeche kennt genau die Trefferarten der Antwort, jede mit Sie
   assert.ok(searchScopeModules().includes('waste'), 'die Entsorgung hat ihre Kachel');
   assert.ok(!searchScopeModules((m) => m !== 'budget').includes('budget'), 'ein nicht verfuegbares Modul faellt heraus');
 });
+
+// --------------------------------------------------------------------------
+// The row axis. The search answers with the rows the list of the same type
+// answers with (test:visibility-matrix holds every role; this is the plain
+// statement per level). Markers of their own, so the fourteen-bucket
+// precondition above keeps its exact count.
+// --------------------------------------------------------------------------
+test('Task search follows the task list: all, creator, assignment rows - never the legacy column', async () => {
+  clearModuleDenials(KID);
+  const marker = 'Zeilenprobe';
+  const insert = db.prepare(`
+    INSERT INTO tasks (title, priority, status, visibility, created_by, assigned_to)
+    VALUES (?, 'medium', 'open', ?, ?, ?)
+  `);
+  const assign = db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)');
+  insert.run(`${marker} fremd alle`, 'all', PARENT, null);
+  assign.run(insert.run(`${marker} fremd zugewiesen`, 'assignees', PARENT, null).lastInsertRowid, KID);
+  insert.run(`${marker} fremd zugewiesen ohne mich`, 'assignees', PARENT, null);
+  // Only the legacy column names the kid: no assignment row, private.
+  insert.run(`${marker} fremd privat altspalte`, 'private', PARENT, KID);
+  insert.run(`${marker} eigen privat`, 'private', KID, null);
+
+  const titleOf = (/** @type {{ title: string }} */ row) => row.title;
+  const titles = (await searchAs(KID, marker)).tasks.map(titleOf).sort();
+  assert.deepEqual(titles, [
+    `${marker} eigen privat`,
+    `${marker} fremd alle`,
+    `${marker} fremd zugewiesen`,
+  ], 'what GET /tasks shows the kid, nothing else');
+
+  // The same rule as the list, measured against it.
+  const { visibilityWhere } = await import('../server/services/visibility.js');
+  const listed = db.prepare(`
+    SELECT t.title FROM tasks t
+    WHERE t.title LIKE @like AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
+    ORDER BY t.title
+  `).all({ like: `${marker}%`, me: KID }).map(titleOf);
+  assert.deepEqual(titles, listed, 'search and list rule agree');
+});
