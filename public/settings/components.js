@@ -433,6 +433,7 @@ export function createStatusSummary({
   return summary;
 }
 
+/** @param {{ label?: unknown, value?: unknown, tone?: 'success' | 'danger' | 'warning' | null, code?: boolean }} params */
 export function createInfoRow({ label, value, tone = null, code = false }) {
   const row = document.createElement('div');
   row.className = 'settings-info-row';
@@ -444,10 +445,11 @@ export function createInfoRow({ label, value, tone = null, code = false }) {
   const valueEl = document.createElement('span');
   valueEl.className = 'settings-info-value';
   const allowedTones = new Set(['success', 'danger', 'warning']);
-  if (allowedTones.has(tone)) valueEl.classList.add(`settings-info-value--${tone}`);
+  if (tone != null && allowedTones.has(tone)) valueEl.classList.add(`settings-info-value--${tone}`);
 
-  if (value != null && typeof value === 'object' && typeof value.nodeType === 'number') {
-    valueEl.appendChild(value);
+  const maybeNode = /** @type {{ nodeType?: unknown } | null} */ (value);
+  if (maybeNode != null && typeof maybeNode === 'object' && typeof maybeNode.nodeType === 'number') {
+    valueEl.appendChild(/** @type {Node} */ (value));
   } else if (code) {
     const codeEl = document.createElement('code');
     codeEl.textContent = String(value ?? '');

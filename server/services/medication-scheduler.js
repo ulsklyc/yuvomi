@@ -10,7 +10,7 @@
  *          #584, D#1041) - each of them only while Health is not denied to
  *          them (#2602), and never through a channel the household shares
  *          (#2598).
- * Dependencies: server/db.js, push.js, notification-channels.js, notifications.js,
+ * Dependencies: server/db.js, push.js, notification-channels.js, channel-delivery.js,
  *               household-modules.js, reminder-origins.js, utils/timezone.js.
  */
 import { runExternalJob } from '../utils/restore-state.js';
@@ -18,7 +18,7 @@ import { createLogger } from '../logger.js';
 import * as dbModule from '../db.js';
 import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
-import { defaultProviders } from './notifications.js';
+import { defaultProviders, sendToChannel } from './channel-delivery.js';
 import { householdDisabledModules } from './household-modules.js';
 import { recipientDeniedModules } from './reminder-origins.js';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
@@ -28,7 +28,6 @@ const log = createLogger('MedicationScheduler');
 const APP_NAME = 'Yuvomi';
 // Fallback body when the medication has no name: never repeat the app name (#581).
 const FALLBACK_BODY = 'Medication reminder';
-const PROVIDER_TIMEOUT_MS = 8_000;
 
 /**
  * Day (YYYY-MM-DD) and time ('HH:MM') of `now` on the HOUSEHOLD's clock.
@@ -58,16 +57,6 @@ function scheduleDueOnDate(schedule, dateKey) {
   if (schedule.end_date && dateKey > schedule.end_date) return false;
   if (schedule.days_mask === null || schedule.days_mask === undefined) return true;
   return (schedule.days_mask & (1 << weekdayIndex(dateKey))) !== 0;
-}
-
-async function withTimeout(fn, timeoutMs = PROVIDER_TIMEOUT_MS) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fn(controller.signal);
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /**
@@ -106,7 +95,8 @@ function mayHearAboutHealth(database, userId) {
  * @param {Object} [opts.channelStore] - { listEnabledChannelsForUser }
  * @param {Object} [opts.providers]    - { [provider]: { send } }
  * @param {Date}   [opts.now]
- * @param {Function} [opts.fetchImpl]
+ * @param {Function} [opts.fetchImpl] - tests inject one; without it the delivery takes
+ *   the SSRF-guarded fetch that channel-delivery.js sets as the default for every sender
  * @returns {Promise<{ due:number, created:number, notified:number, sent:number, failed:number }>}
  */
 /**
@@ -118,13 +108,21 @@ export function processDueMedications(options) {
   return runExternalJob(() => processDueMedicationsUntracked(options));
 }
 
+/**
+ * @param {{
+ *   database?: any, pushService?: typeof defaultPushService, channelStore?: any,
+ *   providers?: typeof defaultProviders, now?: Date, fetchImpl?: Function,
+ * }} [opts] - described at processDueMedications()
+ */
 async function processDueMedicationsUntracked({
   database,
   pushService = defaultPushService,
   channelStore,
   providers = defaultProviders,
   now = new Date(),
-  fetchImpl = fetch,
+  // No default of its own: `undefined` falls through to the guarded fetch of
+  // sendToChannel(), the one default for every sender.
+  fetchImpl,
 } = {}) {
   const activeDb = database || dbModule.get();
 
@@ -261,10 +259,9 @@ async function processDueMedicationsUntracked({
       const channels = store.listEnabledChannelsForUser(recipient.userId)
         .filter((channel) => channel.scope === 'user');
       for (const channel of channels) {
-        const provider = providers[channel.provider];
-        if (!provider) continue;
+        if (!providers[channel.provider]) continue;
         try {
-          await withTimeout((signal) => provider.send({ channel, payload, fetchImpl, signal }));
+          await sendToChannel({ channel, payload, fetchImpl, providers });
           counters.sent += 1;
         } catch (err) {
           counters.failed += 1;
