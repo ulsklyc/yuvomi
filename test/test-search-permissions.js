@@ -453,3 +453,27 @@ test('Die Suchoberflaeche kennt genau die Trefferarten der Antwort, jede mit Sie
   assert.ok(searchScopeModules().includes('waste'), 'die Entsorgung hat ihre Kachel');
   assert.ok(!searchScopeModules((m) => m !== 'budget').includes('budget'), 'ein nicht verfuegbares Modul faellt heraus');
 });
+
+// --------------------------------------------------------------------------
+// The row axis. The search answers with the rows the list of the same type
+// answers with (test:visibility-matrix holds every role; this is the plain
+// statement per level). A marker of its own, so the fourteen-bucket
+// precondition above keeps its exact count.
+// --------------------------------------------------------------------------
+test('Note search follows the note list: all notes of anyone, private ones only of the viewer', async () => {
+  clearModuleDenials(KID);
+  const marker = 'Zettelprobe';
+  const insert = db.prepare('INSERT INTO notes (title, content, visibility, created_by) VALUES (?, ?, ?, ?)');
+  insert.run(`${marker} fremd alle`, 'Text', 'all', PARENT);
+  insert.run(`${marker} fremd privat`, 'Text', 'private', PARENT);
+  insert.run(`${marker} eigen alle`, 'Text', 'all', KID);
+  insert.run(`${marker} eigen privat`, 'Text', 'private', KID);
+
+  const titleOf = (/** @type {{ title: string }} */ row) => row.title;
+  const titles = (await searchAs(KID, marker)).notes.map(titleOf).sort();
+  assert.deepEqual(titles, [
+    `${marker} eigen alle`,
+    `${marker} eigen privat`,
+    `${marker} fremd alle`,
+  ], 'what GET /notes shows the kid, nothing else');
+});

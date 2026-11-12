@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured - only the description was wrong. Such a schedule now stands there as the
   expression itself, like every other list or range; a single weekday is still spelled out,
   as a number or as a short or full name (`mon`, `Monday`).
+- **The global search finds the notes your notes page shows.** It only found notes you had
+  written yourself. A note someone else shared with everyone stood on your notes page and was
+  missing from the search. The search now applies the rule of the page: notes visible to
+  everyone, and your own. A note set to "only me" is still found by nobody but its author.
 
 ## [2.89.1] - 2026-11-12
 
