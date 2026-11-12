@@ -35,14 +35,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   try again. And "Active" is green only while nothing on the card asks for attention: after a
   failed run or with an overdue backup the word stays, since the schedule is still running, but
   without the green that would say all is well next to a red line.
-- **Calendar and task lists show a bell when you have a reminder on an entry.** Until now a
-  reminder only showed at the bottom of the edit form and in the detail view, so a list did not
-  tell which appointments and tasks would notify you. The bell stands before the title in the
-  agenda, in the day list under the month, in search results and in the day view, and next to
-  the recurrence mark on task rows and Kanban cards. The month and week grids leave it out,
-  because every mark there costs the title characters. It shows your own reminders only, like
-  the detail view. API answers for tasks and events carry the same information as
-  `has_reminder`.
+- **Calendar and task lists show a bell when a reminder of yours will notify for an entry**
+  (#2687). Until now a reminder only showed at the bottom of the edit form and in the detail
+  view, so a list did not tell which appointments and tasks would notify you. The bell stands
+  before the title in the agenda, in the day list under the month, in search results and in the
+  day view, and next to the recurrence mark on task rows and Kanban cards. The month and week
+  grids leave it out, because every mark there costs the title characters. It shows your own
+  reminders only. On a series it marks the one occurrence the reminder belongs to, the first
+  that starts at or after it, and the detail view of the other occurrences no longer lists a
+  reminder that stays silent there. Done and archived tasks carry no bell. API answers for
+  tasks and events carry the same information as `has_reminder`.
 
 ### Fixed
 - **"Create backup now" no longer reports success when the backup failed.** The server answers

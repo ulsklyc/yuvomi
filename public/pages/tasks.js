@@ -490,22 +490,23 @@ function renderLockedBadge(task) {
   return `<span class="due-date" role="img" aria-label="${label}" title="${label}"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i></span>`;
 }
 
-/** DIE GLOCKE: der Betrachter hat an der Aufgabe eine Erinnerung
- * (`has_reminder` aus GET /tasks, services/reminder-flags.js - dieselbe Frage
- * wie die Glocken-Zeile der Leseansicht). Bis hierher sah man das nur, wenn man
- * die Aufgabe oeffnete.
+/** DIE GLOCKE: an der Aufgabe meldet sich eine Erinnerung des Betrachters
+ * (`has_reminder` aus GET /tasks, services/reminder-flags.js). Bis hierher sah
+ * man das nur, wenn man die Aufgabe oeffnete.
  *
- * AUCH AN ERLEDIGTEN AUFGABEN, weil die Leseansicht die Erinnerung dort ebenso
- * zeigt und In-App-Meldung und Push sie weiter zustellen (nur `/upcoming` fuer
- * nativ geplante Meldungen laesst erledigte aus, OPEN_TASK_REMINDER_SQL). Nicht
- * ohne Zugang zu den Erinnerungen (reminderAccess): wo die Leseansicht die
- * Zeile nicht zeigt, zeigt die Liste keine Glocke.
+ * NICHT AN ERLEDIGTEN UND ABGELEGTEN AUFGABEN (#2687): sie sollen nicht mehr
+ * erinnern, und die Glocke heisst „das meldet sich bei dir". Der Server laesst
+ * sie dort schon weg; die Frage steht hier noch einmal, damit die Karte nicht
+ * vom Alter ihres Zustands abhaengt. Beim Abhaken selbst nimmt tasks.css sie
+ * mit dem Haken weg (`.task-card--done`). Nicht ohne Zugang zu
+ * den Erinnerungen (reminderAccess): wo die Leseansicht die Zeile nicht zeigt,
+ * zeigt die Liste keine Glocke.
  *
  * `role="img"` und das Wort der Leseansicht als Name, wie die Serienmarke
  * daneben - kein neuer Schluessel.
- * @param {{ has_reminder?: boolean }} task */
+ * @param {{ has_reminder?: boolean, status?: string, archived_at?: string | null }} task */
 function renderReminderBadge(task) {
-  if (task.has_reminder !== true || reminderAccess() === 'none') return '';
+  if (task.has_reminder !== true || task.status === 'done' || task.archived_at || reminderAccess() === 'none') return '';
   return `<span class="due-date task-card__reminder" role="img" aria-label="${esc(t('reminders.sectionTitle'))}"><i data-lucide="bell" class="icon-sm" aria-hidden="true"></i></span>`;
 }
 

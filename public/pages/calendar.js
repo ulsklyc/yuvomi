@@ -768,11 +768,12 @@ function calendarRepeatIconHtml(event) {
 }
 
 /**
- * DIE GLOCKE: der Betrachter hat an diesem Termin eine Erinnerung
- * (`has_reminder`, services/reminder-flags.js auf dem Server - dieselbe Frage
- * wie die Glocken-Zeile der Leseansicht). Bis hierher stand die Erinnerung nur
- * unten im Formular und in der Leseansicht; aus der Liste heraus war nicht zu
- * sehen, ob ein Termin sich meldet.
+ * DIE GLOCKE: an diesem Termin meldet sich eine Erinnerung des Betrachters
+ * (`has_reminder`, services/reminder-flags.js auf dem Server). Bis hierher
+ * stand die Erinnerung nur unten im Formular und in der Leseansicht; aus der
+ * Liste heraus war nicht zu sehen, ob ein Termin sich meldet. An einer Serie
+ * steht sie nur an dem Vorkommen, zu dem die Erinnerung gehoert (#2687) - das
+ * entscheidet der Server, hier wird nur gezeichnet.
  *
  * Der Name ist das Wort der Leseansicht (`reminders.sectionTitle`), wie die
  * Serienmarke das Wort der Serie traegt - kein neuer Schluessel.
@@ -7593,7 +7594,7 @@ export const __test = {
   // Leseansicht, die denselben Zeitpunkt nennen muss. Gemessen wird am
   // AUFRUFER - die Verdrahtung ueber `wireEventForm`, das Ergebnis an dem, was
   // `saveEvent` wirklich sendet -, nicht an den Helfern dazwischen.
-  renderCalendarReminderSection, afterStartResolution, reminderSummary,
+  renderCalendarReminderSection, afterStartResolution, reminderSummary, remindersShownInDetail,
   wireEventForm, saveEvent,
   // Die Frage nach der Reichweite eines Serientermins (#1284) - dieselbe fuer
   // Speichern und Loeschen, gemessen an beiden Aufrufern.
@@ -8221,7 +8222,28 @@ async function openEventDetail(ev, anchor = null, { pane = null, formReady: form
   // Termin ohne Erinnerung bewegt sich also gar nicht. `update` verwirft sich
   // selbst, wenn der Nutzer inzwischen etwas anderes geöffnet hat.
   await remindersReady;
-  if (reminders.length) view.update(renderEventDetail(ev, reminders));
+  const shown = remindersShownInDetail(ev, reminders);
+  if (shown.length) view.update(renderEventDetail(ev, shown));
+}
+
+/**
+ * Die Erinnerungen, die die Leseansicht an DIESEM Termin nennt (#2687).
+ *
+ * An einer Serie haengen sie am Master, und jedes Vorkommen laedt dieselben
+ * Zeilen. Genannt werden sie nur an dem Vorkommen, an dem sie sich melden: ein
+ * „1 Tag vorher" an einem Vorkommen, das still bleibt, verspricht etwas, das
+ * niemand haelt. Die Antwort ist die der Glocke in der Liste (`has_reminder`,
+ * vom Server), damit Liste und Leseansicht nicht zwei Regeln haben. Das
+ * Formular bekommt weiter alle Zeilen - es bearbeitet die Erinnerungen der
+ * Serie. Ein einzelner Termin und eine Antwort ohne das Feld nennen, was
+ * geladen wurde.
+ * @param {{ has_reminder?: boolean, recurrence_rule?: string | null, is_recurring_instance?: unknown, is_occurrence_override?: unknown } | null | undefined} ev
+ * @param {object[]} reminders
+ * @returns {object[]}
+ */
+function remindersShownInDetail(ev, reminders) {
+  const ofSeries = Boolean(ev?.recurrence_rule || ev?.is_recurring_instance || ev?.is_occurrence_override);
+  return ofSeries && ev?.has_reminder === false ? [] : reminders;
 }
 
 // --------------------------------------------------------
@@ -10321,6 +10343,17 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
         await api.put(`/reminders?entity_type=event&entity_id=${savedEventId}`, { remind_ats: remindAts });
       } else {
         await api.delete(`/reminders?entity_type=event&entity_id=${savedEventId}`).catch(() => {});
+      }
+      // DIE GLOCKE DER LISTE (`has_reminder`) kam mit dem Termin vom Server,
+      // die Erinnerungen sind erst jetzt geschrieben. Ein einzelner Termin
+      // weiss, was eben gespeichert wurde. An welchem Vorkommen einer Serie
+      // sie steht, entscheidet der Server - dort wird neu geladen, sobald
+      // Erinnerungen im Spiel waren oder sind.
+      const inState = /** @type {any[]} */ (state.events).filter((e) => e.id === savedEventId);
+      if (inState.length === 1 && !inState[0].recurrence_rule && !inState[0].is_recurring_instance) {
+        inState[0].has_reminder = remindAts.length > 0;
+      } else if (remindAts.length || reminderList(existingReminder).length) {
+        reloadAfter = true;
       }
     }
     if (savedEventId) refreshReminders();

@@ -625,6 +625,23 @@ test('Glocke: die Agenda-Zeile nennt die Erinnerung auch im zugaenglichen Namen'
     'die gerenderte Agenda-Zeile traegt den Namen mit der Erinnerung');
 });
 
+test('Leseansicht: ein Vorkommen ohne Glocke nennt die Erinnerungen seiner Serie nicht (#2687)', () => {
+  // Jedes Vorkommen laedt die Zeilen des Masters. Genannt werden sie nur dort,
+  // wo sie sich melden - dieselbe Antwort wie die Glocke (`has_reminder`).
+  const rows = [{ id: 1, remind_at: '2026-09-23T07:00:00' }];
+  const shown = calendarHelpers.remindersShownInDetail;
+  assert(shown({ is_recurring_instance: 1, recurrence_rule: 'FREQ=WEEKLY', has_reminder: false }, rows).length === 0,
+    'ein spaeteres Vorkommen bleibt still');
+  assert(shown({ is_occurrence_override: true, has_reminder: false }, rows).length === 0, 'ein bearbeitetes Vorkommen ebenso');
+  assert(shown({ is_recurring_instance: 1, recurrence_rule: 'FREQ=WEEKLY', has_reminder: true }, rows) === rows,
+    'das Vorkommen, zu dem die Erinnerung gehoert, nennt sie');
+  // Ein einzelner Termin nennt, was geladen wurde: seine Glocke kam mit dem
+  // Termin, die Erinnerung kann juenger sein. Ebenso eine Antwort ohne das Feld.
+  assert(shown({ has_reminder: false }, rows) === rows, 'ein einzelner Termin nennt, was geladen wurde');
+  assert(shown({ is_recurring_instance: 1, recurrence_rule: 'FREQ=WEEKLY' }, rows) === rows, 'ohne das Feld bleibt es beim Geladenen');
+  assert(shown(null, rows) === rows, 'ohne Termin ebenso');
+});
+
 test('Icon-Regel: kein Baustein ruft das Icon an eventGlyphsHtml() vorbei', () => {
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   const helper = src.slice(src.indexOf('function eventGlyphsHtml('), src.indexOf('function eventIconElement('));

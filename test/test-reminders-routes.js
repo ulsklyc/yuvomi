@@ -650,9 +650,10 @@ test('GET /?entity_type= antwortet 403 statt den Titel zu verraten', async () =>
 
 // --------------------------------------------------------
 // DIE GLOCKE IN DEN LISTEN: `has_reminder` an GET /tasks und GET /calendar
-// folgt derselben Regel wie GET / und GET /all - eigene Zeile, nicht
-// verworfen, je Betrachter. Ein Vorkommen einer Serie fragt beim
-// Erinnerungs-Eigner, wie die Leseansicht (reminderOwnerId() im Client).
+// liest dieselben Zeilen wie GET / und GET /all - eigene Zeile, nicht
+// verworfen, je Betrachter - und heisst "das meldet sich bei dir" (#2687):
+// an einer Serie nur das Vorkommen, zu dem die Erinnerung gehoert, an einer
+// erledigten oder abgelegten Aufgabe nichts.
 // --------------------------------------------------------
 
 /**
@@ -716,6 +717,22 @@ test('GET /tasks: has_reminder je Betrachter - eigene, nicht verworfene Erinneru
   db.prepare("DELETE FROM reminders WHERE entity_type = 'event' AND entity_id = ?").run(quiet);
 });
 
+test('GET /tasks: erledigt oder abgelegt heisst keine Glocke - Wiederoeffnen bringt sie zurueck (#2687)', async () => {
+  const anna = freshUser();
+  const task = Number(makeTask(anna, 'Altglas'));
+  insertReminder(anna, 'task', task, FUTURE);
+  /** @returns {Promise<boolean | undefined>} */
+  const bell = async () => (await listAs('/tasks?archived=1', anna)).find((t) => t.id === task)?.has_reminder;
+  assert.equal(await bell(), true, 'Vorbedingung: offen mit Erinnerung');
+
+  db.prepare("UPDATE tasks SET status = 'done' WHERE id = ?").run(task);
+  assert.equal(await bell(), false, 'erledigt: soll nicht mehr erinnern');
+  db.prepare("UPDATE tasks SET status = 'open', archived_at = '2035-03-01T10:00:00Z' WHERE id = ?").run(task);
+  assert.equal(await bell(), false, 'abgelegt: ebenso');
+  db.prepare('UPDATE tasks SET archived_at = NULL WHERE id = ?').run(task);
+  assert.equal(await bell(), true, 'die Zeile stand die ganze Zeit - wieder offen meldet sie sich wieder');
+});
+
 test('GET /calendar: has_reminder je Betrachter, auch in der Suche', async () => {
   const anna = freshUser();
   const ben = freshUser();
@@ -733,31 +750,102 @@ test('GET /calendar: has_reminder je Betrachter, auch in der Suche', async () =>
   assert.equal(search.find((e) => e.id === dentist)?.has_reminder, true, 'die Suche zeichnet dieselben Agenda-Zeilen');
 });
 
-test('GET /calendar: ein Vorkommen fragt bei der Serie, ein Vorkommen mit eigenen Erinnerungen bei sich', async () => {
+/**
+ * Die Vorkommen einer Serie im Mai 2035, als `Beginn -> has_reminder`.
+ * @param {number} series
+ * @param {number | bigint} uid
+ * @returns {Promise<Record<string, boolean>>}
+ */
+async function bellsOfSeries(series, uid) {
+  const rows = (await listAs('/calendar?from=2035-05-01&to=2035-05-31', uid)).filter((e) => e.series_id === series);
+  return Object.fromEntries(rows.map((e) => [String(e.start_datetime).slice(0, 10), e.has_reminder]));
+}
+
+test('GET /calendar: die Erinnerung einer Serie steht an EINEM Vorkommen - dem ersten, das bei oder nach ihr beginnt (#2687)', async () => {
   const anna = freshUser();
   const series = makeEventWith(anna, {
     title: 'Klavier Glocke', start_datetime: '2035-05-07T16:00', end_datetime: '2035-05-07T17:00',
     recurrence_rule: 'FREQ=WEEKLY;COUNT=4',
   });
-  insertReminder(anna, 'event', series, FUTURE);
+  assert.deepEqual(await bellsOfSeries(series, anna), {
+    '2035-05-07': false, '2035-05-14': false, '2035-05-21': false, '2035-05-28': false,
+  }, 'Vorbedingung: vier Vorkommen, keine Erinnerung');
+
+  // Einen Tag vor dem Beginn der Serie: sie rechnet von dort (#2468), meldet
+  // sich einmal und gehoert zum ersten Vorkommen. Die anderen bleiben still.
+  const first = insertReminder(anna, 'event', series, '2035-05-06T12:00:00');
+  assert.deepEqual(await bellsOfSeries(series, anna), {
+    '2035-05-07': true, '2035-05-14': false, '2035-05-21': false, '2035-05-28': false,
+  });
+  // Die Stammzeile nennt ihr erstes Vorkommen und traegt dessen Antwort.
+  const master = await listAs(`/calendar/${series}`, anna);
+  assert.equal(/** @type {any} */ (master).has_reminder, true);
+
+  // Eine zweite Zeile nach dem Beginn des ersten Vorkommens - so entsteht sie,
+  // wenn eine fremde Serie vom geoeffneten Vorkommen rechnet: sie gehoert zum
+  // dritten, vor dem sie liegt.
+  insertReminder(anna, 'event', series, '2035-05-20T12:00:00');
+  assert.deepEqual(await bellsOfSeries(series, anna), {
+    '2035-05-07': true, '2035-05-14': false, '2035-05-21': true, '2035-05-28': false,
+  });
+
+  // Verworfen ist verworfen: die erste Zeile zaehlt nicht mehr.
+  db.prepare('UPDATE reminders SET dismissed = 1 WHERE id = ?').run(first);
+  assert.deepEqual(await bellsOfSeries(series, anna), {
+    '2035-05-07': false, '2035-05-14': false, '2035-05-21': true, '2035-05-28': false,
+  });
+});
+
+test('GET /calendar: verschoben traegt das Vorkommen die Glocke weiter, geloescht steht sie nirgends', async () => {
+  const anna = freshUser();
+  const series = makeEventWith(anna, {
+    title: 'Chor Glocke', start_datetime: '2035-05-07T16:00', end_datetime: '2035-05-07T17:00',
+    recurrence_rule: 'FREQ=WEEKLY;COUNT=4',
+  });
+  insertReminder(anna, 'event', series, '2035-05-06T12:00:00');
+
+  // Das erste Vorkommen auf den Folgetag verschoben: Ausnahme plus verknuepftes
+  // Einzelvorkommen an seinem Platz. Es findet statt und erbt die Erinnerung.
+  db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)').run(series, '2035-05-07');
+  const moved = makeEventWith(anna, {
+    title: 'Chor Glocke', start_datetime: '2035-05-08T16:00', end_datetime: '2035-05-08T17:00',
+    recurrence_parent_id: series, recurrence_id: '2035-05-07',
+    overridden_fields: '["start_datetime","end_datetime"]',
+  });
+  assert.deepEqual(await bellsOfSeries(series, anna), {
+    '2035-05-08': true, '2035-05-14': false, '2035-05-21': false, '2035-05-28': false,
+  });
+
+  // Geloescht: nur die Ausnahme bleibt. Die Zustellung ueberspringt die Zeile
+  // (#2470), und kein Vorkommen verspricht sie.
+  db.prepare('DELETE FROM calendar_events WHERE id = ?').run(moved);
+  assert.deepEqual(await bellsOfSeries(series, anna), {
+    '2035-05-14': false, '2035-05-21': false, '2035-05-28': false,
+  });
+});
+
+test('GET /calendar: ein Vorkommen mit eigenen Erinnerungen fragt bei sich', async () => {
+  const anna = freshUser();
+  const series = makeEventWith(anna, {
+    title: 'Turnen Glocke', start_datetime: '2035-05-07T16:00', end_datetime: '2035-05-07T17:00',
+    recurrence_rule: 'FREQ=WEEKLY;COUNT=4',
+  });
+  insertReminder(anna, 'event', series, '2035-05-06T12:00:00');
   // Das dritte Vorkommen ist verschoben und fuehrt eigene Erinnerungen - und
   // hat keine. Die Leseansicht fragt dort, die Glocke auch.
   db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)').run(series, '2035-05-21');
   const moved = makeEventWith(anna, {
-    title: 'Klavier Glocke', start_datetime: '2035-05-22T16:00', end_datetime: '2035-05-22T17:00',
+    title: 'Turnen Glocke', start_datetime: '2035-05-22T16:00', end_datetime: '2035-05-22T17:00',
     recurrence_parent_id: series, recurrence_id: '2035-05-21',
     overridden_fields: '["start_datetime","end_datetime","reminders"]',
   });
 
-  const rows = (await listAs('/calendar?from=2035-05-01&to=2035-05-31', anna)).filter((e) => e.series_id === series);
-  const plain = rows.filter((e) => e.id !== moved);
-  assert.equal(plain.length, 3, 'Vorbedingung: drei regulaere Vorkommen');
-  for (const occurrence of plain) {
-    assert.equal(occurrence.reminder_owner_id, series);
-    assert.equal(occurrence.has_reminder, true, `${occurrence.start_datetime}: die Erinnerung der Serie gilt`);
-  }
-  assert.equal(rows.find((e) => e.id === moved)?.has_reminder, false, 'das Vorkommen fuehrt eigene Erinnerungen und hat keine');
+  assert.deepEqual(await bellsOfSeries(series, anna), {
+    '2035-05-07': true, '2035-05-14': false, '2035-05-22': false, '2035-05-28': false,
+  });
+  // Seine eigene Zeile gehoert ihm, wann immer sie liegt.
   insertReminder(anna, 'event', moved, FUTURE);
-  const again = await listAs('/calendar?from=2035-05-01&to=2035-05-31', anna);
-  assert.equal(again.find((e) => e.id === moved)?.has_reminder, true);
+  assert.deepEqual(await bellsOfSeries(series, anna), {
+    '2035-05-07': true, '2035-05-14': false, '2035-05-22': true, '2035-05-28': false,
+  });
 });

@@ -255,17 +255,23 @@ function attachDocumentCounts(tasks, viewer) {
 }
 
 /**
- * Die Glocke in der Liste: `has_reminder`, wenn der Betrachter an der Aufgabe
- * eine eigene, nicht verworfene Erinnerung hat - dieselbe Frage, die die
- * Leseansicht an `GET /reminders` stellt (services/reminder-flags.js). Eine
- * Abfrage für die ganze Liste, aus demselben Grund wie attachDocumentCounts.
+ * Die Glocke in der Liste: `has_reminder`, wenn sich an der Aufgabe eine eigene,
+ * nicht verworfene Erinnerung des Betrachters meldet (services/reminder-flags.js).
+ * Eine Abfrage für die ganze Liste, aus demselben Grund wie attachDocumentCounts.
+ *
+ * NICHT AN ERLEDIGTEN UND ABGELEGTEN AUFGABEN (#2687): sie sollen nicht mehr
+ * erinnern, also verspricht die Liste es auch nicht. Die Zeile bleibt stehen,
+ * und Wiederöffnen bringt die Glocke zurück - dieselbe Bedingung wie
+ * OPEN_TASK_REMINDER_SQL in routes/reminders.js.
  * @param {any[]} tasks
  * @param {number} userId
  */
 function attachReminderFlags(tasks, userId) {
   if (!tasks.length) return tasks;
   const ids = ownReminderIds(db.get(), 'task', tasks.map((t) => t.id), userId);
-  for (const task of tasks) task.has_reminder = ids.has(Number(task.id));
+  for (const task of tasks) {
+    task.has_reminder = task.status !== 'done' && task.archived_at == null && ids.has(Number(task.id));
+  }
   return tasks;
 }
 
