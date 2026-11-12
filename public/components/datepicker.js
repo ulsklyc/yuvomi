@@ -33,6 +33,7 @@ import { esc } from '/utils/html.js';
 import { overlayHost } from '/utils/overlay-host.js';
 import { todayKey, weekdayOrder, weekStartIndex, startOfLocalWeekKey, parseLocalDateKey } from '/utils/date.js';
 import { swapContent } from '/utils/content-swap.js';
+import { nowFields } from '/utils/timezone.js';
 import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
 
 // Das Blatt steht nicht mehr in index.html (Critique R19): im Leerlauf nach
@@ -828,7 +829,9 @@ class YuvomiDatepicker extends HTMLElement {
       // Die Markierung in die Mitte der Spalte, ohne die Seite zu bewegen
       // (scrollIntoView rollte auch den Dialog darunter). Ohne Wert steht die
       // Stunden-Spalte bei der laufenden Stunde statt bei 00, gewaehlt ist nichts.
-      const nowHour = use12h ? (new Date().getHours() % 12 || 12) : new Date().getHours();
+      // Die laufende Stunde IM HAUSHALT (Anzeigezone), nicht die Uhr des Geraets.
+      const hourNow = nowFields()?.hour ?? 0;
+      const nowHour = use12h ? (hourNow % 12 || 12) : hourNow;
       const mark = /** @type {HTMLElement|null} */ (list.querySelector('[aria-selected="true"]')
         || (part === 'hour' && !cur ? list.querySelector(`[data-value="${nowHour}"]`) : null));
       if (mark) list.scrollTop = mark.offsetTop - (list.clientHeight - mark.offsetHeight) / 2;
@@ -838,7 +841,7 @@ class YuvomiDatepicker extends HTMLElement {
   /** @param {HTMLElement} el @param {DpSub} sub @param {string} part @param {number} value */
   _pickTime(el, sub, part, value) {
     const iso = pickTime(sub.iso, part, value, {
-      use12h: getTimeFormat() === '12h', nowHour: new Date().getHours(),
+      use12h: getTimeFormat() === '12h', nowHour: nowFields()?.hour ?? 0,
     });
     this._setSubIso(sub, iso, true);
     if (part === 'minute') { this._returnFocus(); return; }
