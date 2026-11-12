@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **The backup page now shows why the last scheduled run failed** (#2525). Settings > Household >
+  Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
+  in your language - a full disk, an unwritable backup folder, a failed integrity check, or an
+  unrecognised cause - from `scheduler.lastError.reason`. A successful run clears the row.
+
 ## [2.89.1] - 2026-11-12
 
 ### Security
@@ -119,11 +125,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backup folder in it; that text is in the server log only now, where it still names the folder
   and what to check. `POST /api/v1/backup/trigger` answers a failed run as before with `200` and
   `success: false`, and carries the same `reason`. The backup page does not show the reason yet.
-- **The backup page now shows why the last scheduled run failed** (#2525). Settings > Household >
-  Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
-  in your language - a full disk, an unwritable backup folder, a failed integrity check, or an
-  unrecognised cause - from `scheduler.lastError.reason`. A successful run clears it; the raw
-  system text named above stays in the server log only.
 
 ### Fixed
 - **The demo seed finds the database key the server stored itself.** `scripts/seed-demo.js

@@ -301,13 +301,7 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // measures test:backup-routes.
     '../server/routes/backup.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
-  // The scheduled-backup reasons (#2525, #2699) are the keys of
-  // BACKUP_FAILURE_SENTENCES in server/utils/backup-status.js, not a
-  // `reason: '...'` literal anywhere; the real answer measures
-  // test:backup-scheduler.
-  const backupSchedulerReasons = [...read('../server/utils/backup-status.js').matchAll(/^\s*([a-z_]+):\s*'/gm)]
-    .map((m) => `reason: '${m[1]}'`).join('\n');
-  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${backupSchedulerReasons}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
+  const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);

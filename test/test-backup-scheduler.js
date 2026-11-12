@@ -21,6 +21,7 @@ Object.defineProperty(MiniElement.prototype, 'classList', {
   get() {
     const el = this;
     return {
+      /** @param {string[]} names */
       add: (...names) => { el.className = [el.className, ...names].filter(Boolean).join(' '); },
     };
   },

@@ -55,6 +55,7 @@ function scheduleValue(schedule) {
 // (server/services/backup-scheduler.js): nie null, wenn lastError es nicht
 // ist. Ein Grund ausserhalb dieser Liste faellt auf den Allgemeinsatz zurueck
 // statt die Zeile zu verlieren.
+/** @type {Record<string, string>} */
 const BACKUP_ERROR_REASON_KEYS = {
   backup_dir_not_writable: 'settings.backupSchedulerReasonDirNotWritable',
   disk_full: 'settings.backupSchedulerReasonDiskFull',
@@ -68,6 +69,7 @@ const BACKUP_ERROR_REASON_KEYS = {
 // Funktion gibt dann null, und die Zeile verschwindet von selbst (#2525). Nur
 // `reason` wird gelesen, nie der rohe `message`-Text des Systemfehlers
 // (#1909) - der steht im Server-Log.
+/** @param {{ reason?: string | null } | null} lastError */
 export function backupErrorRow(lastError) {
   if (!lastError) return null;
   const sentenceKey = (lastError.reason && BACKUP_ERROR_REASON_KEYS[lastError.reason]) || 'common.errorGeneric';

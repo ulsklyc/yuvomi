@@ -98,13 +98,6 @@ export const CASE_MESSAGES = new Map([
   // (#1795) und Teil der zugesagten API - sie bleiben, wie sie heissen.
   ['waste_import_empty_file', 'waste.errorImportEmpty'],
   ['waste_import_file_too_large', 'waste.errorImportTooLarge'],
-  // Backup-Scheduler (#2525): dieselben vier Gruende wie scheduler.lastError
-  // (server/services/backup-scheduler.js), fuer den Toast eines manuell
-  // ausgeloesten Laufs ("Jetzt sichern").
-  ['backup_dir_not_writable', 'settings.backupSchedulerReasonDirNotWritable'],
-  ['disk_full', 'settings.backupSchedulerReasonDiskFull'],
-  ['backup_verify_failed', 'settings.backupSchedulerReasonVerifyFailed'],
-  ['unknown', 'settings.backupSchedulerReasonUnknown'],
   ['waste_import_event_cap_exceeded', 'waste.errorImportTooManyEvents'],
   ['waste_import_instance_cap_exceeded', 'waste.errorImportTooManyPickups'],
   ['waste_import_label_cap_exceeded', 'waste.errorImportTooManyLabels'],
