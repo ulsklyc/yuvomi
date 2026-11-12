@@ -69,7 +69,7 @@ const BACKUP_ERROR_REASON_KEYS = {
 // Funktion gibt dann null, und die Zeile verschwindet von selbst (#2525). Nur
 // `reason` wird gelesen, nie der rohe `message`-Text des Systemfehlers
 // (#1909) - der steht im Server-Log.
-/** @param {{ reason?: string | null } | null} lastError */
+/** @param {{ timestamp?: string, reason?: string | null, message?: string } | null} lastError */
 export function backupErrorRow(lastError) {
   if (!lastError) return null;
   const sentenceKey = (lastError.reason && BACKUP_ERROR_REASON_KEYS[lastError.reason]) || 'common.errorGeneric';
