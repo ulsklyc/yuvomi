@@ -48,10 +48,11 @@ test('Nutzt die zentralen i18n-Parser/Formatter (kein eigenes Datumsparsing)', (
   assert(/formatDateInput/.test(comp) && /formatTimeInput/.test(comp), 'Muss formatDateInput/formatTimeInput nutzen');
 });
 
-// ── Zeit-Spalten und das Feld als Oeffner ────────────────────────────────
+// ── Zeit-Spalten und das Feld am Finger (#2671) ──────────────────────────
 // Statt EINER Liste aller Zeiten im 15-Minuten-Raster (96 Zeilen) stehen
-// Stunde und Minute nebeneinander; das Feld selbst oeffnet das Blatt, und
-// Getipptes zieht es mit. Tippen bleibt der schnelle Pfad.
+// Stunde und Minute nebeneinander. Am Finger oeffnet ein Tipp ins Feld das
+// Blatt, "Eintippen" holt die Tastatur; mit Maus und Tastatur bleibt das Feld
+// ein Textfeld (Knopf und Pfeil runter oeffnen). Tippen bleibt der schnelle Pfad.
 const inputHandler = comp.match(/sub\.input\.addEventListener\('input',[\s\S]*?\n {4}\}\);/)?.[0] ?? '';
 test('Die Zeit-Auswahl hat Spalten statt einer Liste aller Zeiten', () => {
   assert(/_renderTimeColumns\(el, sub\)/.test(comp), 'Zeit-Popover muss die Spalten zeichnen');
@@ -61,10 +62,13 @@ test('Die Zeit-Auswahl hat Spalten statt einer Liste aller Zeiten', () => {
 test('Spaltennamen kommen aus Intl (keine eigenen Locale-Keys)', () => {
   assert(/Intl\.DisplayNames\(getLocale\(\), \{ type: 'dateTimeField' \}\)/.test(comp), 'Intl.DisplayNames dateTimeField noetig');
 });
-test('Ein Klick ins Feld oeffnet das Blatt, mit der Maus bleibt der Fokus im Feld', () => {
-  assert(/sub\.input\.addEventListener\('click'[\s\S]*?_openPopover\(sub, \{ fromField: !byTap \}\)/.test(comp),
-    'click im Feld muss das Popover oeffnen, aus dem Feld nur ohne Finger');
-  assert(/if \(!fromField\) \{[\s\S]*?\?\.focus\(/.test(comp), 'aus dem Feld geoeffnet darf der Fokus nicht ins Blatt springen');
+test('Mit Maus oder Tastatur oeffnet ein Klick ins Feld das Blatt nicht, Pfeil runter schon', () => {
+  const click = comp.match(/sub\.input\.addEventListener\('click',[\s\S]*?\n {4}\}\);/)?.[0] ?? '';
+  assert(click, 'click-Handler am Feld nicht gefunden');
+  assert(/if \(!byTap \|\|/.test(click), 'ohne Finger-Tipp muss der click-Handler sofort aussteigen');
+  assert(!/fromField/.test(comp), 'den Maus-Pfad (fromField) gibt es nicht mehr');
+  assert(/e\.key === 'ArrowDown'[\s\S]*?this\._openPopover\(sub, \{ returnTo: sub\.input \}\)/.test(comp),
+    'Pfeil runter muss das zugeklappte Blatt oeffnen und den Fokus danach ins Feld geben');
 });
 test('Am Finger geht das Blatt ohne Tastatur auf (je Tipp entschieden)', () => {
   assert(/e\.pointerType === 'touch' \|\| e\.pointerType === 'pen'/.test(comp), 'Entscheidung nach pointerType');
@@ -76,8 +80,13 @@ test('Getipptes zieht das offene Blatt mit und das Feld wird nicht umgeschrieben
   assert(/this\._syncPopover\(sub\)/.test(inputHandler), 'input muss das Blatt nachziehen');
   assert(!/sub\.input\.value\s*=/.test(inputHandler), 'input darf das Feld nicht umschreiben');
 });
-test('Ein Klick ins aus dem Feld geoeffnete Blatt nimmt dem Feld den Fokus nicht', () => {
-  assert(/this\._fromField && e\.pointerType === 'mouse'\) e\.preventDefault\(\)/.test(comp), 'pointerdown im Blatt muss den Fokus halten');
+test('Am Finger traegt das Blatt "Eintippen": Blatt zu, Fokus ins Feld', () => {
+  assert(/if \(byTap\) \{[\s\S]*?t\('datepicker\.typeIn'\)/.test(comp), '"Eintippen" nur im am Finger geoeffneten Blatt');
+  assert(/\.ydp-type'\)\?\.addEventListener\('click', \(\) => \{\s*this\._closePopover\(\);\s*sub\.input\.focus\(\);/.test(comp),
+    '"Eintippen" schliesst das Blatt und fokussiert das Feld');
+  assert(/if \(this\._activeSub === sub\) \{ this\._closePopover\(\); return; \}/.test(comp),
+    'ein Tipp ins Feld bei offenem Blatt tut dasselbe');
+  assert(/this\._returnTo = returnTo \|\| sub\.trigger;/.test(comp), 'nach einer Wahl am Finger zurueck auf den Knopf, nicht ins Feld (keine Tastatur)');
 });
 test('Esc und eine fertige Wahl geben den Fokus dorthin zurueck, woher das Blatt kam', () => {
   // Regression: vorher fragte Esc `_activeSub` erst NACH dem Schliessen ab, und
@@ -209,7 +218,7 @@ test('CSS enthält keine Hex-Farben (nur Tokens)', () => {
 // ── i18n-Vollständigkeit über alle Locales ──────────────────────────────
 const localesDir = new URL('../public/locales/', import.meta.url);
 const localeFiles = readdirSync(localesDir).filter((f) => f.endsWith('.json'));
-const REQUIRED_KEYS = ['openCalendar', 'openTimePicker', 'previousMonth', 'nextMonth', 'today', 'clear'];
+const REQUIRED_KEYS = ['openCalendar', 'openTimePicker', 'previousMonth', 'nextMonth', 'today', 'clear', 'typeIn'];
 
 // Erwartete Anzahl aus SUPPORTED_LOCALES lesen statt sie hier zu doppeln: eine
 // fest verdrahtete Zahl bricht bei jeder neuen Sprache, obwohl am Datepicker

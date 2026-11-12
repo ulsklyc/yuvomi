@@ -6372,7 +6372,8 @@
         "previousMonth": "Előző hónap",
         "nextMonth": "Következő hónap",
         "today": "Ma",
-        "clear": "Törlés"
+        "clear": "Törlés",
+        "typeIn": "Begépelés"
     },
     "pantry": {
         "badgeExpiredDays_one": "{{count}} napja lejárt",

@@ -6372,7 +6372,8 @@
         "previousMonth": "前の月",
         "nextMonth": "次の月",
         "today": "今日",
-        "clear": "クリア"
+        "clear": "クリア",
+        "typeIn": "手入力"
     },
     "pantry": {
         "badgeExpiredDays_one": "{{count}} 日前に期限切れ",

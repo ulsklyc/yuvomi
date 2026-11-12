@@ -6372,7 +6372,8 @@
         "previousMonth": "Vorige maand",
         "nextMonth": "Volgende maand",
         "today": "Vandaag",
-        "clear": "Wissen"
+        "clear": "Wissen",
+        "typeIn": "Typen"
     },
     "pantry": {
         "badgeExpiredDays_one": "{{count}} dag geleden verlopen",

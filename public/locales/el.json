@@ -6372,7 +6372,8 @@
         "previousMonth": "Προηγούμενος μήνας",
         "nextMonth": "Επόμενος μήνας",
         "today": "Σήμερα",
-        "clear": "Εκκαθάριση"
+        "clear": "Εκκαθάριση",
+        "typeIn": "Πληκτρολόγηση"
     },
     "pantry": {
         "badgeExpiredDays_one": "Έληξε πριν {{count}} ημέρα",

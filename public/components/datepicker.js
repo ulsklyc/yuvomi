@@ -1,10 +1,10 @@
 /**
  * Modul: yuvomi-datepicker Web Component
  * Zweck: Gemeinsame Datum-/Zeit-Eingabe für die ganze App. Tippen bleibt der
- *        schnelle Pfad (locale-Parsing wie bisher, #442); ein Klick ins Feld
- *        oder auf den Icon-Trigger öffnet ein Glass-Popover (Kalender-Grid /
- *        Spalten Stunde | Minute), das dem Getippten folgt. Nur ohne
- *        Popover-API greift auf Touch das native OS-Sheet (showPicker()).
+ *        schnelle Pfad (locale-Parsing wie bisher, #442); der Icon-Trigger,
+ *        Pfeil runter im Feld und am Finger ein Tipp ins Feld öffnen ein
+ *        Glass-Popover (Kalender-Grid / Spalten Stunde | Minute, #2671). Nur
+ *        ohne Popover-API greift auf Touch das native OS-Sheet (showPicker()).
  * Abhängigkeiten: /i18n.js (Format/Parse/Locale), /utils/html.js (esc)
  *
  * API (an nativem Input orientiert, damit der Umstieg mechanisch ist):
@@ -300,12 +300,7 @@ class YuvomiDatepicker extends HTMLElement {
     });
 
     // Blur: normalisieren + Validität spiegeln (inkl. min/max-Grenzen)
-    sub.input.addEventListener('blur', (/** @type {FocusEvent} */ e) => {
-      // Mit Tab aus dem Feld weiter: das aus dem Feld geoeffnete Blatt geht
-      // mit zu. Ein Tipp ausserhalb schliesst ueber _onDocPointer.
-      const to = /** @type {Node|null} */ (e.relatedTarget);
-      if (this._activeSub === sub && this._fromField && to
-        && !this._popover?.contains(to)) this._closePopover();
+    sub.input.addEventListener('blur', () => {
       const raw = sub.input.value.trim();
       const iso = parse(raw);
       if (raw && (!iso || this._outOfRange(sub.kind, iso))) {
@@ -337,12 +332,13 @@ class YuvomiDatepicker extends HTMLElement {
       this._syncPopover(sub);
     });
 
-    // Das Feld oeffnet die Auswahl selbst, nicht erst der Knopf: mit der Maus
-    // bleibt der Fokus im Feld (weitertippen, das Blatt zieht mit), am
-    // Finger geht das Blatt ohne Tastatur auf. Ein zweiter Tipp ins Feld
-    // holt die Tastatur dazu. Ohne Popover-API (#2107) bleibt es ein Feld.
+    // Am Finger oeffnet ein Tipp ins Feld die Auswahl statt der Tastatur
+    // (#2671); "Eintippen" im Blatt holt die Tastatur. Mit Maus oder Tastatur
+    // bleibt das Feld ein Textfeld - kein Blatt, das beim Durchtabben oder beim
+    // Korrigieren einer Ziffer aufgeht; dort oeffnen Knopf und Pfeil runter.
     // Entschieden wird je Tipp (pointerType), nicht je Geraet: ein Laptop mit
-    // Touchscreen bekommt am Finger das Blatt, mit der Maus das Feld.
+    // Touchscreen bekommt am Finger das Blatt, mit der Maus das Feld. Ohne
+    // Popover-API (#2107) bleibt es ein Feld.
     let tap = false;
     sub.input.addEventListener('pointerdown', (/** @type {PointerEvent} */ e) => {
       tap = e.pointerType === 'touch' || e.pointerType === 'pen';
@@ -352,9 +348,11 @@ class YuvomiDatepicker extends HTMLElement {
     sub.input.addEventListener('click', () => {
       const byTap = tap;
       tap = false;
-      if (this.hasAttribute('disabled') || !this._supportsPopover()) return;
-      if (this._activeSub === sub) { this._fromField = true; this._returnTo = sub.input; return; }
-      this._openPopover(sub, { fromField: !byTap });
+      if (!byTap || this.hasAttribute('disabled') || !this._supportsPopover()) return;
+      // Ein Tipp ins Feld bei offenem Blatt tut, was "Eintippen" tut: der
+      // Fokus ist schon im Feld, das Blatt geht zu.
+      if (this._activeSub === sub) { this._closePopover(); return; }
+      this._openPopover(sub, { byTap: true });
     });
     sub.input.addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
       if (e.key === 'Escape' && this._activeSub === sub) {
@@ -364,7 +362,7 @@ class YuvomiDatepicker extends HTMLElement {
         // Pfeil runter fuehrt von der Tastatur in die Auswahl
         e.preventDefault();
         if (this._activeSub !== sub) this._openPopover(sub, { returnTo: sub.input });
-        else {
+        else { // offen geblieben (mit der Maus ins Feld geklickt): hinein
           const into = /** @type {HTMLElement|null} */ (this._popover?.querySelector('[aria-selected="true"]')
             || this._popover?.querySelector('[tabindex="0"]') || null);
           into?.focus();
@@ -466,11 +464,6 @@ class YuvomiDatepicker extends HTMLElement {
     el.className = 'ydp-popover';
     el.setAttribute('popover', 'manual');
     el.setAttribute('role', 'dialog');
-    // Aus dem Feld geoeffnet: ein Klick ins Blatt nimmt dem Feld den Fokus
-    // nicht (sonst schloesse der Blur das Blatt, bevor der Klick ankommt).
-    el.addEventListener('pointerdown', (/** @type {PointerEvent} */ e) => {
-      if (this._fromField && e.pointerType === 'mouse') e.preventDefault();
-    });
     el.addEventListener('keydown', (e) => {
       // Esc schliesst NUR den Kalender. `preventDefault` nimmt dem nativen
       // Dialog darunter den Close-Request (sonst ginge das Formular mit zu),
@@ -500,7 +493,7 @@ class YuvomiDatepicker extends HTMLElement {
     }
   }
 
-  _openPopover(sub, { fromField = false, returnTo = null } = {}) {
+  _openPopover(sub, { byTap = false, returnTo = null } = {}) {
     // Ohne Popover-API ist das Kalenderblatt nicht verfuegbar (#2107): reset.css
     // blendet jedes `[popover]` aus, und ein `aria-expanded="true"` samt
     // Fokus-Sprung meldete einen Dialog, den niemand sieht. Tippen bleibt.
@@ -513,14 +506,31 @@ class YuvomiDatepicker extends HTMLElement {
     const host = overlayHost(this);
     if (el.parentNode !== host) host.appendChild(el);
     this._activeSub = sub;
-    this._fromField = fromField;
-    this._returnTo = returnTo || (fromField ? sub.input : sub.trigger);
+    // Nach Esc oder einer fertigen Wahl zurueck auf den Knopf, nach Pfeil
+    // runter ins Feld; am Finger nie ins Feld, sonst kaeme die Tastatur.
+    this._returnTo = returnTo || sub.trigger;
     // Zugänglicher Name des Dialogs + Schreibrichtung (RTL für ar/fa)
     el.setAttribute('aria-label', this._resolveLabel()
       || (sub.kind === 'date' ? t('datepicker.openCalendar') : t('datepicker.openTimePicker')));
     el.dir = this._dir();
     if (sub.kind === 'date') this._renderCalendar(el, sub);
     else this._renderTimeColumns(el, sub);
+    // "Eintippen" nur am Finger: mit der Tastatur ist das Feld einen Esc
+    // entfernt, am Finger ist es der Weg zur Tastatur (#2671). Im Kalender
+    // neben Heute/Loeschen, unter den Zeit-Spalten in einer eigenen Fusszeile.
+    if (byTap) {
+      let foot = el.querySelector('.ydp-cal__foot');
+      if (!foot) {
+        el.insertAdjacentHTML('beforeend', '<div class="ydp-time__foot"></div>');
+        foot = el.querySelector('.ydp-time__foot');
+      }
+      foot?.insertAdjacentHTML('beforeend',
+        `<button type="button" class="ydp-textbtn ydp-textbtn--type ydp-type">${esc(t('datepicker.typeIn'))}</button>`);
+      el.querySelector('.ydp-type')?.addEventListener('click', () => {
+        this._closePopover();
+        sub.input.focus();
+      });
+    }
 
     sub.trigger.setAttribute('aria-expanded', 'true');
     try { el.showPopover(); } catch { /* bereits offen */ }
@@ -529,25 +539,24 @@ class YuvomiDatepicker extends HTMLElement {
     window.addEventListener('resize', this._reposition, { passive: true });
     window.addEventListener('scroll', this._reposition, { passive: true, capture: true });
 
-    // Aus dem Feld geoeffnet bleibt der Fokus im Feld: weitertippen geht,
-    // und das Blatt zieht mit (_syncPopover). Sonst in die aktive Auswahl.
+    // Fokus in die aktive Auswahl. Die Spalten erst jetzt mitten: vor
+    // showPopover() hat die Liste keine Hoehe.
     if (sub.kind === 'time') this._syncTimeColumns(el, sub);
-    if (!fromField) {
-      (el.querySelector('[aria-selected="true"]') || el.querySelector('[tabindex="0"]')
-        || el.querySelector('button'))?.focus({ preventScroll: true });
-    }
+    (el.querySelector('[aria-selected="true"]') || el.querySelector('[tabindex="0"]')
+      || el.querySelector('button'))?.focus({ preventScroll: true });
   }
 
   // Nach einer fertigen Wahl (Tag, Minute, Heute, Loeschen) und mit Esc:
-  // Blatt zu, Fokus dorthin, woher es kam - ins Feld oder auf den Knopf.
+  // Blatt zu, Fokus dorthin, woher es kam (_returnTo).
   _returnFocus() {
     const target = this._returnTo;
     this._closePopover();
     target?.focus();
   }
 
-  // Getipptes ins offene Blatt spiegeln: die Spalten markieren die Stunde und
-  // Minute, der Kalender springt auf den Monat des Tages.
+  // Getipptes ins offene Blatt spiegeln (offen geblieben, weil jemand mit der
+  // Maus ins Feld geklickt hat): die Spalten markieren Stunde und Minute, der
+  // Kalender springt auf den Monat des Tages.
   /** @param {DpSub} sub */
   _syncPopover(sub) {
     if (this._activeSub !== sub || !this._popover) return;
@@ -565,7 +574,6 @@ class YuvomiDatepicker extends HTMLElement {
     try { this._popover.hidePopover(); } catch { /* war zu */ }
     this._activeSub?.trigger.setAttribute('aria-expanded', 'false');
     this._activeSub = null;
-    this._fromField = false;
     this._returnTo = null;
     document.removeEventListener('pointerdown', this._onDocPointer, true);
     window.removeEventListener('resize', this._reposition);

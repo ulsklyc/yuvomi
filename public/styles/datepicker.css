@@ -288,7 +288,8 @@ yuvomi-datepicker {
   background: transparent;
 }
 
-.ydp-cal__foot {
+.ydp-cal__foot,
+.ydp-time__foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -309,12 +310,20 @@ yuvomi-datepicker {
   transition: background-color var(--transition-fast);
 }
 
-.ydp-textbtn--today {
+/* "Heute" und "Eintippen" (am Finger der Weg vom Blatt zur Tastatur, Issue
+ * 2671) sind beide eine Handlung des Blatts, nicht seine Zuruecknahme. */
+.ydp-textbtn--today,
+.ydp-textbtn--type {
   color: var(--color-accent);
 }
 
 .ydp-textbtn--clear {
   color: var(--color-text-tertiary);
+}
+
+/* Unter den Zeit-Spalten steht "Eintippen" allein und mittig. */
+.ydp-time__foot {
+  justify-content: center;
 }
 
 .ydp-textbtn:hover {

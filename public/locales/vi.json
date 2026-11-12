@@ -6372,7 +6372,8 @@
         "previousMonth": "Tháng trước",
         "nextMonth": "Tháng sau",
         "today": "Hôm nay",
-        "clear": "Xóa"
+        "clear": "Xóa",
+        "typeIn": "Nhập"
     },
     "pantry": {
         "badgeExpiredDays_one": "Hết hạn {{count}} ngày trước",

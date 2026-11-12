@@ -6527,7 +6527,8 @@
         "previousMonth": "Předchozí měsíc",
         "nextMonth": "Další měsíc",
         "today": "Dnes",
-        "clear": "Vymazat"
+        "clear": "Vymazat",
+        "typeIn": "Napsat"
     },
     "pantry": {
         "badgeExpiredDays_one": "Prošlo před {{count}} dnem",

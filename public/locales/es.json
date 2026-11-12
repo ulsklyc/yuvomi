@@ -6372,7 +6372,8 @@
         "previousMonth": "Mes anterior",
         "nextMonth": "Mes siguiente",
         "today": "Hoy",
-        "clear": "Borrar"
+        "clear": "Borrar",
+        "typeIn": "Escribir"
     },
     "pantry": {
         "badgeExpiredDays_one": "Caducado hace {{count}} día",
