@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without the green that would say all is well next to a red line.
 
 ### Fixed
+- **A task reminder without a lead time says so, at the lead time.** With the reminder switched on
+  and "None" chosen as lead time, saving the task said "Set a due date to enable task reminders.",
+  even when a date was set, and the line stood at the bottom of the dialog. The message now names
+  the missing lead time and stands under that field, which the dialog moves to.
 - **"Create backup now" no longer reports success when the backup failed.** The server answers
   a failed manual run with `200` and `success: false`, and the page showed "Backup created
   successfully." without reading the answer. It now shows the reason in your language, the

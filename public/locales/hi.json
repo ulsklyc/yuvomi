@@ -566,6 +566,7 @@
         "archivedLabel": "संग्रहित किया गया",
         "kanbanArchived": "संग्रहित",
         "reminderNeedsDueDate": "कार्य अनुस्मारक सक्षम करने के लिए एक नियत तारीख निर्धारित करें।",
+        "reminderNeedsOffset": "चुनें कि अनुस्मारक कब आए, या उसे बंद करें।",
         "startDateLabel": "आरंभ तिथि",
         "startsOn": "शुरू होती है {{date}}",
         "showFuture": "निर्धारित दिखाएँ",

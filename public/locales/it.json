@@ -566,6 +566,7 @@
         "archivedLabel": "Archiviata il",
         "kanbanArchived": "Archiviato",
         "reminderNeedsDueDate": "Imposta una data di scadenza per abilitare i promemoria delle attività.",
+        "reminderNeedsOffset": "Scegli quando deve arrivare il promemoria, oppure disattivalo.",
         "startDateLabel": "Data di inizio",
         "startsOn": "Inizia il {{date}}",
         "showFuture": "Mostra pianificate",

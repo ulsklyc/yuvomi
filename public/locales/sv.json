@@ -566,6 +566,7 @@
         "archivedLabel": "Arkiverad den",
         "kanbanArchived": "Arkiverad",
         "reminderNeedsDueDate": "Ange ett förfallodatum för att aktivera påminnelser för uppgiften.",
+        "reminderNeedsOffset": "Välj när påminnelsen ska komma, eller stäng av den.",
         "startDateLabel": "Startdatum",
         "startsOn": "Börjar {{date}}",
         "showFuture": "Visa schemalagda",

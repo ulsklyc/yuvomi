@@ -582,6 +582,7 @@
         "swipedDoneToast": "Als klaar gemarkeerd.",
         "swipedOpenToast": "Als open gemarkeerd.",
         "reminderNeedsDueDate": "Stel een vervaldatum in om taakmeldingen te activeren.",
+        "reminderNeedsOffset": "Kies wanneer de herinnering moet komen, of zet hem uit.",
         "startDateLabel": "Begindatum",
         "startsOn": "Begint op {{date}}",
         "showFuture": "Ingepland tonen",

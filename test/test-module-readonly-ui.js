@@ -1538,8 +1538,15 @@ async function speichernUndAufrufeSammeln({
   // im Feld, also "unveraendert"; ein Test, der das Leerraeumen messen will,
   // setzt `dueDate: ''` und laesst diesen stehen.
   dueDateWhenOpened = '2026-10-01',
+  // Der Vorlauf in der Auswahl; „Keine" bei eingeschaltetem Schalter ist der
+  // Fall aus #2705 (Frage 5).
+  offset = 'offset_1d',
 }) {
   const calls = [];
+  /** @type {Array<{field: any, msg: string}>} */
+  const fieldErrors = [];
+  const g = /** @type {any} */ (globalThis);
+  g.__reportFieldError = (/** @type {any} */ field, /** @type {string} */ msg) => { fieldErrors.push({ field, msg }); };
   const record = (method) => async (path, body) => {
     calls.push({ method, path, body });
     if (method === 'post' && path === '/tasks') return { data: { id: 7 } };
@@ -1581,7 +1588,7 @@ async function speichernUndAufrufeSammeln({
     points: '0',
     byId: {
       '#reminder-toggle': { checked: reminderChecked },
-      '#reminder-offset': { value: 'offset_1d' },
+      '#reminder-offset': { id: 'reminder-offset', value: offset },
       '#task-visibility': { value: 'all' },
       // Den Abschnitt gibt es nur gesperrt und nur mit haengender Erinnerung -
       // genau dann traegt er im Browser das Attribut (eigens gemessen, siehe
@@ -1603,7 +1610,8 @@ async function speichernUndAufrufeSammeln({
     if (echterToast === undefined) delete globalThis.window.yuvomi.showToast;
     else globalThis.window.yuvomi.showToast = echterToast;
   }
-  return { calls, error: doc.errorNode.hidden ? null : doc.errorNode.textContent };
+  delete g.__reportFieldError;
+  return { calls, error: doc.errorNode.hidden ? null : doc.errorNode.textContent, fieldErrors };
 }
 
 const erinnerungsAufrufe = (calls) => calls.filter((c) => String(c.path).startsWith('/reminders'));
@@ -5627,4 +5635,24 @@ test('R23 G5-P2: Importzeile mit Vorschlag fragt "Mit X verknuepfen?" statt anzu
   assert.match(html, /data-import-link="31" data-contact-id="4"/);
   assert.match(html, /birthdays\.importLinkSuggest/);
   assert.match(html, /birthdays\.linkContact/);
+});
+
+// #2705, Frage 5: Schalter an, Vorlauf „Keine". Die Meldung nannte das
+// Faelligkeitsdatum, obwohl eins gesetzt ist; jetzt nennt sie den fehlenden
+// Vorlauf und steht an der Auswahl.
+test('Erinnerung an, Vorlauf „Keine": die Meldung nennt den Vorlauf und steht an der Auswahl', async () => {
+  const { calls, error, fieldErrors } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'write' }, reminderChecked: true, offset: 'offset_none',
+  });
+  assert.deepEqual(fieldErrors.map((e) => [e.field.id, e.msg]), [['reminder-offset', 'tasks.reminderNeedsOffset']]);
+  assert.equal(error, null, 'nicht die Zeile ganz unten, und nicht der Satz uebers Datum');
+  assert.deepEqual(calls.filter((c) => c.method !== 'get'), [], 'nichts gespeichert');
+});
+
+test('ohne Datum bleibt es bei der Meldung uebers Datum - der Vorlauf kommt erst danach dran', async () => {
+  const { error, fieldErrors } = await speichernUndAufrufeSammeln({
+    modules: { tasks: 'write', calendar: 'write' }, reminderChecked: true, offset: 'offset_none', dueDate: '', dueDateWhenOpened: '',
+  });
+  assert.equal(error, 'tasks.reminderNeedsDueDate');
+  assert.equal(fieldErrors.length, 0);
 });

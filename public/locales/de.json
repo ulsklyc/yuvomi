@@ -602,6 +602,7 @@
         "bulkDeleted": "Aufgaben gelöscht.",
         "kanbanArchived": "Archiviert",
         "reminderNeedsDueDate": "Lege ein Fälligkeitsdatum fest, um Aufgabenerinnerungen zu aktivieren.",
+        "reminderNeedsOffset": "Wähle, wann die Erinnerung kommen soll, oder schalte sie aus.",
         "startDateLabel": "Startdatum",
         "startsOn": "Startet am {{date}}",
         "showFuture": "Geplante anzeigen",
