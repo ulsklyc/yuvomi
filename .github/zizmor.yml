@@ -20,7 +20,6 @@ rules:
       - claude.yml
       - claude-code-review.yml
       - docker-publish.yml
-      - umbrel-publish.yml
 
   dangerous-triggers:
     ignore:
@@ -36,13 +35,6 @@ rules:
       # reusable workflow of this repository called by its local path; both name the same
       # file at this commit.
       - ci.yml
-
-  template-injection:
-    ignore:
-      # Informational: steps.ver.outputs.version, which the "Resolve version" step sets
-      # only after checking it against a version pattern; no free text reaches the shell.
-      - umbrel-publish.yml:195
-      - umbrel-publish.yml:220
 
   dependabot-cooldown:
     ignore:

@@ -814,7 +814,6 @@ const BREAKS_WITHOUT_HYPHENS = {
   '.note-card__content': 'LEGACY',
   '.note-read__body': 'LEGACY',
   '.settings-shell__navigation-result-text': 'LEGACY',
-  '.settings-info-value--danger': 'LEGACY',
   '.settings-document-storage-error': 'LEGACY',
   '.caldav-calendar-name': 'LEGACY',
   '.caldav-calendar-error': 'LEGACY',

@@ -1,10 +1,8 @@
-<!-- version: 2.88.1 -->
-This update closes a gap in medication reminders. A reminder sent to a person's own notification channel (Gotify, ntfy or a webhook) now passes the same protection against requests into the local network as every other reminder. Nothing changes on screen.
+<!-- version: 2.89.1 -->
+This update closes a gap for signed-in devices. A phone that is signed in to Yuvomi with the app could change the email address stored for its own household member, and that address is where a password reset is sent. A signed-in device can no longer change it; everything else on the contact stays editable from the device, and the address can still be changed in the browser.
 
-If such a channel lives in your local network, medication reminders to it now need the setting `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true`, as every other reminder to that channel already does. If your other reminders arrive there today, the setting is in place and there is nothing to do.
-
-The next update will be a foundation release. It changes how Yuvomi is tested and operated, adds a readiness check for monitoring and keeps the status of the last backup across a restart. It brings no visible change and does not touch the database.
+If you use the app on a phone, nothing else changes there. If nobody in your household does, this update changes nothing you would notice.
 
 This update does not change the database. No action is needed from you.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.88.1
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.89.1

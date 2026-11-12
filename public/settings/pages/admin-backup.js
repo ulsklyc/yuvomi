@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { dateTimeText } from '/utils/date-format.js';
 import { confirmModal, whenModalClosed } from '/components/modal.js';
-import { formatCronSchedule } from '/settings/cron-label.js';
+import { cronScheduleIntervalMs, formatCronSchedule } from '/settings/cron-label.js';
 import { wirePasswordToggle } from '/utils/auth-ui.js';
 import { errorSentenceWithDetail, errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 import {
@@ -49,6 +49,194 @@ function scheduleValue(schedule) {
   more.append(summary, expression);
   wrapper.append(text, more);
   return { value: wrapper, code: false };
+}
+
+// Dieselben vier Gruende wie scheduler.lastError.reason
+// (server/services/backup-scheduler.js): nie null, wenn lastError es nicht
+// ist. Ein Grund ausserhalb dieser Liste faellt auf den Allgemeinsatz zurueck
+// statt die Zeile zu verlieren.
+/** @type {Record<string, string>} */
+const BACKUP_ERROR_REASON_KEYS = {
+  backup_dir_not_writable: 'settings.backupSchedulerReasonDirNotWritable',
+  disk_full: 'settings.backupSchedulerReasonDiskFull',
+  backup_verify_failed: 'settings.backupSchedulerReasonVerifyFailed',
+  unknown: 'settings.backupSchedulerReasonUnknown',
+};
+
+/**
+ * Der Satz zu einem Grund, für die Zeile der Karte und für den Toast nach
+ * "Jetzt Backup erstellen": beide nennen denselben Fehlschlag.
+ * @param {string | null | undefined} reason
+ */
+function backupReasonSentence(reason) {
+  return t((reason && BACKUP_ERROR_REASON_KEYS[reason]) || 'common.errorGeneric');
+}
+
+// WARUM DER GRUND UND NICHT NUR "fehlgeschlagen": der Admin muss wissen, WAS
+// zu tun ist - eine volle Platte und ein unschreibbares BACKUP_DIR verlangen
+// Verschiedenes. Ein erfolgreicher Lauf setzt lastError auf null; diese
+// Funktion gibt dann null, und die Zeile verschwindet von selbst (#2525). Nur
+// `reason` wird gelesen, nie der rohe `message`-Text des Systemfehlers
+// (#1909) - der steht im Server-Log.
+/** @param {{ timestamp?: string, reason?: string | null, message?: string } | null} lastError */
+export function backupErrorRow(lastError) {
+  if (!lastError) return null;
+  return createInfoRow({
+    label: t('settings.backupSchedulerLastError'),
+    value: backupReasonSentence(lastError.reason),
+    tone: 'danger',
+  });
+}
+
+/**
+ * Was die Karte vom Scheduler liest (`scheduler` aus `GET /backup/status`).
+ * @typedef {{
+ *   enabled?: boolean,
+ *   schedule?: string,
+ *   keepCount?: number,
+ *   lastBackup?: { timestamp?: string, success?: boolean, reason?: string } | null,
+ *   lastError?: { timestamp?: string, reason?: string | null, message?: string } | null,
+ *   lastSuccess?: string | null,
+ *   nextRun?: string | null,
+ * }} BackupSchedulerStatus
+ */
+
+/**
+ * Wann zuletzt ein Backup gelang, oder null. `lastSuccess` überlebt einen
+ * Fehlschlag; `lastBackup` ist nur der letzte Lauf und trägt den Zeitpunkt
+ * allein dann, wenn dieser Lauf gelang.
+ * @param {BackupSchedulerStatus} scheduler
+ * @returns {string | null}
+ */
+function lastSuccessfulBackup(scheduler) {
+  if (scheduler.lastSuccess) return scheduler.lastSuccess;
+  return scheduler.lastBackup?.success ? (scheduler.lastBackup.timestamp ?? null) : null;
+}
+
+/**
+ * Ist das letzte gelungene Backup überfällig?
+ *
+ * Ja, wenn es älter ist als ZWEI Abstände des Zeitplans: ein einzelner
+ * ausgefallener Lauf (Neustart zur falschen Minute, ein Update) ist noch kein
+ * Befund, zwei in Folge sind einer. Und ja, wenn schon ein Lauf versucht wurde
+ * und noch nie einer gelang - dafür braucht es keinen Abstand.
+ *
+ * Nein bei einem Zeitplan, den `cron-label.js` nicht erkennt: aus einer Liste
+ * oder einem Bereich lässt sich kein Abstand ablesen, und eine geratene
+ * Warnung auf einer Backup-Seite ist schlimmer als keine.
+ *
+ * `now` ist ein ZEITPUNKT (Millisekunden), kein Tagesschlüssel: verglichen
+ * werden zwei Zeitpunkte, die Haushaltszone spielt dabei keine Rolle.
+ * Exportiert für Tests.
+ *
+ * @param {BackupSchedulerStatus} scheduler
+ * @param {number} now
+ * @returns {boolean}
+ */
+export function backupSuccessOverdue(scheduler, now) {
+  if (!scheduler?.enabled) return false;
+  const lastSuccess = lastSuccessfulBackup(scheduler);
+  if (!lastSuccess) return Boolean(scheduler.lastBackup?.timestamp);
+  const interval = cronScheduleIntervalMs(scheduler.schedule);
+  if (interval == null) return false;
+  const succeededAt = Date.parse(lastSuccess);
+  if (Number.isNaN(succeededAt)) return false;
+  return now - succeededAt > 2 * interval;
+}
+
+/**
+ * Die Zeilen zum Stand der Backups. ZWEI AUSSAGEN, NICHT EINE: "Letztes
+ * Backup" ist immer das letzte, das GELANG - das, worauf sich ein Restore
+ * stützen kann. Stünde dort nach einem Fehlschlag dessen Datum mit
+ * "(fehlgeschlagen)", wäre von der Karte verschwunden, wann zuletzt eines
+ * gelang. Der fehlgeschlagene Lauf und sein Grund kommen als eigene Zeilen
+ * dazu und gehen mit dem nächsten Erfolg wieder; gelang der letzte Lauf, sagt
+ * "Letztes Backup" schon alles.
+ *
+ * Überfällig trägt die Zeile, um deren Datum es geht: Warnton und ein Satz
+ * darunter, kein eigener Block - die Fehlerzeile bleibt das Lauteste der
+ * Karte.
+ *
+ * @param {BackupSchedulerStatus} scheduler
+ * @param {number} now
+ * @returns {HTMLDivElement[]}
+ */
+function backupOutcomeRows(scheduler, now) {
+  const lastSuccess = lastSuccessfulBackup(scheduler);
+  const overdue = backupSuccessOverdue(scheduler, now);
+
+  const lastBackupText = lastSuccess
+    ? t('settings.backupSchedulerLastSuccess', { date: dateTimeText(lastSuccess) })
+    : t('settings.backupSchedulerNever');
+  /** @type {string | HTMLElement} */
+  let lastBackupValue = lastBackupText;
+  if (overdue && lastSuccess) {
+    const stack = document.createElement('span');
+    stack.className = 'settings-info-value__stack';
+    const date = document.createElement('span');
+    date.textContent = lastBackupText;
+    const note = document.createElement('span');
+    note.textContent = t('settings.backupSchedulerOverdue');
+    stack.append(date, note);
+    lastBackupValue = stack;
+  }
+
+  const rows = [
+    createInfoRow({
+      label: t('settings.backupSchedulerLastBackup'),
+      value: lastBackupValue,
+      tone: overdue ? 'warning' : null,
+    }),
+  ];
+
+  const { lastBackup } = scheduler;
+  if (lastBackup?.timestamp && lastBackup.success === false) {
+    rows.push(createInfoRow({
+      label: t('settings.backupSchedulerLastAttempt'),
+      value: t('settings.backupSchedulerLastFail', { date: dateTimeText(lastBackup.timestamp) }),
+    }));
+  }
+
+  const errorRow = backupErrorRow(scheduler.lastError ?? null);
+  if (errorRow) rows.push(errorRow);
+  return rows;
+}
+
+/**
+ * Der Ton an "Aktiv". Der TEXT stimmt immer, solange der Zeitplan läuft; das
+ * GRÜN sagt mehr, nämlich "hier ist nichts zu tun". Neben einer roten
+ * Fehlerzeile oder einer Warnung am letzten Backup widerspräche es der Karte,
+ * auf der es steht. Der Erfolgston bleibt deshalb nur, solange der letzte Lauf
+ * nicht fehlschlug und kein Backup überfällig ist; sonst steht "Aktiv" ohne
+ * Ton da. Kein dritter Ton an dieser Zeile: Fehler und Warnung haben ihre
+ * eigene.
+ * Exportiert für Tests.
+ *
+ * @param {BackupSchedulerStatus} scheduler
+ * @param {number} now
+ * @returns {'success' | null}
+ */
+export function backupStatusTone(scheduler, now) {
+  if (!scheduler?.enabled) return null;
+  if (scheduler.lastError || scheduler.lastBackup?.success === false) return null;
+  return backupSuccessOverdue(scheduler, now) ? null : 'success';
+}
+
+/**
+ * Die Zeile zum nächsten geplanten Lauf, oder null. `nextRun` ist null,
+ * solange kein Zeitplan läuft; ein Wert, der kein Zeitpunkt ist, ergäbe eine
+ * leere Zeile und bleibt deshalb ebenfalls weg.
+ *
+ * @param {BackupSchedulerStatus} scheduler
+ * @returns {HTMLDivElement | null}
+ */
+function backupNextRunRow(scheduler) {
+  const { nextRun } = scheduler;
+  if (!nextRun || Number.isNaN(Date.parse(nextRun))) return null;
+  return createInfoRow({
+    label: t('settings.backupSchedulerNextRun'),
+    value: dateTimeText(nextRun),
+  });
 }
 
 function showError(element, message) {
@@ -243,21 +431,16 @@ async function loadBackupSchedulerStatus(container) {
     }
 
     renderDatabaseKeyCard(container, res.data?.database_key);
-    const { enabled, schedule, keepCount, lastBackup } = scheduler;
-
-    let lastBackupText = t('settings.backupSchedulerNever');
-    if (lastBackup?.timestamp) {
-      const date = dateTimeText(lastBackup.timestamp);
-      lastBackupText = lastBackup.success
-        ? t('settings.backupSchedulerLastSuccess', { date })
-        : t('settings.backupSchedulerLastFail', { date });
-    }
+    const { enabled, schedule, keepCount } = scheduler;
+    // EIN "jetzt" für die ganze Karte: der Ton an "Aktiv" und die Warnung am
+    // letzten Backup messen dasselbe und dürfen sich nicht widersprechen.
+    const now = Date.now();
 
     const rows = [
       createInfoRow({
         label: t('settings.backupSchedulerStatus'),
         value: enabled ? t('settings.backupSchedulerEnabled') : t('settings.backupSchedulerDisabled'),
-        tone: enabled ? 'success' : null,
+        tone: backupStatusTone(scheduler, now),
       }),
     ];
 
@@ -267,7 +450,14 @@ async function loadBackupSchedulerStatus(container) {
         label: t('settings.backupSchedulerKeep'),
         value: t('settings.backupSchedulerKeepCount', { count: keepCount }),
       }));
-      rows.push(createInfoRow({ label: t('settings.backupSchedulerLastBackup'), value: lastBackupText }));
+      rows.push(...backupOutcomeRows(scheduler, now));
+      // NACH DEN ERGEBNISSEN, NICHT BEIM ZEITPLAN: die Karte liest sich von
+      // gestern nach morgen, und "wann versucht er es wieder" ist die Frage,
+      // die ein Fehlschlag aufwirft - die Antwort steht direkt darunter, über
+      // dem Knopf, der die Alternative zum Warten ist. Neben "Täglich um
+      // 02:00" stünde zweimal fast dasselbe.
+      const nextRunRow = backupNextRunRow(scheduler);
+      if (nextRunRow) rows.push(nextRunRow);
 
       const actions = document.createElement('div');
       actions.className = 'settings-form-actions';
@@ -288,8 +478,18 @@ async function loadBackupSchedulerStatus(container) {
         triggerBtn.disabled = true;
         triggerBtn.textContent = t('settings.backupSchedulerTriggering');
         try {
-          await api.post('/backup/trigger');
-          window.yuvomi?.showToast(t('settings.backupSchedulerTriggeredToast'), 'success');
+          // DIE ANTWORT LESEN: ein fehlgeschlagener Lauf kommt als 200 mit
+          // `success: false` zurück, nicht als Fehler. Ungelesen stünde
+          // "Backup erfolgreich erstellt." über einer Karte, die gleich
+          // darauf den Fehlschlag zeigt. Erfolg ist nur ein ausdrückliches
+          // `true`; alles andere nennt den Grund.
+          const result = (await api.post('/backup/trigger'))?.data;
+          if (result?.success === true) {
+            window.yuvomi?.showToast(t('settings.backupSchedulerTriggeredToast'), 'success');
+          } else {
+            window.yuvomi?.showToast(backupReasonSentence(result?.reason), 'danger');
+          }
+          // In beiden Fällen: die Zeilen sollen den Lauf zeigen, der gerade war.
           loadBackupSchedulerStatus(container);
         } catch (err) {
           window.yuvomi?.showToast(errorSentence(err), 'danger');
