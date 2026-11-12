@@ -32,7 +32,7 @@ const dateMeta = (field) => (item, fmt) => (item[field] ? fmt.dateText(item[fiel
 // An archived task is still a hit (the list reaches it through its archive
 // filter), so the line has to say what it is before it says when it was due.
 const taskMeta = (/** @type {any} */ item, /** @type {any} */ fmt) => [
-  item.archived ? fmt.archivedText() : '',
+  item.archived_at ? fmt.archivedText() : '',
   item.due_date ? fmt.dateText(item.due_date) : '',
 ].filter(Boolean).join(' · ');
 

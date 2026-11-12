@@ -557,8 +557,8 @@ test('An archived task hit says so in its meta line, before the due date', async
   const meta = SEARCH_SECTIONS.find((s) => s.bucket === 'tasks')?.meta;
   assert.ok(meta, 'the task section has a meta line');
   const fmt = { dateText: (/** @type {string} */ d) => `am ${d}`, archivedText: () => 'Archiviert' };
-  assert.equal(meta({ due_date: '2026-01-01', archived: 1 }, fmt), 'Archiviert · am 2026-01-01');
-  assert.equal(meta({ due_date: null, archived: 1 }, fmt), 'Archiviert');
-  assert.equal(meta({ due_date: '2026-01-01', archived: 0 }, fmt), 'am 2026-01-01');
-  assert.equal(meta({ due_date: null, archived: 0 }, fmt), '');
+  assert.equal(meta({ due_date: '2026-01-01', archived_at: '2026-02-01T10:00:00Z' }, fmt), 'Archiviert · am 2026-01-01');
+  assert.equal(meta({ due_date: null, archived_at: '2026-02-01T10:00:00Z' }, fmt), 'Archiviert');
+  assert.equal(meta({ due_date: '2026-01-01', archived_at: null }, fmt), 'am 2026-01-01');
+  assert.equal(meta({ due_date: null, archived_at: null }, fmt), '');
 });

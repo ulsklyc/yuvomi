@@ -720,13 +720,13 @@ test('Task search finds an archived task, flags it and ranks it last', () => {
   insert.run('Ablageprobe erledigt', 'done', '2026-01-02', null, uid);
   insert.run('Ablageprobe offen', 'open', '2026-01-03', null, uid);
 
-  /** @type {{ title: string, archived: number }[]} */
+  /** @type {{ title: string, archived_at: string | null }[]} */
   const hits = runSearch(db, 'Ablageprobe', Number(uid)).tasks;
-  const got = JSON.stringify(hits.map((t) => [t.title, t.archived]));
+  const got = JSON.stringify(hits.map((t) => [t.title, t.archived_at]));
   const want = JSON.stringify([
-    ['Ablageprobe offen', 0],
-    ['Ablageprobe erledigt', 0],
-    ['Ablageprobe archiviert', 1],
+    ['Ablageprobe offen', null],
+    ['Ablageprobe erledigt', null],
+    ['Ablageprobe archiviert', '2026-02-01T10:00:00Z'],
   ]);
   assert(got === want, `Reihenfolge und Kennzeichen: ${got}`);
 });

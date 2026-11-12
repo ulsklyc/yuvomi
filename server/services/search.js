@@ -450,10 +450,12 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   // its creator.
   // The archive is a wish of the viewer at the list, no limit of what the list
   // may hold (services/task-scope.js): an archived task stays a hit, as does
-  // one that starts later. It says so (`archived`) and stands last.
+  // one that starts later. It says so (`archived_at`, as in the list row) and
+  // stands last - behind the limit, too: with enough open hits an archived
+  // one drops out, and a narrower query brings it back.
   if (allows('tasks')) results.tasks = database.prepare(`
     SELECT t.id, t.title, t.status, t.priority, t.due_date,
-           t.archived_at IS NOT NULL AS archived, s.body AS _body
+           t.archived_at, s.body AS _body
     FROM search_index s
     JOIN tasks t ON t.id = s.entity_id
     WHERE s.entity = 'task' AND s.search_index MATCH @match

@@ -65,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An archived task says so in the search results.** The global search finds archived tasks,
   so that a task you put away can be found again - but the hit looked like any open task. It
   now reads "Archived" before the due date and stands at the end of the task hits, after the
-  done ones.
+  done ones. With many hits an archived task can drop off the end of the list; a more exact
+  search term brings it back. `GET /api/v1/search` returns `archived_at` on a task hit.
 
 ### Security
 - **The global search no longer finds a private task of someone else.** A task set to "only
