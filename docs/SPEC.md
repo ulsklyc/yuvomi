@@ -6879,7 +6879,13 @@ fields: `version`, `build_revision`, `node`, `platform`, `arch`, `sqlite` (`vers
 (what `/readyz` answers at that moment) and `modules_installed`. It never returns a secret, a
 path, a hostname, the value of an environment variable or anything about a member. Members,
 signed-in devices and API tokens with scopes are refused. A single value that cannot be read is
-`null`.
+`null`. Settings → Household → System shows the fields under "Diagnostics" in four groups
+(application, server, database, backup): sizes and timestamps in the household's format, the
+uptime as the moment the server started, an unreadable value as "Unknown". One button copies them
+for a bug report as plain text, one line per field with the field names above and the raw values,
+the same in every language. Without the Clipboard API (plain http) the copy goes through the
+selection; where that fails too, the text stands selected in a field and nothing claims a copy.
+If the request fails, the section shows one sentence and a retry.
 
 ---
 
