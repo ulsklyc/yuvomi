@@ -23,6 +23,7 @@ import {
 } from '../../services/calendar-occurrence-overrides.js';
 import { personAvatarUrlSql } from '../../services/person-avatar.js';
 import { seriesReadingZone } from '../../services/calendar-events.js';
+import { ownEventReminderMarks } from '../../services/reminder-flags.js';
 
 export const VALID_SOURCES  = ['local', 'google', 'apple', 'ics'];
 // Ein Termin-Anhang ist ein Upload wie jeder andere und teilt deshalb die
@@ -558,6 +559,14 @@ export function serializeEvent(event, context = null) {
   // Ohne Leserecht auf die Dokumente `null` wie die anderen Anhangsfelder.
   const attachmentLocked = context?.viewer?.readsDocuments === true ? documentHidden : null;
   const metadata = recurrenceMetadata(event, context);
+  // DIE GLOCKE IN DER LISTE (has_reminder): meldet sich an diesem Termin eine
+  // Erinnerung des BETRACHTERS? Gefragt wird beim Erinnerungs-Eigner - bei
+  // einem Vorkommen mit eigenen Erinnerungen das Vorkommen, sonst die Serie -,
+  // und an einer Serie nur fuer das Vorkommen, zu dem die Erinnerung gehoert
+  // (#2687, services/reminder-flags.js). Ohne Betrachter im Kontext fehlt das
+  // Feld.
+  const reminderOwner = Number(metadata?.reminder_owner_id ?? event.id);
+  const reminderMarks = eventReminderMarks(context, reminderOwner);
   return {
     ...rest,
     ...(birthday_name ? {
@@ -579,7 +588,22 @@ export function serializeEvent(event, context = null) {
       : null,
     housekeeping_visit_id: event.housekeeping_visit_id ?? null,
     ...(metadata ?? {}),
+    ...(reminderMarks ? { has_reminder: reminderMarks.has(reminderOwner, metadata?.recurrence_id ?? null) } : {}),
   };
+}
+
+/**
+ * Wo sich eine Erinnerung des Betrachters meldet, fuer `has_reminder`: aus dem
+ * Listenkontext (serializeEvents fragt einmal fuer alle), sonst fuer den einen
+ * Termin. Ohne Betrachter `null` - dann fehlt das Feld.
+ * @param {{ ownReminderMarks?: ReturnType<typeof ownEventReminderMarks> | null, database?: any, actorId?: number | null } | null} context
+ * @param {number} owner
+ * @returns {ReturnType<typeof ownEventReminderMarks> | null}
+ */
+function eventReminderMarks(context, owner) {
+  if (context?.ownReminderMarks) return context.ownReminderMarks;
+  if (!context?.database || !context.actorId) return null;
+  return ownEventReminderMarks(context.database, [owner], context.actorId);
 }
 
 /**
@@ -608,6 +632,15 @@ export function serializeEvents(events, context) {
     ...context,
     capabilitiesBySeriesId,
     visibleAttachmentDocumentIds: visibleAttachmentDocumentIds(events, context),
+    // Eine Abfrage fuer die ganze Liste. Gefragt wird nach beiden moeglichen
+    // Eignern (Termin und Serie); serializeEvent waehlt den richtigen.
+    ownReminderMarks: context.actorId
+      ? ownEventReminderMarks(
+        context.database,
+        events.flatMap((event) => [event?.id, event?.reminder_owner_id, event?.series_id, event?.recurrence_parent_id]),
+        context.actorId,
+      )
+      : null,
   };
   return events.map((event) => serializeEvent(event, bulkContext));
 }

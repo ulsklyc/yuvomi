@@ -535,6 +535,7 @@ function glyphsBeforeTitle(html, title) {
     calendarGlyph: /data-lucide="calendar"/.test(head),
     ownIcon: /data-lucide="stethoscope"/.test(head),
     repeat: /class="calendar-repeat-icon"/.test(head),
+    bell: /class="calendar-reminder-icon"/.test(head),
   };
 }
 
@@ -572,6 +573,73 @@ test('Icon-Regel: die Serienmarke steht in JEDER Ansicht vor dem Titel', () => {
   for (const [view, html] of Object.entries(everyEventView(glyphEvent({ recurrence_rule: 'FREQ=WEEKLY' })))) {
     assert(glyphsBeforeTitle(html, 'Zahnarzt').repeat, `${view}: die Serienmarke fehlt`);
   }
+});
+
+// --------------------------------------------------------
+// DIE GLOCKE (`has_reminder`) IST DIE AUSNAHME DER ICON-REGEL: eine Auskunft
+// fuer die eine Person, kein Merkmal des Termins. Sie steht in den Listenzeilen
+// (Agenda, die Tagesliste unter dem Monat, die Suche - alle renderAgendaEvent)
+// und in der Tagesansicht, wo der Block die volle Breite hat; im Monats- und
+// Wochenraster kostete sie den Titel Zeichen.
+// --------------------------------------------------------
+test('Glocke: in Agenda und Tagesansicht vor dem Titel, nicht in Monat, Woche und Wochen-Ganztag', () => {
+  const views = /** @type {Record<string, string>} */ (everyEventView(glyphEvent({ has_reminder: true })));
+  for (const view of ['Agenda', 'Tag']) {
+    assert(glyphsBeforeTitle(views[view], 'Zahnarzt').bell, `${view}: die Glocke fehlt`);
+  }
+  for (const view of ['Monat', 'Woche', 'Ganztag']) {
+    assert(!glyphsBeforeTitle(views[view], 'Zahnarzt').bell, `${view}: die Glocke gehoert nicht ins Raster`);
+  }
+  // Der Ganztags-Balken ist EIN Baustein fuer Woche und Tag; die Tagesansicht
+  // bittet um die Glocke, die Woche nicht.
+  const dayAllDay = calendarHelpers.renderAllDayEvent(glyphEvent({ has_reminder: true }), '2026-09-24', { reminder: true });
+  assert(glyphsBeforeTitle(dayAllDay, 'Zahnarzt').bell, 'Ganztag in der Tagesansicht: die Glocke fehlt');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert(/allday\.map\(\(ev\) => renderAllDayEvent\(ev, state\.cursor, \{ reminder: true \}\)\)/.test(src),
+    'die Tagesansicht muss ihre Ganztags-Balken mit Glocke zeichnen');
+  assert(!/renderAllDayEvent\(ev, d, \{ reminder/.test(src), 'die Woche zeichnet ihre Ganztags-Balken ohne Glocke');
+});
+
+test('Glocke: ohne has_reminder in keiner Ansicht', () => {
+  for (const extra of [{}, { has_reminder: false }, { has_reminder: 1 }]) {
+    for (const [view, html] of Object.entries(everyEventView(glyphEvent(extra)))) {
+      assert(!glyphsBeforeTitle(html, 'Zahnarzt').bell, `${view}: Glocke ohne Erinnerung (${JSON.stringify(extra)})`);
+    }
+  }
+  assert(calendarHelpers.calendarReminderIconHtml({ has_reminder: true })
+    .includes('role="img" aria-label="reminders.sectionTitle"'), 'die Glocke traegt das Wort der Leseansicht als Namen');
+});
+
+test('Glocke: die Agenda-Zeile nennt die Erinnerung auch im zugaenglichen Namen', () => {
+  const ev = glyphEvent({ has_reminder: true, recurrence_rule: 'FREQ=WEEKLY' });
+  assert(calendarHelpers.agendaEventAriaLabel(ev, '09:00', '', { reminder: true })
+    .startsWith('calendar.recurringEvent, reminders.sectionTitle, Zahnarzt, 09:00'),
+  'das aria-label der Zeile ueberschreibt ihre Kinder und muss die Glocke wiederholen');
+  assert(!calendarHelpers.agendaEventAriaLabel(ev, '09:00').includes('reminders.sectionTitle'),
+    'wo keine Glocke steht (Woche, Monat), nennt der Name sie auch nicht');
+  assert(!calendarHelpers.agendaEventAriaLabel(glyphEvent({}), '09:00', '', { reminder: true }).includes('reminders.sectionTitle'),
+    'ohne Erinnerung kein Wort');
+  let agenda = '';
+  withMonthState({ events: [ev] }, () => { agenda = calendarHelpers.renderAgendaEvent(ev, '2026-09-24'); });
+  assert(/aria-label="calendar\.recurringEvent, reminders\.sectionTitle, Zahnarzt/.test(agenda),
+    'die gerenderte Agenda-Zeile traegt den Namen mit der Erinnerung');
+});
+
+test('Leseansicht: ein Vorkommen ohne Glocke nennt die Erinnerungen seiner Serie nicht (#2687)', () => {
+  // Jedes Vorkommen laedt die Zeilen des Masters. Genannt werden sie nur dort,
+  // wo sie sich melden - dieselbe Antwort wie die Glocke (`has_reminder`).
+  const rows = [{ id: 1, remind_at: '2026-09-23T07:00:00' }];
+  const shown = calendarHelpers.remindersShownInDetail;
+  assert(shown({ is_recurring_instance: 1, recurrence_rule: 'FREQ=WEEKLY', has_reminder: false }, rows).length === 0,
+    'ein spaeteres Vorkommen bleibt still');
+  assert(shown({ is_occurrence_override: true, has_reminder: false }, rows).length === 0, 'ein bearbeitetes Vorkommen ebenso');
+  assert(shown({ is_recurring_instance: 1, recurrence_rule: 'FREQ=WEEKLY', has_reminder: true }, rows) === rows,
+    'das Vorkommen, zu dem die Erinnerung gehoert, nennt sie');
+  // Ein einzelner Termin nennt, was geladen wurde: seine Glocke kam mit dem
+  // Termin, die Erinnerung kann juenger sein. Ebenso eine Antwort ohne das Feld.
+  assert(shown({ has_reminder: false }, rows) === rows, 'ein einzelner Termin nennt, was geladen wurde');
+  assert(shown({ is_recurring_instance: 1, recurrence_rule: 'FREQ=WEEKLY' }, rows) === rows, 'ohne das Feld bleibt es beim Geladenen');
+  assert(shown(null, rows) === rows, 'ohne Termin ebenso');
 });
 
 test('Icon-Regel: kein Baustein ruft das Icon an eventGlyphsHtml() vorbei', () => {

@@ -1261,7 +1261,8 @@
   height: var(--space-3);
 }
 
-.calendar-repeat-icon {
+.calendar-repeat-icon,
+.calendar-reminder-icon {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;

@@ -1095,7 +1095,9 @@ test('bulk serialization query count follows distinct masters instead of expande
 
   const oneMasterQueries = countFor(hundred);
   const twoMasterQueries = countFor(twoHundred);
-  assert.ok(oneMasterQueries <= 10, `one master used ${oneMasterQueries} statements`);
+  // 11 since the bell in the lists: `has_reminder` asks one statement per list
+  // (services/reminder-flags.js), not one per master or occurrence.
+  assert.ok(oneMasterQueries <= 11, `one master used ${oneMasterQueries} statements`);
   assert.ok(twoMasterQueries <= oneMasterQueries + 3,
     `a second master grew statements from ${oneMasterQueries} to ${twoMasterQueries}`);
 });

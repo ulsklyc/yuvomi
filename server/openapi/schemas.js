@@ -292,6 +292,11 @@ const {
   ...dashboardTaskProperties
 } = taskProperties;
 
+const HAS_REMINDER_FIELD = {
+  type: 'boolean',
+  description: 'True when a reminder of the caller will notify for this entry: one that is not dismissed, from the rows `GET /reminders` and `GET /reminders/all` return for it. Reminders belong to one person, so two members can get different values for the same entry.',
+};
+
 const DOCUMENT_COUNT_FIELD = {
   type: ['integer', 'null'],
   minimum: 0,
@@ -938,13 +943,17 @@ export const schemas = {
         TaskListItem: {
           type: 'object',
           description: 'A top-level task in `GET /tasks`. Subtasks the caller may not see count nowhere.',
-          required: [...taskRequired, 'subtask_total', 'subtask_done', 'subtasks', 'document_count'],
+          required: [...taskRequired, 'subtask_total', 'subtask_done', 'subtasks', 'document_count', 'has_reminder'],
           properties: {
             ...taskProperties,
             subtask_total: { type: 'integer', minimum: 0 },
             subtask_done: { type: 'integer', minimum: 0 },
             subtasks: { type: 'array', items: { $ref: '#/components/schemas/TaskSubtaskSummary' } },
             document_count: DOCUMENT_COUNT_FIELD,
+            has_reminder: {
+              ...HAS_REMINDER_FIELD,
+              description: `${HAS_REMINDER_FIELD.description} False on a done or archived task: it is not meant to remind, and reopening it brings the value back.`,
+            },
           },
         },
         TaskLinkedDocument: {
@@ -1276,6 +1285,10 @@ export const schemas = {
             attachment_data: {
               type: ['string', 'null'],
               description: 'Legacy attachment data URL. Null for attachments linked through attachment_document_id.',
+            },
+            has_reminder: {
+              ...HAS_REMINDER_FIELD,
+              description: `${HAS_REMINDER_FIELD.description} Asked at \`reminder_owner_id\`. A reminder on a series is one row that notifies once, so it is true only at the occurrence the reminder belongs to: the first one that starts at or after it. Present in the answers that know the caller.`,
             },
             ...calendarOccurrenceProperties,
           },
