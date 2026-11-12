@@ -24,7 +24,7 @@ import { householdMemberSql } from './household-members.js';
  * admin's broken subscription cannot stop the others from being told.
  *
  * @param {Object} opts
- * @param {import('better-sqlite3-multiple-ciphers').Database} opts.database
+ * @param {Object} opts.database
  * @param {{ title: string, body: string, url?: string, tag?: string, priority?: string }} opts.payload
  * @param {PushService} [opts.pushService] - { sendPushToUser }
  * @returns {Promise<number>} how many admins actually received the push
@@ -32,8 +32,8 @@ import { householdMemberSql } from './household-members.js';
  *   settled promises)
  */
 export async function notifyAdmins({ database, payload, pushService = defaultPushService }) {
-  /** @type {{ id: number }[]} */
-  const admins = database.prepare(`
+  const db = /** @type {{ prepare: (sql: string) => { all: () => { id: number }[] } }} */ (database);
+  const admins = db.prepare(`
     SELECT u.id FROM users u
     WHERE u.role = 'admin' AND ${householdMemberSql('u')}
     ORDER BY u.id ASC

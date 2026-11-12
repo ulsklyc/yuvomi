@@ -250,7 +250,7 @@ export async function createLocalBackup() {
  * die Nachricht fuer den Sicherungsfall.
  *
  * @param {Object} [opts]
- * @param {import('better-sqlite3-multiple-ciphers').Database} [opts.database]
+ * @param {Object} [opts.database]
  * @param {import('./admin-notices.js').PushService} [opts.pushService] - { sendPushToUser }
  * @param {keyof typeof BACKUP_FAILURE_LOCALE_KEYS} [opts.reason]
  * @returns {Promise<number>} Zahl der Admins, bei denen tatsaechlich eine
