@@ -15,6 +15,40 @@ export function corePaths() {
         },
       }),
     },
+    '/readyz': {
+      get: op({
+        summary: 'Readiness check',
+        operationId: 'getReadiness',
+        tag: 'System',
+        auth: false,
+        description: 'Whether this instance can serve right now. Unlike `/health`, which only says that the process answers and stays 200 during a restore, this answers 503 with a `reason` while a restore is running, the database connection is closed, the applied schema is behind this build, or the data directory is not writable. It does not write to the database. Point a load balancer or an uptime monitor here; keep a container healthcheck on `/health`, or the container is restarted in the middle of a restore.',
+        responses: /** @type {any} */ ({
+          200: {
+            description: 'The instance is ready',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ReadinessResponse' } } },
+          },
+          503: {
+            description: 'The instance is not ready; `reason` says why',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/NotReadyResponse' } } },
+          },
+        }),
+      }),
+    },
+    '/api/v1/system/diagnostics': {
+      get: op({
+        summary: 'Get system diagnostics',
+        operationId: 'getSystemDiagnostics',
+        tag: 'System',
+        admin: true,
+        description: 'What this installation runs on, for a bug report or a look at the last backup: version, runtime, schema, sizes, backup status, readiness. Never a key, a path, a hostname, the value of an environment variable or anything about a member. A single value that cannot be read is `null` (`schema_version`: 0) and does not fail the answer. Not cached.',
+        responses: /** @type {any} */ ({
+          200: {
+            description: 'Diagnostics of this installation',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SystemDiagnosticsResponse' } } },
+          },
+        }),
+      }),
+    },
     '/api/v1/version': {
       get: op({
         summary: 'Get application version',

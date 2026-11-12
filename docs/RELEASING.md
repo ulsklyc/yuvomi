@@ -198,7 +198,9 @@ CVE requested through GitHub. The response times this has to fit are in
   mirror line then publishes `<owner>/oikos`, which a fork can drop.
 - `umbrel-publish.yml` needs the `UMBREL_FORK_TOKEN` secret (a token with `repo` scope on a fork of
   `getumbrel/umbrel-apps`) and pushes to that fork; without the secret the job fails and nothing
-  else is affected.
+  else is affected. Only its last job, `publish`, sees the token: the catalog's linter and its npm
+  dependencies run in a job of their own with no secret and no rights. A manual run with
+  `-f dry_run=true` prepares and lints without pushing.
 - `release-assets.yml` needs no secret: the workflow token uploads the assets, and the
   attestation is signed through GitHub's OIDC token and Sigstore. Attestations are free for public
   repositories only; a private fork has to drop that step.
