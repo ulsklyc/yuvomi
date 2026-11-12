@@ -2628,6 +2628,8 @@
         "backupSchedulerLastFail": "{{date}} (selhalo)",
         "backupSchedulerNever": "Ještě nebyla vytvořena žádná záloha",
         "backupSchedulerLastError": "Poslední chyba",
+        "backupSchedulerLastAttempt": "Poslední pokus",
+        "backupSchedulerOverdue": "Od té doby neproběhly nejméně dvě naplánované zálohy.",
         "backupSchedulerTrigger": "Vytvořit zálohu nyní",
         "backupSchedulerTriggering": "Vytváří se záloha...",
         "backupSchedulerTriggeredToast": "Záloha úspěšně vytvořena.",

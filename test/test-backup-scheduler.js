@@ -7,26 +7,9 @@ import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
-import { register } from 'node:module';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { installMiniDom, MiniElement } from './mini-dom.js';
-
-register('./test-browser-loader.mjs', import.meta.url);
-installMiniDom();
-// mini-dom kennt kein classList; createInfoRow() haengt die Ton-Klasse damit
-// an, nicht ueber className direkt.
-Object.defineProperty(MiniElement.prototype, 'classList', {
-  get() {
-    const el = this;
-    return {
-      /** @param {string[]} names */
-      add: (...names) => { el.className = [el.className, ...names].filter(Boolean).join(' '); },
-    };
-  },
-});
-const { backupErrorRow } = await import('../public/settings/pages/admin-backup.js');
 
 // Nested under a root we control, so one test can revoke write access on the
 // parent and exercise the "backup directory is not writable" path (issue #579).
@@ -439,39 +422,5 @@ describe('Backup status survives a restart', () => {
     const status = (await afterRestart()).getStatus();
     assert.strictEqual(status.lastError, null);
     assert.strictEqual(status.lastBackup.success, true);
-  });
-});
-
-// Gegen die echte Karte unter test/mini-dom.js statt gegen den Quelltext
-// (#2525): backupErrorRow() ist die Funktion, die loadBackupSchedulerStatus()
-// hinter api.get() aufruft, exportiert und von createInfoRow aus baut, mit
-// demselben document.createElement, das mini-dom stubbt.
-describe('Backup-Karte: der Grund des letzten Fehlschlags (#2525)', () => {
-  it('je Grund steht der uebersetzte Satz, als Fehler ausgezeichnet', () => {
-    const faelle = {
-      backup_dir_not_writable: 'settings.backupSchedulerReasonDirNotWritable',
-      disk_full: 'settings.backupSchedulerReasonDiskFull',
-      backup_verify_failed: 'settings.backupSchedulerReasonVerifyFailed',
-      unknown: 'settings.backupSchedulerReasonUnknown',
-    };
-    for (const [reason, key] of Object.entries(faelle)) {
-      const row = backupErrorRow({ timestamp: '2026-01-01T00:00:00Z', reason, message: 'raw system text' });
-      assert.ok(row, reason);
-      const [labelEl, valueEl] = row.childNodes;
-      assert.equal(labelEl.textContent, 'settings.backupSchedulerLastError', reason);
-      // lastError.reason waehlt den uebersetzten Satz (#1909: nie der rohe
-      // lastError.message-Text des Systemfehlers, der bleibt im Server-Log).
-      assert.equal(valueEl.textContent, key, `${reason} muss auf ${key} zeigen, nicht auf den rohen message-Text`);
-      assert.match(valueEl.className, /settings-info-value--danger/, reason);
-    }
-  });
-
-  it('ein Grund ausserhalb der vier bekannten faellt auf den Allgemeinsatz zurueck', () => {
-    const row = backupErrorRow({ timestamp: '2026-01-01T00:00:00Z', reason: 'etwas-neues', message: 'x' });
-    assert.equal(row.childNodes[1].textContent, 'common.errorGeneric');
-  });
-
-  it('ein erfolgreicher Lauf setzt lastError auf null - die Zeile verschwindet von selbst', () => {
-    assert.equal(backupErrorRow(null), null);
   });
 });

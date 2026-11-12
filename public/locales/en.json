@@ -2540,6 +2540,8 @@
         "backupSchedulerLastFail": "{{date}} (failed)",
         "backupSchedulerNever": "No backup created yet",
         "backupSchedulerLastError": "Last error",
+        "backupSchedulerLastAttempt": "Last attempt",
+        "backupSchedulerOverdue": "At least two scheduled backups have been missed since then.",
         "backupSchedulerTrigger": "Create backup now",
         "backupSchedulerTriggering": "Creating backup...",
         "backupSchedulerTriggeredToast": "Backup created successfully.",

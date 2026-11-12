@@ -2442,6 +2442,8 @@
         "backupSchedulerLastSuccess": "{{date}} (bem-sucedida)",
         "backupSchedulerNever": "Ainda não foi criada nenhuma cópia de segurança",
         "backupSchedulerLastError": "Último erro",
+        "backupSchedulerLastAttempt": "Última tentativa",
+        "backupSchedulerOverdue": "Desde então, pelo menos duas cópias de segurança agendadas não foram feitas.",
         "backupSchedulerSchedule": "Agendamento",
         "backupSchedulerCronDaily": "Diariamente às {{time}}",
         "backupSchedulerCronWeekly": "Semanalmente: {{weekday}} às {{time}}",

@@ -2739,6 +2739,8 @@
         "backupSchedulerLastFail": "{{date}} (nie powiodło się)",
         "backupSchedulerNever": "Jeszcze nie utworzono kopii",
         "backupSchedulerLastError": "Ostatni błąd",
+        "backupSchedulerLastAttempt": "Ostatnia próba",
+        "backupSchedulerOverdue": "Od tego czasu nie powstały co najmniej dwie zaplanowane kopie.",
         "backupSchedulerTrigger": "Utwórz kopię teraz",
         "backupSchedulerTriggering": "Tworzenie kopii...",
         "backupSchedulerTriggeredToast": "Kopia pomyślnie utworzona.",

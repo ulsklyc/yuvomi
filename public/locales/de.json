@@ -2584,6 +2584,8 @@
         "backupSchedulerLastFail": "{{date}} (fehlgeschlagen)",
         "backupSchedulerNever": "Noch kein Backup erstellt",
         "backupSchedulerLastError": "Letzter Fehler",
+        "backupSchedulerLastAttempt": "Letzter Versuch",
+        "backupSchedulerOverdue": "Seither sind mindestens zwei geplante Backups ausgeblieben.",
         "backupSchedulerTrigger": "Jetzt Backup erstellen",
         "backupSchedulerTriggering": "Backup wird erstellt...",
         "backupSchedulerTriggeredToast": "Backup erfolgreich erstellt.",
