@@ -7,10 +7,14 @@
  * Schema:  built by the production code, never parsed: server/db.js migrates an in-memory
  *          database on import, and importing server/auth.js creates `sessions` the way the
  *          server does at start (BetterSQLiteStore). A CREATE TABLE outside the migrations
- *          that this suite does not execute would leave its table out; the last block finds
- *          every such statement under server/ and demands that its table is in the schema
- *          built here (a temp-schema table such as temp.search_vocab holds no data and is
- *          skipped). Not measured: which file reads a foreign table (SQL lives in template
+ *          that this suite does not execute would leave its table out, so one block finds
+ *          every `CREATE ... TABLE` under server/ (also with the keywords split by quotes or
+ *          `+`), sets off the statements of the MIGRATIONS entries in server/db.js against
+ *          the imported array, and demands of each other one a table name in plain text
+ *          that is in the schema built here; a name it cannot read (interpolated, quoted,
+ *          bracketed, concatenated) is red with file and line. A temp-schema table such as
+ *          temp.search_vocab holds no data and is skipped. Blind spot: SQL assembled
+ *          without the words CREATE and TABLE in the source (both from variables). Not measured: which file reads a foreign table (SQL lives in template
  *          strings, table names in variables; phase 2 sections B and D route reads through
  *          the owner's read function instead).
  * Run:     npm run test:table-ownership
@@ -100,6 +104,48 @@ test('OWNERS carries every permission module, and every owner owns a table', () 
   assert.deepEqual(idle, [], `owners without a table - drop them from OWNERS or give them their tables: ${idle.join(', ')}`);
 });
 
+/** Every `CREATE [TEMP] [VIRTUAL] TABLE`, also with the keywords split by quotes or `+`. */
+const CREATE_TABLE = /\bCREATE\b(?:[\s"'`+]|TEMP(?:ORARY)?\b|VIRTUAL\b)*\bTABLE\b/gi;
+const IF_NOT_EXISTS = /^\s+IF\s+NOT\s+EXISTS(?=\s)/i;
+/** A plain name, ended by whitespace or `(`: not `${`, a quote, `[` or a concatenation. */
+const PLAIN_NAME = /^\s+((?:temp\.)?[A-Za-z_]\w*)(?=[\s(])/i;
+
+/**
+ * Every CREATE TABLE statement in `text`, with the table name it creates or null when the
+ * name cannot be read as plain text.
+ * @param {string} text
+ * @returns {{ index: number, name: string | null, temp: boolean, snippet: string }[]}
+ */
+function createStatements(text) {
+  const out = [];
+  for (const m of text.matchAll(CREATE_TABLE)) {
+    const index = /** @type {number} */ (m.index);
+    let rest = text.slice(index + m[0].length, index + m[0].length + 200);
+    const ifNotExists = IF_NOT_EXISTS.exec(rest);
+    if (ifNotExists) rest = rest.slice(ifNotExists[0].length);
+    const plain = /["'`+]/.test(m[0]) ? null : PLAIN_NAME.exec(rest);
+    const name = plain && !/^(IF|NOT|EXISTS|AS)$/i.test(plain[1]) ? plain[1] : null;
+    const temp = /\bTEMP/i.test(m[0]) || /^temp\./i.test(name ?? '');
+    out.push({ index, name, temp, snippet: text.slice(index, index + 80).split('\n')[0] });
+  }
+  return out;
+}
+
+test('the statement reader names a plain table and refuses every form it cannot read', () => {
+  const names = (/** @type {string} */ text) => createStatements(text).map((c) => c.name);
+  assert.deepEqual(names('CREATE TABLE a (x); CREATE TABLE IF NOT EXISTS b(x); CREATE VIRTUAL TABLE c USING fts5(x)'), ['a', 'b', 'c']);
+  assert.deepEqual(names('CREATE TEMP TABLE t (x); CREATE VIRTUAL TABLE IF NOT EXISTS temp.v USING fts5vocab(a)'), ['t', 'temp.v']);
+  for (const unreadable of [
+    'CREATE TABLE ${n}_probe (x)',
+    'CREATE TABLE IF NOT EXISTS ${n} (x)',
+    'CREATE TABLE IF NOT EXISTS "quoted" (x)',
+    'CREATE TABLE [probe_bracket] (x)',
+    'CREATE TABLE x_${n} (x)',
+    '"CREATE TABLE " + "probe_concat (x)"',
+    '"CREATE " + "TABLE probe_split (x)"',
+  ]) assert.deepEqual(names(unreadable), [null], unreadable);
+});
+
 test('every table created outside the migrations is in the schema built here', () => {
   /** @type {string[]} */
   const files = [];
@@ -112,22 +158,49 @@ test('every table created outside the migrations is in the schema built here', (
   };
   walk(join(REPO, 'server'));
   assert.ok(files.length >= 200, `only ${files.length} server files - the walk does not reach them`);
-  // db.js holds the migrations (their tables are the migrated schema) and migrate(), which
-  // runs on import; db-schema-test.js is the test mirror of the migrations.
-  const outside = files.filter((f) => f !== 'server/db.js' && f !== 'server/db-schema-test.js');
-  const tables = new Set(schemaTables());
-  const created = [];
-  const missing = [];
-  const STATEMENT = /CREATE\s+(TEMP(?:ORARY)?\s+)?(?:VIRTUAL\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?((?:\w+\.)?\w+)/gi;
-  for (const file of outside) {
-    for (const m of readFileSync(join(REPO, file), 'utf8').matchAll(STATEMENT)) {
-      const name = m[2];
-      created.push(`${file} ${name}`);
-      if (m[1] || /^temp\./i.test(name)) continue;
-      if (!tables.has(name)) missing.push(`${name} (${file})`);
+  // server/db-schema-test.js is the test mirror of the migrations: no server code runs it,
+  // its tables are the migrated ones under a second spelling.
+  const scanned = files.filter((f) => f !== 'server/db-schema-test.js');
+  // Inside server/db.js the statements of the MIGRATIONS entries are the migrated schema
+  // (a migration may create a table a later one drops). They are taken from the imported
+  // array, as text of each `up` string and of each `up`/`afterUp` function, and one
+  // statement in db.js is set off against one equal statement there. Everything else in
+  // db.js - migrate()'s schema_migrations, any later helper - follows the rule for all files.
+  /** @type {Map<string, number>} */
+  const migrated = new Map();
+  for (const m of db.MIGRATIONS) {
+    for (const part of [m.up, m.afterUp]) {
+      if (part == null) continue;
+      for (const c of createStatements(String(part))) migrated.set(c.snippet, (migrated.get(c.snippet) ?? 0) + 1);
     }
   }
-  assert.ok(created.includes('server/auth.js sessions'), `the search does not find the sessions table in server/auth.js: ${created.join(', ')}`);
-  assert.deepEqual(missing, [], 'created at runtime, but not in the schema this suite builds - import the code that '
-    + `creates it at the top of this suite, then give the table its line in server/table-owners.ts:\n  ${missing.join('\n  ')}`);
+  assert.ok(migrated.size >= 100, `only ${migrated.size} CREATE TABLE statements in the migrations - the reader does not see them`);
+  const tables = new Set(schemaTables());
+  const problems = [];
+  let seen = 0;
+  for (const file of scanned) {
+    const text = readFileSync(join(REPO, file), 'utf8');
+    for (const c of createStatements(text)) {
+      seen += 1;
+      if (file === 'server/db.js' && (migrated.get(c.snippet) ?? 0) > 0) {
+        migrated.set(c.snippet, /** @type {number} */ (migrated.get(c.snippet)) - 1);
+        continue;
+      }
+      const where = `${file}:${text.slice(0, c.index).split('\n').length}`;
+      if (c.name === null) {
+        problems.push(`${where}: the table name cannot be read (\`${c.snippet}\`) - write it as plain text, `
+          + 'or execute this code at the top of this suite and read the schema it builds');
+      } else if (!c.temp && !tables.has(c.name)) {
+        problems.push(`${where}: ${c.name} is created at runtime but is not in the schema this suite builds - import `
+          + 'the code that creates it at the top of this suite, then give the table its line in server/table-owners.ts');
+      }
+    }
+  }
+  assert.ok(seen >= 200, `only ${seen} CREATE TABLE statements under server/ - the search does not reach them`);
+  assert.deepEqual(problems, [], `CREATE TABLE outside the migrations (${problems.length}):\n  ${problems.join('\n  ')}`);
+});
+
+test('the manifest lists its tables sorted by name', () => {
+  const keys = Object.keys(TABLE_OWNERS);
+  assert.deepEqual(keys, [...keys].sort(), 'server/table-owners.ts: keep the table lines sorted by name');
 });
