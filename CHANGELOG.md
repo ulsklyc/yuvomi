@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured - only the description was wrong. Such a schedule now stands there as the
   expression itself, like every other list or range; a single weekday is still spelled out,
   as a number or as a short or full name (`mon`, `Monday`).
+- **The global search finds the medications and activities of a person you care for.** If an
+  admin has entered you as someone's caregiver, the Health pages show you that person's
+  entries, including the ones marked private. The search left those out: it only knew your
+  own entries and the ones shared with the family. It now applies the rule of the Health
+  pages. Nothing else changes - without a care grant nobody finds another person's private
+  entry, an admin included.
 
 ## [2.89.1] - 2026-11-12
 

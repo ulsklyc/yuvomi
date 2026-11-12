@@ -6,7 +6,7 @@
  * Abhaengigkeiten: server/services/visibility.js, document-access.js und
  *        budget-visibility.js (reine SQL-Bausteine, kein db.js)
  */
-import { icsSubscriptionVisibleWhere, noteVisibleWhere, visibilityWhere } from './visibility.js';
+import { careAwareClause, icsSubscriptionVisibleWhere, noteVisibleWhere, visibilityWhere } from './visibility.js';
 import { documentVisibleSql } from './document-access.js';
 import { budgetDetailsVisibleWhere, resolveBudgetMode } from './budget-visibility.js';
 
@@ -547,27 +547,34 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     LIMIT @limit
   `).all({ match, limit }).map((row) => withExcerpt(row, q, [row._body]));
 
-  // Health: Medikamente — Treffer auf Name/Dosistext, Sichtbarkeits-Scoping.
+  // Health: the row rule of the health lists (GET /health/medications,
+  // GET /health/activities) - the viewer's own rows, `family` rows, and every
+  // row of a person whose care was granted to the viewer (#584). The clause
+  // binds positionally, so these two queries do as a whole: match, the
+  // clause's parameters, limit - in the order of the placeholders.
+  // Medications: hits on name and dosage text.
+  const medsVisible = careAwareClause('m', userId, null);
   if (allows('meds')) results.meds = database.prepare(`
     SELECT m.id, m.name AS title, m.dosage_text, m.active
     FROM search_index s
     JOIN medications m ON m.id = s.entity_id
-    WHERE s.entity = 'medication' AND s.search_index MATCH @match
-      AND (m.user_id = @userId OR m.visibility = 'family')
+    WHERE s.entity = 'medication' AND s.search_index MATCH ?
+      AND ${medsVisible.sql}
     ORDER BY m.active DESC, m.name ASC
-    LIMIT @limit
-  `).all({ match, userId, limit });
+    LIMIT ?
+  `).all(match, ...medsVisible.params, limit);
 
-  // Health: Aktivitäten — Treffer auf Typ/Notiz, Sichtbarkeits-Scoping.
+  // Activities: hits on type and note, the same row rule.
+  const activitiesVisible = careAwareClause('a', userId, null);
   if (allows('activities')) results.activities = database.prepare(`
     SELECT a.id, a.type AS title, a.note, a.performed_at
     FROM search_index s
     JOIN health_activities a ON a.id = s.entity_id
-    WHERE s.entity = 'activity' AND s.search_index MATCH @match
-      AND (a.user_id = @userId OR a.visibility = 'family')
+    WHERE s.entity = 'activity' AND s.search_index MATCH ?
+      AND ${activitiesVisible.sql}
     ORDER BY a.performed_at DESC
-    LIMIT @limit
-  `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.note]));
+    LIMIT ?
+  `).all(match, ...activitiesVisible.params, limit).map((row) => withExcerpt(row, q, [row.note]));
 
   // Waste: nur der Typ-Katalog ist indiziert (Migration 206) - nie die von
   // waste-domain.js berechneten, potenziell unbegrenzten Termine (siehe dortige

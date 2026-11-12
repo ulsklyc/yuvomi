@@ -818,14 +818,12 @@
         }
       },
       "search": {
-        "activities": {
-          "divergent": "search uses an inline rule without care grants (server/services/search.js:567); the list shows the cared-for person's private activity",
-          "ids": [
-            "activity.admin.family",
-            "activity.child.family",
-            "activity.member.family"
-          ]
-        },
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -847,15 +845,13 @@
           "event.member.all",
           "event.member.ics-shared"
         ],
-        "medications": {
-          "divergent": "search uses an inline rule without care grants (server/services/search.js:556); list and detail show the cared-for person's private medication",
-          "ids": [
-            "medication.admin.family",
-            "medication.caregiver.private",
-            "medication.child.family",
-            "medication.member.family"
-          ]
-        },
+        "medications": [
+          "medication.admin.family",
+          "medication.caregiver.private",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
         "notes": {
           "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
           "ids": []

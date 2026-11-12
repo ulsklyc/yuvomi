@@ -44,6 +44,8 @@ db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
 db.exec(MIGRATIONS_SQL[65]);
 // Migration 66: FTS triggers + backfill for medications and health activities.
 db.exec(MIGRATIONS_SQL[66]);
+// Migration 130: care grants - the health search asks the rule of the health lists.
+db.exec(MIGRATIONS_SQL[130]);
 // Migration 197: waste_types (only the table search reads from).
 db.exec(MIGRATIONS_SQL[197]);
 // Migration 206: FTS triggers + backfill for waste_types.
