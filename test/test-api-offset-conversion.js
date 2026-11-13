@@ -88,9 +88,14 @@ app.use('/calendar', calendarRouter);
 app.use('/reminders', remindersRouter);
 app.use('/health', healthRouter);
 app.use('/housekeeping', housekeepingRouter);
+// Zweite Montierung unter dem echten Pfad: das MCP-Werkzeug `create_event`
+// geht seit #2616 per Loopback durch POST /api/v1/calendar, und genau DAS ist
+// die Aussage des Falls unten - derselbe Weg wie POST, nicht ein zweiter.
+app.use('/api/v1/calendar', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening',
   () => resolve(`http://127.0.0.1:${server.address().port}`)));
+process.env.MCP_INTERNAL_BASE_URL = baseUrl;
 test.after(() => server.close());
 
 async function call(method, route, body) {
@@ -313,12 +318,12 @@ test('PUT /calendar/:seriesId/occurrences/:recurrenceId rechnet einen Offset ebe
 });
 
 test('MCP create_event laeuft durch denselben Weg wie POST', async () => {
-  const created = await callTool({ db, actor: { id: ADMIN, role: 'admin' } }, 'create_event', {
+  const created = await callTool({ db, actor: { kind: 'session', userId: ADMIN, role: 'admin' } }, 'create_event', {
     title: 'Vom LLM', start_datetime: '2026-09-21T16:00:00Z', end_datetime: '2026-09-21T17:00:00Z',
   });
   assert.equal(created.start_datetime, '2026-09-21T18:00');
   assert.equal(created.end_datetime, '2026-09-21T19:00');
-  const allDay = await callTool({ db, actor: { id: ADMIN, role: 'admin' } }, 'create_event', {
+  const allDay = await callTool({ db, actor: { kind: 'session', userId: ADMIN, role: 'admin' } }, 'create_event', {
     title: 'Ganztag vom LLM', all_day: true, start_datetime: '2026-09-21T23:00:00-05:00',
   });
   assert.equal(allDay.start_datetime, '2026-09-21');

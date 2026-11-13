@@ -20,7 +20,7 @@ import { minorUnit } from '../services/split-expenses.js';
 import { isHouseholdMember } from '../services/household-members.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { visibilityWhere } from '../services/visibility.js';
+import { visibleWhere } from '../authorize/index.ts';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 
 const log = createLogger('Rewards');
@@ -364,7 +364,7 @@ const LEDGER_TASK_VISIBLE_SQL = `(
   l.user_id = @me
   OR (l.task_id IS NOT NULL AND EXISTS (
         SELECT 1 FROM tasks t
-        WHERE t.id = l.task_id AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}))
+        WHERE t.id = l.task_id AND ${visibleWhere('tasks', 't', '@me')}))
   OR (l.task_id IS NULL AND (l.type IN ('bonus', 'adjust', 'redeem') OR l.redemption_id IS NOT NULL))
 )`;
 

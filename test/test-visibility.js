@@ -8,7 +8,10 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
-import { visibilityWhere, normalizeVisibility, VISIBILITY_VALUES } from '../server/services/visibility.js';
+import { normalizeVisibility, VISIBILITY_VALUES } from '../server/authorize/index.ts';
+// The single-type fragment behind visibleWhere('tasks' | 'events', ...): an inner
+// seam, not exported from index.ts since B3.
+import { visibilityWhere } from '../server/authorize/rows/assignees.ts';
 
 let passed = 0, failed = 0;
 function test(name, fn) {

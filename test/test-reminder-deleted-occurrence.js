@@ -42,7 +42,7 @@ const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const remindersModule = await import('../server/routes/reminders.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
 const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { deleteOccurrence } = await import('../server/services/calendar-occurrence-overrides.js');
 
 function freshDb() {

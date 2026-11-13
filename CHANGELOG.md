@@ -41,6 +41,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without the green that would say all is well next to a red line.
 
 ### Fixed
+- **An AI assistant now creates tasks, shopping items and events exactly as the app does**
+  (#2616). The MCP tools `create_task`, `add_shopping_item` and `create_event` wrote with their
+  own queries beside the app's own path, and the result differed: a new task got no points,
+  although the household had set a default value for them; your own task category was refused
+  while a default category you had deleted was still accepted; a shopping item took any
+  category name, even one that no longer exists, and without one it fell back on "Sonstiges"
+  even after you had renamed that category; and with an iCloud calendar connected, which uploads
+  every local event, a new calendar event waited for the next sync run instead of going up right
+  away. All three now take the same route as the app, so there is nothing left to keep in step.
+  They also accept an optional `idempotency_key`: repeat a call with the same key after a lost
+  answer and you get the first result back instead of a duplicate. Writing over MCP now needs an
+  API token or a sent-along CSRF token - a client that authenticates with a browser session
+  cookie alone is refused. When the API refuses a call with a machine-readable reason, the error
+  text of these tools and of `call_api_operation` now ends in it, for example
+  `[reason: csrf_invalid]`.
+- **Creating or editing a task with an empty category or priority no longer breaks it.** An
+  API client that sent `category: ""` got a task with an empty category that none of your
+  categories matches, and `priority: ""` failed with "Internal server error.". An empty value
+  now counts as not given, exactly as leaving the field out: a new task gets "Miscellaneous"
+  and no priority, an edited one keeps what it had. The app itself sent an empty category when
+  its category list had not loaded. The description is now stored without leading and trailing spaces, and one
+  that is empty or only spaces is stored as no description - also when you clear it on edit.
+  When an AI assistant cannot reach the API from the server itself, the server log now says so
+  with the cause and the address it tried, not only the assistant.
 - **"Create backup now" no longer reports success when the backup failed.** The server answers
   a failed manual run with `200` and `success: false`, and the page showed "Backup created
   successfully." without reading the answer. It now shows the reason in your language, the
@@ -52,6 +76,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured - only the description was wrong. Such a schedule now stands there as the
   expression itself, like every other list or range; a single weekday is still spelled out,
   as a number or as a short or full name (`mon`, `Monday`).
+- **The global search finds the tasks your task list shows.** It only found tasks you had
+  created yourself or that named you in the old single-assignee field. A task someone else
+  shared with everyone, or one you were assigned to together with others, stood in your list
+  and was missing from the search. The search now applies the rule of the list.
+- **The global search finds the notes your notes page shows.** It only found notes you had
+  written yourself. A note someone else shared with everyone stood on your notes page and was
+  missing from the search. The search now applies the rule of the page: notes visible to
+  everyone, and your own. A note set to "only me" is still found by nobody but its author.
+- **The global search finds the medications and activities of a person you care for.** If an
+  admin has entered you as someone's caregiver, the Health pages show you that person's
+  entries, including the ones marked private. The search left those out: it only knew your
+  own entries and the ones shared with the family. It now applies the rule of the Health
+  pages. Nothing else changes - without a care grant nobody finds another person's private
+  entry, an admin included.
+- **An archived task says so in the search results.** The global search finds archived tasks,
+  so that a task you put away can be found again - but the hit looked like any open task. It
+  now reads "Archived" before the due date and stands at the end of the task hits, after the
+  done ones. With many hits an archived task can drop off the end of the list; a more exact
+  search term brings it back. `GET /api/v1/search` returns `archived_at` on a task hit.
+- **Changing or deleting a quick link that your list does not show answers "not found".**
+  `PUT` and `DELETE /api/v1/quick-links/:id` now apply the same visibility rule as the list. A
+  quick link with a visibility other than "all" or "private", which only a restored backup or
+  direct database access can produce, was hidden from everyone but its creator in the list,
+  yet changing or deleting it answered `403` and so gave away that it exists. It now answers
+  `404` with `quick_links_link_not_found`, like a private quick link of someone else. Nothing
+  changes for the two levels the app writes.
+- **Recurring events decide "is this series mine" the way the calendar list does.** If the
+  creator stored with a series is not an account number - possible only after restoring a
+  backup or editing the database directly, for example `0x2` - the calendar never counted the
+  series as anyone's own, but a single occurrence of it that is shared with everyone could
+  still offer "change this occurrence" to the account that text resembles. It no longer does.
+  Events the app wrote itself are not affected.
+
+### Security
+- **The global search no longer finds a private task of someone else.** A task set to "only
+  me" was found by a second person if the old single-assignee field still named them - a
+  field the task list ignores for a private task. Title, status, priority and due date of that
+  task appeared in the search results, with a matching word from its description or tags as an
+  excerpt. The task list, the detail view and the overview never showed it. The search now
+  asks the same rule as the list: visible to everyone, created by you, or shared with the
+  assigned people and you are one of them.
 
 ## [2.89.1] - 2026-11-12
 

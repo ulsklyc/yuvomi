@@ -890,6 +890,10 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/calendar/subscriptions.js: assignees.reason', { sites: 3, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['services/calendar-occurrence-overrides.js: eligible ? null : \'ineligible_series\'', { sites: 1, at403: [],
     why: 'keine Antwort; wird zu error.code und reist mit 400' }],
+  // authorize() (phase 2 B2): the Verdict type and the allowed verdict. No response:
+  // in B2 every caller reads `allowed` only, no route sends the reason.
+  ['authorize/modules.ts: string | null', { sites: 1, at403: [], why: 'keine Antwort; Typ des Verdict von authorize()' }],
+  ['authorize/modules.ts: null', { sites: 1, at403: [], why: 'keine Antwort; das erlaubte Verdict von authorize()' }],
   ['routes/tasks.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
     why: 'displayActingPerson: 400 ohne Grund oder 403 mit diesem' }],
   ['routes/rewards.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
@@ -913,6 +917,12 @@ const REASONS_PASSED_THROUGH = new Map([
   // Die zweite Stelle ist die Logzeile daneben, keine Antwort.
   ['auth.js: err.reason', { sites: 2, at403: [], why: 'Gravatar-Import: 400/404/413/415/502 oder 500, nie 403' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  // MCP (#2616): KEINE Antwort, sondern der fuer das LLM sichtbare Text eines
+  // ToolError - `<error> [reason: <REASON>]`. Der Grund stammt aus der Antwort
+  // DER ROUTE, die ihn selbst als Literal sendet (jeder Status, 403 inbegriffen);
+  // diese Stelle haengt ihn nur an einen Satz an und sendet nichts.
+  ['mcp/tools.js: ${reason}', { sites: 1, at403: [],
+    why: 'keine Antwort; angehaengt an die Meldung eines ToolError, der Grund kommt aus der Routenantwort' }],
   ['routes/calendar/local-calendars.js: withReason.reason', { sites: 1, at403: [],
     why: 'sendValidationErrors: feste 400 (calendar_name_invalid)' }],
   // SMTP (Re-Critique 2026-10-17): die Absage beim Speichern und der Fall der
@@ -1015,7 +1025,8 @@ function nonLiteralReasonSites(root = serverRoot, source = null) {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) { walk(new URL(`${name}/`, dir), `${rel}${name}/`); continue; }
-      if (name.endsWith('.js')) scan(`${rel}${name}`, readFileSync(url, 'utf8'));
+      // .ts too: server/authorize/ is TypeScript, and sendNotOwner() builds a 403 with a reason there (B2).
+      if (/\.(js|ts)$/.test(name)) scan(`${rel}${name}`, readFileSync(url, 'utf8'));
     }
   }(root, ''));
   return sites;
@@ -1076,7 +1087,8 @@ function refusalReasonsAtTheServer() {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) { walk(new URL(`${name}/`, dir), `${rel}${name}/`); continue; }
-      if (!name.endsWith('.js')) continue;
+      // .ts too: sendNotOwner() in server/authorize/modules.ts sends `not_owner` (B2).
+      if (!/\.(js|ts)$/.test(name)) continue;
       const src = readFileSync(url, 'utf8');
       // `{ error: ..., code: 403, reason: 'x' }`, auch ueber mehrere Zeilen:
       // die Anweisung beginnt an der letzten Zeile mit `return` oder `const`.
@@ -1175,7 +1187,7 @@ test('jeder 403-Satz ohne reason sagt nur, dass die Berechtigung fehlt', () => {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) walk(new URL(`${name}/`, dir), `${rel}${name}/`);
-      else if (name.endsWith('.js')) files.push(`${rel}${name}`);
+      else if (/\.(js|ts)$/.test(name)) files.push(`${rel}${name}`);
     }
   }(serverRoot, ''));
 

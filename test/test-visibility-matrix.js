@@ -1,7 +1,7 @@
 /**
  * Test: Visibility matrix - which rows each role reads on each read path (phase 2, section A)
  * Purpose: a CHARACTERISATION, not a target. For ten roles, nine read paths
- *          and six row types the suite records which seed rows come back
+ *          and seven row types the suite records which seed rows come back
  *          TODAY and compares that against `test/visibility-matrix.expected.json`.
  *          A changed rule anywhere turns exactly the cells red that it moves.
  *
@@ -12,7 +12,18 @@
  *
  *          A non-200 answer is a value of its own ({ status, reason }), an
  *          empty list is `[]`, and a cell that has no such path is
- *          { "n/a": "<reason>" }. Every one of the 540 cells is explicit.
+ *          { "n/a": "<reason>" }. Every one of the 630 cells is explicit.
+ *
+ *          `row_rules` (phase 2, B8a) holds the row checks that were still
+ *          written as JavaScript outside server/authorize: quick links, tasks
+ *          on every call site of the task row rule, series capabilities and
+ *          occurrence routes, the Outlook auto-sync target. Their rows are
+ *          seeded after every read path was measured (see `_meta.row_rules`).
+ *          Since B8b these rules live in server/authorize (mayAccessTask and
+ *          actorCanSeeSeries -> rowVisible, mayEdit -> canEditQuickLink, the
+ *          quick link 404 -> rowVisible (in B8b first quickLinkHiddenFrom),
+ *          the display branch -> householdVisible); the cells measure the same call sites. The old
+ *          names stay in `_meta`, which is compared to the data file.
  *
  *          Rate limits: `apiLimiter` (300/min) and `feedLimiter` (30/min) key
  *          on the client address, and `trust proxy` is one hop, so every
@@ -28,8 +39,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { startTestServer } from './server-ready.js';
-import { seedMatrix, ROLES, PATHS, TYPES, OWNERS, TASK_CATEGORY_OF, groupToken } from './visibility-matrix-seed.js';
+import { startTestServer, cookieHeader } from './server-ready.js';
+import {
+  seedMatrix, seedRowRules, seedOutlookTarget, ROLES, PATHS, TYPES, OWNERS, TASK_CATEGORY_OF, SERIES_DAYS, OUTLOOK_TARGET_OWNER,
+  groupToken,
+} from './visibility-matrix-seed.js';
 
 const DATA_FILE = new URL('./visibility-matrix.expected.json', import.meta.url);
 const UPDATE = process.env.UPDATE_VISIBILITY_MATRIX === '1';
@@ -49,6 +63,12 @@ const { baseUrl: BASE } = await startTestServer({
     // returns before its first write - the seeded subscription events stay as
     // they are. Pinned to off here so a developer's own .env cannot open it.
     ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK: 'false',
+    // The row-rule block seeds an Outlook auto-sync target (seedOutlookTarget).
+    // runOutlookSync() returns before any request while these three are unset;
+    // pinned empty so a developer's own .env cannot open it.
+    MS_CLIENT_ID: '',
+    MS_CLIENT_SECRET: '',
+    MS_REDIRECT_URI: '',
   },
 });
 // The MCP bridge loops back to this server. `internalBaseUrl()` reads the
@@ -57,13 +77,14 @@ process.env.MCP_INTERNAL_BASE_URL = BASE;
 
 const db = (await import('../server/db.js')).get();
 const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
-const { PERMISSION_MODULES } = await import('../server/permissions.js');
+const { PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 const { MODULE_KEYS } = await import('../server/scopes.js');
 const { DISPLAY_COOKIE } = await import('../server/services/display-accounts.js');
 const { recipientDeniedModules } = await import('../server/services/reminder-origins.js');
 const { lacksHealth } = await import('../server/services/cycle-reminders.js');
 const { processDueMedications } = await import('../server/services/medication-scheduler.js');
 const { SEARCH_LIMIT } = await import('../server/services/search.js');
+const { classifyLocalSeries } = await import('../server/services/calendar-occurrence-overrides.js');
 
 // --------------------------------------------------------------------------
 // HTTP with a client address per bucket
@@ -243,6 +264,7 @@ const LIST_ROUTES = {
   documents: '/documents',
   budget: { mine: `/budget?month=${dates.month}`, household: `/budget?month=${dates.month}&scope=household` },
   medications: '/health/medications',
+  activities: '/health/activities',
 };
 
 /**
@@ -332,6 +354,7 @@ async function measureDetail(role) {
   const out = {
     notes: NA('notes have no read-by-id route'),
     budget: NA('budget entries have no read-by-id route'),
+    activities: NA('health activities have no read-by-id route'),
   };
   for (const [type, { route, visible: visibleStatus }] of Object.entries(DETAIL_ROUTES)) {
     /** @type {string[]} */
@@ -454,11 +477,15 @@ async function measureOverview(role, path) {
     // Budget and health carry aggregates, not rows.
     budget: { 'budget.entryCount': d.budget?.entryCount ?? null },
     medications: { 'health.hasMeds': d.health?.hasMeds ?? null },
+    activities: NA('the overview carries no health activities'),
   };
 }
 
 /** @type {Record<string, string>} */
-const SEARCH_BUCKET = { tasks: 'tasks', events: 'events', notes: 'notes', documents: 'documents', budget: 'budget', medications: 'meds' };
+const SEARCH_BUCKET = {
+  tasks: 'tasks', events: 'events', notes: 'notes', documents: 'documents', budget: 'budget', medications: 'meds',
+  activities: 'activities',
+};
 
 /**
  * The owners that have rows of a type: one search group each.
@@ -542,7 +569,7 @@ async function measureMcpCore(role) {
   return {
     tasks: toolList('tasks', tasks, `${role} / mcp_core / tasks`, null),
     events: toolList('events', events, `${role} / mcp_core / events`, null),
-    notes: none, documents: none, budget: none, medications: none,
+    notes: none, documents: none, budget: none, medications: none, activities: none,
   };
 }
 
@@ -584,7 +611,7 @@ async function measureMcpBridge(role) {
  */
 async function measureIcsFeed(role) {
   const eventsOnly = NA('the calendar feed carries events only');
-  const base = { notes: eventsOnly, documents: eventsOnly, budget: eventsOnly, medications: eventsOnly };
+  const base = { notes: eventsOnly, documents: eventsOnly, budget: eventsOnly, medications: eventsOnly, activities: eventsOnly };
   if (role.startsWith('token_')) {
     const own = NA('the feed token belongs to the account, see member');
     return { ...base, tasks: own, events: own };
@@ -613,6 +640,7 @@ async function measureDueReminders(role) {
   const out = {
     notes: NA('notes have no reminder origin'),
     budget: NA('the budget reminder origin is the subscription, not the entry'),
+    activities: NA('health activities have no reminder origin'),
     // Filled after every other measurement by measureMedicationDelivery():
     // the run writes medication_logs, nothing measured afterwards reads them.
     medications: null,
@@ -756,6 +784,396 @@ async function measureModules() {
 }
 
 // --------------------------------------------------------------------------
+// Row rules: the JavaScript row checks outside server/authorize (phase 2, B8a)
+// --------------------------------------------------------------------------
+
+/** The blocks under `row_rules` that are keyed by role. */
+const RULE_BLOCKS = ['quick_links', 'task_writes', 'series', 'series_outlook_target'];
+/** @type {(role: string, block: string) => string} */
+const ruleXff = (role, block) => `10.10.${ROLES.indexOf(role) + 1}.${RULE_BLOCKS.indexOf(block) + 1}`;
+
+/**
+ * A display writes like the wall does: the display cookie plus the session
+ * cookie and CSRF token its first GET was handed (csrfMiddleware keeps the
+ * token in req.session). Filled by measureRowRules before the first block.
+ * @type {Record<string, string> | null}
+ */
+let displayWriteHeaders = null;
+
+/** @param {string} role @returns {Record<string, string>} */
+function ruleHeaders(role) {
+  return role === 'display' && displayWriteHeaders ? displayWriteHeaders : authHeaders(role);
+}
+
+/**
+ * @param {string} role
+ * @param {string} block
+ * @param {string} method
+ * @param {string} url  below /api/v1
+ * @param {unknown} [body]
+ */
+function ruleCall(role, block, method, url, body) {
+  return http(ruleXff(role, block), method, `/api/v1${url}`, { headers: ruleHeaders(role), body });
+}
+
+/**
+ * One answer of a write path, classified against the route's known set:
+ * `ok` (its success status; for a probe that ends at an input check behind
+ * the rights check, that check's status and reason), `not_found` (its 404
+ * with the route's own reason), `refused` (any 403, kept with its reason).
+ * Anything else is flagged and fails the suite.
+ * @typedef {{ status: number, reason?: string }} OkShape
+ * @param {{ status: number, body: any }} res
+ * @param {OkShape} ok
+ * @param {string[]} hiddenReasons  the route's own 404 reasons
+ * @returns {'ok' | 'not_found' | 'refused' | 'unexpected'}
+ */
+function classifyWrite(res, ok, hiddenReasons) {
+  const reason = res.body && typeof res.body === 'object' ? res.body.reason : undefined;
+  if (res.status === ok.status && (ok.reason === undefined || reason === ok.reason)) return 'ok';
+  if (res.status === 404 && hiddenReasons.includes(reason)) return 'not_found';
+  if (res.status === 403) return 'refused';
+  return 'unexpected';
+}
+
+/**
+ * Collects per-row answers of one write path into a cell: `{ ok, not_found,
+ * refused?, unexpected? }`, or the one refusal when the gate refused every row
+ * the same way (the same shape as the detail cells). A route with more than
+ * one 404 reason keeps the reason per row: `not_found: { row: reason }`.
+ */
+class WriteCell {
+  /** @param {string} where @param {OkShape} ok @param {string | string[]} hidden */
+  constructor(where, ok, hidden) {
+    this.where = where; this.okShape = ok;
+    this.hiddenReasons = Array.isArray(hidden) ? hidden : [hidden];
+    /** @type {string[]} */ this.ok = [];
+    /** @type {string[]} */ this.notFound = [];
+    /** @type {Record<string, string>} */ this.notFoundReason = {};
+    /** @type {Record<string, { status: number, reason: string }>} */ this.refused = {};
+    /** @type {Record<string, number>} */ this.odd = {};
+    this.total = 0;
+  }
+
+  /** @param {string} name @param {{ status: number, body: any }} res @returns {boolean} true when ok */
+  add(name, res) {
+    this.total += 1;
+    const kind = classifyWrite(res, this.okShape, this.hiddenReasons);
+    if (kind === 'ok') this.ok.push(name);
+    else if (kind === 'not_found') { this.notFound.push(name); this.notFoundReason[name] = res.body.reason; }
+    else if (kind === 'refused') this.refused[name] = statusValue(res);
+    else {
+      this.odd[name] = res.status;
+      flag(`${this.where} / ${name}`, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+    }
+    return kind === 'ok';
+  }
+
+  value() {
+    const refusals = new Set(Object.values(this.refused).map((v) => JSON.stringify(v)));
+    if (Object.keys(this.refused).length === this.total && refusals.size === 1) return Object.values(this.refused)[0];
+    return {
+      ok: this.ok.sort(),
+      not_found: this.hiddenReasons.length > 1
+        ? Object.fromEntries(this.notFound.sort().map((name) => [name, this.notFoundReason[name]]))
+        : this.notFound.sort(),
+      ...(Object.keys(this.refused).length ? { refused: this.refused } : {}),
+      ...(Object.keys(this.odd).length ? { unexpected: this.odd } : {}),
+    };
+  }
+}
+
+/**
+ * Puts a deleted row back with the same id and the same values.
+ * @param {string} table
+ * @param {Record<string, unknown>} row
+ */
+function reinsert(table, row) {
+  const columns = Object.keys(row);
+  db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map((c) => `@${c}`).join(', ')})`).run(row);
+}
+
+/**
+ * A read in the row-rule blocks: 200 is read on, the gate's 403 is the cell
+ * value, anything else (a 500, a 401) is flagged and fails the suite - also in
+ * update mode, so it never lands in the data file unseen.
+ * @param {{ status: number, body: any }} res
+ * @param {string} where
+ * @returns {{ status: number, reason: string } | null} null for a 200
+ */
+function readRefusal(res, where) {
+  if (res.status === 200) return null;
+  if (res.status !== 403) flag(where, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+  return statusValue(res);
+}
+
+/** @type {ReturnType<typeof seedRowRules> | null} */
+let ruleSeed = null;
+
+/**
+ * Quick links: list (with `can_edit`), the dashboard row, PUT {} and DELETE
+ * per tile (quick-links.js: 404 through rowVisible, 403 through canEditQuickLink;
+ * until B8b the inline 404 at ~302/347 and mayEdit ~145, in B8b quickLinkHiddenFrom).
+ * @param {string} role
+ */
+async function measureQuickLinks(role) {
+  const links = /** @type {NonNullable<typeof ruleSeed>} */ (ruleSeed).quickLinks;
+  const nameOfLink = new Map(links.map((l) => [l.id, l.name]));
+  /** @param {any[]} list */
+  const tiles = (list) => ({
+    editable: list.filter((l) => l.can_edit === true).map((l) => nameOfLink.get(l.id) ?? `unknown:${l.id}`).sort(),
+    visible: list.map((l) => nameOfLink.get(l.id) ?? `unknown:${l.id}`).sort(),
+  });
+  const where = `${role} / row_rules / quick_links`;
+  const out = /** @type {Record<string, any>} */ ({ detail: NA('quick links have no read-by-id route') });
+
+  const list = await ruleCall(role, 'quick_links', 'GET', '/quick-links');
+  const listRefusal = readRefusal(list, `${where} / list`);
+  if (listRefusal) out.list = listRefusal;
+  else {
+    const field = listField(list.body, 'data', `${where} / list`);
+    out.list = 'list' in field ? tiles(field.list) : field.value;
+  }
+  for (const [key, query] of [['overview', ''], ['overview_household', '?audience=household']]) {
+    const res = await ruleCall(role, 'quick_links', 'GET', `/dashboard${query}`);
+    const refusal = readRefusal(res, `${where} / ${key}`);
+    if (refusal) { out[key] = refusal; continue; }
+    const field = listField(res.body, 'quicklinks', `${where} / ${key}`);
+    out[key] = 'list' in field ? tiles(field.list) : field.value;
+  }
+
+  const change = new WriteCell(`${where} / change`, { status: 200 }, 'quick_links_link_not_found');
+  const remove = new WriteCell(`${where} / remove`, { status: 204 }, 'quick_links_link_not_found');
+  const byId = db.prepare('SELECT * FROM quick_links WHERE id = ?');
+  for (const link of links) {
+    // `{}`: every field keeps its value (each is read from the row when absent).
+    change.add(link.name, await ruleCall(role, 'quick_links', 'PUT', `/quick-links/${link.id}`, {}));
+    const before = byId.get(link.id);
+    if (remove.add(link.name, await ruleCall(role, 'quick_links', 'DELETE', `/quick-links/${link.id}`))) reinsert('quick_links', before);
+  }
+  out.change = change.value();
+  out.remove = remove.value();
+  return out;
+}
+
+/**
+ * Tasks on the write paths, one cell per call site of the task row rule
+ * (rowVisible(db, 'tasks', ...) since B8b; until then mayAccessTask, tasks.js
+ * ~420), plus the next due date after ticking a chain off.
+ * @param {string} role
+ */
+async function measureTaskWrites(role) {
+  const seedRules = /** @type {NonNullable<typeof ruleSeed>} */ (ruleSeed);
+  const where = `${role} / row_rules / task_writes`;
+  const notFound = 'tasks_task_not_found';
+  const cells = {
+    completions: new WriteCell(`${where} / completions`, { status: 200 }, notFound),
+    check: new WriteCell(`${where} / check`, { status: 200 }, notFound),
+    archive: new WriteCell(`${where} / archive`, { status: 200 }, notFound),
+    status: new WriteCell(`${where} / status`, { status: 200 }, notFound),
+    subtask: new WriteCell(`${where} / subtask`, { status: 201 }, 'tasks_parent_not_found'),
+    remove: new WriteCell(`${where} / remove`, { status: 200 }, notFound),
+  };
+  const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?');
+  const assignmentRows = db.prepare('SELECT * FROM task_assignments WHERE task_id = ?');
+  for (const task of seedRules.tasks) {
+    cells.completions.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}/completions`));
+    // Unchanged line: `changed: false`, no write.
+    cells.check.add(task.name, await ruleCall(role, 'task_writes', 'PATCH', `/tasks/${task.id}/check`, { line: 0, checked: false }));
+    // Not archived, stays not archived.
+    cells.archive.add(task.name, await ruleCall(role, 'task_writes', 'PATCH', `/tasks/${task.id}/archive`, { archived: false }));
+    // open -> open: no transition, no completion, no followup.
+    cells.status.add(task.name, await ruleCall(role, 'task_writes', 'PATCH', `/tasks/${task.id}/status`, { status: 'open' }));
+    const sub = await ruleCall(role, 'task_writes', 'POST', '/tasks', { title: 'mx subtask', parent_task_id: task.id });
+    if (cells.subtask.add(task.name, sub)) db.prepare('DELETE FROM tasks WHERE id = ?').run(sub.body?.data?.id);
+    const before = taskRow.get(task.id);
+    const assignments = assignmentRows.all(task.id);
+    if (cells.remove.add(task.name, await ruleCall(role, 'task_writes', 'DELETE', `/tasks/${task.id}`))) {
+      reinsert('tasks', before);
+      for (const row of assignments) reinsert('task_assignments', row);
+    }
+  }
+  /** @type {Record<string, any>} */
+  const out = Object.fromEntries(Object.entries(cells).map(([key, cell]) => [key, cell.value()]));
+
+  // Next due date (nextDueDateAfter, tasks.js ~1860): tick each shared origin
+  // off; the answer names the followup's date or null. A display has to name
+  // the person (displayActingPerson); everyone else does not.
+  const body = role === 'display' ? { status: 'done', done_by_user_id: seed.ids.admin } : { status: 'done' };
+  for (const { cell, origin, followup } of seedRules.chains) {
+    const res = await ruleCall(role, 'task_writes', 'PATCH', `/tasks/${origin.id}/status`, body);
+    if (res.status === 200) {
+      const next = res.body?.data?.next_due_date;
+      const followupDue = taskRow.get(followup.id).due_date;
+      if (next !== null && next !== followupDue) flag(`${where} / ${cell}`, `unknown date ${next}`);
+      out[cell] = { next: next === followupDue ? followup.name : null, status: 200 };
+      // Back to open: the transition wrote the status and one completion row.
+      db.prepare("UPDATE tasks SET status = 'open' WHERE id = ?").run(origin.id);
+      db.prepare('DELETE FROM task_completions WHERE task_id = ?').run(origin.id);
+    } else if (res.status === 403 || res.status === 404) out[cell] = statusValue(res);
+    else {
+      flag(`${where} / ${cell}`, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+      out[cell] = statusValue(res);
+    }
+  }
+  return out;
+}
+
+/**
+ * The series capabilities in the calendar answer (buildRecurrenceCapabilityMap,
+ * calendar-occurrence-overrides.js ~643): which seeded series the role sees and
+ * for which it may override or detach an occurrence.
+ * @param {string} role
+ * @param {string} block
+ */
+async function seriesCapabilities(role, block) {
+  const seedRules = /** @type {NonNullable<typeof ruleSeed>} */ (ruleSeed);
+  const nameOfSeries = new Map(seedRules.series.map((s) => [s.id, s.name]));
+  const to = shiftDateKey(seedRules.seriesStart, SERIES_DAYS);
+  const res = await ruleCall(role, block, 'GET', `/calendar?from=${seedRules.seriesStart}&to=${to}`);
+  const refusal = readRefusal(res, `${role} / row_rules / ${block} / capabilities`);
+  if (refusal) return refusal;
+  const field = listField(res.body, 'data', `${role} / row_rules / ${block} / capabilities`);
+  if (!('list' in field)) return field.value;
+  /** @type {Map<string, Set<string>>} */
+  const flags = new Map();
+  for (const event of field.list) {
+    const name = nameOfSeries.get(Number(event.series_id));
+    if (!name) continue;
+    if (!flags.has(name)) flags.set(name, new Set());
+    flags.get(name)?.add(JSON.stringify([event.can_override_occurrence === true, event.can_detach_occurrence === true]));
+  }
+  for (const [name, set] of flags) {
+    if (set.size > 1) flag(`${role} / row_rules / ${block} / capabilities / ${name}`, `rows disagree: ${[...set].join(' ')}`);
+  }
+  /** @param {number} index */
+  const withFlag = (index) => [...flags].filter(([, set]) => JSON.parse([...set][0])[index]).map(([name]) => name).sort();
+  return { can_detach: withFlag(1), can_override: withFlag(0), visible: [...flags.keys()].sort() };
+}
+
+/**
+ * Series: the capability fields, then every write route that reaches
+ * isEligibleLocalSeries (calendar-occurrence-overrides.js ~695). The
+ * occurrence routes get a well-formed key one day before the series start:
+ * baseOccurrenceFor() refuses it with 400 `invalid_recurrence_id` AFTER the
+ * visibility, ownership and series checks, so nothing is written and that 400
+ * means "past the checks". PUT and DELETE on the linked occurrence row end in
+ * 400 `calendar_occurrence_route_required` behind the same checks.
+ * @param {string} role
+ */
+async function measureSeries(role) {
+  const seedRules = /** @type {NonNullable<typeof ruleSeed>} */ (ruleSeed);
+  const where = `${role} / row_rules / series`;
+  const outside = shiftDateKey(seedRules.seriesStart, -1);
+  const past = { status: 400, reason: 'invalid_recurrence_id' };
+  const linked = { status: 400, reason: 'calendar_occurrence_route_required' };
+  const cells = {
+    occurrence_put: new WriteCell(`${where} / occurrence_put`, past, 'calendar_series_not_found'),
+    occurrence_put_following: new WriteCell(`${where} / occurrence_put_following`, past, 'calendar_series_not_found'),
+    occurrence_delete: new WriteCell(`${where} / occurrence_delete`, past, 'calendar_series_not_found'),
+    occurrence_delete_following: new WriteCell(`${where} / occurrence_delete_following`, past, 'calendar_series_not_found'),
+    exceptions_post: new WriteCell(`${where} / exceptions_post`, past, 'calendar_event_not_found'),
+    // The occurrence row itself hidden (event) or visible with its series
+    // hidden (series, rejectLinkedOccurrenceResource): both are kept by row.
+    linked_put: new WriteCell(`${where} / linked_put`, linked, ['calendar_event_not_found', 'calendar_series_not_found']),
+    linked_delete: new WriteCell(`${where} / linked_delete`, linked, ['calendar_event_not_found', 'calendar_series_not_found']),
+  };
+  for (const s of seedRules.series) {
+    cells.occurrence_put.add(s.name, await ruleCall(role, 'series', 'PUT', `/calendar/${s.id}/occurrences/${outside}`, { title: 'mx' }));
+    cells.occurrence_put_following.add(s.name, await ruleCall(role, 'series', 'PUT', `/calendar/${s.id}/occurrences/${outside}/following`, { title: 'mx' }));
+    cells.occurrence_delete.add(s.name, await ruleCall(role, 'series', 'DELETE', `/calendar/${s.id}/occurrences/${outside}`));
+    cells.occurrence_delete_following.add(s.name, await ruleCall(role, 'series', 'DELETE', `/calendar/${s.id}/occurrences/${outside}/following`));
+    cells.exceptions_post.add(s.name, await ruleCall(role, 'series', 'POST', `/calendar/${s.id}/exceptions`, { recurrence_id: outside }));
+    if (s.linkedChildId === null) continue;
+    cells.linked_put.add(s.name, await ruleCall(role, 'series', 'PUT', `/calendar/${s.linkedChildId}`, {}));
+    cells.linked_delete.add(s.name, await ruleCall(role, 'series', 'DELETE', `/calendar/${s.linkedChildId}`));
+  }
+  return {
+    capabilities: await seriesCapabilities(role, 'series'),
+    ...Object.fromEntries(Object.entries(cells).map(([key, cell]) => [key, cell.value()])),
+  };
+}
+
+/**
+ * The Outlook block, last: with a writable auto-sync target owned by
+ * OUTLOOK_TARGET_OWNER, a series the target's owner would see is no longer
+ * eligible (hasConfiguredOutlookAutoSyncTarget, ~508). The calendar answer
+ * shows it only through can_override_occurrence; the classification itself
+ * comes from the exported production function classifyLocalSeries.
+ */
+async function measureOutlookTarget() {
+  const seedRules = /** @type {NonNullable<typeof ruleSeed>} */ (ruleSeed);
+  /** @type {Record<string, any>} */
+  const classification = {};
+  const before = Object.fromEntries(seedRules.series.map((s) => [s.name,
+    classifyLocalSeries(db, db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(s.id))]));
+  seedOutlookTarget(db, seed.ids);
+  for (const s of seedRules.series) {
+    const row = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(s.id);
+    classification[s.name] = { after: classifyLocalSeries(db, row), before: before[s.name] };
+  }
+  /** @type {Record<string, any>} */
+  const roles = {};
+  for (const role of ROLES) roles[role] = { capabilities: await seriesCapabilities(role, 'series_outlook_target') };
+  return { classification, roles };
+}
+
+/**
+ * What the write probes must leave as it was: every role measures the same
+ * state. Every column except updated_at (PUT {} on a quick link moves it) of
+ * the seeded rows, their assignment rows, and how many reminders and ledger
+ * rows hang on them.
+ * @returns {Record<string, unknown>}
+ */
+function ruleRowState() {
+  /** @param {any[]} rows */
+  const withoutUpdatedAt = (rows) => rows.map(({ updated_at: _ignored, ...rest }) => rest);
+  const taskIds = 'SELECT id FROM tasks WHERE title LIKE \'wtask.%\' OR title = \'mx subtask\'';
+  const eventIds = 'SELECT id FROM calendar_events WHERE title LIKE \'series.%\'';
+  return {
+    completions: db.prepare(`SELECT COUNT(*) AS n FROM task_completions WHERE task_id IN (${taskIds})`).get(),
+    eventAssignments: db.prepare(`SELECT * FROM event_assignments WHERE event_id IN (${eventIds}) ORDER BY event_id, user_id`).all(),
+    events: withoutUpdatedAt(db.prepare(`SELECT * FROM calendar_events WHERE id IN (${eventIds}) ORDER BY id`).all()),
+    exceptions: db.prepare('SELECT event_id, exception_date FROM calendar_event_exceptions ORDER BY event_id, exception_date').all(),
+    ledger: db.prepare(`SELECT COUNT(*) AS n FROM reward_ledger WHERE task_id IN (${taskIds})`).get(),
+    quickLinks: withoutUpdatedAt(db.prepare('SELECT * FROM quick_links ORDER BY id').all()),
+    reminders: db.prepare(`SELECT COUNT(*) AS n FROM reminders
+                           WHERE (entity_type = 'task' AND entity_id IN (${taskIds}))
+                              OR (entity_type = 'event' AND entity_id IN (${eventIds}))`).get(),
+    taskAssignments: db.prepare(`SELECT * FROM task_assignments WHERE task_id IN (${taskIds}) ORDER BY task_id, user_id`).all(),
+    tasks: withoutUpdatedAt(db.prepare(`SELECT * FROM tasks WHERE id IN (${taskIds}) ORDER BY id`).all()),
+  };
+}
+
+/** @type {{ before: any, after: any } | null} */
+let ruleStateKept = null;
+
+/** @returns {Promise<Record<string, any>>} */
+async function measureRowRules() {
+  ruleSeed = seedRowRules({ db, ids: seed.ids, dates, shiftDateKey });
+  // The wall's session: the first GET below /api/v1 (csrfMiddleware; /auth is mounted before it) hands out the session cookie and the CSRF token.
+  const first = await http('10.10.250.200', 'GET', '/api/v1/quick-links', { headers: authHeaders('display') });
+  const sessionCookie = cookieHeader(first.headers.get('set-cookie'));
+  const csrf = first.headers.get('x-csrf-token');
+  assert.ok(sessionCookie && csrf, `the display GET hands out a session and a CSRF token (${first.status})`);
+  displayWriteHeaders = { Cookie: `${DISPLAY_COOKIE}=${seed.displayToken}; ${sessionCookie}`, 'X-CSRF-Token': String(csrf) };
+
+  /** @type {Record<string, Record<string, any>>} */
+  const out = { quick_links: {}, task_writes: {}, series: {} };
+  const before = ruleRowState();
+  for (const role of ROLES) {
+    out.quick_links[role] = await measureQuickLinks(role);
+    out.task_writes[role] = await measureTaskWrites(role);
+    out.series[role] = await measureSeries(role);
+  }
+  ruleStateKept = { after: ruleRowState(), before };
+  const outlook = await measureOutlookTarget();
+  out.series_outlook_target = outlook.roles;
+  out.outlook_classification = outlook.classification;
+  return out;
+}
+
+// --------------------------------------------------------------------------
 // Measure everything once
 // --------------------------------------------------------------------------
 
@@ -767,6 +1185,8 @@ for (const role of ROLES) {
   for (const path of PATHS) measured[role][path] = await MEASURE[path](role);
 }
 const measuredModules = await measureModules();
+// Row rules: their rows exist only from here on (see seedRowRules).
+const measuredRowRules = await measureRowRules();
 // Last: the scheduler run writes medication_logs.
 const delivery = await measureMedicationDelivery();
 for (const role of ROLES) measured[role].due_reminders.medications = delivery[ACCOUNT_OF[role]];
@@ -844,6 +1264,14 @@ const meta = {
   seed_counts: Object.fromEntries(TYPES.map((type) => [type, seed.rows[type].length])),
   seed_shape: 'tasks and events per owner all/private/assignees (all and assignees assigned to one other account via the assignment table, legacy assigned_to NULL); task.admin.private.legacy-assigned-member sets only tasks.assigned_to = member; task.admin.assignees.secondary-member is not seeded because task.admin.assignees already is "assignment row only"; event.member.ics-unshared / ics-shared come from two subscriptions of the member; countdown flag on task.member.assignees and event.member.assignees; document expiry (today+10, lead 30 days) on the member\'s three documents and on document.admin.private; tasks due today, events all-day in two days, budget entries today',
   tokens: 'minted via POST /auth/api-tokens with subject_user_id = member: ' + JSON.stringify(seed.facts.tokenShapes),
+  row_rules: 'row_rules holds the JavaScript row checks outside server/authorize (phase 2, B8a). Its rows are seeded AFTER every read path and the module level were measured and BEFORE the medication run (seedRowRules in the seed file); they are not in seed_counts and no read-path cell sees them. Blocks quick_links, task_writes, series and series_outlook_target are keyed by role (all ten), then by cell; outlook_classification is keyed by series. One cell = one leaf under a role (or one series in outlook_classification). Every block sends from its own client address 10.10.<role>.<block>; setup requests from 10.10.250.x',
+  row_rules_cells: 'write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route\'s success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route\'s own reason (a route with two 404 reasons keeps them by row: not_found: { row: reason }), refused = any 403; any other answer fails the suite. The reads (list, overview, capabilities) accept 200 and the gate\'s 403; anything else is flagged, also in update mode',
+  row_rules_display: 'the display writes like the wall: display cookie plus the session cookie and CSRF token its first GET below /api/v1 (GET /quick-links) handed out (csrfMiddleware keeps the token in req.session)',
+  row_rules_quick_links: 'quicklink.<owner>.<all|private> for admin/member/child, seeded directly. list = GET /quick-links as { visible, editable (can_edit) }; overview / overview_household = the quicklinks row of GET /dashboard (personal, audience=household) in the same shape; change = PUT /quick-links/:id with {} (every field keeps its value, only updated_at moves), ok 200; remove = DELETE /quick-links/:id, ok 204, the row goes back with the same id and values after each 204; detail is n/a',
+  row_rules_task_writes: 'wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description "- [ ] mx item", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branch of PATCH /:id/status, tasks.js ~2287, answers for no task because mayAccessTask runs first). One cell per mayAccessTask call site: completions = GET /:id/completions (~2604), check = PATCH /:id/check {line 0, checked false} (~2471, unchanged line, no write), archive = PATCH /:id/archive {archived false} (~2418), status = PATCH /:id/status {status open} on an open task (~2244, then the display branch ~2287), subtask = POST /tasks {title, parent_task_id} (~1399, ok 201, the subtask is deleted), remove = DELETE /:id (~2529, the row and its assignments go back with the same id). next_due_date / next_due_date_all / next_due_date_assignees = PATCH /:id/status {status done} on wtask.chain.origin / wtask.chain-all.origin / wtask.chain-assignees.origin (shared, weekly) whose followup already exists: wtask.chain.followup (admin, private), wtask.chain-all.followup (admin, all), wtask.chain-assignees.followup (admin, assignees, assigned to OTHER_OF.admin = member); next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter ~1860: display reads visibility all, people mayAccessTask); the display names done_by_user_id = admin; each origin is reopened and its completion row deleted after each 200',
+  row_rules_series: 'series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=' + SERIES_DAYS + ' from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day, seeded directly in the shape PUT /calendar/:id/occurrences/:day writes (recurrence_parent_id, recurrence_id, overridden_fields, series_authored 1, the series\' assignment rows copied, the exception row on the master; not through the route, which runs the rule under test); the occurrence of a private or assignees series is overridden to visibility all, so a viewer who may not see the series still gets the occurrence in GET /calendar and the capability map loads the hidden master itself (canOverrideOccurrence then hangs on actorCanSeeSeries alone). Plus series.admin.assignees.unlinked (assigned to member) and series.member.private.unlinked without a linked occurrence: after the Outlook target they are local and not eligible, the only state in which can_detach can be true (a linked child makes it false for everyone). capabilities = GET /calendar over the series days as { visible (series with at least one row in the answer, a shared occurrence included), can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written ("past the checks"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found by row = 404 calendar_event_not_found (the occurrence row hidden) or calendar_series_not_found (the occurrence shared, its series hidden); the unlinked series have no linked_* answer',
+  row_rules_coverage: 'what the cells do NOT measure: exceptions_post reaches only loadVisibleEvent and refuseForeignEvent (calendar/crud.js ~1967); isEligibleLocalSeries there only supplies the reason for a series that is not locally owned, so the cell is no evidence for actorCanSeeSeries. canDetachOccurrence (~686-688) is measured only in the stricter direction: a row of a series without a linked child reaches a viewer only when the master itself is visible, which is the same rule as actorCanSeeSeries; a looser actorCanSeeSeries cannot show there. quick_links.overview_household is empty for every role that reads it: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks, so householdAudienceAnswer() keeps the empty form',
+  row_rules_outlook: 'series_outlook_target = the capabilities cell again after seedOutlookTarget: one outlook_accounts row (auto_sync_calendar_id, owner_user_id = ' + OUTLOOK_TARGET_OWNER + ') with one outlook_calendar_selection row (enabled 1, can_edit 1); MS_CLIENT_ID / MS_CLIENT_SECRET / MS_REDIRECT_URI are pinned empty, so the sync tick returns before any request. outlook_classification = classifyLocalSeries (exported production function) per series before and after the target: the calendar answer shows eligibility only through can_override_occurrence',
 };
 
 if (UPDATE) {
@@ -862,9 +1290,23 @@ if (UPDATE) {
   const modules = Object.fromEntries(Object.entries(measuredModules)
     .map(([key, value]) => [key, withAnnotations(expected?.modules?.[key], value)]));
   const unknownAccount = withAnnotations(expected?.unknown_account, measuredUnknown);
-  const file = sortKeys({ _meta: meta, cells, modules, unknown_account: unknownAccount });
-  writeFileSync(DATA_FILE, `${JSON.stringify(file, null, 2)}\n`);
-  expected = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
+  /** @type {Record<string, any>} */
+  const rowRules = {};
+  for (const block of RULE_BLOCKS) {
+    rowRules[block] = {};
+    for (const role of ROLES) {
+      rowRules[block][role] = Object.fromEntries(Object.entries(measuredRowRules[block][role])
+        .map(([cell, value]) => [cell, withAnnotations(expected?.row_rules?.[block]?.[role]?.[cell], value)]));
+    }
+  }
+  rowRules.outlook_classification = Object.fromEntries(Object.entries(measuredRowRules.outlook_classification)
+    .map(([name, value]) => [name, withAnnotations(expected?.row_rules?.outlook_classification?.[name], value)]));
+  const file = sortKeys({ _meta: meta, cells, modules, unknown_account: unknownAccount, row_rules: rowRules });
+  // A flagged answer must not land in the data file: the run is red, the file stays.
+  if (unexpected.length === 0 && seen429.length === 0) {
+    writeFileSync(DATA_FILE, `${JSON.stringify(file, null, 2)}\n`);
+    expected = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -906,17 +1348,18 @@ test('precondition: the unrestricted view is not empty for any type', () => {
   has(list.documents, [...adminRows('documents'), ...openRows('documents', ['family'])], 'documents');
   has([...list.budget.mine, ...list.budget.household], [...adminRows('budget'), ...openRows('budget', ['shared'])], 'budget');
   has(list.medications, [...adminRows('medications'), ...openRows('medications', ['family'])], 'medications');
+  has(list.activities, [...adminRows('activities'), ...openRows('activities', ['family'])], 'activities');
 });
 
 test('no measurement met an answer outside its known set', () => {
   assert.deepEqual(unexpected, []);
 });
 
-test('the data file has exactly the measured keys at every level (540 cells, no leftovers)', () => {
+test('the data file has exactly the measured keys at every level (630 cells, no leftovers)', () => {
   assert.ok(expected, 'test/visibility-matrix.expected.json is missing - run with UPDATE_VISIBILITY_MATRIX=1');
   /** @param {any} value */
   const keys = (value) => Object.keys(value && typeof value === 'object' ? value : {}).sort();
-  assert.deepEqual(keys(expected), ['_meta', 'cells', 'modules', 'unknown_account']);
+  assert.deepEqual(keys(expected), ['_meta', 'cells', 'modules', 'row_rules', 'unknown_account']);
   assert.deepEqual(keys(expected.cells), [...ROLES].sort(), 'roles');
   for (const role of ROLES) {
     assert.deepEqual(keys(expected.cells[role]), [...PATHS].sort(), `${role}: paths`);
@@ -927,6 +1370,51 @@ test('the data file has exactly the measured keys at every level (540 cells, no 
     assert.deepEqual(keys(stripAnnotations(expected.modules[moduleKey])), keys(measuredModules[moduleKey]), `modules / ${moduleKey}: levels`);
   }
   assert.deepEqual(keys(stripAnnotations(expected.unknown_account)), keys(measuredUnknown), 'unknown_account');
+});
+
+test('row_rules has exactly the measured keys down to the cell', () => {
+  /** @param {any} value */
+  const keys = (value) => Object.keys(value && typeof value === 'object' ? value : {}).sort();
+  const rules = expected?.row_rules;
+  assert.deepEqual(keys(rules), [...RULE_BLOCKS, 'outlook_classification'].sort(), 'blocks');
+  for (const block of RULE_BLOCKS) {
+    assert.deepEqual(keys(rules[block]), [...ROLES].sort(), `${block}: roles`);
+    for (const role of ROLES) {
+      assert.deepEqual(keys(rules[block][role]), keys(measuredRowRules[block][role]), `${block} / ${role}: cells`);
+    }
+  }
+  assert.deepEqual(keys(rules.outlook_classification), keys(measuredRowRules.outlook_classification), 'outlook_classification: series');
+});
+
+for (const block of RULE_BLOCKS) {
+  test(`row_rules / ${block}`, () => {
+    const diffs = [];
+    for (const role of ROLES) {
+      for (const [cell, got] of Object.entries(measuredRowRules[block][role])) {
+        const want = stripAnnotations(expected?.row_rules?.[block]?.[role]?.[cell]);
+        try { assert.deepStrictEqual(sortKeys(got), sortKeys(want)); } catch {
+          diffs.push(`${role} / ${block} / ${cell}: expected ${JSON.stringify(want)} got ${JSON.stringify(got)}`);
+        }
+      }
+    }
+    assert.equal(diffs.length, 0, `\n${diffs.join('\n')}`);
+  });
+}
+
+test('row_rules: the write probes leave every seeded row as it was', () => {
+  assert.ok(ruleStateKept, 'measured');
+  assert.deepStrictEqual(ruleStateKept.after, ruleStateKept.before);
+});
+
+test('row_rules / outlook_classification', () => {
+  const diffs = [];
+  for (const [name, got] of Object.entries(measuredRowRules.outlook_classification)) {
+    const want = stripAnnotations(expected?.row_rules?.outlook_classification?.[name]);
+    try { assert.deepStrictEqual(sortKeys(got), sortKeys(want)); } catch {
+      diffs.push(`outlook_classification / ${name}: expected ${JSON.stringify(want)} got ${JSON.stringify(got)}`);
+    }
+  }
+  assert.equal(diffs.length, 0, `\n${diffs.join('\n')}`);
 });
 
 test('the _meta block of the data file matches this seed', () => {

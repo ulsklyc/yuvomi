@@ -56,12 +56,13 @@ import { getSupportedLocales, isSupportedLocale, resolveHouseholdLocale } from '
 import { isValidTimeZone } from './utils/timezone.js';
 import { accountIdsByEmail, emailMatchKey } from './utils/email-match.js';
 import {
-  resolvePermissions, buildSessionModuleAccess, clientPermissions,
+  resolvePermissions, clientPermissions,
   invitePresetPermissions, isValidInvitePreset, writeSubjectPermissions,
   applyChildStartPermissions, INVITE_PRESET_DEFAULT,
   userForRequest,
-} from './permissions.js';
+} from './authorize/index.ts';
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
+import { resolveRequestModuleAccess } from './authorize/index.ts';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
 import * as twoFactor from './services/two-factor.js';
 import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
@@ -1103,27 +1104,12 @@ function authenticateApiToken(req) {
 // --------------------------------------------------------
 
 function applyRoleModuleAccess(req) {
-  // Rollen-/Mitglied-basierte Modulrechte (#467) gelten unabhängig davon, ob
-  // das Subjekt interaktiv oder über ein Integrationstoken authentifiziert ist.
-  // Admins: null = Vollzugriff. Token-Scopes bleiben eine zusätzliche
-  // Least-Privilege-Grenze und können diese Rechte niemals erweitern.
-  req.sessionModuleAccess = null;
-  // Safe to skip the lookup: for every path `authRole` comes from the database
-  // or is fixed to `member` (session and token read `users`, devices and
-  // displays are members), never from a stored session (#2611).
-  if (req.authRole === 'admin') return;
-  try {
-    const user = db.get()
-      .prepare('SELECT id, role, family_role FROM users WHERE id = ?')
-      .get(req.authUserId);
-    if (user) {
-      req.sessionModuleAccess = buildSessionModuleAccess(
-        resolvePermissions(db.get(), userForRequest(req, user), { isDisplay: req.authMethod === 'display' }),
-      );
-    }
-  } catch (err) {
-    log.error('Permission resolution failed:', err.message);
-  }
+  // The role- and member-based module rights (#467). The resolution lives in
+  // server/authorize/actor.ts since phase 2 (B1), next to the actor it feeds;
+  // `req.sessionModuleAccess` stays the field every gate reads.
+  // `db.get()` cannot throw here: every branch of requireAuth has just read
+  // through it in the same tick.
+  req.sessionModuleAccess = resolveRequestModuleAccess(db.get(), req);
 }
 
 /**

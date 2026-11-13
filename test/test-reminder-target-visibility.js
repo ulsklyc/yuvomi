@@ -38,8 +38,8 @@ const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const remindersModule = await import('../server/routes/reminders.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
 const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
-const { TARGET_ENTITY_TYPES, HOUSEHOLD_CHANNEL_POLICY, reminderTargetPublicSql } = await import('../server/services/reminder-targets.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
+const { TARGET_ENTITY_TYPES, HOUSEHOLD_CHANNEL_POLICY, reminderTargetPublicSql } = await import('../server/authorize/index.ts');
 
 const NOW = new Date('2024-06-15T12:00:00Z');
 const PAST = '2000-01-01T00:00:00';
@@ -234,12 +234,12 @@ const SETTABLE = ['task', 'event', 'subscription', 'inventory_item', 'inventory_
 // --------------------------------------------------------------------------
 // 0. DER GUARD: jede Herkunft, die ein Mensch setzen kann, hat eine Zielregel
 //
-// Eine neue setzbare Herkunft ohne Eintrag in reminder-targets.js wuerde am
+// Eine neue setzbare Herkunft ohne Eintrag in authorize/rows/reminders.ts wuerde am
 // Schreibweg abgewiesen (Allowlist) - am LESEWEG aber durchgelassen, weil der
 // Filter dort nur beurteilt, was er kennt. Diese Zusicherung macht die Luecke
 // laut, bevor sie eine ist.
 // --------------------------------------------------------------------------
-test('jede setzbare Herkunft steht in reminder-targets.js', () => {
+test('jede setzbare Herkunft steht in authorize/rows/reminders.ts', () => {
   assert.deepEqual([...remindersModule.SETTABLE_ENTITY_TYPES].sort(), [...TARGET_ENTITY_TYPES].sort());
   assert.deepEqual([...SETTABLE].sort(), [...TARGET_ENTITY_TYPES].sort(), 'die Liste dieser Suite ist veraltet');
 });

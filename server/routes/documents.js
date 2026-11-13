@@ -10,11 +10,14 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, date as validateDate, num, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { mayReadModule } from '../permissions.js';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from '../services/visibility.js';
-import { budgetDetailsVisibleWhere, resolveBudgetMode } from '../services/budget-visibility.js';
+import {
+  mayReadModule,
+  budgetDetailsVisibleWhere,
+  resolveBudgetMode,
+  canManageDocument,
+  visibleWhere,
+} from '../authorize/index.ts';
 import { reminderDateBefore, reminderIsInThePast } from '../utils/reminder-schedule.js';
-import { canManageDocument, documentVisibleSql } from '../services/document-access.js';
 import { isHouseholdMember, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import {
   DocumentDeletionInProgressError,
@@ -159,13 +162,13 @@ function userId(req) {
 }
 
 // Schreiben darf, wer das Dokument angelegt hat, oder ein Admin. Die Regel steht
-// neben der Sichtbarkeit in services/document-access.js (#989).
+// neben der Sichtbarkeit in authorize/rows/documents.ts (#989).
 function mayManage(req, document) {
   return canManageDocument(document, { userId: userId(req), isAdmin: isAdminRequest(req) });
 }
 
 function canSeeSql(alias = 'd') {
-  return documentVisibleSql(alias);
+  return visibleWhere('documents', alias, '@userId');
 }
 
 const EXPIRY_REMINDER_MIN_DAYS = 0;
@@ -675,7 +678,7 @@ function visibleFolderDocuments(req, folderIds) {
       SELECT d.id, d.name, d.storage_backend, d.storage_key, d.created_by
       FROM family_documents d
       WHERE d.folder_id IN (${folderPlaceholders})
-        AND ${documentVisibleSql('d')}
+        AND ${visibleWhere('documents', 'd', '@userId')}
       ORDER BY d.id ASC
     `)
     .all({ ...folderParams, userId: userId(req) });
@@ -733,8 +736,8 @@ function folderDeleteLinkedState(req, documentIds) {
     calendar_events: readsCalendar ? ids(`
       SELECT e.id AS identity FROM calendar_events e
        WHERE e.attachment_document_id IN (${placeholders})
-         AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-         AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}
+         AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
+         AND ${visibleWhere('events', 'e', '@userId')}
        ORDER BY e.id
     `) : null,
     housekeeping_work_sessions: reads('housekeeping') ? ids(`
@@ -762,7 +765,7 @@ function folderDeleteLinkedState(req, documentIds) {
       SELECT printf('%d:%d', td.task_id, td.document_id) AS identity FROM task_documents td
         JOIN tasks t ON t.id = td.task_id
        WHERE td.document_id IN (${placeholders})
-         AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@userId')}
+         AND ${visibleWhere('tasks', 't', '@userId')}
        ORDER BY identity
     `) : null,
     budget_entry_attachments: readsBudget ? ids(`

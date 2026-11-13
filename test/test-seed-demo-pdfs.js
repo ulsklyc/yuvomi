@@ -28,7 +28,7 @@ import Database from 'better-sqlite3-multiple-ciphers';
 
 import { buildDemoPdf, toWinAnsi } from '../scripts/seed-demo-pdf.js';
 import { matchChecklistLine } from '../public/utils/markdown-checklist.js';
-import { CHILD_START_PERMISSIONS, CHILD_START_PREFERENCES } from '../server/permissions.js';
+import { CHILD_START_PERMISSIONS, CHILD_START_PREFERENCES } from '../server/authorize/index.ts';
 import { tempDir } from './tmp-dir.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');

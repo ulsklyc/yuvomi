@@ -304,9 +304,9 @@ const DOCUMENT_COUNT_FIELD = {
 
 const taskInputProperties = {
   title: { type: 'string', minLength: 1, maxLength: 200 },
-  description: { type: ['string', 'null'], maxLength: 5000 },
-  category: { type: 'string', description: 'Key of a category of the household, see `GET /tasks/meta/options`; anything else answers 400. Defaults to `misc` on create.' },
-  priority: { ...taskPriority, description: 'Defaults to `none` on create.' },
+  description: { type: ['string', 'null'], maxLength: 5000, description: 'Stored without leading and trailing whitespace; an empty or whitespace-only value is stored as `null`.' },
+  category: { type: 'string', description: 'Key of a category of the household, see `GET /tasks/meta/options`; anything else answers 400. An empty string counts as not given. Defaults to `misc` on create.' },
+  priority: { ...taskPriority, description: 'An empty string counts as not given. Defaults to `none` on create.' },
   start_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day.'),
   due_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day.'),
   due_time: { type: ['string', 'null'], pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: '`HH:MM` wall-clock time of the household.' },

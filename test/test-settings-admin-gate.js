@@ -343,7 +343,6 @@ const ADMIN_PREDICATE_EXCEPTIONS = new Map([
   ]],
   // test-sso-only.js haelt die woertliche Schreibweise per Regex.
   ['server/auth.js', [
-    "authRole==='admin' @ if(req.authRole==='admin')return",
     "authRole==='admin' @ const isAdmin=req.authRole==='admin'",
   ]],
   // Ausserhalb dieses Schnitts geblieben; zieht beim naechsten Anfassen nach.
@@ -352,12 +351,14 @@ const ADMIN_PREDICATE_EXCEPTIONS = new Map([
   ]],
 ]);
 
+// `.ts` as well: phase 2 moves server code into TypeScript (server/authorize/),
+// and a walk over `.js` alone would not see a predicate that moved there.
 function serverJsFiles(dir = join(ROOT, 'server')) {
   const files = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) files.push(...serverJsFiles(full));
-    else if (entry.name.endsWith('.js')) files.push(full);
+    else if (/\.[jt]s$/.test(entry.name)) files.push(full);
   }
   return files;
 }

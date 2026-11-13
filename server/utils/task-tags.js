@@ -14,12 +14,12 @@
  * Kopien derselben Regel wären eine wandernde Annahme - fiele eine Seite zurück,
  * unterschieden sich die Tags derselben Aufgabe je nach Herkunft.
  *
- * Abhängigkeiten: server/services/visibility.js (reiner SQL-Fragment-Bauer ohne
+ * Abhängigkeiten: server/authorize/rows/assignees.ts (reiner SQL-Fragment-Bauer ohne
  * eigene Abhängigkeiten - die Sichtbarkeitsregel gehört zu jeder Tag-Abfrage,
  * die eine Liste an eine Person ausliefert).
  */
 
-import { visibilityWhere } from '../services/visibility.js';
+import { visibleWhere } from '../authorize/index.ts';
 
 // Identisch zu den Grenzen im Parser (server/services/ics-parser.js): was von
 // dort hereinkommt, ist bereits gedeckelt, was aus der Oberfläche kommt, wird es
@@ -213,7 +213,7 @@ export function allTags(database, me = null) {
     SELECT MIN(tt.tag) AS tag, COUNT(*) AS count
     FROM task_tags tt
     JOIN tasks t ON t.id = tt.task_id
-    WHERE ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
+    WHERE ${visibleWhere('tasks', 't', '@me')}
     GROUP BY tt.tag_key
     ORDER BY count DESC, tag COLLATE NOCASE ASC
   `).all({ me });
@@ -241,7 +241,7 @@ export function taskIdsWithTag(database, tag, me = null) {
     FROM task_tags tt
     JOIN tasks t ON t.id = tt.task_id
     WHERE tt.tag_key = ?
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
+      AND ${visibleWhere('tasks', 't', '@me')}
     ORDER BY t.id
   `).all(tagKey(tag), { me }).map((r) => r.id);
 }

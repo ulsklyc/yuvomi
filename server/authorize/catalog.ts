@@ -1,57 +1,112 @@
 /**
- * Modul: Zugriffsrechte (Rollen & Rechte)
- * Zweck: Geteiltes Berechtigungsmodell für interaktive Nutzer. Legt fest, welche
- *        Module ein Familienmitglied sehen/bearbeiten darf und welche Dashboard-
- *        Widgets ihm zur Verfügung stehen — konfigurierbar pro Familienrolle
- *        (Standard) und pro einzelnem Mitglied (Override). Siehe Discussion #467.
+ * Module: the permission catalog (phase 2, section B2; until then server/permissions.js)
+ * Purpose: what rights EXIST and how permission rows are read and written. The
+ *          shared permission model for interactive users (Discussion #467): which
+ *          modules a family member may see or edit and which dashboard widgets and
+ *          capabilities they have - configurable per family role (default) and per
+ *          member (override). Next to it, in modules.ts, the questions that DECIDE
+ *          with these rights.
  *
- * Vertrag / Invarianten:
- *   - SPARSE-Speicherung: nur Abweichungen vom Standard landen in
- *     `access_permissions`. Fehlt eine Zeile → Modul 'write', Widget 'allow'.
- *     Dadurch verhalten sich Bestands-Installationen nach Migration v74
- *     unverändert (kein Zwangs-Lockout).
- *   - Dieser Standard ist für die MIGRATION entschieden, nicht für die
- *     EINLADUNG. Dass ein Konto ohne Zeilen alles sieht, ist für einen
- *     bestehenden Haushalt richtig und für ein neu eingeladenes Mitglied nur
- *     geerbt (#869). Die Antwort dort liegt bewusst NICHT hier: wer den
- *     Standard umdreht, um sie zu geben, sperrt beim nächsten Update genau die
- *     Haushalte aus, die v74 schützen sollte. Sie liegt in der Vorauswahl des
- *     Einladungsformulars (settings/pages/admin-family.js), die eng startet
- *     und zeigt, was die gewählte Rolle darf - eine Formular-Voreinstellung,
- *     kein gespeicherter Standard.
- *   - Admins (users.role = 'admin') umgehen das System vollständig: immer
- *     Vollzugriff, kein Scoping. So kann sich niemand selbst aussperren.
- *   - Auflösungsreihenfolge für ein Mitglied: Mitglied-Override ?? Rollen-Profil
- *     ?? Standard.
- *   - Widgets erben die Modulsperre: Modul 'none' → zugehörige Widgets gesperrt.
+ * Contract / invariants (moved from the header of server/permissions.js):
+ *   - SPARSE storage: only deviations from the default land in
+ *     `access_permissions`. No row -> module 'write', widget 'allow'. That keeps
+ *     installations from before migration v74 unchanged (no forced lockout).
+ *   - This default was decided for the MIGRATION, not for the INVITE. That an
+ *     account without rows sees everything is right for an existing household and
+ *     only inherited for a newly invited member (#869). The answer to that does
+ *     NOT live here: turning the default round would lock out, on the next update,
+ *     exactly the households v74 was meant to protect. It lives in the preset of
+ *     the invite form (settings/pages/admin-family.js), which starts narrow - a
+ *     form preset, not a stored default.
+ *   - Admins (users.role = 'admin') bypass the system completely: always full
+ *     access, no scoping. So nobody can lock themselves out.
+ *   - Resolution order for a member: member override ?? role profile ?? default.
+ *   - Widgets inherit the module lock: module 'none' -> its widgets locked.
  *
- * Die Modulschlüssel sind IDENTISCH mit den Scope-Modulschlüsseln aus scopes.js,
- * damit die Backend-Durchsetzung dieselbe Prüf-Infrastruktur nutzt (ein
- * eingeschränktes Mitglied bekommt eine Modul→Access-Map, die die /api/v1-
- * Middleware wie ein gescoptes Token auswertet).
+ * The module keys are IDENTICAL to the scope module keys of server/scopes.js, so
+ * the backend enforcement uses the same check: a restricted member gets a
+ * module -> access map that the /api/v1 middleware evaluates like a scoped token.
  *
- * Bewusst nur Abhängigkeiten ohne Seiteneffekte (scopes.js, display-scopes.js,
- * require-admin.js; kein express, kein db.js) - nutzbar in Middleware, Routen,
- * Migrationen und Tests.
+ * resolvePermissions() lives here and not in modules.ts: it reads the permission
+ * rows into the effective matrix of an account and decides nothing itself; the
+ * writer applyChildStartPermissions() needs it, and modules.ts may import this
+ * file, never the other way round.
+ *
+ * Dependencies without side effects only (server/scopes.js,
+ * server/display-scopes.js; no express, NEVER server/db.js, not even
+ * transitively - see actor.ts) - usable in middleware, routes, migrations and
+ * tests. The connection is always a parameter.
+ * Erasable TS syntax only (runs through type stripping, no build).
  */
 
-import { MODULE_KEYS, getModuleKeys, tokenAllows } from './scopes.js';
+import { MODULE_KEYS, getModuleKeys } from '../scopes.js';
 // NUR die reinen Listen, NICHT den Dienst: der zieht server/db.js mit, und damit
 // legte jede Suite, die bloss Rechte aufloest, eine echte yuvomi.db im Repo an
 // (test:db-isolation nannte vier davon).
-import { DISPLAY_SCOPE_MODULES } from './display-scopes.js';
-import { isAdminRequest } from './middleware/require-admin.js';
+import { DISPLAY_SCOPE_MODULES } from '../display-scopes.js';
+
+/** The statement surface used here; better-sqlite3 and node:sqlite both provide it. */
+type Statement = {
+  all(...params: unknown[]): unknown[];
+  get(...params: unknown[]): unknown;
+  run(...params: unknown[]): { changes: number | bigint };
+};
+
+/** A database connection (better-sqlite3 in production, node:sqlite in tests). */
+export type Database = {
+  prepare(sql: string): Statement;
+  exec(sql: string): unknown;
+};
+
+type ModuleLevel = 'none' | 'read' | 'write';
+type GrantLevel = 'none' | 'allow';
+
+/** The account fields a resolution reads; nothing else. */
+export type PermissionUser = { id?: number | null; role?: string | null; family_role?: string | null };
+
+export type ResolvedPermissions = {
+  admin: boolean;
+  modules: Record<string, ModuleLevel>;
+  widgets: Record<string, GrantLevel>;
+  capabilities: Record<string, GrantLevel>;
+};
+
+type PermissionModule = {
+  key: string;
+  labelKey?: string | null;
+  label?: string | null;
+  icon?: string;
+  navIds?: readonly string[];
+  extensionModuleId?: string | null;
+};
+
+/** The fifteen core modules carry a label key, an icon and their nav ids. */
+type CorePermissionModule = PermissionModule & { labelKey: string; icon: string; navIds: readonly string[] };
+
+type PermissionWidget = { id: string; module: string | null; label?: string | null; labelKey?: string | null };
+
+type PermissionCapability = { key: string; module: string; labelKey: string; default: GrantLevel };
+
+/** A stored row of `access_permissions`, as read here. */
+type PermissionRow = { resource_type: string; resource_key: string; access: string };
+
+/** The input of the permission sheet (PUT body): resource -> access, per axis. */
+type PermissionInput = {
+  modules?: Readonly<Record<string, string>> | null;
+  widgets?: Readonly<Record<string, string>> | null;
+  capabilities?: Readonly<Record<string, string>> | null;
+};
 
 // Familienrollen (Subjekt-Achse „role"). Spiegelt den CHECK-Constraint der
 // users.family_role-Spalte (Migration, db.js).
-export const FAMILY_ROLES = Object.freeze([
+const FAMILY_ROLES = Object.freeze([
   'dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other',
 ]);
 
 // Gateable, nutzer-sichtbare Module. `key` === Scope-Modulschlüssel (scopes.js),
 // `navIds` = zugehörige Navigations-/Kitchen-IDs im Frontend (für die Nav-Filterung;
 // mehrere Nav-Einträge können sich ein Modul teilen, z. B. calendar+birthdays).
-export const PERMISSION_MODULES = Object.freeze([
+export const PERMISSION_MODULES: readonly CorePermissionModule[] = Object.freeze([
   { key: 'calendar',     labelKey: 'nav.calendar',     icon: 'calendar',      navIds: ['calendar', 'birthdays'] },
   { key: 'tasks',        labelKey: 'nav.tasks',        icon: 'check-square',  navIds: ['tasks'] },
   { key: 'notes',        labelKey: 'nav.notes',        icon: 'sticky-note',   navIds: ['notes'] },
@@ -74,7 +129,7 @@ export const PERMISSION_MODULES = Object.freeze([
 // Das cycle-Widget hängt am Modul health, ist aber separat sperrbar — so lässt
 // es sich z. B. für einzelne Mitglieder ausblenden, ohne Gesundheit ganz zu
 // sperren (#467).
-export const PERMISSION_WIDGETS = Object.freeze([
+export const PERMISSION_WIDGETS: readonly PermissionWidget[] = Object.freeze([
   { id: 'tasks',        module: 'tasks' },
   { id: 'calendar',     module: 'calendar' },
   { id: 'meals',        module: 'meals' },
@@ -122,7 +177,7 @@ export const PERMISSION_WIDGETS = Object.freeze([
 // Feinere Schreibrechte, die kein ganzes Modul sperren sollen. Persoenliche
 // Notiz-Kategorien bleiben immer Sache ihres Besitzers; dieser Schalter
 // betrifft ausschliesslich den gemeinsamen Haushaltskatalog.
-export const PERMISSION_CAPABILITIES = Object.freeze([
+export const PERMISSION_CAPABILITIES: readonly PermissionCapability[] = Object.freeze([
   {
     key: 'notes_manage_household_categories',
     module: 'notes',
@@ -194,9 +249,9 @@ export const PERMISSION_CAPABILITIES = Object.freeze([
   },
 ]);
 
-export const MODULE_ACCESS_LEVELS = Object.freeze(['none', 'read', 'write']);
-export const WIDGET_ACCESS_LEVELS = Object.freeze(['none', 'allow']);
-export const CAPABILITY_ACCESS_LEVELS = Object.freeze(['none', 'allow']);
+const MODULE_ACCESS_LEVELS = Object.freeze(['none', 'read', 'write']);
+const WIDGET_ACCESS_LEVELS = Object.freeze(['none', 'allow']);
+const CAPABILITY_ACCESS_LEVELS = Object.freeze(['none', 'allow']);
 const MODULE_DEFAULT = 'write';
 const WIDGET_DEFAULT = 'allow';
 const CAPABILITY_DEFAULT = 'none';
@@ -216,7 +271,7 @@ const CAPABILITY_DEFAULT = 'none';
 // namens "voller Zugriff", die bei eingeschraenkter Rolle nichts tut, waere
 // eine Zusage, die nicht haelt. Wer allen einer Rolle mehr geben will, aendert
 // das Rollenprofil.
-export const INVITE_PRESETS = Object.freeze(['restricted', 'role']);
+const INVITE_PRESETS = Object.freeze(['restricted', 'role']);
 export const INVITE_PRESET_DEFAULT = 'restricted';
 
 // Was 'restricted' sperrt. Die Trennlinie ist nicht "wenig Module", sondern
@@ -275,14 +330,16 @@ export const CHILD_START_PERMISSIONS = Object.freeze({
 // `userCfgKey()` (preferences.js): `<key>:user:<id>` in `sync_config`.
 export const CHILD_START_PREFERENCES = Object.freeze({ health_cycle_enabled: '0' });
 
-const MODULE_ACCESS_RANK = Object.freeze({ none: 0, read: 1, write: 2 });
-const CAPABILITY_ACCESS_RANK = Object.freeze({ none: 0, allow: 1 });
+const MODULE_ACCESS_RANK: Readonly<Record<string, number>> = Object.freeze({ none: 0, read: 1, write: 2 });
+const CAPABILITY_ACCESS_RANK: Readonly<Record<string, number>> = Object.freeze({ none: 0, allow: 1 });
 
 /** Extension catalog injected at runtime by the module registry — keeps this file off db.js. */
-let _extensionPermissionModules = [];
-let _extensionPermissionWidgets = [];
+let _extensionPermissionModules: PermissionModule[] = [];
+let _extensionPermissionWidgets: PermissionWidget[] = [];
 
-export function setExtensionPermissionCatalog(catalog) {
+export function setExtensionPermissionCatalog(
+  catalog: { permissionModules?: unknown; permissionWidgets?: unknown } | null | undefined,
+): void {
   _extensionPermissionModules = Array.isArray(catalog?.permissionModules)
     ? catalog.permissionModules.filter((m) => m && typeof m.key === 'string')
     : [];
@@ -291,19 +348,19 @@ export function setExtensionPermissionCatalog(catalog) {
     : [];
 }
 
-function extensionPermissionModules() {
+function extensionPermissionModules(): PermissionModule[] {
   return _extensionPermissionModules;
 }
 
-function extensionPermissionWidgets() {
+function extensionPermissionWidgets(): PermissionWidget[] {
   return _extensionPermissionWidgets;
 }
 
-function allPermissionModules() {
+function allPermissionModules(): PermissionModule[] {
   return [...PERMISSION_MODULES, ...extensionPermissionModules()];
 }
 
-function allPermissionWidgets() {
+function allPermissionWidgets(): PermissionWidget[] {
   return [...PERMISSION_WIDGETS, ...extensionPermissionWidgets()];
 }
 
@@ -330,10 +387,10 @@ for (const m of PERMISSION_MODULES) {
 }
 
 /** Liest die gespeicherten (abweichenden) Rechte-Zeilen eines Subjekts. */
-function loadSubjectRows(database, subjectType, subjectId) {
+function loadSubjectRows(database: Database, subjectType: string, subjectId: string | number): PermissionRow[] {
   return database
     .prepare('SELECT resource_type, resource_key, access FROM access_permissions WHERE subject_type = ? AND subject_id = ?')
-    .all(subjectType, String(subjectId));
+    .all(subjectType, String(subjectId)) as PermissionRow[];
 }
 
 /**
@@ -342,11 +399,15 @@ function loadSubjectRows(database, subjectType, subjectId) {
  * @param {{ id: number, role: string, family_role?: string }} user
  * @returns {{ admin: boolean, modules: Record<string,'none'|'read'|'write'>, widgets: Record<string,'none'|'allow'>, capabilities: Record<string,'none'|'allow'> }}
  */
-export function resolvePermissions(database, user, { isDisplay = false } = {}) {
+export function resolvePermissions(
+  database: Database,
+  user: PermissionUser | null | undefined,
+  { isDisplay = false }: { isDisplay?: boolean } = {},
+): ResolvedPermissions {
   const isAdmin = user?.role === 'admin';
-  const modules = {};
-  const widgets = {};
-  const capabilities = {};
+  const modules: Record<string, ModuleLevel> = {};
+  const widgets: Record<string, GrantLevel> = {};
+  const capabilities: Record<string, GrantLevel> = {};
   for (const m of allPermissionModules()) modules[m.key] = isAdmin ? 'write' : MODULE_DEFAULT;
   for (const w of allPermissionWidgets()) widgets[w.id] = isAdmin ? 'allow' : WIDGET_DEFAULT;
   for (const item of PERMISSION_CAPABILITIES) capabilities[item.key] = isAdmin ? 'allow' : (item.default ?? CAPABILITY_DEFAULT);
@@ -355,14 +416,14 @@ export function resolvePermissions(database, user, { isDisplay = false } = {}) {
   const MODULE_KEY_SET = moduleKeySet();
   const WIDGET_ID_SET = widgetIdSet();
 
-  const apply = (rows) => {
+  const apply = (rows: PermissionRow[]) => {
     for (const r of rows) {
       if (r.resource_type === 'module' && MODULE_KEY_SET.has(r.resource_key) && MODULE_ACCESS_SET.has(r.access)) {
-        modules[r.resource_key] = r.access;
+        modules[r.resource_key] = r.access as ModuleLevel;
       } else if (r.resource_type === 'widget' && WIDGET_ID_SET.has(r.resource_key) && WIDGET_ACCESS_SET.has(r.access)) {
-        widgets[r.resource_key] = r.access;
+        widgets[r.resource_key] = r.access as GrantLevel;
       } else if (r.resource_type === 'capability' && CAPABILITY_KEY_SET.has(r.resource_key) && CAPABILITY_ACCESS_SET.has(r.access)) {
-        capabilities[r.resource_key] = r.access;
+        capabilities[r.resource_key] = r.access as GrantLevel;
       }
     }
   };
@@ -416,163 +477,6 @@ export function resolvePermissions(database, user, { isDisplay = false } = {}) {
   return { admin: false, modules, widgets, capabilities };
 }
 
-/**
- * Baut die Modul→Access-Map für die /api/v1-Session-Durchsetzung.
- * Nur abweichende (eingeschränkte) Module werden gelistet; fehlt ein Modul,
- * gilt Vollzugriff. Gibt `null` zurück, wenn nichts eingeschränkt ist
- * (Fast-Path: Middleware ohne Arbeit) oder der Nutzer Admin ist.
- * @returns {Record<string,'none'|'read'>|null}
- */
-export function buildSessionModuleAccess(resolved) {
-  if (!resolved || resolved.admin) return null;
-  const map = {};
-  let restricted = false;
-  for (const [key, access] of Object.entries(resolved.modules)) {
-    if (access !== 'write') {
-      map[key] = access;
-      restricted = true;
-    }
-  }
-  return restricted ? map : null;
-}
-
-/**
- * Die Module, die einem Betrachter GANZ entzogen sind — als Set.
- *
- * Eingabe ist `req.sessionModuleAccess`, also genau das, was die Middleware in
- * server/index.js schon aufgelöst hat: null (Admin oder unbeschränkt) oder eine
- * Karte der abweichenden Module. Kein zweiter DB-Zugriff, keine zweite
- * Auflösung — eine zweite Wahrheit über Rechte wäre die teuerste Sorte Fehler.
- *
- * NUR 'none' ZÄHLT, NICHT 'read'. Wer nur lesen darf, darf lesen; ein Filter,
- * der ihm die Daten wegnimmt, hätte aus der Leseberechtigung eine Sperre
- * gemacht.
- *
- * Gedacht für aggregierende Endpunkte, die die Pfad-Middleware nicht abdeckt:
- * /dashboard trägt Inhalte aus einem Dutzend Modulen, sein eigener Pfad löst
- * aber auf das Scope-Modul `dashboard` auf, das gar kein Permissions-Modul ist.
- * Der Guard lässt die Anfrage deshalb immer durch, und das Aussortieren muss in
- * der Route passieren.
- *
- * @param {Record<string,'none'|'read'>|null|undefined} sessionModuleAccess
- * @returns {Set<string>}
- */
-export function deniedModules(sessionModuleAccess) {
-  const out = new Set();
-  for (const [key, level] of Object.entries(sessionModuleAccess || {})) {
-    if (level === 'none') out.add(key);
-  }
-  return out;
-}
-
-/**
- * Was ein aggregierender Endpunkt für DIESE Anfrage auslassen muss — beide
- * Achsen in einem Aufruf.
- *
- * `deniedModules` kennt nur die Rollenachse. Ein API-Token trägt eine zweite
- * Grenze, seine Scopes (`req.authScopes`), und die prüft die Pfad-Middleware
- * ebenfalls nur am ersten Pfadsegment: ein Token mit `search:read` oder
- * `dashboard:read` kam dort durch und bekam Treffer und Kacheln aus Modulen,
- * die seine Scopes gar nicht nennen. Über die Rechte seines Subjekts kam es nie
- * hinaus, über die eigene Allow-Liste schon — und die ist genau für Tokens da,
- * die an einen fremden Client gehen (Discussion #455).
- *
- * `moduleKeys` sind die Module, aus denen der Endpunkt liest: eine Allow-Liste
- * braucht die Menge, gegen die sie prüft. Lesen verlangt `read` (`write`
- * schließt es ein); `authScopes === null` ist ungescopt und nimmt nichts weg.
- *
- * @param {{ sessionModuleAccess?: object|null, authScopes?: string[]|null }} req
- * @param {Iterable<string>} moduleKeys
- * @returns {Set<string>}
- */
-export function hiddenModulesFor(req, moduleKeys) {
-  const hidden = deniedModules(req.sessionModuleAccess);
-  for (const key of moduleKeys) {
-    if (!tokenAllows(req.authScopes, key, 'read')) hidden.add(key);
-  }
-  return hidden;
-}
-
-/**
- * Darf dieses Credential in diesem Modul SCHREIBEN? Beide Achsen in einem Aufruf.
- *
- * Fuer die Handvoll GET-Routen, die es nur wegen einer Schreibgeste gibt: die
- * Sync-Ziel-Listen fuellen ein Feld im Aufgaben- und im Termindialog, und wer
- * dort nichts speichern darf, braucht die Auswahl nicht - wohl aber traegt sie
- * Kontonamen und Sammlungs-URLs der angebundenen Konten. Der Pfad-Guard in
- * server/index.js verlangt bei GET nur `read` (`requiredAccess`), diese Stellen
- * schulden die haertere Frage deshalb selbst.
- *
- * Gemessen am RECHT, nicht am Kontotyp: ein Wandtablett faellt heraus, weil es
- * nur Leserechte hat, und ein Mitglied mit `tasks: read` aus demselben Grund.
- */
-export function mayWriteModule(req, moduleKey) {
-  return tokenAllows(req?.authScopes, moduleKey, 'write')
-    && moduleAccessVerdict(req?.sessionModuleAccess, moduleKey, 'write') === MODULE_ACCESS_ALLOW;
-}
-
-/**
- * Darf dieses Credential in diesem Modul LESEN? Das Gegenstueck zu
- * `mayWriteModule()`, beide Achsen in einem Aufruf.
- *
- * Fuer jede Stelle, deren Pfad einem Modul gehoert und die Daten eines
- * ANDEREN liest: die Importe zwischen Vorrat und Einkauf, die Kontakt- und
- * Geburtstagsfelder der Split-Kandidaten, Buchungen am Inventar, Vorratszeilen
- * am Rezept, Belege, Geburtstags-Importkandidaten. Der Pfad-Guard in
- * server/index.js misst nur das eigene Modul.
- *
- * EINE REGEL: gebaut auf `hiddenModulesFor()`, damit "lesen darf" und "wird
- * ausgeblendet" nie auseinanderlaufen. Kein Nachbau aus `tokenAllows()` und
- * `deniedModules()` an der Aufrufstelle.
- */
-export function mayReadModule(req, moduleKey) {
-  return !hiddenModulesFor(req, [moduleKey]).has(moduleKey);
-}
-
-// Urteil der Modulrechte-Prüfung. 'allow' = durchlassen, 'none' = Modul ganz
-// gesperrt, 'read-only' = nur Lesen erlaubt, Schreibversuch abgewiesen.
-export const MODULE_ACCESS_ALLOW = 'allow';
-export const MODULE_ACCESS_DENIED = 'none';
-export const MODULE_ACCESS_READ_ONLY = 'read-only';
-
-/**
- * Erlaubt die aufgelöste Modulrechte-Karte diesen Zugriff?
- *
- * DIE Prüfung für jede Oberfläche, die Haushaltsdaten herausgibt — REST wie
- * MCP. Sie stand vorher nur inline in der /api/v1-Middleware, und genau das war
- * der Fehler aus #823: die MCP-Kern-Tools laufen in-process an express vorbei,
- * hatten damit keine Modulprüfung und gaben einem Mitglied mit `tasks: none`
- * die Aufgaben trotzdem heraus. Eine zweite Schreibweise derselben Regel wäre
- * dieselbe Falle noch einmal — deshalb ein Aufruf, kein Nachbau.
- *
- * DENY-Liste, keine Allow-Liste: `null` (Admin/unbeschränkt) und jedes nicht
- * gelistete Modul sind erlaubt. Nur was ausdrücklich eingeschränkt wurde, wird
- * abgewiesen.
- *
- * @param {Record<string,'none'|'read'>|null|undefined} sessionModuleAccess
- * @param {string|null} moduleKey - Scope-Modulschlüssel (scopes.js)
- * @param {'read'|'write'} access
- * @returns {'allow'|'none'|'read-only'}
- */
-export function moduleAccessVerdict(sessionModuleAccess, moduleKey, access) {
-  if (!sessionModuleAccess) return MODULE_ACCESS_ALLOW;
-  if (!moduleKey || !(moduleKey in sessionModuleAccess)) return MODULE_ACCESS_ALLOW;
-  const level = sessionModuleAccess[moduleKey];
-  if (level === 'none') return MODULE_ACCESS_DENIED;
-  if (level === 'read' && access === 'write') return MODULE_ACCESS_READ_ONLY;
-  return MODULE_ACCESS_ALLOW;
-}
-
-/**
- * Nur-Lese-Payload für Clients (/auth/me, /login): die aufgelösten Maps plus
- * Admin-Flag. Der Client blendet damit Nav-Einträge, Settings-Ziele und
- * Dashboard-Widgets aus — die verbindliche Durchsetzung bleibt serverseitig.
- */
-export function clientPermissions(database, user, { isDisplay = false } = {}) {
-  const { admin, modules, widgets, capabilities } = resolvePermissions(database, user, { isDisplay });
-  return { admin, modules, widgets, capabilities };
-}
-
 /** Voller Katalog für die Admin-UI (Module, Widgets, Rollen). */
 export function permissionCatalog() {
   return {
@@ -620,11 +524,11 @@ export function permissionCatalog() {
  * @param {'role'|'user'} subjectType
  * @param {string|number} subjectId
  */
-export function getSubjectPermissions(database, subjectType, subjectId) {
+export function getSubjectPermissions(database: Database, subjectType: 'role' | 'user', subjectId: string | number) {
   const rows = loadSubjectRows(database, subjectType, subjectId);
-  const modules = {};
-  const widgets = {};
-  const capabilities = {};
+  const modules: Record<string, string> = {};
+  const widgets: Record<string, string> = {};
+  const capabilities: Record<string, string> = {};
   const MODULE_KEY_SET = moduleKeySet();
   const WIDGET_ID_SET = widgetIdSet();
   for (const r of rows) {
@@ -643,10 +547,10 @@ export function getSubjectPermissions(database, subjectType, subjectId) {
  * @returns {{ resource_type: string, resource_key: string, access: string }[]}
  */
 export function normalizePermissionInput(
-  { modules = {}, widgets = {}, capabilities = {} } = {},
-  { subjectType = 'role' } = {},
-) {
-  const rows = [];
+  { modules = {}, widgets = {}, capabilities = {} }: PermissionInput = {},
+  { subjectType = 'role' }: { subjectType?: string } = {},
+): PermissionRow[] {
+  const rows: PermissionRow[] = [];
   const MODULE_KEY_SET = moduleKeySet();
   const WIDGET_ID_SET = widgetIdSet();
   for (const [key, access] of Object.entries(modules || {})) {
@@ -682,7 +586,12 @@ export function normalizePermissionInput(
  * bereitgestellt oder hier gekapselt.
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
  */
-export function replaceSubjectPermissions(database, subjectType, subjectId, input) {
+export function replaceSubjectPermissions(
+  database: Database,
+  subjectType: 'role' | 'user',
+  subjectId: string | number,
+  input: PermissionInput | undefined,
+) {
   // Portable Transaktion (BEGIN/COMMIT/ROLLBACK): funktioniert sowohl mit
   // better-sqlite3 (Produktion) als auch node:sqlite (Tests). Kein
   // database.transaction()-Helfer, den node:sqlite nicht kennt.
@@ -708,7 +617,12 @@ export function replaceSubjectPermissions(database, subjectType, subjectId, inpu
  * abgebrochen: das Konto entstuende, die Rechte nicht - und die Einladung
  * waere verbraucht.
  */
-export function writeSubjectPermissions(database, subjectType, subjectId, input) {
+export function writeSubjectPermissions(
+  database: Database,
+  subjectType: 'role' | 'user',
+  subjectId: string | number,
+  input: PermissionInput | undefined,
+): number {
   const rows = normalizePermissionInput(input, { subjectType });
   const deleteModulesAndWidgets = database.prepare(`
     DELETE FROM access_permissions
@@ -749,9 +663,11 @@ export function writeSubjectPermissions(database, subjectType, subjectId, input)
  * @param {'restricted'|'role'} preset
  * @returns {{ modules: Record<string,string>, widgets: Record<string,string> }|null}
  */
-export function invitePresetPermissions(preset) {
+export function invitePresetPermissions(
+  preset: string | null | undefined,
+): { modules: Record<string, string>; widgets: Record<string, string> } | null {
   if (preset !== 'restricted') return null;
-  const modules = {};
+  const modules: Record<string, string> = {};
   for (const key of INVITE_RESTRICTED_MODULES) modules[key] = 'none';
   return { modules, widgets: {} };
 }
@@ -772,7 +688,7 @@ export function invitePresetPermissions(preset) {
  * @param {{ id: number, role: string, family_role?: string|null }} user
  * @returns {number} Anzahl geschriebener Zeilen
  */
-export function applyChildStartPermissions(database, user) {
+export function applyChildStartPermissions(database: Database, user: PermissionUser | null | undefined): number {
   if (!user || user.id == null || user.role === 'admin' || user.family_role !== 'child') return 0;
   const current = resolvePermissions(database, user);
   const upsert = database.prepare(`
@@ -798,87 +714,15 @@ export function applyChildStartPermissions(database, user) {
     ON CONFLICT(key) DO NOTHING
   `);
   for (const [key, value] of Object.entries(CHILD_START_PREFERENCES)) {
-    written += preference.run(`${key}:user:${Number(user.id)}`, value).changes;
+    written += preference.run(`${key}:user:${Number(user.id)}`, value).changes as number;
   }
   return written;
 }
 
-/**
- * Darf diese Anfrage die Capability nutzen? Admin immer; sonst die Aufloesung
- * des Subjekts (Rollenprofil, Mitglied-Zeilen) - dieselbe wie im Rechte-Blatt.
- * Ohne aufloesbares Subjekt: nein. Fuer Felder, die eine Antwort WEGLAESST,
- * ist "im Zweifel weglassen" die sichere Seite.
- */
-export function requestHasCapability(database, req, key) {
-  if (!req) return false;
-  if (isAdminRequest(req)) return true;
-  const id = req.authUserId ?? req.session?.userId;
-  if (id == null) return false;
-  return userHasCapability(database, id, key, {
-    isDisplay: req.authMethod === 'display',
-    actingAsMember: req.authDeviceId != null,
-  });
-}
-
-/**
- * Die Rolle, mit der ein Konto in DIESER Anfrage aufgeloest wird. Ein Admin ist
- * auf einem angemeldeten Geraet ein Mitglied (server/auth.js, `requireAuth`) -
- * auch dort, wo eine Regel die Zeile aus `users` liest statt `req.authRole`.
- * Sonst behielte ein verlorenes Telefon ueber die Rechte-Aufloesung, was ihm
- * `isAdminRequest()` eben genommen hat.
- */
-export function userForRequest(req, user) {
-  return req?.authDeviceId != null && user ? { ...user, role: 'member' } : user;
-}
-
-/**
- * Darf das Konto die Capability nutzen - ohne Anfrage, aus der gespeicherten
- * Rolle und den Rechte-Zeilen? Admin immer, ein unbekanntes Konto nie. Die
- * Frage hinter `requestHasCapability()`, und die, die ein Nachtrag ueber ein
- * ANDERES Konto stellt als das anfragende (Zahlungsaufgaben,
- * services/payment-task-audience.js). Eine Migration ruft sie NIE auf: die
- * friert ihre Regel ein (Migration 250 in server/db.js).
- */
-export function userHasCapability(database, userId, key, { isDisplay = false, actingAsMember = false } = {}) {
-  if (userId == null) return false;
-  const row = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!row) return false;
-  const user = actingAsMember ? { ...row, role: 'member' } : row;
-  if (user.role === 'admin') return true;
-  return resolvePermissions(database, user, { isDisplay }).capabilities[key] === 'allow';
-}
-
-/**
- * Darf diese Anfrage einen Datensatz AENDERN oder LOESCHEN (R23, D5)?
- *
- * `own` sagt der Aufrufer, weil "eigen" je Modul etwas anderes heisst: die
- * Notiz und der Gegenstand, die ich angelegt habe; im Kalender zusaetzlich der
- * Termin, dem ich zugewiesen bin. Eigenes immer; Fremdes nur mit der
- * Capability des Moduls. Das Modulrecht selbst (`read` = gar nicht schreiben)
- * prueft weiter die Pfad-Middleware, diese Frage kommt danach.
- *
- * EINE Stelle fuer REST, API-Tokens und die MCP-Bruecke: `call_api_operation`
- * laeuft per Loopback durch dieselben Routen, und `requestHasCapability()`
- * liest das Subjekt aus `req.authUserId` wie aus der Sitzung.
- */
-export function mayChangeRecord(database, req, capabilityKey, own) {
-  if (own) return true;
-  return requestHasCapability(database, req, capabilityKey);
-}
-
-/** Die Absage zu `mayChangeRecord()`: 403 mit festem Grund, den die Oberflaeche benennt. */
-export function sendNotOwner(res) {
-  return res.status(403).json({
-    error: 'You can only change entries you created.',
-    code: 403,
-    reason: 'not_owner',
-  });
-}
-
-export function isValidInvitePreset(preset) {
+export function isValidInvitePreset(preset: string): boolean {
   return INVITE_PRESETS.includes(preset);
 }
 
-export function isValidFamilyRole(role) {
+export function isValidFamilyRole(role: string): boolean {
   return FAMILY_ROLE_SET.has(role);
 }

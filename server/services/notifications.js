@@ -18,7 +18,7 @@ import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
 import { withoutModulesDeniedToRecipient, withoutSwitchedOffModules } from './reminder-origins.js';
-import { reminderTargetPublicSql, reminderTargetVisibleSql } from './reminder-targets.js';
+import { reminderTargetPublicSql, visibleWhere } from '../authorize/index.ts';
 import { withoutGoneEvents } from './reminder-deleted-occurrence.js';
 import { syncAllPreventionReminders } from './prevention-reminders.js';
 import { syncAllFastingReminders } from './fasting-reminders.js';
@@ -591,11 +591,11 @@ export async function processDueNotifications({
       AND (r.entity_type != 'task'  OR EXISTS (SELECT 1 FROM tasks           WHERE id = r.entity_id))
       AND (r.entity_type != 'event' OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id))
       -- Kein Titel an jemanden, der die Zeile nicht sieht - dieselbe Klausel
-      -- wie in routes/reminders.js#/pending (services/reminder-targets.js).
+      -- wie in routes/reminders.js#/pending (authorize/rows/reminders.ts).
       -- Die Zeile bleibt ausstehend (pushed_at leer) und geht raus, sobald
       -- der Empfaenger ihr Ziel wieder sieht. Der Filter steht in der Abfrage
       -- und damit vor Push UND Kanaelen.
-      AND ${reminderTargetVisibleSql(activeDb, 'r')}
+      AND ${visibleWhere('reminders', 'r', 'r.created_by', { database: activeDb })}
       -- NICHTS GEHT AN EIN EHEMALIGES KONTO (#1381). Das Deaktivieren loescht
       -- die offenen Erinnerungen, Push-Abos und eigenen Kanaele des Kontos;
       -- einer der Abgleiche oben kann eine Zeile aber neu anlegen, und fuer

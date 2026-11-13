@@ -11,13 +11,15 @@
  *
  *        Die Auth-Schicht ist wie in test-dashboard-permissions.js nachgestellt
  *        (`applyRoleModuleAccess` aus server/auth.js), nicht nachgebaut: dieselben
- *        Felder, dieselbe Auflösung.
+ *        Felder, dieselbe Auflösung (`resolveRequestModuleAccess`, die auch die
+ *        Verbindung an server/authorize/ reicht). Eine Anfrage MIT Bearer-Token
+ *        geht stattdessen durch das echte `requireAuth`.
  *
  * Ausführen: npm run test:mcp-router-permissions
  */
 
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
@@ -27,7 +29,8 @@ process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'mcp-router-permissions-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolveRequestModuleAccess } = await import('../server/authorize/index.ts');
+const { requireAuth } = await import('../server/auth.js');
 const { default: mcpRouter } = await import('../server/mcp/server.js');
 
 const moduleDatabase = get();
@@ -91,15 +94,14 @@ db.prepare(`
 let actor = PARENT;
 const app = express();
 app.use(express.json());
-app.use((req, _res, next) => {
+app.use((req, res, next) => {
+  if (req.headers.authorization) return requireAuth(req, res, next);
   const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor);
   req.authUserId = user.id;
   req.authRole = user.role;
   req.authMethod = 'api_token';
   req.authScopes = null;                      // Legacy-Token: kein Scoping
-  req.sessionModuleAccess = user.role === 'admin'
-    ? null
-    : buildSessionModuleAccess(resolvePermissions(db, user));
+  req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
   next();
 });
 app.use('/mcp', mcpRouter);
@@ -169,4 +171,55 @@ test('Der Guest-Status hängt am Konto, nicht am Endpoint', async () => {
     (await toolsFor(PARENT)).includes('list_tasks'),
     true,
   );
+});
+
+// ── Display-Konto per Token ──────────────────────────────────────────────────
+
+/**
+ * Ein Integrations-Token fuer `userId`, direkt in `api_tokens` (wie die Matrix ihre Feed-Tokens).
+ * @param {number|bigint} userId
+ * @returns {string}
+ */
+function tokenFor(userId) {
+  const credential = randomBytes(24).toString('hex');
+  db.prepare(`
+    INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(`t-${randomUUID()}`, createHash('sha256').update(credential, 'utf8').digest('hex'), credential.slice(0, 12), PARENT, userId);
+  return credential;
+}
+
+/**
+ * @param {string} credential
+ * @param {string} method
+ * @param {object} [params]
+ */
+async function rpcWithToken(credential, method, params) {
+  const res = await fetch(base, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${credential}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  assert.equal(res.status, 200);
+  return res.json();
+}
+
+test('Ein Display-Konto per API-Token bekommt ueber /mcp kein Werkzeug (#1208)', async () => {
+  // Das Display-Cookie traegt seine Art selbst (`authMethod: 'display'`); ein
+  // Token, das auf ein Display-Konto lautet, nicht - dort entscheidet allein die
+  // Abfrage auf `display_accounts`. Die Route verweigert solche Tokens, also steht
+  // es direkt in der Datenbank: es geht um das, was der Server tut, wenn es eins gibt.
+  const wall = seedUser('wall', 'member', 'other');
+  db.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').run(wall, PARENT);
+  const credential = tokenFor(wall);
+  const list = await rpcWithToken(credential, 'tools/list');
+  assert.deepEqual(list.result.tools, []);
+  const call = await rpcWithToken(credential, 'tools/call', { name: 'list_tasks', arguments: {} });
+  assert.equal(call.result.isError, true);
+  assert.equal(JSON.stringify(call).includes('Heizung entlüften'), false);
+
+  // Gegenprobe: derselbe Weg mit einem Konto ohne Display-Zeile liefert aus.
+  const plain = tokenFor(seedUser('plain', 'member', 'other'));
+  const names = (await rpcWithToken(plain, 'tools/list')).result.tools.map((/** @type {{ name: string }} */ t) => t.name);
+  assert.equal(names.includes('list_tasks'), true);
 });

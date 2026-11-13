@@ -16,7 +16,11 @@
  *          and the lint exceptions name the same files as the import rules;
  *          the real tree has no hard finding (this runs in the required test jobs, next to the
  *          lint job); the real lint-baseline.json is sorted, carries no hard rule and names no
- *          missing file. The fixture test/fixtures/lint/error-text/ must give exactly its
+ *          missing file. The rights fixture test/fixtures/lint/rights/ (phase 2, B5) must give
+ *          exactly its marked RIGHTS-SQL and RIGHTS-MODULE lines, nothing under server/authorize/,
+ *          server/db.js or server/openapi/, and exactly its two imports past
+ *          server/authorize/index.ts; RIGHTS-MODULE and both authorize import rules are hard,
+ *          a RIGHTS-SQL key needs a reason. The fixture test/fixtures/lint/error-text/ must give exactly its
  *          thirty-three ERROR-TEXT findings (the self-test cases of the text reader the rule
  *          replaced, phase 1b section E, and the spellings a probe against that reader
  *          found) and nothing for the lines it must leave alone. A
@@ -32,7 +36,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync,
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tempDir } from './tmp-dir.js';
-import { pushSenders } from '../scripts/generate-oxlint-overrides.mjs';
+import { buildOverrides, pushSenders } from '../scripts/generate-oxlint-overrides.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(REPO, 'scripts', 'check-lint-baseline.ts');
@@ -44,6 +48,7 @@ const KNIP = join(REPO, 'node_modules', 'knip', 'bin', 'knip.js');
 const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
 const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'CHANNEL-SEND', 'PUSH-SEND',
   'push-service-importers', 'web-push-only-in-push-service', 'channel-delivery-importers', 'providers-only-in-channel-delivery',
+  'RIGHTS-MODULE', 'rights-only-through-authorize', 'authorize-not-to-db',
   'blanket-disable', 'disable-no-restricted-syntax'];
 
 /** The real rule set for a directory outside the repo: no fixture ignore, plugin by absolute URL. */
@@ -347,6 +352,27 @@ test('each of the other layer rules fires, and an unresolved local import is key
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('server/authorize/ reaching server/db.js, also through another module, is a finding', () => {
+  // db.js opens the database on import; the permission module takes the connection
+  // as a parameter instead (phase 2, B1). The indirect case is the one that happened.
+  const dir = project(NONE);
+  try {
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
+    for (const d of ['server/authorize', 'server/services']) mkdirSync(join(dir, d), { recursive: true });
+    writeFileSync(join(dir, 'server', 'db.js'), 'export const get = () => null;\n');
+    writeFileSync(join(dir, 'server', 'services', 'uses-db.js'), "import { get } from '../db.js';\nexport const u = get;\n");
+    writeFileSync(join(dir, 'server', 'authorize', 'index.ts'), 'export const c = 1;\n');
+    writeFileSync(join(dir, 'server', 'x.js'), "import { c } from './authorize/index.ts';\nimport { get } from './db.js';\nexport const x = [c, get];\n");
+    assert.equal(run(dir, '--init').code, 0);
+    assert.deepEqual(baselineOf(dir), {}, 'a module outside server/authorize/ may load db.js');
+    writeFileSync(join(dir, 'server', 'authorize', 'actor.ts'), "import { u } from '../services/uses-db.js';\nexport const a = u;\n");
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    // Hard since phase 2, B5: named on its own, never a baseline key.
+    assert.match(r.out, /Hard rules[\s\S]*server\/authorize\/actor\.ts\s+depcruise\/authorize-not-to-db\s+1/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('a broken dependency-cruiser config is exit 2', () => {
   const dir = project(NONE);
   try {
@@ -436,14 +462,45 @@ function serverSelectors() {
 /** @param {string} tag @returns {(s: Selector) => boolean} */
 const tagged = (tag) => (s) => s.message.startsWith(`${tag}:`);
 
-test('server/ gets the whole base rule plus the sender selectors, nothing else', () => {
+const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE'];
+/** @param {Selector} s */
+const serverOnly = (s) => SERVER_ONLY.some((tag) => tagged(tag)(s));
+
+test('server/ gets the whole base rule plus the sender and rights selectors, nothing else', () => {
   const [severity, ...base] = CONFIG.rules[RESTRICTED];
   const [serverSeverity, ...server] = serverSelectors();
   assert.equal(serverSeverity, severity);
   assert.deepEqual(server.slice(0, base.length), base);
   const extra = server.slice(base.length);
-  assert.ok(extra.length > 0 && extra.every((s) => tagged('CHANNEL-SEND')(s) || tagged('PUSH-SEND')(s)), 'only sender selectors are added');
-  assert.ok(!base.some((/** @type {Selector} */ s) => tagged('CHANNEL-SEND')(s) || tagged('PUSH-SEND')(s)), 'test files may stub a sender; the rule is for server/ only');
+  assert.ok(extra.every(serverOnly), 'only sender and rights selectors are added');
+  for (const tag of SERVER_ONLY) assert.ok(extra.some(tagged(tag)), `server/** carries no ${tag} selector`);
+  // Test files may stub a sender or seed a visibility value; the rules are for server/ only.
+  assert.ok(!base.some(serverOnly), 'a server-only selector in the base rule');
+});
+
+// Where the rights rules are the rule itself (phase 2, B5): the permission module, the
+// schema and its test mirror (migrations write visibility values), the API documentation.
+const RIGHTS_HOME = ['server/authorize/**', 'server/db.js', 'server/db-schema-test.js', 'server/openapi/**'];
+
+test('the rights exception covers exactly the permission module, the schema and the API docs, and drops only the rights selectors', () => {
+  const [severity, ...selectors] = serverSelectors();
+  const override = CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes('server/authorize/**'));
+  assert.ok(override, 'no override for server/authorize/**');
+  assert.deepEqual(override.files, RIGHTS_HOME);
+  assert.deepEqual(override.rules[RESTRICTED], [severity, ...selectors.filter((s) => !tagged('RIGHTS-SQL')(s) && !tagged('RIGHTS-MODULE')(s))]);
+  // Every other server override keeps both rights tags.
+  for (const other of /** @type {Override[]} */ (CONFIG.overrides)) {
+    if (other === override || !other.files.some((f) => f.startsWith('server/'))) continue;
+    for (const tag of ['RIGHTS-SQL', 'RIGHTS-MODULE']) {
+      const [, ...list] = other.rules[RESTRICTED];
+      assert.ok(list.some(tagged(tag)), `${other.files.join(', ')} loses ${tag}`);
+    }
+  }
+});
+
+test('the generator refuses a file under two exceptions (the later list would win whole)', () => {
+  assert.throws(() => buildOverrides(CONFIG, ['server/authorize/x.js']), /overlap: server\/authorize\/x\.js and server\/authorize\/\*\*/);
+  assert.throws(() => buildOverrides(CONFIG, ['server/utils/timezone.js']), /overlap/);
 });
 
 test('the timezone exception drops only the UTC selector', () => {
@@ -626,6 +683,81 @@ test('the sender fixture gives exactly its lint lines, and the ratchet holds the
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+const RIGHTS = join(FIXTURE, 'rights');
+
+test('the rights fixture gives exactly its marked lint lines, and nothing where the rule lives', () => {
+  const dir = tempDir('yuvomi-rights-fixture-');
+  try {
+    cpSync(RIGHTS, dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    const reads = 'server/routes/reads.js';
+    // The fixture marks every line that must be reported with `rights-N: TAG`.
+    const marked = readFileSync(join(dir, reads), 'utf8').split('\n')
+      .flatMap((line, i) => {
+        const m = /rights-\d+: ([A-Z-]+)/.exec(line);
+        return m ? [`${reads}:${i + 1} ${m[1]}`] : [];
+      });
+    assert.deepEqual(marked.map((l) => l.split(' ')[1]), [
+      ...Array(8).fill('RIGHTS-SQL'), ...Array(4).fill('RIGHTS-MODULE'),
+    ], 'the fixture marks eight SQL and four module lines');
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    // Silent: server/authorize/rows/inside.ts (the rule itself), server/db.js (migrations),
+    // server/openapi/ (the docs), and the lines without a mark.
+    assert.deepEqual(found, [...marked].sort());
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the rights fixture gives exactly its two imports past server/authorize/index.ts', () => {
+  const r = spawnSync(process.execPath, [DEPCRUISE, '--config', DEPCRUISE_CONFIG, '--output-type', 'json', 'server', 'scripts', 'test'], {
+    cwd: RIGHTS, encoding: 'utf8',
+  });
+  const report = JSON.parse(r.stdout);
+  assert.equal(report.summary.totalCruised, 10, 'dependency-cruiser does not read the whole rights fixture');
+  const found = report.summary.violations
+    .map((/** @type {{ rule: { name: string }, from: string, to: string }} */ v) => `${v.rule.name} ${v.from} -> ${v.to}`)
+    .sort();
+  // Silent: server/routes/door.js (through index.ts), index.ts itself (inside), and
+  // test/test-inner.js (a test checks an inner seam on its own).
+  assert.deepEqual(found, [
+    'rights-only-through-authorize scripts/tool.js -> server/authorize/rows/inside.ts',
+    'rights-only-through-authorize server/routes/inner.js -> server/authorize/modules.ts',
+  ]);
+});
+
+test('the ratchet holds RIGHTS-MODULE and the import rule as hard, and asks a reason for RIGHTS-SQL', () => {
+  const dir = tempDir('yuvomi-rights-ratchet-');
+  try {
+    cpSync(RIGHTS, dir, { recursive: true });
+    rmSync(join(dir, 'test'), { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
+    const hard = run(dir, '--init');
+    assert.equal(hard.code, 1, hard.out);
+    const lines = hard.out.split('\n').map((l) => l.trim().split(/\s+/).join(' '));
+    for (const key of [
+      'server/routes/reads.js oxlint/no-restricted-syntax/RIGHTS-MODULE 4',
+      'server/routes/inner.js depcruise/rights-only-through-authorize 1',
+      'scripts/tool.js depcruise/rights-only-through-authorize 1',
+    ]) assert.ok(lines.includes(key), `${key}:\n${hard.out}`);
+    assert.doesNotMatch(hard.out, /RIGHTS-SQL/, 'RIGHTS-SQL is a list of exceptions, not a hard rule');
+    assert.equal(existsSync(join(dir, 'lint-baseline.json')), false, 'a hard finding never enters a baseline');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  // RIGHTS-SQL alone: the baseline takes the key, but only with a reason.
+  const sql = project("export const f = (db) => db.prepare(`UPDATE t SET visibility = 'private' WHERE id = ?`);\n");
+  try {
+    const init = run(sql, '--init');
+    assert.equal(init.code, 1, init.out);
+    assert.match(init.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/RIGHTS-SQL\s+no reason/);
+    assert.deepEqual(baselineOf(sql), { 'server/x.js\toxlint/no-restricted-syntax/RIGHTS-SQL': 1 });
+    writeReasons(sql, { 'server/x.js\toxlint/no-restricted-syntax/RIGHTS-SQL': 'a write filter: narrows a row to private, reads nothing' });
+    const ok = run(sql);
+    assert.equal(ok.code, 0, ok.out);
+  } finally { rmSync(sql, { recursive: true, force: true }); }
+});
+
 test('oxlint reaches the source tree, but not vendor code or the fixture', () => {
   const r = spawnSync(process.execPath, [OXLINT, '--debug=files', '.'], { cwd: REPO, encoding: 'utf8' });
   const files = `${r.stdout}${r.stderr}`.split('\n').filter(Boolean);
@@ -771,7 +903,7 @@ test('the real lint-baseline.json is sorted, has no hard rule and names only exi
   assert.deepEqual([...new Set(stale)], [], 'baseline names files that do not exist');
 });
 
-test('the real lint-baseline-reasons.json is sorted and explains every error-text key', () => {
+test('the real lint-baseline-reasons.json is sorted and explains every error-text and rights-sql key', () => {
   const baseline = JSON.parse(readFileSync(join(REPO, 'lint-baseline.json'), 'utf8'));
   const reasons = JSON.parse(readFileSync(join(REPO, 'lint-baseline-reasons.json'), 'utf8'));
   const keys = Object.keys(reasons);
@@ -783,4 +915,6 @@ test('the real lint-baseline-reasons.json is sorted and explains every error-tex
   const errorText = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/ERROR-TEXT'));
   assert.ok(errorText.length > 0, 'the baseline carries no error-text key');
   assert.deepEqual(errorText.filter((key) => !(key in reasons)), [], 'error-text keys without a reason');
+  const rightsSql = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/RIGHTS-SQL'));
+  assert.deepEqual(rightsSql.filter((key) => !(key in reasons)), [], 'rights-sql keys without a reason');
 });

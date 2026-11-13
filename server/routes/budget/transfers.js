@@ -2,7 +2,7 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { str, num, date as validateDate, MAX_TITLE } from '../../middleware/validate.js';
-import { normalizeBudgetVisibility } from '../../services/budget-visibility.js';
+import { normalizeBudgetVisibility } from '../../authorize/index.ts';
 import { todayKey } from '../../utils/timezone.js';
 import { createLogger } from '../../logger.js';
 import { createTransfer, transferPair, mirrorTransfer, transferIncomeCategory, TRANSFER_SAVING_CATEGORY, TRANSFER_SAVING_SUBCATEGORY } from '../../services/budget-transfers.js';

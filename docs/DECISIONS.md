@@ -69,16 +69,22 @@ explicit grants once.
 
 One rule, one place, so a future change cannot be forgotten in a copy:
 
-- **Documents:** `documentVisibleSql()` in `server/services/document-access.js` has exactly
-  three branches - creator, family visibility, explicit share - and no admin branch. Every
-  path that hands out documents goes through it, including the modules that only link them.
-- **Tasks and events:** `visibilityWhere()` in `server/services/visibility.js`, enforced on
+- **Documents:** `documentVisibleWhere()` in `server/authorize/rows/documents.ts`
+  (`documentVisibleSql()` is a wrapper around it) has exactly three branches - creator, family
+  visibility, explicit share - and no admin branch. Every path that hands out documents goes
+  through it, including the modules that only link them: mostly by way of
+  `visibleWhere('documents', ...)` or `filterVisible(database, 'documents', ...)` from
+  `server/authorize/index.ts`, and inside the permission module itself for reminders on a
+  document (`visibleWhere('reminders', ...)`) and for calendar attachments
+  (`documentClonePredicate`, `documentWidenPredicate`).
+- **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`, enforced on
   the server and without an admin bypass (#474); the one deliberate exception is the personal ICS
   feed, an export of the household calendar that only drops other members' unshared ICS
   subscriptions (`icsSubscriptionVisibleWhere()`, SPEC "deliberately not filtered").
-- **Health:** `server/routes/health/caregivers.js`. Grants are per person, managed by admins,
-  and every member can read their own.
-- **Invitations:** `INVITE_PRESETS` in `server/permissions.js`, default `restricted`, and the
+- **Health:** `server/routes/health/caregivers.js` manages the grants; the rule they feed
+  (`canWriteFor()`, `careAwareClause()`, `writableClause()`) lives in `server/authorize/care.ts`.
+  Grants are per person, managed by admins, and every member can read their own.
+- **Invitations:** `INVITE_PRESETS` in `server/authorize/catalog.ts`, default `restricted`, and the
   invite handler in `server/auth.js`, where a *missing* field means the narrow template so
   that an older client cannot invite with full access by accident.
 
@@ -86,7 +92,7 @@ One rule, one place, so a future change cannot be forgotten in a copy:
 
 Whether an admin should ever see past the visibility rule is a real question, and it has an
 address: #1007, member visibility as its own axis. If the answer there is ever yes, the change
-goes into `document-access.js` - one rule, all paths, one test - and never into an `isAdmin`
+goes into `server/authorize/rows/documents.ts` - one rule, all paths, one test - and never into an `isAdmin`
 check at a single call site. Until then, an admin who cannot see a document still has the
 non-destructive path, and a pull request that adds an admin exception to any of the four
 places above is undoing this decision rather than extending it.
@@ -112,7 +118,7 @@ different shapes of copy:
   paths to the same document gave two answers: the single-document path told an admin that a
   member's private document did not exist, the folder path deleted it. Decided in review: the
   subtree goes through the one visibility rule, and if admins are ever to see past it, that
-  change goes into `document-access.js` - one rule, all paths, one test.
+  change goes into `server/authorize/rows/documents.ts` - one rule, all paths, one test.
 - **A second regex, #1013.** The storage check for dashboard widget ids was written without
   ever seeing how `fullWidgetId()` composes them, so it knew nothing of the colon in
   `<module-id>:<widget-id>`, and every layout containing a third-party widget was refused
@@ -120,7 +126,7 @@ different shapes of copy:
   check built from the same parts instead of imitating them.
 - **A condition on a future build, #1007.** Member visibility, if it is built, comes with two
   conditions: every list of people goes through a single predicate, the way documents go
-  through `documentVisibleSql()`, and all screens change at once, because a person hidden in a
+  through `visibleWhere('documents', ...)`, and all screens change at once, because a person hidden in a
   picker but visible in a mention is not hidden, only inconsistently visible.
 
 An older instance shows the third shape of copy, a rule living inside a middleware. In
@@ -132,17 +138,32 @@ document visibility SQL into one file, and that file's header records why.
 
 ### Where the rule lives
 
-- **Documents:** `documentVisibleSql()` and `filterVisibleDocumentIds()` in
-  `server/services/document-access.js`, called from documents, dms, tasks and the document
-  links every other module uses.
-- **Tasks and events:** `visibilityWhere()` in `server/services/visibility.js`. **Budget:**
-  `server/services/budget-visibility.js`, owner-based and without an admin bypass.
+- **Documents:** the rule in `server/authorize/rows/documents.ts`, reached through
+  `server/authorize/index.ts` - mostly `visibleWhere('documents', ...)` and
+  `filterVisible(database, 'documents', ...)`, for reminders and calendar attachments the
+  reminder rule and the attachment predicates that call it; used by documents, dms, tasks and
+  the document links every other module uses.
+- **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`, reached
+  through `visibleWhere('tasks', ...)` and `visibleWhere('events', ...)`. **Budget:**
+  `server/authorize/rows/budget.ts`, owner-based and without an admin bypass, reached through
+  `visibleWhere('budget', ...)` and the budget helpers `index.ts` exports with it.
 - **Module permission:** `moduleAccessVerdict()` and `deniedModules()` in
-  `server/permissions.js`. The path middleware and the MCP tool layer call the same verdict,
+  `server/authorize/modules.ts`. The path middleware and the MCP tool layer call the same verdict,
   and a route that carries several modules sorts with `deniedModules()`, because a middleware
   that reads the path cannot know what such a route returns.
 - **Widget and module id notation:** `server/services/module-capabilities.js`, where
   `fullWidgetId()` composes them and `isWidgetId()` is built from the same parts.
+
+Since phase 2 (B1 to B4) the SQL visibility rules and the module verdict stand in
+`server/authorize/`, and `server/authorize/index.ts` is its one door. Three guards in
+`npm run lint` keep them there (B5): `RIGHTS-SQL` reports a visibility literal in SQL anywhere
+else under `server/`, and the few that stay - a write, never a read - are listed in
+`lint-baseline-reasons.json` with their reason; `RIGHTS-MODULE` fails on a module level
+(`x.modules.y`) compared with `'none'` outside the permission module; and the import rule
+`rights-only-through-authorize` fails on any import of an inner file of `server/authorize/` from
+outside, tests apart. The schema, its test mirror and the API documentation may spell visibility
+values, because they write or describe them. A visibility compared on a row in JavaScript and a
+module level read under a computed key are seen by no guard; they are what is left to move.
 
 ### What counts as undoing it
 
@@ -294,12 +315,13 @@ because it answers a different question.
 
 ### Where the rule lives
 
-- `server/services/visibility.js` - `VISIBILITY_VALUES` and `visibilityWhere()`, the canonical
+- `server/authorize/rows/assignees.ts` - `VISIBILITY_VALUES` and `visibilityWhere()`, the canonical
   set and the one WHERE fragment tasks and calendar share (#474).
-- `server/routes/health/helpers.js` - the health pair, to be read through an adapter.
-- `server/services/budget-visibility.js` - the budget triple, with `shared_amount` as the
+- `server/authorize/care.ts` - the health pair (`OPEN_FAMILY`, `OPEN_ALL`), to be read through an adapter.
+- `server/authorize/rows/budget.ts` - the budget triple, with `shared_amount` as the
   second axis.
-- `server/services/document-access.js` - `documentVisibleSql()`, `family` plus the access list.
+- `server/authorize/rows/documents.ts` - `documentVisibleWhere()` (with `documentVisibleSql()` as a
+  wrapper), `family` plus the access list.
 - `public/locales/*.json` - the visibility labels under tasks, documents, health, budget and
   quick links, the place the family sees first.
 
@@ -686,7 +708,7 @@ forgot to ask about.
 
 ### Where the rule lives
 
-- `mayWriteModule()` in `server/permissions.js`, both axes in one call. The transfer routes ask it
+- `mayWriteModule()` in `server/authorize/modules.ts`, both axes in one call. The transfer routes ask it
   before any lookup that could answer 404, so a refusal does not confirm that an id exists: the
   `to-shopping-list` routes in `server/routes/meals.js` and `server/routes/recipes.js` for
   `shopping`, `import-meal-plan` and the undo of a meal transfer in `server/routes/shopping.js` for
@@ -784,7 +806,7 @@ each module's own ICS feed, and incoming calendar, reminder and contact sync.
 
 - `server/services/household-modules.js`: `householdDisabledModules()` is the one reading of the
   stored value. `modulesLeftOut()` merges it with what `hiddenModulesFor()` in
-  `server/permissions.js` withholds from this caller, one set for a mixed answer.
+  `server/authorize/modules.ts` withholds from this caller, one set for a mixed answer.
   `birthdaysSwitchedOff()` and `notBirthdayEventSql()` are for the birthday events that live in
   `calendar_events`. Not in a middleware: the path of a mixed answer names none of the modules it
   carries.
@@ -1238,10 +1260,12 @@ server's, and the recipient's own permission is not asked there.
 
 ### Where the rule lives
 
-- `recipientDeniedModules()` in `server/services/reminder-origins.js`: `resolvePermissions()` ->
-  `buildSessionModuleAccess()` -> `deniedModules()`, the same resolution `req.sessionModuleAccess`
-  takes, and `null` for an owner that does not resolve. Exported as an interim step until
-  `authorize()` in phase 2 of the architecture roadmap.
+- `authorize(actor, 'receive', { module })` in `server/authorize/` (phase 2 B2), with the actor
+  from `actorForUser()`: `resolvePermissions()` -> `buildSessionModuleAccess()`, the same
+  resolution `req.sessionModuleAccess` takes; only `none` refuses, no token scopes, and an owner
+  that does not resolve has no actor and receives nothing. Until B2 this was
+  `recipientDeniedModules()` in `server/services/reminder-origins.js`, which no production code
+  calls any more.
 - `ORIGIN_MODULE` and `FEED_MODULE` next to it, the one map per kind of output;
   `withoutModulesDeniedToRecipient()` for the delivery in `server/services/notifications.js`,
   `feedModuleDenied()` for the feeds in `server/index.js`, `emptyFeed()` in

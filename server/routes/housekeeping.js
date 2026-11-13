@@ -31,8 +31,13 @@ import {
   queueEventDeletion,
   markInlineOutbound,
 } from '../services/calendar-outbound.js';
-import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW, requestHasCapability } from '../permissions.js';
-import { documentVisibleSql } from '../services/document-access.js';
+import {
+  mayWriteModule,
+  moduleAccessVerdict,
+  MODULE_ACCESS_ALLOW,
+  requestHasCapability,
+  visibleWhere,
+} from '../authorize/index.ts';
 import { tokenAllows } from '../scopes.js';
 import {
   configuredHouseholdTimeZone,
@@ -762,7 +767,7 @@ function visitCapabilities(row, req, viewer = MASKED_RECEIPTS) {
 // LOEHNE, ZAHLUNGEN UND BETRAEGE SIND EINE EIGENE FRAGE (R20). Das Modulrecht
 // sagt, ob jemand die Haushaltshilfe sieht und bedient; die Capability
 // `housekeeping_view_amounts` sagt, ob er dabei Geld sieht. Neue Kinderkonten
-// starten ohne sie (CHILD_START_PERMISSIONS in server/permissions.js).
+// starten ohne sie (CHILD_START_PERMISSIONS in server/authorize/catalog.ts).
 // Das Urteil reist im selben Objekt wie das zum Beleg (`receiptAccess`), weil
 // es an genau denselben Serialisierern haengt - und ein Serialisierer, der es
 // nicht bekommt, gibt wie beim Beleg nichts heraus (MASKED_RECEIPTS).
@@ -794,7 +799,7 @@ function payment403(res) {
 // UND Token-Scope, dieselbe Frage wie bei Budget, Ausgaben und Inventar) und die
 // Sichtbarkeit des einzelnen Dokuments (`documentVisibleSql`, dieselbe Regel
 // wie im Dokumente-Modul). Wer durchfaellt, bekommt `null` fuer beide - auch die
-// ID verraet sonst, dass es ein Dokument dieser Nummer gibt (document-access.js).
+// ID verraet sonst, dass es ein Dokument dieser Nummer gibt (authorize/rows/documents.ts).
 // Uebrig bleibt `has_receipt`, eine Aussage ueber den Besuch - aber nur fuer
 // wer Dokumente lesen darf. Ohne dieses Recht ist es `null` wie `attachments`
 // bei Budget, Ausgaben und Inventar und `document_count` bei Aufgaben: kein
@@ -815,7 +820,7 @@ function receiptAccess(req) {
     for (const id of wanted) names.set(id, undefined);
     const rows = db.get().prepare(`
       SELECT d.id, d.name FROM family_documents d
-      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${documentVisibleSql('d')}
+      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${visibleWhere('documents', 'd', '@userId')}
     `).all(...wanted, { userId: viewer });
     for (const row of rows) names.set(row.id, row.name);
   };

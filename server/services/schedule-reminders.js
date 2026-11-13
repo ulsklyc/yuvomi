@@ -26,7 +26,7 @@
  */
 
 import { localToUTCPrecise, householdTimeZone, todayKey, shiftDateKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { scheduleData } from './schedule.js';
@@ -78,9 +78,7 @@ function scheduleDisabled(database) {
 }
 
 function lacksSchedule(database, userId) {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return true;
-  return resolvePermissions(database, user).modules.schedule === 'none';
+  return !authorize(actorForUser(database, userId), 'receive', { module: 'schedule' }).allowed;
 }
 
 /**

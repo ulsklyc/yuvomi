@@ -845,7 +845,11 @@ test('jedes INSERT in calendar_events nennt series_authored oder ist ein Abruf',
       sites.push({ name, sql: match[0] });
     }
   }
-  assert.ok(sites.length >= 11, `nur ${sites.length} Anlegestellen gefunden - stimmt die Suche noch?`);
+  // 10 seit #2616: das MCP-Werkzeug `create_event` legte einen Termin mit
+  // eigenem INSERT an (und nannte die Marke dort selbst); es geht jetzt per
+  // Loopback durch POST /api/v1/calendar, dessen INSERT hier mitgezaehlt wird.
+  // Eine Anlegestelle weniger, nicht eine ohne Marke.
+  assert.ok(sites.length >= 10, `nur ${sites.length} Anlegestellen gefunden - stimmt die Suche noch?`);
 
   const inbound = sites.filter((s) => /'(google|caldav|apple|ics)'/.test(s.sql));
   const authored = sites.filter((s) => /\bseries_authored\b/.test(s.sql));

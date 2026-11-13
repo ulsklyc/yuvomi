@@ -550,7 +550,7 @@ test('createInvite speichert das Startrechte-Set als Text, oder null', () => {
 });
 
 test('die enge Vorlage sperrt genau die drei persönlichen Module', async () => {
-  const { invitePresetPermissions, INVITE_RESTRICTED_MODULES } = await import('../server/permissions.js');
+  const { invitePresetPermissions, INVITE_RESTRICTED_MODULES } = await import('../server/authorize/index.ts');
   const restricted = invitePresetPermissions('restricted');
   assert.deepEqual(Object.keys(restricted.modules).sort(), [...INVITE_RESTRICTED_MODULES].sort());
   for (const access of Object.values(restricted.modules)) assert.equal(access, 'none');
@@ -599,7 +599,7 @@ test('accept schreibt die Startrechte, bevor das Konto benutzbar ist', async () 
   ]);
   // Und die Auflösung sagt dasselbe - die Zeilen allein wären nur die halbe
   // Zusicherung, wenn resolvePermissions() sie nicht anwendete.
-  const { resolvePermissions } = await import('../server/permissions.js');
+  const { resolvePermissions } = await import('../server/authorize/index.ts');
   const resolved = resolvePermissions(routeDb, { id: userId, role: 'member', family_role: 'other' });
   assert.equal(resolved.modules.health, 'none');
   assert.equal(resolved.widgets.cycle, 'none', 'ein Widget erbt die Sperre seines Moduls');

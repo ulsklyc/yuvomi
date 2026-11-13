@@ -56,7 +56,7 @@ function makeDb({ withNotificationTables = true } = {}) {
       goal_minutes INTEGER
     );
     -- Die Sichtbarkeitsspalten und Zuweisungstabellen, an denen die Zustellung
-    -- seit services/reminder-targets.js haengt - mit den Vorgaben des echten
+    -- seit authorize/rows/reminders.ts haengt - mit den Vorgaben des echten
     -- Schemas, damit eine Zeile ohne Angabe wie in Produktion fuer alle da ist.
     CREATE TABLE tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,7 +106,7 @@ function makeDb({ withNotificationTables = true } = {}) {
     );
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
     -- Sichtbarkeit und Freigaben wie im echten Schema: die Zustellung fragt
-    -- seit services/reminder-targets.js, ob ein Dokument fuer alle da ist.
+    -- seit authorize/rows/reminders.ts, ob ein Dokument fuer alle da ist.
     CREATE TABLE family_documents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -822,7 +822,7 @@ test('next-fast channel notification uses household-localized actionable copy', 
   const db = makeDb();
   const store = createNotificationChannelStore({ db });
   // Fasten ist Gesundheit und geht nur an die Person selbst: an ihren eigenen
-  // Kanal, nie an den des Haushalts (services/reminder-targets.js). Beide
+  // Kanal, nie an den des Haushalts (authorize/rows/reminders.ts). Beide
   // stehen hier, damit der Test auch sieht, wohin die Meldung NICHT geht.
   store.createChannel({ provider: 'ntfy', name: 'household', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
   store.createChannel({ provider: 'ntfy', name: 'mine', enabled: true, scope: 'user', userId: 1, config: { baseUrl: 'https://ntfy.test', topic: 'me' }, secrets: {} });

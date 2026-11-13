@@ -35,7 +35,7 @@
  *     ruft den Sync zusätzlich sofort nach `PUT /caregivers/:subjectId` auf,
  *     dieselbe "wirkt sofort"-Erwartung wie beim Zyklus-Einstellungs-Schreiben.
  *   - GEGATET JE EMPFÄNGER, NICHT NUR JE EIGENTÜMER: eine betreuende Person ohne
- *     Health-Zugriff (`resolvePermissions(...).modules.health === 'none'`)
+ *     Health-Zugriff (`authorize(actor, 'receive', { module: 'health' })` sagt nein)
  *     bekommt keine Zeile.
  *   - OPT-IN DURCH DEN EIGENTÜMER (`health_prevention_notify_caregivers`,
  *     server/routes/preferences.js), Standard AUS - dasselbe Muster wie
@@ -49,6 +49,7 @@
  *     (`assigned_from IS NOT NULL`) - server/services/notifications.js#preventionDueBody.
  */
 
+import { caregiversOf } from '../authorize/index.ts';
 import { reminderDateBefore } from '../utils/reminder-schedule.js';
 import { todayKey } from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
@@ -218,9 +219,8 @@ export function syncPreventionRemindersForSubject(database, subjectId, now = new
     const notifyCaregivers = database.prepare(
       'SELECT value FROM sync_config WHERE key = ?'
     ).get(`health_prevention_notify_caregivers:user:${subjectId}`)?.value === '1';
-    const caregiverIds = notifyCaregivers ? database.prepare(
-      'SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?'
-    ).all(subjectId).map((r) => r.caregiver_id).filter((id) => !lacksHealth(database, id)) : [];
+    const caregiverIds = notifyCaregivers ? caregiversOf(/** @type {import('../authorize/index.ts').Database} */ (database), subjectId)
+      .filter((id) => !lacksHealth(database, id)) : [];
 
     for (const item of items) {
       syncRecordReminder(database, item, subjectId, subjectHasHealth, caregiverIds);

@@ -6,11 +6,14 @@
 
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
-import {
-  applyDocumentAccess, attachmentAccessMode, eventAudienceChanged, filterVisibleDocumentIds,
-} from '../../services/document-access.js';
 import { documentViewer } from '../../services/document-links.js';
-import { mayWriteModule } from '../../permissions.js';
+import {
+  mayWriteModule,
+  applyDocumentAccess,
+  attachmentAccessMode,
+  eventAudienceChanged,
+  filterVisible,
+} from '../../authorize/index.ts';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
@@ -330,7 +333,7 @@ export function storedAttachmentLocked(req, database, storedDocumentId) {
   const viewer = documentViewer(req);
   if (!viewer.readsDocuments) return true;
   if (storedDocumentId == null) return false;
-  return filterVisibleDocumentIds(database, [storedDocumentId], viewer.userId).length === 0;
+  return filterVisible(database, 'documents', [storedDocumentId], viewer.userId).length === 0;
 }
 
 export function attachmentDataUrl(event) {
@@ -361,7 +364,7 @@ export function parseAssignedTo(val) {
  * Dokument sehen UND verwalten, #1358) gleicht voll ab, `ATTACHMENT_NARROW_ONLY`
  * (in diesem Schreiben neu hochgeladen) verengt nur. Sonst bleibt das Dokument,
  * wie die Besitzerin es gesetzt hat (#1443): `applyDocumentAccess()` in
- * services/document-access.js.
+ * authorize/rows/documents.ts.
  *
  * UND NUR, WENN SICH DAS PUBLIKUM AENDERT (#1443): `before` ist, wer den Termin
  * vor diesem Speichern sah (`{ visibility, userIds }`, `null` fuer einen neuen
@@ -592,7 +595,7 @@ function visibleAttachmentDocumentIds(events, context) {
   const viewer = context?.viewer;
   if (!context?.database || viewer?.readsDocuments !== true) return new Set();
   const ids = events.map((event) => event?.attachment_document_id).filter((id) => id != null);
-  return new Set(filterVisibleDocumentIds(context.database, ids, viewer.userId));
+  return new Set(filterVisible(context.database, 'documents', ids, viewer.userId));
 }
 
 /** Serializes a result set with one capability classification per master. */

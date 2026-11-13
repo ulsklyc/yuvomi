@@ -37,7 +37,7 @@ const { callTool } = await import('../server/mcp/tools.js');
 const {
   resolvePermissions, buildSessionModuleAccess, moduleAccessVerdict,
   applyChildStartPermissions, permissionCatalog, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED,
-} = await import('../server/permissions.js');
+} = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 function addUser(username, role, familyRole) {
@@ -356,7 +356,7 @@ async function taskSurfaces(userId, token, taskId) {
   const wall = await call('GET', '/api/v1/dashboard?audience=household', token);
   const search = await call('GET', `/api/v1/search?q=${encodeURIComponent('maria')}`, token);
   const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  const mcp = await callTool({ db, actor: { ...user } }, 'list_tasks', {});
+  const mcp = await callTool({ db, actor: { kind: 'session', userId: user.id, role: user.role, familyRole: user.family_role } }, 'list_tasks', {});
   return {
     list: (list.body.data ?? []).some((t) => t.id === taskId),
     listDone: (done.body.data ?? []).some((t) => t.id === taskId),

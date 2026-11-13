@@ -39,7 +39,7 @@ process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'dashboard-pantry-test-secret';
 
 const widgets = await import('../public/utils/dashboard-widgets.js');
-const { PERMISSION_WIDGETS, resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { PERMISSION_WIDGETS, resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { EXPIRY_SOON_DAYS, pantryFilterFromSearch } = await import('../public/utils/pantry-status.js');
 const { __test } = await import('../public/pages/dashboard.js');
 const { renderPantryWidget, listRowCap } = __test;

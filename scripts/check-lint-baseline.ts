@@ -61,8 +61,11 @@ const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.
 // the HTML rule is hard constraint 1. The sender rules keep household data from
 // reaching a device or an outside service past a recipient check (#2602, #2598): who
 // sends is named in .dependency-cruiser.mjs, the calls are held by CHANNEL-SEND and
-// PUSH-SEND. A blanket or no-restricted-syntax suppression would switch them off, so
-// it is hard as well.
+// PUSH-SEND. The rights rules keep the SQL visibility rules and the module verdict in
+// server/authorize/ (phase 2, B5): RIGHTS-MODULE (a module level compared with 'none'), the one door
+// (rights-only-through-authorize) and a permission module that never opens the database
+// (authorize-not-to-db). A blanket or no-restricted-syntax suppression would switch them
+// off, so it is hard as well.
 const HARD = new Set([
   'oxlint/no-restricted-syntax/HTML-STRING-WRITE',
   'oxlint/no-restricted-syntax/TX-ASYNC-FN',
@@ -73,6 +76,9 @@ const HARD = new Set([
   'depcruise/web-push-only-in-push-service',
   'depcruise/channel-delivery-importers',
   'depcruise/providers-only-in-channel-delivery',
+  'oxlint/no-restricted-syntax/RIGHTS-MODULE',
+  'depcruise/rights-only-through-authorize',
+  'depcruise/authorize-not-to-db',
   'directive/blanket-disable',
   'directive/disable-no-restricted-syntax',
 ]);
@@ -80,8 +86,11 @@ const HARD = new Set([
 // Rules whose baseline is not a debt list but a list of exceptions: every key says in
 // lint-baseline-reasons.json why it may stand. ERROR-TEXT took over the allow-list of
 // test-client-error-text-guard.js (phase 1b, section E): the text in the response is our own.
+// RIGHTS-SQL (phase 2, B5): a visibility literal in SQL outside server/authorize/ stands
+// only as a write, never a read.
 const REASONED = new Set([
   'oxlint/no-restricted-syntax/ERROR-TEXT',
+  'oxlint/no-restricted-syntax/RIGHTS-SQL',
 ]);
 const MIN_REASON = 20;
 

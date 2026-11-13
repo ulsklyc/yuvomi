@@ -8,7 +8,7 @@
  *        Aenderst du die Regel hier, bleibt 250, wie sie ist; der
  *        Aequivalenztest in test/test-payment-task-backfill.js zeigt dann
  *        die Abweichung und wird mit Begruendung angepasst.
- * Abhaengigkeiten: server/permissions.js, server/services/household-members.js
+ * Abhaengigkeiten: server/authorize/, server/services/household-members.js
  *
  * WER DIE ZAHLUNGSAUFGABE SIEHT (Ulas 2026-10-17).
  *
@@ -19,7 +19,7 @@
  * Stelle: die Aufgabe steht auf `assignees` und gehoert den Erwachsenen, die
  * bezahlen - der Person, die eincheckt (bzw. sie angelegt hat), wenn sie
  * Betraege sehen darf, und den aktiven Admins. Die Sichtbarkeitsregel
- * (services/visibility.js) haelt sie damit in jedem Lesepfad zurueck, ohne dass
+ * (authorize/rows/assignees.ts) haelt sie damit in jedem Lesepfad zurueck, ohne dass
  * einer davon sie kennt.
  *
  * Ein Konto OHNE Betraege steht nicht als Ersteller drin: die Regel laesst die
@@ -37,7 +37,7 @@
  * darf ihn dann nicht sehen). Auf `all` bleibt keine.
  */
 
-import { userHasCapability } from '../permissions.js';
+import { userHasCapability } from '../authorize/index.ts';
 import { activeAccountSql, householdMemberSql } from './household-members.js';
 
 export const AMOUNTS_CAPABILITY = 'housekeeping_view_amounts';

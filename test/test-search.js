@@ -44,6 +44,8 @@ db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
 db.exec(MIGRATIONS_SQL[65]);
 // Migration 66: FTS triggers + backfill for medications and health activities.
 db.exec(MIGRATIONS_SQL[66]);
+// Migration 130: care grants - the health search asks the rule of the health lists.
+db.exec(MIGRATIONS_SQL[130]);
 // Migration 197: waste_types (only the table search reads from).
 db.exec(MIGRATIONS_SQL[197]);
 // Migration 206: FTS triggers + backfill for waste_types.
@@ -66,8 +68,10 @@ db.prepare(`INSERT INTO tasks (title, description, priority, status, created_by)
   VALUES ('Buy birthday cake', 'chocolate sponge', 'high', 'open', ?)`).run(uid);
 db.prepare(`INSERT INTO tasks (title, description, priority, status, created_by)
   VALUES ('Mow the lawn', 'garden chores', 'low', 'open', ?)`).run(uid);
-db.prepare(`INSERT INTO tasks (title, description, priority, status, created_by)
-  VALUES ('Secret cake plan', 'hidden', 'low', 'open', ?)`).run(otherUid);
+// Private: the task search follows the task list, and another person's `all`
+// task is a hit there. What stays out is what the list keeps out.
+db.prepare(`INSERT INTO tasks (title, description, priority, status, visibility, created_by)
+  VALUES ('Secret cake plan', 'hidden', 'low', 'open', 'private', ?)`).run(otherUid);
 
 const list = db.prepare(`INSERT INTO shopping_lists (name, created_by) VALUES ('Groceries', ?)`).run(uid);
 db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'cake mix')`).run(list.lastInsertRowid);
@@ -145,7 +149,7 @@ test('Suche respektiert Besitzer-Filter bei Aufgaben', () => {
   const r = runSearch(db, 'cake', uid);
   const titles = r.tasks.map((t) => t.title);
   assert(titles.includes('Buy birthday cake'), 'Eigene Aufgabe gefunden');
-  assert(!titles.includes('Secret cake plan'), 'Fremde Aufgabe ausgeschlossen');
+  assert(!titles.includes('Secret cake plan'), 'Fremde private Aufgabe ausgeschlossen');
 });
 
 test('Suche deckt alle Entitäten ab', () => {
@@ -543,8 +547,8 @@ test('Leere/kurze Query liefert leere Ergebnisse', () => {
 // --------------------------------------------------------------------------
 db.prepare(`INSERT INTO tasks (title, priority, status, created_by)
   VALUES ('Vollmilch holen', 'low', 'open', ?)`).run(uid);
-db.prepare(`INSERT INTO tasks (title, priority, status, created_by)
-  VALUES ('Fremde Hafermilch', 'low', 'open', ?)`).run(otherUid);
+db.prepare(`INSERT INTO tasks (title, priority, status, visibility, created_by)
+  VALUES ('Fremde Hafermilch', 'low', 'open', 'private', ?)`).run(otherUid);
 db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'Tiefkühlerbsen')`).run(list.lastInsertRowid);
 db.prepare(`INSERT INTO shopping_items (list_id, name) VALUES (?, 'Gießkanne')`).run(list.lastInsertRowid);
 
@@ -700,6 +704,31 @@ test('Tabellensuche: gesperrte Module und abgeschaltete Eintraege bleiben leer',
   assert(r.recipes.length === 0, 'meals gesperrt -> keine Rezepte');
   const d = runTableSearch(full, 'strasser', fa, { disabledNav: new Set(['birthdays']) });
   assert(d.birthdays.length === 0, 'Geburtstage abgeschaltet');
+});
+
+// --------------------------------------------------------------------------
+// The archive axis. The search finds what the list reaches in any filter
+// state, so an archived task stays a hit - but it says so and stands last,
+// behind the done ones.
+// --------------------------------------------------------------------------
+test('Task search finds an archived task, flags it and ranks it last', () => {
+  const insert = db.prepare(`
+    INSERT INTO tasks (title, priority, status, due_date, archived_at, created_by)
+    VALUES (?, 'low', ?, ?, ?, ?)
+  `);
+  insert.run('Ablageprobe archiviert', 'open', '2026-01-01', '2026-02-01T10:00:00Z', uid);
+  insert.run('Ablageprobe erledigt', 'done', '2026-01-02', null, uid);
+  insert.run('Ablageprobe offen', 'open', '2026-01-03', null, uid);
+
+  /** @type {{ title: string, archived_at: string | null }[]} */
+  const hits = runSearch(db, 'Ablageprobe', Number(uid)).tasks;
+  const got = JSON.stringify(hits.map((t) => [t.title, t.archived_at]));
+  const want = JSON.stringify([
+    ['Ablageprobe offen', null],
+    ['Ablageprobe erledigt', null],
+    ['Ablageprobe archiviert', '2026-02-01T10:00:00Z'],
+  ]);
+  assert(got === want, `Reihenfolge und Kennzeichen: ${got}`);
 });
 
 full.close();

@@ -4,7 +4,7 @@
  *        wieder abräumen, wenn er zurückgenommen wird - plus die beiden
  *        Lesepfade, die daraus einen Verlauf machen (#791).
  * Abhängigkeiten: better-sqlite3-Handle (synchron), wird vom Aufrufer übergeben;
- *        visibilityWhere aus services/visibility.js.
+ *        visibilityWhere aus authorize/rows/assignees.ts.
  *
  * WARUM DAS NEBEN rewards.js STEHT UND NICHT DARIN. Beide hängen am selben
  * Statuswechsel und sehen sich deshalb ähnlich, aber sie beantworten
@@ -22,7 +22,7 @@
  * der Serie ist das Abhaken der Hauptaufgabe.
  */
 
-import { visibilityWhere } from './visibility.js';
+import { visibleWhere } from '../authorize/index.ts';
 import { personAvatarUrlSql } from './person-avatar.js';
 
 /**
@@ -174,7 +174,7 @@ export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId
  * danach nicht weiter zeigen. Genau dafür trägt `task_completions` keine eigene
  * Kopie der Stufe.
  */
-const VISIBLE_SQL = visibilityWhere('t', 'task_assignments', 'task_id', '@me');
+const VISIBLE_SQL = visibleWhere('tasks', 't', '@me');
 
 /**
  * Spalten, die beide Lesepfade teilen.

@@ -6,8 +6,10 @@
  *     Frontend-Code läuft im Browser; ein Server-Modul (node:*, better-sqlite3,
  *     Middleware) dort zu importieren bricht zur Laufzeit und vermischt die Schichten.
  *   - `server/` (Node-Backend) importiert aus `public/` NUR bewusst geteilte,
- *     isomorphe Utilities aus der Allowlist unten (reine Funktionen ohne DOM/Node-
- *     Abhängigkeit, die Front- und Backend identisch nutzen sollen).
+ *     isomorphe Utilities aus der Liste SERVER_PUBLIC_IMPORT_NAMES in
+ *     `.dependency-cruiser.mjs` (reine Funktionen ohne DOM/Node-Abhängigkeit, die
+ *     Front- und Backend identisch nutzen sollen). Die Liste steht nur dort, mit
+ *     dem Grund je Eintrag; dieser Test liest sie.
  *
  * Motivation: Ein AST-Namensauflöser (z. B. graphify) band gleichnamige Funktionen
  * (`num()`, `save()`) über die Schichtgrenze hinweg falsch aneinander. Die Regel
@@ -15,164 +17,27 @@
  * zuverlässige Filter dafür — und zugleich eine echte Architektur-Invariante des
  * Produkts. Dieser Guard erzwingt sie an der Quelle statt am regenerierten Graphen.
  *
- * Eine neue geteilte isomorphe Util wird bewusst durch Aufnahme in SHARED_ISOMORPHIC
- * freigegeben — nicht durch Aufweichen der Regel.
+ * Eine neue geteilte isomorphe Util wird bewusst durch Aufnahme in
+ * SERVER_PUBLIC_IMPORT_NAMES freigegeben - nicht durch Aufweichen der Regel.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { SERVER_PUBLIC_IMPORT_NAMES } from '../.dependency-cruiser.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const SERVER_DIR = path.join(ROOT, 'server');
 
-/**
- * Allowlist geteilter, isomorpher Module (repo-relativer Pfad), die `server/`
- * aus `public/` importieren darf. Reine Funktionen, front- und backend-identisch.
- */
-const SHARED_ISOMORPHIC = new Set([
-  // #2436: The API and tablet agree on the five display options; no DOM or storage.
-  'public/utils/display-device-settings.js',
-  // The Savings chart bucket must identify the same stored category/subcategory in API and UI.
-  'public/utils/budget-chart-category.js',
-  // One recurrence maximum for the API validation and both budget dialogs; pure constant only.
-  'public/utils/budget-recurrence.js',
-  // #1705: One day for "expiring soon" on the document chip and the Key dates tile.
-  'public/utils/document-expiry.js',
-  // Notes category identity must match in the API and duplicate-name picker.
-  // This pure Unicode normalization has no browser or server dependencies.
-  'public/utils/note-category-name.js',
-  // #469: Was aus einem Adressfeld eine Adresse macht - oder eine Absage. Das
-  // Ergebnis landet als `href` einer Kachel auf der Startseite; die Route
-  // prueft es, weil eine Client-Pruefung keine Grenze ist, und das Formular
-  // prueft es, damit es sofort widerspricht statt nach dem Absenden. Zwei
-  // Fassungen liefen hier nicht bei einem Tippfehler auseinander, sondern bei
-  // genau dem Wert, den jemand sucht, der sie auseinanderlaufen sehen will.
-  'public/utils/quick-link-url.js',
-  'public/utils/recipe-meal-types.js',
-  // #1314: Der Anker einer bestaetigten Zutaten-Zuordnung. Der Server schreibt
-  // den Schluessel und liest ihn beim Zusammenfuehren wieder, die Oberflaeche
-  // zeigt das Ergebnis an derselben Zutat an. Zwei Fassungen liefen nicht bei
-  // einem Randfall auseinander, sondern bei jedem Namen, den nur eine Seite
-  // anders zusammenzieht - und die Zuordnung waere dann einfach weg, ohne
-  // Fehler. Rein: trim, Leerraum, toLowerCase, kein DOM und kein Node.
-  'public/utils/ingredient-match-key.js',
-  'public/utils/contact-name.js',
-  // #2375: Welche Einheit eine Messart fuehrt und was sich umrechnen laesst. Das
-  // Diagramm rechnet damit, die Route nimmt genau das an und prueft die harten
-  // Grenzen am umgerechneten Wert. Zwei Fassungen liefen bei der naechsten
-  // Einheit auseinander. Rein: Tabellen und Rechnung, kein DOM und kein Node.
-  'public/utils/vital-units.js',
-  // #1748: der Schritt einer Serie (`addInterval`, `nextRunNotBefore`). Der
-  // Dialog der geteilten Ausgaben nennt vor dem Speichern, wie viele Termine
-  // der Server bei `missed: skip` ueberspringt und auf welchem er landet; eine
-  // zweite Rechnung daneben laege an einem 31. oder 29.02. daneben. Rein:
-  // Datumsrechnung in UTC, kein DOM und kein Node.
-  'public/utils/interval-date.js',
-  // #1909: Wie lang eine Telefonnummer sein darf. Die Route prueft das Einzelfeld
-  // `phone` und die Liste `phones` dagegen, das Formular setzt damit `maxlength`.
-  // Zwei Zahlen liefen schon einmal auseinander (100 und 50), und das Formular
-  // nannte nacheinander beide. Rein: eine Konstante, kein DOM und kein Node.
-  'public/utils/contact-limits.js',
-  'public/utils/pantry-units.js',
-  // #1680: Wie viele Termine die Kalender-Kachel listet - 5, 8 oder 12. Die
-  // Route klemmt den Parameter mit derselben Allowlist, mit der die Kachel
-  // schneidet und der Dialog seine drei Radios baut. Zwei Listen liefen nicht
-  // bei einem Randfall auseinander, sondern bei der naechsten Stufe: der Server
-  // lieferte sie, und der Browser zeigte weiter fuenf. Rein: eine eingefrorene
-  // Liste und ein Vergleich, kein DOM und kein Node.
-  'public/utils/dashboard-event-limit.js',
-  // #1074: Ziffern fremder Systeme nach ASCII. Client und Server lesen dieselben
-  // Mengentexte („۲۵۰ g") - der Client, um eine Zutat zu skalieren, der Server,
-  // um sie beim Uebertrag in die Einkaufsliste zusammenzuzaehlen. Zwei Fassungen
-  // wuerden hier nicht bei einem Randfall auseinanderlaufen, sondern bei jedem
-  // Haushalt, der seine eigenen Ziffern schreibt: die eine Seite rechnete, die
-  // andere nicht. Rein aus Intl abgeleitet, ohne DOM und ohne Node.
-  'public/utils/digits.js',
-  // #620: Das Format der Sync-Ziel-Kennung. Der Server validiert genau das,
-  // was Event-Modal und Einstellungen bauen - zwei Definitionen desselben
-  // Formats würden sich unbemerkt auseinanderentwickeln.
-  'public/utils/sync-target.js',
-  // #944: HTML-Escaping. Eine Erinnerungsmail traegt Nutzertexte (Aufgaben-,
-  // Terminnamen) in ihren HTML-Teil; dort gilt dieselbe Regel wie im DOM. Das
-  // Modul ist absichtlich schmal - die Nachbardatei utils/html.js re-exportiert
-  // esc(), traegt aber auch den Notiz-Renderer mit seinen CSS-Klassen und ist
-  // damit Frontend-Code, kein geteiltes Util.
-  'public/utils/html-escape.js',
-  // #891: Wie ein Termin zu seiner Farbe kommt - eigene Farbe, sonst die der
-  // PRIMAEREN zugewiesenen Person, sonst die des Kalenders. Der Browser malt
-  // damit Kalender und Uebersicht, der Server beantwortet damit die
-  // Countdown-Kachel, die ihre Zeilen fertig ausliefert statt die Rohfelder.
-  // Zwei Fassungen liefen genau dort auseinander, wo es niemandem auffaellt:
-  // derselbe Termin traegt in der einen Kachel die Farbe der Person und in der
-  // anderen den Modulton - und vor #891 war der Unterschied unsichtbar, weil
-  // die Spalte NOT NULL war und die Rangfolge nie ueber ihr erstes Glied kam.
-  'public/utils/event-color.js',
-  // #734: Wie ein Kommentartext gegen die Mitgliederliste gelesen wird. Der
-  // Browser hebt damit hervor, der Server wählt damit die Empfänger der
-  // Benachrichtigung. Zwei Fassungen hieße: ein Name steht farbig da, und
-  // niemand erfährt, dass er gemeint war.
-  'public/utils/mentions.js',
-  // #825: Der lokale Kalendertag. `start_date` und `due_date` sind Tage, die
-  // jemand lokal eingegeben hat - wer sie gegen `date('now')` oder
-  // `toISOString()` prueft, vergleicht sie mit dem UTC-Tag und liegt westlich
-  // von UTC abends, oestlich davon morgens um einen Tag daneben. Genau deshalb
-  // nennt CLAUDE.md diese Funktion als DIE Antwort auf die Falle. Eine zweite
-  // Fassung im Backend waere die dritte im Repo und wuerde von der ersten nur
-  // dort abweichen, wo es niemandem auffaellt: nicht in der CI, die in UTC laeuft.
-  'public/utils/date.js',
-  // #841: Der Vorrat waehlbarer Waehrungen. Er stand viermal woertlich im Repo
-  // (Einstellungen, Abos, Preferences-Route, Geteilte Ausgaben) und wurde von
-  // zwei Guards per Regex ueber den Quelltext zusammengehalten - eine teure
-  // Antwort auf die falsche Frage. Wer eine Waehrung aufnahm, musste vier
-  // Listen anfassen, und wer eine vergass, bekam eine Waehrung, die im
-  // Haushalt einstellbar und in zwei Modulen nicht waehlbar war (KRW, IDR,
-  // IRR waren genau so gestrandet). Eine reine Konstante, sonst nichts.
-  'public/utils/currency-codes.js',
-  // #704: Was eine Checklisten-Zeile ist. Der Renderer im Browser entscheidet
-  // damit, welche Zeile ein antippbares Kaestchen bekommt, und die Route
-  // entscheidet damit, welche Zeile einen Haken aendern darf. Zwei Fassungen
-  // hiessen: eine Zeile wird als Kaestchen gezeichnet und beim Antippen mit
-  // 409 abgewiesen - oder, schlimmer, eine Zeile ohne Kaestchen laesst sich
-  // ueber die Route umschreiben. Reine Textfunktionen, kein DOM, kein Node.
-  'public/utils/markdown-checklist.js',
-  // #1514, #1602: Wer eine Notiz sieht und wer sie aendert. Die Karte nimmt
-  // damit Nadel, Loeschen und Kaestchen weg, die Route weist damit ab - zwei
-  // Fassungen hiessen ein Kaestchen, das antippbar aussieht und mit 403
-  // zurueckspringt. Reine Funktionen ueber eine Notizzeile, kein DOM, kein Node.
-  'public/utils/note-access.js',
-  // #785: Was ein Ordnerbaum bedeutet - was liegt unter einem Ordner, wo liegt
-  // er selbst, und darf er dorthin. Die Seitenleiste zaehlt damit ihre
-  // Dokumente je Ordner, die Route filtert damit ihre Abfrage. Zwei Fassungen
-  // ergaeben die unangenehmste Sorte Fehler: eine Zahl links, die nicht zur
-  // Liste rechts passt, ohne dass eine von beiden falsch aussieht. Dass beide
-  // Seiten "auch die Unterordner" gleich beantworten, ist die ganze Aussage
-  // des Baums - und die Zyklus- und Tiefengrenze darf gar nicht erst zweimal
-  // formuliert sein: die eine Fassung ist die Grenze, die andere waere ein
-  // Vorschlag. Reine Funktionen ueber eine Ordnerliste, kein DOM, kein Node.
-  'public/utils/folder-tree.js',
-  // Zyklus-Vorhersage (Health, Phase 1 der Cycle-Roadmap): nächster
-  // Periodenbeginn, Eisprung, fruchtbares Fenster. Der Zyklus-Tab zeichnet
-  // damit den Ring und den Kalender, server/services/cycle-reminders.js
-  // berechnet damit den Zeitpunkt der Erinnerung. Zwei Fassungen liefen genau
-  // dort auseinander, wo es niemandem auffiele: eine Erinnerung, die einen
-  // anderen Tag nennt als der Ring zeigt. Rein, ohne DOM/Node - der einzige
-  // Import (date.js) steht selbst schon in dieser Liste.
-  'public/utils/health-cycle.js',
-  // #1607: Welche Form einer koreanischen Partikel hinter einem eingesetzten
-  // Wort gilt (`{{name}}이(가)` -> 이 oder 가). t() im Browser und translate()
-  // auf dem Server lesen dieselbe ko.json - der Server fuer Push-Texte,
-  // ICS-Feeds und gespeicherte Kalendertitel. Zwei Fassungen hiessen: derselbe
-  // Satz steht in der Oberflaeche richtig und in der Benachrichtigung mit
-  // beiden Formen, und eine neue Schreibweise in ko.json muesste an zwei
-  // Stellen nachgezogen werden. Rein: Zeichencodes und ein Muster, kein DOM,
-  // kein Node.
-  'public/utils/korean-particles.js',
-]);
+// The shared isomorphic modules server/ may import from public/ are listed once, in
+// SERVER_PUBLIC_IMPORT_NAMES in .dependency-cruiser.mjs (decision E16, frozen until
+// phase 4), each with the reason it is shared. Names without extension: the rename to
+// TypeScript in phase 2 is no new target.
+const SHARED_ISOMORPHIC = new Set(SERVER_PUBLIC_IMPORT_NAMES.map((name) => `public/utils/${name}`));
 
-const SOURCE_EXT = /\.(js|mjs)$/;
+const SOURCE_EXT = /\.(js|mjs|ts)$/;
 
 /** Alle .js/.mjs-Dateien unter dir (rekursiv), als absolute Pfade. */
 function sourceFiles(dir) {
@@ -252,7 +117,7 @@ test('server/ importiert aus public/ nur geteilte isomorphe Utils (Allowlist)', 
       const target = resolveRelative(file, spec);
       if (target && layerOf(target) === 'public') {
         const relTarget = path.relative(ROOT, target).split(path.sep).join('/');
-        if (!SHARED_ISOMORPHIC.has(relTarget)) {
+        if (!SHARED_ISOMORPHIC.has(relTarget.replace(/\.[jt]s$/, ''))) {
           violations.push(
             `${path.relative(ROOT, file)}:${line} → importiert '${spec}' (${relTarget})`,
           );
@@ -264,7 +129,8 @@ test('server/ importiert aus public/ nur geteilte isomorphe Utils (Allowlist)', 
     violations,
     [],
     'Backend darf aus public/ nur bewusst freigegebene isomorphe Utils importieren.\n' +
-      'Ist das Modul wirklich isomorph (rein, ohne DOM/Node), in SHARED_ISOMORPHIC aufnehmen —\n' +
+      'Ist das Modul wirklich isomorph (rein, ohne DOM/Node), ist das eine Entwurfsentscheidung:\n' +
+      'Name samt Grund in SERVER_PUBLIC_IMPORT_NAMES (.dependency-cruiser.mjs) aufnehmen -\n' +
       'sonst die Logik ins Backend verschieben:\n' +
       violations.join('\n'),
   );
@@ -295,7 +161,7 @@ test('keine Quelldatei enthaelt ein rohes NUL-Byte', () => {
       if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (/\.(js|mjs|json|css|html)$/.test(entry.name)) files.push(full);
+      else if (/\.(js|mjs|ts|json|css|html)$/.test(entry.name)) files.push(full);
     }
   };
   for (const r of roots) walk(path.join(ROOT, r));

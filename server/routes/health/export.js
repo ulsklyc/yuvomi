@@ -13,9 +13,10 @@ import express from 'express';
 import * as db from '../../db.js';
 import { vitalsToCsv, activitiesToCsv, labsToCsv, medLogsToCsv, nutritionToCsv } from '../../services/health-export.js';
 import {
-  log, viewerId, careAwareClause, attachResults, OPEN_ALL,
+  log, viewerId, attachResults,
   exportFilename, sendCsv, exportRange,
 } from './helpers.js';
+import { careAwareClause, OPEN_ALL } from '../../authorize/index.ts';
 
 const router = express.Router();
 

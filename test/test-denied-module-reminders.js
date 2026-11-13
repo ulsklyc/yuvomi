@@ -40,7 +40,7 @@ const remindersModule = await import('../server/routes/reminders.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
 const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
 const { ORIGIN_MODULE } = await import('../server/services/reminder-origins.js');
-const { PERMISSION_MODULES, resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { PERMISSION_MODULES, resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 
 // Fest und in der Vergangenheit, gleiche Begruendung wie in der Schwestersuite:
 // die Syncs rechnen mit `now`, GET /pending mit der Wanduhr.

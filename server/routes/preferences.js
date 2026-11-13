@@ -22,7 +22,7 @@ import { syncPreventionRemindersForSubject } from '../services/prevention-remind
 import { syncAllFastingReminders } from '../services/fasting-reminders.js';
 import { isScreensaverEnabled } from './screensaver.js';
 import { rekeyForHouseholdZoneChange } from '../services/calendar-occurrence-overrides.js';
-import { VISIBILITY_VALUES } from '../services/visibility.js';
+import { VISIBILITY_VALUES } from '../authorize/index.ts';
 // Geteilte isomorphe Util (#620, Allowlist in test/test-layer-boundary.js):
 // dasselbe Kennungsformat, das Event-Modal und Einstellungen verwenden.
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';

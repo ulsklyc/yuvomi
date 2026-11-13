@@ -5,48 +5,27 @@
  *        der Router wird in index.js hinter `requireAuth` gemountet, daher greift
  *        der CSRF-Bypass für `api_token` automatisch.
  *
- *        Hier wird der Akteur für die Tool-Schicht zusammengesetzt. Das ist
- *        keine Formsache: die Kern-Tools laufen in-process gegen SQLite und
- *        sehen die /api/v1-Middleware NIE. Was diese Middleware an Rechten
- *        prüft, muss deshalb im Akteur mitreisen - Token-Scopes, Modulrechte
- *        des Nutzers (#467/#823) und der Split-Guest-Status (#823).
- * Abhängigkeiten: express, server/db.js, server/logger.js, server/mcp/protocol.js
+ *        Hier bekommt die Tool-Schicht ihren Akteur. Das ist keine Formsache:
+ *        die Kern-Tools laufen in-process gegen SQLite und sehen die
+ *        /api/v1-Middleware NIE. Was diese Middleware an Rechten prüft, muss
+ *        deshalb im Akteur mitreisen - Token-Scopes, Modulrechte des Nutzers
+ *        (#467/#823), der Split-Guest-Status (#823) und das Wandtablett (#1208).
+ *        Gebaut wird er seit Phase 2 (B1) an EINER Stelle,
+ *        `actorFromRequest()` in server/authorize/: `kind` ist dort `guest` oder
+ *        `display`, und ein Lesefehler zählt als die engere Art.
+ * Abhängigkeiten: express, server/db.js, server/logger.js, server/mcp/protocol.js,
+ *        server/authorize/
  */
 
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { handleMcpRequest, PARSE_ERROR } from './protocol.js';
-import { isDisplayAccount } from '../services/display-accounts.js';
+import { actorFromRequest } from '../authorize/index.ts';
 import { hadNoBody } from '../middleware/empty-body.js';
 
 const log = createLogger('MCP');
 const router = express.Router();
-
-// Gast-Konto für geteilte Ausgaben? Unter /api/v1 sperrt ein eigener Guard diese
-// Konten auf /split-expenses ein; /mcp liegt bewusst ausserhalb davon und hatte
-// die Sperre damit gar nicht. Fehler beim Lesen zählen als Gast: im Zweifel
-// zumachen, nicht aufmachen.
-function isSplitGuest(userId) {
-  if (userId == null) return true;
-  try {
-    return Boolean(db.get().prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(userId));
-  } catch (err) {
-    log.error('Split-guest lookup failed:', err.message);
-    return true;
-  }
-}
-
-/** Wandtablett? Fehler beim Lesen zaehlen als Display: im Zweifel zumachen. */
-function isDisplay(userId) {
-  if (userId == null) return true;
-  try {
-    return isDisplayAccount(userId);
-  } catch (err) {
-    log.error('Display lookup failed:', err.message);
-    return true;
-  }
-}
 
 // POST: einzelne JSON-RPC-Nachricht → einzelne JSON-Antwort (oder 202 bei Notification).
 router.post('/', async (req, res) => {
@@ -59,21 +38,10 @@ router.post('/', async (req, res) => {
         error: { code: PARSE_ERROR, message: 'Parse error: expected a JSON-RPC 2.0 body.' },
       });
     }
-    const actor = {
-      id: req.authUserId,
-      role: req.authRole,
-      scopes: req.authScopes ?? null,
-      // Von requireAuth aufgelöst: null = Admin oder unbeschränkt.
-      moduleAccess: req.sessionModuleAccess ?? null,
-      splitGuest: isSplitGuest(req.authUserId),
-      // Wandtablett (#1208)? `/mcp` liegt bewusst ausserhalb der /api/v1-Gates,
-      // und der Display-Zweig in `requireAuth` setzt Scopes unabhaengig vom
-      // Pfad - ohne diese Zeile erreichte ein Tablett hier Werkzeuge, die ihm
-      // die REST-Seite verweigert. Dieselbe Klasse wie GHSA-4jcg-7jvj-p4v9:
-      // eine Regel, die je Pfad statt zentral steht. Fehler beim Lesen zaehlen
-      // als Display - im Zweifel zumachen.
-      display: isDisplay(req.authUserId),
-    };
+    // Wandtablett (#1208) und Ausgaben-Gast (#823) stecken in `actor.kind`:
+    // `/mcp` liegt bewusst ausserhalb der /api/v1-Gates, ohne sie erreichte
+    // ein Tablett hier Werkzeuge, die ihm die REST-Seite verweigert.
+    const actor = actorFromRequest(req);
     const response = await handleMcpRequest(
       db.get(),
       actor,

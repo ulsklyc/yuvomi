@@ -53,7 +53,7 @@ register('./test-browser-loader.mjs', import.meta.url);
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'wall-tasks-test-secret';
 
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
@@ -1296,7 +1296,7 @@ test('Persoenliches: die Glocke der Shell fragt ueber einer Wand die Haushaltsfa
 // lag auf dem Geraet. Jetzt gilt die Umkehrung, und diese Tests messen sie an
 // der ECHTEN Route.
 
-const visibility = await import('../server/services/visibility.js');
+const visibility = await import('../server/authorize/index.ts');
 
 const HELGA = addUser('Helga');
 let SHOPPING_LIST = null;

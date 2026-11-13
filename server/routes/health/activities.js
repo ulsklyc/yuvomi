@@ -9,9 +9,10 @@ import * as v from '../../middleware/validate.js';
 import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
   log, VISIBILITIES, MAX_UNIT,
-  viewerId, careAwareClause, applyUpdate, badRequest,
-  resolveOwner, writableClause, wallClockInput,
+  viewerId, applyUpdate, badRequest,
+  resolveOwner, wallClockInput,
 } from './helpers.js';
+import { careAwareClause, writableClause } from '../../authorize/index.ts';
 
 const router = express.Router();
 

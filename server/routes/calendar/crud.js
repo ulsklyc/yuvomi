@@ -7,7 +7,6 @@ import { createLogger } from '../../logger.js';
 import express from 'express';
 import * as db from '../../db.js';
 import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
-import { icsSubscriptionVisibleWhere, normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';
@@ -28,9 +27,15 @@ import {
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
-  ATTACHMENT_NARROW_ONLY, documentClonePredicate, documentWidenPredicate,
-} from '../../services/document-access.js';
-import { mayChangeRecord, mayWriteModule, sendNotOwner } from '../../permissions.js';
+  mayChangeRecord,
+  mayWriteModule,
+  sendNotOwner,
+  normalizeVisibility,
+  ATTACHMENT_NARROW_ONLY,
+  documentClonePredicate,
+  documentWidenPredicate,
+  visibleWhere,
+} from '../../authorize/index.ts';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import { localCalendarColorSql, localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
 import {
@@ -515,8 +520,8 @@ router.get('/:id', (req, res) => {
       LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
       LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
       WHERE e.id = ?
-        AND ${icsSubscriptionVisibleWhere('e')}
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
+        AND ${visibleWhere('ics_subscriptions', 'e', '?')}
+        AND ${visibleWhere('events', 'e', '?')}
     `).get(id, getUserId(req), getUserId(req), getUserId(req));
 
     if (!event) return sendEventGone(res);
@@ -770,8 +775,8 @@ function loadVisibleEvent(id, req) {
   return db.get().prepare(`
     SELECT e.* FROM calendar_events e
     WHERE e.id = ?
-      AND ${icsSubscriptionVisibleWhere('e')}
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
+      AND ${visibleWhere('ics_subscriptions', 'e', '?')}
+      AND ${visibleWhere('events', 'e', '?')}
   `).get(id, me, me, me);
 }
 

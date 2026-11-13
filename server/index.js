@@ -92,7 +92,8 @@ import displaysRouter from './routes/displays.js';
 import { pairingRouter } from './routes/displays.js';
 import { peopleRouter } from './routes/displays.js';
 import { displayMayAct } from './display-scopes.js';
-import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
+import { splitGuestMayReach } from './split-guest-scope.js';
+import { actorForUser, actorFromRequest, authorize } from './authorize/index.ts';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -114,8 +115,8 @@ import scheduleFeedRouter from './routes/schedule-feed.js';
 import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
 import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
-import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
-import { FEED_MODULE, recipientDeniedModules } from './services/reminder-origins.js';
+import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './authorize/index.ts';
+import { FEED_MODULE } from './services/reminder-origins.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
 import { createStaticAssets } from './utils/static-assets.js';
@@ -574,10 +575,10 @@ const feedLimiter = rateLimit({
 // and fills again once the permission is given back (skip, do not delete, as
 // the delivery of reminders since #1289). `read` keeps delivering, an admin is
 // never affected. The household module switch stays deliberately open for
-// feeds (docs/DECISIONS.md).
+// feeds (docs/DECISIONS.md). A feed is a delivery, not a request: `receive`,
+// without token scopes (server/authorize/).
 function feedModuleDenied(userId, feed) {
-  const denied = recipientDeniedModules(db.get(), userId);
-  return !denied || denied.has(FEED_MODULE[feed]);
+  return !authorize(actorForUser(db.get(), userId), 'receive', { module: FEED_MODULE[feed] }).allowed;
 }
 
 app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
@@ -725,7 +726,11 @@ app.use('/api/v1', trackAdmittedWrite);
 app.use('/api/v1/changelog', changelogRouter);
 app.use('/api/v1', (req, res, next) => {
   try {
-    if (!isSplitGuestAccount(db.get(), req.authUserId)) return next();
+    // Die Art des Akteurs entscheidet (server/authorize/, Phase 2 B1): `guest`
+    // heisst Gast-Abfrage ja oder fehlgeschlagen, gleich was die Display-Seite
+    // sagt, auch beim Display-Cookie; ein Konto ohne id ist kein Gast - wie
+    // zuvor hier mit isSplitGuestAccount.
+    if (actorFromRequest(req).kind !== 'guest') return next();
     // Die Liste steht in server/split-guest-scope.js, weil der Auth-Router sie
     // ebenso fragt (GHSA-q7gc-2cc9-w8fj): er haengt vor diesem Gate, eine
     // `/auth`-Anfrage kommt hier nie an. Die frueheren Eintraege fuer
@@ -785,7 +790,7 @@ app.use('/api/v1', (req, res, next) => {
 // erreichbar, damit die App bedienbar bleibt. Admins haben sessionModuleAccess
 // === null (Bypass), ebenso unbeschränkte Mitglieder (Fast-Path).
 app.use('/api/v1', (req, res, next) => {
-  // Die Regel selbst steht in permissions.js — dieselbe Funktion prüft den
+  // Die Regel selbst steht in server/authorize/modules.ts — dieselbe Funktion prüft den
   // MCP-Endpoint (#823), damit beide Oberflächen nicht auseinanderlaufen.
   //
   // AUSNAHME /schedule/preferences (S-12, UX-Audit): der Vorlauf/die
@@ -813,7 +818,7 @@ app.use('/api/v1', (req, res, next) => {
   // jeden Hinweis worauf.
   //
   // DIE MODULSTUFE AUF `write` ZU HEBEN WAERE DER FALSCHE WEG GEWESEN. Sie
-  // steuert auch, was die App ZEICHNET (permissions.js, „Navigation, Kacheln und
+  // steuert auch, was die App ZEICHNET (server/authorize/catalog.ts, „Navigation, Kacheln und
   // der Anlege-Knopf" folgen derselben Quelle) - ein Display bekaeme dann
   // Anlegen-, Bearbeiten- und Loeschen-Knoepfe, die der Server hinterher
   // abweist. Die Erlaubnis ist keine Modulstufe, sondern genau zwei Routen, und

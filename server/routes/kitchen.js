@@ -37,7 +37,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { deniedModules } from '../permissions.js';
+import { deniedModules } from '../authorize/index.ts';
 import { todayKey } from '../utils/timezone.js';
 
 const log = createLogger('Kitchen');

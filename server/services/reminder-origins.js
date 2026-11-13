@@ -9,13 +9,13 @@
  *          all; until #1289 it did not ask about the recipient's permissions.
  *          The medication scheduler, which sends without `reminders` rows,
  *          asks the same recipient verdict since #2602.
- * Dependencies: server/services/household-modules.js, server/permissions.js
+ * Dependencies: server/services/household-modules.js,
+ *   server/authorize/ (actorForUser, authorize; it loads no server/db.js either)
  */
 import { householdDisabledModules } from './household-modules.js';
-// Only the resolution, not server/db.js: the delivery passes in its own
-// connection, and permissions.js deliberately depends on nothing beyond
-// scopes.js/display-scopes.js (see its header comment).
-import { resolvePermissions, buildSessionModuleAccess, deniedModules } from '../permissions.js';
+// The delivery passes in its own connection; the actor without a request
+// (server/authorize/, phase 2 B1) reads through exactly that connection.
+import { actorForUser, authorize, deniedModules } from '../authorize/index.ts';
 
 /* ONE MAP OVER ALL ORIGINS, WITH NO EXCEPTION FOR THE NEWEST ONE.
  *
@@ -49,7 +49,7 @@ export const ORIGIN_MODULE = Object.freeze({
  *
  * Each `/feed/<name>/:token.ics` route in server/index.js belongs to one
  * permission module. A member for whom that module is `none` gets an empty
- * calendar (see `recipientDeniedModules()` below); the household switch stays
+ * calendar (`receive` of server/authorize/, as for the delivery below); the household switch stays
  * deliberately open for feeds (docs/DECISIONS.md). Birthdays follow
  * `calendar`, as in the delivery: `birthdays` is a nav id under it, not a
  * permission module of its own. A local calendar's feed is not here - its token
@@ -119,7 +119,9 @@ export function withoutSwitchedOffModules(database, rows) {
  * THE SAME TWO STEPS AS IN THE ROUTER, not a second spelling:
  * `resolvePermissions()` -> `buildSessionModuleAccess()` -> `deniedModules()`
  * is exactly the path `req.sessionModuleAccess` takes in server/auth.js and
- * that `mayTouchOrigin()` in server/routes/reminders.js evaluates. So here as
+ * that `mayTouchOrigin()` in server/routes/reminders.js evaluates. The first
+ * two run in `actorForUser()` (server/authorize/), the actor without a request;
+ * it does not classify display or guest accounts (see there). So here as
  * there only `none` counts, not `read`: whoever may read a module may also
  * hear from it - a filter that took the message away would turn a read
  * permission into a lock. An admin falls through `buildSessionModuleAccess()`
@@ -132,21 +134,22 @@ export function withoutSwitchedOffModules(database, rows) {
  * NOT NULL with a foreign key to `users` - but relying on exactly that would
  * make the answer depend on a PRAGMA.
  *
- * EXPORTED AS AN INTERIM STEP UNTIL PHASE 2 of the architecture roadmap, where
- * it moves into `authorize()`; until then no further module should grow its
- * own permission predicate next to it. Callers: the delivery
- * (`withoutModulesDeniedToRecipient()` below, for notifications.js), the
- * medication scheduler (#2602, which sends without `reminders` rows), and
- * the calendar feeds (#2615, server/index.js).
+ * NO PRODUCTION CALLER SINCE PHASE 2 B2: the delivery
+ * (`withoutModulesDeniedToRecipient()` below), the medication scheduler
+ * (#2602) and the calendar feeds (#2615, server/index.js) ask
+ * `authorize(actor, 'receive', { module })` of server/authorize/, which gives
+ * the same answer. It stays exported for one reader: test/test-visibility-matrix.js
+ * records its answer for an unknown account (`recipientDeniedModulesIsNull`,
+ * test/visibility-matrix.expected.json). No new caller.
  *
- * @param {object} database
+ * @param {import('../authorize/index.ts').Database} database
  * @param {number} userId
  * @returns {Set<string>|null}
  */
 export function recipientDeniedModules(database, userId) {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return null;
-  return deniedModules(buildSessionModuleAccess(resolvePermissions(database, user)));
+  const actor = actorForUser(database, userId);
+  if (!actor) return null;
+  return deniedModules(actor.moduleAccess);
 }
 
 /**
@@ -177,7 +180,7 @@ export function recipientDeniedModules(database, userId) {
  *
  * BIRTHDAYS NEED NO EXCEPTION HERE, unlike for the household switch:
  * `birthdays` is not a permission module but a nav id under `calendar`
- * (PERMISSION_MODULES in server/permissions.js). Whoever lacks the calendar
+ * (PERMISSION_MODULES in server/authorize/catalog.ts). Whoever lacks the calendar
  * lacks the birthdays - special handling would invent a distinction the
  * permission matrix does not even offer.
  *
@@ -188,20 +191,21 @@ export function recipientDeniedModules(database, userId) {
  *
  * Synchronous, without `await`: the caller reads the rows right before.
  *
- * @param {object} database
+ * @param {import('../authorize/index.ts').Database} database
  * @param {Array<{entity_type: string, created_by: number}>} rows
  * @returns {Array} the same row objects, filtered
  */
 export function withoutModulesDeniedToRecipient(database, rows) {
   if (!rows.length) return rows;
-  // Once per recipient, not per row: a run typically carries several messages
-  // of the same person, and every resolution is two queries.
+  // The actor once per recipient, not per row: a run typically carries several
+  // messages of the same person, and every resolution is up to three queries.
   const byUser = new Map();
   return rows.filter((row) => {
-    if (!byUser.has(row.created_by)) byUser.set(row.created_by, recipientDeniedModules(database, row.created_by));
-    const denied = byUser.get(row.created_by);
-    if (!denied) return false;
+    if (!byUser.has(row.created_by)) byUser.set(row.created_by, actorForUser(database, row.created_by));
+    const actor = byUser.get(row.created_by);
+    // An unknown recipient: nobody the message belongs to, whatever its origin.
+    if (!actor) return false;
     const moduleKey = ORIGIN_MODULE[row.entity_type];
-    return !moduleKey || !denied.has(moduleKey);
+    return !moduleKey || authorize(actor, 'receive', { module: moduleKey }).allowed;
   });
 }
