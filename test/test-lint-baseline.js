@@ -700,8 +700,8 @@ test('the rights fixture gives exactly its marked lint lines, and nothing where 
         return m ? [`${file}:${i + 1} ${m[1]}`] : [];
       }));
     assert.deepEqual(marked.map((l) => l.split(' ')[1]), [
-      ...Array(8).fill('RIGHTS-SQL'), ...Array(4).fill('RIGHTS-MODULE'), ...Array(19).fill('RIGHTS-ROW'),
-    ], 'the fixture marks eight SQL, four module and nineteen row lines');
+      ...Array(8).fill('RIGHTS-SQL'), ...Array(4).fill('RIGHTS-MODULE'), ...Array(21).fill('RIGHTS-ROW'),
+    ], 'the fixture marks eight SQL, four module and twenty-one row lines');
     const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
     const found = JSON.parse(r.stdout).diagnostics
       .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)

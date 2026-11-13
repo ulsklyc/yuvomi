@@ -197,9 +197,9 @@ compares a module level in dot notation (`x.modules.y`) with `'none'` (`RIGHTS-M
 three hard; a visibility literal in SQL there (`RIGHTS-SQL`) and a visibility level compared
 with a string literal in JavaScript (`RIGHTS-ROW`: `row.visibility === 'all'`, also reversed,
 loose, behind `?.` or `['visibility']`, on a variable named `visibility`, a `case` of a switch on
-it, `['all', ...].includes(it)`) stand only as listed exceptions with their reason, like
-`ERROR-TEXT` below. None of them sees a level under another name, compared with a constant or
-through a named list, a computed module key, a module level read into a variable first, or SQL
+it, `['all', ...].includes(it)`, one side of a `||` or `??`) stand only as listed exceptions with their reason, like
+`ERROR-TEXT` below. None of them sees a level under another name, passed through a call first, compared with a
+constant or through a named list, a computed module key, a module level read into a variable first, or SQL
 assembled from pieces; review those.
 knip (`knip.json`) adds dead code: files no entry point reaches, exports nobody imports, an export
 under two names, packages imported but not listed and listed but not used. Its entry points are the

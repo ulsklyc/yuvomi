@@ -26,6 +26,8 @@ export function rows(row, a, stmt, id, visibility, open, OPEN_FAMILY, VISIBILITI
   switch (row.visibility) { case 'all': out.push(17); break; default: break; } // rights-17: RIGHTS-ROW (switch case)
   if (['all', 'family'].includes(row.visibility)) out.push(18);  // rights-18: RIGHTS-ROW (literal list includes)
   if (['all'].includes(visibility)) out.push(19);                // rights-19: RIGHTS-ROW (literal list, local variable)
+  if ((row.visibility ?? 'private') !== 'private') out.push(28);  // rights-20: RIGHTS-ROW (behind ??)
+  if ((visibility || row.visibility) === 'restricted') out.push(29); // rights-21: RIGHTS-ROW (right side of ||)
   // Silent: a variable or constant level, an assignment, an object literal, SQL (that is
   // RIGHTS-SQL's), another field, null/undefined, a named list, a key held in a variable.
   if (row.visibility === open) out.push(20);
@@ -39,5 +41,6 @@ export function rows(row, a, stmt, id, visibility, open, OPEN_FAMILY, VISIBILITI
   if (VISIBILITIES.includes(row.visibility)) out.push(25);
   if ([open, OPEN_FAMILY].includes(row.visibility)) out.push(26);
   switch (row.status) { case 'all': out.push(27); break; default: break; }
+  if ((row.status ?? 'all') === 'all') out.push(30);
   return [out, o, e];
 }

@@ -228,7 +228,7 @@
  "server/routes/documents.js\toxlint/max-lines-per-function": 1,
  "server/routes/documents.js\toxlint/no-restricted-syntax/ERROR-TEXT": 1,
  "server/routes/documents.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 16,
- "server/routes/documents.js\toxlint/no-restricted-syntax/RIGHTS-ROW": 2,
+ "server/routes/documents.js\toxlint/no-restricted-syntax/RIGHTS-ROW": 3,
  "server/routes/email.js\tknip/exports": 1,
  "server/routes/email.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 3,
  "server/routes/family.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 2,

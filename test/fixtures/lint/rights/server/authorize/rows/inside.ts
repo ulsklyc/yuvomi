@@ -6,7 +6,7 @@ export function inside(db: any, perms: any, row: any, visibility: string): unkno
   const c = perms.modules.health === 'none';
   const d = row.visibility === 'all' || row?.visibility !== 'family' || row['visibility'] == 'all';
   const e = visibility === 'restricted' || 'all' === row.visibility;
-  const f = ['all', 'family'].includes(row.visibility);
+  const f = ['all', 'family'].includes(row.visibility) || (row.visibility ?? 'private') !== 'private';
   switch (row.visibility) { case 'private': return [a, b, c, d, e, f]; default: break; }
   return [a, b, c, d, e, f];
 }
