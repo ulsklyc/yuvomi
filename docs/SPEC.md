@@ -1281,7 +1281,7 @@ Membership belongs to the series: a single-occurrence edit cannot change it, a f
 can put its new series in another calendar, and whole-series moves include linked replacements.
 Calendar create, rename, reorder and delete require calendar write access. Creating/revoking
 feed links and deleting calendars with an active link also require admin access. Counts follow
-the caller's event visibility. Each calendar feed uses `visibleWhere('events', ...)` without a viewer,
+the caller's event visibility. Each calendar feed uses `visibleWhere('events', ...)` with the viewer `NULL`,
 so only household-visible events leave through it. Personal feed behavior remains unchanged.
 
 ### Event Assignments

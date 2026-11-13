@@ -72,8 +72,11 @@ One rule, one place, so a future change cannot be forgotten in a copy:
 - **Documents:** `documentVisibleWhere()` in `server/authorize/rows/documents.ts`
   (`documentVisibleSql()` is a wrapper around it) has exactly three branches - creator, family
   visibility, explicit share - and no admin branch. Every path that hands out documents goes
-  through it, by way of `visibleWhere('documents', ...)` or `filterVisible(database, 'documents',
-  ...)` from `server/authorize/index.ts`, including the modules that only link them.
+  through it, including the modules that only link them: mostly by way of
+  `visibleWhere('documents', ...)` or `filterVisible(database, 'documents', ...)` from
+  `server/authorize/index.ts`, and inside the permission module itself for reminders on a
+  document (`visibleWhere('reminders', ...)`) and for calendar attachments
+  (`documentClonePredicate`, `documentWidenPredicate`).
 - **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`, enforced on
   the server and without an admin bypass (#474); the one deliberate exception is the personal ICS
   feed, an export of the household calendar that only drops other members' unshared ICS
@@ -136,13 +139,14 @@ document visibility SQL into one file, and that file's header records why.
 ### Where the rule lives
 
 - **Documents:** the rule in `server/authorize/rows/documents.ts`, reached through
-  `visibleWhere('documents', ...)` and `filterVisible(database, 'documents', ...)` from
-  `server/authorize/index.ts`; called from documents, dms, tasks and the document links every
-  other module uses.
+  `server/authorize/index.ts` - mostly `visibleWhere('documents', ...)` and
+  `filterVisible(database, 'documents', ...)`, for reminders and calendar attachments the
+  reminder rule and the attachment predicates that call it; used by documents, dms, tasks and
+  the document links every other module uses.
 - **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`, reached
   through `visibleWhere('tasks', ...)` and `visibleWhere('events', ...)`. **Budget:**
   `server/authorize/rows/budget.ts`, owner-based and without an admin bypass, reached through
-  `visibleWhere('budget', ...)`.
+  `visibleWhere('budget', ...)` and the budget helpers `index.ts` exports with it.
 - **Module permission:** `moduleAccessVerdict()` and `deniedModules()` in
   `server/authorize/modules.ts`. The path middleware and the MCP tool layer call the same verdict,
   and a route that carries several modules sorts with `deniedModules()`, because a middleware
