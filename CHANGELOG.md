@@ -91,6 +91,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now reads "Archived" before the due date and stands at the end of the task hits, after the
   done ones. With many hits an archived task can drop off the end of the list; a more exact
   search term brings it back. `GET /api/v1/search` returns `archived_at` on a task hit.
+- **Changing or deleting a quick link you cannot see now always answers "not found".**
+  `PUT` and `DELETE /api/v1/quick-links/:id` now apply the same visibility rule as the list. A
+  quick link with a visibility other than "all" or "private", which only a restored backup or
+  direct database access can produce, was hidden from everyone but its creator in the list,
+  yet changing or deleting it answered `403` and so gave away that it exists. It now answers
+  `404` with `quick_links_link_not_found`, like any other quick link you cannot see. Nothing
+  changes for the two levels the app writes.
 
 ### Security
 - **The global search no longer finds a private task of someone else.** A task set to "only

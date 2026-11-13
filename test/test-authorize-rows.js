@@ -230,7 +230,7 @@ test('filterVisible: quick_links', () => {
 
 // ── 4. The row form of the rules (B8b) ──────────────────────────────────────────
 //
-// rowVisible(), householdVisible(), canEditQuickLink() and quickLinkHiddenFrom()
+// rowVisible(), householdVisible() and canEditQuickLink()
 // answer for ONE row the routes already loaded. Held against the SQL fragment of
 // the same type over a seed with every level, own, foreign and assigned rows
 // (the row_rules seed of test/visibility-matrix-seed.js is the model), for every
@@ -424,19 +424,25 @@ test('canEditQuickLink: own tiles, and shared tiles for an admin; never a foreig
   }
 });
 
-test('quickLinkHiddenFrom: the 404 of PUT/DELETE, the complement of rowVisible on both stored levels', () => {
-  const quickLinkHiddenFrom = rowApi('quickLinkHiddenFrom');
+test('rowVisible(quick_links): a third visibility value is the creator\'s alone, as in visibleWhere (the 404 of PUT/DELETE)', () => {
+  // quick_links.visibility has no CHECK: a value other than 'all' and 'private'
+  // (not writable through the route, possible in a restored file). PUT and DELETE
+  // answer 404 through rowVisible, so they hide such a tile exactly as the list.
   const rowVisible = rowApi('rowVisible');
-  for (const row of rowsById('quick_links', eqLinks)) {
-    for (const viewer of VIEWERS) {
-      assert.equal(quickLinkHiddenFrom(row, viewer), !rowVisible(db, 'quick_links', row, viewer), `${row.id} viewer ${viewer}`);
+  const odd = [...CREATORS, null].map((creator) => Number(db.prepare(
+    "INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('odd', 'https://odd.example/', ?, ?, 0)",
+  ).run(OFF_DOMAIN, creator).lastInsertRowid));
+  try {
+    const rows = rowsById('quick_links', odd);
+    for (const viewer of LINK_VIEWERS) {
+      const js = rows.filter((row) => rowVisible(db, 'quick_links', row, viewer)).map((row) => row.id);
+      assert.deepEqual(js, sqlIds('quick_links', visibleWhere('quick_links', 'x', '@v'), odd, viewer), `viewer ${viewer}`);
     }
+    assert.equal(rowVisible(db, 'quick_links', { id: 0, created_by: owner, visibility: OFF_DOMAIN }, owner), true, 'own');
+    assert.equal(rowVisible(db, 'quick_links', { id: 0, created_by: owner, visibility: OFF_DOMAIN }, stranger), false, 'foreign');
+    // The second wording of the 404 is gone: one rule, no facade.
+    assert.equal(Object.hasOwn(authorizeApi, 'quickLinkHiddenFrom'), false);
+  } finally {
+    db.prepare(`DELETE FROM quick_links WHERE id IN (${odd.join(',')})`).run();
   }
-  // quick_links.visibility has no CHECK: a third value (not writable through the
-  // route, possible in a restored file) is hidden by the SQL fragment but not by
-  // the 404 of PUT/DELETE, which then answers 403 through canEditQuickLink. Held
-  // as it is; B8b moves the check without changing an answer.
-  const odd = { id: 0, created_by: owner, visibility: 'family' };
-  assert.equal(quickLinkHiddenFrom(odd, stranger), false);
-  assert.equal(rowVisible(db, 'quick_links', odd, stranger), false);
 });

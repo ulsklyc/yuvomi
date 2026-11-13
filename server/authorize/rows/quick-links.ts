@@ -4,7 +4,8 @@
  * Purpose: which quick links a viewer sees: the shared ones and their own.
  *
  *          The row forms (B8b, until then server/routes/quick-links.js): the same
- *          rule for one loaded tile, who may edit a tile, and the 404 of PUT/DELETE.
+ *          rule for one loaded tile (also the 404 of PUT/DELETE, through
+ *          rowVisible()) and who may edit a tile.
  *
  * Dependencies: none. Erasable TS syntax only (runs through type stripping, no build).
  */
@@ -32,21 +33,6 @@ export function quickLinkRowVisible(row: QuickLinkRow, viewerId: unknown): boole
   if (row.visibility === 'all') return true;
   if (row.created_by == null || viewerId == null) return false;
   return Number(row.created_by) === Number(viewerId);
-}
-
-/**
- * Is the tile hidden from `viewerId` for PUT and DELETE (their 404)? A foreign
- * private tile does not exist for this person - 404 and not 403, or the answer
- * gives its existence away.
- *
- * NOT written as !quickLinkRowVisible(): quick_links.visibility has no CHECK, and
- * for a value other than 'all' and 'private' (the route writes neither, a restored
- * file could carry one) the fragment hides the tile while this check lets it on to
- * canEditQuickLink(), which answers 403. Kept as it was (B8b changes no answer);
- * for the two stored levels both are the same set (test:authorize-rows).
- */
-export function quickLinkHiddenFrom(row: QuickLinkRow, viewerId: unknown): boolean {
-  return row.visibility === 'private' && row.created_by !== viewerId;
 }
 
 /**

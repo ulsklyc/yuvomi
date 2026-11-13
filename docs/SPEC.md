@@ -5576,7 +5576,9 @@ admin is expressly not an exception, and it is not merely hidden in the browser 
 filters it out of the payload, including the aggregated `/dashboard` response. Editing follows the
 same rule and ships with the row: `can_edit` is computed on the server by the same function that
 draws the boundary (`canEditQuickLink` in `server/authorize/rows/quick-links.ts`), so the client does not restate the rule from its own idea of who it
-is. A foreign private link answers `404` rather than `403` - the latter would confirm it exists.
+is. A link the list does not show its caller answers `404` on `PUT`/`DELETE` rather than `403` - the latter
+would confirm it exists; both routes ask the list's own rule (`rowVisible`), so this also holds for a
+visibility value outside `all`/`private` that only a restore can write.
 
 API: `GET/POST /api/v1/quick-links`, `PUT/DELETE /api/v1/quick-links/:id`, `PUT /api/v1/quick-links/order`.
 The scope key is `dashboard` (`scopes.js`), not one of its own: the row is not a permissions module,
