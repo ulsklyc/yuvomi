@@ -2189,6 +2189,8 @@ and `scope` (`personal` or `household`) as the single catalog discriminator.
 `server/authorize/rows/notes.ts` is the only place the rule ("household, or personal and mine")
 is written, as a SQL fragment with a caller-supplied placeholder (`?` or a named bind like `@me`);
 `categoryVisibleTo(category, userId)` is the same rule as a JS predicate for an already-loaded row.
+Callers outside `server/authorize/` reach both through its one door, `server/authorize/index.ts`:
+the fragment as `visibleWhere('note_categories', alias, bind)`, the predicate as `categoryVisibleTo()`.
 Every reader - the notes route's own category list, the note-category join, the dashboard's
 `notes_category` filter, and the editable-assignments replace - calls one of the two instead of
 writing the condition again.

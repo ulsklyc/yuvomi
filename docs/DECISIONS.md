@@ -133,11 +133,14 @@ document visibility SQL into one file, and that file's header records why.
 
 ### Where the rule lives
 
-- **Documents:** `documentVisibleSql()` and `filterVisibleDocumentIds()` in
-  `server/authorize/rows/documents.ts`, called from documents, dms, tasks and the document
-  links every other module uses.
-- **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`. **Budget:**
-  `server/authorize/rows/budget.ts`, owner-based and without an admin bypass.
+- **Documents:** the rule in `server/authorize/rows/documents.ts`, reached through
+  `visibleWhere('documents', ...)` and `filterVisible(database, 'documents', ...)` from
+  `server/authorize/index.ts`; called from documents, dms, tasks and the document links every
+  other module uses.
+- **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`, reached
+  through `visibleWhere('tasks', ...)` and `visibleWhere('events', ...)`. **Budget:**
+  `server/authorize/rows/budget.ts`, owner-based and without an admin bypass, reached through
+  `visibleWhere('budget', ...)`.
 - **Module permission:** `moduleAccessVerdict()` and `deniedModules()` in
   `server/authorize/modules.ts`. The path middleware and the MCP tool layer call the same verdict,
   and a route that carries several modules sorts with `deniedModules()`, because a middleware
