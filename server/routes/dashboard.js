@@ -6,7 +6,7 @@
 
 import { createLogger } from '../logger.js';
 import express from 'express';
-import { categoryVisibleWhere, hydrateNotesWithCategories } from '../services/note-categories.js';
+import { hydrateNotesWithCategories } from '../services/note-categories.js';
 import * as db from '../db.js';
 import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
 import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
@@ -15,11 +15,15 @@ import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryF
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
-  asksHouseholdAudience, householdAudienceAnswer, householdAudienceShows, householdVisibleWhere, noteVisibleWhere,
-  visibilityWhere,
-} from '../services/visibility.js';
-import { resolveBudgetMode } from '../services/budget-visibility.js';
-import { hiddenModulesFor, requestHasCapability } from '../authorize/index.ts';
+  hiddenModulesFor,
+  requestHasCapability,
+  asksHouseholdAudience,
+  householdAudienceAnswer,
+  householdAudienceShows,
+  householdVisibleWhere,
+  resolveBudgetMode,
+  visibleWhere,
+} from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
@@ -268,7 +272,7 @@ function wallTasksByMember(d, { today, zone, now, categoryAnd = '', categoryBind
     JOIN task_assignments ta ON ta.task_id = t.id
     LEFT JOIN task_completions tc ON tc.task_id = t.id
     WHERE t.archived_at IS NULL
-      AND t.visibility = 'all'
+      AND ${householdVisibleWhere('t')}
       AND t.due_date IS NOT NULL AND t.due_date <= @today
       AND ${taskScopeWhere('t', { bind: '@today' })}${categoryAnd}
       AND (t.status != 'done' OR t.due_date = @today OR tc.completed_at >= @since)
@@ -389,7 +393,7 @@ router.get('/', (req, res) => {
       JOIN note_categories nc ON nc.id = nca.category_id
       WHERE nca.note_id = n.id
         AND nc.id = @note_category_${index}
-        AND ${categoryVisibleWhere('nc', '@me')}
+        AND ${visibleWhere('note_categories', 'nc', '@me')}
     )
   `).join('');
   /* FUER WEN DIE ANTWORT IST (#1817). `audience=household` fragt die Fassung
@@ -406,7 +410,7 @@ router.get('/', (req, res) => {
    *
    * UND SIE TRAEGT NUR, WAS DIE WAND ZEICHNET. Welche Schluessel das sind,
    * steht als Allowlist an einer Stelle (`HOUSEHOLD_AUDIENCE_SHOWS` in
-   * services/visibility.js); alles andere kommt in der leeren Fassung einer
+   * authorize/rows/household.ts); alles andere kommt in der leeren Fassung einer
    * Modulsperre - Notizen, Budget, geteilte Ausgaben, Schnellzugriffe,
    * Countdowns, der offene Lohn der Haushaltshilfe, und was nur dem Betrachter
    * gilt (Dosen, die eigene Schicht, wartende Freigaben: „2 zu bestaetigen"
@@ -420,7 +424,7 @@ router.get('/', (req, res) => {
   const householdAudience = asksHouseholdAudience(req.query);
   const taskVisibleSql = householdAudience
     ? householdVisibleWhere('t')
-    : visibilityWhere('t', 'task_assignments', 'task_id', '@me');
+    : visibleWhere('tasks', 't', '@me');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
   // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
   // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
@@ -796,7 +800,7 @@ router.get('/', (req, res) => {
       SELECT n.*, u.display_name AS author_name, u.avatar_color AS author_color
       FROM notes n
       LEFT JOIN users u ON n.created_by = u.id
-      WHERE ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
+      WHERE ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
       ORDER BY n.pinned DESC, n.updated_at DESC
       -- FUENF, WEIL DIE KACHEL ZWEI HOCH SEIN DARF - dieselbe Korrektur, die
       -- die Geburtstage oben schon bekommen haben und bei der die Notizen
@@ -817,7 +821,7 @@ router.get('/', (req, res) => {
      * braucht deshalb eine eigene, echte Zahl. */
     result.pinnedNotesCount = d.prepare(`
       SELECT COUNT(*) AS n FROM notes n
-      WHERE n.pinned = 1 AND ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
+      WHERE n.pinned = 1 AND ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
     `).get({ me: userId, ...noteCategoryBinds }).n;
     /* UND DIE MENGE, AUS DER DIE VORSCHAU SCHOEPFT - fuer die Badge und das
      * „+N weitere" der Kachel. `pinnedNotesCount` ist dafuer die falsche Zahl:
@@ -827,7 +831,7 @@ router.get('/', (req, res) => {
      * (#814: Filter vor Schnitt UND Zahl). */
     result.notesTotal = d.prepare(`
       SELECT COUNT(*) AS n FROM notes n
-      WHERE ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
+      WHERE ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
     `).get({ me: userId, ...noteCategoryBinds }).n;
   } catch (err) {
     log.error('pinnedNotes error:', err.message);

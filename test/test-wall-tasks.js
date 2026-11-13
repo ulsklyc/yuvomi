@@ -1296,7 +1296,7 @@ test('Persoenliches: die Glocke der Shell fragt ueber einer Wand die Haushaltsfa
 // lag auf dem Geraet. Jetzt gilt die Umkehrung, und diese Tests messen sie an
 // der ECHTEN Route.
 
-const visibility = await import('../server/services/visibility.js');
+const visibility = await import('../server/authorize/index.ts');
 
 const HELGA = addUser('Helga');
 let SHOPPING_LIST = null;

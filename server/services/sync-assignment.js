@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
-import { visibilityWhere } from './visibility.js';
+import { visibleWhere } from '../authorize/index.ts';
 
 // Die Standard-Zuweisung eines Kalenders laeuft ohne Person dahinter - ueber
 // den Auto-Sync, sobald jemand einen Termin im externen Client zwischen zwei
@@ -433,7 +433,7 @@ export const movedCandidatesLimit = { max: 5000 };
 // zaehlt dagegen nur und nennt keinen Termin; es bleibt, wie es ist.
 // --------------------------------------------------------
 
-const MOVED_VISIBLE_TO_VIEWER = visibilityWhere('e', 'event_assignments', 'event_id', '@viewerId');
+const MOVED_VISIBLE_TO_VIEWER = visibleWhere('events', 'e', '@viewerId');
 
 // Blaettern: nach (start_datetime, id) des letzten gezeigten Eintrags, in
 // derselben Ordnung wie die Liste. Ein Admin, der eine ganze Seite abwaehlt,

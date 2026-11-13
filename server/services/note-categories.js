@@ -8,6 +8,8 @@ import {
   categoryNameKey,
   NOTE_CATEGORY_NAME_MAX_LENGTH,
 } from '../../public/utils/note-category-name.js';
+// The visibility rule itself lives in server/authorize/rows/notes.ts (phase 2, B3).
+import { categoryVisibleTo, visibleWhere } from '../authorize/index.ts';
 export { categoryNameKey };
 
 export class NoteCategoryInputError extends Error {
@@ -30,36 +32,11 @@ function normalizedIds(value) {
   return [...new Set(ids)];
 }
 
-/**
- * WHERE-Fragment fuer "die Kategorie ist fuer userId sichtbar": jede
- * Haushaltskategorie, dazu die eigenen persoenlichen. `alias` ist der
- * Tabellen-Alias ('' fuer keinen), `bind` der Platzhalter fuer owner_user_id -
- * `?` fuer positionale Bindung, `@name` fuer eine benannte (wie bei
- * `noteVisibleWhere()` in services/visibility.js).
- *
- * EINE STELLE, weil die Regel an vier Stellen in diesem Modul und einmal in
- * dashboard.js wortgleich stand (#2601) - und dort schon einmal ohne das
- * `scope = 'personal' AND` drifted war: `nc.scope = 'household' OR
- * nc.owner_user_id = @me` traf zufaellig dieselbe Menge, weil heute keine
- * dritte scope existiert, haette eine vierte scope das aber lautlos falsch
- * gemacht.
- */
-export function categoryVisibleWhere(alias, bind = '?') {
-  const col = (name) => (alias ? `${alias}.${name}` : name);
-  return `(${col('scope')} = 'household' OR (${col('scope')} = 'personal' AND ${col('owner_user_id')} = ${bind}))`;
-}
-
-/** Wie `categoryVisibleWhere()`, als JS-Praedikat auf eine schon geladene Zeile. */
-export function categoryVisibleTo(category, userId) {
-  return category.scope === 'household'
-    || (category.scope === 'personal' && Number(category.owner_user_id) === Number(userId));
-}
-
 export function listVisibleCategories(database, userId) {
   return database.prepare(`
     SELECT id, name, scope, owner_user_id, sort_order
     FROM note_categories
-    WHERE ${categoryVisibleWhere('')}
+    WHERE ${visibleWhere('note_categories', '', '?')}
     ORDER BY CASE scope WHEN 'household' THEN 0 ELSE 1 END,
              sort_order ASC, name COLLATE NOCASE ASC, id ASC
   `).all(userId);
@@ -80,7 +57,7 @@ export function hydrateNotesWithCategories(database, notes, userId) {
       FROM note_category_assignments a
       JOIN note_categories c ON c.id = a.category_id
       WHERE a.note_id IN (${placeholders})
-        AND ${categoryVisibleWhere('c')}
+        AND ${visibleWhere('note_categories', 'c', '?')}
       ORDER BY CASE c.scope WHEN 'household' THEN 0 ELSE 1 END,
                c.sort_order ASC, c.name COLLATE NOCASE ASC, c.id ASC
     `).all(...chunk, userId));
@@ -126,7 +103,7 @@ export function replaceEditableAssignments(database, {
       DELETE FROM note_category_assignments
       WHERE note_id = ? AND category_id IN (
         SELECT id FROM note_categories
-        WHERE ${categoryVisibleWhere('')}
+        WHERE ${visibleWhere('note_categories', '', '?')}
       )
     `).run(noteId, userId);
     const insert = database.prepare(`

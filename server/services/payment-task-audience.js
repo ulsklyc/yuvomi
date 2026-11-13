@@ -19,7 +19,7 @@
  * Stelle: die Aufgabe steht auf `assignees` und gehoert den Erwachsenen, die
  * bezahlen - der Person, die eincheckt (bzw. sie angelegt hat), wenn sie
  * Betraege sehen darf, und den aktiven Admins. Die Sichtbarkeitsregel
- * (services/visibility.js) haelt sie damit in jedem Lesepfad zurueck, ohne dass
+ * (authorize/rows/assignees.ts) haelt sie damit in jedem Lesepfad zurueck, ohne dass
  * einer davon sie kennt.
  *
  * Ein Konto OHNE Betraege steht nicht als Ersteller drin: die Regel laesst die

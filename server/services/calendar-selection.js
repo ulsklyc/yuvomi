@@ -22,7 +22,7 @@
 
 import { SOURCE_CALENDAR_JOIN } from './calendar-events.js';
 import { localCalendarIdSql } from './local-calendars.js';
-import { visibilityWhere } from './visibility.js';
+import { visibleWhere } from '../authorize/index.ts';
 
 const KEY_RE = /^(local|cal|sub):([1-9]\d{0,14})$/;
 const MAX_SELECTION = 50;
@@ -68,7 +68,7 @@ export function calendarSources(d, viewerId) {
     FROM calendar_events e
     ${SOURCE_CALENDAR_JOIN}
     WHERE src.id IS NOT NULL AND e.subscription_id IS NULL
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@viewer')}
+      AND ${visibleWhere('events', 'e', '@viewer')}
   `).all({ viewer: viewerId }).map((row) => ({ key: `cal:${row.id}`, name: row.name, color: row.color ?? null }));
   const subscriptions = d.prepare(`
     SELECT id, name, color FROM ics_subscriptions WHERE shared = 1 OR created_by = ?

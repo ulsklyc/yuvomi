@@ -247,7 +247,7 @@ async function processDueMedicationsUntracked({
 
       // ONLY THE RECIPIENT'S OWN CHANNELS, NEVER ONE THE HOUSEHOLD SHARES (#2598).
       // Every Health origin is `'personal'` for household channels
-      // (HOUSEHOLD_CHANNEL_POLICY in reminder-targets.js), and SECURITY.md
+      // (HOUSEHOLD_CHANNEL_POLICY in authorize/rows/reminders.ts), and SECURITY.md
       // promises that a channel shared by the household never receives a
       // health reminder. A medication's row visibility does not change that:
       // a family-visible one still goes out by push and to the person's own

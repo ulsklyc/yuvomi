@@ -10,9 +10,15 @@ import { linkTransfer } from '../../services/budget-transfers.js';
 import path from 'path';
 import * as db from '../../db.js';
 import {
-  budgetVisibilityWhere, budgetDetailsVisibleWhere, budgetScopeWhere, budgetDetailsHiddenWhere, canEditEntry,
-  resolveBudgetMode, maskBudgetEntry, BUDGET_MASKED_CATEGORY,
-} from '../../services/budget-visibility.js';
+  budgetDetailsVisibleWhere,
+  budgetScopeWhere,
+  budgetDetailsHiddenWhere,
+  canEditEntry,
+  resolveBudgetMode,
+  maskBudgetEntry,
+  BUDGET_MASKED_CATEGORY,
+  visibleWhere,
+} from '../../authorize/index.ts';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
 import { cachedRate, cachedRateInfo } from '../../services/subscription-rates.js';
@@ -49,7 +55,7 @@ export function budgetFilter(req, alias, { scoped = true } = {}) {
   const mode = getBudgetMode();
   if (mode !== 'personal') return { clause: '', params: [] };
   const me = viewerId(req);
-  let clause = ` AND ${budgetVisibilityWhere(alias, '?', { mode })}`;
+  let clause = ` AND ${visibleWhere('budget', alias, '?', { mode })}`;
   const params = [me];
   if (scoped) {
     const scope = req.query.scope === 'household' ? 'household' : 'mine';
@@ -75,7 +81,7 @@ export function budgetFilter(req, alias, { scoped = true } = {}) {
  * aufgingen (#659). Eine erwartete Zeile steckt in KEINER Summe - ihr Fehlen
  * verfaelscht nichts. Maskiert waere sie dagegen eine Reihe gleicher Betraege
  * im Rhythmus eines Abos: der Zweck, nur ohne Titel, und gegen die Abo-Liste
- * zu lesen. Das ist die Faustregel aus services/budget-visibility.js: geht es
+ * zu lesen. Das ist die Faustregel aus authorize/rows/budget.ts: geht es
  * um den Zweck und gibt es keinen Saldo, den ein Weglassen verfaelscht, gilt
  * die Zweck-Regel. Eine maskierte erwartete Zeile gibt es deshalb nicht, und
  * damit auch keine Form, an der man sie erkennen koennte.
@@ -90,7 +96,7 @@ export function expectedSubscriptionFilter(req) {
   return {
     clause: `${entry.clause}`
       + ` AND ${budgetDetailsVisibleWhere('b', '?', { mode })}`
-      + ` AND ${budgetVisibilityWhere('sub', '?', { mode })}`,
+      + ` AND ${visibleWhere('budget', 'sub', '?', { mode })}`,
     params: [...entry.params, me, me],
   };
 }

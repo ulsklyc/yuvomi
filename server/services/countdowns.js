@@ -3,8 +3,8 @@
  * Zweck: Die als Countdown markierten Termine und Aufgaben und die bald
  *        ablaufenden Dokumente zu EINER nach Nähe sortierten Liste
  *        zusammenführen - die Datenseite des Übersichts-Widgets.
- * Abhängigkeiten: server/services/calendar-events.js, server/services/visibility.js,
- *                 server/services/document-access.js
+ * Abhängigkeiten: server/services/calendar-events.js, server/authorize/rows/assignees.ts,
+ *                 server/authorize/rows/ics-subscriptions.ts, server/authorize/rows/documents.ts
  *
  * WARUM ZWEI QUELLEN UND NICHT EINE TABELLE. Der Thread zu #647 ist genau an
  * dieser Frage entlanggegangen und bei zwei Quellen gelandet: @Kyrodan zählt bis
@@ -51,8 +51,7 @@ import { expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS } 
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { notCancelledEventSql } from './reminder-deleted-occurrence.js';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { documentVisibleSql } from './document-access.js';
+import { visibleWhere } from '../authorize/index.ts';
 import { hasExplicitZone, householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
@@ -353,8 +352,8 @@ function eventCountdowns(d, { userId, todayKey, graceDays, hidden }) {
       -- Vom Anbieter abgesagt (#2499): kein Countdown auf einen Termin, der
       -- nicht stattfindet.
       AND ${notCancelledEventSql(d)}
-      AND ${icsSubscriptionVisibleWhere('e')}
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id')}${
+      AND ${visibleWhere('ics_subscriptions', 'e', '?')}
+      AND ${visibleWhere('events', 'e', '?')}${
         withBirthdays ? '' : ` AND ${notBirthdayEventSql('e')}`}
   `).all(userId, userId, userId);
 
@@ -433,7 +432,7 @@ function taskCountdowns(d, { userId, todayKey, graceDays }) {
       AND t.archived_at IS NULL
       AND t.due_date IS NOT NULL
       AND t.due_date >= CASE WHEN t.is_recurring = 1 THEN @today ELSE @floor END
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
+      AND ${visibleWhere('tasks', 't', '@me')}
   `).all({ today: todayKey, floor, me: userId });
 
   const out = [];
@@ -467,7 +466,7 @@ function documentCountdowns(d, { userId, todayKey, graceDays }) {
     WHERE x.status = 'active'
       AND x.expires_at IS NOT NULL
       AND x.expires_at >= @floor
-      AND ${documentVisibleSql('x', 'me')}
+      AND ${visibleWhere('documents', 'x', '@me')}
   `).all({ floor, me: userId });
 
   const out = [];

@@ -44,7 +44,7 @@
  * wie vorher. Lieber eine Meldung zu viel als eine gewollte still verschluckt.
  *
  * UEBERSPRUNGEN, NICHT GELOESCHT - derselbe Grund wie bei Sichtbarkeit und
- * Modulschalter (reminder-targets.js, reminder-origins.js): ein Leseweg
+ * Modulschalter (authorize/rows/reminders.ts, reminder-origins.js): ein Leseweg
  * schreibt nicht, und das Vorkommen kann zurueckkommen (Ausnahme
  * zurueckgenommen, Serie zurueckgesetzt). Eine Zeile, die die Zustellung
  * ueberspringt, behaelt `pushed_at = NULL` und kostet je Lauf eine Abfrage.

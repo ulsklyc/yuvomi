@@ -24,10 +24,9 @@
 import * as v from '../middleware/validate.js';
 import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
-import { authorize } from '../authorize/index.ts';
+import { authorize, visibleWhere } from '../authorize/index.ts';
 import { householdTimeZone, todayKey } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
-import { visibilityWhere } from '../services/visibility.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { loadTagsFor, normalizeTags, setTags, tagKey } from '../utils/task-tags.js';
 import { readBindAddress, selfCallHost } from '../utils/bind-address.js';
@@ -56,7 +55,7 @@ function listTasks(db, actorId, args) {
       -- anderer. Stand hier bisher nicht, obwohl die Termin-Abfrage sie führt -
       -- ein MCP-Token sah damit jede private Aufgabe des Haushalts, und mit den
       -- Tags (#586) käme deren Freitext gleich mit.
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
+      AND ${visibleWhere('tasks', 't', '@me')}
   `;
   // Dieselbe Auswahl wie `GET /api/v1/tasks` und die Uebersicht (#825): eine
   // Automatisierung, die andere Aufgaben sieht als das UI, ist der Grund, aus

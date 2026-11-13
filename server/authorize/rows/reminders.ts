@@ -1,9 +1,22 @@
 /**
+ * Module: the target of a reminder and who sees it (phase 2, section B3; until then
+ *         server/services/reminder-targets.js, moved whole)
+ * Purpose: whether a reminder target exists and is visible to a person, as a single
+ *          question for the write paths and as an SQL fragment for the read paths and
+ *          the household channels. It passes on the rules of rows/assignees.ts,
+ *          rows/ics-subscriptions.ts, rows/budget.ts and rows/documents.ts.
+ *
+ * Dependencies: those four files. Erasable TS syntax only (runs through type
+ * stripping, no build).
+ */
+
+/**
  * Modul: Das Ziel einer Erinnerung und wer es sehen darf
  * Zweck: Die eine Stelle, die fuer `reminders.entity_type` + `entity_id` sagt,
  *        ob es die Zeile gibt und ob eine Person sie sieht - als Einzelfrage
  *        fuer die Schreibwege und als SQL-Fragment fuer die Lesewege.
- * Abhaengigkeiten: visibility (Aufgaben, Termine), budget-visibility (Abos).
+ * Abhaengigkeiten: assignees.ts + ics-subscriptions.ts (Aufgaben, Termine), budget.ts (Abos),
+ *        documents.ts (Dokumentablauf).
  *
  * WARUM ES DIESE DATEI GIBT. `reminders.entity_id` ist ein weicher Verweis ohne
  * Fremdschluessel, und der Router fragte fuer ihn nur das MODULRECHT
@@ -32,9 +45,18 @@
  * laesst sie deshalb unberuehrt.
  */
 
-import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { budgetVisibilityWhere, resolveBudgetMode } from './budget-visibility.js';
-import { documentVisibleSql } from './document-access.js';
+import type { Database } from '../catalog.ts';
+import { visibilityWhere } from './assignees.ts';
+import { icsSubscriptionVisibleWhere } from './ics-subscriptions.ts';
+import { budgetVisibilityWhere, resolveBudgetMode } from './budget.ts';
+import { documentVisibleSql } from './documents.ts';
+
+/** One origin a person can set: its table and the clause under which a viewer sees its row `x`. */
+type ReminderTarget = {
+  table: string;
+  rowRule?: boolean;
+  visible: (viewer: string, database: Database) => string;
+};
 
 /** Platzhaltername fuer "niemand Bestimmtes" - wird im SQL durch NULL ersetzt. */
 const NOBODY = 'reminder_target_nobody';
@@ -45,7 +67,7 @@ const NOBODY = 'reminder_target_nobody';
  * dass die Herkunft eine eigene Zeilen-Sichtbarkeit HAT - nur dann gibt es am
  * Leseweg etwas zu verbergen.
  */
-const TARGETS = Object.freeze({
+const TARGETS: Readonly<Record<string, ReminderTarget>> = Object.freeze({
   task: {
     table: 'tasks',
     rowRule: true,
@@ -73,7 +95,7 @@ export const TARGET_ENTITY_TYPES = Object.freeze(Object.keys(TARGETS));
 // `documentVisibleSql` nimmt den Namen eines Bind-Parameters; hier steht an
 // seiner Stelle ein Spaltenausdruck oder NULL, damit die Regel der Dokumente
 // woertlich dieselbe bleibt.
-function documentVisibleFor(viewer) {
+function documentVisibleFor(viewer: string): string {
   return documentVisibleSql('x', NOBODY).replaceAll(`@${NOBODY}`, viewer);
 }
 
@@ -85,7 +107,7 @@ function documentVisibleFor(viewer) {
  * selbst schon die Auskunft waere. Eine Herkunft ohne Eintrag ist `false` -
  * was diese Datei nicht kennt, nimmt kein Schreibweg an (Allowlist).
  */
-export function reminderTargetVisible(database, entityType, entityId, userId) {
+export function reminderTargetVisible(database: Database, entityType: string, entityId: unknown, userId: unknown): boolean {
   const target = Object.hasOwn(TARGETS, entityType) ? TARGETS[entityType] : null;
   if (!target) return false;
   return !!database.prepare(`
@@ -129,7 +151,7 @@ export function reminderTargetVisible(database, entityType, entityId, userId) {
  * @param {object} database  fuer den Budget-Modus (ein Lesezugriff, synchron)
  * @param {string} alias     Alias der reminders-Tabelle in der Abfrage
  */
-export function reminderTargetVisibleSql(database, alias = 'r', viewer = `${alias}.created_by`) {
+export function reminderTargetVisibleSql(database: Database, alias: string = 'r', viewer: string = `${alias}.created_by`): string {
   const hidden = Object.keys(TARGETS)
     .filter((type) => TARGETS[type].rowRule)
     .map((type) => `(${alias}.entity_type = '${type}' AND EXISTS (
@@ -179,7 +201,7 @@ export function reminderTargetVisibleSql(database, alias = 'r', viewer = `${alia
  * 06:00"). Im Haushaltskanal waere sie eine Meldung ohne Adressaten ueber den
  * Arbeitstag eines Einzelnen.
  */
-export const HOUSEHOLD_CHANNEL_POLICY = Object.freeze({
+export const HOUSEHOLD_CHANNEL_POLICY: Readonly<Record<string, string>> = Object.freeze({
   ...Object.fromEntries(Object.keys(TARGETS).map((type) => [type, 'row'])),
   document_expiry:       'row',
   pantry_item:           'household',
@@ -220,8 +242,8 @@ export const HOUSEHOLD_CHANNEL_POLICY = Object.freeze({
  * Unterschied zu `reminderTargetVisibleSql()`: dort geht es um den Empfaenger
  * der eigenen Zeile, hier um Dritte.
  */
-export function reminderTargetPublicSql(database, alias = 'r') {
-  const quoted = (policy) => Object.keys(HOUSEHOLD_CHANNEL_POLICY)
+export function reminderTargetPublicSql(database: Database, alias: string = 'r'): string {
+  const quoted = (policy: string) => Object.keys(HOUSEHOLD_CHANNEL_POLICY)
     .filter((type) => HOUSEHOLD_CHANNEL_POLICY[type] === policy)
     .map((type) => `'${type}'`).join(', ');
   return `(CASE

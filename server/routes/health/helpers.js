@@ -20,13 +20,13 @@
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
-import { CARED_FOR_SUBQUERY, OPEN_FAMILY, careAwareClause } from '../../services/visibility.js';
+import { CARED_FOR_SUBQUERY, OPEN_FAMILY, careAwareClause } from '../../authorize/index.ts';
 
 export const log = createLogger('Health');
 
 export const VISIBILITIES = ['private', 'family'];
 
-// OPEN_FAMILY and careAwareClause() live in services/visibility.js, where the
+// OPEN_FAMILY and careAwareClause() live in authorize/rows/health.ts, where the
 // global search reaches them too (a service must not import a route module).
 // Every health route keeps importing them from here.
 export { OPEN_FAMILY, careAwareClause };

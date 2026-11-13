@@ -24,6 +24,7 @@ import { str, color, collectErrors, MAX_SHORT } from '../middleware/validate.js'
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { normalizeQuickLinkUrl } from '../../public/utils/quick-link-url.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
+import { visibleWhere } from '../authorize/index.ts';
 
 const log = createLogger('QuickLinks');
 
@@ -122,12 +123,8 @@ function iconName(value) {
   return { value: trimmed, error: null };
 }
 
-/**
- * WHERE-Fragment: was diese Person sehen darf.
- * Geteilte Kacheln sehen alle; private nur ihre Urheberin - auch Admins nicht,
- * wie überall sonst in dieser App (vgl. services/visibility.js).
- */
-const VISIBLE_WHERE = "(q.visibility = 'all' OR q.created_by = @me)";
+// What this person may see: the rule lives in authorize/rows/quick-links.ts.
+const VISIBLE_WHERE = visibleWhere('quick_links', 'q', '@me');
 
 const SELECT_COLUMNS = `
   q.id, q.name, q.url, q.icon_data, q.icon_name, q.color, q.visibility,
