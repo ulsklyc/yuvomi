@@ -1069,7 +1069,17 @@ test('B9: displayActingPerson per role, family role, level and module - producti
     assert.deepEqual(displayActingPerson({}, null, 'tasks', { db }),
       { ok: false, status: 400, error: 'A paired display must name the person it is acting for.' }, 'no person');
     rowCount += 2;
-    assert.equal(rowCount, 42, 'the table has 42 rows');
+    // A module key the two display actions do not use is refused, whoever is chosen:
+    // authorize() denies by list and would let a key outside the catalog through, so a
+    // typo in a future caller has to close, not open (as before B9).
+    for (const moduleKey of ['dashboard', 'budget', 'constructor', '__proto__', '']) {
+      for (const name of /** @type {const} */ (['member/parent', 'admin/parent'])) {
+        assert.deepEqual(displayActingPerson({}, people[name], /** @type {any} */ (moduleKey), { db }),
+          NO_ACCESS, `${name} ${moduleKey || '(empty)'}: no display action`);
+        rowCount += 1;
+      }
+    }
+    assert.equal(rowCount, 52, 'the table has 52 rows');
   } finally {
     dropAccounts(created);
     db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'role' AND subject_id = 'child' AND resource_type = 'module'`).run();

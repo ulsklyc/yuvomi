@@ -24,6 +24,11 @@ import { isHouseholdMember, nonMemberMessage } from './household-members.js';
 import { actorForUser, authorize } from '../authorize/index.ts';
 import * as dbModule from '../db.js';
 
+// The modules a display acts in. authorize() denies by list, so a key outside the
+// permission catalog would pass it; a key that is not one of these is refused here,
+// as it was when this file compared the resolved level itself.
+const ACTING_MODULES = new Set(['tasks', 'rewards']);
+
 /**
  * Handelt dieser Request als gekoppeltes Display?
  *
@@ -96,7 +101,7 @@ export function displayActingPerson(req, rawId, moduleKey, { db } = {}) {
   if (!actor) {
     return { ok: false, status: 400, error: nonMemberMessage([userId]) };
   }
-  if (!authorize(actor, 'write', { module: moduleKey }).allowed) {
+  if (!ACTING_MODULES.has(moduleKey) || !authorize(actor, 'write', { module: moduleKey }).allowed) {
     return {
       ok: false,
       status: 403,
