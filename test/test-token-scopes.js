@@ -171,8 +171,36 @@ test('tools/call: read-Scope erlaubt Lesen, verweigert Schreiben', async () => {
 });
 
 test('tools/call: write-Scope erlaubt Anlegen, andere Module bleiben gesperrt', async () => {
-  const created = await callToolRes(['tasks:write'], 'create_task', { title: 'Rasen mähen', priority: 'high' });
-  assert.equal(created.result.isError, false);
+  // `create_task` geht seit #2616 per Loopback durch POST /api/v1/tasks. Diese
+  // Suite misst das Scope-Gate der Tool-Schicht, nicht den Schreibweg: ihre
+  // Zusicherung ist "der Aufruf kommt durch", und wie die Route antwortet,
+  // halten test:mcp (echter Loopback) und test:idempotency fest. Darum eine
+  // Attrappe statt eines zweiten Servers - sie wird je Test gesetzt und
+  // zurueckgestellt.
+  // Die Attrappe antwortet nur auf den einen erwarteten Aufruf; alles andere
+  // ist ein 404, damit ein falscher Pfad oder eine falsche Methode rot wird.
+  const realFetch = global.fetch;
+  /** @type {{ method: string, path: string }[]} */
+  const calls = [];
+  global.fetch = /** @type {any} */ (async (/** @type {any} */ url, /** @type {any} */ options = {}) => {
+    const call = { method: String(options.method), path: new URL(String(url)).pathname };
+    calls.push(call);
+    const expected = call.method === 'POST' && call.path === '/api/v1/tasks';
+    return {
+      ok: expected, status: expected ? 201 : 404,
+      headers: { get: (/** @type {any} */ h) => (String(h).toLowerCase() === 'content-type' ? 'application/json' : null) },
+      json: async () => (expected
+        ? { data: { id: 1, title: 'Rasen mähen', status: 'open', priority: 'high' } }
+        : { error: 'Not found.', code: 404 }),
+    };
+  });
+  try {
+    const created = /** @type {any} */ (await callToolRes(['tasks:write'], 'create_task', { title: 'Rasen mähen', priority: 'high' }));
+    assert.equal(created.result.isError, false, created.result.content?.[0]?.text);
+    assert.deepEqual(calls, [{ method: 'POST', path: '/api/v1/tasks' }]);
+  } finally {
+    global.fetch = realFetch;
+  }
 
   const denied = await callToolRes(['calendar:write'], 'list_tasks', {});
   assert.equal(denied.result.isError, true);
