@@ -345,6 +345,157 @@ function seedOtherRows(db, ids, dates, remember) {
   }
 }
 
+// --------------------------------------------------------------------------
+// Row rules (phase 2, B8a): rows for the JavaScript row checks outside
+// server/authorize. Seeded AFTER every read path has been measured: the ICS
+// feed, the due reminders and the dashboard would read every new event and
+// task row. They never enter `rows` or `seed_counts`.
+// --------------------------------------------------------------------------
+
+/** The two quick link levels (VISIBILITY_VALUES in server/routes/quick-links.js). */
+export const QUICK_LINK_LEVELS = Object.freeze(['all', 'private']);
+/** Task and event levels. */
+export const ROW_LEVELS = Object.freeze(['all', 'private', 'assignees']);
+/** Days a seeded series runs (FREQ=DAILY;COUNT=...). */
+export const SERIES_DAYS = 3;
+/** The account that owns the seeded Outlook auto-sync target. */
+export const OUTLOOK_TARGET_OWNER = 'member';
+
+/**
+ * @typedef {{ name: string, id: number, owner: string, level: string }} RuleRow
+ * @typedef {{
+ *   quickLinks: RuleRow[],
+ *   tasks: RuleRow[],
+ *   chain: { origin: RuleRow, followup: RuleRow },
+ *   series: Array<RuleRow & { start: string, linkedChildId: number }>,
+ *   seriesStart: string,
+ * }} RuleSeed
+ */
+
+/**
+ * Quick links, tasks for the write paths, a task chain for the next due date,
+ * local series with one linked occurrence each.
+ *
+ * @param {object} options
+ * @param {Database} options.db
+ * @param {HttpFn} options.http
+ * @param {Record<string, number>} options.ids
+ * @param {Record<string, SeedSession>} options.sessions
+ * @param {SeedDates} options.dates
+ * @param {(key: string, days: number) => string} options.shiftDateKey
+ * @returns {Promise<RuleSeed>}
+ */
+export async function seedRowRules({ db, http, ids, sessions, dates, shiftDateKey }) {
+  // Quick links: one per owner and level, position in seed order.
+  const insertLink = db.prepare(`
+    INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES (?, ?, ?, ?, ?) RETURNING id
+  `);
+  /** @type {RuleRow[]} */
+  const quickLinks = [];
+  for (const owner of OWNERS) {
+    for (const level of QUICK_LINK_LEVELS) {
+      const name = `quicklink.${owner}.${level}`;
+      const id = insertLink.get(name, `https://example.org/${owner}/${level}`, level, ids[owner], quickLinks.length).id;
+      quickLinks.push({ name, id: Number(id), owner, level });
+    }
+  }
+
+  // Tasks for the write paths: no due date (no reminder, no dashboard block),
+  // one checklist line so PATCH /:id/check can answer without writing.
+  const insertTask = db.prepare(`
+    INSERT INTO tasks (title, description, category, priority, status, visibility, created_by)
+    VALUES (?, '- [ ] mx item', 'household', 'none', 'open', ?, ?) RETURNING id
+  `);
+  const assignTask = db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)');
+  /** @type {RuleRow[]} */
+  const tasks = [];
+  for (const owner of OWNERS) {
+    for (const level of ROW_LEVELS) {
+      const name = `wtask.${owner}.${level}`;
+      const id = Number(insertTask.get(name, level, ids[owner]).id);
+      if (level !== 'private') assignTask.run(id, ids[OTHER_OF[owner]]);
+      tasks.push({ name, id, owner, level });
+    }
+  }
+  // The display branch of PATCH /:id/status (tasks.js ~2287) sits behind
+  // mayAccessTask: a display is never creator or assignee in the household, so
+  // without this row the branch answers for no task. Not a realistic state.
+  const displayName = 'wtask.admin.assignees.display';
+  const displayTaskId = Number(insertTask.get(displayName, 'assignees', ids.admin).id);
+  assignTask.run(displayTaskId, ids.display);
+  tasks.push({ name: displayName, id: displayTaskId, owner: 'admin', level: 'assignees' });
+
+  // A recurring chain for nextDueDateAfter (tasks.js ~1860): the origin is
+  // shared, its already spawned followup is the admin's private row. Ticking
+  // the origin off spawns nothing (one followup per completion) and reports
+  // the followup's due date only to whom the read check lets see it.
+  const insertChain = db.prepare(`
+    INSERT INTO tasks (title, category, priority, status, due_date, visibility, created_by, is_recurring,
+                       recurrence_rule, recurrence_origin_id)
+    VALUES (?, 'household', 'none', 'open', ?, ?, ?, 1, 'FREQ=WEEKLY', ?) RETURNING id
+  `);
+  const originId = Number(insertChain.get('wtask.chain.origin', dates.today, 'all', ids.admin, null).id);
+  const followupId = Number(insertChain.get('wtask.chain.followup', shiftDateKey(dates.today, 7), 'private', ids.admin, originId).id);
+  const chain = {
+    origin: { name: 'wtask.chain.origin', id: originId, owner: 'admin', level: 'all' },
+    followup: { name: 'wtask.chain.followup', id: followupId, owner: 'admin', level: 'private' },
+  };
+
+  // Local series: daily, all-day, far enough ahead to stay out of every
+  // seeded window. `assignees` and `all` carry an event_assignments row for
+  // OTHER_OF[owner], like the read seed.
+  const seriesStart = shiftDateKey(dates.today, 40);
+  const insertSeries = db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, all_day, visibility, created_by, external_source, recurrence_rule)
+    VALUES (?, ?, 1, ?, ?, 'local', 'FREQ=DAILY;COUNT=${SERIES_DAYS}') RETURNING id
+  `);
+  const assignEvent = db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)');
+  /** @type {Array<RuleRow & { start: string, linkedChildId: number }>} */
+  const series = [];
+  let setupIp = 0;
+  for (const owner of OWNERS) {
+    for (const level of ROW_LEVELS) {
+      const name = `series.${owner}.${level}`;
+      const id = Number(insertSeries.get(name, seriesStart, level, ids[owner]).id);
+      if (level !== 'private') assignEvent.run(id, ids[OTHER_OF[owner]]);
+      // One linked occurrence (the second day) through the real override route,
+      // as the owner: PUT/DELETE /calendar/:childId reach the series rule
+      // through rejectLinkedOccurrenceResource (calendar/crud.js ~828).
+      const session = sessions[owner];
+      const res = await http(`10.10.250.${++setupIp}`, 'PUT',
+        `/api/v1/calendar/${id}/occurrences/${shiftDateKey(seriesStart, 1)}`, {
+          headers: { Cookie: session.cookie, 'X-CSRF-Token': session.csrf },
+          body: { title: `${name} linked` },
+        });
+      assert.ok(res.status === 200 || res.status === 201, `linked occurrence of ${name}: ${res.status} ${JSON.stringify(res.body)}`);
+      const child = db.prepare('SELECT id FROM calendar_events WHERE recurrence_parent_id = ?').get(id);
+      assert.ok(child, `linked occurrence row of ${name}`);
+      series.push({ name, id, owner, level, start: seriesStart, linkedChildId: Number(child.id) });
+    }
+  }
+  return { quickLinks, tasks, chain, series, seriesStart };
+}
+
+/**
+ * A writable Outlook auto-sync target owned by OUTLOOK_TARGET_OWNER. No token
+ * is real: the sync tick returns before any request while MS_CLIENT_ID,
+ * MS_CLIENT_SECRET and MS_REDIRECT_URI are unset (outlook-calendar.js,
+ * runOutlookSync), and the suite pins them empty.
+ *
+ * @param {Database} db
+ * @param {Record<string, number>} ids
+ */
+export function seedOutlookTarget(db, ids) {
+  const accountId = db.prepare(`
+    INSERT INTO outlook_accounts (name, access_token, refresh_token, auto_sync_calendar_id, owner_user_id)
+    VALUES ('matrix outlook', 'not-a-token', 'not-a-token', 'mx-outlook-calendar', ?) RETURNING id
+  `).get(ids[OUTLOOK_TARGET_OWNER]).id;
+  db.prepare(`
+    INSERT INTO outlook_calendar_selection (account_id, calendar_id, calendar_name, can_edit, enabled)
+    VALUES (?, 'mx-outlook-calendar', 'matrix', 1, 1)
+  `).run(accountId);
+}
+
 /**
  * Builds the household.
  *
