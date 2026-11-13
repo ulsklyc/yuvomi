@@ -91,13 +91,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now reads "Archived" before the due date and stands at the end of the task hits, after the
   done ones. With many hits an archived task can drop off the end of the list; a more exact
   search term brings it back. `GET /api/v1/search` returns `archived_at` on a task hit.
-- **Changing or deleting a quick link you cannot see now always answers "not found".**
+- **Changing or deleting a quick link that your list does not show answers "not found".**
   `PUT` and `DELETE /api/v1/quick-links/:id` now apply the same visibility rule as the list. A
   quick link with a visibility other than "all" or "private", which only a restored backup or
   direct database access can produce, was hidden from everyone but its creator in the list,
   yet changing or deleting it answered `403` and so gave away that it exists. It now answers
-  `404` with `quick_links_link_not_found`, like any other quick link you cannot see. Nothing
+  `404` with `quick_links_link_not_found`, like a private quick link of someone else. Nothing
   changes for the two levels the app writes.
+- **Tasks, events and quick links decide "is this mine" for a single entry the way their
+  lists do.** If the creator stored with an entry is not an account number - possible only
+  after restoring a backup or editing the database directly, for example `0x2` - the lists
+  never counted the entry as anyone's own, but changing a task could treat it as yours. Such
+  an entry is now nobody's own on every path: a private one answers "not found" when you try
+  to change or delete it, and a recurring event no longer offers changing single occurrences
+  on that ground. Entries the app wrote itself are not affected.
 
 ### Security
 - **The global search no longer finds a private task of someone else.** A task set to "only

@@ -7,8 +7,11 @@
  *          rule for one loaded tile (also the 404 of PUT/DELETE, through
  *          rowVisible()) and who may edit a tile.
  *
- * Dependencies: none. Erasable TS syntax only (runs through type stripping, no build).
+ * Dependencies: creator.ts (the creator comparison). Erasable TS syntax only (runs
+ * through type stripping, no build).
  */
+
+import { isOwnRow } from './creator.ts';
 
 /**
  * WHERE-Fragment: was diese Person sehen darf.
@@ -25,14 +28,14 @@ export function quickLinkVisibleWhere(alias: string, viewer: string = '@me'): st
 export type QuickLinkRow = { visibility?: unknown; created_by?: unknown };
 
 /**
- * The row form of quickLinkVisibleWhere(): shared, or the viewer's own. As in SQL,
- * where `created_by = @me` never matches NULL, a tile without a creator
- * (quick_links.created_by is nullable) is nobody's own, and no viewer owns one.
+ * The row form of quickLinkVisibleWhere(): shared, or the viewer's own. The creator
+ * is compared as SQL compares `created_by = @me` (isOwnRow): a tile without a
+ * creator (quick_links.created_by is nullable) or with a TEXT creator is nobody's
+ * own, and a viewer of null owns none.
  */
 export function quickLinkRowVisible(row: QuickLinkRow, viewerId: unknown): boolean {
   if (row.visibility === 'all') return true;
-  if (row.created_by == null || viewerId == null) return false;
-  return Number(row.created_by) === Number(viewerId);
+  return isOwnRow(row.created_by, viewerId);
 }
 
 /**

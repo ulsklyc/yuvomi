@@ -300,6 +300,49 @@ const eqLinks = [...CREATORS, null].flatMap((creator) => ['all', 'private'].map(
 const LINK_VIEWERS = [...VIEWERS, null];
 
 /**
+ * created_by is INTEGER without CHECK on all three tables: with foreign keys off (a
+ * restore, direct database access) it can hold TEXT. '0x<id>' stays TEXT in SQLite
+ * ('<id>', ' <id>', '<id>.0' become the integer on write), SQL `created_by = @v`
+ * never matches it, Number('0x<id>') does. One row per creator and level, creator
+ * written as the hex of that account; one 'assignees' row is assigned to it.
+ * @param {string} table
+ * @param {(creator: string, visibility: string) => number} mk
+ * @param {string[]} levels
+ * @param {[string, string] | null} assign
+ * @returns {number[]}
+ */
+function seedTextCreators(table, mk, levels, assign) {
+  /** @type {number[]} */
+  const ids = [];
+  db.pragma('foreign_keys = OFF');
+  try {
+    for (const creator of CREATORS) {
+      const hex = `0x${creator.toString(16)}`;
+      for (const visibility of levels) ids.push(mk(hex, visibility));
+      if (assign) {
+        const id = mk(hex, 'assignees');
+        ids.push(id);
+        db.prepare(`INSERT INTO ${assign[0]} (${assign[1]}, user_id) VALUES (?, ?)`).run(id, creator);
+      }
+    }
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  return ids;
+}
+const textCreators = /** @type {const} */ ([
+  ['tasks', 'tasks', seedTextCreators('tasks', (c, v) => Number(db.prepare(
+    "INSERT INTO tasks (title, created_by, visibility) VALUES ('hex', ?, ?)",
+  ).run(c, v).lastInsertRowid), ['all', 'assignees', 'private', OFF_DOMAIN], ['task_assignments', 'task_id'])],
+  ['events', 'calendar_events', seedTextCreators('calendar_events', (c, v) => Number(db.prepare(
+    "INSERT INTO calendar_events (title, start_datetime, created_by, visibility) VALUES ('hex', '2026-01-01T10:00', ?, ?)",
+  ).run(c, v).lastInsertRowid), ['all', 'assignees', 'private', OFF_DOMAIN], ['event_assignments', 'event_id'])],
+  ['quick_links', 'quick_links', seedTextCreators('quick_links', (c, v) => Number(db.prepare(
+    "INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('hex', 'https://hex.example/', ?, ?, 0)",
+  ).run(v, c).lastInsertRowid), ['all', 'private', OFF_DOMAIN], null)],
+]);
+
+/**
  * The ids among `ids` the SQL fragment lets through for `viewer`.
  * @param {string} table @param {string} where @param {number[]} ids @param {number | null} viewer
  */
@@ -380,6 +423,27 @@ test('rowVisible(quick_links): the same rows as visibleWhere for every viewer, a
     assert.deepEqual(js, sqlIds('quick_links', visibleWhere('quick_links', 'x', '@v'), eqLinks, viewer), `viewer ${viewer}`);
     assert.equal(c.calls, 0, 'quick links read nothing');
   }
+});
+
+test('rowVisible: a TEXT creator that reads as an account id is nobody\'s own row, as in SQL', () => {
+  const rowVisible = rowApi('rowVisible');
+  for (const [type, table, ids] of textCreators) {
+    const rows = rowsById(table, ids);
+    assert.ok(rows.every((row) => typeof row.created_by === 'string'), `${type}: the creators are stored as TEXT`);
+    for (const viewer of LINK_VIEWERS) {
+      const js = rows.filter((row) => rowVisible(db, type, row, viewer)).map((row) => row.id);
+      assert.deepEqual(js, sqlIds(table, visibleWhere(type, 'x', '@v'), ids, viewer), `${type}: viewer ${viewer}`);
+    }
+  }
+});
+
+test('rowVisible with assignedIds (the Outlook target) keeps the Number() creator comparison - held', () => {
+  // Deliberately not aligned: a narrower answer here means "no auto-sync target" and
+  // makes a series eligible for occurrence overrides (see assignableRowVisible).
+  const rowVisible = rowApi('rowVisible');
+  const row = { id: 0, created_by: `0x${owner.toString(16)}`, visibility: 'private' };
+  assert.equal(rowVisible(db, 'events', row, owner, { assignedIds: [] }), true, 'Outlook path: as before B8b');
+  assert.equal(rowVisible(db, 'events', row, owner), false, 'every other path: as in SQL');
 });
 
 test('rowVisible: an unknown type or one without a row check throws, a missing row is not visible', () => {

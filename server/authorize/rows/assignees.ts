@@ -13,6 +13,7 @@
  */
 
 import type { Database } from '../catalog.ts';
+import { isOwnRow } from './creator.ts';
 
 // --------------------------------------------------------
 // Sichtbarkeit pro Aufgabe/Termin (#474): all | assignees | private.
@@ -69,10 +70,16 @@ export type AssignableRow = { id?: unknown; visibility?: unknown; created_by?: u
  * no narrower one: who sees a task may edit it in the household, that is the
  * module's standing promise. New was only that the invisible is also untouchable.
  *
- * The creator is compared through Number() on both sides, as the calendar paths did
- * (actorCanSeeSeries, the Outlook target): ids from SQLite and from the session are
- * integers there and in the task routes, so the strict comparison the task routes
- * had answers the same for every value they pass.
+ * The creator is compared as SQL compares `created_by = @me` (isOwnRow): a TEXT
+ * creator such as '0x5' (only a restore or direct database access writes one) is
+ * nobody's own row. Number() on both sides, as B8b had it, read '0x5' as account 5
+ * and opened a private task the list hides.
+ *
+ * EXCEPT with `assignedIds` (the Outlook target, hasConfiguredOutlookAutoSyncTarget):
+ * there the creator stays compared through Number(), as before B8b. A narrower
+ * answer there says "no auto-sync target", which makes the series eligible for
+ * occurrence overrides - a capability nobody had before. Changing that is a
+ * decision of its own, not part of this alignment.
  *
  * `assignedIds` given (account ids, numbers or numeric strings): the assignments
  * are those, nothing is read - the row may carry values that are not stored yet
@@ -88,7 +95,10 @@ export function assignableRowVisible(
   assignedIds?: readonly unknown[],
 ): boolean {
   if (row.visibility === 'all') return true;
-  if (Number(row.created_by) === Number(viewerId)) return true;
+  const own = assignedIds === undefined
+    ? isOwnRow(row.created_by, viewerId)
+    : Number(row.created_by) === Number(viewerId);
+  if (own) return true;
   if (row.visibility !== 'assignees') return false;
   if (assignedIds !== undefined) return assignedIds.map(Number).includes(Number(viewerId));
   return !!database.prepare(
