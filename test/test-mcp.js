@@ -61,15 +61,21 @@ const actor = { kind: 'token', userId: uid, role: 'admin' };
 // Sitzungs-Cookie (`session`, CSRF-pflichtig). Welcher gilt, entscheidet der
 // weitergereichte Header, nicht der Test.
 const SESSION_COOKIE = 'yuvomi.sid=mcp-test';
+// EINE Sitzung je Cookie-Wert, ueber Anfragen hinweg wie bei express-session:
+// ein neues Objekt je Anfrage liesse `csrfMiddleware` jedes Mal ein neues
+// Token ziehen, und kein mitgeschickter Wert koennte je passen.
+/** @type {Map<string, any>} */
+const sessions = new Map();
 const app = express();
 app.use(express.json());
 app.use('/api/v1', (/** @type {any} */ req, /** @type {any} */ _res, /** @type {any} */ next) => {
-  const session = String(req.headers.cookie || '').includes('yuvomi.sid=');
+  const cookie = String(req.headers.cookie || '');
   req.authUserId = Number(uid);
   req.authRole = 'admin';
-  req.authMethod = session ? 'session' : 'api_token';
+  req.authMethod = cookie.includes('yuvomi.sid=') ? 'session' : 'api_token';
   req.authScopes = null;
-  req.session = { userId: Number(uid), role: 'admin' };
+  if (!sessions.has(cookie)) sessions.set(cookie, { userId: Number(uid), role: 'admin' });
+  req.session = sessions.get(cookie);
   next();
 });
 app.use('/api/v1', csrfMiddleware);
@@ -237,6 +243,40 @@ test('tools/call create_task: fehlender Titel → isError mit Meldung', async ()
   const res = await toolCall('create_task', {});
   assert.equal(res.result.isError, true);
   assert.match(res.result.content[0].text, /title/i);
+});
+
+// `null` heisst "nicht angegeben", wie vor #2616: viele Clients serialisieren
+// ein weggelassenes optionales Argument so. Die Route liest `null` in Kategorie
+// und Priorität als falsche Form (400) - also darf es sie nicht erreichen.
+test('tools/call create_task: category null legt an wie ohne das Feld', async () => {
+  const res = await toolCall('create_task', { title: 'Kategorie null', category: null });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.equal(parseContent(res).category, 'misc');
+});
+
+test('tools/call create_task: priority null legt an wie ohne das Feld', async () => {
+  const res = await toolCall('create_task', { title: 'Priorität null', priority: null });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.equal(parseContent(res).priority, 'none');
+});
+
+test('null in jedem optionalen Feld der drei Schreibwerkzeuge heisst weggelassen', async () => {
+  const task = await toolCall('create_task', {
+    title: 'Alles null', description: null, category: null, priority: null,
+    due_date: null, due_time: null, tags: null, idempotency_key: null,
+  });
+  assert.equal(task.result.isError, false, task.result.content?.[0]?.text);
+  assert.deepEqual(parseContent(task).tags, []);
+  const item = await toolCall('add_shopping_item', { name: 'Alles null', quantity: null, category: null, list: null });
+  assert.equal(item.result.isError, false, item.result.content?.[0]?.text);
+  assert.equal(parseContent(item).list, 'Wocheneinkauf');
+  const event = await toolCall('create_event', {
+    title: 'Alles null', start_datetime: `${in3days}T11:15`, description: null,
+    end_datetime: null, all_day: null, location: null,
+  });
+  assert.equal(event.result.isError, false, event.result.content?.[0]?.text);
+  assert.equal(parseContent(event).all_day, 0);
+  assert.equal(parseContent(event).start_datetime, `${in3days}T11:15`);
 });
 
 test('tools/call create_task: ungültige Priorität → isError', async () => {
@@ -490,6 +530,24 @@ test('tools/call create_event: für den Ort gilt das Maß der Route (#2616)', as
   assert.equal(parseContent(res).location, location);
 });
 
+test('tools/call create_event: all_day "false" behält die Uhrzeit und ist nicht ganztägig', async () => {
+  // Die Route liest `!!req.body.all_day`: der String "false" wäre ganztägig und
+  // die Uhrzeit fiele weg. Das Werkzeug nahm immer nur das Boolean `true`.
+  const res = await toolCall('create_event', {
+    title: 'Kein Ganztag', start_datetime: `${in3days}T09:30`, all_day: 'false',
+  });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  const ev = parseContent(res);
+  assert.equal(ev.all_day, 0);
+  assert.equal(ev.start_datetime, `${in3days}T09:30`);
+  assert.equal(row('SELECT all_day FROM calendar_events WHERE id = ?', ev.id).all_day, 0);
+
+  // Gegenprobe: das Boolean `true` bleibt ganztägig.
+  const allDay = parseContent(await toolCall('create_event',
+    { title: 'Ganztag', start_datetime: `${in3days}T09:30`, all_day: true }));
+  assert.equal(allDay.all_day, 1);
+});
+
 test('tools/call create_event: fehlender Start → isError', async () => {
   const res = await toolCall('create_event', { title: 'Ohne Start' });
   assert.equal(res.result.isError, true);
@@ -611,15 +669,34 @@ test('die schreibenden Kern-Tools antworten weiter in ihrer schlanken Form (#261
   const task = parseContent(await toolCall('create_task', { title: 'Form der Antwort' }));
   assert.deepEqual(Object.keys(task),
     ['id', 'title', 'status', 'priority', 'category', 'due_date', 'due_time', 'tags']);
-  const item = parseContent(await toolCall('add_shopping_item', { name: 'Form der Antwort' }));
+  // Die Werte, nicht nur die Schlüssel: eine Kennung als Text oder `tags` als
+  // verbundener String fiele bei Object.keys nicht auf.
+  assert.equal(typeof task.id, 'number');
+  assert.equal(task.title, 'Form der Antwort');
+  assert.equal(task.status, 'open');
+  assert.equal(task.priority, 'none');
+  assert.equal(task.category, 'misc');
+  assert.equal(task.due_date, null);
+  assert.equal(task.due_time, null);
+  assert.ok(Array.isArray(task.tags), '`tags` ist eine Liste');
+  const item = parseContent(await toolCall('add_shopping_item', { name: 'Form der Antwort', quantity: '3' }));
   assert.deepEqual(Object.keys(item), ['id', 'name', 'quantity', 'category', 'is_checked', 'list']);
+  assert.equal(typeof item.id, 'number');
+  assert.equal(item.name, 'Form der Antwort');
+  assert.equal(item.quantity, '3');
+  assert.equal(typeof item.category, 'string');
   assert.equal(item.list, 'Wocheneinkauf', '`list` ist der NAME der Liste, nicht ihre Kennung');
   assert.equal(item.is_checked, 0, '0/1 wie in der Spalte, kein Boolean');
   const event = parseContent(await toolCall('create_event',
     { title: 'Form der Antwort', start_datetime: `${in3days}T07:00` }));
   assert.deepEqual(Object.keys(event),
     ['id', 'title', 'start_datetime', 'end_datetime', 'all_day', 'location']);
+  assert.equal(typeof event.id, 'number');
+  assert.equal(event.title, 'Form der Antwort');
+  assert.equal(event.start_datetime, `${in3days}T07:00`);
+  assert.equal(event.end_datetime, null);
   assert.equal(event.all_day, 0);
+  assert.equal(event.location, null);
 });
 
 // ── Idempotenz der schreibenden Kern-Tools (#2616) ───────────────────────────
@@ -699,6 +776,36 @@ test('Schreiben mit Sitzungs-Cookie ohne CSRF-Token wird abgewiesen (#2616)', as
       return true;
     },
   );
+});
+
+test('Schreiben mit Sitzungs-Cookie UND gültigem CSRF-Token legt an (#2616)', async () => {
+  // Die zweite Hälfte der Zusage: eine Sitzung, die ihr Token mitschickt, darf
+  // schreiben. Das Token holt ein GET durch denselben Stapel, wie die App es tut.
+  const probe = await fetch(`${LOOPBACK}/api/v1/tasks/categories`, { headers: { cookie: SESSION_COOKIE } });
+  await probe.text();
+  const token = probe.headers.get('x-csrf-token');
+  assert.match(String(token), /^[0-9a-f]{64}$/);
+  const res = await rpc('tools/call', { name: 'create_task', arguments: { title: 'Mit CSRF' } },
+    1, { cookie: SESSION_COOKIE, 'x-csrf-token': token });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.ok(row(`SELECT 1 FROM tasks WHERE title = 'Mit CSRF'`));
+});
+
+test('Loopback nicht erreichbar: eine Meldung mit MCP_INTERNAL_BASE_URL, kein interner Fehler (#2616)', async () => {
+  // `BASE_URL` ist oft die öffentliche Adresse hinter einem Proxy. Wirft
+  // `fetch`, soll der Aufrufer die Einstellung lesen, nicht "Internal error".
+  const before = internalErrors.length;
+  installFetchMock(async () => { throw new TypeError('fetch failed'); });
+  let res;
+  try {
+    res = await toolCall('create_task', { title: 'Unerreichbar' });
+  } finally {
+    global.fetch = realFetch;
+  }
+  assert.equal(res.result.isError, true);
+  assert.match(res.result.content[0].text, /MCP_INTERNAL_BASE_URL/);
+  assert.doesNotMatch(res.result.content[0].text, /fetch failed|Internal error/);
+  assert.equal(internalErrors.length, before);
 });
 
 // ── OpenAPI-Brücke: Metadaten (list/get) ─────────────────────────────────────

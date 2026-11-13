@@ -153,6 +153,14 @@ function pickFields(row, fields) {
  * Only the fields the caller actually passed. A field left out stays out of the
  * request body, so the ROUTE's default applies - that is the whole point of
  * going through it (default points, fallback category, fallback visibility).
+ *
+ * `null` COUNTS AS NOT PASSED, exactly as it did before #2616: a client that
+ * serializes an unset optional argument as `null` sends `{ category: null }`.
+ * The route reads that differently - `validateTaskInput` asks
+ * `textShape(body.category)` and `textShape(body.priority)` WITHOUT
+ * `{ nullable: true }` (server/routes/tasks.js), so an explicit `null` is
+ * "category must be text.", a 400 for a call that created a task before. No
+ * field of the three tool schemas is nullable.
  * @param {Record<string, any>} fields
  * @returns {Record<string, any>}
  */
@@ -160,7 +168,7 @@ function passedFields(fields) {
   /** @type {Record<string, any>} */
   const body = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (value !== undefined) body[key] = value;
+    if (value != null) body[key] = value;
   }
   return body;
 }
@@ -168,9 +176,9 @@ function passedFields(fields) {
 // The limit of the `Idempotency-Key` header, as server/middleware/idempotency.js
 // draws it (MAX_KEY_LENGTH, printable ASCII). Named a second time instead of
 // imported: that module pulls in server/db.js, and this layer stays testable
-// without the database module. A value the route judges differently still gets
-// the route's own 400 - this check only keeps `fetch` from throwing on a header
-// value it cannot send, which would be an internal error instead of a message.
+// without the database module; test:idempotency binds the two numbers. A value
+// the route judges differently still gets the route's own 400 - this check only
+// keeps `fetch` from throwing on a header value it cannot send.
 const MAX_IDEMPOTENCY_KEY_LENGTH = 255;
 
 /**
@@ -296,7 +304,11 @@ async function createEvent(ctx, args) {
       description: args.description,
       start_datetime: args.start_datetime,
       end_datetime: args.end_datetime,
-      all_day: args.all_day,
+      // THE TOOL'S OWN COERCION STAYS. The route reads `!!req.body.all_day`,
+      // so every truthy value counts - the string "false" would turn a 09:30
+      // appointment into an all-day entry and drop its time. This tool has
+      // always accepted only the boolean `true`, and its schema says `boolean`.
+      all_day: args.all_day == null ? undefined : args.all_day === true,
       location: args.location,
     }),
     headers: idempotencyHeader(args),
@@ -553,6 +565,11 @@ async function readCappedBinary(response, cap = MAX_BINARY_RESPONSE_BYTES) {
   return Buffer.concat(chunks);
 }
 
+// Die Zusatzkoepfe, die ein Werkzeug mitgeben darf (klein geschrieben). Eine
+// Erlaubnisliste statt einer Reihenfolge: nur so kann ein Zusatzkopf die
+// weitergereichte Authentifizierung in KEINER Schreibweise beruehren.
+const EXTRA_REQUEST_HEADERS = new Set(['idempotency-key']);
+
 /**
  * Ein authentifizierter Loopback-Aufruf auf die eigene REST-API.
  * @param {{ requestHeaders?: object }} ctx
@@ -575,9 +592,15 @@ async function internalApiRequest(ctx, method, path, {
     }
   }
 
-  // Die weitergereichte Authentifizierung steht ZULETZT: ein zusaetzlicher
-  // Kopf (Idempotency-Key) kann sie damit nicht ueberschreiben.
-  const headers = { Accept: 'application/json', ...(extraHeaders || {}), ...forwardedAuthHeaders(ctx) };
+  // Nur gelistete Zusatzkoepfe, die Auth danach: die Reihenfolge allein reicht
+  // nicht, `fetch` fasst `authorization` und `Authorization` zu EINEM Kopf mit
+  // beiden Werten zusammen.
+  /** @type {Record<string, string>} */
+  const allowed = { Accept: 'application/json' };
+  for (const [name, value] of Object.entries(extraHeaders || {})) {
+    if (EXTRA_REQUEST_HEADERS.has(name.toLowerCase())) allowed[name] = value;
+  }
+  const headers = { ...allowed, ...forwardedAuthHeaders(ctx) };
   const options = { method, headers };
   if (contentData !== undefined && contentData !== null) {
     options.body = contentBytes(contentData);
@@ -587,7 +610,25 @@ async function internalApiRequest(ctx, method, path, {
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(url, options);
+  // EIN TRANSPORTFEHLER IST EINE MELDUNG, KEIN INTERNER FEHLER. Der Loopback
+  // folgt `MCP_INTERNAL_BASE_URL`, sonst `BASE_URL` - und das ist auf vielen
+  // Installationen die oeffentliche Adresse hinter einem Reverse Proxy, die aus
+  // dem Prozess selbst nicht erreichbar sein muss. Ohne diesen Fang wirft
+  // `fetch` einen TypeError, und der Aufrufer liest "Internal error executing
+  // tool." - ein Satz, aus dem niemand den Namen der Einstellung errät. Die
+  // Meldung ist fest: weder der Text der Bibliothek (Regel ERROR-TEXT) noch die
+  // interne Adresse geht hinaus. Der Originalfehler bleibt als `cause` am Fehler.
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (cause) {
+    throw new ToolError(
+      'Could not reach the Yuvomi API from the server itself. '
+      + 'Set MCP_INTERNAL_BASE_URL to an address the app can reach locally '
+      + '(for example http://127.0.0.1:3000).',
+      { cause },
+    );
+  }
   const responseContentType = response.headers.get('content-type') || '';
   let data;
   if (responseContentType.includes('application/json')) {
@@ -954,4 +995,4 @@ async function callTool(ctx, name, args = {}) {
   return tool.handler(ctx, args || {});
 }
 
-export { TOOL_DEFINITIONS, listToolDefinitions, callTool, ToolError };
+export { TOOL_DEFINITIONS, listToolDefinitions, callTool, ToolError, MAX_IDEMPOTENCY_KEY_LENGTH };
