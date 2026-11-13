@@ -16,11 +16,12 @@
  *          and the lint exceptions name the same files as the import rules;
  *          the real tree has no hard finding (this runs in the required test jobs, next to the
  *          lint job); the real lint-baseline.json is sorted, carries no hard rule and names no
- *          missing file. The rights fixture test/fixtures/lint/rights/ (phase 2, B5) must give
- *          exactly its marked RIGHTS-SQL and RIGHTS-MODULE lines, nothing under server/authorize/,
- *          server/db.js or server/openapi/, and exactly its two imports past
+ *          missing file. The rights fixture test/fixtures/lint/rights/ (phase 2, B5, B8c) must give
+ *          exactly its marked RIGHTS-SQL, RIGHTS-MODULE and RIGHTS-ROW lines, nothing under
+ *          server/authorize/, server/db.js or server/openapi/, and exactly its two imports past
  *          server/authorize/index.ts; RIGHTS-MODULE and both authorize import rules are hard,
- *          a RIGHTS-SQL key needs a reason. The fixture test/fixtures/lint/error-text/ must give exactly its
+ *          a RIGHTS-SQL or RIGHTS-ROW key needs a reason, and a RIGHTS-ROW finding outside the
+ *          listed counts is red and never taken in by --update. The fixture test/fixtures/lint/error-text/ must give exactly its
  *          thirty-three ERROR-TEXT findings (the self-test cases of the text reader the rule
  *          replaced, phase 1b section E, and the spellings a probe against that reader
  *          found) and nothing for the lines it must leave alone. A
@@ -462,7 +463,7 @@ function serverSelectors() {
 /** @param {string} tag @returns {(s: Selector) => boolean} */
 const tagged = (tag) => (s) => s.message.startsWith(`${tag}:`);
 
-const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE'];
+const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW'];
 /** @param {Selector} s */
 const serverOnly = (s) => SERVER_ONLY.some((tag) => tagged(tag)(s));
 
@@ -478,8 +479,10 @@ test('server/ gets the whole base rule plus the sender and rights selectors, not
   assert.ok(!base.some(serverOnly), 'a server-only selector in the base rule');
 });
 
-// Where the rights rules are the rule itself (phase 2, B5): the permission module, the
-// schema and its test mirror (migrations write visibility values), the API documentation.
+// Where the rights rules are the rule itself (phase 2, B5, B8c): the permission module, the
+// schema and its test mirror (migrations write visibility values and compare a row's level
+// while they move data), the API documentation.
+const RIGHTS_TAGS = ['RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW'];
 const RIGHTS_HOME = ['server/authorize/**', 'server/db.js', 'server/db-schema-test.js', 'server/openapi/**'];
 
 test('the rights exception covers exactly the permission module, the schema and the API docs, and drops only the rights selectors', () => {
@@ -487,11 +490,11 @@ test('the rights exception covers exactly the permission module, the schema and 
   const override = CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes('server/authorize/**'));
   assert.ok(override, 'no override for server/authorize/**');
   assert.deepEqual(override.files, RIGHTS_HOME);
-  assert.deepEqual(override.rules[RESTRICTED], [severity, ...selectors.filter((s) => !tagged('RIGHTS-SQL')(s) && !tagged('RIGHTS-MODULE')(s))]);
-  // Every other server override keeps both rights tags.
+  assert.deepEqual(override.rules[RESTRICTED], [severity, ...selectors.filter((s) => !RIGHTS_TAGS.some((tag) => tagged(tag)(s)))]);
+  // Every other server override keeps every rights tag.
   for (const other of /** @type {Override[]} */ (CONFIG.overrides)) {
     if (other === override || !other.files.some((f) => f.startsWith('server/'))) continue;
-    for (const tag of ['RIGHTS-SQL', 'RIGHTS-MODULE']) {
+    for (const tag of RIGHTS_TAGS) {
       const [, ...list] = other.rules[RESTRICTED];
       assert.ok(list.some(tagged(tag)), `${other.files.join(', ')} loses ${tag}`);
     }
@@ -690,22 +693,21 @@ test('the rights fixture gives exactly its marked lint lines, and nothing where 
   try {
     cpSync(RIGHTS, dir, { recursive: true });
     writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
-    const reads = 'server/routes/reads.js';
     // The fixture marks every line that must be reported with `rights-N: TAG`.
-    const marked = readFileSync(join(dir, reads), 'utf8').split('\n')
+    const marked = ['server/routes/reads.js', 'server/routes/rows.js'].flatMap((file) => readFileSync(join(dir, file), 'utf8').split('\n')
       .flatMap((line, i) => {
         const m = /rights-\d+: ([A-Z-]+)/.exec(line);
-        return m ? [`${reads}:${i + 1} ${m[1]}`] : [];
-      });
+        return m ? [`${file}:${i + 1} ${m[1]}`] : [];
+      }));
     assert.deepEqual(marked.map((l) => l.split(' ')[1]), [
-      ...Array(8).fill('RIGHTS-SQL'), ...Array(4).fill('RIGHTS-MODULE'),
-    ], 'the fixture marks eight SQL and four module lines');
+      ...Array(8).fill('RIGHTS-SQL'), ...Array(4).fill('RIGHTS-MODULE'), ...Array(19).fill('RIGHTS-ROW'),
+    ], 'the fixture marks eight SQL, four module and nineteen row lines');
     const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
     const found = JSON.parse(r.stdout).diagnostics
       .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
       .sort();
-    // Silent: server/authorize/rows/inside.ts (the rule itself), server/db.js (migrations),
-    // server/openapi/ (the docs), and the lines without a mark.
+    // Silent: server/authorize/rows/inside.ts (the rule itself, every spelling of rows.js
+    // too), server/db.js (migrations), server/openapi/ (the docs), and the lines without a mark.
     assert.deepEqual(found, [...marked].sort());
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -715,7 +717,7 @@ test('the rights fixture gives exactly its two imports past server/authorize/ind
     cwd: RIGHTS, encoding: 'utf8',
   });
   const report = JSON.parse(r.stdout);
-  assert.equal(report.summary.totalCruised, 10, 'dependency-cruiser does not read the whole rights fixture');
+  assert.equal(report.summary.totalCruised, 11, 'dependency-cruiser does not read the whole rights fixture');
   const found = report.summary.violations
     .map((/** @type {{ rule: { name: string }, from: string, to: string }} */ v) => `${v.rule.name} ${v.from} -> ${v.to}`)
     .sort();
@@ -743,6 +745,7 @@ test('the ratchet holds RIGHTS-MODULE and the import rule as hard, and asks a re
       'scripts/tool.js depcruise/rights-only-through-authorize 1',
     ]) assert.ok(lines.includes(key), `${key}:\n${hard.out}`);
     assert.doesNotMatch(hard.out, /RIGHTS-SQL/, 'RIGHTS-SQL is a list of exceptions, not a hard rule');
+    assert.doesNotMatch(hard.out, /RIGHTS-ROW/, 'RIGHTS-ROW is a list of exceptions, not a hard rule');
     assert.equal(existsSync(join(dir, 'lint-baseline.json')), false, 'a hard finding never enters a baseline');
   } finally { rmSync(dir, { recursive: true, force: true }); }
   // RIGHTS-SQL alone: the baseline takes the key, but only with a reason.
@@ -756,6 +759,40 @@ test('the ratchet holds RIGHTS-MODULE and the import rule as hard, and asks a re
     const ok = run(sql);
     assert.equal(ok.code, 0, ok.out);
   } finally { rmSync(sql, { recursive: true, force: true }); }
+});
+
+const ROW = 'server/x.js\toxlint/no-restricted-syntax/RIGHTS-ROW';
+const ROW_FILTER = "export const f = (task, set) => { if (task.visibility === 'all') set(task); if (task.visibility !== 'private') set(task); };\n";
+
+test('a RIGHTS-ROW key stands only with a reason, and only at its count', () => {
+  const dir = project(ROW_FILTER);
+  try {
+    // (d) the baseline takes the key, but a key without a reason is red.
+    const init = run(dir, '--init');
+    assert.equal(init.code, 1, init.out);
+    assert.match(init.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/RIGHTS-ROW\s+no reason/);
+    assert.deepEqual(baselineOf(dir), { [ROW]: 2 });
+    writeReasons(dir, { [ROW]: 'a write filter: only shared rows are moved, nothing is read' });
+    const ok = run(dir);
+    assert.equal(ok.code, 0, ok.out);
+    // (f) a third comparison in the file with the key: 2 -> 3 is red, --update does not raise it.
+    writeFileSync(join(dir, 'server', 'x.js'), `${ROW_FILTER}export const g = (row) => row?.visibility === 'family';\n`);
+    const more = run(dir);
+    assert.equal(more.code, 1, more.out);
+    assert.match(more.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/RIGHTS-ROW\s+2 -> 3/);
+    assert.equal(run(dir, '--update').code, 1);
+    assert.deepEqual(baselineOf(dir), { [ROW]: 2 });
+    // (e) a finding in a file without a key is red, and --update does not take it in.
+    writeFileSync(join(dir, 'server', 'x.js'), ROW_FILTER);
+    writeFileSync(join(dir, 'server', 'y.js'), "export const h = (visibility) => visibility === 'restricted';\n");
+    const fresh = run(dir);
+    assert.equal(fresh.code, 1, fresh.out);
+    assert.match(fresh.out, /server\/y\.js\s+oxlint\/no-restricted-syntax\/RIGHTS-ROW\s+0 -> 1/);
+    const update = run(dir, '--update');
+    assert.equal(update.code, 1, update.out);
+    assert.deepEqual(baselineOf(dir), { [ROW]: 2 }, '--update never takes in a new RIGHTS-ROW key');
+    assert.deepEqual(reasonsOf(dir), { [ROW]: 'a write filter: only shared rows are moved, nothing is read' });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('oxlint reaches the source tree, but not vendor code or the fixture', () => {
@@ -903,7 +940,7 @@ test('the real lint-baseline.json is sorted, has no hard rule and names only exi
   assert.deepEqual([...new Set(stale)], [], 'baseline names files that do not exist');
 });
 
-test('the real lint-baseline-reasons.json is sorted and explains every error-text and rights-sql key', () => {
+test('the real lint-baseline-reasons.json is sorted and explains every error-text, rights-sql and rights-row key', () => {
   const baseline = JSON.parse(readFileSync(join(REPO, 'lint-baseline.json'), 'utf8'));
   const reasons = JSON.parse(readFileSync(join(REPO, 'lint-baseline-reasons.json'), 'utf8'));
   const keys = Object.keys(reasons);
@@ -917,4 +954,7 @@ test('the real lint-baseline-reasons.json is sorted and explains every error-tex
   assert.deepEqual(errorText.filter((key) => !(key in reasons)), [], 'error-text keys without a reason');
   const rightsSql = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/RIGHTS-SQL'));
   assert.deepEqual(rightsSql.filter((key) => !(key in reasons)), [], 'rights-sql keys without a reason');
+  const rightsRow = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/RIGHTS-ROW'));
+  assert.ok(rightsRow.length > 0, 'the baseline carries no rights-row key');
+  assert.deepEqual(rightsRow.filter((key) => !(key in reasons)), [], 'rights-row keys without a reason');
 });

@@ -162,8 +162,14 @@ else under `server/`, and the few that stay - a write, never a read - are listed
 (`x.modules.y`) compared with `'none'` outside the permission module; and the import rule
 `rights-only-through-authorize` fails on any import of an inner file of `server/authorize/` from
 outside, tests apart. The schema, its test mirror and the API documentation may spell visibility
-values, because they write or describe them. A visibility compared on a row in JavaScript and a
-module level read under a computed key are seen by no guard; they are what is left to move.
+values, because they write or describe them. B8b moved the read rules that compared a row's
+visibility in JavaScript into `server/authorize/`, and a fourth guard keeps them there (B8c):
+`RIGHTS-ROW` reports a visibility level compared with a string literal in JavaScript outside the
+permission module (`row.visibility === 'all'`, a variable named `visibility`, a `case` of a
+switch on it, a literal list's `includes`), and the few that stay - a write filter or data
+upkeep, never a read rule - are listed in `lint-baseline-reasons.json` with their reason. A level
+under another name or compared through a named list, and a module level read under a computed
+key, are seen by no guard; review those.
 
 ### What counts as undoing it
 
