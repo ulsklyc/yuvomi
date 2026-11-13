@@ -161,6 +161,12 @@ async function httpFixture() {
     next();
   });
   app.use('/api/v1/auth', router);
+  const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+  const internalErrors = /** @type {{message:string,error:unknown}[]} */ ([]);
+  app.use(createErrorHandler({
+    warn() {},
+    error: (/** @type {string} */ message, /** @type {unknown} */ error) => internalErrors.push({message,error}),
+  }));
   /** @type {import('node:http').Server} */
   const server = await new Promise((resolve, reject) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); s.on('error', reject); });
   const base = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}`;
@@ -183,7 +189,7 @@ async function httpFixture() {
    * @param {Record<string,string>} [headers]
    */
   const route = (p, method, body, headers) => call('/api/v1/auth' + p, method, body, headers);
-  return { route, call, cookies, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
+  return { route, call, cookies, internalErrors, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
 }
 
 const managementRoutes = [
@@ -502,7 +508,6 @@ test('an account SSO-only change during registration is read again after verific
 test('the four credential-recovery paths revoke planted passkeys and pending enrollment', async () => {
   const { hashPassword } = await import('../server/utils/password.js');
   const { createPasswordResetService } = await import('../server/services/password-reset.js');
-  const { generateCode } = await import('../server/utils/totp.js');
   const password = 'Recovery-test-password-123!'; const hash = await hashPassword(password);
   for (const action of ['password-change', 'password-reset', 'admin-password', 'admin-emergency']) {
     const { route, call, close } = await httpFixture();
@@ -671,4 +676,52 @@ test('passkey reauthentication cannot revive a session revoked during verificati
     assert.equal(result.status,400);
     assert.equal((await route('/me')).status,401);
   } finally {await close();}
+});
+
+
+test('recovery rolls back all credential deletions on failure, including inside an outer transaction', async () => {
+  const person = user(); await enroll(person);
+  await passkeys.beginAuthentication(database, 'rollback-reauth', person.id);
+  database.exec(`CREATE TEMP TRIGGER passkey_recovery_failure BEFORE DELETE ON user_passkey_handles
+    WHEN OLD.user_id = ${person.id} BEGIN SELECT RAISE(ABORT, 'Injected recovery failure'); END`);
+  try {
+    database.transaction(() => {
+      assert.throws(() => passkeys.revokeAll(database, person.id), /Injected recovery failure/);
+      assert.equal(database.inTransaction, true, 'the caller transaction stays active');
+      assert.equal(passkeys.list(database, person.id).length, 1);
+      assert.ok(database.prepare('SELECT 1 FROM user_passkey_handles WHERE user_id = ?').get(person.id));
+      assert.ok(database.prepare('SELECT 1 FROM passkey_challenges WHERE user_id = ?').get(person.id));
+    })();
+    assert.equal(passkeys.list(database, person.id).length, 1);
+  } finally { database.exec('DROP TRIGGER passkey_recovery_failure'); }
+  passkeys.revokeAll(database, person.id);
+  assert.equal(passkeys.list(database, person.id).length, 0);
+  assert.equal(database.prepare('SELECT 1 FROM user_passkey_handles WHERE user_id = ?').get(person.id), undefined);
+  assert.equal(database.prepare('SELECT 1 FROM passkey_challenges WHERE user_id = ?').get(person.id), undefined);
+});
+
+test('passkey management database errors use the central JSON error handler without exposing details', async () => {
+  const { hashPassword } = await import('../server/utils/password.js');
+  const person = user(); await enroll(person); const password = 'Management-errors-password!';
+  database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPassword(password), person.id);
+  const { route, internalErrors, close } = await httpFixture();
+  const prepare = database.prepare;
+  try {
+    assert.equal((await route('/login', 'POST', {username:person.username,password})).status, 200);
+    const id = passkeys.list(database, person.id)[0].id;
+    database.prepare = function(/** @type {string} */ sql) {
+      if (sql.startsWith('SELECT id, name, created_at, last_used_at FROM user_passkeys')
+          || sql.startsWith('DELETE FROM user_passkeys WHERE id = ? AND user_id = ?')) {
+        throw new Error('Private database failure detail');
+      }
+      return prepare.call(this, sql);
+    };
+    for (const [path, method] of [['/passkeys', 'GET'], [`/passkeys/${id}`, 'DELETE']]) {
+      const response = await route(path, method, method === 'GET' ? undefined : {});
+      assert.equal(response.status, 500);
+      assert.deepEqual(response.data, {error:'Internal server error.',code:500});
+    }
+    assert.equal(internalErrors.length, 2);
+    assert.ok(internalErrors.every(entry => entry.message.includes('500') && entry.error instanceof Error));
+  } finally { database.prepare = prepare; await close(); }
 });
