@@ -70,17 +70,11 @@ export function remove(database, userId, id) {
  */
 export function revokeAll(database, userId) {
   // Rotating the opaque handle also invalidates registration already verifying.
-  database.exec('SAVEPOINT revoke_passkeys');
-  try {
+  database.transaction(() => {
     database.prepare('DELETE FROM user_passkeys WHERE user_id = ?').run(userId);
     database.prepare('DELETE FROM user_passkey_handles WHERE user_id = ?').run(userId);
     database.prepare('DELETE FROM passkey_challenges WHERE user_id = ?').run(userId);
-    database.exec('RELEASE revoke_passkeys');
-  } catch (error) {
-    database.exec('ROLLBACK TO revoke_passkeys');
-    database.exec('RELEASE revoke_passkeys');
-    throw error;
-  }
+  })();
 }
 
 /** @param {Database} database
