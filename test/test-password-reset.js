@@ -472,7 +472,7 @@ test('reset-password beendet jede Sitzung des Kontos, auch eine abgelaufene Zeil
   const token = sent[0].html.match(/token=([a-f0-9]+)/)[1];
   const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
   assert.equal(status, 200);
-  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map((r) => r.sid);
+  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map((/** @type {{sid:string}} */ r) => r.sid);
   assert.deepEqual(left, ['bob-1', 'broken']);
 });
 
