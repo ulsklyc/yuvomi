@@ -228,6 +228,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `success: false`, and carries the same `reason`. The backup page does not show the reason yet.
 
 ### Fixed
+- **Leaving the title blank in a budget entry dialog no longer blocks saving.** The title field is
+  now optional. When you leave it empty, the dialog fills in the label of the subcategory (or
+  category if there is no subcategory) you selected, so the entry is never saved untitled. Editing
+  an entry and clearing the title leaves the stored title in place. API callers that omit the title
+  get the same localized label from the household language. (Refs #2403)
 - **The demo seed finds the database key the server stored itself.** `scripts/seed-demo.js
   --db <path>` now reads `DB_ENCRYPTION_KEY_FILE` and the key a first start keeps under
   `.secrets/` next to the database, in the same order as the server. Until now it stopped on an

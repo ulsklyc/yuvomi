@@ -4627,9 +4627,9 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
     </div>
 
     <div class="form-group js-entry-field">
-      <label class="form-label" for="bm-title">${t('budget.titleLabel')}${REQUIRED_MARK}</label>
+      <label class="form-label" for="bm-title">${t('budget.titleLabel')}</label>
       <input type="text" class="form-input" id="bm-title"
-             placeholder="${t('budget.titlePlaceholder')}" value="${esc(isEdit ? entry.title : '')}" required>
+             placeholder="${t('budget.titlePlaceholder')}" value="${esc(isEdit ? entry.title : '')}">
     </div>
 
     <div class="form-group js-entry-field">
@@ -5008,8 +5008,19 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         saveBtn.textContent = '…';
 
         try {
+          // Leerer Titel: der Dialog sendet die angezeigte Bezeichnung der
+          // gewaehlten Unterkategorie oder Kategorie (#2403). Beim Bearbeiten
+          // bleibt der gespeicherte Titel, wenn das Feld geleert wird (der
+          // Server laesst ihn dann unveraendert per COALESCE).
+          const titleToSend = title || (!isEdit && (() => {
+            const subSel = panel.querySelector('#bm-subcategory');
+            const catSel = panel.querySelector('#bm-category');
+            return (subSel?.value && subSel.selectedOptions[0]?.textContent.trim())
+                || (catSel?.value && catSel.selectedOptions[0]?.textContent.trim())
+                || '';
+          })()) || title;
           const body = {
-            title, amount, category, subcategory, date,
+            title: titleToSend, amount, category, subcategory, date,
             is_recurring: recurring,
             recurrence_interval: interval,
             recurrence_interval_count: intervalN,
@@ -5235,9 +5246,10 @@ function bindEntryAccountCurrency(panel) {
  * @param {{title: string, absVal: number, category: string, subcategory: string, date: string, original: number|null}} values
  * @returns {Array<[Element|null, string]|false>}
  */
-export function entryFormErrors(panel, { title, category, subcategory, date, original = null }) {
+export function entryFormErrors(panel, { category, subcategory, date, original = null }) {
   return [
-    !title && [panel.querySelector('#bm-title'), t('common.titleRequired')],
+    // Kein Titelcheck: leerer Titel ist gueltig; der Server oder der Dialog ersetzt
+    // ihn durch den lokalisierten Unterkategorie-/Kategorienamen (#2403).
     // Der Grund kommt aus dem TEXT des Feldes (D1): gruppiert, keine Zahl,
     // nicht positiv oder zu viele Stellen - nie ein stilles Fehllesen.
     amountFieldError(panel.querySelector('#bm-amount'), entryDialogCurrency(panel), { required: true, original }),
