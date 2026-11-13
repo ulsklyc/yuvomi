@@ -366,26 +366,24 @@ export const OUTLOOK_TARGET_OWNER = 'member';
  * @typedef {{
  *   quickLinks: RuleRow[],
  *   tasks: RuleRow[],
- *   chain: { origin: RuleRow, followup: RuleRow },
- *   series: Array<RuleRow & { start: string, linkedChildId: number }>,
+ *   chains: Array<{ cell: string, origin: RuleRow, followup: RuleRow }>,
+ *   series: Array<RuleRow & { start: string, linkedChildId: number | null }>,
  *   seriesStart: string,
  * }} RuleSeed
  */
 
 /**
- * Quick links, tasks for the write paths, a task chain for the next due date,
+ * Quick links, tasks for the write paths, task chains for the next due date,
  * local series with one linked occurrence each.
  *
  * @param {object} options
  * @param {Database} options.db
- * @param {HttpFn} options.http
  * @param {Record<string, number>} options.ids
- * @param {Record<string, SeedSession>} options.sessions
  * @param {SeedDates} options.dates
  * @param {(key: string, days: number) => string} options.shiftDateKey
- * @returns {Promise<RuleSeed>}
+ * @returns {RuleSeed}
  */
-export async function seedRowRules({ db, http, ids, sessions, dates, shiftDateKey }) {
+export function seedRowRules({ db, ids, dates, shiftDateKey }) {
   // Quick links: one per owner and level, position in seed order.
   const insertLink = db.prepare(`
     INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES (?, ?, ?, ?, ?) RETURNING id
@@ -425,21 +423,34 @@ export async function seedRowRules({ db, http, ids, sessions, dates, shiftDateKe
   assignTask.run(displayTaskId, ids.display);
   tasks.push({ name: displayName, id: displayTaskId, owner: 'admin', level: 'assignees' });
 
-  // A recurring chain for nextDueDateAfter (tasks.js ~1860): the origin is
-  // shared, its already spawned followup is the admin's private row. Ticking
-  // the origin off spawns nothing (one followup per completion) and reports
-  // the followup's due date only to whom the read check lets see it.
+  // Recurring chains for nextDueDateAfter (tasks.js ~1860): every origin is
+  // shared, its already spawned followup exists. Ticking the origin off spawns
+  // nothing (one followup per completion) and reports the followup's due date
+  // only to whom the read check lets see it: the display arm reads
+  // `visibility = 'all'` (~1864), people read mayAccessTask (~1865). Followups:
+  // the admin's private row, a shared row, and the admin's `assignees` row
+  // assigned to OTHER_OF.admin (the assignment branch of mayAccessTask).
   const insertChain = db.prepare(`
     INSERT INTO tasks (title, category, priority, status, due_date, visibility, created_by, is_recurring,
                        recurrence_rule, recurrence_origin_id)
     VALUES (?, 'household', 'none', 'open', ?, ?, ?, 1, 'FREQ=WEEKLY', ?) RETURNING id
   `);
-  const originId = Number(insertChain.get('wtask.chain.origin', dates.today, 'all', ids.admin, null).id);
-  const followupId = Number(insertChain.get('wtask.chain.followup', shiftDateKey(dates.today, 7), 'private', ids.admin, originId).id);
-  const chain = {
-    origin: { name: 'wtask.chain.origin', id: originId, owner: 'admin', level: 'all' },
-    followup: { name: 'wtask.chain.followup', id: followupId, owner: 'admin', level: 'private' },
-  };
+  /** @type {Array<{ cell: string, origin: RuleRow, followup: RuleRow }>} */
+  const chains = [];
+  for (const [cell, prefix, level] of [
+    ['next_due_date', 'wtask.chain', 'private'],
+    ['next_due_date_all', 'wtask.chain-all', 'all'],
+    ['next_due_date_assignees', 'wtask.chain-assignees', 'assignees'],
+  ]) {
+    const originId = Number(insertChain.get(`${prefix}.origin`, dates.today, 'all', ids.admin, null).id);
+    const followupId = Number(insertChain.get(`${prefix}.followup`, shiftDateKey(dates.today, 7), level, ids.admin, originId).id);
+    if (level === 'assignees') assignTask.run(followupId, ids[OTHER_OF.admin]);
+    chains.push({
+      cell,
+      origin: { name: `${prefix}.origin`, id: originId, owner: 'admin', level: 'all' },
+      followup: { name: `${prefix}.followup`, id: followupId, owner: 'admin', level },
+    });
+  }
 
   // Local series: daily, all-day, far enough ahead to stay out of every
   // seeded window. `assignees` and `all` carry an event_assignments row for
@@ -450,30 +461,56 @@ export async function seedRowRules({ db, http, ids, sessions, dates, shiftDateKe
     VALUES (?, ?, 1, ?, ?, 'local', 'FREQ=DAILY;COUNT=${SERIES_DAYS}') RETURNING id
   `);
   const assignEvent = db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)');
-  /** @type {Array<RuleRow & { start: string, linkedChildId: number }>} */
+  // One linked occurrence per series (its second day), written in the shape
+  // PUT /calendar/:id/occurrences/:day writes for an override of the title
+  // (and the visibility): recurrence_parent_id, recurrence_id in format A,
+  // overridden_fields, series_authored = 1, the series' assignment rows copied,
+  // and the exception row on the master for that day. Seeded directly and not through
+  // the route, because that route runs isEligibleLocalSeries - the rule under
+  // test - and a mutant of it must turn cells red, not stop the seed.
+  // PUT/DELETE /calendar/:childId reach the series rule through
+  // rejectLinkedOccurrenceResource (calendar/crud.js ~828).
+  // The occurrence of a `private` or `assignees` series is shared (visibility
+  // all, overridden): a viewer who may not see the series still gets the
+  // occurrence in GET /calendar, the capability map loads the hidden master
+  // itself, and canOverrideOccurrence then hangs on actorCanSeeSeries alone -
+  // the rule becomes visible in both directions.
+  const insertLinked = db.prepare(`
+    INSERT INTO calendar_events (title, start_datetime, all_day, visibility, created_by, external_source,
+                                 recurrence_parent_id, recurrence_id, overridden_fields, series_authored)
+    VALUES (?, ?, 1, ?, ?, 'local', ?, ?, ?, 1) RETURNING id
+  `);
+  const insertException = db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)');
+  /** @type {Array<RuleRow & { start: string, linkedChildId: number | null }>} */
   const series = [];
-  let setupIp = 0;
+  const linkedDay = shiftDateKey(seriesStart, 1);
   for (const owner of OWNERS) {
     for (const level of ROW_LEVELS) {
       const name = `series.${owner}.${level}`;
       const id = Number(insertSeries.get(name, seriesStart, level, ids[owner]).id);
       if (level !== 'private') assignEvent.run(id, ids[OTHER_OF[owner]]);
-      // One linked occurrence (the second day) through the real override route,
-      // as the owner: PUT/DELETE /calendar/:childId reach the series rule
-      // through rejectLinkedOccurrenceResource (calendar/crud.js ~828).
-      const session = sessions[owner];
-      const res = await http(`10.10.250.${++setupIp}`, 'PUT',
-        `/api/v1/calendar/${id}/occurrences/${shiftDateKey(seriesStart, 1)}`, {
-          headers: { Cookie: session.cookie, 'X-CSRF-Token': session.csrf },
-          body: { title: `${name} linked` },
-        });
-      assert.ok(res.status === 200 || res.status === 201, `linked occurrence of ${name}: ${res.status} ${JSON.stringify(res.body)}`);
-      const child = db.prepare('SELECT id FROM calendar_events WHERE recurrence_parent_id = ?').get(id);
-      assert.ok(child, `linked occurrence row of ${name}`);
-      series.push({ name, id, owner, level, start: seriesStart, linkedChildId: Number(child.id) });
+      const fields = level === 'all' ? ['title'] : ['title', 'visibility'];
+      const childId = Number(insertLinked.get(`${name} linked`, linkedDay, 'all', ids[owner], id, linkedDay,
+        JSON.stringify(fields)).id);
+      // The route copies the series' assignment rows onto the occurrence and
+      // excludes the day from the master.
+      if (level !== 'private') assignEvent.run(childId, ids[OTHER_OF[owner]]);
+      insertException.run(id, linkedDay);
+      series.push({ name, id, owner, level, start: seriesStart, linkedChildId: childId });
     }
   }
-  return { quickLinks, tasks, chain, series, seriesStart };
+  // Two series WITHOUT a linked occurrence: once the Outlook target makes them
+  // local but not eligible, canDetachOccurrence (~686) is true for whom
+  // actorCanSeeSeries lets through - with a linked child it is false for
+  // everyone (linkedParents). Both are seen by the target owner (member):
+  // one through the assignment, one as its creator.
+  for (const [owner, level] of [['admin', 'assignees'], ['member', 'private']]) {
+    const name = `series.${owner}.${level}.unlinked`;
+    const id = Number(insertSeries.get(name, seriesStart, level, ids[owner]).id);
+    if (level === 'assignees') assignEvent.run(id, ids[OTHER_OF[owner]]);
+    series.push({ name, id, owner, level, start: seriesStart, linkedChildId: null });
+  }
+  return { quickLinks, tasks, chains, series, seriesStart };
 }
 
 /**

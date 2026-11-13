@@ -820,13 +820,13 @@ function ruleCall(role, block, method, url, body) {
  * @typedef {{ status: number, reason?: string }} OkShape
  * @param {{ status: number, body: any }} res
  * @param {OkShape} ok
- * @param {string | null} hiddenReason
+ * @param {string[]} hiddenReasons  the route's own 404 reasons
  * @returns {'ok' | 'not_found' | 'refused' | 'unexpected'}
  */
-function classifyWrite(res, ok, hiddenReason) {
+function classifyWrite(res, ok, hiddenReasons) {
   const reason = res.body && typeof res.body === 'object' ? res.body.reason : undefined;
   if (res.status === ok.status && (ok.reason === undefined || reason === ok.reason)) return 'ok';
-  if (res.status === 404 && (hiddenReason === null || reason === hiddenReason)) return 'not_found';
+  if (res.status === 404 && hiddenReasons.includes(reason)) return 'not_found';
   if (res.status === 403) return 'refused';
   return 'unexpected';
 }
@@ -834,14 +834,17 @@ function classifyWrite(res, ok, hiddenReason) {
 /**
  * Collects per-row answers of one write path into a cell: `{ ok, not_found,
  * refused?, unexpected? }`, or the one refusal when the gate refused every row
- * the same way (the same shape as the detail cells).
+ * the same way (the same shape as the detail cells). A route with more than
+ * one 404 reason keeps the reason per row: `not_found: { row: reason }`.
  */
 class WriteCell {
-  /** @param {string} where @param {OkShape} ok @param {string | null} hiddenReason */
-  constructor(where, ok, hiddenReason) {
-    this.where = where; this.okShape = ok; this.hiddenReason = hiddenReason;
+  /** @param {string} where @param {OkShape} ok @param {string | string[]} hidden */
+  constructor(where, ok, hidden) {
+    this.where = where; this.okShape = ok;
+    this.hiddenReasons = Array.isArray(hidden) ? hidden : [hidden];
     /** @type {string[]} */ this.ok = [];
     /** @type {string[]} */ this.notFound = [];
+    /** @type {Record<string, string>} */ this.notFoundReason = {};
     /** @type {Record<string, { status: number, reason: string }>} */ this.refused = {};
     /** @type {Record<string, number>} */ this.odd = {};
     this.total = 0;
@@ -850,9 +853,9 @@ class WriteCell {
   /** @param {string} name @param {{ status: number, body: any }} res @returns {boolean} true when ok */
   add(name, res) {
     this.total += 1;
-    const kind = classifyWrite(res, this.okShape, this.hiddenReason);
+    const kind = classifyWrite(res, this.okShape, this.hiddenReasons);
     if (kind === 'ok') this.ok.push(name);
-    else if (kind === 'not_found') this.notFound.push(name);
+    else if (kind === 'not_found') { this.notFound.push(name); this.notFoundReason[name] = res.body.reason; }
     else if (kind === 'refused') this.refused[name] = statusValue(res);
     else {
       this.odd[name] = res.status;
@@ -866,7 +869,9 @@ class WriteCell {
     if (Object.keys(this.refused).length === this.total && refusals.size === 1) return Object.values(this.refused)[0];
     return {
       ok: this.ok.sort(),
-      not_found: this.notFound.sort(),
+      not_found: this.hiddenReasons.length > 1
+        ? Object.fromEntries(this.notFound.sort().map((name) => [name, this.notFoundReason[name]]))
+        : this.notFound.sort(),
       ...(Object.keys(this.refused).length ? { refused: this.refused } : {}),
       ...(Object.keys(this.odd).length ? { unexpected: this.odd } : {}),
     };
@@ -883,7 +888,21 @@ function reinsert(table, row) {
   db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map((c) => `@${c}`).join(', ')})`).run(row);
 }
 
-/** @type {Awaited<ReturnType<typeof seedRowRules>> | null} */
+/**
+ * A read in the row-rule blocks: 200 is read on, the gate's 403 is the cell
+ * value, anything else (a 500, a 401) is flagged and fails the suite - also in
+ * update mode, so it never lands in the data file unseen.
+ * @param {{ status: number, body: any }} res
+ * @param {string} where
+ * @returns {{ status: number, reason: string } | null} null for a 200
+ */
+function readRefusal(res, where) {
+  if (res.status === 200) return null;
+  if (res.status !== 403) flag(where, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+  return statusValue(res);
+}
+
+/** @type {ReturnType<typeof seedRowRules> | null} */
 let ruleSeed = null;
 
 /**
@@ -903,14 +922,16 @@ async function measureQuickLinks(role) {
   const out = /** @type {Record<string, any>} */ ({ detail: NA('quick links have no read-by-id route') });
 
   const list = await ruleCall(role, 'quick_links', 'GET', '/quick-links');
-  if (list.status !== 200) out.list = statusValue(list);
+  const listRefusal = readRefusal(list, `${where} / list`);
+  if (listRefusal) out.list = listRefusal;
   else {
     const field = listField(list.body, 'data', `${where} / list`);
     out.list = 'list' in field ? tiles(field.list) : field.value;
   }
   for (const [key, query] of [['overview', ''], ['overview_household', '?audience=household']]) {
     const res = await ruleCall(role, 'quick_links', 'GET', `/dashboard${query}`);
-    if (res.status !== 200) { out[key] = statusValue(res); continue; }
+    const refusal = readRefusal(res, `${where} / ${key}`);
+    if (refusal) { out[key] = refusal; continue; }
     const field = listField(res.body, 'quicklinks', `${where} / ${key}`);
     out[key] = 'list' in field ? tiles(field.list) : field.value;
   }
@@ -968,24 +989,25 @@ async function measureTaskWrites(role) {
   /** @type {Record<string, any>} */
   const out = Object.fromEntries(Object.entries(cells).map(([key, cell]) => [key, cell.value()]));
 
-  // Next due date (nextDueDateAfter, tasks.js ~1860): tick the shared origin
-  // off; the answer names the private followup's date or null. A display has
-  // to name the person (displayActingPerson); everyone else does not.
-  const { origin, followup } = seedRules.chain;
+  // Next due date (nextDueDateAfter, tasks.js ~1860): tick each shared origin
+  // off; the answer names the followup's date or null. A display has to name
+  // the person (displayActingPerson); everyone else does not.
   const body = role === 'display' ? { status: 'done', done_by_user_id: seed.ids.admin } : { status: 'done' };
-  const res = await ruleCall(role, 'task_writes', 'PATCH', `/tasks/${origin.id}/status`, body);
-  if (res.status === 200) {
-    const next = res.body?.data?.next_due_date;
-    const followupDue = taskRow.get(followup.id).due_date;
-    if (next !== null && next !== followupDue) flag(`${where} / next_due_date`, `unknown date ${next}`);
-    out.next_due_date = { next: next === followupDue ? followup.name : null, status: 200 };
-    // Back to open: the transition wrote the status and one completion row.
-    db.prepare("UPDATE tasks SET status = 'open' WHERE id = ?").run(origin.id);
-    db.prepare('DELETE FROM task_completions WHERE task_id = ?').run(origin.id);
-  } else if (res.status === 403 || res.status === 404) out.next_due_date = statusValue(res);
-  else {
-    flag(`${where} / next_due_date`, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
-    out.next_due_date = statusValue(res);
+  for (const { cell, origin, followup } of seedRules.chains) {
+    const res = await ruleCall(role, 'task_writes', 'PATCH', `/tasks/${origin.id}/status`, body);
+    if (res.status === 200) {
+      const next = res.body?.data?.next_due_date;
+      const followupDue = taskRow.get(followup.id).due_date;
+      if (next !== null && next !== followupDue) flag(`${where} / ${cell}`, `unknown date ${next}`);
+      out[cell] = { next: next === followupDue ? followup.name : null, status: 200 };
+      // Back to open: the transition wrote the status and one completion row.
+      db.prepare("UPDATE tasks SET status = 'open' WHERE id = ?").run(origin.id);
+      db.prepare('DELETE FROM task_completions WHERE task_id = ?').run(origin.id);
+    } else if (res.status === 403 || res.status === 404) out[cell] = statusValue(res);
+    else {
+      flag(`${where} / ${cell}`, `status ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+      out[cell] = statusValue(res);
+    }
   }
   return out;
 }
@@ -1002,7 +1024,8 @@ async function seriesCapabilities(role, block) {
   const nameOfSeries = new Map(seedRules.series.map((s) => [s.id, s.name]));
   const to = shiftDateKey(seedRules.seriesStart, SERIES_DAYS);
   const res = await ruleCall(role, block, 'GET', `/calendar?from=${seedRules.seriesStart}&to=${to}`);
-  if (res.status !== 200) return statusValue(res);
+  const refusal = readRefusal(res, `${role} / row_rules / ${block} / capabilities`);
+  if (refusal) return refusal;
   const field = listField(res.body, 'data', `${role} / row_rules / ${block} / capabilities`);
   if (!('list' in field)) return field.value;
   /** @type {Map<string, Set<string>>} */
@@ -1043,8 +1066,10 @@ async function measureSeries(role) {
     occurrence_delete: new WriteCell(`${where} / occurrence_delete`, past, 'calendar_series_not_found'),
     occurrence_delete_following: new WriteCell(`${where} / occurrence_delete_following`, past, 'calendar_series_not_found'),
     exceptions_post: new WriteCell(`${where} / exceptions_post`, past, 'calendar_event_not_found'),
-    linked_put: new WriteCell(`${where} / linked_put`, linked, 'calendar_event_not_found'),
-    linked_delete: new WriteCell(`${where} / linked_delete`, linked, 'calendar_event_not_found'),
+    // The occurrence row itself hidden (event) or visible with its series
+    // hidden (series, rejectLinkedOccurrenceResource): both are kept by row.
+    linked_put: new WriteCell(`${where} / linked_put`, linked, ['calendar_event_not_found', 'calendar_series_not_found']),
+    linked_delete: new WriteCell(`${where} / linked_delete`, linked, ['calendar_event_not_found', 'calendar_series_not_found']),
   };
   for (const s of seedRules.series) {
     cells.occurrence_put.add(s.name, await ruleCall(role, 'series', 'PUT', `/calendar/${s.id}/occurrences/${outside}`, { title: 'mx' }));
@@ -1052,6 +1077,7 @@ async function measureSeries(role) {
     cells.occurrence_delete.add(s.name, await ruleCall(role, 'series', 'DELETE', `/calendar/${s.id}/occurrences/${outside}`));
     cells.occurrence_delete_following.add(s.name, await ruleCall(role, 'series', 'DELETE', `/calendar/${s.id}/occurrences/${outside}/following`));
     cells.exceptions_post.add(s.name, await ruleCall(role, 'series', 'POST', `/calendar/${s.id}/exceptions`, { recurrence_id: outside }));
+    if (s.linkedChildId === null) continue;
     cells.linked_put.add(s.name, await ruleCall(role, 'series', 'PUT', `/calendar/${s.linkedChildId}`, {}));
     cells.linked_delete.add(s.name, await ruleCall(role, 'series', 'DELETE', `/calendar/${s.linkedChildId}`));
   }
@@ -1087,19 +1113,28 @@ async function measureOutlookTarget() {
 
 /**
  * What the write probes must leave as it was: every role measures the same
- * state. updated_at is left out (PUT {} on a quick link moves it).
- * @returns {Record<string, unknown[]>}
+ * state. Every column except updated_at (PUT {} on a quick link moves it) of
+ * the seeded rows, their assignment rows, and how many reminders and ledger
+ * rows hang on them.
+ * @returns {Record<string, unknown>}
  */
 function ruleRowState() {
+  /** @param {any[]} rows */
+  const withoutUpdatedAt = (rows) => rows.map(({ updated_at: _ignored, ...rest }) => rest);
+  const taskIds = 'SELECT id FROM tasks WHERE title LIKE \'wtask.%\' OR title = \'mx subtask\'';
+  const eventIds = 'SELECT id FROM calendar_events WHERE title LIKE \'series.%\'';
   return {
-    completions: db.prepare('SELECT COUNT(*) AS n FROM task_completions').all(),
+    completions: db.prepare(`SELECT COUNT(*) AS n FROM task_completions WHERE task_id IN (${taskIds})`).get(),
+    eventAssignments: db.prepare(`SELECT * FROM event_assignments WHERE event_id IN (${eventIds}) ORDER BY event_id, user_id`).all(),
+    events: withoutUpdatedAt(db.prepare(`SELECT * FROM calendar_events WHERE id IN (${eventIds}) ORDER BY id`).all()),
     exceptions: db.prepare('SELECT event_id, exception_date FROM calendar_event_exceptions ORDER BY event_id, exception_date').all(),
-    events: db.prepare(`SELECT id, title, start_datetime, recurrence_rule, recurrence_parent_id, visibility, created_by
-                        FROM calendar_events WHERE title LIKE 'series.%' ORDER BY id`).all(),
-    quickLinks: db.prepare('SELECT id, name, url, icon_data, icon_name, color, visibility, created_by, position FROM quick_links ORDER BY id').all(),
-    taskAssignments: db.prepare('SELECT * FROM task_assignments ORDER BY task_id, user_id').all(),
-    tasks: db.prepare(`SELECT id, title, description, status, archived_at, visibility, created_by, parent_task_id, due_date
-                       FROM tasks WHERE title LIKE 'wtask.%' OR title = 'mx subtask' ORDER BY id`).all(),
+    ledger: db.prepare(`SELECT COUNT(*) AS n FROM reward_ledger WHERE task_id IN (${taskIds})`).get(),
+    quickLinks: withoutUpdatedAt(db.prepare('SELECT * FROM quick_links ORDER BY id').all()),
+    reminders: db.prepare(`SELECT COUNT(*) AS n FROM reminders
+                           WHERE (entity_type = 'task' AND entity_id IN (${taskIds}))
+                              OR (entity_type = 'event' AND entity_id IN (${eventIds}))`).get(),
+    taskAssignments: db.prepare(`SELECT * FROM task_assignments WHERE task_id IN (${taskIds}) ORDER BY task_id, user_id`).all(),
+    tasks: withoutUpdatedAt(db.prepare(`SELECT * FROM tasks WHERE id IN (${taskIds}) ORDER BY id`).all()),
   };
 }
 
@@ -1108,7 +1143,7 @@ let ruleStateKept = null;
 
 /** @returns {Promise<Record<string, any>>} */
 async function measureRowRules() {
-  ruleSeed = await seedRowRules({ db, http, ids: seed.ids, sessions: seed.sessions, dates, shiftDateKey });
+  ruleSeed = seedRowRules({ db, ids: seed.ids, dates, shiftDateKey });
   // The wall's session: the first GET below /api/v1 (csrfMiddleware; /auth is mounted before it) hands out the session cookie and the CSRF token.
   const first = await http('10.10.250.200', 'GET', '/api/v1/quick-links', { headers: authHeaders('display') });
   const sessionCookie = cookieHeader(first.headers.get('set-cookie'));
@@ -1223,11 +1258,12 @@ const meta = {
   seed_shape: 'tasks and events per owner all/private/assignees (all and assignees assigned to one other account via the assignment table, legacy assigned_to NULL); task.admin.private.legacy-assigned-member sets only tasks.assigned_to = member; task.admin.assignees.secondary-member is not seeded because task.admin.assignees already is "assignment row only"; event.member.ics-unshared / ics-shared come from two subscriptions of the member; countdown flag on task.member.assignees and event.member.assignees; document expiry (today+10, lead 30 days) on the member\'s three documents and on document.admin.private; tasks due today, events all-day in two days, budget entries today',
   tokens: 'minted via POST /auth/api-tokens with subject_user_id = member: ' + JSON.stringify(seed.facts.tokenShapes),
   row_rules: 'row_rules holds the JavaScript row checks outside server/authorize (phase 2, B8a). Its rows are seeded AFTER every read path and the module level were measured and BEFORE the medication run (seedRowRules in the seed file); they are not in seed_counts and no read-path cell sees them. Blocks quick_links, task_writes, series and series_outlook_target are keyed by role (all ten), then by cell; outlook_classification is keyed by series. One cell = one leaf under a role (or one series in outlook_classification). Every block sends from its own client address 10.10.<role>.<block>; setup requests from 10.10.250.x',
-  row_rules_cells: 'write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route\'s success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route\'s own reason, refused = any 403; any other answer fails the suite',
+  row_rules_cells: 'write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route\'s success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route\'s own reason (a route with two 404 reasons keeps them by row: not_found: { row: reason }), refused = any 403; any other answer fails the suite. The reads (list, overview, capabilities) accept 200 and the gate\'s 403; anything else is flagged, also in update mode',
   row_rules_display: 'the display writes like the wall: display cookie plus the session cookie and CSRF token its first GET below /api/v1 (GET /quick-links) handed out (csrfMiddleware keeps the token in req.session)',
   row_rules_quick_links: 'quicklink.<owner>.<all|private> for admin/member/child, seeded directly. list = GET /quick-links as { visible, editable (can_edit) }; overview / overview_household = the quicklinks row of GET /dashboard (personal, audience=household) in the same shape; change = PUT /quick-links/:id with {} (every field keeps its value, only updated_at moves), ok 200; remove = DELETE /quick-links/:id, ok 204, the row goes back with the same id and values after each 204; detail is n/a',
-  row_rules_task_writes: 'wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description "- [ ] mx item", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branch of PATCH /:id/status, tasks.js ~2287, answers for no task because mayAccessTask runs first). One cell per mayAccessTask call site: completions = GET /:id/completions (~2604), check = PATCH /:id/check {line 0, checked false} (~2471, unchanged line, no write), archive = PATCH /:id/archive {archived false} (~2418), status = PATCH /:id/status {status open} on an open task (~2244, then the display branch ~2287), subtask = POST /tasks {title, parent_task_id} (~1399, ok 201, the subtask is deleted), remove = DELETE /:id (~2529, the row and its assignments go back with the same id). next_due_date = PATCH /:id/status {status done} on wtask.chain.origin (shared, weekly) whose followup wtask.chain.followup (admin, private) already exists: next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter ~1860: display reads visibility all, people mayAccessTask); the display names done_by_user_id = admin; the origin is reopened and its completion row deleted after each 200',
-  row_rules_series: 'series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=' + SERIES_DAYS + ' from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day created by its owner through PUT /calendar/:id/occurrences/:day. capabilities = GET /calendar over the series days as { visible, can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written ("past the checks"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found = 404 calendar_series_not_found / calendar_event_not_found',
+  row_rules_task_writes: 'wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description "- [ ] mx item", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branch of PATCH /:id/status, tasks.js ~2287, answers for no task because mayAccessTask runs first). One cell per mayAccessTask call site: completions = GET /:id/completions (~2604), check = PATCH /:id/check {line 0, checked false} (~2471, unchanged line, no write), archive = PATCH /:id/archive {archived false} (~2418), status = PATCH /:id/status {status open} on an open task (~2244, then the display branch ~2287), subtask = POST /tasks {title, parent_task_id} (~1399, ok 201, the subtask is deleted), remove = DELETE /:id (~2529, the row and its assignments go back with the same id). next_due_date / next_due_date_all / next_due_date_assignees = PATCH /:id/status {status done} on wtask.chain.origin / wtask.chain-all.origin / wtask.chain-assignees.origin (shared, weekly) whose followup already exists: wtask.chain.followup (admin, private), wtask.chain-all.followup (admin, all), wtask.chain-assignees.followup (admin, assignees, assigned to OTHER_OF.admin = member); next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter ~1860: display reads visibility all, people mayAccessTask); the display names done_by_user_id = admin; each origin is reopened and its completion row deleted after each 200',
+  row_rules_series: 'series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=' + SERIES_DAYS + ' from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day, seeded directly in the shape PUT /calendar/:id/occurrences/:day writes (recurrence_parent_id, recurrence_id, overridden_fields, series_authored 1, the series\' assignment rows copied, the exception row on the master; not through the route, which runs the rule under test); the occurrence of a private or assignees series is overridden to visibility all, so a viewer who may not see the series still gets the occurrence in GET /calendar and the capability map loads the hidden master itself (canOverrideOccurrence then hangs on actorCanSeeSeries alone). Plus series.admin.assignees.unlinked (assigned to member) and series.member.private.unlinked without a linked occurrence: after the Outlook target they are local and not eligible, the only state in which can_detach can be true (a linked child makes it false for everyone). capabilities = GET /calendar over the series days as { visible (series with at least one row in the answer, a shared occurrence included), can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written ("past the checks"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found by row = 404 calendar_event_not_found (the occurrence row hidden) or calendar_series_not_found (the occurrence shared, its series hidden); the unlinked series have no linked_* answer',
+  row_rules_coverage: 'what the cells do NOT measure: exceptions_post reaches only loadVisibleEvent and refuseForeignEvent (calendar/crud.js ~1967); isEligibleLocalSeries there only supplies the reason for a series that is not locally owned, so the cell is no evidence for actorCanSeeSeries. canDetachOccurrence (~686-688) is measured only in the stricter direction: a row of a series without a linked child reaches a viewer only when the master itself is visible, which is the same rule as actorCanSeeSeries; a looser actorCanSeeSeries cannot show there. quick_links.overview_household is empty for every role that reads it: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks, so householdAudienceAnswer() keeps the empty form',
   row_rules_outlook: 'series_outlook_target = the capabilities cell again after seedOutlookTarget: one outlook_accounts row (auto_sync_calendar_id, owner_user_id = ' + OUTLOOK_TARGET_OWNER + ') with one outlook_calendar_selection row (enabled 1, can_edit 1); MS_CLIENT_ID / MS_CLIENT_SECRET / MS_REDIRECT_URI are pinned empty, so the sync tick returns before any request. outlook_classification = classifyLocalSeries (exported production function) per series before and after the target: the calendar answer shows eligibility only through can_override_occurrence',
 };
 
@@ -1259,8 +1295,11 @@ if (UPDATE) {
   rowRules.outlook_classification = Object.fromEntries(Object.entries(measuredRowRules.outlook_classification)
     .map(([name, value]) => [name, withAnnotations(expected?.row_rules?.outlook_classification?.[name], value)]));
   const file = sortKeys({ _meta: meta, cells, modules, unknown_account: unknownAccount, row_rules: rowRules });
-  writeFileSync(DATA_FILE, `${JSON.stringify(file, null, 2)}\n`);
-  expected = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
+  // A flagged answer must not land in the data file: the run is red, the file stays.
+  if (unexpected.length === 0 && seen429.length === 0) {
+    writeFileSync(DATA_FILE, `${JSON.stringify(file, null, 2)}\n`);
+    expected = JSON.parse(readFileSync(DATA_FILE, 'utf8'));
+  }
 }
 
 // --------------------------------------------------------------------------

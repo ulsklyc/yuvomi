@@ -11,12 +11,13 @@
     "mcp": "list_tasks with include_future=true, list_upcoming_events with limit=100; the bridge calls call_api_operation with method GET and the /api/v1 path of each list route; a refused call is { status: tool_error, reason }",
     "role_accounts": "token_read / token_write / token_unscoped act for the member account",
     "row_rules": "row_rules holds the JavaScript row checks outside server/authorize (phase 2, B8a). Its rows are seeded AFTER every read path and the module level were measured and BEFORE the medication run (seedRowRules in the seed file); they are not in seed_counts and no read-path cell sees them. Blocks quick_links, task_writes, series and series_outlook_target are keyed by role (all ten), then by cell; outlook_classification is keyed by series. One cell = one leaf under a role (or one series in outlook_classification). Every block sends from its own client address 10.10.<role>.<block>; setup requests from 10.10.250.x",
-    "row_rules_cells": "write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route's success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route's own reason, refused = any 403; any other answer fails the suite",
+    "row_rules_cells": "write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route's success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route's own reason (a route with two 404 reasons keeps them by row: not_found: { row: reason }), refused = any 403; any other answer fails the suite. The reads (list, overview, capabilities) accept 200 and the gate's 403; anything else is flagged, also in update mode",
+    "row_rules_coverage": "what the cells do NOT measure: exceptions_post reaches only loadVisibleEvent and refuseForeignEvent (calendar/crud.js ~1967); isEligibleLocalSeries there only supplies the reason for a series that is not locally owned, so the cell is no evidence for actorCanSeeSeries. canDetachOccurrence (~686-688) is measured only in the stricter direction: a row of a series without a linked child reaches a viewer only when the master itself is visible, which is the same rule as actorCanSeeSeries; a looser actorCanSeeSeries cannot show there. quick_links.overview_household is empty for every role that reads it: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks, so householdAudienceAnswer() keeps the empty form",
     "row_rules_display": "the display writes like the wall: display cookie plus the session cookie and CSRF token its first GET below /api/v1 (GET /quick-links) handed out (csrfMiddleware keeps the token in req.session)",
     "row_rules_outlook": "series_outlook_target = the capabilities cell again after seedOutlookTarget: one outlook_accounts row (auto_sync_calendar_id, owner_user_id = member) with one outlook_calendar_selection row (enabled 1, can_edit 1); MS_CLIENT_ID / MS_CLIENT_SECRET / MS_REDIRECT_URI are pinned empty, so the sync tick returns before any request. outlook_classification = classifyLocalSeries (exported production function) per series before and after the target: the calendar answer shows eligibility only through can_override_occurrence",
     "row_rules_quick_links": "quicklink.<owner>.<all|private> for admin/member/child, seeded directly. list = GET /quick-links as { visible, editable (can_edit) }; overview / overview_household = the quicklinks row of GET /dashboard (personal, audience=household) in the same shape; change = PUT /quick-links/:id with {} (every field keeps its value, only updated_at moves), ok 200; remove = DELETE /quick-links/:id, ok 204, the row goes back with the same id and values after each 204; detail is n/a",
-    "row_rules_series": "series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=3 from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day created by its owner through PUT /calendar/:id/occurrences/:day. capabilities = GET /calendar over the series days as { visible, can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written (\"past the checks\"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found = 404 calendar_series_not_found / calendar_event_not_found",
-    "row_rules_task_writes": "wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description \"- [ ] mx item\", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branch of PATCH /:id/status, tasks.js ~2287, answers for no task because mayAccessTask runs first). One cell per mayAccessTask call site: completions = GET /:id/completions (~2604), check = PATCH /:id/check {line 0, checked false} (~2471, unchanged line, no write), archive = PATCH /:id/archive {archived false} (~2418), status = PATCH /:id/status {status open} on an open task (~2244, then the display branch ~2287), subtask = POST /tasks {title, parent_task_id} (~1399, ok 201, the subtask is deleted), remove = DELETE /:id (~2529, the row and its assignments go back with the same id). next_due_date = PATCH /:id/status {status done} on wtask.chain.origin (shared, weekly) whose followup wtask.chain.followup (admin, private) already exists: next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter ~1860: display reads visibility all, people mayAccessTask); the display names done_by_user_id = admin; the origin is reopened and its completion row deleted after each 200",
+    "row_rules_series": "series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=3 from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day, seeded directly in the shape PUT /calendar/:id/occurrences/:day writes (recurrence_parent_id, recurrence_id, overridden_fields, series_authored 1, the series' assignment rows copied, the exception row on the master; not through the route, which runs the rule under test); the occurrence of a private or assignees series is overridden to visibility all, so a viewer who may not see the series still gets the occurrence in GET /calendar and the capability map loads the hidden master itself (canOverrideOccurrence then hangs on actorCanSeeSeries alone). Plus series.admin.assignees.unlinked (assigned to member) and series.member.private.unlinked without a linked occurrence: after the Outlook target they are local and not eligible, the only state in which can_detach can be true (a linked child makes it false for everyone). capabilities = GET /calendar over the series days as { visible (series with at least one row in the answer, a shared occurrence included), can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written (\"past the checks\"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found by row = 404 calendar_event_not_found (the occurrence row hidden) or calendar_series_not_found (the occurrence shared, its series hidden); the unlinked series have no linked_* answer",
+    "row_rules_task_writes": "wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description \"- [ ] mx item\", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branch of PATCH /:id/status, tasks.js ~2287, answers for no task because mayAccessTask runs first). One cell per mayAccessTask call site: completions = GET /:id/completions (~2604), check = PATCH /:id/check {line 0, checked false} (~2471, unchanged line, no write), archive = PATCH /:id/archive {archived false} (~2418), status = PATCH /:id/status {status open} on an open task (~2244, then the display branch ~2287), subtask = POST /tasks {title, parent_task_id} (~1399, ok 201, the subtask is deleted), remove = DELETE /:id (~2529, the row and its assignments go back with the same id). next_due_date / next_due_date_all / next_due_date_assignees = PATCH /:id/status {status done} on wtask.chain.origin / wtask.chain-all.origin / wtask.chain-assignees.origin (shared, weekly) whose followup already exists: wtask.chain.followup (admin, private), wtask.chain-all.followup (admin, all), wtask.chain-assignees.followup (admin, assignees, assigned to OTHER_OF.admin = member); next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter ~1860: display reads visibility all, people mayAccessTask); the display names done_by_user_id = admin; each origin is reopened and its completion row deleted after each 200",
     "seed_counts": {
       "activities": 6,
       "budget": 9,
@@ -4265,6 +4266,16 @@
           "reason": null
         }
       },
+      "series.admin.assignees.unlinked": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
       "series.admin.private": {
         "after": {
           "eligible": true,
@@ -4334,6 +4345,16 @@
           "eligible": true,
           "reason": null
         }
+      },
+      "series.member.private.unlinked": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
       }
     },
     "quick_links": {
@@ -4383,6 +4404,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4442,6 +4464,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4517,6 +4540,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4566,6 +4590,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4623,6 +4648,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4690,6 +4716,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4774,6 +4801,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4831,6 +4859,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4904,6 +4933,7 @@
         },
         "overview_household": {
           "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
           "visible": []
         },
         "remove": {
@@ -4935,6 +4965,7 @@
           "can_override": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.all",
             "series.member.all"
@@ -4942,9 +4973,14 @@
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.all",
-            "series.member.all"
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
           ]
         },
         "exceptions_post": {
@@ -4952,23 +4988,26 @@
             "series.child.assignees",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.all",
             "series.member.all"
           ]
         },
         "linked_delete": {
-          "not_found": [
-            "series.child.assignees",
-            "series.child.private",
-            "series.member.assignees",
-            "series.member.private"
-          ],
+          "not_found": {
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found",
+            "series.member.assignees": "calendar_series_not_found",
+            "series.member.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
@@ -4978,12 +5017,12 @@
           ]
         },
         "linked_put": {
-          "not_found": [
-            "series.child.assignees",
-            "series.child.private",
-            "series.member.assignees",
-            "series.member.private"
-          ],
+          "not_found": {
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found",
+            "series.member.assignees": "calendar_series_not_found",
+            "series.member.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
@@ -4997,11 +5036,13 @@
             "series.child.assignees",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.all",
             "series.member.all"
@@ -5012,11 +5053,13 @@
             "series.child.assignees",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.all",
             "series.member.all"
@@ -5027,11 +5070,13 @@
             "series.child.assignees",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.all",
             "series.member.all"
@@ -5042,11 +5087,13 @@
             "series.child.assignees",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.all",
             "series.member.all"
@@ -5064,19 +5111,27 @@
           ],
           "visible": [
             "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
             "series.child.all",
             "series.child.assignees",
-            "series.member.all"
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
           ]
         },
         "exceptions_post": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "ok": [
             "series.admin.all",
             "series.child.all",
@@ -5085,13 +5140,13 @@
           ]
         },
         "linked_delete": {
-          "not_found": [
-            "series.admin.assignees",
-            "series.admin.private",
-            "series.child.private",
-            "series.member.assignees",
-            "series.member.private"
-          ],
+          "not_found": {
+            "series.admin.assignees": "calendar_series_not_found",
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found",
+            "series.member.assignees": "calendar_series_not_found",
+            "series.member.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.child.all",
@@ -5100,13 +5155,13 @@
           ]
         },
         "linked_put": {
-          "not_found": [
-            "series.admin.assignees",
-            "series.admin.private",
-            "series.child.private",
-            "series.member.assignees",
-            "series.member.private"
-          ],
+          "not_found": {
+            "series.admin.assignees": "calendar_series_not_found",
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found",
+            "series.member.assignees": "calendar_series_not_found",
+            "series.member.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.child.all",
@@ -5117,10 +5172,12 @@
         "occurrence_delete": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.admin.all",
@@ -5132,10 +5189,12 @@
         "occurrence_delete_following": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.admin.all",
@@ -5147,10 +5206,12 @@
         "occurrence_put": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.admin.all",
@@ -5162,10 +5223,12 @@
         "occurrence_put_following": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.private",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.admin.all",
@@ -5188,19 +5251,25 @@
           ],
           "visible": [
             "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
             "series.child.all",
             "series.child.assignees",
             "series.child.private",
             "series.member.all",
-            "series.member.assignees"
+            "series.member.assignees",
+            "series.member.private"
           ]
         },
         "exceptions_post": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "ok": [
             "series.child.all",
             "series.child.assignees",
@@ -5216,11 +5285,7 @@
           }
         },
         "linked_delete": {
-          "not_found": [
-            "series.admin.assignees",
-            "series.admin.private",
-            "series.member.private"
-          ],
+          "not_found": {},
           "ok": [
             "series.child.all",
             "series.child.assignees",
@@ -5232,15 +5297,23 @@
             "series.admin.all": {
               "reason": "not_owner",
               "status": 403
+            },
+            "series.admin.assignees": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.admin.private": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.member.private": {
+              "reason": "not_owner",
+              "status": 403
             }
           }
         },
         "linked_put": {
-          "not_found": [
-            "series.admin.assignees",
-            "series.admin.private",
-            "series.member.private"
-          ],
+          "not_found": {},
           "ok": [
             "series.child.all",
             "series.child.assignees",
@@ -5250,6 +5323,18 @@
           ],
           "refused": {
             "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.admin.assignees": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.admin.private": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.member.private": {
               "reason": "not_owner",
               "status": 403
             }
@@ -5258,8 +5343,10 @@
         "occurrence_delete": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.child.all",
@@ -5278,8 +5365,10 @@
         "occurrence_delete_following": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.child.all",
@@ -5298,8 +5387,10 @@
         "occurrence_put": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.child.all",
@@ -5318,8 +5409,10 @@
         "occurrence_put_following": {
           "not_found": [
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "ok": [
             "series.child.all",
@@ -5346,11 +5439,18 @@
           ],
           "visible": [
             "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
             "series.child.all",
-            "series.member.all"
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
           ]
         },
         "exceptions_post": {
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "reason": "token_scope",
           "status": 403
         },
@@ -5385,18 +5485,25 @@
           "can_override": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
             "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "exceptions_post": {
@@ -5405,21 +5512,24 @@
             "series.child.assignees",
             "series.child.private"
           ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "linked_delete": {
-          "not_found": [
-            "series.admin.private",
-            "series.child.assignees",
-            "series.child.private"
-          ],
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
@@ -5430,11 +5540,11 @@
           ]
         },
         "linked_put": {
-          "not_found": [
-            "series.admin.private",
-            "series.child.assignees",
-            "series.child.private"
-          ],
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
@@ -5453,10 +5563,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_delete_following": {
@@ -5468,10 +5580,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_put": {
@@ -5483,10 +5597,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_put_following": {
@@ -5498,10 +5614,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         }
       },
@@ -5511,6 +5629,7 @@
           "status": 403
         },
         "exceptions_post": {
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "reason": "module_access_denied",
           "status": 403
         },
@@ -5545,6 +5664,7 @@
           "status": 403
         },
         "exceptions_post": {
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "reason": "split_guest_scope",
           "status": 403
         },
@@ -5579,21 +5699,29 @@
           "can_override": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
             "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "exceptions_post": {
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "reason": "token_scope",
           "status": 403
         },
@@ -5628,18 +5756,25 @@
           "can_override": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
             "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "exceptions_post": {
@@ -5648,21 +5783,24 @@
             "series.child.assignees",
             "series.child.private"
           ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "linked_delete": {
-          "not_found": [
-            "series.admin.private",
-            "series.child.assignees",
-            "series.child.private"
-          ],
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
@@ -5673,11 +5811,11 @@
           ]
         },
         "linked_put": {
-          "not_found": [
-            "series.admin.private",
-            "series.child.assignees",
-            "series.child.private"
-          ],
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
@@ -5696,10 +5834,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_delete_following": {
@@ -5711,10 +5851,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_put": {
@@ -5726,10 +5868,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_put_following": {
@@ -5741,10 +5885,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         }
       },
@@ -5754,18 +5900,25 @@
           "can_override": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
             "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "exceptions_post": {
@@ -5774,21 +5927,24 @@
             "series.child.assignees",
             "series.child.private"
           ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for actorCanSeeSeries.",
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "linked_delete": {
-          "not_found": [
-            "series.admin.private",
-            "series.child.assignees",
-            "series.child.private"
-          ],
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
@@ -5799,11 +5955,11 @@
           ]
         },
         "linked_put": {
-          "not_found": [
-            "series.admin.private",
-            "series.child.assignees",
-            "series.child.private"
-          ],
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
@@ -5822,10 +5978,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_delete_following": {
@@ -5837,10 +5995,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_put": {
@@ -5852,10 +6012,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         },
         "occurrence_put_following": {
@@ -5867,10 +6029,12 @@
           "ok": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.child.all",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         }
       }
@@ -5878,16 +6042,23 @@
     "series_outlook_target": {
       "admin": {
         "capabilities": {
-          "can_detach": [],
+          "can_detach": [
+            "series.admin.assignees.unlinked"
+          ],
           "can_override": [
             "series.admin.private"
           ],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
             "series.admin.private",
             "series.child.all",
-            "series.member.all"
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
           ]
         }
       },
@@ -5899,9 +6070,14 @@
           ],
           "visible": [
             "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
             "series.child.all",
             "series.child.assignees",
-            "series.member.all"
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
           ]
         }
       },
@@ -5914,11 +6090,14 @@
           ],
           "visible": [
             "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
             "series.child.all",
             "series.child.assignees",
             "series.child.private",
             "series.member.all",
-            "series.member.assignees"
+            "series.member.assignees",
+            "series.member.private"
           ]
         }
       },
@@ -5928,22 +6107,36 @@
           "can_override": [],
           "visible": [
             "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
             "series.child.all",
-            "series.member.all"
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
           ]
         }
       },
       "member": {
         "capabilities": {
-          "can_detach": [],
+          "can_detach": [
+            "series.admin.assignees.unlinked",
+            "series.member.private.unlinked"
+          ],
           "can_override": [],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
             "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         }
       },
@@ -5961,43 +6154,67 @@
       },
       "token_read": {
         "capabilities": {
-          "can_detach": [],
+          "can_detach": [
+            "series.admin.assignees.unlinked",
+            "series.member.private.unlinked"
+          ],
           "can_override": [],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
             "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         }
       },
       "token_unscoped": {
         "capabilities": {
-          "can_detach": [],
+          "can_detach": [
+            "series.admin.assignees.unlinked",
+            "series.member.private.unlinked"
+          ],
           "can_override": [],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
             "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         }
       },
       "token_write": {
         "capabilities": {
-          "can_detach": [],
+          "can_detach": [
+            "series.admin.assignees.unlinked",
+            "series.member.private.unlinked"
+          ],
           "can_override": [],
           "visible": [
             "series.admin.all",
             "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
             "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
             "series.member.all",
             "series.member.assignees",
-            "series.member.private"
+            "series.member.private",
+            "series.member.private.unlinked"
           ]
         }
       }
@@ -6056,6 +6273,14 @@
           "next": "wtask.chain.followup",
           "status": 200
         },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": "wtask.chain-assignees.followup",
+          "status": 200
+        },
         "remove": {
           "not_found": [
             "wtask.child.assignees",
@@ -6155,6 +6380,14 @@
           ]
         },
         "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
           "next": null,
           "status": 200
         },
@@ -6260,6 +6493,14 @@
           "next": null,
           "status": 200
         },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": null,
+          "status": 200
+        },
         "remove": {
           "not_found": [
             "wtask.admin.assignees",
@@ -6335,6 +6576,14 @@
           ]
         },
         "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
           "next": null,
           "status": 200
         },
@@ -6427,6 +6676,14 @@
           "next": null,
           "status": 200
         },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": "wtask.chain-assignees.followup",
+          "status": 200
+        },
         "remove": {
           "not_found": [
             "wtask.admin.assignees.display",
@@ -6493,6 +6750,14 @@
           "reason": "module_access_denied",
           "status": 403
         },
+        "next_due_date_all": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "next_due_date_assignees": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
         "remove": {
           "reason": "module_access_denied",
           "status": 403
@@ -6520,6 +6785,14 @@
           "status": 403
         },
         "next_due_date": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "next_due_date_all": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "next_due_date_assignees": {
           "reason": "split_guest_scope",
           "status": 403
         },
@@ -6562,6 +6835,14 @@
           ]
         },
         "next_due_date": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "next_due_date_all": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "next_due_date_assignees": {
           "reason": "token_scope",
           "status": 403
         },
@@ -6629,6 +6910,14 @@
         },
         "next_due_date": {
           "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": "wtask.chain-assignees.followup",
           "status": 200
         },
         "remove": {
@@ -6731,6 +7020,14 @@
         },
         "next_due_date": {
           "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": "wtask.chain-assignees.followup",
           "status": 200
         },
         "remove": {
