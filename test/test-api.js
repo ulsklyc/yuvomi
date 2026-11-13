@@ -917,6 +917,12 @@ const REASONS_PASSED_THROUGH = new Map([
   // Die zweite Stelle ist die Logzeile daneben, keine Antwort.
   ['auth.js: err.reason', { sites: 2, at403: [], why: 'Gravatar-Import: 400/404/413/415/502 oder 500, nie 403' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  // MCP (#2616): KEINE Antwort, sondern der fuer das LLM sichtbare Text eines
+  // ToolError - `<error> [reason: <REASON>]`. Der Grund stammt aus der Antwort
+  // DER ROUTE, die ihn selbst als Literal sendet (jeder Status, 403 inbegriffen);
+  // diese Stelle haengt ihn nur an einen Satz an und sendet nichts.
+  ['mcp/tools.js: ${reason}', { sites: 1, at403: [],
+    why: 'keine Antwort; angehaengt an die Meldung eines ToolError, der Grund kommt aus der Routenantwort' }],
   ['routes/calendar/local-calendars.js: withReason.reason', { sites: 1, at403: [],
     why: 'sendValidationErrors: feste 400 (calendar_name_invalid)' }],
   // SMTP (Re-Critique 2026-10-17): die Absage beim Speichern und der Fall der
