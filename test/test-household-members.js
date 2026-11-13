@@ -872,3 +872,208 @@ test('auth: othersCanRead names the modules another account can read, staff incl
       .run(String(BEN), String(CLARA));
   }
 });
+
+// --------------------------------------------------------------------------
+// Phase 2 B9: the rights questions of othersCanRead and displayActingPerson
+// against server/authorize/. Each table holds three things per row: the answer
+// of the production path, a literal expectation, and the answer the question to
+// server/authorize/ gives for the same accounts.
+// --------------------------------------------------------------------------
+
+const authorizeApi = await import('../server/authorize/index.ts');
+const { displayActingPerson } = await import('../server/services/display-acting.js');
+
+const PRIVACY_KEYS = ['calendar', 'documents', 'tasks'];
+const LEVELS = ['write', 'read', 'none', 'absent'];
+
+/**
+ * One module row for a user or a role profile; 'absent' deletes it.
+ * @param {string} subjectType @param {number|string} subjectId @param {string} key @param {string} level
+ */
+function setModuleRow(subjectType, subjectId, key, level) {
+  db.prepare(`DELETE FROM access_permissions WHERE subject_type = ? AND subject_id = ? AND resource_type = 'module' AND resource_key = ?`)
+    .run(subjectType, String(subjectId), key);
+  if (level === 'absent') return;
+  db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access) VALUES (?, ?, 'module', ?, ?)`)
+    .run(subjectType, String(subjectId), key, level);
+}
+
+/**
+ * Temporary account rows for one test; removed again in `finally`.
+ * @param {string} username
+ * @param {{ role?: string, familyRole?: string, display?: boolean, deactivated?: boolean }} [options]
+ */
+function tempAccount(username, { role = 'member', familyRole = 'other', display = false, deactivated = false } = {}) {
+  const id = addUser(username, username, role, familyRole);
+  if (display) db.prepare('INSERT INTO display_accounts (user_id) VALUES (?)').run(id);
+  if (deactivated) db.prepare("UPDATE users SET deactivated_at = '2026-01-01T00:00:00Z' WHERE id = ?").run(id);
+  ROLE[id] = role;
+  return id;
+}
+/** @param {number[]} ids */
+function dropAccounts(ids) {
+  for (const id of ids) {
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?`).run(String(id));
+    db.prepare('DELETE FROM display_accounts WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    delete ROLE[id];
+  }
+}
+
+/**
+ * The question to server/authorize/ for othersCanRead: per other active account
+ * (family or display) ONE resolution with the display flag, then authorize(read)
+ * per key. Written from the public pieces, not from the production function.
+ * @param {number} viewerId
+ */
+function othersCanReadByAuthorize(viewerId) {
+  const others = db.prepare(`
+    SELECT u.id, u.role, u.family_role,
+      EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = u.id) AS is_display
+    FROM users u
+    WHERE u.id != ? AND u.deactivated_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
+  `).all(viewerId);
+  const actors = others.map((/** @type {any} */ other) => ({
+    kind: 'system', userId: other.id, role: other.role, familyRole: other.family_role, scopes: null,
+    moduleAccess: authorizeApi.buildSessionModuleAccess(
+      authorizeApi.resolvePermissions(db, other, { isDisplay: other.is_display === 1 })),
+    deviceId: null, unresolved: false,
+  }));
+  return PRIVACY_KEYS.filter((key) => actors.some((/** @type {any} */ actor) => authorizeApi.authorize(actor, 'read', { module: key }).allowed));
+}
+
+test('B9: othersCanRead per kind of other account and level - production, literal, authorize agree', async () => {
+  const readersAs = async (/** @type {number} */ viewer) => {
+    const me = await call('GET', '/auth/me', { as: viewer });
+    assert.equal(me.status, 200);
+    return me.body.othersCanRead;
+  };
+  const ALL = PRIVACY_KEYS;
+  const DISPLAY_READS = ['calendar', 'tasks']; // DISPLAY_SCOPE_MODULES among the three
+  /** @type {number[]} */
+  const created = [];
+  const rows = [];
+  try {
+    // Baseline: nobody but the subject of a row reads anything. Anna is the viewer
+    // unless the subject is the admin herself; Ben and Clara are closed per row.
+    for (const key of ALL) { setModuleRow('user', BEN, key, 'none'); setModuleRow('user', CLARA, key, 'none'); }
+    assert.deepEqual(await readersAs(ANNA), [], 'baseline: guests and closed accounts read nothing');
+
+    /** subject, viewer, levels per key -> expected */
+    const cases = [];
+    for (const level of LEVELS) {
+      const open = level === 'none' ? [] : ALL;
+      cases.push({ kind: 'family member', subject: BEN, viewer: ANNA, levels: [level, level, level], expected: open });
+      cases.push({ kind: 'family staff', subject: CLARA, viewer: ANNA, levels: [level, level, level], expected: open });
+      cases.push({ kind: 'family admin', subject: ANNA, viewer: BEN, levels: [level, level, level], expected: ALL });
+      cases.push({ kind: 'display', subject: 'display', viewer: ANNA, levels: [level, level, level], expected: DISPLAY_READS });
+      cases.push({ kind: 'split guest', subject: DORA, viewer: ANNA, levels: [level, level, level], expected: [] });
+      cases.push({ kind: 'deactivated', subject: 'former', viewer: ANNA, levels: [level, level, level], expected: [] });
+    }
+    cases.push({ kind: 'family member', subject: BEN, viewer: ANNA, levels: ['none', 'read', 'absent'], expected: ['documents', 'tasks'] });
+    cases.push({ kind: 'family member', subject: BEN, viewer: ANNA, levels: ['write', 'none', 'none'], expected: ['calendar'] });
+    cases.push({ kind: 'display', subject: 'display', viewer: ANNA, levels: ['none', 'write', 'none'], expected: DISPLAY_READS });
+
+    // The display and the deactivated account exist only for their own rows: a
+    // display reads calendar and tasks whatever its rows say.
+    let seq = 0;
+    const makeSubject = (/** @type {number|string} */ subject) => {
+      if (typeof subject === 'number') return subject;
+      seq += 1;
+      const id = tempAccount(`b9${subject}${seq}`, { display: subject === 'display', deactivated: subject === 'former' });
+      created.push(id);
+      return id;
+    };
+    for (const spec of cases) {
+      const c = { ...spec, subject: makeSubject(spec.subject) };
+      const before = PRIVACY_KEYS.map((key) => db.prepare(`SELECT access FROM access_permissions WHERE subject_type = 'user' AND subject_id = ? AND resource_type = 'module' AND resource_key = ?`).get(String(c.subject), key)?.access ?? 'absent');
+      PRIVACY_KEYS.forEach((key, i) => setModuleRow('user', c.subject, key, c.levels[i]));
+      // Ben is closed in the baseline; as the viewer of the admin row he does not count.
+      const production = await readersAs(c.viewer);
+      const byAuthorize = othersCanReadByAuthorize(c.viewer);
+      rows.push(c);
+      const label = `${c.kind} ${c.levels.join('/')}`;
+      assert.deepEqual(production, c.expected, `${label}: production`);
+      assert.deepEqual(byAuthorize, c.expected, `${label}: authorize`);
+      PRIVACY_KEYS.forEach((key, i) => setModuleRow('user', c.subject, key, before[i]));
+      if (c.subject !== spec.subject) dropAccounts(created.splice(created.indexOf(c.subject), 1));
+    }
+    assert.equal(rows.length, 27, 'the table has 27 rows');
+  } finally {
+    dropAccounts(created);
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'user' AND resource_type = 'module' AND subject_id IN (?, ?, ?, ?)`)
+      .run(String(ANNA), String(BEN), String(CLARA), String(DORA));
+  }
+});
+
+test('B9: displayActingPerson per role, family role, level and module - production, literal, authorize agree', () => {
+  const NO_ACCESS = {
+    ok: false, status: 403,
+    error: 'The selected person does not have access to this module.',
+    reason: 'acting_person_no_access',
+  };
+  const notMember = (/** @type {number} */ id) => ({ ok: false, status: 400, error: `Only household members can be chosen here - user ${id} is not a household member.` });
+  /** @type {number[]} */
+  const created = [];
+  let rowCount = 0;
+  try {
+    const people = {
+      'admin/parent': tempAccount('b9adminparent', { role: 'admin', familyRole: 'parent' }),
+      'member/parent': tempAccount('b9memberparent', { role: 'member', familyRole: 'parent' }),
+      'member/child': tempAccount('b9memberchild', { role: 'member', familyRole: 'child' }),
+      'member/other': tempAccount('b9memberother', { role: 'member', familyRole: 'other' }),
+    };
+    created.push(...Object.values(people));
+    // Role profile rows: `child` may only read tasks and has no rewards.
+    /** @type {Record<string, Record<string, string>>} */
+    const PROFILE = { child: { tasks: 'read', rewards: 'none' } };
+    for (const [familyRole, rights] of Object.entries(PROFILE)) {
+      for (const [key, level] of Object.entries(rights)) setModuleRow('role', familyRole, key, level);
+    }
+
+    for (const [name, id] of Object.entries(people)) {
+      const [role, familyRole] = name.split('/');
+      for (const moduleKey of /** @type {const} */ (['tasks', 'rewards'])) {
+        for (const level of LEVELS) {
+          setModuleRow('user', id, moduleKey, level);
+          const effective = level === 'absent' ? (PROFILE[familyRole]?.[moduleKey] ?? 'write') : level;
+          const expected = role === 'admin' || effective === 'write' ? { ok: true, userId: id } : NO_ACCESS;
+          const production = displayActingPerson({}, id, moduleKey, { db });
+          const actor = authorizeApi.actorForUser(db, id);
+          const verdict = authorizeApi.authorize(actor, 'write', { module: moduleKey });
+          const byAuthorize = verdict.allowed ? { ok: true, userId: id } : NO_ACCESS;
+          const label = `${name} ${moduleKey} ${level}`;
+          assert.deepEqual(production, expected, `${label}: production`);
+          assert.deepEqual(byAuthorize, expected, `${label}: authorize`);
+          rowCount += 1;
+          setModuleRow('user', id, moduleKey, 'absent');
+        }
+      }
+    }
+
+    // Accounts that never reach the rights question: the household-member check
+    // answers first, with the same 400 for each. With `write` everywhere, so the
+    // refusal cannot come from the module.
+    const display = tempAccount('b9actdisplay', { display: true });
+    const former = tempAccount('b9actformer', { deactivated: true });
+    created.push(display, former);
+    for (const [name, id] of /** @type {[string, number][]} */ ([['staff', CLARA], ['split guest', DORA], ['display', display], ['deactivated', former]])) {
+      for (const moduleKey of /** @type {const} */ (['tasks', 'rewards'])) {
+        setModuleRow('user', id, moduleKey, 'write');
+        assert.deepEqual(displayActingPerson({}, id, moduleKey, { db }), notMember(id), `${name} ${moduleKey}`);
+        rowCount += 1;
+      }
+    }
+    assert.deepEqual(displayActingPerson({}, 999999, 'tasks', { db }), notMember(999999), 'unknown account');
+    assert.deepEqual(displayActingPerson({}, null, 'tasks', { db }),
+      { ok: false, status: 400, error: 'A paired display must name the person it is acting for.' }, 'no person');
+    rowCount += 2;
+    assert.equal(rowCount, 42, 'the table has 42 rows');
+  } finally {
+    dropAccounts(created);
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'role' AND subject_id = 'child' AND resource_type = 'module'`).run();
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'user' AND resource_type = 'module' AND subject_id IN (?, ?)`)
+      .run(String(CLARA), String(DORA));
+  }
+});

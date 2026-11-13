@@ -80,7 +80,6 @@ const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
 const { PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 const { MODULE_KEYS } = await import('../server/scopes.js');
 const { DISPLAY_COOKIE } = await import('../server/services/display-accounts.js');
-const { recipientDeniedModules } = await import('../server/services/reminder-origins.js');
 const { lacksHealth } = await import('../server/services/cycle-reminders.js');
 const { processDueMedications } = await import('../server/services/medication-scheduler.js');
 const { SEARCH_LIMIT } = await import('../server/services/search.js');
@@ -1191,12 +1190,11 @@ const measuredRowRules = await measureRowRules();
 const delivery = await measureMedicationDelivery();
 for (const role of ROLES) measured[role].due_reminders.medications = delivery[ACCOUNT_OF[role]];
 // The scheduler has no path for an account that does not exist (owner and
-// caregiver are foreign keys); recorded is what the two exported production
-// functions say about such an id.
+// caregiver are foreign keys); recorded is what the exported production
+// function says about such an id.
 const unknownAccountId = Number(db.prepare('SELECT COALESCE(MAX(id), 0) + 1000 AS id FROM users').get().id);
 const measuredUnknown = {
   health_predicates: {
-    recipientDeniedModulesIsNull: recipientDeniedModules(db, unknownAccountId) === null,
     notLacksHealth: !lacksHealth(db, unknownAccountId),
   },
 };
@@ -1258,7 +1256,7 @@ const meta = {
   dashboard_reads: 'once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read',
   due_reminders: 'one due reminder per task, event and document row for each of these accounts (created_by = caller): ' + seed.facts.reminderAccounts.join(', ') + '; document_expiry rows are seeded directly like the others; token roles read the member\'s rows',
   health_delivery: 'due_reminders / medications is measured on the production path: one processDueMedications() run (medication-scheduler.js) after every other measurement, every seeded medication with one active 00:00 schedule, push spy, no channels; hearsOwnDose = the account received a push for a medication it owns, hearsCaredForDose = for one it does not own (n/a without a care grant); notLacksHealth = !lacksHealth(db, id) (cycle-reminders.js ~71). caregiver, member_none, split_guest and display own one private medication each so they can be addressed',
-  health_unknown_account: 'unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded are the two exported production answers for such an id: recipientDeniedModulesIsNull (reminder-origins.js, null = drop the recipient) and notLacksHealth',
+  health_unknown_account: 'unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded is the exported production answer for such an id: notLacksHealth',
   mcp: 'list_tasks with include_future=true, list_upcoming_events with limit=100; the bridge calls call_api_operation with method GET and the /api/v1 path of each list route; a refused call is { status: tool_error, reason }',
   role_accounts: 'token_read / token_write / token_unscoped act for the member account',
   seed_counts: Object.fromEntries(TYPES.map((type) => [type, seed.rows[type].length])),

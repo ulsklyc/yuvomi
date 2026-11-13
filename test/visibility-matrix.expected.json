@@ -7,7 +7,7 @@
     "detail_statuses": "per route exactly three answers: its success status (200; thumbnail 415) = visible, 404 = not visible, 403 = refused; refusals next to visible rows stay in the cell as { visible, refused: { row: status } }",
     "due_reminders": "one due reminder per task, event and document row for each of these accounts (created_by = caller): admin, member, child, caregiver, member_none, split_guest, display; document_expiry rows are seeded directly like the others; token roles read the member's rows",
     "health_delivery": "due_reminders / medications is measured on the production path: one processDueMedications() run (medication-scheduler.js) after every other measurement, every seeded medication with one active 00:00 schedule, push spy, no channels; hearsOwnDose = the account received a push for a medication it owns, hearsCaredForDose = for one it does not own (n/a without a care grant); notLacksHealth = !lacksHealth(db, id) (cycle-reminders.js ~71). caregiver, member_none, split_guest and display own one private medication each so they can be addressed",
-    "health_unknown_account": "unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded are the two exported production answers for such an id: recipientDeniedModulesIsNull (reminder-origins.js, null = drop the recipient) and notLacksHealth",
+    "health_unknown_account": "unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded is the exported production answer for such an id: notLacksHealth",
     "mcp": "list_tasks with include_future=true, list_upcoming_events with limit=100; the bridge calls call_api_operation with method GET and the /api/v1 path of each list route; a refused call is { status: tool_error, reason }",
     "role_accounts": "token_read / token_write / token_unscoped act for the member account",
     "row_rules": "row_rules holds the JavaScript row checks outside server/authorize (phase 2, B8a). Its rows are seeded AFTER every read path and the module level were measured and BEFORE the medication run (seedRowRules in the seed file); they are not in seed_counts and no read-path cell sees them. Blocks quick_links, task_writes, series and series_outlook_target are keyed by role (all ten), then by cell; outlook_classification is keyed by series. One cell = one leaf under a role (or one series in outlook_classification). Every block sends from its own client address 10.10.<role>.<block>; setup requests from 10.10.250.x",
@@ -7083,8 +7083,7 @@
   },
   "unknown_account": {
     "health_predicates": {
-      "notLacksHealth": false,
-      "recipientDeniedModulesIsNull": true
+      "notLacksHealth": false
     }
   }
 }

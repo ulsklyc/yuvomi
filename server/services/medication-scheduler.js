@@ -20,7 +20,7 @@ import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
 import { defaultProviders, sendToChannel } from './channel-delivery.js';
 import { householdDisabledModules } from './household-modules.js';
-import { actorForUser, authorize } from '../authorize/index.ts';
+import { actorForUser, authorize, caregiversOf } from '../authorize/index.ts';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 
@@ -154,15 +154,6 @@ async function processDueMedicationsUntracked({
     WHERE s.active = 1 AND m.active = 1
   `).all();
 
-  // Caregivers of the affected person (#584). The grant is given per person by
-  // an admin and is never derived from a role - so it is looked up here
-  // exactly as when it is entered, not guessed from "is a parent". Until
-  // D#1041 the scheduler did not query the table at all: a child without a
-  // device got the reminder, the parents did not.
-  const caregiversOf = activeDb.prepare(
-    'SELECT caregiver_id FROM health_care_grants WHERE subject_id = ? ORDER BY caregiver_id'
-  );
-
   const findLog = activeDb.prepare(
     'SELECT id FROM medication_logs WHERE medication_id = ? AND schedule_id = ? AND scheduled_at = ?'
   );
@@ -215,7 +206,12 @@ async function processDueMedicationsUntracked({
   const deliveries = newlyDue.map((dose) => {
     const medBody = dose.medName || FALLBACK_BODY;
     const recipients = [{ userId: dose.ownerId, body: medBody }];
-    for (const { caregiver_id: caregiverId } of caregiversOf.all(dose.ownerId)) {
+    // Caregivers of the affected person (#584), by id (caregiversOf() in
+    // server/authorize/). The grant is given per person by an admin and is never
+    // derived from a role - so it is looked up exactly as when it is entered, not
+    // guessed from "is a parent". Until D#1041 the scheduler did not query the
+    // table at all: a child without a device got the reminder, the parents did not.
+    for (const caregiverId of caregiversOf(activeDb, dose.ownerId)) {
       if (caregiverId === dose.ownerId) continue;
       recipients.push({ userId: caregiverId, body: `${dose.ownerName}: ${medBody}` });
     }

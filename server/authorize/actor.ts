@@ -10,6 +10,8 @@
  *     lookups that decide the kind (split guest, display account).
  *   - actorForUser(database, userId): the actor without a request (scheduler, push,
  *     feeds), from the `users` row and the permission matrix.
+ *   - actorForAccount(database, row, { isDisplay }): the same from a `users` row the
+ *     caller has already loaded, with the display flag (B9).
  *   - householdAudience(): the household as a whole, no account behind it.
  *
  * resolveRequestModuleAccess(database, req) is the module-rights resolution
@@ -53,7 +55,7 @@ type AuthenticatedRequest = {
 type Database = Parameters<typeof resolvePermissions>[0];
 
 // `family_role` is NULL in the database for some accounts; typed optional to match resolvePermissions().
-type UserRow = { id: number; role: string; family_role?: string };
+type UserRow = { id: number; role: string; family_role?: string | null };
 
 // Kept per request object, not as a field on it: nothing else can read or overwrite
 // them, and they go with the request. `requests` is written by
@@ -241,6 +243,30 @@ export function actorForUser(database: Database, userId: number | null | undefin
     familyRole: user.family_role ?? null,
     scopes: null,
     moduleAccess: buildSessionModuleAccess(resolvePermissions(database, user)),
+    deviceId: null,
+    unresolved: false,
+  });
+}
+
+/**
+ * The actor of an account row the caller has already loaded (B9; othersCanRead in
+ * server/auth.js): no second `users` query, module rights from ONE resolution with
+ * the display flag the caller knows. Unlike actorForUser() a display is resolved as
+ * a display (#1208) and gets `kind: 'display'`; every other row is `system`.
+ * Not classified as a guest: the caller decides which rows it asks about.
+ */
+export function actorForAccount(
+  database: Database,
+  user: UserRow,
+  { isDisplay = false }: { isDisplay?: boolean } = {},
+): Actor {
+  return Object.freeze({
+    kind: isDisplay ? 'display' : 'system',
+    userId: user.id,
+    role: roleOf(user.role),
+    familyRole: user.family_role ?? null,
+    scopes: null,
+    moduleAccess: buildSessionModuleAccess(resolvePermissions(database, user, { isDisplay })),
     deviceId: null,
     unresolved: false,
   });

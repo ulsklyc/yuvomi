@@ -121,8 +121,8 @@ const ACTORS = [
 
 /**
  * THE OLD RULES, written out: what toolAllowed (server/mcp/tools.js) asked for
- * read/write, and what recipientDeniedModules() + deniedModules() said to the
- * delivery and the feeds for receive.
+ * read/write, and what the recipient's deniedModules() said to the delivery and
+ * the feeds for receive (the helper in services/reminder-origins.js, removed in B9).
  * @param {any} actor @param {string} action @param {string} key
  */
 function oracle(actor, action, key) {
