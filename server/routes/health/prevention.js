@@ -8,7 +8,7 @@
  * Jahre und ein Zahnarzttermin alle 6 Monate sind dieselbe Zeile - Person + Art
  * + wann es war + Intervall zum nächsten Mal.
  *
- * Sichtbarkeit/Betreuung folgen exakt dem Muster von vitals.js - `helpers.js`
+ * Sichtbarkeit/Betreuung folgen exakt dem Muster von vitals.js - `authorize/care.ts`
  * ist die einzige Stelle, an der die Klausel gebaut werden darf (#884).
  */
 
@@ -22,9 +22,10 @@ import { computeDueForUser } from '../../services/prevention-due.js';
 import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
 import {
   log, VISIBILITIES,
-  viewerId, careAwareClause, applyUpdate, badRequest,
-  resolveOwner, writableClause, canWriteFor,
+  viewerId, applyUpdate, badRequest,
+  resolveOwner,
 } from './helpers.js';
+import { canWriteFor, careAwareClause, writableClause } from '../../authorize/index.ts';
 
 const router = express.Router();
 
@@ -364,10 +365,10 @@ router.get('/prevention/due', (req, res) => {
     const today = todayKey(db.get(), new Date());
     let items = computeDueForUser(db.get(), personId, today);
 
-    if (!canWriteFor(viewer, personId)) {
+    if (!canWriteFor(db.get(), viewer, personId)) {
       // Ohne Betreuung nur, was der Eigentuemer als familiensichtbar markiert
       // hat - dieselbe Grenze wie careAwareClause() fuer die Datensaetze
-      // selbst (helpers.js), hier auf den je Typ juengsten Datensatz
+      // selbst (authorize/care.ts), hier auf den je Typ juengsten Datensatz
       // angewandt statt sie ein zweites Mal zu formulieren. computeDueForUser()
       // liest die Sichtbarkeit ohnehin schon je Datensatz mit, kein zweiter
       // Query pro Eintrag noetig.

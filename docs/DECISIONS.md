@@ -76,8 +76,9 @@ One rule, one place, so a future change cannot be forgotten in a copy:
   the server and without an admin bypass (#474); the one deliberate exception is the personal ICS
   feed, an export of the household calendar that only drops other members' unshared ICS
   subscriptions (`icsSubscriptionVisibleWhere()`, SPEC "deliberately not filtered").
-- **Health:** `server/routes/health/caregivers.js`. Grants are per person, managed by admins,
-  and every member can read their own.
+- **Health:** `server/routes/health/caregivers.js` manages the grants; the rule they feed
+  (`canWriteFor()`, `careAwareClause()`, `writableClause()`) lives in `server/authorize/care.ts`.
+  Grants are per person, managed by admins, and every member can read their own.
 - **Invitations:** `INVITE_PRESETS` in `server/authorize/catalog.ts`, default `restricted`, and the
   invite handler in `server/auth.js`, where a *missing* field means the narrow template so
   that an older client cannot invite with full access by accident.
@@ -296,7 +297,7 @@ because it answers a different question.
 
 - `server/authorize/rows/assignees.ts` - `VISIBILITY_VALUES` and `visibilityWhere()`, the canonical
   set and the one WHERE fragment tasks and calendar share (#474).
-- `server/routes/health/helpers.js` - the health pair, to be read through an adapter.
+- `server/authorize/care.ts` - the health pair (`OPEN_FAMILY`, `OPEN_ALL`), to be read through an adapter.
 - `server/authorize/rows/budget.ts` - the budget triple, with `shared_amount` as the
   second axis.
 - `server/authorize/rows/documents.ts` - `documentVisibleSql()`, `family` plus the access list.

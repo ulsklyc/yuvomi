@@ -364,7 +364,6 @@
  "server/services/google-drive-storage.js\tknip/exports": 2,
  "server/services/google-drive-storage.js\toxlint/no-control-regex": 1,
  "server/services/gravatar.js\tknip/exports": 1,
- "server/services/health-nutrition.js\tdepcruise/lower-layers-not-to-routes": 1,
  "server/services/holidays.js\toxlint/no-restricted-syntax/UTC-DAY-KEY": 1,
  "server/services/housekeeping-month.js\tknip/exports": 1,
  "server/services/ics-export.js\toxlint/no-restricted-syntax/UTC-DAY-KEY": 1,
