@@ -25,7 +25,7 @@ import {
   viewerId, applyUpdate, badRequest,
   resolveOwner,
 } from './helpers.js';
-import { canWriteFor, careAwareClause, writableClause } from '../../authorize/index.ts';
+import { careAwareClause, readableRows, writableClause } from '../../authorize/index.ts';
 
 const router = express.Router();
 
@@ -365,15 +365,13 @@ router.get('/prevention/due', (req, res) => {
     const today = todayKey(db.get(), new Date());
     let items = computeDueForUser(db.get(), personId, today);
 
-    if (!canWriteFor(db.get(), viewer, personId)) {
-      // Ohne Betreuung nur, was der Eigentuemer als familiensichtbar markiert
-      // hat - dieselbe Grenze wie careAwareClause() fuer die Datensaetze
-      // selbst (authorize/care.ts), hier auf den je Typ juengsten Datensatz
-      // angewandt statt sie ein zweites Mal zu formulieren. computeDueForUser()
-      // liest die Sichtbarkeit ohnehin schon je Datensatz mit, kein zweiter
-      // Query pro Eintrag noetig.
-      items = items.filter((item) => item.visibility === 'family');
-    }
+    // Ohne Betreuung nur, was der Eigentuemer als familiensichtbar markiert
+    // hat - dieselbe Grenze wie careAwareClause() fuer die Datensaetze
+    // selbst (authorize/care.ts), hier auf den je Typ juengsten Datensatz
+    // angewandt statt sie ein zweites Mal zu formulieren. computeDueForUser()
+    // liest die Sichtbarkeit ohnehin schon je Datensatz mit, kein zweiter
+    // Query pro Eintrag noetig.
+    items = readableRows(db.get(), items, viewer, personId);
 
     res.json({ data: items });
   } catch (err) {

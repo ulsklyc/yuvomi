@@ -35,6 +35,14 @@ export function householdVisibleWhere(alias: string): string {
 }
 
 /**
+ * The row form of householdVisibleWhere() (B8b): does a reader without a viewer (a
+ * paired display, the wall) see this loaded task? Only what everyone sees.
+ */
+export function householdVisible(row: { visibility?: unknown } | null | undefined): boolean {
+  return row != null && row.visibility === 'all';
+}
+
+/**
  * Fragt diese Anfrage die Fassung fuer eine geteilte Flaeche ab?
  *
  * DIE EINE STELLE, DIE DAS WAND-PUBLIKUM ERKENNT. `audience=household` schickt

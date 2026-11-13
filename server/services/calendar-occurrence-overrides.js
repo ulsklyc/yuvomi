@@ -17,7 +17,7 @@ import {
   hasExplicitZone, householdTimeZone, shiftDateKey, storedDayDiffersFromSeriesDay, storedToInstantMsPrecise,
 } from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
-import { applyDocumentAccess, attachmentAccessMode, eventAudienceChanged } from '../authorize/index.ts';
+import { applyDocumentAccess, attachmentAccessMode, eventAudienceChanged, rowVisible } from '../authorize/index.ts';
 
 const log = createLogger('CalendarOccurrenceOverrides');
 
@@ -511,16 +511,14 @@ function hasConfiguredOutlookAutoSyncTarget(database, row, assignments,
   const assignedIds = assignments === undefined
     ? canonicalIds(assignmentIds(database, row.id))
     : canonicalIds(assignments);
-  const assigned = new Set(assignedIds.map(Number));
   return targets.some((target) => {
     const calendarId = Number(row.target_outlook_account_id) === Number(target.id)
       ? row.target_outlook_calendar_id
       : target.auto_sync_calendar_id;
-    return calendarId === target.calendar_id && (
-      row.visibility === 'all'
-      || Number(row.created_by) === Number(target.owner_user_id)
-      || (row.visibility === 'assignees' && assigned.has(Number(target.owner_user_id)))
-    );
+    // Would the target's owner see the series? The assignments are handed in: the
+    // row may carry proposed values that are not stored yet, so nothing is read.
+    return calendarId === target.calendar_id
+      && rowVisible(database, 'events', row, target.owner_user_id, { assignedIds });
   });
 }
 
@@ -629,16 +627,6 @@ export function isLocallyOwnedSeries(database, row) {
   return classifyLocalSeriesBatch(database, [row]).get(Number(row?.id))?.local === true;
 }
 
-function actorCanSeeSeries(database, row, actorId) {
-  // Visibility deliberately has no admin bypass (#474). Occurrence mutations
-  // must use the same policy as the whole-series routes that loaded the row.
-  if (Number(row.created_by) === Number(actorId) || row.visibility === 'all') return true;
-  if (row.visibility !== 'assignees') return false;
-  return !!database.prepare(`
-    SELECT 1 FROM event_assignments WHERE event_id = ? AND user_id = ?
-  `).get(row.id, actorId);
-}
-
 /** Builds request-local capability metadata once per distinct recurring master. */
 export function buildRecurrenceCapabilityMap(database, events, {
   actorId = null,
@@ -674,6 +662,9 @@ export function buildRecurrenceCapabilityMap(database, events, {
     WHERE recurrence_parent_id IN (${legacyCandidates.map(() => '?').join(',')})
   `).all(...legacyCandidates).map((row) => Number(row.recurrence_parent_id)));
   const capabilities = new Map();
+  // Whether the actor sees a master: rowVisible(database, 'events', ...), the
+  // rule of the whole-series routes that loaded the row. Visibility deliberately
+  // has no admin bypass (#474).
   for (const [seriesId, master] of mastersById) {
     if (!master) continue;
     const classification = classifications.get(seriesId)
@@ -682,10 +673,10 @@ export function buildRecurrenceCapabilityMap(database, events, {
       master,
       isLocalRecurringSeries: classification.local === true,
       canOverrideOccurrence: classification.eligible
-        && actorCanSeeSeries(database, master, actorId),
+        && rowVisible(database, 'events', master, actorId),
       canDetachOccurrence: classification.local === true && !classification.eligible
         && !linkedParents.has(seriesId)
-        && actorCanSeeSeries(database, master, actorId),
+        && rowVisible(database, 'events', master, actorId),
     });
   }
   return capabilities;
@@ -695,7 +686,9 @@ export function buildRecurrenceCapabilityMap(database, events, {
 export function isEligibleLocalSeries(database, row, actorId) {
   const classification = classifyLocalSeries(database, row);
   if (!classification.eligible) return classification;
-  if (!actorCanSeeSeries(database, row, actorId)) {
+  // Occurrence mutations use the same policy as the whole-series routes that
+  // loaded the row; no admin bypass (#474).
+  if (!rowVisible(database, 'events', row, actorId)) {
     return { eligible: false, reason: 'not_authorized' };
   }
   return classification;

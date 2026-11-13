@@ -48,7 +48,9 @@ export {
 // Row visibility (B3): one file per data type under rows/, one entry point for
 // "visible to this viewer" (rows/index.ts). The single-type fragments behind it are
 // not exported here.
-export { filterVisible, visibleWhere } from './rows/index.ts';
+// rowVisible (B8b) is the same rule for one row a caller has already loaded.
+export { filterVisible, rowVisible, visibleWhere } from './rows/index.ts';
+export { canEditQuickLink, quickLinkHiddenFrom } from './rows/quick-links.ts';
 export { normalizeVisibility, VISIBILITY_VALUES } from './rows/assignees.ts';
 export { categoryVisibleTo } from './rows/notes.ts';
 export { icsSubscriptionSharedWhere } from './rows/ics-subscriptions.ts';
@@ -57,6 +59,7 @@ export {
   HOUSEHOLD_AUDIENCE_SHOWS,
   householdAudienceAnswer,
   householdAudienceShows,
+  householdVisible,
   householdVisibleWhere,
 } from './rows/household.ts';
 export {
@@ -97,9 +100,11 @@ export {
   caregiversOf,
   fastingVisibleFilter,
   hasCareGrant,
+  healthRowReadable,
   OPEN_ALL,
   OPEN_FAMILY,
   readableClause,
+  readableRows,
   visibilityClause,
   writableChild,
   writableClause,

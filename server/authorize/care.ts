@@ -177,6 +177,41 @@ export function readableClause(alias: string, viewer: unknown, open: string = OP
 }
 
 /**
+ * The row form of readableClause() (B8b): may `viewer` read this loaded row? The
+ * open value, the viewer's own row, or a care grant for its owner - the grant is
+ * read only when the first two do not hold (one read at most). Throws for an
+ * unknown open value like readableClause(); a missing row is not readable.
+ *
+ * For health_fasts (CHECK visibility IN ('private', 'family')) "not 'family'" is
+ * the old "'private'" of fasting.js loadWritable: both name the same rows.
+ */
+export function healthRowReadable(database: Database, row: Row | null | undefined, viewer: unknown, open: string = OPEN_FAMILY): boolean {
+  if (!OPEN_VALUES.includes(open)) throw new TypeError(`healthRowReadable: unknown open value '${String(open)}'`);
+  if (row == null) return false;
+  if (row.visibility === open) return true;
+  if (viewer === row.user_id) return true;
+  return hasCareGrant(database, viewer, row.user_id);
+}
+
+/**
+ * readableClause() over a list of ONE owner's rows (B8b; the derived prevention due
+ * list, whose items carry no user_id): the whole list - the same array - for the
+ * owner and a caregiver of the owner, otherwise only the rows with the open value.
+ * One canWriteFor() for the whole list, as the route did.
+ */
+export function readableRows<T extends { visibility?: unknown }>(
+  database: Database,
+  rows: T[],
+  viewer: unknown,
+  ownerId: unknown,
+  open: string = OPEN_FAMILY,
+): T[] {
+  if (!OPEN_VALUES.includes(open)) throw new TypeError(`readableRows: unknown open value '${String(open)}'`);
+  if (canWriteFor(database, viewer, ownerId)) return rows;
+  return rows.filter((row) => row.visibility === open);
+}
+
+/**
  * Lädt einen abhängigen Datensatz, wenn `viewer` dessen Eltern-Zeile ändern
  * darf; sonst null.
  *

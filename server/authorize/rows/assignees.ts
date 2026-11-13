@@ -5,8 +5,14 @@
  *          fragment for every read path. The viewer is a bind token the caller names
  *          ('?', '@me', a column expression, NULL), not a value.
  *
- * Dependencies: none. Erasable TS syntax only (runs through type stripping, no build).
+ *          rowVisible() in rows/index.ts asks the same rule of ONE row a caller has
+ *          already loaded: assignableRowVisible() below, next to the fragment (B8b).
+ *
+ * Dependencies: catalog.ts for the Database type only; never server/db.js. Erasable
+ * TS syntax only (runs through type stripping, no build).
  */
+
+import type { Database } from '../catalog.ts';
 
 // --------------------------------------------------------
 // Sichtbarkeit pro Aufgabe/Termin (#474): all | assignees | private.
@@ -47,4 +53,45 @@ export function visibilityWhere(alias: string, assignTable: string, assignCol: s
           SELECT 1 FROM ${assignTable} vx
           WHERE vx.${assignCol} = ${alias}.id AND vx.user_id = ${bind}))
   )`;
+}
+
+/** The columns of a task or event row the row rule reads. */
+export type AssignableRow = { id?: unknown; visibility?: unknown; created_by?: unknown };
+
+/**
+ * The row form of visibilityWhere(): does `viewerId` see this loaded task or event?
+ * Same three branches as the fragment - 'all', the creator, an assignment on an
+ * 'assignees' row - with no admin bypass (#474).
+ *
+ * Why the write paths ask it (#748/#769): PUT and DELETE of a task loaded the row
+ * by id and worked on it without asking; whoever knew a foreign id could change or
+ * delete someone else's private task. The rule is deliberately the read rule and
+ * no narrower one: who sees a task may edit it in the household, that is the
+ * module's standing promise. New was only that the invisible is also untouchable.
+ *
+ * The creator is compared through Number() on both sides, as the calendar paths did
+ * (actorCanSeeSeries, the Outlook target): ids from SQLite and from the session are
+ * integers there and in the task routes, so the strict comparison the task routes
+ * had answers the same for every value they pass.
+ *
+ * `assignedIds` given (account ids, numbers or numeric strings): the assignments
+ * are those, nothing is read - the row may carry values that are not stored yet
+ * (the Outlook target of a proposed series). Without it the assignment table is
+ * read once, and only on the 'assignees' branch of a row neither open nor own.
+ */
+export function assignableRowVisible(
+  database: Database,
+  assignTable: string,
+  assignCol: string,
+  row: AssignableRow,
+  viewerId: unknown,
+  assignedIds?: readonly unknown[],
+): boolean {
+  if (row.visibility === 'all') return true;
+  if (Number(row.created_by) === Number(viewerId)) return true;
+  if (row.visibility !== 'assignees') return false;
+  if (assignedIds !== undefined) return assignedIds.map(Number).includes(Number(viewerId));
+  return !!database.prepare(
+    `SELECT 1 FROM ${assignTable} WHERE ${assignCol} = ? AND user_id = ?`
+  ).get(row.id, viewerId);
 }

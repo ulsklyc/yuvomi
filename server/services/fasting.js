@@ -1,4 +1,4 @@
-import { fastingVisibleFilter, hasCareGrant, resolvePermissions } from '../authorize/index.ts';
+import { fastingVisibleFilter, hasCareGrant, healthRowReadable, resolvePermissions } from '../authorize/index.ts';
 import { summarizeFastingRows, fastingStreaks, weeklyFastingSeries } from './fasting-stats.js';
 import { fastingDateKeyFactory, parseFastingDateRange, rowMatchesFastingDateRange } from './fasting-dates.js';
 import { householdTimeZone, shiftDateKey, todayKey } from '../utils/timezone.js';
@@ -367,10 +367,8 @@ export function createFast(database, actor, input = {}) {
 function loadWritable(database, actorId, id) {
   const row = database.prepare('SELECT * FROM health_fasts WHERE id = ?').get(id);
   if (!row) fail(404, 'FASTING_NOT_FOUND', 'Fasting record not found.');
-  if (actorId !== row.user_id && row.visibility === 'private') {
-    const grant = hasCareGrant(database, actorId, row.user_id);
-    if (!grant) fail(404, 'FASTING_NOT_FOUND', 'Fasting record not found.');
-  }
+  // A foreign private fast without a care grant does not exist for this actor.
+  if (!healthRowReadable(database, row, actorId)) fail(404, 'FASTING_NOT_FOUND', 'Fasting record not found.');
   ensureSubject(database, actorId, row.user_id);
   return row;
 }
