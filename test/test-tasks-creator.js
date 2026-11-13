@@ -38,7 +38,7 @@ process.env.SESSION_SECRET = 'tasks-creator-test-secret';
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { __test: tasksPage } = await import('../public/pages/tasks.js');
 
 const moduleDatabase = get();
