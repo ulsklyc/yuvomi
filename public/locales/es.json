@@ -566,6 +566,7 @@
         "archivedLabel": "Archivada el",
         "kanbanArchived": "Archivado",
         "reminderNeedsDueDate": "Establece una fecha de vencimiento para activar los recordatorios de tareas.",
+        "reminderNeedsOffset": "Elige cuándo debe llegar el recordatorio o desactívalo.",
         "startDateLabel": "Fecha de inicio",
         "startsOn": "Inicia el {{date}}",
         "showFuture": "Mostrar programadas",

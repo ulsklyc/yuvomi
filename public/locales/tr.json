@@ -566,6 +566,7 @@
         "archivedLabel": "Arşivlenme tarihi",
         "kanbanArchived": "Arşivlenmiş",
         "reminderNeedsDueDate": "Görev hatırlatıcılarını etkinleştirmek için bir son tarih belirleyin.",
+        "reminderNeedsOffset": "Hatırlatıcının ne zaman geleceğini seçin veya kapatın.",
         "startDateLabel": "Başlangıç tarihi",
         "startsOn": "Başlıyor {{date}}",
         "showFuture": "Planlanmışları göster",

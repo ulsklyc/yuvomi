@@ -566,6 +566,7 @@
         "archivedLabel": "归档于",
         "kanbanArchived": "已归档",
         "reminderNeedsDueDate": "设置截止日期以启用任务提醒。",
+        "reminderNeedsOffset": "请选择提醒何时到达，或将其关闭。",
         "startDateLabel": "开始日期",
         "startsOn": "开始于{{date}}",
         "showFuture": "显示计划中",

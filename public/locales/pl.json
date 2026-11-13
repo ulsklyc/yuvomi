@@ -698,6 +698,7 @@
         "bulkDeleted": "Zadania usunięte.",
         "kanbanArchived": "Zarchiwizowane",
         "reminderNeedsDueDate": "Ustaw datę terminu, aby włączyć przypomnienia o zadaniu.",
+        "reminderNeedsOffset": "Wybierz, kiedy ma przyjść przypomnienie, albo je wyłącz.",
         "startDateLabel": "Data rozpoczęcia",
         "startsOn": "Zaczyna się {{date}}",
         "showFuture": "Pokaż zaplanowane",

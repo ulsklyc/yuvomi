@@ -566,6 +566,7 @@
         "archivedLabel": "Archivée le",
         "kanbanArchived": "Archivé",
         "reminderNeedsDueDate": "Définissez une date d'échéance pour activer les rappels de tâche.",
+        "reminderNeedsOffset": "Choisissez quand le rappel doit arriver, ou désactivez-le.",
         "startDateLabel": "Date de début",
         "startsOn": "Commence le {{date}}",
         "showFuture": "Afficher les planifiées",
