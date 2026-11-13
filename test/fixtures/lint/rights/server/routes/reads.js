@@ -23,9 +23,10 @@ export function reads(db, alias, perms, resolve, u, row) {
   if (resolve(u).modules.tasks !== 'none') return null;                                 // rights-10: RIGHTS-MODULE (behind a call)
   if ('none' === perms.modules.notes) return null;                                      // rights-11: RIGHTS-MODULE (reversed)
   if (perms.modules.budget != 'none') return null;                                      // rights-12: RIGHTS-MODULE (loose comparison)
-  // Silent: a JS comparison of a row, a bind parameter, another level, a comment.
+  // Silent: a bind parameter, another level, a comment (a JS comparison of a row is
+  // RIGHTS-ROW's, server/routes/rows.js).
   // SELECT * FROM t WHERE t.visibility = 'all'
-  const ok = row.visibility === 'all';
+  const ok = row.status === 'all';
   const e = db.prepare(`SELECT 1 FROM t WHERE visibility = ?`).get('all');
   const f = perms.modules.health === 'read';
   return [a, b, c, d, g, h, k, ok, e, f];

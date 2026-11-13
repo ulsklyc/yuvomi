@@ -87,10 +87,14 @@ const HARD = new Set([
 // lint-baseline-reasons.json why it may stand. ERROR-TEXT took over the allow-list of
 // test-client-error-text-guard.js (phase 1b, section E): the text in the response is our own.
 // RIGHTS-SQL (phase 2, B5): a visibility literal in SQL outside server/authorize/ stands
-// only as a write, never a read.
+// only as a write, never a read. RIGHTS-ROW (phase 2, B8c): a visibility level compared in
+// JavaScript there stands only as a write filter or data upkeep, never a read rule.
+// A new key of either is red like any new key, and --update never takes one in (it only
+// lowers), so the list grows only by hand, with its reason.
 const REASONED = new Set([
   'oxlint/no-restricted-syntax/ERROR-TEXT',
   'oxlint/no-restricted-syntax/RIGHTS-SQL',
+  'oxlint/no-restricted-syntax/RIGHTS-ROW',
 ]);
 const MIN_REASON = 20;
 

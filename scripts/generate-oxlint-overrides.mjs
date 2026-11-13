@@ -3,7 +3,8 @@
  * Module: oxlint overrides for the senders and the rights rules
  * Purpose: Writes the `overrides` of .oxlintrc.json: `server/**` gets the base
  *          no-restricted-syntax list plus the sender selectors CHANNEL-SEND and PUSH-SEND
- *          and the rights selectors RIGHTS-SQL and RIGHTS-MODULE (phase 2, B5), and a few
+ *          and the rights selectors RIGHTS-SQL, RIGHTS-MODULE (phase 2, B5) and RIGHTS-ROW
+ *          (phase 2, B8c), and a few
  *          files get the same list minus what they are allowed to do.
  * WHY: oxlint replaces the whole option list per override, and the later override wins.
  *      Written by hand, one forgotten selector switches a sender rule off for a file without
@@ -30,12 +31,50 @@ const WEBPUSH = 'PUSH-SEND: web-push is called only in server/services/push.js, 
 // Phase 2, B5: the SQL visibility rules and the module verdict have one home,
 // server/authorize/ (index.ts is its only door). These selectors find them spelled again
 // elsewhere. RIGHTS-SQL is a list of exceptions (lint-baseline-reasons.json: a write,
-// never a read); RIGHTS-MODULE is hard. Neither sees a JS comparison of a row's
-// visibility (`row.visibility === 'all'`), a computed key (`modules[name] === 'none'`), a
-// level read into a variable first, or SQL assembled from pieces that split `visibility`
-// from its value; these are left to review and to test:visibility-matrix.
+// never a read); RIGHTS-MODULE is hard. Neither sees a computed key
+// (`modules[name] === 'none'`), a module level read into a variable first, or SQL assembled
+// from pieces that split `visibility` from its value; these are left to review and to
+// test:visibility-matrix.
+// Phase 2, B8c: RIGHTS-ROW finds a visibility level compared with a string literal in
+// JavaScript (`row.visibility === 'all'`), the read rule B8b moved into server/authorize/.
+// Like RIGHTS-SQL it is a list of exceptions: a write filter or data upkeep, never a read
+// rule, stands in lint-baseline-reasons.json with its reason. Its operand is a member
+// `.visibility` (dot, `['visibility']`, optional chain, behind a call) or a variable named
+// `visibility`; seen: ===, !==, ==, != in both orders, a `case` literal of a switch on it,
+// `[<literal>, ...].includes(it)`, and the level as one side of a `||`, `&&` or `??`
+// (`(row.visibility ?? 'private') !== 'private'`). Blind: a level under another name (`level`, `vis`, a
+// destructured alias), a template literal or a constant as the other side, a named list
+// (`VISIBILITIES.includes`, `new Set([...]).has`), indexOf, some(), a regex, a level passed through a call first (`String(row.visibility)`,
+// `row.visibility.toLowerCase()`), a list whose first element is no literal, a lookup table keyed by the
+// level (`MAP[row.visibility]`), a comparison in SQL (that is RIGHTS-SQL's).
 const RIGHTS_SQL = 'RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason.';
 const RIGHTS_MODULE = "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module }).";
+const RIGHTS_ROW = 'RIGHTS-ROW: a visibility level compared in JavaScript outside server/authorize/; ask rowVisible(), householdVisible() or a named rule of server/authorize/index.ts. A write filter or data upkeep, never a read rule, stands in lint-baseline-reasons.json with its reason.';
+/**
+ * The ways `<path>` holds a visibility level: row.visibility, row['visibility'],
+ * row?.visibility, row?.['visibility'] (a ChainExpression around the member), `visibility`.
+ * A computed key held in a variable (`row[visibility]`) is not one.
+ * @param {string} path
+ */
+const levelForms = (path) => [
+  `[${path}.type='MemberExpression'][${path}.computed=false][${path}.property.name='visibility']`,
+  `[${path}.type='MemberExpression'][${path}.property.value='visibility']`,
+  `[${path}.type='Identifier'][${path}.name='visibility']`,
+  `[${path}.type='ChainExpression'][${path}.expression.computed=false][${path}.expression.property.name='visibility']`,
+  `[${path}.type='ChainExpression'][${path}.expression.property.value='visibility']`,
+];
+// One level of ||, && or ?? around it counts as well: (row.visibility ?? 'private'),
+// (visibility || existing.visibility).
+/** @param {string} path */
+const visibilityAt = (path) => `:matches(${[
+  ...levelForms(path),
+  ...['left', 'right'].flatMap((side) => levelForms(`${path}.${side}`)
+    .map((form) => `[${path}.type='LogicalExpression']${form}`)),
+].join(', ')})`;
+// A string literal (the regex passes only strings: null, undefined, numbers stay silent).
+/** @param {string} path */
+const levelAt = (path) => `[${path}.type='Literal'][${path}.value=/./]`;
+const looseOrStrict = '[operator=/^[!=]==?$/]';
 // Case-insensitive (the `i` flag passes the esquery bridge, measured 13 Nov 2026).
 const sqlVisibility = "/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i";
 const RIGHTS_SELECTORS = [
@@ -47,6 +86,14 @@ const RIGHTS_SELECTORS = [
   { selector: "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']", message: RIGHTS_MODULE },
   // 'none' === perms.modules.notes
   { selector: "BinaryExpression[operator=/^[!=]==?$/][right.type='MemberExpression'][right.object.type='MemberExpression'][right.object.property.name='modules'][left.value='none']", message: RIGHTS_MODULE },
+  // row.visibility === 'all', row?.visibility != 'family', visibility !== 'restricted'
+  { selector: `BinaryExpression${looseOrStrict}${levelAt('right')}${visibilityAt('left')}`, message: RIGHTS_ROW },
+  // 'all' === row.visibility
+  { selector: `BinaryExpression${looseOrStrict}${levelAt('left')}${visibilityAt('right')}`, message: RIGHTS_ROW },
+  // switch (row.visibility) { case 'all': ... } - one finding per literal case
+  { selector: `SwitchStatement${visibilityAt('discriminant')} > SwitchCase${levelAt('test')}`, message: RIGHTS_ROW },
+  // ['all', 'family'].includes(row.visibility)
+  { selector: `CallExpression[callee.type='MemberExpression'][callee.property.name='includes'][callee.object.type='ArrayExpression']${levelAt('callee.object.elements.0')}${visibilityAt('arguments.0')}`, message: RIGHTS_ROW },
 ];
 // Where the rule is the rule itself: the permission module, the schema and its test
 // mirror (migrations and seeds write visibility values), the API documentation.
