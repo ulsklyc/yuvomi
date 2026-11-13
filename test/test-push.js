@@ -30,7 +30,7 @@ function makeDb() {
       resource_key TEXT NOT NULL, access TEXT NOT NULL,
       PRIMARY KEY (subject_type, subject_id, resource_type, resource_key));
     -- Die Sichtbarkeitsspalten und Zuweisungstabellen, an denen die Zustellung
-    -- seit services/reminder-targets.js haengt - mit den Vorgaben des echten
+    -- seit authorize/rows/reminders.ts haengt - mit den Vorgaben des echten
     -- Schemas, damit eine Zeile ohne Angabe wie in Produktion fuer alle da ist.
     CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
       created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -52,7 +52,7 @@ function makeDb() {
       quantity REAL NOT NULL DEFAULT 1, expires_on TEXT, created_by INTEGER REFERENCES users(id) ON DELETE SET NULL);
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
     -- Sichtbarkeit und Freigaben wie im echten Schema: die Zustellung fragt
-    -- seit services/reminder-targets.js, ob ein Dokument fuer alle da ist.
+    -- seit authorize/rows/reminders.ts, ob ein Dokument fuer alle da ist.
     CREATE TABLE family_documents (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       expires_at TEXT, created_by INTEGER, visibility TEXT NOT NULL DEFAULT 'family');
     CREATE TABLE family_document_access (document_id INTEGER NOT NULL, user_id INTEGER NOT NULL);

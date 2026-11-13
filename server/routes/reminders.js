@@ -298,7 +298,7 @@ function callerReminders(req, {
       AND ${window.sql}
       AND r.entity_type IN (${origins.map(() => '?').join(', ')})
       -- Der Titel wird nur fuer eine Zeile aufgeloest, die der Aufrufer
-      -- sieht (services/reminder-targets.js). Das Modulrecht darueber sagt
+      -- sieht (authorize/rows/reminders.ts). Das Modulrecht darueber sagt
       -- nichts ueber die einzelne Aufgabe, und die Sichtbarkeit aendert sich
       -- nach dem Anlegen. Uebersprungen, nicht geloescht.
       AND ${visibleWhere('reminders', 'r', 'r.created_by', { database: db.get() })}

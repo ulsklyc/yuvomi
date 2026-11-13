@@ -69,9 +69,14 @@ explicit grants once.
 
 One rule, one place, so a future change cannot be forgotten in a copy:
 
-- **Documents:** `documentVisibleSql()` in `server/authorize/rows/documents.ts` has exactly
-  three branches - creator, family visibility, explicit share - and no admin branch. Every
-  path that hands out documents goes through it, including the modules that only link them.
+- **Documents:** `documentVisibleWhere()` in `server/authorize/rows/documents.ts`
+  (`documentVisibleSql()` is a wrapper around it) has exactly three branches - creator, family
+  visibility, explicit share - and no admin branch. Every path that hands out documents goes
+  through it, including the modules that only link them: mostly by way of
+  `visibleWhere('documents', ...)` or `filterVisible(database, 'documents', ...)` from
+  `server/authorize/index.ts`, and inside the permission module itself for reminders on a
+  document (`visibleWhere('reminders', ...)`) and for calendar attachments
+  (`documentClonePredicate`, `documentWidenPredicate`).
 - **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`, enforced on
   the server and without an admin bypass (#474); the one deliberate exception is the personal ICS
   feed, an export of the household calendar that only drops other members' unshared ICS
@@ -121,7 +126,7 @@ different shapes of copy:
   check built from the same parts instead of imitating them.
 - **A condition on a future build, #1007.** Member visibility, if it is built, comes with two
   conditions: every list of people goes through a single predicate, the way documents go
-  through `documentVisibleSql()`, and all screens change at once, because a person hidden in a
+  through `visibleWhere('documents', ...)`, and all screens change at once, because a person hidden in a
   picker but visible in a mention is not hidden, only inconsistently visible.
 
 An older instance shows the third shape of copy, a rule living inside a middleware. In
@@ -133,11 +138,15 @@ document visibility SQL into one file, and that file's header records why.
 
 ### Where the rule lives
 
-- **Documents:** `documentVisibleSql()` and `filterVisibleDocumentIds()` in
-  `server/authorize/rows/documents.ts`, called from documents, dms, tasks and the document
-  links every other module uses.
-- **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`. **Budget:**
-  `server/authorize/rows/budget.ts`, owner-based and without an admin bypass.
+- **Documents:** the rule in `server/authorize/rows/documents.ts`, reached through
+  `server/authorize/index.ts` - mostly `visibleWhere('documents', ...)` and
+  `filterVisible(database, 'documents', ...)`, for reminders and calendar attachments the
+  reminder rule and the attachment predicates that call it; used by documents, dms, tasks and
+  the document links every other module uses.
+- **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`, reached
+  through `visibleWhere('tasks', ...)` and `visibleWhere('events', ...)`. **Budget:**
+  `server/authorize/rows/budget.ts`, owner-based and without an admin bypass, reached through
+  `visibleWhere('budget', ...)` and the budget helpers `index.ts` exports with it.
 - **Module permission:** `moduleAccessVerdict()` and `deniedModules()` in
   `server/authorize/modules.ts`. The path middleware and the MCP tool layer call the same verdict,
   and a route that carries several modules sorts with `deniedModules()`, because a middleware
@@ -311,7 +320,8 @@ because it answers a different question.
 - `server/authorize/care.ts` - the health pair (`OPEN_FAMILY`, `OPEN_ALL`), to be read through an adapter.
 - `server/authorize/rows/budget.ts` - the budget triple, with `shared_amount` as the
   second axis.
-- `server/authorize/rows/documents.ts` - `documentVisibleSql()`, `family` plus the access list.
+- `server/authorize/rows/documents.ts` - `documentVisibleWhere()` (with `documentVisibleSql()` as a
+  wrapper), `family` plus the access list.
 - `public/locales/*.json` - the visibility labels under tasks, documents, health, budget and
   quick links, the place the family sees first.
 
