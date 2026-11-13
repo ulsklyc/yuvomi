@@ -93,7 +93,7 @@ import { pairingRouter } from './routes/displays.js';
 import { peopleRouter } from './routes/displays.js';
 import { displayMayAct } from './display-scopes.js';
 import { splitGuestMayReach } from './split-guest-scope.js';
-import { actorFromRequest } from './authorize/index.ts';
+import { actorForUser, actorFromRequest, authorize } from './authorize/index.ts';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -116,7 +116,7 @@ import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
 import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './authorize/index.ts';
-import { FEED_MODULE, recipientDeniedModules } from './services/reminder-origins.js';
+import { FEED_MODULE } from './services/reminder-origins.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
 import { createStaticAssets } from './utils/static-assets.js';
@@ -575,10 +575,10 @@ const feedLimiter = rateLimit({
 // and fills again once the permission is given back (skip, do not delete, as
 // the delivery of reminders since #1289). `read` keeps delivering, an admin is
 // never affected. The household module switch stays deliberately open for
-// feeds (docs/DECISIONS.md).
+// feeds (docs/DECISIONS.md). A feed is a delivery, not a request: `receive`,
+// without token scopes (server/authorize/).
 function feedModuleDenied(userId, feed) {
-  const denied = recipientDeniedModules(db.get(), userId);
-  return !denied || denied.has(FEED_MODULE[feed]);
+  return !authorize(actorForUser(db.get(), userId), 'receive', { module: FEED_MODULE[feed] }).allowed;
 }
 
 app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {

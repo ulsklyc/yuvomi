@@ -13,7 +13,7 @@
  * auf die Liste.
  */
 
-import { resolvePermissions } from '../authorize/index.ts';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { activeAccountSql } from './account-state.js';
 
 /**
@@ -29,10 +29,11 @@ import { activeAccountSql } from './account-state.js';
  */
 export function noteMoveTakenBack(database, { movedBy, itemId, itemName, backListId, targetListId, reason }) {
   if (!movedBy) return null;
-  const user = database.prepare(
-    `SELECT id, role, family_role FROM users WHERE id = ? AND ${activeAccountSql('users')}`
+  // Active first, as its own question: actorForUser() does not filter by it.
+  const active = database.prepare(
+    `SELECT 1 FROM users WHERE id = ? AND ${activeAccountSql('users')}`
   ).get(movedBy);
-  if (!user || resolvePermissions(database, user).modules.shopping === 'none') return null;
+  if (!active || !authorize(actorForUser(database, movedBy), 'receive', { module: 'shopping' }).allowed) return null;
   const listName = (id) => database.prepare('SELECT name FROM shopping_lists WHERE id = ?').get(id)?.name ?? '';
   const noticeId = Number(database.prepare(`
     INSERT INTO shopping_move_notices (user_id, item_id, item_name, back_list_id, back_list_name, target_list_name, reason)

@@ -5,8 +5,10 @@
  *          per module across both axes (role rights and token scopes), the
  *          capability questions, and the refusal for a record someone else
  *          created. What rights exist and how they are stored lives in catalog.ts.
+ *          authorize() (B2) answers read, write and receive per module for an actor.
  *
- * Dependencies: catalog.ts, server/scopes.js, server/middleware/require-admin.js
+ * Dependencies: catalog.ts, types.ts, server/scopes.js,
+ * server/middleware/require-admin.js
  * (none of them loads server/db.js; see actor.ts). The connection is a parameter.
  * Erasable TS syntax only (runs through type stripping, no build).
  */
@@ -15,6 +17,7 @@ import { tokenAllows } from '../scopes.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { resolvePermissions } from './catalog.ts';
 import type { Database, PermissionUser, ResolvedPermissions } from './catalog.ts';
+import type { Actor } from './types.ts';
 
 /** A module -> access map as requireAuth leaves it on a request; null = unrestricted. */
 type ModuleAccessInput = Readonly<Record<string, string>> | null | undefined;
@@ -183,6 +186,56 @@ export function moduleAccessVerdict(
   if (level === 'none') return MODULE_ACCESS_DENIED;
   if (level === 'read' && access === 'write') return MODULE_ACCESS_READ_ONLY;
   return MODULE_ACCESS_ALLOW;
+}
+
+type Action = 'read' | 'write' | 'manage' | 'receive';
+type Verdict = Readonly<{ allowed: boolean; reason: string | null }>;
+
+const NO_ACTOR: Verdict = Object.freeze({ allowed: false, reason: 'no_actor' });
+const ALLOWED: Verdict = Object.freeze({ allowed: true, reason: null });
+const SCOPE: Verdict = Object.freeze({ allowed: false, reason: 'scope' });
+const MODULE_NONE: Verdict = Object.freeze({ allowed: false, reason: 'module_none' });
+const MODULE_READ_ONLY: Verdict = Object.freeze({ allowed: false, reason: 'module_read_only' });
+
+/**
+ * May this actor read, write or receive from this module? The ONE answer to the
+ * module question (phase 2, section B2); before B2 it stood in MCP's toolAllowed,
+ * in the delivery and the feeds (deniedModules() of the recipient) and in seven
+ * reminder sources that compared the resolved module level with 'none' themselves.
+ *
+ *   - `actor == null` (an account that does not exist any more): nothing.
+ *   - 'read' / 'write': first the token scopes, then the module rights - both must
+ *     agree. A scope can only narrow the rights, never widen them.
+ *   - 'receive': a message, a feed, a push. Allowed unless the module is denied
+ *     entirely (`none`); `read` is enough - whoever may read a module may hear
+ *     from it. NO token scopes: a scope belongs to a request, and a delivery is
+ *     not one (see withoutModulesDeniedToRecipient() in
+ *     services/reminder-origins.js). An admin (`moduleAccess: null`) always
+ *     receives.
+ *
+ * The channel rules of /mcp (a display or an unresolved actor reaches no tool, a
+ * guest no core tool) are not module verdicts; they stay in toolAllowed.
+ *
+ * 'manage' and resources other than a module come with B3/B4/C; until then they
+ * throw, so nobody uses them silently.
+ */
+export function authorize(actor: Actor | null, action: Action, resource: { module: string }): Verdict {
+  if (action === 'manage' || typeof resource?.module !== 'string') {
+    throw new Error(`authorize: ${action} on ${JSON.stringify(resource)} is not implemented in B2`);
+  }
+  if (actor == null) return NO_ACTOR;
+  const key = resource.module;
+  if (action === 'receive') {
+    return moduleAccessVerdict(actor.moduleAccess, key, 'read') === MODULE_ACCESS_DENIED ? MODULE_NONE : ALLOWED;
+  }
+  if (action !== 'read' && action !== 'write') {
+    throw new Error(`authorize: action ${String(action)} is not implemented in B2`);
+  }
+  // Cast as in hiddenModulesFor(): tokenAllows() only reads the list.
+  if (!tokenAllows(actor.scopes as string[] | null, key, action)) return SCOPE;
+  const verdict = moduleAccessVerdict(actor.moduleAccess, key, action);
+  if (verdict === MODULE_ACCESS_ALLOW) return ALLOWED;
+  return verdict === MODULE_ACCESS_DENIED ? MODULE_NONE : MODULE_READ_ONLY;
 }
 
 /**

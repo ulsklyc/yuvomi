@@ -890,6 +890,10 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/calendar/subscriptions.js: assignees.reason', { sites: 3, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['services/calendar-occurrence-overrides.js: eligible ? null : \'ineligible_series\'', { sites: 1, at403: [],
     why: 'keine Antwort; wird zu error.code und reist mit 400' }],
+  // authorize() (phase 2 B2): the Verdict type and the allowed verdict. No response:
+  // in B2 every caller reads `allowed` only, no route sends the reason.
+  ['authorize/modules.ts: string | null', { sites: 1, at403: [], why: 'keine Antwort; Typ des Verdict von authorize()' }],
+  ['authorize/modules.ts: null', { sites: 1, at403: [], why: 'keine Antwort; das erlaubte Verdict von authorize()' }],
   ['routes/tasks.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
     why: 'displayActingPerson: 400 ohne Grund oder 403 mit diesem' }],
   ['routes/rewards.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],

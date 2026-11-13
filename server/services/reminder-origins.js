@@ -9,14 +9,13 @@
  *          all; until #1289 it did not ask about the recipient's permissions.
  *          The medication scheduler, which sends without `reminders` rows,
  *          asks the same recipient verdict since #2602.
- * Dependencies: server/services/household-modules.js, server/authorize/,
- *   server/authorize/ (actorForUser; it loads no server/db.js either)
+ * Dependencies: server/services/household-modules.js,
+ *   server/authorize/ (actorForUser, authorize; it loads no server/db.js either)
  */
 import { householdDisabledModules } from './household-modules.js';
 // The delivery passes in its own connection; the actor without a request
 // (server/authorize/, phase 2 B1) reads through exactly that connection.
-import { deniedModules } from '../authorize/index.ts';
-import { actorForUser } from '../authorize/index.ts';
+import { actorForUser, authorize, deniedModules } from '../authorize/index.ts';
 
 /* ONE MAP OVER ALL ORIGINS, WITH NO EXCEPTION FOR THE NEWEST ONE.
  *
@@ -50,7 +49,7 @@ export const ORIGIN_MODULE = Object.freeze({
  *
  * Each `/feed/<name>/:token.ics` route in server/index.js belongs to one
  * permission module. A member for whom that module is `none` gets an empty
- * calendar (see `recipientDeniedModules()` below); the household switch stays
+ * calendar (`receive` of server/authorize/, as for the delivery below); the household switch stays
  * deliberately open for feeds (docs/DECISIONS.md). Birthdays follow
  * `calendar`, as in the delivery: `birthdays` is a nav id under it, not a
  * permission module of its own. A local calendar's feed is not here - its token
@@ -135,12 +134,13 @@ export function withoutSwitchedOffModules(database, rows) {
  * NOT NULL with a foreign key to `users` - but relying on exactly that would
  * make the answer depend on a PRAGMA.
  *
- * EXPORTED AS AN INTERIM STEP UNTIL PHASE 2 of the architecture roadmap, where
- * it moves into `authorize()`; until then no further module should grow its
- * own permission predicate next to it. Callers: the delivery
- * (`withoutModulesDeniedToRecipient()` below, for notifications.js), the
- * medication scheduler (#2602, which sends without `reminders` rows), and
- * the calendar feeds (#2615, server/index.js).
+ * NO PRODUCTION CALLER SINCE PHASE 2 B2: the delivery
+ * (`withoutModulesDeniedToRecipient()` below), the medication scheduler
+ * (#2602) and the calendar feeds (#2615, server/index.js) ask
+ * `authorize(actor, 'receive', { module })` of server/authorize/, which gives
+ * the same answer. It stays exported for one reader: test/test-visibility-matrix.js
+ * records its answer for an unknown account (`recipientDeniedModulesIsNull`,
+ * test/visibility-matrix.expected.json). No new caller.
  *
  * @param {import('../authorize/index.ts').Database} database
  * @param {number} userId
@@ -197,14 +197,15 @@ export function recipientDeniedModules(database, userId) {
  */
 export function withoutModulesDeniedToRecipient(database, rows) {
   if (!rows.length) return rows;
-  // Once per recipient, not per row: a run typically carries several messages
-  // of the same person, and every resolution is two queries.
+  // The actor once per recipient, not per row: a run typically carries several
+  // messages of the same person, and every resolution is up to three queries.
   const byUser = new Map();
   return rows.filter((row) => {
-    if (!byUser.has(row.created_by)) byUser.set(row.created_by, recipientDeniedModules(database, row.created_by));
-    const denied = byUser.get(row.created_by);
-    if (!denied) return false;
+    if (!byUser.has(row.created_by)) byUser.set(row.created_by, actorForUser(database, row.created_by));
+    const actor = byUser.get(row.created_by);
+    // An unknown recipient: nobody the message belongs to, whatever its origin.
+    if (!actor) return false;
     const moduleKey = ORIGIN_MODULE[row.entity_type];
-    return !moduleKey || !denied.has(moduleKey);
+    return !moduleKey || authorize(actor, 'receive', { module: moduleKey }).allowed;
   });
 }

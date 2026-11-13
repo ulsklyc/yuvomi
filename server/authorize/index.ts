@@ -5,6 +5,7 @@
  */
 
 export { actorForUser, actorFromRequest, householdAudience, resolveRequestModuleAccess } from './actor.ts';
+export type { Actor } from './types.ts';
 export type { Database } from './catalog.ts';
 export {
   applyChildStartPermissions,
@@ -27,6 +28,7 @@ export {
   writeSubjectPermissions,
 } from './catalog.ts';
 export {
+  authorize,
   buildSessionModuleAccess,
   clientPermissions,
   deniedModules,

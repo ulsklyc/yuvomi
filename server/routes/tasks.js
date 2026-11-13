@@ -29,7 +29,7 @@ import { uniqueKey } from '../utils/category-slug.js';
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { resolvePermissions } from '../authorize/index.ts';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { householdMemberSql, isHouseholdMember, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
@@ -2701,10 +2701,8 @@ function notifyMentions(task, comment, authorId, previousComment = '') {
     // Aufgaben-Modul entzogen ist, der kommt an die Aufgabe gar nicht heran -
     // und bekaeme mit dem Push trotzdem ihren Titel und den Kommentaranfang
     // zugestellt. Dieselbe Frage, die die /api/v1-Middleware beim Lesen stellt.
-    const target = db.get().prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(id);
-    if (!target) continue;
-    const perms = resolvePermissions(db.get(), target);
-    if (!perms.admin && perms.modules?.tasks === 'none') continue;
+    // An account that does not exist (any more) gets nothing either.
+    if (!authorize(actorForUser(db.get(), id), 'receive', { module: 'tasks' }).allowed) continue;
     // Als Job (#1532): der Versand schreibt nach dem await `last_used_at` oder
     // loescht eine erloschene Subscription. Ohne Job saehe ein Restore ihn nicht
     // und die Zeile landete in der eingespielten Datenbank. Waehrend eines

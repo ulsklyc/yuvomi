@@ -1238,10 +1238,12 @@ server's, and the recipient's own permission is not asked there.
 
 ### Where the rule lives
 
-- `recipientDeniedModules()` in `server/services/reminder-origins.js`: `resolvePermissions()` ->
-  `buildSessionModuleAccess()` -> `deniedModules()`, the same resolution `req.sessionModuleAccess`
-  takes, and `null` for an owner that does not resolve. Exported as an interim step until
-  `authorize()` in phase 2 of the architecture roadmap.
+- `authorize(actor, 'receive', { module })` in `server/authorize/` (phase 2 B2), with the actor
+  from `actorForUser()`: `resolvePermissions()` -> `buildSessionModuleAccess()`, the same
+  resolution `req.sessionModuleAccess` takes; only `none` refuses, no token scopes, and an owner
+  that does not resolve has no actor and receives nothing. Until B2 this was
+  `recipientDeniedModules()` in `server/services/reminder-origins.js`, which no production code
+  calls any more.
 - `ORIGIN_MODULE` and `FEED_MODULE` next to it, the one map per kind of output;
   `withoutModulesDeniedToRecipient()` for the delivery in `server/services/notifications.js`,
   `feedModuleDenied()` for the feeds in `server/index.js`, `emptyFeed()` in

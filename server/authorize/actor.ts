@@ -27,7 +27,7 @@
  * test:authorize-actor holds this in a child process.
  *
  * Dependencies: server/logger.js, server/middleware/require-admin.js,
- *   catalog.ts, modules.ts (none of them loads db.js).
+ *   catalog.ts, modules.ts, types.ts (none of them loads db.js).
  * Erasable TS syntax only (runs through type stripping, no build).
  */
 
@@ -35,36 +35,10 @@ import { createLogger } from '../logger.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { resolvePermissions } from './catalog.ts';
 import { buildSessionModuleAccess, userForRequest } from './modules.ts';
+import type { Actor, ActorKind, ModuleAccess } from './types.ts';
 
 // The logger of server/auth.js: the resolution moved, its log line did not change.
 const log = createLogger('Auth');
-
-// Not exported yet: knip counts an exported type without an importer as a finding.
-// The first module that names the type exports it here and from index.ts.
-type ActorKind = 'session' | 'token' | 'display' | 'guest' | 'system' | 'household';
-
-type ModuleAccess = Readonly<Record<string, 'none' | 'read'>>;
-
-type Actor = Readonly<{
-  kind: ActorKind;
-  /** null only for 'household' - and for a request without an account id, see kindOf(). */
-  userId: number | null;
-  /** The role as it counts in THIS request: a device token of an admin is a member. */
-  role: 'admin' | 'member' | null;
-  familyRole: string | null;
-  /** null = no scoping. */
-  scopes: readonly string[] | null;
-  /** null = unrestricted (admin, or nothing restricted). */
-  moduleAccess: ModuleAccess | null;
-  deviceId: number | null;
-  /**
-   * A lookup that decides the kind failed, the two lookups contradict each other
-   * (a split guest that is also a display), or the request carries no account /
-   * never passed requireAuth. A caller that must fail closed treats it as closed.
-   * Always false for actorForUser() and householdAudience().
-   */
-  unresolved: boolean;
-}>;
 
 /** The fields requireAuth sets on a request; nothing else is read here. */
 type AuthenticatedRequest = {

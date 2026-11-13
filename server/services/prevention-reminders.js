@@ -35,7 +35,7 @@
  *     ruft den Sync zusätzlich sofort nach `PUT /caregivers/:subjectId` auf,
  *     dieselbe "wirkt sofort"-Erwartung wie beim Zyklus-Einstellungs-Schreiben.
  *   - GEGATET JE EMPFÄNGER, NICHT NUR JE EIGENTÜMER: eine betreuende Person ohne
- *     Health-Zugriff (`resolvePermissions(...).modules.health === 'none'`)
+ *     Health-Zugriff (`authorize(actor, 'receive', { module: 'health' })` sagt nein)
  *     bekommt keine Zeile.
  *   - OPT-IN DURCH DEN EIGENTÜMER (`health_prevention_notify_caregivers`,
  *     server/routes/preferences.js), Standard AUS - dasselbe Muster wie
