@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Tasks can show who created them (#2451).** Administrators turn on Settings > Tasks >
+  "Show creator in task list"; the task list then names the creator next to each title, and a
+  filter narrows the list to one creator. The household's own tasks are unaffected when the
+  setting is off, and a one-person household never shows it.
 - **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
   system information there is a section with what the installation runs on: version and build,
   whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema

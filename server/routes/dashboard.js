@@ -626,11 +626,14 @@ router.get('/', (req, res) => {
     result.urgentTasks = d.prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
         ${ASSIGNED_USERS_SQL},
+        cu.display_name AS created_by_name, cu.avatar_color AS created_by_color,
+        ${personAvatarUrlSql('cu')} AS created_by_avatar,
         CASE WHEN t.due_date IS NULL THEN NULL
              ELSE t.due_date || 'T' || COALESCE(t.due_time, '23:59:59')
         END AS __due_sort
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN users cu ON t.created_by = cu.id
       WHERE t.status != 'done'
         -- Abgelegtes gehört nicht in „Heute auf einen Blick" (#688): eine
         -- archivierte Aufgabe ist aus dem Lauf genommen, und wer sie von hier aus

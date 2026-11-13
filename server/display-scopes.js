@@ -202,7 +202,7 @@ export const DISPLAY_PREFERENCE_KEYS = Object.freeze([
   'timezone', 'timezone_effective',
   'disabled_modules', 'hidden_modules', 'module_order', 'mobile_nav_order',
   'dashboard_widgets', 'dashboard_today_glance',
-  'tasks_subtasks_expanded',
+  'tasks_subtasks_expanded', 'tasks_show_creator',
   'holiday_show_public', 'holiday_show_school', 'holiday_public_color', 'holiday_school_color',
   'screensaver_enabled', 'display_device_settings',
 ]);
