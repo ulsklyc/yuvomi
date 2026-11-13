@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Household members can sign in with passkeys without an external identity provider.**
+  Add and name passkeys in account settings, then sign in without a username.
+  A passkey verified with your device PIN or biometrics satisfies MFA; password
+  sign-in keeps its configured second step. Confirm passkey changes inline.
+  Changing your password removes all your passkeys and immediately refreshes the
+  list. Removing a passkey signs out other devices and shows how many sessions ended.
+  Password and SSO recovery paths remain available.
 - **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
   system information there is a section with what the installation runs on: version and build,
   whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema

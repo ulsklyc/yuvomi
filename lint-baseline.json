@@ -438,7 +438,6 @@
  "server/utils/ssrf.js\tknip/exports": 2,
  "server/utils/static-assets.js\toxlint/max-lines-per-function": 1,
  "server/utils/task-tags.js\tknip/exports": 1,
- "server/utils/totp.js\tknip/exports": 3,
  "setup.js\toxlint/no-unused-vars": 1,
  "test/caldav-fake-server.js\toxlint/max-lines-per-function": 1,
  "test/coverage-report.mjs\toxlint/no-unused-vars": 1,

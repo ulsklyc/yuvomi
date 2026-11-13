@@ -165,6 +165,7 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   pantry_items: 'pantry',
   pantry_locations: 'pantry',
   pantry_products: 'pantry',
+  passkey_challenges: 'auth',
   password_resets: 'auth',
   push_subscriptions: 'delivery',
   quick_links: 'dashboard', // server/scopes.js gates its route under the dashboard key
@@ -221,6 +222,8 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   task_rotation_pool: 'tasks',
   task_tags: 'tasks',
   tasks: 'tasks',
+  user_passkey_handles: 'auth',
+  user_passkeys: 'auth',
   user_recovery_codes: 'auth', // second-factor recovery codes, not users
   user_totp: 'auth', // the second factor, not users
   users: 'core',

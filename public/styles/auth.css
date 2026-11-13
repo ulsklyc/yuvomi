@@ -378,3 +378,8 @@
   letter-spacing: var(--tracking-label);
   text-align: center;
 }
+
+/* Reserve the final button height while availability loads; fields stay put. */
+.auth-passkeys--pending {
+  visibility: hidden;
+}
