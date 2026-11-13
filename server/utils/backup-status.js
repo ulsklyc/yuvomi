@@ -35,6 +35,18 @@ export const BACKUP_FAILURE_SENTENCES = Object.freeze({
 });
 
 /**
+ * The same four sentences the backup card shows, by locale key - for a push
+ * notification, which has no browser to run the client's own i18n map
+ * (public/settings/pages/admin-backup.js) against.
+ */
+export const BACKUP_FAILURE_LOCALE_KEYS = Object.freeze({
+  backup_dir_not_writable: 'settings.backupSchedulerReasonDirNotWritable',
+  disk_full: 'settings.backupSchedulerReasonDiskFull',
+  backup_verify_failed: 'settings.backupSchedulerReasonVerifyFailed',
+  unknown: 'settings.backupSchedulerReasonUnknown',
+});
+
+/**
  * A stored or thrown value as one of the known reasons.
  * @param {unknown} value
  * @returns {keyof typeof BACKUP_FAILURE_SENTENCES}

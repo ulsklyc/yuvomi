@@ -356,6 +356,7 @@
       "files": [
         "server/routes/tasks.js",
         "server/routes/push.js",
+        "server/services/admin-notices.js",
         "server/services/medication-scheduler.js",
         "server/services/notifications.js"
       ],

@@ -11,9 +11,12 @@ import path from 'node:path';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import * as webdav from './backup-webdav.js';
+import { notifyAdmins } from './admin-notices.js';
+import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
 import { remoteFailure } from '../utils/http.js';
 import {
-  BACKUP_FAILURE_SENTENCES, BACKUP_STATUS_KEYS, backupFailureReason, knownBackupFailureReason,
+  BACKUP_FAILURE_LOCALE_KEYS, BACKUP_FAILURE_SENTENCES, BACKUP_STATUS_KEYS,
+  backupFailureReason, knownBackupFailureReason,
 } from '../utils/backup-status.js';
 
 const log = createLogger('BackupScheduler');
@@ -231,9 +234,55 @@ export async function createLocalBackup() {
 }
 
 /**
- * Perform automated backup
+ * EIN FEHLGESCHLAGENES SICHERUNGSLAUF MELDET SICH BEI DEN ADMINS (#2519).
+ *
+ * Ohne diese Meldung faellt die naechtliche Sicherung still aus: gesehen wird
+ * das erst, wenn jemand Einstellungen > Sicherung aufschlaegt - also meistens
+ * dann, wenn die Sicherung gebraucht wird.
+ *
+ * DER GRUND STEHT IM PUSH, NICHT DER FEHLERTEXT. Seit #2540 ist der Grund
+ * einer von vier festen, unbedenklichen Saetzen (BACKUP_FAILURE_LOCALE_KEYS,
+ * dieselben, die die Karte in Einstellungen > Sicherung zeigt) - nie die
+ * rohe Fehlermeldung mit ihrem absoluten Pfad oder errno, die nur ins Log
+ * gehoert.
+ *
+ * Wer die Meldung bekommt, loest admin-notices.js. Diese Funktion baut nur
+ * die Nachricht fuer den Sicherungsfall.
+ *
+ * @param {Object} [opts]
+ * @param {Object} [opts.database]
+ * @param {import('./admin-notices.js').PushService} [opts.pushService] - { sendPushToUser }
+ * @param {keyof typeof BACKUP_FAILURE_LOCALE_KEYS} [opts.reason]
+ * @returns {Promise<number>} Zahl der Admins, bei denen tatsaechlich eine
+ *   Push-Mitteilung zugestellt wurde
  */
-async function performBackup() {
+async function notifyAdminsOfBackupFailure({ database, pushService, reason = 'unknown' } = {}) {
+  try {
+    const activeDb = database ?? db.get();
+    const locale = resolveHouseholdLocale(activeDb);
+    const reasonKey = BACKUP_FAILURE_LOCALE_KEYS[reason] ?? BACKUP_FAILURE_LOCALE_KEYS.unknown;
+    const payload = {
+      title: translate(locale, 'settings.backupSchedulerFailedPushTitle'),
+      body: translate(locale, reasonKey),
+      url: '/settings/admin/backup',
+      // EIN EINTRAG, NICHT EINER JE LAUF: zwei Naechte hintereinander
+      // gescheitert soll eine Meldung ersetzen, keine zweite daneben legen.
+      tag: 'backup-failure',
+      priority: 'default',
+    };
+    return await notifyAdmins({ database: activeDb, payload, pushService });
+  } catch (err) {
+    log.error('Could not notify the administrators about the failed backup:', err);
+    return 0;
+  }
+}
+
+/**
+ * Perform automated backup
+ * @param {Object} [opts]
+ * @param {boolean} [opts.notify]
+ */
+async function performBackup(opts = {}) {
   try {
     log.info('Starting scheduled backup...');
 
@@ -278,6 +327,10 @@ async function performBackup() {
     lastBackup = { timestamp, success: false, error: message, reason };
     statusLoaded = true;
     storeStatus(timestamp, reason);
+    // Nach dem Setzen von lastError: die Meldung verweist auf die Seite, die
+    // ihn zeigt, also muss er dort schon stehen. Nur automatische Laeufe
+    // benachrichtigen - ein manueller Klick landet sofort auf der Seite.
+    if (opts.notify) await notifyAdminsOfBackupFailure({ ...opts, reason });
   }
 }
 
@@ -297,7 +350,7 @@ export function startScheduler() {
 
   // Laedt nach WebDAV hoch: waehrend eines Restores beginnt kein Lauf, ein
   // laufender wird abgewartet (Codex-Befund in #1431).
-  scheduledTask = cron.schedule(BACKUP_SCHEDULE, () => runExternalJob(performBackup), {
+  scheduledTask = cron.schedule(BACKUP_SCHEDULE, () => runExternalJob(() => performBackup({ notify: true })), {
     timezone: process.env.TZ || 'UTC',
   });
 
@@ -314,6 +367,9 @@ export function stopScheduler() {
     log.info('Backup scheduler stopped');
   }
 }
+
+/** Nur fuer die Tests: der Melder allein, ohne einen Sicherungslauf. */
+export const _notifyAdminsOfBackupFailure = notifyAdminsOfBackupFailure;
 
 /**
  * Get scheduler status
@@ -338,7 +394,11 @@ export function getStatus() {
 /**
  * Trigger an immediate backup (for manual/testing purposes)
  */
-export async function triggerBackup() {
-  await performBackup();
+export async function triggerBackup(opts = {}) {
+  // `opts` reicht die Datenbank und den Push-Dienst an den Melder weiter -
+  // sonst waere der Fehlerweg nur ueber den globalen Zustand pruefbar
+  // (derselbe Weg wie processDueMedications, services/medication-scheduler.js).
+  // Die Route ruft ohne Argumente, dann gelten die echten Dienste.
+  await performBackup(opts);
   return lastBackup;
 }

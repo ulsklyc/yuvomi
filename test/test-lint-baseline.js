@@ -568,7 +568,7 @@ const GENERATOR = join(REPO, 'scripts', 'generate-oxlint-overrides.mjs');
 
 test('the push senders are read from push-service-importers', () => {
   assert.deepEqual([...PUSH_SENDERS].sort(), [
-    'server/routes/push.js', 'server/routes/tasks.js',
+    'server/routes/push.js', 'server/routes/tasks.js', 'server/services/admin-notices.js',
     'server/services/medication-scheduler.js', 'server/services/notifications.js',
   ]);
 });

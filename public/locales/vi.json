@@ -3583,6 +3583,8 @@
         "memberErrorGone": "Thành viên này không còn nữa.",
         "memberErrorSsoEmailRequired": "Tài khoản chỉ dùng SSO cần một địa chỉ email để lần đăng nhập SSO đầu tiên tìm thấy nó.",
         "memberErrorSsoEmailAmbiguous": "Một thành viên khác đã có địa chỉ email này. SSO không thể phân biệt các tài khoản.",
+        "backupSchedulerFailedPushTitle": "Sao lưu thất bại",
+        "backupSchedulerFailedPushBody": "Bản sao lưu tự động đã không chạy. Mở {{path}} để xem lý do.",
         "twoFactorAlreadyEnabled": "Xác thực hai bước đã được bật. Tải lại trang để xem trạng thái hiện tại.",
         "twoFactorSetupExpired": "Phiên thiết lập đã hết hạn. Hãy hủy và bắt đầu lại.",
         "oidcLinkErrorNotConfigured": "SSO không còn được thiết lập trên máy chủ này.",

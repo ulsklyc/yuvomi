@@ -3583,6 +3583,8 @@
         "memberErrorGone": "Αυτό το μέλος δεν υπάρχει πια.",
         "memberErrorSsoEmailRequired": "Ένας λογαριασμός μόνο με SSO χρειάζεται διεύθυνση email, ώστε να τον βρει η πρώτη σύνδεση μέσω SSO.",
         "memberErrorSsoEmailAmbiguous": "Αυτή τη διεύθυνση email την έχει ήδη άλλο μέλος. Το SSO δεν θα μπορούσε να ξεχωρίσει τους λογαριασμούς.",
+        "backupSchedulerFailedPushTitle": "Το αντίγραφο ασφαλείας απέτυχε",
+        "backupSchedulerFailedPushBody": "Το αυτόματο αντίγραφο ασφαλείας δεν εκτελέστηκε. Δείτε τον λόγο στις {{path}}.",
         "twoFactorAlreadyEnabled": "Ο έλεγχος ταυτότητας δύο παραγόντων είναι ήδη ενεργός. Φόρτωσε ξανά τη σελίδα για να δεις την τρέχουσα κατάσταση.",
         "twoFactorSetupExpired": "Η ρύθμιση έληξε. Ακύρωσέ την και ξεκίνα ξανά.",
         "oidcLinkErrorNotConfigured": "Το SSO δεν είναι πλέον ρυθμισμένο σε αυτόν τον διακομιστή.",
