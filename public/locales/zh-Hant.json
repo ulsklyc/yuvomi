@@ -763,6 +763,11 @@
         "importMeals": "來自用餐計劃",
         "sendList": "傳送清單",
         "sendListTitle": "傳送購物清單",
+        "sendWebhook": "傳送未購買的項目",
+        "sendWebhookSent": "已傳送 {{count}} 個項目。",
+        "sendWebhookSent_one": "已傳送 {{count}} 個項目。",
+        "sendWebhookUnconfigured": "尚未設定 webhook 目標。",
+        "sendWebhookError": "無法傳送到 webhook。",
         "sendListDescription": "{{count}} 項未購買的條目將傳送給所選成員。",
         "sendListDescription_one": "{{count}} 項未購買的條目將傳送給所選成員。",
         "sendListRecipient": "收件人",
@@ -844,7 +849,8 @@
             "waited": "「{{item}}」未移到「{{target}}」：「{{back}}」的同步已關閉超過一週。開啟該清單後，項目會重新出現在「{{back}}」。"
         },
         "moreDetailsHint": "價格、商店、連結、備註",
-        "toPantryAllToPlaceholder": "選擇位置 …"
+        "toPantryAllToPlaceholder": "選擇位置 …",
+        "sendWebhookPrivateNetwork": "目標位於你的區域網路。伺服器必須允許這件事（NOTIFICATION_ALLOW_PRIVATE_NETWORK）。"
     },
     "meals": {
         "ingredientCount_one": "{{count}} 種食材",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "已重置為家庭預設值",
         "pushDeviceDescription": "Web Push 僅適用於此裝置和此瀏覽器。",
         "notificationChannelsTitle": "家庭頻道",
+        "shoppingWebhookTitle": "購物清單 Webhook",
+        "shoppingWebhookDescription": "將清單中未購買的項目以 JSON 傳送到這個網址。只有管理員能設定目標；之後家中任何成員都能從清單選單傳送。",
+        "shoppingWebhookUrl": "Webhook 網址",
+        "shoppingWebhookSaved": "已儲存。",
         "notificationChannelsDescription": "管理員可以新增在 Web Push 之外接收提醒的通道。",
         "notificationChannelAdd": "新增頻道",
         "notificationChannelProvider": "提供商",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "此成員已不存在。",
         "memberErrorSsoEmailRequired": "僅限 SSO 的帳號需要電子郵件地址，首次 SSO 登入才能找到它。",
         "memberErrorSsoEmailAmbiguous": "其他成員已使用此電子郵件地址。SSO 無法區分這些帳號。",
+        "shoppingWebhookPrivateNetworkHint": "位於你自己網路中的目標（Home Assistant、本機 n8n）只有在伺服器以 NOTIFICATION_ALLOW_PRIVATE_NETWORK=true 啟動時才能運作。",
+        "shoppingWebhookUrlInvalid": "這不是有效的網址。必須以 http:// 或 https:// 開頭。",
         "twoFactorAlreadyEnabled": "兩步驗證已經啟用。請重新載入頁面查看目前狀態。",
         "twoFactorSetupExpired": "設定已逾時。請取消後重新開始。",
         "oidcLinkErrorNotConfigured": "此伺服器已不再設定 SSO。",

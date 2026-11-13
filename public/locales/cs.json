@@ -832,6 +832,12 @@
         "importMeals": "Z jídelního plánu",
         "sendList": "Odeslat seznam",
         "sendListTitle": "Odeslat nákupní seznam",
+        "sendWebhook": "Odeslat otevřené položky",
+        "sendWebhookSent": "Odesláno {{count}} položek.",
+        "sendWebhookSent_one": "Odeslána {{count}} položka.",
+        "sendWebhookSent_few": "Odeslány {{count}} položky.",
+        "sendWebhookUnconfigured": "Není nastaven žádný cíl webhooku.",
+        "sendWebhookError": "Odeslání na webhook se nezdařilo.",
         "sendListDescription": "{{count}} nevyřízených položek půjde vybranému členovi.",
         "sendListDescription_one": "{{count}} nevyřízená položka půjde vybranému členovi.",
         "sendListDescription_few": "{{count}} nevyřízené položky půjdou vybranému členovi.",
@@ -917,7 +923,8 @@
             "waited": "Položka „{{item}}“ nebyla přesunuta do seznamu „{{target}}“: synchronizace seznamu „{{back}}“ je přes týden vypnutá. Položka se v seznamu „{{back}}“ znovu objeví, jakmile ho zapnete."
         },
         "moreDetailsHint": "Cena, obchod, odkaz, poznámka",
-        "toPantryAllToPlaceholder": "Vyberte místo …"
+        "toPantryAllToPlaceholder": "Vyberte místo …",
+        "sendWebhookPrivateNetwork": "Cíl je ve vaší místní síti. Server to musí povolit (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",
@@ -3235,6 +3242,10 @@
         "personalWeatherReset": "Obnovena výchozí poloha domácnosti",
         "pushDeviceDescription": "Web Push platí pouze pro toto zařízení a tento prohlížeč.",
         "notificationChannelsTitle": "Kanály domácnosti",
+        "shoppingWebhookTitle": "Webhook nákupního seznamu",
+        "shoppingWebhookDescription": "Odešle otevřené položky seznamu jako JSON na tuto adresu. Cíl může nastavit jen správce; poslat pak může kterýkoli člen domácnosti z nabídky seznamu.",
+        "shoppingWebhookUrl": "Adresa webhooku",
+        "shoppingWebhookSaved": "Uloženo.",
         "notificationChannelsDescription": "Správci mohou přidat kanály, které dostávají připomínky navíc k Web Push.",
         "notificationChannelAdd": "Přidat kanál",
         "notificationChannelProvider": "Poskytovatel",
@@ -3701,6 +3712,8 @@
         "memberErrorGone": "Tento člen už neexistuje.",
         "memberErrorSsoEmailRequired": "Účet jen pro SSO potřebuje e-mailovou adresu, aby ho první přihlášení přes SSO našlo.",
         "memberErrorSsoEmailAmbiguous": "Tuto e-mailovou adresu už má jiný člen. SSO by účty nedokázalo rozlišit.",
+        "shoppingWebhookPrivateNetworkHint": "Cíl ve vaší vlastní síti (Home Assistant, místní n8n) funguje jen tehdy, pokud byl server spuštěn s NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "To není platná webová adresa. Musí začínat http:// nebo https://.",
         "twoFactorAlreadyEnabled": "Dvoufázové ověření je už zapnuté. Načti stránku znovu, abys viděl aktuální stav.",
         "twoFactorSetupExpired": "Nastavení vypršelo. Zruš ho a začni znovu.",
         "oidcLinkErrorNotConfigured": "SSO už na tomto serveru není nastavené.",

@@ -297,6 +297,7 @@
   "test-search-permissions.js": "locale JSON",
   "test-seed-demo-pdfs.js": "a key file under the temp directory; pdf.js is imported, not read",
   "test-settings-cron-label.js": "locale JSON",
+  "test-shopping-webhook.js": "locale JSON",
   "test-split-folder-rename-migration.js": "locale JSON",
   "test-subscription-meta-labels.js": "locale JSON",
   "test-suite-chain.js": "package.json, docs/test-suites.md and the suites under test/",

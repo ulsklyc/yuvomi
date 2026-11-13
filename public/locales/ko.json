@@ -781,6 +781,11 @@
         "importMeals": "식단에서",
         "sendList": "목록 보내기",
         "sendListTitle": "장보기 목록 보내기",
+        "sendWebhook": "남은 항목 보내기",
+        "sendWebhookSent": "{{count}}개 항목을 보냈습니다.",
+        "sendWebhookSent_one": "{{count}}개 항목을 보냈습니다.",
+        "sendWebhookUnconfigured": "웹훅 대상이 설정되지 않았습니다.",
+        "sendWebhookError": "웹훅으로 보내지 못했습니다.",
         "sendListDescription": "남은 항목 {{count}}개가 선택한 구성원에게 전송됩니다.",
         "sendListDescription_one": "남은 항목 {{count}}개가 선택한 구성원에게 전송됩니다.",
         "sendListRecipient": "받는 사람",
@@ -862,7 +867,8 @@
             "waited": "“{{item}}” 항목이 “{{target}}” 목록으로 옮겨지지 않았습니다. “{{back}}” 목록의 동기화가 일주일 넘게 꺼져 있습니다. 목록을 켜면 “{{back}}”에 다시 나타납니다."
         },
         "moreDetailsHint": "가격, 매장, 링크, 메모",
-        "toPantryAllToPlaceholder": "장소 선택 …"
+        "toPantryAllToPlaceholder": "장소 선택 …",
+        "sendWebhookPrivateNetwork": "대상이 로컬 네트워크에 있습니다. 서버에서 이를 허용해야 합니다(NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "재료 {{count}}개",
@@ -3147,6 +3153,10 @@
         "personalWeatherReset": "가구 기본값으로 재설정되었습니다",
         "pushDeviceDescription": "웹 푸시는 이 기기와 브라우저에만 적용됩니다.",
         "notificationChannelsTitle": "가구 채널",
+        "shoppingWebhookTitle": "쇼핑 목록 웹훅",
+        "shoppingWebhookDescription": "목록의 남은 항목을 JSON으로 이 주소에 보냅니다. 대상은 관리자만 설정할 수 있고, 그 뒤에는 가구의 누구나 목록 메뉴에서 보낼 수 있습니다.",
+        "shoppingWebhookUrl": "웹훅 주소",
+        "shoppingWebhookSaved": "저장했습니다.",
         "notificationChannelsDescription": "관리자는 웹 푸시에 더해 알림을 받는 채널을 추가할 수 있습니다.",
         "notificationChannelAdd": "채널 추가",
         "notificationChannelProvider": "제공자",
@@ -3601,6 +3611,8 @@
         "memberErrorGone": "이 구성원은 더 이상 없습니다.",
         "memberErrorSsoEmailRequired": "SSO 전용 계정에는 첫 SSO 로그인이 찾을 수 있도록 이메일 주소가 필요합니다.",
         "memberErrorSsoEmailAmbiguous": "다른 구성원이 이미 이 이메일 주소를 사용하고 있습니다. SSO가 계정을 구별할 수 없습니다.",
+        "shoppingWebhookPrivateNetworkHint": "집 네트워크에 있는 대상(Home Assistant, 로컬 n8n)은 서버가 NOTIFICATION_ALLOW_PRIVATE_NETWORK=true로 시작된 경우에만 작동합니다.",
+        "shoppingWebhookUrlInvalid": "올바른 웹 주소가 아닙니다. http:// 또는 https:// 로 시작해야 합니다.",
         "twoFactorAlreadyEnabled": "2단계 인증이 이미 켜져 있습니다. 현재 상태를 보려면 페이지를 새로 고치세요.",
         "twoFactorSetupExpired": "설정이 만료되었습니다. 취소하고 다시 시작하세요.",
         "oidcLinkErrorNotConfigured": "이 서버에는 더 이상 SSO가 설정되어 있지 않습니다.",
