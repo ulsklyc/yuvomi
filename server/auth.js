@@ -1905,17 +1905,17 @@ function passkeyAuthFailure(req, res, error, operation) {
   log.error('Passkey sign-in error', { ip: req.ip, reason: 'internal_error', operation, error: error instanceof Error ? error.message : undefined });
   return res.status(500).json({ error: 'Could not complete passkey authentication.', code: 500 });
 }
-router.get('/passkeys/config', (/** @type {PasskeyRequest} */ _req, /** @type {PasskeyResponse} */ res) => {
+router.get('/passkeys/config', (/** @type {PasskeyRequest} */ _req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
   try {
     res.json({ data: { enabled: !!passkeys.configuration(), login_enabled: isPasswordLoginEnabled() || hasSplitExpenseGuests(db.get()) } });
-  } catch { res.status(500).json({ error: 'Could not read passkey configuration.', code: 500 }); }
+  } catch (error) { next(error); }
 });
-router.get('/passkeys', requireAuth, (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
+router.get('/passkeys', requireAuth, (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
   try {
     if (req.authMethod !== 'session') return res.status(403).json({ error: 'Use a browser session.', code: 403, reason: 'browser_session_required' });
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
     res.json({ data: { enabled: !!passkeys.configuration(), enrollment_allowed: !!user && nativePasskeysAllowed(user), second_factor_required: twoFactor.isEnabled(db.get(), req.authUserId), passkeys: passkeys.list(db.get(), req.authUserId) } });
-  } catch { res.status(500).json({ error: 'Could not read passkeys.', code: 500 }); }
+  } catch (error) { next(error); }
 });
 // Reauthentication refreshes only the proof timestamp of this browser identity.
 // It never signs in another user or completes a pending anonymous sign-in.
@@ -1983,13 +1983,13 @@ router.post('/passkeys/register/verify', requireAuth, csrfMiddleware, recentPass
     res.json({ data: { ok: true } });
   } catch (error) { passkeyAuthFailure(req, res, error, 'registration'); }
 });
-router.delete('/passkeys/:id', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
+router.delete('/passkeys/:id', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0 || !passkeys.remove(db.get(), req.authUserId, id)) return res.status(404).json({ error: 'Passkey not found.', code: 404 });
     const ended = invalidateUserSessions(req.authUserId, req.sessionID);
     res.json({ data: { ok: true, ended } });
-  } catch { res.status(500).json({ error: 'Could not remove passkey.', code: 500 }); }
+  } catch (error) { next(error); }
 });
 router.post('/passkeys/login/options', passkeyOptionsLimiter, passkeyOrigin, async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
   try {
