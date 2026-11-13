@@ -10,6 +10,13 @@
     "health_unknown_account": "unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded are the two exported production answers for such an id: recipientDeniedModulesIsNull (reminder-origins.js, null = drop the recipient) and notLacksHealth",
     "mcp": "list_tasks with include_future=true, list_upcoming_events with limit=100; the bridge calls call_api_operation with method GET and the /api/v1 path of each list route; a refused call is { status: tool_error, reason }",
     "role_accounts": "token_read / token_write / token_unscoped act for the member account",
+    "row_rules": "row_rules holds the JavaScript row checks outside server/authorize (phase 2, B8a). Its rows are seeded AFTER every read path and the module level were measured and BEFORE the medication run (seedRowRules in the seed file); they are not in seed_counts and no read-path cell sees them. Blocks quick_links, task_writes, series and series_outlook_target are keyed by role (all ten), then by cell; outlook_classification is keyed by series. One cell = one leaf under a role (or one series in outlook_classification). Every block sends from its own client address 10.10.<role>.<block>; setup requests from 10.10.250.x",
+    "row_rules_cells": "write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route's success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route's own reason, refused = any 403; any other answer fails the suite",
+    "row_rules_display": "the display writes like the wall: display cookie plus the session cookie and CSRF token its first GET below /api/v1 (GET /quick-links) handed out (csrfMiddleware keeps the token in req.session)",
+    "row_rules_outlook": "series_outlook_target = the capabilities cell again after seedOutlookTarget: one outlook_accounts row (auto_sync_calendar_id, owner_user_id = member) with one outlook_calendar_selection row (enabled 1, can_edit 1); MS_CLIENT_ID / MS_CLIENT_SECRET / MS_REDIRECT_URI are pinned empty, so the sync tick returns before any request. outlook_classification = classifyLocalSeries (exported production function) per series before and after the target: the calendar answer shows eligibility only through can_override_occurrence",
+    "row_rules_quick_links": "quicklink.<owner>.<all|private> for admin/member/child, seeded directly. list = GET /quick-links as { visible, editable (can_edit) }; overview / overview_household = the quicklinks row of GET /dashboard (personal, audience=household) in the same shape; change = PUT /quick-links/:id with {} (every field keeps its value, only updated_at moves), ok 200; remove = DELETE /quick-links/:id, ok 204, the row goes back with the same id and values after each 204; detail is n/a",
+    "row_rules_series": "series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=3 from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day created by its owner through PUT /calendar/:id/occurrences/:day. capabilities = GET /calendar over the series days as { visible, can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written (\"past the checks\"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found = 404 calendar_series_not_found / calendar_event_not_found",
+    "row_rules_task_writes": "wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description \"- [ ] mx item\", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branch of PATCH /:id/status, tasks.js ~2287, answers for no task because mayAccessTask runs first). One cell per mayAccessTask call site: completions = GET /:id/completions (~2604), check = PATCH /:id/check {line 0, checked false} (~2471, unchanged line, no write), archive = PATCH /:id/archive {archived false} (~2418), status = PATCH /:id/status {status open} on an open task (~2244, then the display branch ~2287), subtask = POST /tasks {title, parent_task_id} (~1399, ok 201, the subtask is deleted), remove = DELETE /:id (~2529, the row and its assignments go back with the same id). next_due_date = PATCH /:id/status {status done} on wtask.chain.origin (shared, weekly) whose followup wtask.chain.followup (admin, private) already exists: next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter ~1860: display reads visibility all, people mayAccessTask); the display names done_by_user_id = admin; the origin is reopened and its completion row deleted after each 200",
     "seed_counts": {
       "activities": 6,
       "budget": 9,
@@ -4233,6 +4240,2547 @@
           "data"
         ],
         "status": 200
+      }
+    }
+  },
+  "row_rules": {
+    "outlook_classification": {
+      "series.admin.all": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.admin.assignees": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.admin.private": {
+        "after": {
+          "eligible": true,
+          "reason": null
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.child.all": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.child.assignees": {
+        "after": {
+          "eligible": true,
+          "reason": null
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.child.private": {
+        "after": {
+          "eligible": true,
+          "reason": null
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.member.all": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.member.assignees": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.member.private": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      }
+    },
+    "quick_links": {
+      "admin": {
+        "change": {
+          "not_found": [
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        }
+      },
+      "caregiver": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "child": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.member.private"
+          ],
+          "ok": [
+            "quicklink.child.all",
+            "quicklink.child.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.child.all",
+            "quicklink.child.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.child.private",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.child.all",
+            "quicklink.child.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.child.private",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.member.private"
+          ],
+          "ok": [
+            "quicklink.child.all",
+            "quicklink.child.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "display": {
+        "change": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "member": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "member_none": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "split_guest": {
+        "change": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "overview": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "overview_household": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "remove": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "token_read": {
+        "change": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "token_unscoped": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "token_write": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      }
+    },
+    "series": {
+      "admin": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "linked_delete": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "linked_put": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        }
+      },
+      "caregiver": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "linked_delete": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "linked_put": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        }
+      },
+      "child": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "linked_delete": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "linked_put": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.member.private"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        }
+      },
+      "display": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.child.all",
+            "series.member.all"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "exceptions_post": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "linked_delete": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "linked_put": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_delete": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_delete_following": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_put": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_put_following": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "member": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "member_none": {
+        "capabilities": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "exceptions_post": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "linked_delete": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "linked_put": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "occurrence_delete": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "occurrence_delete_following": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "occurrence_put": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "occurrence_put_following": {
+          "reason": "module_access_denied",
+          "status": 403
+        }
+      },
+      "split_guest": {
+        "capabilities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "exceptions_post": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "linked_delete": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "linked_put": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "occurrence_delete": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "occurrence_delete_following": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "occurrence_put": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "occurrence_put_following": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "token_read": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "exceptions_post": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "linked_delete": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "linked_put": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_delete": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_delete_following": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_put": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_put_following": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "token_unscoped": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "token_write": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      }
+    },
+    "series_outlook_target": {
+      "admin": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.private"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        }
+      },
+      "caregiver": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.child.assignees"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        }
+      },
+      "child": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ]
+        }
+      },
+      "display": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.child.all",
+            "series.member.all"
+          ]
+        }
+      },
+      "member": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "member_none": {
+        "capabilities": {
+          "reason": "module_access_denied",
+          "status": 403
+        }
+      },
+      "split_guest": {
+        "capabilities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "token_read": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "token_unscoped": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "token_write": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      }
+    },
+    "task_writes": {
+      "admin": {
+        "archive": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "next_due_date": {
+          "next": "wtask.chain.followup",
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        }
+      },
+      "caregiver": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        }
+      },
+      "child": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        }
+      },
+      "display": {
+        "archive": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "check": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees.display",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "status": {
+          "divergent": "The display branch of PATCH /tasks/:id/status (tasks.js ~2287) answers 404 for wtask.admin.assignees.display, which GET /tasks/:id/completions (mayAccessTask) shows to the same display.",
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "wtask.admin.all": {
+              "reason": "display_action",
+              "status": 403
+            },
+            "wtask.child.all": {
+              "reason": "display_action",
+              "status": 403
+            },
+            "wtask.member.all": {
+              "reason": "display_action",
+              "status": 403
+            }
+          }
+        },
+        "subtask": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "member": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        }
+      },
+      "member_none": {
+        "archive": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "check": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "completions": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "next_due_date": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "remove": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "status": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "subtask": {
+          "reason": "module_access_denied",
+          "status": 403
+        }
+      },
+      "split_guest": {
+        "archive": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "check": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "completions": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "next_due_date": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "remove": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "status": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "subtask": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "token_read": {
+        "archive": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "check": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "next_due_date": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "remove": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "status": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "subtask": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "token_unscoped": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        }
+      },
+      "token_write": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        }
       }
     }
   },
