@@ -98,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   yet changing or deleting it answered `403` and so gave away that it exists. It now answers
   `404` with `quick_links_link_not_found`, like a private quick link of someone else. Nothing
   changes for the two levels the app writes.
-- **Tasks, events and quick links decide "is this mine" for a single entry the way their
+- **Recurring events decide "is this series mine" the way the calendar list does.** If the creator stored with a series is not an account number - possible only after restoring a backup or editing the database directly, for example `0x2` - the calendar never counted the series as anyone's own, but a single occurrence of it that is shared with everyone could still offer "change this occurrence" to the account that text resembles. It no longer does. Events the app wrote itself are not affected.
   lists do.** If the creator stored with an entry is not an account number - possible only
   after restoring a backup or editing the database directly, for example `0x2` - the lists
   never counted the entry as anyone's own, but changing a task could treat it as yours. Such
