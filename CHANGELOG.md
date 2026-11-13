@@ -56,9 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API client that sent `category: ""` got a task with an empty category that none of your
   categories matches, and `priority: ""` failed with "Internal server error.". An empty value
   now counts as not given, exactly as leaving the field out: a new task gets "Miscellaneous"
-  and no priority, an
-  edited one keeps what it had. The app itself sent an empty category when its category list
-  had not loaded. The description is now stored without leading and trailing spaces, and one
+  and no priority, an edited one keeps what it had. The app itself sent an empty category when
+  its category list had not loaded. The description is now stored without leading and trailing spaces, and one
   that is empty or only spaces is stored as no description - also when you clear it on edit.
   When an AI assistant cannot reach the API from the server itself, the server log now says so
   with the cause and the address it tried, not only the assistant.
