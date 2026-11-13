@@ -51,7 +51,7 @@ async function call(method, path, body, asUser = USER_A) {
     body: body ? JSON.stringify(body) : undefined,
   });
   let json = null;
-  try { json = await res.json(); } catch (_) { /* empty */ }
+  try { json = await res.json(); } catch { /* empty */ }
   return { status: res.status, json };
 }
 

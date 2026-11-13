@@ -1429,7 +1429,7 @@ router.get('/', (req, res) => {
   // und die Wand steht in einem gemeinsamen Raum (Review zu #1591).
   try {
     const statuses = getAllStatuses();
-    result.familyStatuses = isDisplay ? statuses.map(({ note, ...rest }) => rest) : statuses;
+    result.familyStatuses = isDisplay ? statuses.map(({ note: _note, ...rest }) => rest) : statuses;
   } catch (err) {
     log.error('familyStatuses error:', err.message);
     result.familyStatuses = [];
