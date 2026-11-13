@@ -145,6 +145,16 @@ document visibility SQL into one file, and that file's header records why.
 - **Widget and module id notation:** `server/services/module-capabilities.js`, where
   `fullWidgetId()` composes them and `isWidgetId()` is built from the same parts.
 
+Since phase 2 (B1 to B4) every rule of who may see or use what stands in `server/authorize/`,
+and `server/authorize/index.ts` is its one door. Three guards in `npm run lint` keep it there
+(B5): `RIGHTS-SQL` reports a visibility literal in SQL anywhere else under `server/`, and the few
+that stay - a write filter that narrows a row, never a read - are listed in
+`lint-baseline-reasons.json` with their reason; `RIGHTS-MODULE` fails on a module level compared
+with `'none'` outside the permission module; and the import rule `rights-only-through-authorize`
+fails on any import of an inner file of `server/authorize/` from outside, tests apart. The
+schema, its test mirror and the API documentation may spell visibility values, because they
+write or describe them.
+
 ### What counts as undoing it
 
 An `isAdmin` or ownership check inlined at a call site instead of the shared predicate. A

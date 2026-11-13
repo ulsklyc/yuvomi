@@ -188,6 +188,11 @@ The same script runs dependency-cruiser with the layer rules in `.dependency-cru
 import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
 named files import `server/services/push.js`, and only that file imports `web-push`; the server
 reads nothing from `public/` but `utils/` and `locales/`; `public/` never imports `server/`.
+The rights rules keep every permission rule in `server/authorize/`: outside it no module imports
+anything but `server/authorize/index.ts` (`rights-only-through-authorize`), the permission module
+never reaches `server/db.js` (`authorize-not-to-db`), no file under `server/` compares a module
+level with `'none'` (`RIGHTS-MODULE`), all three hard, and a visibility literal in SQL there
+(`RIGHTS-SQL`) stands only as a listed exception with its reason, like `ERROR-TEXT` below.
 knip (`knip.json`) adds dead code: files no entry point reaches, exports nobody imports, an export
 under two names, packages imported but not listed and listed but not used. Its entry points are the
 server, the router and pages, the three facades, the classic scripts the HTML pages load, the two
@@ -205,7 +210,8 @@ so a suppression needs the same review as the finding it hides; one without a ru
 names `no-restricted-syntax` is a hard finding. A file that is renamed or split takes its keys
 along by hand: move them to the new path in `lint-baseline.json` with the same or lower counts.
 
-The `ERROR-TEXT` rule (no text of an exception in a response, see [Backend](#backend)) keeps a list
+The `ERROR-TEXT` rule (no text of an exception in a response, see [Backend](#backend)) and the
+`RIGHTS-SQL` rule (a write filter that narrows a row, never a read) keep a list
 of exceptions rather than a debt list: each of its baseline keys needs a reason of at least twenty
 characters under the same key in `lint-baseline-reasons.json` - why the text is our own and behind
 which gate. A reason without a baseline key fails as well, and `--update` drops the reason of a key

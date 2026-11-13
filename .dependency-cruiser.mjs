@@ -204,6 +204,16 @@ export default {
       to: { path: '^server/db\\.[jt]s$', reachable: true },
     },
     {
+      name: 'rights-only-through-authorize',
+      comment: 'A rights predicate has exactly one door (phase 2, F2): outside server/authorize/ a module imports '
+        + 'only server/authorize/index.ts, never an inner seam (actor, catalog, modules, care, rows/). '
+        + 'Tests are not walked by the lint run and are left out on purpose: a test may import an inner seam '
+        + 'to check it on its own (test:authorize-modules, test:authorize-rows).',
+      severity: 'error',
+      from: { pathNot: ['^server/authorize/', '^test/'] },
+      to: { path: '^server/authorize/', pathNot: '^server/authorize/index\\.ts$' },
+    },
+    {
       name: 'server-not-to-public-except-shared',
       comment: 'The server imports from public/ only the frozen list SERVER_PUBLIC_IMPORTS, until phase 4 moves them to shared/.',
       severity: 'error',
