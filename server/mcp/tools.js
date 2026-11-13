@@ -37,7 +37,9 @@ import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { loadTagsFor, normalizeTags, tagKey } from '../utils/task-tags.js';
 import { readBindAddress, selfCallHost } from '../utils/bind-address.js';
+import { createLogger } from '../logger.js';
 
+const log = createLogger('MCP');
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
 // Spiegelt server/routes/tasks.js. Diese Liste ist dort ebenfalls fest
@@ -160,11 +162,14 @@ function pickFields(row, fields) {
  * client that serializes an unset optional argument as `null` sends
  * `{ category: null }`, and the route reads that differently - `textShape`
  * WITHOUT `{ nullable: true }` makes it "category must be text.", a 400. `''`
- * passes the route's checks, but its defaults (`category = FALLBACK_CATEGORY`,
- * `priority = 'none'`) apply to `undefined` only: the row got the orphan key
- * `''` (cleaned up by migration v114), `priority: ''` ran into the CHECK as a
- * 500, `description: ''` stored `''` instead of NULL. No field of the three
- * tool schemas is nullable, and none gives `''` a meaning of its own.
+ * passes the route's checks; until the task route read it itself
+ * (`normalizeBlankTaskFields` in server/routes/tasks.js), its defaults
+ * (`category = FALLBACK_CATEGORY`, `priority = 'none'`) applied to `undefined`
+ * only: the row got the orphan key `''` (cleaned up by migration v114),
+ * `priority: ''` ran into the CHECK as a 500, `description: ''` stored `''`
+ * instead of NULL. Dropping `''` here keeps the tool independent of each
+ * route's reading. No field of the three tool schemas is nullable, and none
+ * gives `''` a meaning of its own.
  * @param {Record<string, any>} fields
  * @returns {Record<string, any>}
  */
@@ -635,10 +640,26 @@ async function internalApiRequest(ctx, method, path, {
   // tool." - ein Satz, aus dem niemand den Namen der Einstellung errät. Die
   // Meldung ist fest: weder der Text der Bibliothek (Regel ERROR-TEXT) noch die
   // interne Adresse geht hinaus. Der Originalfehler bleibt als `cause` am Fehler.
+  //
+  // Der Betreiber sieht ihn im Log: Ursache und Basisadresse, diese ohne
+  // Zugangsdaten aus der URL, und keine Koepfe - die tragen das weitergereichte
+  // Token oder den Session-Cookie. Pfad und Query der Anfrage bleiben draussen.
   let response;
   try {
     response = await fetch(url, options);
   } catch (cause) {
+    const base = new URL(`${internalBaseUrl()}/`);
+    base.username = '';
+    base.password = '';
+    base.search = '';
+    base.hash = '';
+    // Name and code only, never the cause's text: undici quotes an invalid
+    // header value in its message, and the headers carry the forwarded token.
+    log.warn('Loopback to the own API failed', {
+      base: base.href.replace(/\/+$/, ''),
+      cause: cause instanceof Error ? cause.name : typeof cause,
+      code: cause?.cause?.code,
+    });
     throw new ToolError(
       'Could not reach the Yuvomi API from the server itself. '
       + 'Set MCP_INTERNAL_BASE_URL to an address the app can reach locally '

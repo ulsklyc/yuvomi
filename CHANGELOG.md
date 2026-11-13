@@ -52,6 +52,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cookie alone is refused. When the API refuses a call with a machine-readable reason, the error
   text of these tools and of `call_api_operation` now ends in it, for example
   `[reason: csrf_invalid]`.
+- **Creating or editing a task with an empty category or priority no longer breaks it.** An
+  API client that sent `category: ""` got a task with an empty category that none of your
+  categories matches, and `priority: ""` failed with "Internal server error.". An empty value
+  now counts as not given, exactly as leaving the field out: a new task gets "Miscellaneous"
+  and no priority, an edited one keeps what it had. The app itself sent an empty category when
+  its category list had not loaded. The description is now stored without leading and trailing spaces, and one
+  that is empty or only spaces is stored as no description - also when you clear it on edit.
+  When an AI assistant cannot reach the API from the server itself, the server log now says so
+  with the cause and the address it tried, not only the assistant.
 - **"Create backup now" no longer reports success when the backup failed.** The server answers
   a failed manual run with `200` and `success: false`, and the page showed "Backup created
   successfully." without reading the answer. It now shows the reason in your language, the
