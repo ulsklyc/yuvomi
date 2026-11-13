@@ -551,14 +551,34 @@ function validateTags(value) {
 }
 
 /**
- * Ein leerer String in einem Tagesfeld heisst "kein Wert". Die Validatoren
- * lassen '' durch, und die Zeile trug danach '' statt NULL, gegen
- * `format: date` in der Spec und gegen jede Abfrage auf `IS NULL`.
+ * Leere Strings lesen, bevor validiert und geschrieben wird - die eine Stelle
+ * fuer POST und PUT. Die Validatoren lassen '' durch (`v.oneOf` definiert es
+ * ausdruecklich als "nicht angegeben"), und danach trug die Zeile den Wert roh.
+ *
+ * - Tagesfelder: '' heisst "kein Wert" und wird NULL - sonst stand '' in der
+ *   Zeile, gegen `format: date` in der Spec und gegen jede Abfrage auf `IS NULL`.
+ * - Kategorie und Prioritaet: '' heisst "nicht angegeben", wie bei `v.oneOf`.
+ *   Das Feld faellt weg, damit dieselbe Vorgabe greift wie beim Weglassen:
+ *   beim Anlegen `misc`/`none`, beim Aktualisieren der Bestand. Vorher trug die
+ *   Zeile den Kategorie-Key '' (die Waisen, die Migration v114 geputzt hat),
+ *   und '' als Prioritaet lief in den CHECK und kam als 500 zurueck. Die App
+ *   schickt '' fuer die Kategorie, wenn ihre Kategorienliste leer geladen ist.
+ * - Beschreibung: getrimmt, leer oder nur Leerzeichen wird NULL - wie im
+ *   Kalender, der den Wert aus `v.str` schreibt. Vorher stand der rohe Wert in
+ *   der Zeile. Beim PUT ist '' damit ein gewolltes Leeren.
+ *
+ * Nur Strings werden angefasst: eine falsche Form bleibt, wie sie ist, und
+ * `v.textShape` weist sie ab.
  */
-function blankDayFieldsToNull(body) {
+function normalizeBlankTaskFields(body) {
+  if (!body || typeof body !== 'object') return;
   for (const field of ['start_date', 'due_date', 'due_time']) {
-    if (body?.[field] === '') body[field] = null;
+    if (body[field] === '') body[field] = null;
   }
+  for (const field of ['category', 'priority']) {
+    if (body[field] === '') delete body[field];
+  }
+  if (typeof body.description === 'string') body.description = body.description.trim() || null;
 }
 
 /**
@@ -1280,7 +1300,7 @@ router.get('/:id', (req, res) => {
 // --------------------------------------------------------
 router.post('/', (req, res) => {
   try {
-    blankDayFieldsToNull(req.body);
+    normalizeBlankTaskFields(req.body);
     const errors = validateTaskInput(req.body, true);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1471,7 +1491,7 @@ router.put('/:id', (req, res) => {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
-    blankDayFieldsToNull(req.body);
+    normalizeBlankTaskFields(req.body);
     const errors = validateTaskInput(req.body, false, task.recurrence_rule);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 

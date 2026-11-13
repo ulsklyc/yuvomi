@@ -166,6 +166,60 @@ test('POST/PUT: falsche Formen sind 400, leere Tagesfelder werden null', async (
   );
 });
 
+// Vorher: '' in Kategorie lief am eigenen Validator vorbei in die Zeile (der
+// Waisen-Key, den Migration v114 geputzt hat), '' in Prioritaet in den CHECK
+// (500), und die Beschreibung stand ungetrimmt in der Zeile, '   ' als '   '.
+test('POST: leere Kategorie/Prioritaet heissen "nicht angegeben", Beschreibung getrimmt', async () => {
+  const as = { id: ALICE, role: 'admin' };
+  /** @param {number} id */
+  const rowOf = (id) => ({ .../** @type {any} */ (db.prepare('SELECT category, priority, description FROM tasks WHERE id = ?').get(id)) });
+
+  const cat = await call('POST', '/', { as, body: { title: 'Leere Kategorie', category: '' } });
+  assert.equal(cat.status, 201);
+  assert.equal(rowOf(cat.body.data.id).category, 'misc');
+
+  const prio = await call('POST', '/', { as, body: { title: 'Leere Prioritaet', priority: '' } });
+  assert.equal(prio.status, 201, JSON.stringify(prio.body));
+  assert.equal(rowOf(prio.body.data.id).priority, 'none');
+
+  const blankDesc = await call('POST', '/', { as, body: { title: 'Leere Beschreibung', description: '   ' } });
+  assert.equal(blankDesc.status, 201);
+  assert.equal(rowOf(blankDesc.body.data.id).description, null);
+
+  const padded = await call('POST', '/', { as, body: { title: 'Gepolstert', description: '  x  ' } });
+  assert.equal(padded.status, 201);
+  assert.equal(rowOf(padded.body.data.id).description, 'x');
+});
+
+// Beim PUT heisst "weggelassen" "unveraendert": '' in Kategorie oder Prioritaet
+// laesst den Bestand stehen, statt einen Waisen-Key oder einen 500 zu erzeugen.
+// '' in der Beschreibung ist ein gewolltes Leeren und wird NULL.
+test('PUT /:id: leere Kategorie/Prioritaet lassen den Bestand, leere Beschreibung wird NULL', async () => {
+  const as = { id: ALICE, role: 'admin' };
+  /** @param {number} id */
+  const rowOf = (id) => ({ .../** @type {any} */ (db.prepare('SELECT category, priority, description FROM tasks WHERE id = ?').get(id)) });
+  const id = (await call('POST', '/', {
+    as, body: { title: 'Bestand', category: 'school', priority: 'high', description: 'Text' },
+  })).body.data.id;
+
+  assert.equal((await call('PUT', `/${id}`, { as, body: { category: '' } })).status, 200);
+  assert.equal(rowOf(id).category, 'school');
+
+  const prio = await call('PUT', `/${id}`, { as, body: { priority: '' } });
+  assert.equal(prio.status, 200, JSON.stringify(prio.body));
+  assert.equal(rowOf(id).priority, 'high');
+
+  assert.equal((await call('PUT', `/${id}`, { as, body: { description: '  y  ' } })).status, 200);
+  assert.equal(rowOf(id).description, 'y');
+
+  assert.equal((await call('PUT', `/${id}`, { as, body: { description: '   ' } })).status, 200);
+  assert.equal(rowOf(id).description, null);
+
+  await call('PUT', `/${id}`, { as, body: { description: 'wieder' } });
+  assert.equal((await call('PUT', `/${id}`, { as, body: { description: '' } })).status, 200);
+  assert.equal(rowOf(id).description, null);
+});
+
 // --------------------------------------------------------
 // GET-Filter + GET /:id
 // --------------------------------------------------------

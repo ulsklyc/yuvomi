@@ -901,6 +901,40 @@ test('Loopback nicht erreichbar: eine Meldung mit MCP_INTERNAL_BASE_URL, kein in
   assert.equal(internalErrors.length, before);
 });
 
+test('Loopback nicht erreichbar: der Betreiber sieht Ursache und Basisadresse im Log, ohne Zugangsdaten', async (t) => {
+  // Vorher sah nur der Client den Fehler. Die Meldung an ihn bleibt dieselbe;
+  // im Log stehen Ursache und Adresse, aber weder URL-Zugangsdaten noch Koepfe.
+  /** @type {any[][]} */
+  const warned = [];
+  t.mock.method(console, 'warn', (/** @type {any[]} */ ...args) => { warned.push(args); });
+  const previousBase = process.env.MCP_INTERNAL_BASE_URL;
+  process.env.MCP_INTERNAL_BASE_URL = 'http://ops:geheim@127.0.0.1:1/yuvomi';
+  const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1'), { code: 'ECONNREFUSED' });
+  installFetchMock(async () => { throw new TypeError('fetch failed', { cause }); });
+  let res;
+  try {
+    res = await toolCallWithHeaders('create_task', { title: 'Unerreichbar geloggt' },
+      { authorization: 'Bearer mcp-geheim-token', cookie: 'yuvomi.sid=geheim-cookie' });
+  } finally {
+    global.fetch = realFetch;
+    if (previousBase === undefined) delete process.env.MCP_INTERNAL_BASE_URL;
+    else process.env.MCP_INTERNAL_BASE_URL = previousBase;
+  }
+  assert.equal(res.result.content[0].text,
+    'Could not reach the Yuvomi API from the server itself. '
+    + 'Set MCP_INTERNAL_BASE_URL to an address the app can reach locally '
+    + '(for example http://127.0.0.1:3000).');
+
+  const lines = warned.filter((args) => args[0] === '[MCP]');
+  assert.equal(lines.length, 1, `genau eine Logzeile, bekommen: ${JSON.stringify(warned)}`);
+  assert.deepEqual(lines[0], ['[MCP]', 'Loopback to the own API failed', {
+    base: 'http://127.0.0.1:1/yuvomi',
+    cause: 'fetch failed',
+    code: 'ECONNREFUSED',
+  }]);
+  assert.doesNotMatch(JSON.stringify(warned), /geheim|ops:|Bearer|yuvomi\.sid/);
+});
+
 // ── OpenAPI-Brücke: Metadaten (list/get) ─────────────────────────────────────
 
 test('list_api_operations / get_api_operation: spiegeln die Live-OpenAPI-Spec', async () => {
