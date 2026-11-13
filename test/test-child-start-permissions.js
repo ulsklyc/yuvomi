@@ -37,7 +37,7 @@ const { callTool } = await import('../server/mcp/tools.js');
 const {
   resolvePermissions, buildSessionModuleAccess, moduleAccessVerdict,
   applyChildStartPermissions, permissionCatalog, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED,
-} = await import('../server/permissions.js');
+} = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 function addUser(username, role, familyRole) {

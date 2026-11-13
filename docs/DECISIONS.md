@@ -78,7 +78,7 @@ One rule, one place, so a future change cannot be forgotten in a copy:
   subscriptions (`icsSubscriptionVisibleWhere()`, SPEC "deliberately not filtered").
 - **Health:** `server/routes/health/caregivers.js`. Grants are per person, managed by admins,
   and every member can read their own.
-- **Invitations:** `INVITE_PRESETS` in `server/permissions.js`, default `restricted`, and the
+- **Invitations:** `INVITE_PRESETS` in `server/authorize/catalog.ts`, default `restricted`, and the
   invite handler in `server/auth.js`, where a *missing* field means the narrow template so
   that an older client cannot invite with full access by accident.
 
@@ -138,7 +138,7 @@ document visibility SQL into one file, and that file's header records why.
 - **Tasks and events:** `visibilityWhere()` in `server/services/visibility.js`. **Budget:**
   `server/services/budget-visibility.js`, owner-based and without an admin bypass.
 - **Module permission:** `moduleAccessVerdict()` and `deniedModules()` in
-  `server/permissions.js`. The path middleware and the MCP tool layer call the same verdict,
+  `server/authorize/modules.ts`. The path middleware and the MCP tool layer call the same verdict,
   and a route that carries several modules sorts with `deniedModules()`, because a middleware
   that reads the path cannot know what such a route returns.
 - **Widget and module id notation:** `server/services/module-capabilities.js`, where
@@ -686,7 +686,7 @@ forgot to ask about.
 
 ### Where the rule lives
 
-- `mayWriteModule()` in `server/permissions.js`, both axes in one call. The transfer routes ask it
+- `mayWriteModule()` in `server/authorize/modules.ts`, both axes in one call. The transfer routes ask it
   before any lookup that could answer 404, so a refusal does not confirm that an id exists: the
   `to-shopping-list` routes in `server/routes/meals.js` and `server/routes/recipes.js` for
   `shopping`, `import-meal-plan` and the undo of a meal transfer in `server/routes/shopping.js` for
@@ -784,7 +784,7 @@ each module's own ICS feed, and incoming calendar, reminder and contact sync.
 
 - `server/services/household-modules.js`: `householdDisabledModules()` is the one reading of the
   stored value. `modulesLeftOut()` merges it with what `hiddenModulesFor()` in
-  `server/permissions.js` withholds from this caller, one set for a mixed answer.
+  `server/authorize/modules.ts` withholds from this caller, one set for a mixed answer.
   `birthdaysSwitchedOff()` and `notBirthdayEventSql()` are for the birthday events that live in
   `calendar_events`. Not in a middleware: the path of a mixed answer names none of the modules it
   carries.

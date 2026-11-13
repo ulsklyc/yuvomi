@@ -27,13 +27,14 @@
  * test:authorize-actor holds this in a child process.
  *
  * Dependencies: server/logger.js, server/middleware/require-admin.js,
- *   server/permissions.js (none of them loads db.js).
+ *   catalog.ts, modules.ts (none of them loads db.js).
  * Erasable TS syntax only (runs through type stripping, no build).
  */
 
 import { createLogger } from '../logger.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { buildSessionModuleAccess, resolvePermissions, userForRequest } from '../permissions.js';
+import { resolvePermissions } from './catalog.ts';
+import { buildSessionModuleAccess, userForRequest } from './modules.ts';
 
 // The logger of server/auth.js: the resolution moved, its log line did not change.
 const log = createLogger('Auth');

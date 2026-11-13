@@ -36,7 +36,7 @@ const { baseUrl: BASE } = await startTestServer({
   env: { SESSION_SECRET: 'test-denied-module-feeds-secret-32chars', TRUST_PROXY: '1' },
 });
 const db = (await import('../server/db.js')).get();
-const { PERMISSION_MODULES } = await import('../server/permissions.js');
+const { PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 // Read as a namespace, not destructured: against a state without the map the
 // guard below turns red on its own instead of taking the whole suite down.
 const origins = await import('../server/services/reminder-origins.js');

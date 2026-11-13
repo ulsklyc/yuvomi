@@ -35,7 +35,7 @@
 
 import { reminderDateBefore } from '../utils/reminder-schedule.js';
 import { todayKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { predictCycle } from '../../public/utils/health-cycle.js';
 import { healthCycleViews } from '../routes/preferences.js';

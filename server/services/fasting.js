@@ -1,4 +1,4 @@
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import { summarizeFastingRows, fastingStreaks, weeklyFastingSeries } from './fasting-stats.js';
 import { fastingDateKeyFactory, parseFastingDateRange, rowMatchesFastingDateRange } from './fasting-dates.js';
 import { householdTimeZone, shiftDateKey, todayKey } from '../utils/timezone.js';

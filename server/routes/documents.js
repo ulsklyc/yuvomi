@@ -10,7 +10,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, date as validateDate, num, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { mayReadModule } from '../permissions.js';
+import { mayReadModule } from '../authorize/index.ts';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from '../services/visibility.js';
 import { budgetDetailsVisibleWhere, resolveBudgetMode } from '../services/budget-visibility.js';
 import { reminderDateBefore, reminderIsInThePast } from '../utils/reminder-schedule.js';

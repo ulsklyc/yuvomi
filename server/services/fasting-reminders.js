@@ -2,7 +2,7 @@
  * Own-only fasting reminders.  A reminder points directly at the fasting row,
  * so reconciliation can be idempotent without an additional anchor table.
  */
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import { householdDisabledModules } from './household-modules.js';
 
 const GOAL_TYPE = 'fasting_goal';

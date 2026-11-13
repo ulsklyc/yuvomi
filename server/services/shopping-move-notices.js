@@ -4,7 +4,7 @@
  *        Absage des Ziels, Zielliste auf dem Server fort, Frist aus #1911),
  *        erfährt es die Person, die verschoben hat - an der Glocke, als
  *        sofort fällige Erinnerung `shopping_move_returned`.
- * Abhängigkeiten: server/permissions.js, server/services/account-state.js
+ * Abhängigkeiten: server/authorize/, server/services/account-state.js
  *
  * EINE MOMENTAUFNAHME, KEIN VERWEIS: nach der Frist steht der Artikel auf einer
  * abgeschalteten Liste, und der nächste Abruf nimmt ihn dort lokal fort. Die
@@ -13,7 +13,7 @@
  * auf die Liste.
  */
 
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import { activeAccountSql } from './account-state.js';
 
 /**
@@ -22,7 +22,7 @@ import { activeAccountSql } from './account-state.js';
  * deaktiviert) oder ohne Einkaufsrecht bleibt es beim Log des Aufrufers.
  * Synchron, in der Transaktion des Rückwegs.
  *
- * @param {object} database
+ * @param {import('../authorize/index.ts').Database} database
  * @param {{movedBy: number|null, itemId: number, itemName: string,
  *          backListId: number, targetListId: number, reason: 'refused'|'waited'}} notice
  * @returns {number|null} die Kennung der Meldung

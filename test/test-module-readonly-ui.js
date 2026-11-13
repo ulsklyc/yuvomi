@@ -5094,7 +5094,7 @@ test('Haushaltshilfe hat keine Display-Ausnahme, und ein Display erreicht die Se
     'gaebe es hier eine Route, brauchte die Seite ein actingAsDisplay() VOR der Modulregel');
   const scopes = display.slice(display.indexOf('DISPLAY_SCOPES = Object.freeze(['));
   assert.ok(!/housekeeping:/.test(scopes.slice(0, scopes.indexOf(']);'))),
-    'ohne Scope setzt server/permissions.js das Modul fuer ein Display auf none - die Seite ist fuer es nicht offen');
+    'ohne Scope setzt server/authorize/catalog.ts das Modul fuer ein Display auf none - die Seite ist fuer es nicht offen');
 });
 
 test('Aufgaben-Dokumente ohne Dokumentenrecht: keine Zahl, keine Zeile, kein Link auf /documents/null (#1358)', () => {

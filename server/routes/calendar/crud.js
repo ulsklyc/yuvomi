@@ -30,7 +30,7 @@ import { documentViewer } from '../../services/document-links.js';
 import {
   ATTACHMENT_NARROW_ONLY, documentClonePredicate, documentWidenPredicate,
 } from '../../services/document-access.js';
-import { mayChangeRecord, mayWriteModule, sendNotOwner } from '../../permissions.js';
+import { mayChangeRecord, mayWriteModule, sendNotOwner } from '../../authorize/index.ts';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import { localCalendarColorSql, localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
 import {

@@ -161,7 +161,7 @@ test('keine Quelldatei enthaelt ein rohes NUL-Byte', () => {
       if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (/\.(js|mjs|json|css|html)$/.test(entry.name)) files.push(full);
+      else if (/\.(js|mjs|ts|json|css|html)$/.test(entry.name)) files.push(full);
     }
   };
   for (const r of roots) walk(path.join(ROOT, r));

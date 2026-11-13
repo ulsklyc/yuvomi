@@ -20,7 +20,7 @@
 
 import { reminderDateBefore, reminderIsInThePast, REMINDER_TIME_SUFFIX } from '../utils/reminder-schedule.js';
 import { todayKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { activeAccountSql } from './account-state.js';

@@ -25,7 +25,7 @@ register('./test-browser-loader.mjs', import.meta.url);
 const { __test } = await import('../public/pages/dashboard.js');
 const { renderWasteWidget, listRowCap } = __test;
 const widgetsUtil = await import('../public/utils/dashboard-widgets.js');
-const permissions = await import('../server/permissions.js');
+const permissions = await import('../server/authorize/index.ts');
 
 const src = () => readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
 

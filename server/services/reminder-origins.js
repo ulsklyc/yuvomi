@@ -9,13 +9,13 @@
  *          all; until #1289 it did not ask about the recipient's permissions.
  *          The medication scheduler, which sends without `reminders` rows,
  *          asks the same recipient verdict since #2602.
- * Dependencies: server/services/household-modules.js, server/permissions.js,
+ * Dependencies: server/services/household-modules.js, server/authorize/,
  *   server/authorize/ (actorForUser; it loads no server/db.js either)
  */
 import { householdDisabledModules } from './household-modules.js';
 // The delivery passes in its own connection; the actor without a request
 // (server/authorize/, phase 2 B1) reads through exactly that connection.
-import { deniedModules } from '../permissions.js';
+import { deniedModules } from '../authorize/index.ts';
 import { actorForUser } from '../authorize/index.ts';
 
 /* ONE MAP OVER ALL ORIGINS, WITH NO EXCEPTION FOR THE NEWEST ONE.
@@ -142,7 +142,7 @@ export function withoutSwitchedOffModules(database, rows) {
  * medication scheduler (#2602, which sends without `reminders` rows), and
  * the calendar feeds (#2615, server/index.js).
  *
- * @param {object} database
+ * @param {import('../authorize/index.ts').Database} database
  * @param {number} userId
  * @returns {Set<string>|null}
  */
@@ -180,7 +180,7 @@ export function recipientDeniedModules(database, userId) {
  *
  * BIRTHDAYS NEED NO EXCEPTION HERE, unlike for the household switch:
  * `birthdays` is not a permission module but a nav id under `calendar`
- * (PERMISSION_MODULES in server/permissions.js). Whoever lacks the calendar
+ * (PERMISSION_MODULES in server/authorize/catalog.ts). Whoever lacks the calendar
  * lacks the birthdays - special handling would invent a distinction the
  * permission matrix does not even offer.
  *
@@ -191,7 +191,7 @@ export function recipientDeniedModules(database, userId) {
  *
  * Synchronous, without `await`: the caller reads the rows right before.
  *
- * @param {object} database
+ * @param {import('../authorize/index.ts').Database} database
  * @param {Array<{entity_type: string, created_by: number}>} rows
  * @returns {Array} the same row objects, filtered
  */

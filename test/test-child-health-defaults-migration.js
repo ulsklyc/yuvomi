@@ -23,7 +23,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const dbmod = await import('../server/db.js');
-const { applyChildStartPermissions, CHILD_START_PREFERENCES } = await import('../server/permissions.js');
+const { applyChildStartPermissions, CHILD_START_PREFERENCES } = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 const migration = dbmod.MIGRATIONS.find((m) => m.version === 258);

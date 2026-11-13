@@ -5,7 +5,7 @@
  */
 
 import { createLogger } from '../logger.js';
-import { mayWriteModule, requestHasCapability } from '../permissions.js';
+import { mayWriteModule, requestHasCapability } from '../authorize/index.ts';
 import express from 'express';
 import * as db from '../db.js';
 import { documentVisibleSql } from '../services/document-access.js';
@@ -29,7 +29,7 @@ import { uniqueKey } from '../utils/category-slug.js';
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { householdMemberSql, isHouseholdMember, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';

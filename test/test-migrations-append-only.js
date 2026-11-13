@@ -305,7 +305,7 @@ test('jede Migration nennt neben ihrer Version auch eine Beschreibung', () => {
   assert.deepEqual(findings, [], findings.join('\n  '));
 });
 
-test('kein Migrationseintrag ruft Laufzeit-Code aus services/, routes/ oder permissions.js', () => {
+test('kein Migrationseintrag ruft Laufzeit-Code aus services/, routes/ oder server/authorize/', () => {
   // EINE MIGRATION TUT FUER IMMER DASSELBE. Ruft ein Eintrag eine geteilte
   // Laufzeitregel auf, aendert jede spaetere Aenderung an ihr rueckwirkend,
   // was die Migration auf einer noch nicht migrierten Installation tut - und

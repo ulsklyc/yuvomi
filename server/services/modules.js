@@ -11,7 +11,7 @@ import { createLogger } from '../logger.js';
 import { getSupportedLocales } from '../utils/i18n.js';
 import { normalizeCapabilities, buildExtensionCatalog, MODULE_ID_RE as ID_RE } from './module-capabilities.js';
 import { setExtensionScopeModules } from '../scopes.js';
-import { setExtensionPermissionCatalog } from '../permissions.js';
+import { setExtensionPermissionCatalog } from '../authorize/index.ts';
 
 const log = createLogger('Modules');
 

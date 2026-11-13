@@ -10,7 +10,7 @@ import * as db from '../db.js';
 import * as v from '../middleware/validate.js';
 import { syncAllBirthdayReminders } from '../services/birthdays.js';
 import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-fanout.js';
-import { deniedModules } from '../permissions.js';
+import { deniedModules } from '../authorize/index.ts';
 import { tokenAllows } from '../scopes.js';
 import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
 import { reminderTargetVisible, reminderTargetVisibleSql } from '../services/reminder-targets.js';

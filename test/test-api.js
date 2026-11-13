@@ -1015,7 +1015,8 @@ function nonLiteralReasonSites(root = serverRoot, source = null) {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) { walk(new URL(`${name}/`, dir), `${rel}${name}/`); continue; }
-      if (name.endsWith('.js')) scan(`${rel}${name}`, readFileSync(url, 'utf8'));
+      // .ts too: server/authorize/ is TypeScript, and sendNotOwner() builds a 403 with a reason there (B2).
+      if (/\.(js|ts)$/.test(name)) scan(`${rel}${name}`, readFileSync(url, 'utf8'));
     }
   }(root, ''));
   return sites;
@@ -1076,7 +1077,8 @@ function refusalReasonsAtTheServer() {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) { walk(new URL(`${name}/`, dir), `${rel}${name}/`); continue; }
-      if (!name.endsWith('.js')) continue;
+      // .ts too: sendNotOwner() in server/authorize/modules.ts sends `not_owner` (B2).
+      if (!/\.(js|ts)$/.test(name)) continue;
       const src = readFileSync(url, 'utf8');
       // `{ error: ..., code: 403, reason: 'x' }`, auch ueber mehrere Zeilen:
       // die Anweisung beginnt an der letzten Zeile mit `return` oder `const`.
@@ -1175,7 +1177,7 @@ test('jeder 403-Satz ohne reason sagt nur, dass die Berechtigung fehlt', () => {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) walk(new URL(`${name}/`, dir), `${rel}${name}/`);
-      else if (name.endsWith('.js')) files.push(`${rel}${name}`);
+      else if (/\.(js|ts)$/.test(name)) files.push(`${rel}${name}`);
     }
   }(serverRoot, ''));
 

@@ -4,7 +4,7 @@
  *        Familienrolle und pro einzelnem Mitglied (#467). Die verbindliche
  *        Durchsetzung liegt in server/index.js (Session-Gate) — diese Routen
  *        pflegen nur die Konfiguration.
- * Abhängigkeiten: express, server/db.js, server/permissions.js, server/auth.js
+ * Abhängigkeiten: express, server/db.js, server/authorize/, server/auth.js
  */
 
 import express from 'express';
@@ -17,7 +17,7 @@ import {
   getSubjectPermissions,
   writeSubjectPermissions,
   isValidFamilyRole,
-} from '../permissions.js';
+} from '../authorize/index.ts';
 import { syncFastingRemindersForUser } from '../services/fasting-reminders.js';
 import { revokePaymentTasksForUsers } from '../services/payment-task-audience.js';
 

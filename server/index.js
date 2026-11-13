@@ -115,7 +115,7 @@ import scheduleFeedRouter from './routes/schedule-feed.js';
 import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
 import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
-import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
+import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './authorize/index.ts';
 import { FEED_MODULE, recipientDeniedModules } from './services/reminder-origins.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
@@ -790,7 +790,7 @@ app.use('/api/v1', (req, res, next) => {
 // erreichbar, damit die App bedienbar bleibt. Admins haben sessionModuleAccess
 // === null (Bypass), ebenso unbeschränkte Mitglieder (Fast-Path).
 app.use('/api/v1', (req, res, next) => {
-  // Die Regel selbst steht in permissions.js — dieselbe Funktion prüft den
+  // Die Regel selbst steht in server/authorize/modules.ts — dieselbe Funktion prüft den
   // MCP-Endpoint (#823), damit beide Oberflächen nicht auseinanderlaufen.
   //
   // AUSNAHME /schedule/preferences (S-12, UX-Audit): der Vorlauf/die
@@ -818,7 +818,7 @@ app.use('/api/v1', (req, res, next) => {
   // jeden Hinweis worauf.
   //
   // DIE MODULSTUFE AUF `write` ZU HEBEN WAERE DER FALSCHE WEG GEWESEN. Sie
-  // steuert auch, was die App ZEICHNET (permissions.js, „Navigation, Kacheln und
+  // steuert auch, was die App ZEICHNET (server/authorize/catalog.ts, „Navigation, Kacheln und
   // der Anlege-Knopf" folgen derselben Quelle) - ein Display bekaeme dann
   // Anlegen-, Bearbeiten- und Loeschen-Knoepfe, die der Server hinterher
   // abweist. Die Erlaubnis ist keine Modulstufe, sondern genau zwei Routen, und

@@ -31,7 +31,7 @@ import {
   queueEventDeletion,
   markInlineOutbound,
 } from '../services/calendar-outbound.js';
-import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW, requestHasCapability } from '../permissions.js';
+import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW, requestHasCapability } from '../authorize/index.ts';
 import { documentVisibleSql } from '../services/document-access.js';
 import { tokenAllows } from '../scopes.js';
 import {
@@ -762,7 +762,7 @@ function visitCapabilities(row, req, viewer = MASKED_RECEIPTS) {
 // LOEHNE, ZAHLUNGEN UND BETRAEGE SIND EINE EIGENE FRAGE (R20). Das Modulrecht
 // sagt, ob jemand die Haushaltshilfe sieht und bedient; die Capability
 // `housekeeping_view_amounts` sagt, ob er dabei Geld sieht. Neue Kinderkonten
-// starten ohne sie (CHILD_START_PERMISSIONS in server/permissions.js).
+// starten ohne sie (CHILD_START_PERMISSIONS in server/authorize/catalog.ts).
 // Das Urteil reist im selben Objekt wie das zum Beleg (`receiptAccess`), weil
 // es an genau denselben Serialisierern haengt - und ein Serialisierer, der es
 // nicht bekommt, gibt wie beim Beleg nichts heraus (MASKED_RECEIPTS).

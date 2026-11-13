@@ -57,7 +57,7 @@ process.env.MCP_INTERNAL_BASE_URL = BASE;
 
 const db = (await import('../server/db.js')).get();
 const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
-const { PERMISSION_MODULES } = await import('../server/permissions.js');
+const { PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 const { MODULE_KEYS } = await import('../server/scopes.js');
 const { DISPLAY_COOKIE } = await import('../server/services/display-accounts.js');
 const { recipientDeniedModules } = await import('../server/services/reminder-origins.js');

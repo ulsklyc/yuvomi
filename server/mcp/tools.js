@@ -11,7 +11,7 @@
  *      erbt exakt die Rechte des aufrufenden API-Tokens; Rollen- und
  *      CSRF-Prüfung greifen serverseitig auf `/api/v1/*` wie bei jedem Client.
  * Abhängigkeiten: server/middleware/validate.js, server/openapi.js,
- *                  server/scopes.js + server/permissions.js (Rechte-Durchsetzung)
+ *                  server/scopes.js + server/authorize/ (Rechte-Durchsetzung)
  *
  * Architektur: Jedes Tool ist EIN Eintrag in der Registry (Definition + Handler
  *   zusammen) — daraus werden `tools/list` und der Dispatch abgeleitet, damit
@@ -25,7 +25,7 @@ import * as v from '../middleware/validate.js';
 import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
 import { tokenAllows } from '../scopes.js';
-import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../authorize/index.ts';
 import { householdTimeZone, todayKey } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { visibilityWhere } from '../services/visibility.js';

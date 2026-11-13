@@ -19,7 +19,7 @@ import {
   visibilityWhere,
 } from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
-import { hiddenModulesFor, requestHasCapability } from '../permissions.js';
+import { hiddenModulesFor, requestHasCapability } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';

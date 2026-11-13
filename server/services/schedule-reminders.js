@@ -26,7 +26,7 @@
  */
 
 import { localToUTCPrecise, householdTimeZone, todayKey, shiftDateKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { scheduleData } from './schedule.js';
