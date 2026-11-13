@@ -3235,7 +3235,8 @@ function serverSources(dir = resolve(ROOT, 'server')) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = resolve(dir, e.name);
     if (e.isDirectory()) out.push(...serverSources(p));
-    else if (e.name.endsWith('.js')) out.push(readFileSync(p, 'utf8'));
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(js|ts)$/.test(e.name)) out.push(readFileSync(p, 'utf8'));
   }
   return out;
 }

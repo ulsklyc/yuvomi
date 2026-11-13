@@ -101,7 +101,8 @@ test('meals apply-plan documents skip_occupied and the skipped answer (Discussio
 });
 const indexSrc = readFileSync(new URL('index.js', pathsDir), 'utf8');
 const moduleFiles = readdirSync(pathsDir)
-  .filter((f) => f.endsWith('.js') && f !== 'index.js')
+  // .ts too: a path module written in TypeScript (phase 2 onward) is a path module.
+  .filter((f) => /\.(js|ts)$/.test(f) && f !== 'index.js')
   .sort();
 
 async function fragmentOf(file) {

@@ -231,7 +231,8 @@ test('keine Absage der Budget-Routen traegt deutschen Wortlaut', async () => {
 // Der Leser (`outboundLiterals`) steht in test/error-language.js.
 test('kein Satz und kein Feldname, den die Budget-Routen hinausreichen, ist deutsch', () => {
   const dir = new URL('../server/routes/budget/', import.meta.url);
-  const files = readdirSync(dir).filter((f) => f.endsWith('.js'));
+  // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+  const files = readdirSync(dir).filter((f) => /\.(js|ts)$/.test(f));
   assert.ok(files.length >= 8, `Vorbedingung: die Routen-Dateien sind da (${files.length})`);
   let read = 0;
   const offenders = [];

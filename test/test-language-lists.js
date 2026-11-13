@@ -161,7 +161,8 @@ function* jsFiles(dir) {
     const full = path.join(dir, name);
     if (name === 'node_modules' || name === 'vendor' || name === 'locales') continue;
     if (statSync(full).isDirectory()) yield* jsFiles(full);
-    else if (/\.(m?js)$/.test(name)) yield full;
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(m?js|ts)$/.test(name)) yield full;
   }
 }
 

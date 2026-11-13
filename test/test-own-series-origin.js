@@ -836,8 +836,9 @@ test(`[${ZONE}] Migration 246 markiert lokale Zeilen und lässt gespiegelte unbe
 test('jedes INSERT in calendar_events nennt series_authored oder ist ein Abruf', async () => {
   const { readFileSync, readdirSync } = await import('node:fs');
   const root = new URL('../server/', import.meta.url);
-  const files = readdirSync(root, { recursive: true })
-    .filter((name) => name.endsWith('.js') && !/^db(-schema-test)?\.js$/.test(name));
+  const files = readdirSync(root, { recursive: true }).map(String)
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    .filter((name) => /\.(js|ts)$/.test(name) && !/^db(-schema-test)?\.js$/.test(name));
   const sites = [];
   for (const name of files) {
     const source = readFileSync(new URL(name, root), 'utf8');

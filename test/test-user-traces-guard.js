@@ -470,7 +470,8 @@ function sourceFiles(dir) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) out.push(...sourceFiles(full));
-    else if (/\.(js|mjs|cjs)$/.test(entry)) out.push(full);
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(js|mjs|cjs|ts)$/.test(entry)) out.push(full);
   }
   return out;
 }
