@@ -160,6 +160,22 @@
           {
             "selector": "CallExpression:matches([callee.property.name='sendNotification'], [callee.property.value='sendNotification'], [callee.name='sendNotification'])",
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][right.type='MemberExpression'][right.object.type='MemberExpression'][right.object.property.name='modules'][left.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
           }
         ]
       }
@@ -238,6 +254,22 @@
           {
             "selector": "CallExpression:matches([callee.property.name='sendNotification'], [callee.property.value='sendNotification'], [callee.name='sendNotification'])",
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][right.type='MemberExpression'][right.object.type='MemberExpression'][right.object.property.name='modules'][left.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
           }
         ]
       }
@@ -300,6 +332,22 @@
           {
             "selector": "CallExpression:matches([callee.property.name='sendNotification'], [callee.property.value='sendNotification'], [callee.name='sendNotification'])",
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][right.type='MemberExpression'][right.object.type='MemberExpression'][right.object.property.name='modules'][left.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
           }
         ]
       }
@@ -381,6 +429,22 @@
           {
             "selector": "CallExpression:matches([callee.property.name='sendNotification'], [callee.property.value='sendNotification'], [callee.name='sendNotification'])",
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][right.type='MemberExpression'][right.object.type='MemberExpression'][right.object.property.name='modules'][left.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
           }
         ]
       }
@@ -455,6 +519,107 @@
           {
             "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send']) > ObjectExpression:first-child > Property:matches([key.name='channel'], [key.value='channel'])",
             "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
+          },
+          {
+            "selector": "BinaryExpression[operator=/^[!=]==?$/][right.type='MemberExpression'][right.object.type='MemberExpression'][right.object.property.name='modules'][left.value='none']",
+            "message": "RIGHTS-MODULE: a module level compared with 'none' outside server/authorize/; ask authorize(actor, 'read' | 'write' | 'receive', { module })."
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "server/authorize/**",
+        "server/db.js",
+        "server/db-schema-test.js",
+        "server/openapi/**"
+      ],
+      "rules": {
+        "eslint-js/no-restricted-syntax": [
+          "error",
+          {
+            "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.name=/^(innerHTML|outerHTML)$/]",
+            "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+          },
+          {
+            "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.value=/^(innerHTML|outerHTML)$/]",
+            "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+          },
+          {
+            "selector": "AssignmentExpression[left.type='MemberExpression'][left.property.type='TemplateLiteral'][left.property.expressions.length=0][left.property.quasis.0.value.cooked=/^(innerHTML|outerHTML)$/]",
+            "message": "HTML-STRING-WRITE: no innerHTML/outerHTML assignment; use insertAdjacentHTML or the DOM API, user data through esc()."
+          },
+          {
+            "selector": "CallExpression[callee.property.name=/^(slice|substring|substr)$/][callee.object.type='CallExpression'][callee.object.callee.property.name='toISOString'][arguments.0.value=0][arguments.1.value=10]",
+            "message": "UTC-DAY-KEY: toISOString().slice(0, 10) is the UTC day, not the household's; use the helpers in server/utils/timezone.js."
+          },
+          {
+            "selector": "CatchClause CallExpression[callee.property.name='status'][arguments.0.value=500]",
+            "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+          },
+          {
+            "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
+            "message": "ERROR-TEXT: the text of an exception goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
+          },
+          {
+            "selector": "CatchClause :matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/])[object.type='Identifier']:not([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *)",
+            "message": "ERROR-TEXT: inside a catch block the text of a caught value goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
+          },
+          {
+            "selector": ":matches(:matches(:matches(VariableDeclarator, AssignmentExpression, AssignmentPattern), :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > * > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > * > * > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > * > * > * > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > * > * > * > * > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > * > * > * > * > * > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > * > * > * > * > * > * > * > *, :matches(VariableDeclarator, AssignmentExpression, AssignmentPattern) > * > * > * > * > * > * > * > * > * > * > *) > :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(:matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) *):not(CallExpression[callee.object.name=/^(log|logger|console)$/] *), VariableDeclarator[init.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/] > ObjectPattern > Property[key.name=/^(message|stack)$/]):matches(:function:has(:matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/][arguments.length>0], [arguments.0.name='res'][arguments.length>1])) *, Program:has(:matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/][arguments.length>0], [arguments.0.name='res'][arguments.length>1])) *:not(:function *))",
+            "message": "ERROR-TEXT: the text of an exception is read into a variable where a response is sent; log the error itself, and answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='Identifier'][callee.object.name=/^providers?$/]",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression'][callee.object.object.type='Identifier'][callee.object.object.name=/^providers?$/]",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression']:matches([callee.object.property.name=/^providers?$/], [callee.object.property.value=/^providers?$/])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send'])[callee.object.type='MemberExpression'][callee.object.object.type='MemberExpression']:matches([callee.object.object.property.name=/^providers?$/], [callee.object.object.property.value=/^providers?$/])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='send'], [callee.property.value='send']) > ObjectExpression:first-child > Property:matches([key.name='channel'], [key.value='channel'])",
+            "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='sendPushToUser'], [callee.property.value='sendPushToUser'], [callee.name='sendPushToUser'])",
+            "message": "PUSH-SEND: a Web Push is sent only by the files .dependency-cruiser.mjs names in push-service-importers, each with its recipient check; add the new sender there with its reason."
+          },
+          {
+            "selector": "CallExpression:matches([callee.property.name='sendNotification'], [callee.property.value='sendNotification'], [callee.name='sendNotification'])",
+            "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
           }
         ]
       }

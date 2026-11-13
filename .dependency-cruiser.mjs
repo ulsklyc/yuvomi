@@ -198,10 +198,21 @@ export default {
     {
       name: 'authorize-not-to-db',
       comment: 'server/authorize/ never reaches server/db.js, not even transitively: db.js opens the database '
-        + 'on import, and server/openapi.js imports the permission module (phase 2, B1). The connection is a parameter.',
+        + 'on import, and server/openapi.js reaches the permission module (through server/services/reminder-origins.js, '
+        + 'phase 2, B1). The connection is a parameter.',
       severity: 'error',
       from: { path: '^server/authorize/' },
       to: { path: '^server/db\\.[jt]s$', reachable: true },
+    },
+    {
+      name: 'rights-only-through-authorize',
+      comment: 'A rights predicate has exactly one door (phase 2, F2): outside server/authorize/ a module imports '
+        + 'only server/authorize/index.ts, never an inner seam (actor, catalog, modules, care, rows/). '
+        + 'Tests are not walked by the lint run and are left out on purpose: a test may import an inner seam '
+        + 'to check it on its own (test:authorize-modules, test:authorize-rows).',
+      severity: 'error',
+      from: { pathNot: ['^server/authorize/', '^test/'] },
+      to: { path: '^server/authorize/', pathNot: '^server/authorize/index\\.ts$' },
     },
     {
       name: 'server-not-to-public-except-shared',
