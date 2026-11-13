@@ -162,12 +162,12 @@
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
           },
           {
-            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
-            "selector": "Literal[value=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
             "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
@@ -256,12 +256,12 @@
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
           },
           {
-            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
-            "selector": "Literal[value=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
             "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
@@ -334,12 +334,12 @@
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
           },
           {
-            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
-            "selector": "Literal[value=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
             "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
@@ -431,12 +431,12 @@
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
           },
           {
-            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
-            "selector": "Literal[value=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
             "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",
@@ -521,12 +521,12 @@
             "message": "CHANNEL-SEND: a channel provider is called only in server/services/channel-delivery.js; send through sendToChannel() from a file that dependency-cruiser lets import it."
           },
           {
-            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "TemplateElement[value.raw=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
-            "selector": "Literal[value=/visibility\\s*(=|<>|!=|IN)\\s*('|\\()/]",
-            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write filter or a cleanup stands in lint-baseline-reasons.json with its reason."
+            "selector": "Literal[value=/visibility\\s*(=|<>|!=|(NOT\\s+)?IN)\\s*('|\\()/i]",
+            "message": "RIGHTS-SQL: a visibility literal in SQL outside server/authorize/; ask visibleWhere()/filterVisible() or a named rule of server/authorize/index.ts. A write, never a read, stands in lint-baseline-reasons.json with its reason."
           },
           {
             "selector": "BinaryExpression[operator=/^[!=]==?$/][left.type='MemberExpression'][left.object.type='MemberExpression'][left.object.property.name='modules'][right.value='none']",

@@ -198,7 +198,8 @@ export default {
     {
       name: 'authorize-not-to-db',
       comment: 'server/authorize/ never reaches server/db.js, not even transitively: db.js opens the database '
-        + 'on import, and server/openapi.js imports the permission module (phase 2, B1). The connection is a parameter.',
+        + 'on import, and server/openapi.js reaches the permission module (through server/services/reminder-origins.js, '
+        + 'phase 2, B1). The connection is a parameter.',
       severity: 'error',
       from: { path: '^server/authorize/' },
       to: { path: '^server/db\\.[jt]s$', reachable: true },

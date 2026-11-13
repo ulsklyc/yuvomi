@@ -36,7 +36,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync,
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tempDir } from './tmp-dir.js';
-import { pushSenders } from '../scripts/generate-oxlint-overrides.mjs';
+import { buildOverrides, pushSenders } from '../scripts/generate-oxlint-overrides.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(REPO, 'scripts', 'check-lint-baseline.ts');
@@ -498,6 +498,11 @@ test('the rights exception covers exactly the permission module, the schema and 
   }
 });
 
+test('the generator refuses a file under two exceptions (the later list would win whole)', () => {
+  assert.throws(() => buildOverrides(CONFIG, ['server/authorize/x.js']), /overlap: server\/authorize\/x\.js and server\/authorize\/\*\*/);
+  assert.throws(() => buildOverrides(CONFIG, ['server/utils/timezone.js']), /overlap/);
+});
+
 test('the timezone exception drops only the UTC selector', () => {
   const [severity, ...selectors] = serverSelectors();
   const override = overrideFor('server/utils/timezone.js');
@@ -693,8 +698,8 @@ test('the rights fixture gives exactly its marked lint lines, and nothing where 
         return m ? [`${reads}:${i + 1} ${m[1]}`] : [];
       });
     assert.deepEqual(marked.map((l) => l.split(' ')[1]), [
-      ...Array(5).fill('RIGHTS-SQL'), ...Array(4).fill('RIGHTS-MODULE'),
-    ], 'the fixture marks five SQL and four module lines');
+      ...Array(8).fill('RIGHTS-SQL'), ...Array(4).fill('RIGHTS-MODULE'),
+    ], 'the fixture marks eight SQL and four module lines');
     const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
     const found = JSON.parse(r.stdout).diagnostics
       .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)

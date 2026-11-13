@@ -16,14 +16,17 @@ export function reads(db, alias, perms, resolve, u, row) {
       ('all', 'assignees')
   `).all();
   db.prepare(`UPDATE t SET visibility = 'private' WHERE id = ?`).run(1);                // rights-5: RIGHTS-SQL (a write filter: an exception with a reason)
-  if (perms.modules.health === 'none') return null;                                     // rights-6: RIGHTS-MODULE
-  if (resolve(u).modules.tasks !== 'none') return null;                                 // rights-7: RIGHTS-MODULE (behind a call)
-  if ('none' === perms.modules.notes) return null;                                      // rights-8: RIGHTS-MODULE (reversed)
-  if (perms.modules.budget != 'none') return null;                                      // rights-9: RIGHTS-MODULE (loose comparison)
+  const g = db.prepare(`SELECT * FROM t WHERE t.visibility NOT IN ('private')`).all();  // rights-6: RIGHTS-SQL (NOT IN)
+  const h = db.prepare("select * from t where t.visibility in ('all')").all();           // rights-7: RIGHTS-SQL (lower case)
+  const k = db.prepare(`SELECT * FROM t WHERE t.visibility != 'private'`).all();        // rights-8: RIGHTS-SQL (!=)
+  if (perms.modules.health === 'none') return null;                                     // rights-9: RIGHTS-MODULE
+  if (resolve(u).modules.tasks !== 'none') return null;                                 // rights-10: RIGHTS-MODULE (behind a call)
+  if ('none' === perms.modules.notes) return null;                                      // rights-11: RIGHTS-MODULE (reversed)
+  if (perms.modules.budget != 'none') return null;                                      // rights-12: RIGHTS-MODULE (loose comparison)
   // Silent: a JS comparison of a row, a bind parameter, another level, a comment.
   // SELECT * FROM t WHERE t.visibility = 'all'
   const ok = row.visibility === 'all';
   const e = db.prepare(`SELECT 1 FROM t WHERE visibility = ?`).get('all');
   const f = perms.modules.health === 'read';
-  return [a, b, c, d, ok, e, f];
+  return [a, b, c, d, g, h, k, ok, e, f];
 }
