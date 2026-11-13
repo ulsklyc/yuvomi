@@ -234,12 +234,12 @@ const SETTABLE = ['task', 'event', 'subscription', 'inventory_item', 'inventory_
 // --------------------------------------------------------------------------
 // 0. DER GUARD: jede Herkunft, die ein Mensch setzen kann, hat eine Zielregel
 //
-// Eine neue setzbare Herkunft ohne Eintrag in reminder-targets.js wuerde am
+// Eine neue setzbare Herkunft ohne Eintrag in authorize/rows/reminders.ts wuerde am
 // Schreibweg abgewiesen (Allowlist) - am LESEWEG aber durchgelassen, weil der
 // Filter dort nur beurteilt, was er kennt. Diese Zusicherung macht die Luecke
 // laut, bevor sie eine ist.
 // --------------------------------------------------------------------------
-test('jede setzbare Herkunft steht in reminder-targets.js', () => {
+test('jede setzbare Herkunft steht in authorize/rows/reminders.ts', () => {
   assert.deepEqual([...remindersModule.SETTABLE_ENTITY_TYPES].sort(), [...TARGET_ENTITY_TYPES].sort());
   assert.deepEqual([...SETTABLE].sort(), [...TARGET_ENTITY_TYPES].sort(), 'die Liste dieser Suite ist veraltet');
 });
