@@ -6,7 +6,7 @@
 
 import { createLogger } from '../logger.js';
 import express from 'express';
-import { hydrateNotesWithCategories } from '../services/note-categories.js';
+import { categoryVisibleWhere, hydrateNotesWithCategories } from '../services/note-categories.js';
 import * as db from '../db.js';
 import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
 import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
@@ -389,7 +389,7 @@ router.get('/', (req, res) => {
       JOIN note_categories nc ON nc.id = nca.category_id
       WHERE nca.note_id = n.id
         AND nc.id = @note_category_${index}
-        AND (nc.scope = 'household' OR nc.owner_user_id = @me)
+        AND ${categoryVisibleWhere('nc', '@me')}
     )
   `).join('');
   /* FUER WEN DIE ANTWORT IST (#1817). `audience=household` fragt die Fassung

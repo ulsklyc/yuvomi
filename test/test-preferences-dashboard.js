@@ -95,7 +95,7 @@ test('category visibility is loaded lazily and at most once per preferences read
   const originalPrepare = database.prepare;
   let reads = 0;
   database.prepare = function (sql, ...args) {
-    if (/FROM note_categories\s+WHERE scope/.test(sql)) reads++;
+    if (/FROM note_categories\s+WHERE \(?scope/.test(sql)) reads++;
     return originalPrepare.call(this, sql, ...args);
   };
   try {

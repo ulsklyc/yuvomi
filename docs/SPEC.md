@@ -2185,6 +2185,14 @@ catalog. Managing the household catalog requires admin access or the
 `notes_manage_household_categories` capability. Category responses use `id` as their identifier
 and `scope` (`personal` or `household`) as the single catalog discriminator.
 
+**Single source of the visibility rule (#2601):** `categoryVisibleWhere(alias, bind)` in
+`server/services/note-categories.js` is the only place the rule ("household, or personal and mine")
+is written, as a SQL fragment with a caller-supplied placeholder (`?` or a named bind like `@me`);
+`categoryVisibleTo(category, userId)` is the same rule as a JS predicate for an already-loaded row.
+Every reader - the notes route's own category list, the note-category join, the dashboard's
+`notes_category` filter, and the editable-assignments replace - calls one of the two instead of
+writing the condition again.
+
 | Column | Type | Constraint |
 |--------|------|-----------|
 | id | INTEGER | PRIMARY KEY AUTOINCREMENT |
