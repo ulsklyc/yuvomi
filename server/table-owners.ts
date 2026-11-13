@@ -221,6 +221,7 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   task_rotation_pool: 'tasks',
   task_tags: 'tasks',
   tasks: 'tasks',
+  user_availability: 'core', // a member's own status, not gated by a module permission
   user_recovery_codes: 'auth', // second-factor recovery codes, not users
   user_totp: 'auth', // the second factor, not users
   users: 'core',
