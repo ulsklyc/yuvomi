@@ -171,8 +171,24 @@ test('tools/call: read-Scope erlaubt Lesen, verweigert Schreiben', async () => {
 });
 
 test('tools/call: write-Scope erlaubt Anlegen, andere Module bleiben gesperrt', async () => {
-  const created = await callToolRes(['tasks:write'], 'create_task', { title: 'Rasen mähen', priority: 'high' });
-  assert.equal(created.result.isError, false);
+  // `create_task` geht seit #2616 per Loopback durch POST /api/v1/tasks. Diese
+  // Suite misst das Scope-Gate der Tool-Schicht, nicht den Schreibweg: ihre
+  // Zusicherung ist "der Aufruf kommt durch", und wie die Route antwortet,
+  // halten test:mcp (echter Loopback) und test:idempotency fest. Darum eine
+  // Attrappe statt eines zweiten Servers - sie wird je Test gesetzt und
+  // zurueckgestellt.
+  const realFetch = global.fetch;
+  global.fetch = /** @type {any} */ (async () => ({
+    ok: true, status: 201,
+    headers: { get: (/** @type {any} */ h) => (String(h).toLowerCase() === 'content-type' ? 'application/json' : null) },
+    json: async () => ({ data: { id: 1, title: 'Rasen mähen', status: 'open', priority: 'high' } }),
+  }));
+  try {
+    const created = /** @type {any} */ (await callToolRes(['tasks:write'], 'create_task', { title: 'Rasen mähen', priority: 'high' }));
+    assert.equal(created.result.isError, false, created.result.content?.[0]?.text);
+  } finally {
+    global.fetch = realFetch;
+  }
 
   const denied = await callToolRes(['calendar:write'], 'list_tasks', {});
   assert.equal(denied.result.isError, true);

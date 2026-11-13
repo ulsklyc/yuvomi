@@ -6,66 +6,39 @@
  *        (Operation-Auflösung, Path-Params, Query, Auth-Weiterleitung, Payload,
  *        Fehlerpropagation) über einen gemockten `fetch`.
  *        Dazu die Rechte-Durchsetzung der Tool-Schicht (#823): Modulrechte des
- *        Nutzers, Token-Scopes und Split-Guests — die Kern-Tools laufen an der
- *        /api/v1-Middleware vorbei und müssen dieselbe Grenze selbst ziehen.
- * Ausführen: node --test test/test-mcp.js
+ *        Nutzers, Token-Scopes und Split-Guests - die lesenden Kern-Tools laufen
+ *        an der /api/v1-Middleware vorbei und müssen dieselbe Grenze selbst ziehen.
+ *
+ *        DIE DREI SCHREIBENDEN KERN-TOOLS GEHEN SEIT #2616 DURCH IHRE ROUTE.
+ *        Deshalb hängt in dieser Suite ein echter Server an einem echten
+ *        Middleware-Stapel (Auth, CSRF, Idempotenz) und `MCP_INTERNAL_BASE_URL`
+ *        zeigt darauf: Standardpunkte, eigene Kategorien, der Listenstand und
+ *        die Retry-Sicherheit entstehen IN der Route - eine fetch-Attrappe
+ *        könnte nur messen, was sie selbst geantwortet hat. Die Attrappen-Tests
+ *        der Brücke bleiben, sie setzen `fetch` je Test und stellen es zurück.
+ * Ausführen: npm run test:mcp
  */
+
+process.env.DB_PATH = ':memory:';
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'mcp-test-secret';
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
-import { handleMcpRequest, LATEST_PROTOCOL_VERSION } from '../server/mcp/protocol.js';
-import { callTool, TOOL_DEFINITIONS } from '../server/mcp/tools.js';
-import { buildSessionModuleAccess, resolvePermissions } from '../server/authorize/index.ts';
+import http from 'node:http';
+// @ts-expect-error express 5 ships no type declarations (TS7016); new code type-checks clean
+import express from 'express';
 
-// Deterministische Loopback-Basis für die OpenAPI-Brücke (fetch wird gemockt).
-process.env.MCP_INTERNAL_BASE_URL = 'http://mcp.test';
-
-// ── Test-DB aufsetzen ────────────────────────────────────────────────────────
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[1]);
-db.exec(MIGRATIONS_SQL[27]);  // legacy calendar attachment body
-db.exec(MIGRATIONS_SQL[2]);   // sync_config for the shared calendar reader
-db.exec(MIGRATIONS_SQL[10]);  // ics_subscriptions used by calendar visibility
-db.exec(`
-  ALTER TABLE calendar_events ADD COLUMN subscription_id INTEGER;
-  ALTER TABLE calendar_events ADD COLUMN calendar_ref_id INTEGER;
-  ALTER TABLE calendar_events ADD COLUMN target_google_calendar_id TEXT;
-  ALTER TABLE calendar_events ADD COLUMN target_caldav_calendar_url TEXT;
-  ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
-  CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
-  ALTER TABLE calendar_events ADD COLUMN outbound_move_to TEXT;
-  CREATE TABLE external_calendars (
-    id INTEGER PRIMARY KEY,
-    source TEXT,
-    external_id TEXT,
-    name TEXT NOT NULL,
-    color TEXT
-  );
-  CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
-`);
-db.exec(MIGRATIONS_SQL[85]);  // calendar_event_exceptions
-db.exec(MIGRATIONS_SQL[174]); // generated birthday/name-day joins
-db.exec(MIGRATIONS_SQL[254]); // birthday without a year, read by the calendar join
-db.exec(MIGRATIONS_SQL[44]); // search index rebuilt by migration 194
-db.exec(MIGRATIONS_SQL[245]);
-// Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
-db.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
-db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
-db.exec(MIGRATIONS_SQL[41]);  // tasks.start_date (geplante Aufgaben)
-db.exec(MIGRATIONS_SQL[74]);  // access_permissions (Modulrechte, #467)
-// DIESE DREI SIND EINE AUSWAHL, KEIN SCHEMA: Migration 1 legt `tasks` in der
-// Fassung von damals an, jede spaeter ergaenzte Spalte fehlt hier. Wer eine
-// Abfrage der MCP-Tools um ein Feld erweitert, das nach Migration 1 kam, muss
-// dessen Migration hier nachtragen - sonst scheitert der Test an einer
-// fehlenden Spalte und nicht an dem, was er pruefen soll. `start_date` (41)
-// kam auf genau diesem Weg dazu (#825).
+// Nach den beiden env-Zeilen: server/db.js liest DB_PATH beim Laden.
+const dbmod = await import('../server/db.js');
+const db = dbmod.get();
+const { handleMcpRequest, LATEST_PROTOCOL_VERSION } = await import('../server/mcp/protocol.js');
+const { callTool, TOOL_DEFINITIONS } = await import('../server/mcp/tools.js');
+const { buildSessionModuleAccess, resolvePermissions } = await import('../server/authorize/index.ts');
+const { csrfMiddleware } = await import('../server/middleware/csrf.js');
+const { default: idempotencyMiddleware } = await import('../server/middleware/idempotency.js');
+const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { default: shoppingRouter } = await import('../server/routes/shopping.js');
+const { default: calendarRouter } = await import('../server/routes/calendar.js');
 
 const uid = db.prepare(
   `INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -80,17 +53,67 @@ const in3days = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
 
 const actor = { kind: 'token', userId: uid, role: 'admin' };
 
+// ── Loopback: die echten Routen hinter dem echten Middleware-Stapel ──────────
+//
+// Die Auth-Schicht ist nachgestellt wie in test-mcp-router-permissions.js: was
+// `requireAuth` setzt, setzt diese Zeile. Zwei Wege, weil die Brücke genau zwei
+// weiterreicht - ein Bearer-Token (`api_token`, von CSRF ausgenommen) und ein
+// Sitzungs-Cookie (`session`, CSRF-pflichtig). Welcher gilt, entscheidet der
+// weitergereichte Header, nicht der Test.
+const SESSION_COOKIE = 'yuvomi.sid=mcp-test';
+const app = express();
+app.use(express.json());
+app.use('/api/v1', (/** @type {any} */ req, /** @type {any} */ _res, /** @type {any} */ next) => {
+  const session = String(req.headers.cookie || '').includes('yuvomi.sid=');
+  req.authUserId = Number(uid);
+  req.authRole = 'admin';
+  req.authMethod = session ? 'session' : 'api_token';
+  req.authScopes = null;
+  req.session = { userId: Number(uid), role: 'admin' };
+  next();
+});
+app.use('/api/v1', csrfMiddleware);
+app.use('/api/v1', idempotencyMiddleware);
+app.use('/api/v1/tasks', tasksRouter);
+app.use('/api/v1/shopping', shoppingRouter);
+app.use('/api/v1/calendar', calendarRouter);
+const server = http.createServer(app);
+await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(null)));
+const LOOPBACK = `http://127.0.0.1:${/** @type {any} */ (server.address()).port}`;
+process.env.MCP_INTERNAL_BASE_URL = LOOPBACK;
+test.after(() => server.close());
+
 // Hilfsfunktion: JSON-RPC-Request absetzen und Antwort zurückgeben.
+/** @type {any[]} */
 let internalErrors = [];
-function rpc(method, params, id = 1) {
+/**
+ * @param {string} method
+ * @param {any} [params]
+ * @param {number|null} [id]
+ * @param {any} [requestHeaders]
+ * @returns {Promise<any>}
+ */
+function rpc(method, params, id = 1, requestHeaders = { authorization: 'Bearer mcp-test' }) {
+  /** @type {any} */
   const body = { jsonrpc: '2.0', method };
   if (params !== undefined) body.params = params;
   if (id !== null) body.id = id;
-  return handleMcpRequest(db, actor, body, (err) => internalErrors.push(err));
+  return handleMcpRequest(db, actor, body, (err) => internalErrors.push(err), { requestHeaders });
 }
+/** @returns {Promise<any>} */
 function toolCall(name, args) {
   return rpc('tools/call', { name, arguments: args });
 }
+/**
+ * ctx wie `server/mcp/server.js` ihn baut: Akteur plus weitergereichte Header.
+ * @param {any} [headers]
+ * @param {any} [as]
+ * @returns {any}
+ */
+function ctxFor(headers = { authorization: 'Bearer mcp-test' }, as = actor) {
+  return { db, actor: as, requestHeaders: headers };
+}
+/** @returns {Promise<any>} */
 function toolCallWithHeaders(name, args, requestHeaders) {
   return handleMcpRequest(
     db, actor,
@@ -99,8 +122,18 @@ function toolCallWithHeaders(name, args, requestHeaders) {
     { requestHeaders },
   );
 }
+/** @returns {any} */
 function parseContent(res) {
   return JSON.parse(res.result.content[0].text);
+}
+/**
+ * Eine Zeile aus der Test-DB, ohne Typzeremonie.
+ * @param {string} sql
+ * @param {...any} params
+ * @returns {any}
+ */
+function row(sql, ...params) {
+  return db.prepare(sql).get(...params);
 }
 
 // ── fetch-Mock für die OpenAPI-Brücke ────────────────────────────────────────
@@ -192,11 +225,8 @@ test('tools/call create_task: ohne Kategorie fällt auf den Key misc, nicht auf 
   // task_categories. Der alte Fallback ließ jede per MCP erzeugte Aufgabe aus
   // Dropdown und Filter fallen und sie beim ersten Speichern im Modal still auf
   // die erste echte Kategorie springen. Migration v114 hat den Bestand geputzt -
-  // ohne diesen Guard liefert die Tool-Schicht ihn weiter nach.
-  // priority explizit: die Test-DB hier steht auf dem v1-Schema, dessen
-  // CHECK-Constraint den späteren Wert 'none' noch nicht kennt. Das ist eine
-  // eigene Baustelle (server/db-schema-test.js endet bei v97) und soll diesen
-  // Guard nicht mit einem fremden Fehlschlag verdecken.
+  // ohne diesen Guard liefert die Tool-Schicht ihn weiter nach. Seit #2616 ist
+  // es der Rückfall der Route (`FALLBACK_CATEGORY`), nicht mehr ein eigener.
   const res = await toolCall('create_task', { title: 'Ohne Kategorie', priority: 'low' });
   assert.equal(res.result.isError, false);
   const task = parseContent(res);
@@ -213,6 +243,45 @@ test('tools/call create_task: ungültige Priorität → isError', async () => {
   const res = await toolCall('create_task', { title: 'X', priority: 'sofort' });
   assert.equal(res.result.isError, true);
   assert.match(res.result.content[0].text, /priority/i);
+});
+
+// ── #2616: dasselbe Verhalten wie die App, weil es DIESELBE Route ist ────────
+//
+// Jeder Fall hier war gegen das eigene INSERT der Tool-Schicht rot. Gemessen
+// wird die Zeile, nicht die Antwort: eine Automatisierung, die anders anlegt
+// als der Dialog, erzeugt Aufgaben, die der Haushalt hinterher nachbessert.
+
+test('tools/call create_task: der Haushalt-Standardwert für Punkte greift (#2616)', async (t) => {
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('tasks_default_points', '5')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run();
+  t.after(() => db.prepare(`DELETE FROM sync_config WHERE key = 'tasks_default_points'`).run());
+
+  const res = await toolCall('create_task', { title: 'Mit Standardpunkten' });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.equal(row('SELECT points FROM tasks WHERE id = ?', parseContent(res).id).points, 5, 'das eigene INSERT liess points auf dem Spaltendefault 0');
+});
+
+test('tools/call create_task: eigene Kategorie erlaubt, gelöschter Standard-Key nicht (#2616)', async (t) => {
+  db.prepare(`INSERT INTO task_categories (key, name, sort_order) VALUES ('garten', 'Garten', 20)`).run();
+  const removed = row(`SELECT * FROM task_categories WHERE key = 'repair'`);
+  db.prepare(`DELETE FROM task_categories WHERE key = 'repair'`).run();
+  t.after(() => {
+    db.prepare(`DELETE FROM task_categories WHERE key = 'garten'`).run();
+    db.prepare(`INSERT OR IGNORE INTO task_categories (key, name, label_key, sort_order) VALUES (?, ?, ?, ?)`)
+      .run(removed.key, removed.name, removed.label_key, removed.sort_order);
+  });
+
+  // Die feste Liste `VALID_CATEGORIES` kannte 'garten' nicht und wies ab.
+  const own = await toolCall('create_task', { title: 'Hecke schneiden', category: 'garten' });
+  assert.equal(own.result.isError, false, own.result.content?.[0]?.text);
+  assert.equal(parseContent(own).category, 'garten');
+
+  // Und sie kannte 'repair' noch, als der Haushalt es längst gelöscht hatte -
+  // die Aufgabe fiel damit aus Dropdown und Filter.
+  const deleted = await toolCall('create_task', { title: 'Geht nicht mehr', category: 'repair' });
+  assert.equal(deleted.result.isError, true);
+  assert.match(deleted.result.content[0].text, /category/i);
+  assert.equal(db.prepare(`SELECT 1 FROM tasks WHERE category = 'repair'`).get(), undefined);
 });
 
 // ── list_tasks ───────────────────────────────────────────────────────────────
@@ -352,6 +421,42 @@ test('tools/call add_shopping_item: unbekannte Liste → isError', async () => {
   assert.match(res.result.content[0].text, /Gibt-es-nicht/);
 });
 
+test('tools/call add_shopping_item: eine fremde Kategorie wird abgewiesen wie in der Route (#2616)', async () => {
+  // Das eigene INSERT schrieb jeden Text in die Spalte. Eine Kategorie, die
+  // `validCategoryNames()` nicht kennt, sortiert den Artikel ganz nach unten,
+  // und PATCH /items/:id lehnt danach schon das Abhaken ab ("Invalid category").
+  const res = await toolCall('add_shopping_item', { name: 'Schrauben', category: 'Baumarkt' });
+  assert.equal(res.result.isError, true);
+  assert.match(res.result.content[0].text, /category/i);
+  assert.equal(db.prepare(`SELECT 1 FROM shopping_items WHERE category = 'Baumarkt'`).get(), undefined);
+});
+
+test('tools/call add_shopping_item: ohne Kategorie gilt der Rückfall der Route (#2616)', async (t) => {
+  // Der eigene Rückfall war der feste Text 'Sonstiges'. Hat der Haushalt diese
+  // Kategorie umbenannt, schrieb die Tool-Schicht einen Namen, den es nicht
+  // mehr gibt; die Route nimmt dann die letzte in Gang-Reihenfolge.
+  db.prepare(`UPDATE shopping_categories SET name = 'Diverses' WHERE name = 'Sonstiges'`).run();
+  t.after(() => db.prepare(`UPDATE shopping_categories SET name = 'Sonstiges' WHERE name = 'Diverses'`).run());
+
+  const res = await toolCall('add_shopping_item', { name: 'Klebeband' });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  const names = db.prepare('SELECT name FROM shopping_categories ORDER BY sort_order ASC').all().map((c) => c.name);
+  assert.equal(parseContent(res).category, names.at(-1));
+  assert.notEqual(parseContent(res).category, 'Sonstiges');
+});
+
+test('tools/call add_shopping_item: die Laufnummer der Liste rückt vor (#2616)', async () => {
+  // Hier bewegt sie ein TRIGGER (Migration v196), nicht die Route - der Stand
+  // rückte deshalb auch beim eigenen INSERT vor. Die Zeile steht trotzdem:
+  // `withListChange()` rahmt den Schreibvorgang mit genau dieser Nummer ein,
+  // und ein Einkaufszettel, der sie abfragt, muss den MCP-Artikel sehen.
+  const version = () => row('SELECT version FROM shopping_list_changes WHERE list_id = ?', Number(listId))?.version;
+  const before = version();
+  const res = await toolCall('add_shopping_item', { name: 'Butter' });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.ok(version() > before, `Laufnummer blieb bei ${before}`);
+});
+
 test('tools/call list_shopping_items: unerledigte Artikel enthalten Milch', async () => {
   const items = parseContent(await toolCall('list_shopping_items', {}));
   assert.ok(items.some((i) => i.name === 'Milch'));
@@ -369,6 +474,20 @@ test('tools/call create_event: legt Event an', async () => {
   const row = db.prepare('SELECT title, external_source, created_by FROM calendar_events WHERE id = ?').get(ev.id);
   assert.equal(row.external_source, 'local');
   assert.equal(row.created_by, uid);
+});
+
+test('tools/call create_event: für den Ort gilt das Maß der Route (#2616)', async () => {
+  // Die Tool-Schicht prüfte `location` gegen MAX_SHORT (100), die Route gegen
+  // MAX_TITLE (200) - derselbe Termin, einmal angelegt und einmal abgewiesen,
+  // je nachdem ob ein Mensch oder ein Assistent ihn eintrug. Eine Adresse mit
+  // Zusatz reisst die 100 schnell.
+  const location = `${'Musterstraße 1, 12345 Musterstadt, '.repeat(4)}Hinterhof`;
+  assert.ok(location.length > 100 && location.length <= 200, `Probe misst ${location.length} Zeichen`);
+  const res = await toolCall('create_event', {
+    title: 'Mit langer Adresse', start_datetime: `${in3days}T08:00`, location,
+  });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.equal(parseContent(res).location, location);
 });
 
 test('tools/call create_event: fehlender Start → isError', async () => {
@@ -484,6 +603,104 @@ test('tools/call list_upcoming_events reuses linked occurrence resolution', asyn
     && event.recurrence_id === originalDate), false, 'original EXDATE slot must stay suppressed');
 });
 
+test('die schreibenden Kern-Tools antworten weiter in ihrer schlanken Form (#2616)', async () => {
+  // Die Route antwortet mit der ganzen Zeile samt Zuweisungen, Anhängen und
+  // Sync-Zielen. Ein LLM braucht davon sechs bis acht Felder; alles andere
+  // kostet nur Kontext. Die Auswahl steht hier, damit sie nicht mit der
+  // Routenantwort mitwächst.
+  const task = parseContent(await toolCall('create_task', { title: 'Form der Antwort' }));
+  assert.deepEqual(Object.keys(task),
+    ['id', 'title', 'status', 'priority', 'category', 'due_date', 'due_time', 'tags']);
+  const item = parseContent(await toolCall('add_shopping_item', { name: 'Form der Antwort' }));
+  assert.deepEqual(Object.keys(item), ['id', 'name', 'quantity', 'category', 'is_checked', 'list']);
+  assert.equal(item.list, 'Wocheneinkauf', '`list` ist der NAME der Liste, nicht ihre Kennung');
+  assert.equal(item.is_checked, 0, '0/1 wie in der Spalte, kein Boolean');
+  const event = parseContent(await toolCall('create_event',
+    { title: 'Form der Antwort', start_datetime: `${in3days}T07:00` }));
+  assert.deepEqual(Object.keys(event),
+    ['id', 'title', 'start_datetime', 'end_datetime', 'all_day', 'location']);
+  assert.equal(event.all_day, 0);
+});
+
+// ── Idempotenz der schreibenden Kern-Tools (#2616) ───────────────────────────
+//
+// Opt-in über ein Argument, nicht über die JSON-RPC-id: ein Client, der seine
+// ids hochzählt, hätte sonst Retry-Sicherheit, die er nie bestellt hat, und
+// einer, der sie wiederverwendet, bekäme 409 auf eine neue Aufgabe.
+
+test('tools/call create_task: derselbe idempotency_key legt genau einmal an (#2616)', async () => {
+  const args = { title: 'Nur einmal anlegen', idempotency_key: 'mcp-task-once' };
+  const first = await toolCall('create_task', args);
+  const second = await toolCall('create_task', args);
+  assert.equal(first.result.isError, false, first.result.content?.[0]?.text);
+  assert.equal(second.result.isError, false, second.result.content?.[0]?.text);
+  assert.equal(parseContent(second).id, parseContent(first).id, 'die Wiederholung muss dieselbe Aufgabe nennen');
+  assert.equal(
+    row(`SELECT COUNT(*) AS n FROM tasks WHERE title = 'Nur einmal anlegen'`).n, 1,
+  );
+});
+
+test('tools/call create_task: ohne idempotency_key bleibt jede Wiederholung ein neuer Vorgang', async () => {
+  // Die Gegenprobe zur Zeile darüber: ohne Schlüssel geht KEIN Header hinaus,
+  // und für bestehende Aufrufer ändert sich damit nichts.
+  await toolCall('create_task', { title: 'Zweimal gewollt' });
+  await toolCall('create_task', { title: 'Zweimal gewollt' });
+  assert.equal(
+    row(`SELECT COUNT(*) AS n FROM tasks WHERE title = 'Zweimal gewollt'`).n, 2,
+  );
+});
+
+test('tools/call add_shopping_item: derselbe Schlüssel für anderen Inhalt → Fehler der Route', async () => {
+  const first = await toolCall('add_shopping_item', { name: 'Hefe', idempotency_key: 'mcp-item-once' });
+  assert.equal(first.result.isError, false, first.result.content?.[0]?.text);
+  const clash = await toolCall('add_shopping_item', { name: 'Mehl', idempotency_key: 'mcp-item-once' });
+  assert.equal(clash.result.isError, true);
+  // Der Grund der Route reist mit, damit das LLM den Unterschied zwischen
+  // "schon angelegt" und "Schlüssel verbraucht" lesen kann.
+  assert.match(clash.result.content[0].text, /already used for a different request/i);
+  assert.match(clash.result.content[0].text, /\[reason: idempotency_key_reused\]/);
+  assert.equal(db.prepare(`SELECT 1 FROM shopping_items WHERE name = 'Mehl'`).get(), undefined);
+});
+
+test('tools/call create_event: ein unbrauchbarer idempotency_key wird vorher abgewiesen', async () => {
+  // Ein Zeilenumbruch im Header-Wert liesse `fetch` werfen - das wäre ein
+  // interner Fehler statt einer Meldung, die der Aufrufer lesen kann.
+  const res = await toolCall('create_event', {
+    title: 'Kaputter Schlüssel', start_datetime: `${in3days}T10:00`, idempotency_key: 'a\nb',
+  });
+  assert.equal(res.result.isError, true);
+  assert.match(res.result.content[0].text, /idempotency_key/);
+  assert.equal(db.prepare(`SELECT 1 FROM calendar_events WHERE title = 'Kaputter Schlüssel'`).get(), undefined);
+});
+
+// ── Die Grenze, die der Umbau zieht (#2616) ──────────────────────────────────
+
+test('Schreiben mit Sitzungs-Cookie ohne CSRF-Token wird abgewiesen (#2616)', async () => {
+  // DIESE GRENZE IST NEU UND SIE IST GEWOLLT. `/mcp` liegt ausserhalb der
+  // /api/v1-Gates und kennt deshalb kein CSRF; die Route dahinter schon. Ein
+  // MCP-Aufrufer, der sich mit einem Sitzungs-Cookie ausweist, konnte vor #2616
+  // schreiben und braucht jetzt ein API-Token oder ein mitgeschicktes
+  // CSRF-Token. Ohne diesen Test kippt sie still.
+  const res = await rpc('tools/call', { name: 'create_task', arguments: { title: 'Ohne CSRF' } },
+    1, { cookie: SESSION_COOKIE });
+  assert.equal(res.result.isError, true);
+  assert.match(res.result.content[0].text, /Invalid CSRF token/);
+  assert.equal(db.prepare(`SELECT 1 FROM tasks WHERE title = 'Ohne CSRF'`).get(), undefined);
+
+  // `status`, `code` und `reason` hängen am Fehler, nicht nur im Text: wer die
+  // Brücke programmatisch nutzt, soll den Grund nicht aus dem Satz lesen müssen.
+  await assert.rejects(
+    () => callTool(ctxFor({ cookie: SESSION_COOKIE }), 'create_task', { title: 'Ohne CSRF' }),
+    (/** @type {any} */ err) => {
+      assert.equal(err.status, 403);
+      assert.equal(err.code, 403);
+      assert.equal(err.reason, 'csrf_invalid');
+      assert.match(err.message, /\[reason: csrf_invalid\]$/);
+      return true;
+    },
+  );
+});
+
 // ── OpenAPI-Brücke: Metadaten (list/get) ─────────────────────────────────────
 
 test('list_api_operations / get_api_operation: spiegeln die Live-OpenAPI-Spec', async () => {
@@ -563,7 +780,7 @@ test('call_api_operation GET: baut URL, leitet Auth-Header weiter, gibt Body zur
     assert.deepEqual(parseContent(res), { data: { open_tasks: 3 } });
 
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, 'http://mcp.test/api/v1/dashboard');
+    assert.equal(calls[0].url, `${LOOPBACK}/api/v1/dashboard`);
     assert.equal(calls[0].options.method, 'GET');
     assert.equal(calls[0].options.headers.Authorization, 'Bearer test-token');
     assert.equal(calls[0].options.headers.Cookie, 'sid=abc');
@@ -613,7 +830,7 @@ test('call_api_operation: rendert Path-Params und Query in die URL', async () =>
       { authorization: 'Bearer test-token' },
     );
     assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
-    assert.equal(calls[0].url, 'http://mcp.test/api/v1/tasks/42?expand=subtasks');
+    assert.equal(calls[0].url, `${LOOPBACK}/api/v1/tasks/42?expand=subtasks`);
     assert.equal(calls[0].options.method, 'GET');
   } finally {
     global.fetch = realFetch;
@@ -751,6 +968,23 @@ test('call_api_operation: Upstream-Fehler wird als isError durchgereicht', async
     );
     assert.equal(res.result.isError, true);
     assert.match(res.result.content[0].text, /Task not found/);
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('call_api_operation: ein `reason` der Route hängt an Meldung und Fehler (#2616)', async () => {
+  installFetchMock(() => jsonResponse(
+    { error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' }, { ok: false, status: 404 },
+  ));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'get_tasks_by_id', path_params: { id: 999 } },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.isError, true);
+    assert.equal(res.result.content[0].text, 'Task not found. [reason: tasks_task_not_found]');
   } finally {
     global.fetch = realFetch;
   }

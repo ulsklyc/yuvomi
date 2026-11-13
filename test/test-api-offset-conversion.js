@@ -88,9 +88,14 @@ app.use('/calendar', calendarRouter);
 app.use('/reminders', remindersRouter);
 app.use('/health', healthRouter);
 app.use('/housekeeping', housekeepingRouter);
+// Zweite Montierung unter dem echten Pfad: das MCP-Werkzeug `create_event`
+// geht seit #2616 per Loopback durch POST /api/v1/calendar, und genau DAS ist
+// die Aussage des Falls unten - derselbe Weg wie POST, nicht ein zweiter.
+app.use('/api/v1/calendar', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening',
   () => resolve(`http://127.0.0.1:${server.address().port}`)));
+process.env.MCP_INTERNAL_BASE_URL = baseUrl;
 test.after(() => server.close());
 
 async function call(method, route, body) {
