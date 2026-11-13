@@ -230,7 +230,7 @@ test('filterVisible: quick_links', () => {
 
 // ── 4. The row form of the rules (B8b) ──────────────────────────────────────────
 //
-// rowVisible(), householdVisible(), canEditQuickLink() and quickLinkHiddenFrom()
+// rowVisible(), householdVisible() and canEditQuickLink()
 // answer for ONE row the routes already loaded. Held against the SQL fragment of
 // the same type over a seed with every level, own, foreign and assigned rows
 // (the row_rules seed of test/visibility-matrix-seed.js is the model), for every
@@ -298,6 +298,49 @@ const eqLinks = [...CREATORS, null].flatMap((creator) => ['all', 'private'].map(
 ).run(visibility, creator).lastInsertRowid)));
 /** The quick link viewers: every account, and no account at all. */
 const LINK_VIEWERS = [...VIEWERS, null];
+
+/**
+ * created_by is INTEGER without CHECK on all three tables: with foreign keys off (a
+ * restore, direct database access) it can hold TEXT. '0x<id>' stays TEXT in SQLite
+ * ('<id>', ' <id>', '<id>.0' become the integer on write), SQL `created_by = @v`
+ * never matches it, Number('0x<id>') does. One row per creator and level, creator
+ * written as the hex of that account; one 'assignees' row is assigned to it.
+ * @param {string} table
+ * @param {(creator: string, visibility: string) => number} mk
+ * @param {string[]} levels
+ * @param {[string, string] | null} assign
+ * @returns {number[]}
+ */
+function seedTextCreators(table, mk, levels, assign) {
+  /** @type {number[]} */
+  const ids = [];
+  db.pragma('foreign_keys = OFF');
+  try {
+    for (const creator of CREATORS) {
+      const hex = `0x${creator.toString(16)}`;
+      for (const visibility of levels) ids.push(mk(hex, visibility));
+      if (assign) {
+        const id = mk(hex, 'assignees');
+        ids.push(id);
+        db.prepare(`INSERT INTO ${assign[0]} (${assign[1]}, user_id) VALUES (?, ?)`).run(id, creator);
+      }
+    }
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  return ids;
+}
+const textCreators = /** @type {const} */ ([
+  ['tasks', 'tasks', seedTextCreators('tasks', (c, v) => Number(db.prepare(
+    "INSERT INTO tasks (title, created_by, visibility) VALUES ('hex', ?, ?)",
+  ).run(c, v).lastInsertRowid), ['all', 'assignees', 'private', OFF_DOMAIN], ['task_assignments', 'task_id'])],
+  ['events', 'calendar_events', seedTextCreators('calendar_events', (c, v) => Number(db.prepare(
+    "INSERT INTO calendar_events (title, start_datetime, created_by, visibility) VALUES ('hex', '2026-01-01T10:00', ?, ?)",
+  ).run(c, v).lastInsertRowid), ['all', 'assignees', 'private', OFF_DOMAIN], ['event_assignments', 'event_id'])],
+  ['quick_links', 'quick_links', seedTextCreators('quick_links', (c, v) => Number(db.prepare(
+    "INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('hex', 'https://hex.example/', ?, ?, 0)",
+  ).run(v, c).lastInsertRowid), ['all', 'private', OFF_DOMAIN], null)],
+]);
 
 /**
  * The ids among `ids` the SQL fragment lets through for `viewer`.
@@ -382,6 +425,27 @@ test('rowVisible(quick_links): the same rows as visibleWhere for every viewer, a
   }
 });
 
+test('rowVisible: a TEXT creator that reads as an account id is nobody\'s own row, as in SQL', () => {
+  const rowVisible = rowApi('rowVisible');
+  for (const [type, table, ids] of textCreators) {
+    const rows = rowsById(table, ids);
+    assert.ok(rows.every((row) => typeof row.created_by === 'string'), `${type}: the creators are stored as TEXT`);
+    for (const viewer of LINK_VIEWERS) {
+      const js = rows.filter((row) => rowVisible(db, type, row, viewer)).map((row) => row.id);
+      assert.deepEqual(js, sqlIds(table, visibleWhere(type, 'x', '@v'), ids, viewer), `${type}: viewer ${viewer}`);
+    }
+  }
+});
+
+test('rowVisible with assignedIds (the Outlook target) keeps the Number() creator comparison - held', () => {
+  // Deliberately not aligned: a narrower answer here means "no auto-sync target" and
+  // makes a series eligible for occurrence overrides (see assignableRowVisible).
+  const rowVisible = rowApi('rowVisible');
+  const row = { id: 0, created_by: `0x${owner.toString(16)}`, visibility: 'private' };
+  assert.equal(rowVisible(db, 'events', row, owner, { assignedIds: [] }), true, 'Outlook path: as before B8b');
+  assert.equal(rowVisible(db, 'events', row, owner), false, 'every other path: as in SQL');
+});
+
 test('rowVisible: an unknown type or one without a row check throws, a missing row is not visible', () => {
   const rowVisible = rowApi('rowVisible');
   const [row] = rowsById('tasks', eqTasks);
@@ -424,19 +488,25 @@ test('canEditQuickLink: own tiles, and shared tiles for an admin; never a foreig
   }
 });
 
-test('quickLinkHiddenFrom: the 404 of PUT/DELETE, the complement of rowVisible on both stored levels', () => {
-  const quickLinkHiddenFrom = rowApi('quickLinkHiddenFrom');
+test('rowVisible(quick_links): a third visibility value is the creator\'s alone, as in visibleWhere (the 404 of PUT/DELETE)', () => {
+  // quick_links.visibility has no CHECK: a value other than 'all' and 'private'
+  // (not writable through the route, possible in a restored file). PUT and DELETE
+  // answer 404 through rowVisible, so they hide such a tile exactly as the list.
   const rowVisible = rowApi('rowVisible');
-  for (const row of rowsById('quick_links', eqLinks)) {
-    for (const viewer of VIEWERS) {
-      assert.equal(quickLinkHiddenFrom(row, viewer), !rowVisible(db, 'quick_links', row, viewer), `${row.id} viewer ${viewer}`);
+  const odd = [...CREATORS, null].map((creator) => Number(db.prepare(
+    "INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('odd', 'https://odd.example/', ?, ?, 0)",
+  ).run(OFF_DOMAIN, creator).lastInsertRowid));
+  try {
+    const rows = rowsById('quick_links', odd);
+    for (const viewer of LINK_VIEWERS) {
+      const js = rows.filter((row) => rowVisible(db, 'quick_links', row, viewer)).map((row) => row.id);
+      assert.deepEqual(js, sqlIds('quick_links', visibleWhere('quick_links', 'x', '@v'), odd, viewer), `viewer ${viewer}`);
     }
+    assert.equal(rowVisible(db, 'quick_links', { id: 0, created_by: owner, visibility: OFF_DOMAIN }, owner), true, 'own');
+    assert.equal(rowVisible(db, 'quick_links', { id: 0, created_by: owner, visibility: OFF_DOMAIN }, stranger), false, 'foreign');
+    // The second wording of the 404 is gone: one rule, no facade.
+    assert.equal(Object.hasOwn(authorizeApi, 'quickLinkHiddenFrom'), false);
+  } finally {
+    db.prepare(`DELETE FROM quick_links WHERE id IN (${odd.join(',')})`).run();
   }
-  // quick_links.visibility has no CHECK: a third value (not writable through the
-  // route, possible in a restored file) is hidden by the SQL fragment but not by
-  // the 404 of PUT/DELETE, which then answers 403 through canEditQuickLink. Held
-  // as it is; B8b moves the check without changing an answer.
-  const odd = { id: 0, created_by: owner, visibility: 'family' };
-  assert.equal(quickLinkHiddenFrom(odd, stranger), false);
-  assert.equal(rowVisible(db, 'quick_links', odd, stranger), false);
 });

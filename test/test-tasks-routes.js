@@ -390,6 +390,33 @@ test('DELETE /:id: Erfolg (204/ok) und unbekannte ID → 404', async () => {
   assert.equal(missing.status, 404);
 });
 
+// tasks.created_by is INTEGER without CHECK: with foreign keys off (a restore,
+// direct database access) it can hold TEXT. '0x<id>' stays TEXT in SQLite, the
+// list (`created_by = @me`) never matches it, and Number('0x<id>') would. The
+// write paths compare the creator like the list: such a task is nobody's own.
+test('DELETE/PATCH /:id: a private task whose creator is TEXT reading as my id is not mine (404)', async () => {
+  db.pragma('foreign_keys = OFF');
+  let id;
+  try {
+    id = Number(db.prepare("INSERT INTO tasks (title, created_by, visibility) VALUES ('Hex', ?, 'private')")
+      .run(`0x${Number(BOB).toString(16)}`).lastInsertRowid);
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  assert.equal(db.prepare('SELECT typeof(created_by) AS t FROM tasks WHERE id = ?').get(id).t, 'text');
+  const bob = { id: BOB, role: 'member' };
+  for (const res of [
+    await call('PATCH', `/${id}/status`, { as: bob, body: { status: 'done' } }),
+    await call('DELETE', `/${id}`, { as: bob }),
+  ]) {
+    assert.equal(res.status, 404, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'tasks_task_not_found');
+  }
+  const row = db.prepare('SELECT status FROM tasks WHERE id = ?').get(id);
+  assert.equal(row?.status, 'open', 'the task is still there, unchanged');
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+});
+
 // --------------------------------------------------------
 // GET /meta/options
 // --------------------------------------------------------

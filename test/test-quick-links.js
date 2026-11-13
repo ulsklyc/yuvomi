@@ -288,6 +288,96 @@ test('eine fremde private Kachel antwortet mit 404 und nicht mit 403', async () 
   assert.equal((await call('PUT', `/${priv.id}`, { visibility: 'all' })).status, 404);
 });
 
+// quick_links.visibility has no CHECK: a value other than 'all' and 'private'
+// only arrives through a restore or direct database access. The list hides such
+// a tile from everyone but its creator, so PUT and DELETE must not give it away
+// with a 403 either - they ask the same rule as the list (rowVisible).
+test('a tile with a third visibility value is gone for others on change and delete, too', async () => {
+  reset();
+  const odd = db.prepare("INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('Odd','https://odd.example/','family',?,0)").run(ALICE).lastInsertRowid;
+
+  for (const [who, role] of [[BOB, 'member'], [ADMIN, 'admin']]) {
+    as(who, role);
+    assert.deepEqual((await call('GET', '/')).body.data.map((/** @type {any} */ q) => q.id), [], `${role}: list`);
+    for (const res of [await call('PUT', `/${odd}`, { name: 'x' }), await call('DELETE', `/${odd}`)]) {
+      assert.equal(res.status, 404, `${role}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.reason, 'quick_links_link_not_found');
+    }
+  }
+  assert.equal(db.prepare('SELECT name FROM quick_links WHERE id = ?').get(odd).name, 'Odd');
+
+  // The creator keeps what she had: she sees it, may edit it, may delete it.
+  as(ALICE);
+  const seen = (await call('GET', '/')).body.data;
+  assert.deepEqual(seen.map((/** @type {any} */ q) => [q.id, q.can_edit]), [[odd, true]]);
+  const put = await call('PUT', `/${odd}`, { name: 'Still odd' });
+  assert.equal(put.status, 200);
+  assert.equal(put.body.data.name, 'Still odd');
+  assert.equal(put.body.data.visibility, 'family');
+  assert.equal((await call('DELETE', `/${odd}`)).status, 204);
+});
+
+test('a tile with a third visibility value and no creator is gone for everyone', async () => {
+  reset();
+  const odd = db.prepare("INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('Odd','https://odd.example/','family',NULL,0)").run().lastInsertRowid;
+  for (const [who, role] of [[ALICE, 'member'], [BOB, 'member'], [ADMIN, 'admin']]) {
+    as(who, role);
+    assert.deepEqual((await call('GET', '/')).body.data, [], `${role}: list`);
+    for (const res of [await call('PUT', `/${odd}`, { name: 'x' }), await call('DELETE', `/${odd}`)]) {
+      assert.equal(res.status, 404, `${role}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.reason, 'quick_links_link_not_found');
+    }
+  }
+  assert.equal(db.prepare('SELECT name FROM quick_links WHERE id = ?').get(odd)?.name, 'Odd');
+});
+
+// quick_links.created_by is INTEGER without CHECK: with foreign keys off (a
+// restore, direct database access) it can hold TEXT. '0x<id>' stays TEXT, the list
+// (`created_by = @me`) never matches it - and Number('0x<id>') would. PUT and
+// DELETE compare the creator like the list, so the tile does not exist for Bob.
+test('a private tile whose creator is TEXT reading as my id is not mine', async () => {
+  reset();
+  db.pragma('foreign_keys = OFF');
+  let hex;
+  try {
+    hex = db.prepare("INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('Hex','https://hex.example/','private',?,0)")
+      .run(`0x${Number(BOB).toString(16)}`).lastInsertRowid;
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  assert.equal(db.prepare('SELECT typeof(created_by) AS t FROM quick_links WHERE id = ?').get(hex).t, 'text');
+  as(BOB);
+  assert.deepEqual((await call('GET', '/')).body.data, []);
+  for (const res of [await call('PUT', `/${hex}`, { name: 'x' }), await call('DELETE', `/${hex}`)]) {
+    assert.equal(res.status, 404, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'quick_links_link_not_found');
+  }
+  assert.equal(db.prepare('SELECT name FROM quick_links WHERE id = ?').get(hex)?.name, 'Hex');
+});
+
+// quick_links.created_by is nullable: a tile without a creator is nobody's own.
+// Held as it was before PUT/DELETE moved to rowVisible.
+test('a tile without a creator: private is gone, shared is the admin\'s to tidy', async () => {
+  reset();
+  const priv = db.prepare("INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('P','https://p.example/','private',NULL,0)").run().lastInsertRowid;
+  const shared = db.prepare("INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('S','https://s.example/','all',NULL,1)").run().lastInsertRowid;
+
+  for (const [who, role] of [[BOB, 'member'], [ADMIN, 'admin']]) {
+    as(who, role);
+    for (const res of [await call('PUT', `/${priv}`, { name: 'x' }), await call('DELETE', `/${priv}`)]) {
+      assert.equal(res.status, 404, `${role}: private`);
+      assert.equal(res.body.reason, 'quick_links_link_not_found');
+    }
+  }
+  assert.equal(db.prepare('SELECT name FROM quick_links WHERE id = ?').get(priv)?.name, 'P', 'the private tile is still there');
+  as(BOB);
+  assert.equal((await call('PUT', `/${shared}`, { name: 'x' })).status, 403);
+  assert.equal((await call('DELETE', `/${shared}`)).status, 403);
+  as(ADMIN, 'admin');
+  assert.equal((await call('PUT', `/${shared}`, { name: 'tidied' })).status, 200);
+  assert.equal((await call('DELETE', `/${shared}`)).status, 204);
+});
+
 test('PUT ändert nur, was mitgeschickt wurde', async () => {
   reset();
   as(ALICE);

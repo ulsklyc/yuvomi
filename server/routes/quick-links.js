@@ -24,7 +24,7 @@ import { str, color, collectErrors, MAX_SHORT } from '../middleware/validate.js'
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { normalizeQuickLinkUrl } from '../../public/utils/quick-link-url.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { canEditQuickLink, quickLinkHiddenFrom, visibleWhere } from '../authorize/index.ts';
+import { canEditQuickLink, rowVisible, visibleWhere } from '../authorize/index.ts';
 
 const log = createLogger('QuickLinks');
 
@@ -280,9 +280,11 @@ router.put('/:id', (req, res) => {
   try {
     const id  = parseInt(req.params.id, 10);
     const row = db.get().prepare('SELECT * FROM quick_links WHERE id = ?').get(id);
-    // Eine fremde private Kachel gibt es für diese Person nicht - 404 und nicht
-    // 403, sonst verrät die Antwort ihre Existenz.
-    if (!row || quickLinkHiddenFrom(row, actingUser(req))) {
+    // A tile this person's list does not show does not exist for them - 404 and
+    // not 403, or the answer gives its existence away. The same rule as the list
+    // (rowVisible), also for a value outside all|private, which only a restore
+    // can write (no CHECK on quick_links.visibility).
+    if (!rowVisible(db.get(), 'quick_links', row, actingUser(req))) {
       return res.status(404).json({ error: 'Quick link not found.', code: 404, reason: 'quick_links_link_not_found' });
     }
     if (!canEditQuickLink(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
@@ -327,7 +329,8 @@ router.delete('/:id', (req, res) => {
   try {
     const id  = parseInt(req.params.id, 10);
     const row = db.get().prepare('SELECT * FROM quick_links WHERE id = ?').get(id);
-    if (!row || quickLinkHiddenFrom(row, actingUser(req))) {
+    // As in PUT: not visible means 404, never 403.
+    if (!rowVisible(db.get(), 'quick_links', row, actingUser(req))) {
       return res.status(404).json({ error: 'Quick link not found.', code: 404, reason: 'quick_links_link_not_found' });
     }
     if (!canEditQuickLink(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });

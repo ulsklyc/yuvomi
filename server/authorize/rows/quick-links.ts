@@ -4,10 +4,14 @@
  * Purpose: which quick links a viewer sees: the shared ones and their own.
  *
  *          The row forms (B8b, until then server/routes/quick-links.js): the same
- *          rule for one loaded tile, who may edit a tile, and the 404 of PUT/DELETE.
+ *          rule for one loaded tile (also the 404 of PUT/DELETE, through
+ *          rowVisible()) and who may edit a tile.
  *
- * Dependencies: none. Erasable TS syntax only (runs through type stripping, no build).
+ * Dependencies: creator.ts (the creator comparison). Erasable TS syntax only (runs
+ * through type stripping, no build).
  */
+
+import { isOwnRow } from './creator.ts';
 
 /**
  * WHERE-Fragment: was diese Person sehen darf.
@@ -24,29 +28,14 @@ export function quickLinkVisibleWhere(alias: string, viewer: string = '@me'): st
 export type QuickLinkRow = { visibility?: unknown; created_by?: unknown };
 
 /**
- * The row form of quickLinkVisibleWhere(): shared, or the viewer's own. As in SQL,
- * where `created_by = @me` never matches NULL, a tile without a creator
- * (quick_links.created_by is nullable) is nobody's own, and no viewer owns one.
+ * The row form of quickLinkVisibleWhere(): shared, or the viewer's own. The creator
+ * is compared as SQL compares `created_by = @me` (isOwnRow): a tile without a
+ * creator (quick_links.created_by is nullable) or with a TEXT creator is nobody's
+ * own, and a viewer of null owns none.
  */
 export function quickLinkRowVisible(row: QuickLinkRow, viewerId: unknown): boolean {
   if (row.visibility === 'all') return true;
-  if (row.created_by == null || viewerId == null) return false;
-  return Number(row.created_by) === Number(viewerId);
-}
-
-/**
- * Is the tile hidden from `viewerId` for PUT and DELETE (their 404)? A foreign
- * private tile does not exist for this person - 404 and not 403, or the answer
- * gives its existence away.
- *
- * NOT written as !quickLinkRowVisible(): quick_links.visibility has no CHECK, and
- * for a value other than 'all' and 'private' (the route writes neither, a restored
- * file could carry one) the fragment hides the tile while this check lets it on to
- * canEditQuickLink(), which answers 403. Kept as it was (B8b changes no answer);
- * for the two stored levels both are the same set (test:authorize-rows).
- */
-export function quickLinkHiddenFrom(row: QuickLinkRow, viewerId: unknown): boolean {
-  return row.visibility === 'private' && row.created_by !== viewerId;
+  return isOwnRow(row.created_by, viewerId);
 }
 
 /**

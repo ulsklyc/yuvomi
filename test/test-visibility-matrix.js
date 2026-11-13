@@ -21,8 +21,8 @@
  *          seeded after every read path was measured (see `_meta.row_rules`).
  *          Since B8b these rules live in server/authorize (mayAccessTask and
  *          actorCanSeeSeries -> rowVisible, mayEdit -> canEditQuickLink, the
- *          quick link 404 -> quickLinkHiddenFrom, the display branch ->
- *          householdVisible); the cells measure the same call sites. The old
+ *          quick link 404 -> rowVisible (in B8b first quickLinkHiddenFrom),
+ *          the display branch -> householdVisible); the cells measure the same call sites. The old
  *          names stay in `_meta`, which is compared to the data file.
  *
  *          Rate limits: `apiLimiter` (300/min) and `feedLimiter` (30/min) key
@@ -912,8 +912,8 @@ let ruleSeed = null;
 
 /**
  * Quick links: list (with `can_edit`), the dashboard row, PUT {} and DELETE
- * per tile (quick-links.js: 404 through quickLinkHiddenFrom, 403 through
- * canEditQuickLink; until B8b the inline 404 at ~302/347 and mayEdit ~145).
+ * per tile (quick-links.js: 404 through rowVisible, 403 through canEditQuickLink;
+ * until B8b the inline 404 at ~302/347 and mayEdit ~145, in B8b quickLinkHiddenFrom).
  * @param {string} role
  */
 async function measureQuickLinks(role) {
