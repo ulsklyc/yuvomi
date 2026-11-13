@@ -228,6 +228,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `success: false`, and carries the same `reason`. The backup page does not show the reason yet.
 
 ### Fixed
+- **Status bar no longer blurs beside the Dynamic Island on iOS 26 (PWA).** (#2390)
 - **The demo seed finds the database key the server stored itself.** `scripts/seed-demo.js
   --db <path>` now reads `DB_ENCRYPTION_KEY_FILE` and the key a first start keeps under
   `.secrets/` next to the database, in the same order as the server. Until now it stopped on an
