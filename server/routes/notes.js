@@ -15,7 +15,7 @@ import {
   resolvePermissions,
   userForRequest,
   sendNotOwner,
-  noteVisibleWhere,
+  visibleWhere,
 } from '../authorize/index.ts';
 import {
   categoryNameKey,
@@ -90,7 +90,7 @@ function viewerOf(req) {
  * eine geloeschte: 404, denn schon ein 403 sagte, dass es sie gibt.
  */
 function findVisibleNote(req, id) {
-  return db.get().prepare(`SELECT * FROM notes n WHERE n.id = ? AND ${noteVisibleWhere('n')}`)
+  return db.get().prepare(`SELECT * FROM notes n WHERE n.id = ? AND ${visibleWhere('notes', 'n', '?')}`)
     .get(id, actorId(req));
 }
 
@@ -289,7 +289,7 @@ router.get('/', (req, res) => {
       SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
       FROM notes n
       LEFT JOIN users u ON u.id = n.created_by
-      WHERE ${noteVisibleWhere('n')}
+      WHERE ${visibleWhere('notes', 'n', '?')}
       ORDER BY n.pinned DESC, n.updated_at DESC
     `).all(actorId(req));
     res.json({ data: hydrateNotesWithCategories(db.get(), notes, actorId(req)) });

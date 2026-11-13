@@ -9,7 +9,7 @@ import {
   NOTE_CATEGORY_NAME_MAX_LENGTH,
 } from '../../public/utils/note-category-name.js';
 // The visibility rule itself lives in server/authorize/rows/notes.ts (phase 2, B3).
-import { categoryVisibleTo, categoryVisibleWhere } from '../authorize/index.ts';
+import { categoryVisibleTo, visibleWhere } from '../authorize/index.ts';
 export { categoryNameKey };
 
 export class NoteCategoryInputError extends Error {
@@ -36,7 +36,7 @@ export function listVisibleCategories(database, userId) {
   return database.prepare(`
     SELECT id, name, scope, owner_user_id, sort_order
     FROM note_categories
-    WHERE ${categoryVisibleWhere('')}
+    WHERE ${visibleWhere('note_categories', '', '?')}
     ORDER BY CASE scope WHEN 'household' THEN 0 ELSE 1 END,
              sort_order ASC, name COLLATE NOCASE ASC, id ASC
   `).all(userId);
@@ -57,7 +57,7 @@ export function hydrateNotesWithCategories(database, notes, userId) {
       FROM note_category_assignments a
       JOIN note_categories c ON c.id = a.category_id
       WHERE a.note_id IN (${placeholders})
-        AND ${categoryVisibleWhere('c')}
+        AND ${visibleWhere('note_categories', 'c', '?')}
       ORDER BY CASE c.scope WHEN 'household' THEN 0 ELSE 1 END,
                c.sort_order ASC, c.name COLLATE NOCASE ASC, c.id ASC
     `).all(...chunk, userId));
@@ -103,7 +103,7 @@ export function replaceEditableAssignments(database, {
       DELETE FROM note_category_assignments
       WHERE note_id = ? AND category_id IN (
         SELECT id FROM note_categories
-        WHERE ${categoryVisibleWhere('')}
+        WHERE ${visibleWhere('note_categories', '', '?')}
       )
     `).run(noteId, userId);
     const insert = database.prepare(`

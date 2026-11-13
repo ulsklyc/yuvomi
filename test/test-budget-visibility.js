@@ -19,7 +19,6 @@ import {
   BUDGET_MASKED_CATEGORY,
   normalizeBudgetVisibility,
   normalizeObjectVisibility,
-  budgetVisibilityWhere,
   budgetDetailsVisibleWhere,
   budgetDetailsHiddenWhere,
   budgetScopeWhere,
@@ -27,6 +26,9 @@ import {
   maskBudgetEntry,
   canEditEntry,
 } from '../server/authorize/index.ts';
+// The single-type fragment behind visibleWhere('budget', ...): an inner seam, not
+// exported from index.ts since B3.
+import { budgetVisibilityWhere } from '../server/authorize/rows/budget.ts';
 
 let passed = 0;
 let failed = 0;

@@ -12,7 +12,7 @@ import {
   applyDocumentAccess,
   attachmentAccessMode,
   eventAudienceChanged,
-  filterVisibleDocumentIds,
+  filterVisible,
 } from '../../authorize/index.ts';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
@@ -333,7 +333,7 @@ export function storedAttachmentLocked(req, database, storedDocumentId) {
   const viewer = documentViewer(req);
   if (!viewer.readsDocuments) return true;
   if (storedDocumentId == null) return false;
-  return filterVisibleDocumentIds(database, [storedDocumentId], viewer.userId).length === 0;
+  return filterVisible(database, 'documents', [storedDocumentId], viewer.userId).length === 0;
 }
 
 export function attachmentDataUrl(event) {
@@ -595,7 +595,7 @@ function visibleAttachmentDocumentIds(events, context) {
   const viewer = context?.viewer;
   if (!context?.database || viewer?.readsDocuments !== true) return new Set();
   const ids = events.map((event) => event?.attachment_document_id).filter((id) => id != null);
-  return new Set(filterVisibleDocumentIds(context.database, ids, viewer.userId));
+  return new Set(filterVisible(context.database, 'documents', ids, viewer.userId));
 }
 
 /** Serializes a result set with one capability classification per master. */

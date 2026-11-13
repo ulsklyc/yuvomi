@@ -13,8 +13,8 @@ import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-
 import {
   deniedModules,
   reminderTargetVisible,
-  reminderTargetVisibleSql,
   asksHouseholdAudience,
+  visibleWhere,
 } from '../authorize/index.ts';
 import { tokenAllows } from '../scopes.js';
 import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
@@ -301,7 +301,7 @@ function callerReminders(req, {
       -- sieht (services/reminder-targets.js). Das Modulrecht darueber sagt
       -- nichts ueber die einzelne Aufgabe, und die Sichtbarkeit aendert sich
       -- nach dem Anlegen. Uebersprungen, nicht geloescht.
-      AND ${reminderTargetVisibleSql(db.get(), 'r')}
+      AND ${visibleWhere('reminders', 'r', 'r.created_by', { database: db.get() })}
       -- Eine 'cycle_period'/'cycle_log_nudge'-Zeile, deren Anker bereits
       -- geloescht wurde (Eigentuemer geloescht, Einstellung geaendert, o.ae.),
       -- aber deren periodischer Sync noch nicht wieder gelaufen ist, darf
@@ -508,7 +508,7 @@ router.get('/all', (req, res) => {
     const rows = db.get().prepare(`
       SELECT r.* FROM reminders r
       WHERE r.entity_type = ? AND r.entity_id = ? AND r.created_by = ? AND r.dismissed = 0
-        AND ${reminderTargetVisibleSql(db.get(), 'r')}
+        AND ${visibleWhere('reminders', 'r', 'r.created_by', { database: db.get() })}
       ORDER BY r.remind_at ASC
     `).all(entityType, entityId, userId);
 
@@ -540,7 +540,7 @@ router.get('/', (req, res) => {
     const row = db.get().prepare(`
       SELECT r.* FROM reminders r
       WHERE r.entity_type = ? AND r.entity_id = ? AND r.created_by = ? AND r.dismissed = 0
-        AND ${reminderTargetVisibleSql(db.get(), 'r')}
+        AND ${visibleWhere('reminders', 'r', 'r.created_by', { database: db.get() })}
       ORDER BY r.created_at DESC LIMIT 1
     `).get(entityType, entityId, userId);
 

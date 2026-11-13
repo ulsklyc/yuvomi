@@ -30,12 +30,11 @@ import {
   mayChangeRecord,
   mayWriteModule,
   sendNotOwner,
-  icsSubscriptionVisibleWhere,
   normalizeVisibility,
-  visibilityWhere,
   ATTACHMENT_NARROW_ONLY,
   documentClonePredicate,
   documentWidenPredicate,
+  visibleWhere,
 } from '../../authorize/index.ts';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import { localCalendarColorSql, localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
@@ -521,8 +520,8 @@ router.get('/:id', (req, res) => {
       LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
       LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
       WHERE e.id = ?
-        AND ${icsSubscriptionVisibleWhere('e')}
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
+        AND ${visibleWhere('ics_subscriptions', 'e', '?')}
+        AND ${visibleWhere('events', 'e', '?')}
     `).get(id, getUserId(req), getUserId(req), getUserId(req));
 
     if (!event) return sendEventGone(res);
@@ -776,8 +775,8 @@ function loadVisibleEvent(id, req) {
   return db.get().prepare(`
     SELECT e.* FROM calendar_events e
     WHERE e.id = ?
-      AND ${icsSubscriptionVisibleWhere('e')}
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
+      AND ${visibleWhere('ics_subscriptions', 'e', '?')}
+      AND ${visibleWhere('events', 'e', '?')}
   `).get(id, me, me, me);
 }
 

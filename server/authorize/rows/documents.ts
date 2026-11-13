@@ -47,12 +47,22 @@ type AttachmentCaller = { actorId?: number | null; isAdmin?: boolean | null; doc
  * @returns {string}
  */
 export function documentVisibleSql(alias: string = 'd', param: string = 'userId'): string {
+  return documentVisibleWhere(alias, `@${param}`);
+}
+
+/**
+ * The same fragment with the viewer as a bind token ('@me', '?', a column
+ * expression), the form visibleWhere('documents', ...) passes on. The text for
+ * documentVisibleSql(alias, param) is the one documentVisibleWhere(alias, '@' + param)
+ * builds.
+ */
+export function documentVisibleWhere(alias: string, viewer: string): string {
   return `(
-    ${alias}.created_by = @${param}
+    ${alias}.created_by = ${viewer}
     OR ${alias}.visibility = 'family'
     OR EXISTS (
       SELECT 1 FROM family_document_access a
-      WHERE a.document_id = ${alias}.id AND a.user_id = @${param}
+      WHERE a.document_id = ${alias}.id AND a.user_id = ${viewer}
     )
   )`;
 }
@@ -66,19 +76,35 @@ export function documentVisibleSql(alias: string = 'd', param: string = 'userId'
  * @param {number} userId
  * @returns {number[]} sichtbare IDs, Reihenfolge wie uebergeben, ohne Duplikate
  */
-export function filterVisibleDocumentIds(database: Database, ids: readonly unknown[] | null | undefined, userId: unknown): number[] {
+function filterVisibleDocumentIds(database: Database, ids: readonly unknown[] | null | undefined, userId: unknown): number[] {
+  return filterVisibleIds(database, 'family_documents', documentVisibleSql('d'), ids, userId);
+}
+
+/**
+ * The query behind filterVisibleDocumentIds() for any table: `visible` is a
+ * fragment over the alias `d` with the viewer bound as `@userId`. filterVisible()
+ * (rows/index.ts) passes visibleWhere(type, 'd', '@userId'); for documents that is
+ * the text filterVisibleDocumentIds() builds, so both run the same SQL.
+ */
+export function filterVisibleIds(
+  database: Database,
+  table: string,
+  visible: string,
+  ids: readonly unknown[] | null | undefined,
+  userId: unknown,
+): number[] {
   const wanted = [...new Set((ids || [])
     .map((id) => Number(id))
     .filter((id) => Number.isInteger(id) && id > 0))];
   if (!wanted.length) return [];
 
   const placeholders = wanted.map(() => '?').join(', ');
-  const visible = new Set((database.prepare(`
-    SELECT d.id FROM family_documents d
-    WHERE d.id IN (${placeholders}) AND ${documentVisibleSql('d')}
+  const rows = new Set((database.prepare(`
+    SELECT d.id FROM ${table} d
+    WHERE d.id IN (${placeholders}) AND ${visible}
   `).all(...wanted, { userId }) as { id: number }[]).map((row) => row.id));
 
-  return wanted.filter((id) => visible.has(id));
+  return wanted.filter((id) => rows.has(id));
 }
 
 /**

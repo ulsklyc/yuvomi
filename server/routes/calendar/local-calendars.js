@@ -1,7 +1,7 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
-import { mayWriteModule, visibilityWhere } from '../../authorize/index.ts';
+import { mayWriteModule, visibleWhere } from '../../authorize/index.ts';
 import {
   clearCalendarFeedToken,
   ensureDefaultCalendar,
@@ -44,7 +44,7 @@ function loadCalendars(database, viewerId) {
   ensureDefaultCalendar(database);
   return database.prepare(`
     SELECT lc.*,
-           (SELECT COUNT(*) FROM calendar_events e WHERE ${localCalendarIdSql()} = lc.id AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@viewerId')}) AS event_count
+           (SELECT COUNT(*) FROM calendar_events e WHERE ${localCalendarIdSql()} = lc.id AND ${visibleWhere('events', 'e', '@viewerId')}) AS event_count
     FROM local_calendars lc
     ORDER BY lc.sort_order ASC, lc.name COLLATE NOCASE ASC, lc.id ASC
   `).all({ viewerId });

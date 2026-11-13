@@ -22,7 +22,7 @@
  * der Serie ist das Abhaken der Hauptaufgabe.
  */
 
-import { visibilityWhere } from '../authorize/index.ts';
+import { visibleWhere } from '../authorize/index.ts';
 import { personAvatarUrlSql } from './person-avatar.js';
 
 /**
@@ -174,7 +174,7 @@ export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId
  * danach nicht weiter zeigen. Genau dafür trägt `task_completions` keine eigene
  * Kopie der Stufe.
  */
-const VISIBLE_SQL = visibilityWhere('t', 'task_assignments', 'task_id', '@me');
+const VISIBLE_SQL = visibleWhere('tasks', 't', '@me');
 
 /**
  * Spalten, die beide Lesepfade teilen.

@@ -6,7 +6,7 @@
  */
 
 import { localCalendarIdSql } from './local-calendars.js';
-import { visibilityWhere, icsSubscriptionVisibleWhere } from '../authorize/index.ts';
+import { visibleWhere } from '../authorize/index.ts';
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
@@ -324,7 +324,7 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
     .toISOString().slice(0, 10);
   const feedZone = resolveFeedZone(tz);
   const calendarFilterSql = options.localCalendarId
-    ? `AND ${localCalendarIdSql()} = ? AND ${visibilityWhere('e', 'event_assignments', 'event_id', 'NULL')}`
+    ? `AND ${localCalendarIdSql()} = ? AND ${visibleWhere('events', 'e', 'NULL')}`
     : '';
   const calendarFilterParams = options.localCalendarId ? [options.localCalendarId] : [];
   const calendarName = options.calendarName || 'Yuvomi';
@@ -361,7 +361,7 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
   const queriedRows = conn.prepare(`
     SELECT ${eventProjectionSql(conn, 'e', BODY_FREE_EVENT_COLUMNS)}${assigneeSelect}
     FROM calendar_events e
-    WHERE ${icsSubscriptionVisibleWhere('e')}
+    WHERE ${visibleWhere('ics_subscriptions', 'e', '?')}
     AND (
       e.recurrence_rule IS NOT NULL
       OR DATE(e.start_datetime) >= ?

@@ -8,12 +8,9 @@
  */
 import {
   careAwareClause,
-  icsSubscriptionVisibleWhere,
-  noteVisibleWhere,
-  visibilityWhere,
-  documentVisibleSql,
   budgetDetailsVisibleWhere,
   resolveBudgetMode,
+  visibleWhere,
 } from '../authorize/index.ts';
 
 import {
@@ -466,7 +463,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     JOIN tasks t ON t.id = s.entity_id
     WHERE s.entity = 'task' AND s.search_index MATCH @match
       AND t.parent_task_id IS NULL
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@userId')}
+      AND ${visibleWhere('tasks', 't', '@userId')}
     ORDER BY t.archived_at IS NOT NULL,
              CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
              t.due_date ASC NULLS LAST
@@ -492,8 +489,8 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
       FROM search_index s
       JOIN calendar_events e ON e.id = s.entity_id
       WHERE s.entity = 'event' AND s.search_index MATCH @match
-        AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}${
+        AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
+        AND ${visibleWhere('events', 'e', '@userId')}${
           // Geburtstagstermine stehen in dieser Trefferart, gehoeren aber dem
           // Schalter `birthdays` - wie in der Kalendersuche (#1660).
           disabledNav?.has('birthdays') ? ` AND ${notBirthdayEventSql('e')}` : ''}
@@ -540,7 +537,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     FROM search_index s
     JOIN notes n ON n.id = s.entity_id
     WHERE s.entity = 'note' AND s.search_index MATCH @match
-      AND ${noteVisibleWhere('n', '@userId')}
+      AND ${visibleWhere('notes', 'n', '@userId')}
     ORDER BY n.pinned DESC, n.updated_at DESC
     LIMIT @limit
   `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.content]));
@@ -697,7 +694,7 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
     results.documents = firstMatches(database.prepare(`
       SELECT d.id, d.name AS title, d.description, d.category, d.updated_at
       FROM family_documents d
-      WHERE ${documentVisibleSql('d', 'userId')} AND d.status = 'active'
+      WHERE ${visibleWhere('documents', 'd', '@userId')} AND d.status = 'active'
       ORDER BY d.updated_at DESC, d.id DESC
     `).all({ userId }), matches, (d) => [d.title, d.description], limit)
       .map((d) => withExcerpt(pick(d, ['id', 'title', 'category']), q, [d.description]));

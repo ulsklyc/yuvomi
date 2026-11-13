@@ -36,7 +36,7 @@ import {
   moduleAccessVerdict,
   MODULE_ACCESS_ALLOW,
   requestHasCapability,
-  documentVisibleSql,
+  visibleWhere,
 } from '../authorize/index.ts';
 import { tokenAllows } from '../scopes.js';
 import {
@@ -820,7 +820,7 @@ function receiptAccess(req) {
     for (const id of wanted) names.set(id, undefined);
     const rows = db.get().prepare(`
       SELECT d.id, d.name FROM family_documents d
-      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${documentVisibleSql('d')}
+      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${visibleWhere('documents', 'd', '@userId')}
     `).all(...wanted, { userId: viewer });
     for (const row of rows) names.set(row.id, row.name);
   };

@@ -12,12 +12,10 @@ import { str, date as validateDate, num, collectErrors, id as validateId, MAX_TE
 import { isAdminRequest } from '../middleware/require-admin.js';
 import {
   mayReadModule,
-  icsSubscriptionVisibleWhere,
-  visibilityWhere,
   budgetDetailsVisibleWhere,
   resolveBudgetMode,
   canManageDocument,
-  documentVisibleSql,
+  visibleWhere,
 } from '../authorize/index.ts';
 import { reminderDateBefore, reminderIsInThePast } from '../utils/reminder-schedule.js';
 import { isHouseholdMember, newNonMembers, nonMemberMessage } from '../services/household-members.js';
@@ -170,7 +168,7 @@ function mayManage(req, document) {
 }
 
 function canSeeSql(alias = 'd') {
-  return documentVisibleSql(alias);
+  return visibleWhere('documents', alias, '@userId');
 }
 
 const EXPIRY_REMINDER_MIN_DAYS = 0;
@@ -680,7 +678,7 @@ function visibleFolderDocuments(req, folderIds) {
       SELECT d.id, d.name, d.storage_backend, d.storage_key, d.created_by
       FROM family_documents d
       WHERE d.folder_id IN (${folderPlaceholders})
-        AND ${documentVisibleSql('d')}
+        AND ${visibleWhere('documents', 'd', '@userId')}
       ORDER BY d.id ASC
     `)
     .all({ ...folderParams, userId: userId(req) });
@@ -738,8 +736,8 @@ function folderDeleteLinkedState(req, documentIds) {
     calendar_events: readsCalendar ? ids(`
       SELECT e.id AS identity FROM calendar_events e
        WHERE e.attachment_document_id IN (${placeholders})
-         AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-         AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}
+         AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
+         AND ${visibleWhere('events', 'e', '@userId')}
        ORDER BY e.id
     `) : null,
     housekeeping_work_sessions: reads('housekeeping') ? ids(`
@@ -767,7 +765,7 @@ function folderDeleteLinkedState(req, documentIds) {
       SELECT printf('%d:%d', td.task_id, td.document_id) AS identity FROM task_documents td
         JOIN tasks t ON t.id = td.task_id
        WHERE td.document_id IN (${placeholders})
-         AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@userId')}
+         AND ${visibleWhere('tasks', 't', '@userId')}
        ORDER BY identity
     `) : null,
     budget_entry_attachments: readsBudget ? ids(`

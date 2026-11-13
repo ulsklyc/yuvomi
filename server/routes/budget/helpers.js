@@ -10,7 +10,6 @@ import { linkTransfer } from '../../services/budget-transfers.js';
 import path from 'path';
 import * as db from '../../db.js';
 import {
-  budgetVisibilityWhere,
   budgetDetailsVisibleWhere,
   budgetScopeWhere,
   budgetDetailsHiddenWhere,
@@ -18,6 +17,7 @@ import {
   resolveBudgetMode,
   maskBudgetEntry,
   BUDGET_MASKED_CATEGORY,
+  visibleWhere,
 } from '../../authorize/index.ts';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
@@ -55,7 +55,7 @@ export function budgetFilter(req, alias, { scoped = true } = {}) {
   const mode = getBudgetMode();
   if (mode !== 'personal') return { clause: '', params: [] };
   const me = viewerId(req);
-  let clause = ` AND ${budgetVisibilityWhere(alias, '?', { mode })}`;
+  let clause = ` AND ${visibleWhere('budget', alias, '?', { mode })}`;
   const params = [me];
   if (scoped) {
     const scope = req.query.scope === 'household' ? 'household' : 'mine';
@@ -96,7 +96,7 @@ export function expectedSubscriptionFilter(req) {
   return {
     clause: `${entry.clause}`
       + ` AND ${budgetDetailsVisibleWhere('b', '?', { mode })}`
-      + ` AND ${budgetVisibilityWhere('sub', '?', { mode })}`,
+      + ` AND ${visibleWhere('budget', 'sub', '?', { mode })}`,
     params: [...entry.params, me, me],
   };
 }

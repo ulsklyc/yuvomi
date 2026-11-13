@@ -16,8 +16,7 @@ import { resolveEventRows } from './calendar-occurrence-overrides.js';
 import {
   householdVisibleWhere,
   icsSubscriptionSharedWhere,
-  icsSubscriptionVisibleWhere,
-  visibilityWhere,
+  visibleWhere,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
 import { calendarSelectionSql } from './calendar-selection.js';
@@ -223,7 +222,7 @@ function eventAudience(userId, household) {
   return household
     ? { where: `${icsSubscriptionSharedWhere('e')}\n    AND ${householdVisibleWhere('e')}`, params: [] }
     : {
-      where: `${icsSubscriptionVisibleWhere('e')}\n    AND ${visibilityWhere('e', 'event_assignments', 'event_id')}`,
+      where: `${visibleWhere('ics_subscriptions', 'e', '?')}\n    AND ${visibleWhere('events', 'e', '?')}`,
       params: [userId, userId, userId],
     };
 }
