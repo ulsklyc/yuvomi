@@ -335,6 +335,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without its file.
 
 ### Fixed
+- **Tasks: `updated_at` moves again when a task is actually changed.** Every database from
+  migration v4 on had silently lost the trigger that keeps `tasks.updated_at` current: the table
+  rebuilds (v4, v25, v114) dropped the table together with its triggers, and the last rebuild
+  re-created the search triggers but missed this one. Editing a task kept `updated_at` frozen at
+  the creation time, while calendar events advanced correctly. A new migration restores the
+  trigger; existing values stay as they are, only further updates advance the timestamp.
 - **Storage and backup errors in settings say what happened, in your language** (#2622). When
   document storage or a WebDAV backup failed without a technical class to show, settings put an
   English server sentence ("WebDAV upload failed.") into the translated message instead of the
