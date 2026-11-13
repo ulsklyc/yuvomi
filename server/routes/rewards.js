@@ -20,7 +20,7 @@ import { minorUnit } from '../services/split-expenses.js';
 import { isHouseholdMember } from '../services/household-members.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { visibilityWhere } from '../services/visibility.js';
+import { visibilityWhere } from '../authorize/index.ts';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 
 const log = createLogger('Rewards');

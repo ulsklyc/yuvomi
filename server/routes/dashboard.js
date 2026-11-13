@@ -6,7 +6,7 @@
 
 import { createLogger } from '../logger.js';
 import express from 'express';
-import { categoryVisibleWhere, hydrateNotesWithCategories } from '../services/note-categories.js';
+import { hydrateNotesWithCategories } from '../services/note-categories.js';
 import * as db from '../db.js';
 import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
 import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
@@ -15,11 +15,17 @@ import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryF
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
-  asksHouseholdAudience, householdAudienceAnswer, householdAudienceShows, householdVisibleWhere, noteVisibleWhere,
+  hiddenModulesFor,
+  requestHasCapability,
+  categoryVisibleWhere,
+  asksHouseholdAudience,
+  householdAudienceAnswer,
+  householdAudienceShows,
+  householdVisibleWhere,
+  noteVisibleWhere,
   visibilityWhere,
-} from '../services/visibility.js';
-import { resolveBudgetMode } from '../services/budget-visibility.js';
-import { hiddenModulesFor, requestHasCapability } from '../authorize/index.ts';
+  resolveBudgetMode,
+} from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
@@ -406,7 +412,7 @@ router.get('/', (req, res) => {
    *
    * UND SIE TRAEGT NUR, WAS DIE WAND ZEICHNET. Welche Schluessel das sind,
    * steht als Allowlist an einer Stelle (`HOUSEHOLD_AUDIENCE_SHOWS` in
-   * services/visibility.js); alles andere kommt in der leeren Fassung einer
+   * authorize/rows/household.ts); alles andere kommt in der leeren Fassung einer
    * Modulsperre - Notizen, Budget, geteilte Ausgaben, Schnellzugriffe,
    * Countdowns, der offene Lohn der Haushaltshilfe, und was nur dem Betrachter
    * gilt (Dosen, die eigene Schicht, wartende Freigaben: „2 zu bestaetigen"

@@ -45,3 +45,48 @@ export {
   userForRequest,
   userHasCapability,
 } from './modules.ts';
+// Row visibility (B3): one file per data type under rows/.
+export { normalizeVisibility, visibilityWhere, VISIBILITY_VALUES } from './rows/assignees.ts';
+export { categoryVisibleTo, categoryVisibleWhere, noteVisibleWhere } from './rows/notes.ts';
+export { icsSubscriptionSharedWhere, icsSubscriptionVisibleWhere } from './rows/ics-subscriptions.ts';
+export {
+  asksHouseholdAudience,
+  HOUSEHOLD_AUDIENCE_SHOWS,
+  householdAudienceAnswer,
+  householdAudienceShows,
+  householdVisibleWhere,
+} from './rows/household.ts';
+export { CARED_FOR_SUBQUERY, careAwareClause, OPEN_FAMILY } from './rows/health.ts';
+export {
+  applyDocumentAccess,
+  ATTACHMENT_NARROW_ONLY,
+  attachmentAccessMode,
+  canManageDocument,
+  documentClonePredicate,
+  documentVisibleSql,
+  documentWidenPredicate,
+  eventAudienceChanged,
+  filterVisibleDocumentIds,
+} from './rows/documents.ts';
+export {
+  BUDGET_MASKED_CATEGORY,
+  BUDGET_OBJECT_VISIBILITY_VALUES,
+  BUDGET_VISIBILITY_VALUES,
+  budgetDetailsHiddenWhere,
+  budgetDetailsVisibleWhere,
+  budgetScopeWhere,
+  budgetVisibilityWhere,
+  canEditEntry,
+  hidesBudgetDetails,
+  maskBudgetEntry,
+  normalizeBudgetVisibility,
+  normalizeObjectVisibility,
+  resolveBudgetMode,
+} from './rows/budget.ts';
+export {
+  HOUSEHOLD_CHANNEL_POLICY,
+  reminderTargetPublicSql,
+  reminderTargetVisible,
+  reminderTargetVisibleSql,
+  TARGET_ENTITY_TYPES,
+} from './rows/reminders.ts';

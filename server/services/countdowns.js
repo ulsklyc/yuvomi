@@ -3,8 +3,8 @@
  * Zweck: Die als Countdown markierten Termine und Aufgaben und die bald
  *        ablaufenden Dokumente zu EINER nach Nähe sortierten Liste
  *        zusammenführen - die Datenseite des Übersichts-Widgets.
- * Abhängigkeiten: server/services/calendar-events.js, server/services/visibility.js,
- *                 server/services/document-access.js
+ * Abhängigkeiten: server/services/calendar-events.js, server/authorize/rows/assignees.ts,
+ *                 server/authorize/rows/ics-subscriptions.ts, server/authorize/rows/documents.ts
  *
  * WARUM ZWEI QUELLEN UND NICHT EINE TABELLE. Der Thread zu #647 ist genau an
  * dieser Frage entlanggegangen und bei zwei Quellen gelandet: @Kyrodan zählt bis
@@ -51,8 +51,7 @@ import { expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS } 
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { notCancelledEventSql } from './reminder-deleted-occurrence.js';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { documentVisibleSql } from './document-access.js';
+import { icsSubscriptionVisibleWhere, visibilityWhere, documentVisibleSql } from '../authorize/index.ts';
 import { hasExplicitZone, householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,

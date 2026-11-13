@@ -532,7 +532,7 @@ test('#2602: der Entzug zaehlt auch aus dem Rollenprofil, nicht nur aus dem Mitg
 // Haushaltskanaele bekommen nie eine Medikamenten-Erinnerung (#2598, E1)
 // --------------------------------------------------------
 // Jede Health-Herkunft ist im Haushaltskanal `'personal'`
-// (HOUSEHOLD_CHANNEL_POLICY in server/services/reminder-targets.js), und
+// (HOUSEHOLD_CHANNEL_POLICY in server/authorize/rows/reminders.ts), und
 // SECURITY.md sagt es zu: ein Kanal, den der Haushalt teilt, bekommt nie eine
 // Health-Erinnerung. Die Sichtbarkeit des Medikaments aendert daran nichts -
 // auch ein fuer die Familie sichtbares geht nur per Push und an Kanaele der

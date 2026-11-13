@@ -11,7 +11,7 @@
  *        Die Dokumente tragen dazu eine ZWEITE Regel, die die Oberflaeche gar
  *        nicht kannte: aendern, archivieren und loeschen darf nur, wer das
  *        Dokument angelegt hat, oder ein Admin (`canManageDocument()` in
- *        server/services/document-access.js). Mit `documents: write` trug
+ *        server/authorize/rows/documents.ts). Mit `documents: write` trug
  *        trotzdem jedes fremde Familien-Dokument das volle Menue.
  *
  *        Die Regel (Kopf von public/utils/module-access.js):

@@ -31,8 +31,13 @@ import {
   queueEventDeletion,
   markInlineOutbound,
 } from '../services/calendar-outbound.js';
-import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW, requestHasCapability } from '../authorize/index.ts';
-import { documentVisibleSql } from '../services/document-access.js';
+import {
+  mayWriteModule,
+  moduleAccessVerdict,
+  MODULE_ACCESS_ALLOW,
+  requestHasCapability,
+  documentVisibleSql,
+} from '../authorize/index.ts';
 import { tokenAllows } from '../scopes.js';
 import {
   configuredHouseholdTimeZone,
@@ -794,7 +799,7 @@ function payment403(res) {
 // UND Token-Scope, dieselbe Frage wie bei Budget, Ausgaben und Inventar) und die
 // Sichtbarkeit des einzelnen Dokuments (`documentVisibleSql`, dieselbe Regel
 // wie im Dokumente-Modul). Wer durchfaellt, bekommt `null` fuer beide - auch die
-// ID verraet sonst, dass es ein Dokument dieser Nummer gibt (document-access.js).
+// ID verraet sonst, dass es ein Dokument dieser Nummer gibt (authorize/rows/documents.ts).
 // Uebrig bleibt `has_receipt`, eine Aussage ueber den Besuch - aber nur fuer
 // wer Dokumente lesen darf. Ohne dieses Recht ist es `null` wie `attachments`
 // bei Budget, Ausgaben und Inventar und `document_count` bei Aufgaben: kein

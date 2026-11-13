@@ -14,12 +14,12 @@
  * Kopien derselben Regel wären eine wandernde Annahme - fiele eine Seite zurück,
  * unterschieden sich die Tags derselben Aufgabe je nach Herkunft.
  *
- * Abhängigkeiten: server/services/visibility.js (reiner SQL-Fragment-Bauer ohne
+ * Abhängigkeiten: server/authorize/rows/assignees.ts (reiner SQL-Fragment-Bauer ohne
  * eigene Abhängigkeiten - die Sichtbarkeitsregel gehört zu jeder Tag-Abfrage,
  * die eine Liste an eine Person ausliefert).
  */
 
-import { visibilityWhere } from '../services/visibility.js';
+import { visibilityWhere } from '../authorize/index.ts';
 
 // Identisch zu den Grenzen im Parser (server/services/ics-parser.js): was von
 // dort hereinkommt, ist bereits gedeckelt, was aus der Oberfläche kommt, wird es

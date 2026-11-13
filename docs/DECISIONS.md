@@ -69,10 +69,10 @@ explicit grants once.
 
 One rule, one place, so a future change cannot be forgotten in a copy:
 
-- **Documents:** `documentVisibleSql()` in `server/services/document-access.js` has exactly
+- **Documents:** `documentVisibleSql()` in `server/authorize/rows/documents.ts` has exactly
   three branches - creator, family visibility, explicit share - and no admin branch. Every
   path that hands out documents goes through it, including the modules that only link them.
-- **Tasks and events:** `visibilityWhere()` in `server/services/visibility.js`, enforced on
+- **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`, enforced on
   the server and without an admin bypass (#474); the one deliberate exception is the personal ICS
   feed, an export of the household calendar that only drops other members' unshared ICS
   subscriptions (`icsSubscriptionVisibleWhere()`, SPEC "deliberately not filtered").
@@ -86,7 +86,7 @@ One rule, one place, so a future change cannot be forgotten in a copy:
 
 Whether an admin should ever see past the visibility rule is a real question, and it has an
 address: #1007, member visibility as its own axis. If the answer there is ever yes, the change
-goes into `document-access.js` - one rule, all paths, one test - and never into an `isAdmin`
+goes into `server/authorize/rows/documents.ts` - one rule, all paths, one test - and never into an `isAdmin`
 check at a single call site. Until then, an admin who cannot see a document still has the
 non-destructive path, and a pull request that adds an admin exception to any of the four
 places above is undoing this decision rather than extending it.
@@ -112,7 +112,7 @@ different shapes of copy:
   paths to the same document gave two answers: the single-document path told an admin that a
   member's private document did not exist, the folder path deleted it. Decided in review: the
   subtree goes through the one visibility rule, and if admins are ever to see past it, that
-  change goes into `document-access.js` - one rule, all paths, one test.
+  change goes into `server/authorize/rows/documents.ts` - one rule, all paths, one test.
 - **A second regex, #1013.** The storage check for dashboard widget ids was written without
   ever seeing how `fullWidgetId()` composes them, so it knew nothing of the colon in
   `<module-id>:<widget-id>`, and every layout containing a third-party widget was refused
@@ -133,10 +133,10 @@ document visibility SQL into one file, and that file's header records why.
 ### Where the rule lives
 
 - **Documents:** `documentVisibleSql()` and `filterVisibleDocumentIds()` in
-  `server/services/document-access.js`, called from documents, dms, tasks and the document
+  `server/authorize/rows/documents.ts`, called from documents, dms, tasks and the document
   links every other module uses.
-- **Tasks and events:** `visibilityWhere()` in `server/services/visibility.js`. **Budget:**
-  `server/services/budget-visibility.js`, owner-based and without an admin bypass.
+- **Tasks and events:** `visibilityWhere()` in `server/authorize/rows/assignees.ts`. **Budget:**
+  `server/authorize/rows/budget.ts`, owner-based and without an admin bypass.
 - **Module permission:** `moduleAccessVerdict()` and `deniedModules()` in
   `server/authorize/modules.ts`. The path middleware and the MCP tool layer call the same verdict,
   and a route that carries several modules sorts with `deniedModules()`, because a middleware
@@ -294,12 +294,12 @@ because it answers a different question.
 
 ### Where the rule lives
 
-- `server/services/visibility.js` - `VISIBILITY_VALUES` and `visibilityWhere()`, the canonical
+- `server/authorize/rows/assignees.ts` - `VISIBILITY_VALUES` and `visibilityWhere()`, the canonical
   set and the one WHERE fragment tasks and calendar share (#474).
 - `server/routes/health/helpers.js` - the health pair, to be read through an adapter.
-- `server/services/budget-visibility.js` - the budget triple, with `shared_amount` as the
+- `server/authorize/rows/budget.ts` - the budget triple, with `shared_amount` as the
   second axis.
-- `server/services/document-access.js` - `documentVisibleSql()`, `family` plus the access list.
+- `server/authorize/rows/documents.ts` - `documentVisibleSql()`, `family` plus the access list.
 - `public/locales/*.json` - the visibility labels under tasks, documents, health, budget and
   quick links, the place the family sees first.
 

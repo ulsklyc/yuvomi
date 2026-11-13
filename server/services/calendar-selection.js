@@ -22,7 +22,7 @@
 
 import { SOURCE_CALENDAR_JOIN } from './calendar-events.js';
 import { localCalendarIdSql } from './local-calendars.js';
-import { visibilityWhere } from './visibility.js';
+import { visibilityWhere } from '../authorize/index.ts';
 
 const KEY_RE = /^(local|cal|sub):([1-9]\d{0,14})$/;
 const MAX_SELECTION = 50;

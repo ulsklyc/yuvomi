@@ -3,12 +3,18 @@
  * Zweck: Reine Suchlogik gegen den FTS5-Index `search_index` (Migration 44).
  *        Keine Abhängigkeit auf db.js - die Datenbank wird hereingereicht, damit
  *        die Logik direkt mit node:sqlite getestet werden kann.
- * Abhaengigkeiten: server/services/visibility.js, document-access.js und
- *        budget-visibility.js (reine SQL-Bausteine, kein db.js)
+ * Abhaengigkeiten: server/authorize/index.ts (rows/: assignees, notes, ics-subscriptions,
+ *        health, documents, budget - reine SQL-Bausteine, kein db.js)
  */
-import { careAwareClause, icsSubscriptionVisibleWhere, noteVisibleWhere, visibilityWhere } from './visibility.js';
-import { documentVisibleSql } from './document-access.js';
-import { budgetDetailsVisibleWhere, resolveBudgetMode } from './budget-visibility.js';
+import {
+  careAwareClause,
+  icsSubscriptionVisibleWhere,
+  noteVisibleWhere,
+  visibilityWhere,
+  documentVisibleSql,
+  budgetDetailsVisibleWhere,
+  resolveBudgetMode,
+} from '../authorize/index.ts';
 
 import {
   expandRecurringEvents, loadEventExceptions, seriesReadingZone,

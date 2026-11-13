@@ -8,7 +8,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
-import { visibilityWhere, normalizeVisibility, VISIBILITY_VALUES } from '../server/services/visibility.js';
+import { visibilityWhere, normalizeVisibility, VISIBILITY_VALUES } from '../server/authorize/index.ts';
 
 let passed = 0, failed = 0;
 function test(name, fn) {

@@ -4,7 +4,7 @@
  *        wieder abräumen, wenn er zurückgenommen wird - plus die beiden
  *        Lesepfade, die daraus einen Verlauf machen (#791).
  * Abhängigkeiten: better-sqlite3-Handle (synchron), wird vom Aufrufer übergeben;
- *        visibilityWhere aus services/visibility.js.
+ *        visibilityWhere aus authorize/rows/assignees.ts.
  *
  * WARUM DAS NEBEN rewards.js STEHT UND NICHT DARIN. Beide hängen am selben
  * Statuswechsel und sehen sich deshalb ähnlich, aber sie beantworten
@@ -22,7 +22,7 @@
  * der Serie ist das Abhaken der Hauptaufgabe.
  */
 
-import { visibilityWhere } from './visibility.js';
+import { visibilityWhere } from '../authorize/index.ts';
 import { personAvatarUrlSql } from './person-avatar.js';
 
 /**

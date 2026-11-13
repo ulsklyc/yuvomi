@@ -1,8 +1,7 @@
-import { visibilityWhere } from '../../services/visibility.js';
 import express from 'express';
 import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
-import { mayWriteModule } from '../../authorize/index.ts';
+import { mayWriteModule, visibilityWhere } from '../../authorize/index.ts';
 import {
   clearCalendarFeedToken,
   ensureDefaultCalendar,

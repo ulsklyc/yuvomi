@@ -26,7 +26,7 @@ import {
   hidesBudgetDetails,
   maskBudgetEntry,
   canEditEntry,
-} from '../server/services/budget-visibility.js';
+} from '../server/authorize/index.ts';
 
 let passed = 0;
 let failed = 0;

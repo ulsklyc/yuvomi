@@ -7,7 +7,6 @@ import { createLogger } from '../../logger.js';
 import express from 'express';
 import * as db from '../../db.js';
 import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
-import { icsSubscriptionVisibleWhere, normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';
@@ -28,9 +27,16 @@ import {
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
-  ATTACHMENT_NARROW_ONLY, documentClonePredicate, documentWidenPredicate,
-} from '../../services/document-access.js';
-import { mayChangeRecord, mayWriteModule, sendNotOwner } from '../../authorize/index.ts';
+  mayChangeRecord,
+  mayWriteModule,
+  sendNotOwner,
+  icsSubscriptionVisibleWhere,
+  normalizeVisibility,
+  visibilityWhere,
+  ATTACHMENT_NARROW_ONLY,
+  documentClonePredicate,
+  documentWidenPredicate,
+} from '../../authorize/index.ts';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import { localCalendarColorSql, localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
 import {

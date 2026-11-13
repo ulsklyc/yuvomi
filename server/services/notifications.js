@@ -18,7 +18,7 @@ import { syncAllCycleReminders } from './cycle-reminders.js';
 import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
 import { withoutModulesDeniedToRecipient, withoutSwitchedOffModules } from './reminder-origins.js';
-import { reminderTargetPublicSql, reminderTargetVisibleSql } from './reminder-targets.js';
+import { reminderTargetPublicSql, reminderTargetVisibleSql } from '../authorize/index.ts';
 import { withoutGoneEvents } from './reminder-deleted-occurrence.js';
 import { syncAllPreventionReminders } from './prevention-reminders.js';
 import { syncAllFastingReminders } from './fasting-reminders.js';

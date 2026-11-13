@@ -10,13 +10,16 @@ import * as db from '../db.js';
 import * as v from '../middleware/validate.js';
 import { syncAllBirthdayReminders } from '../services/birthdays.js';
 import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-fanout.js';
-import { deniedModules } from '../authorize/index.ts';
+import {
+  deniedModules,
+  reminderTargetVisible,
+  reminderTargetVisibleSql,
+  asksHouseholdAudience,
+} from '../authorize/index.ts';
 import { tokenAllows } from '../scopes.js';
 import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
-import { reminderTargetVisible, reminderTargetVisibleSql } from '../services/reminder-targets.js';
 import { withoutGoneEvents } from '../services/reminder-deleted-occurrence.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
-import { asksHouseholdAudience } from '../services/visibility.js';
 import { moveNoticeFields } from '../services/shopping-move-notices.js';
 
 const log    = createLogger('Reminders');
@@ -181,7 +184,7 @@ function derivedTypeError(entityType) {
  * Aufgabe sieht. Bis hierher fragte das kein Schreibweg: eine Erinnerung liess
  * sich auf eine geratene Kennung setzen, auch auf eine, die es nicht gibt, und
  * `/pending` nannte danach den Titel. Die Regel selbst steht in
- * services/reminder-targets.js und ist die des jeweiligen Moduls.
+ * authorize/rows/reminders.ts und ist die des jeweiligen Moduls.
  *
  * 404 FUER BEIDES, "gibt es nicht" und "siehst du nicht": der Unterschied
  * zwischen den Antworten waere die Auskunft, die die Sichtbarkeit verweigert.

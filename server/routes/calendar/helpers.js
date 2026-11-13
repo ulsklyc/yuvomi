@@ -6,11 +6,14 @@
 
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
-import {
-  applyDocumentAccess, attachmentAccessMode, eventAudienceChanged, filterVisibleDocumentIds,
-} from '../../services/document-access.js';
 import { documentViewer } from '../../services/document-links.js';
-import { mayWriteModule } from '../../authorize/index.ts';
+import {
+  mayWriteModule,
+  applyDocumentAccess,
+  attachmentAccessMode,
+  eventAudienceChanged,
+  filterVisibleDocumentIds,
+} from '../../authorize/index.ts';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
@@ -361,7 +364,7 @@ export function parseAssignedTo(val) {
  * Dokument sehen UND verwalten, #1358) gleicht voll ab, `ATTACHMENT_NARROW_ONLY`
  * (in diesem Schreiben neu hochgeladen) verengt nur. Sonst bleibt das Dokument,
  * wie die Besitzerin es gesetzt hat (#1443): `applyDocumentAccess()` in
- * services/document-access.js.
+ * authorize/rows/documents.ts.
  *
  * UND NUR, WENN SICH DAS PUBLIKUM AENDERT (#1443): `before` ist, wer den Termin
  * vor diesem Speichern sah (`{ visibility, userIds }`, `null` fuer einen neuen

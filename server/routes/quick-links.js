@@ -125,7 +125,7 @@ function iconName(value) {
 /**
  * WHERE-Fragment: was diese Person sehen darf.
  * Geteilte Kacheln sehen alle; private nur ihre Urheberin - auch Admins nicht,
- * wie überall sonst in dieser App (vgl. services/visibility.js).
+ * wie überall sonst in dieser App (vgl. authorize/rows/assignees.ts).
  */
 const VISIBLE_WHERE = "(q.visibility = 'all' OR q.created_by = @me)";
 

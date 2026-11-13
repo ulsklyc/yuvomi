@@ -10,7 +10,13 @@ import * as db from '../db.js';
 import { str, color, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { mayChangeRecord, resolvePermissions, userForRequest, sendNotOwner } from '../authorize/index.ts';
+import {
+  mayChangeRecord,
+  resolvePermissions,
+  userForRequest,
+  sendNotOwner,
+  noteVisibleWhere,
+} from '../authorize/index.ts';
 import {
   categoryNameKey,
   hydrateNotesWithCategories,
@@ -21,7 +27,6 @@ import {
   validateCategoryName,
 } from '../services/note-categories.js';
 import { personAvatarUrlSql } from '../services/person-avatar.js';
-import { noteVisibleWhere } from '../services/visibility.js';
 import {
   mayChangeNoteLock,
   mayChangeNoteVisibility,

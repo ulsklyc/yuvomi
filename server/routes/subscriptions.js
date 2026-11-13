@@ -21,7 +21,13 @@ import {
 } from '../services/subscription-budget-projection.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { findLogoOptions } from '../services/subscription-logo.js';
-import { normalizeObjectVisibility, budgetVisibilityWhere, budgetDetailsVisibleWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
+import {
+  normalizeObjectVisibility,
+  budgetVisibilityWhere,
+  budgetDetailsVisibleWhere,
+  canEditEntry,
+  resolveBudgetMode,
+} from '../authorize/index.ts';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { budgetFilter, budgetAccountCurrency, listAccounts, validateAccountRef } from './budget/helpers.js';
 import { remoteFailure } from '../utils/http.js';

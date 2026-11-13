@@ -6,7 +6,7 @@
  */
 
 import { localCalendarIdSql } from './local-calendars.js';
-import { visibilityWhere } from './visibility.js';
+import { visibilityWhere, icsSubscriptionVisibleWhere } from '../authorize/index.ts';
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
@@ -17,7 +17,6 @@ import { outboundDateRange, outboundRecurrenceRule } from './outbound-dtstart.js
 import { rruleLine } from './recurrence.js';
 import { timedSeriesUntil } from '../utils/rrule-until.js';
 import { activeAccountSql } from './account-state.js';
-import { icsSubscriptionVisibleWhere } from './visibility.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
 import {
   BODY_FREE_EVENT_COLUMNS, eventProjectionSql, resolveProjectedEventRows,

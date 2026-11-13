@@ -227,7 +227,7 @@ test('eine private Kachel sieht nur ihre Urheberin - auch der Admin nicht', asyn
   assert.deepEqual(bobSees.map((q) => q.name), ['Für alle']);
 
   // DER ADMIN IST HIER KEINE AUSNAHME, und das ist Absicht: privat heisst
-  // privat, wie überall sonst in dieser App (services/visibility.js).
+  // privat, wie überall sonst in dieser App (authorize/rows/assignees.ts).
   as(ADMIN, 'admin');
   assert.deepEqual((await call('GET', '/')).body.data.map((q) => q.name), ['Für alle']);
 });

@@ -24,10 +24,9 @@
 import * as v from '../middleware/validate.js';
 import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
-import { authorize } from '../authorize/index.ts';
+import { authorize, visibilityWhere } from '../authorize/index.ts';
 import { householdTimeZone, todayKey } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
-import { visibilityWhere } from '../services/visibility.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { loadTagsFor, normalizeTags, setTags, tagKey } from '../utils/task-tags.js';
 import { readBindAddress, selfCallHost } from '../utils/bind-address.js';

@@ -17,7 +17,7 @@ import {
   hasExplicitZone, householdTimeZone, shiftDateKey, storedDayDiffersFromSeriesDay, storedToInstantMsPrecise,
 } from '../utils/timezone.js';
 import { createLogger } from '../logger.js';
-import { applyDocumentAccess, attachmentAccessMode, eventAudienceChanged } from './document-access.js';
+import { applyDocumentAccess, attachmentAccessMode, eventAudienceChanged } from '../authorize/index.ts';
 
 const log = createLogger('CalendarOccurrenceOverrides');
 

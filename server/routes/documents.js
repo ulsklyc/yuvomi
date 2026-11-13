@@ -10,11 +10,16 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, date as validateDate, num, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { mayReadModule } from '../authorize/index.ts';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from '../services/visibility.js';
-import { budgetDetailsVisibleWhere, resolveBudgetMode } from '../services/budget-visibility.js';
+import {
+  mayReadModule,
+  icsSubscriptionVisibleWhere,
+  visibilityWhere,
+  budgetDetailsVisibleWhere,
+  resolveBudgetMode,
+  canManageDocument,
+  documentVisibleSql,
+} from '../authorize/index.ts';
 import { reminderDateBefore, reminderIsInThePast } from '../utils/reminder-schedule.js';
-import { canManageDocument, documentVisibleSql } from '../services/document-access.js';
 import { isHouseholdMember, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import {
   DocumentDeletionInProgressError,
@@ -159,7 +164,7 @@ function userId(req) {
 }
 
 // Schreiben darf, wer das Dokument angelegt hat, oder ein Admin. Die Regel steht
-// neben der Sichtbarkeit in services/document-access.js (#989).
+// neben der Sichtbarkeit in authorize/rows/documents.ts (#989).
 function mayManage(req, document) {
   return canManageDocument(document, { userId: userId(req), isAdmin: isAdminRequest(req) });
 }

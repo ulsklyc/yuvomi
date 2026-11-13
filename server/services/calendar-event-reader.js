@@ -14,8 +14,11 @@ import {
 } from './calendar-events.js';
 import { resolveEventRows } from './calendar-occurrence-overrides.js';
 import {
-  householdVisibleWhere, icsSubscriptionSharedWhere, icsSubscriptionVisibleWhere, visibilityWhere,
-} from './visibility.js';
+  householdVisibleWhere,
+  icsSubscriptionSharedWhere,
+  icsSubscriptionVisibleWhere,
+  visibilityWhere,
+} from '../authorize/index.ts';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
 import { calendarSelectionSql } from './calendar-selection.js';
 import { notCancelledEventSql } from './reminder-deleted-occurrence.js';

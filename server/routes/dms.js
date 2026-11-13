@@ -9,7 +9,7 @@ import { createLogger } from '../logger.js';
 import { str, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { getAdapter as defaultGetAdapter, SUPPORTED_PROVIDERS } from '../services/dms/index.js';
-import { documentVisibleSql } from '../services/document-access.js';
+import { documentVisibleSql } from '../authorize/index.ts';
 import { StorageError, readDocumentContent } from '../services/document-storage.js';
 
 let adapterFactory = defaultGetAdapter;

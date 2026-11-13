@@ -8,6 +8,8 @@ import {
   categoryNameKey,
   NOTE_CATEGORY_NAME_MAX_LENGTH,
 } from '../../public/utils/note-category-name.js';
+// The visibility rule itself lives in server/authorize/rows/notes.ts (phase 2, B3).
+import { categoryVisibleTo, categoryVisibleWhere } from '../authorize/index.ts';
 export { categoryNameKey };
 
 export class NoteCategoryInputError extends Error {
@@ -28,31 +30,6 @@ function normalizedIds(value) {
     throw new NoteCategoryInputError('Invalid category id');
   }
   return [...new Set(ids)];
-}
-
-/**
- * WHERE-Fragment fuer "die Kategorie ist fuer userId sichtbar": jede
- * Haushaltskategorie, dazu die eigenen persoenlichen. `alias` ist der
- * Tabellen-Alias ('' fuer keinen), `bind` der Platzhalter fuer owner_user_id -
- * `?` fuer positionale Bindung, `@name` fuer eine benannte (wie bei
- * `noteVisibleWhere()` in services/visibility.js).
- *
- * EINE STELLE, weil die Regel an vier Stellen in diesem Modul und einmal in
- * dashboard.js wortgleich stand (#2601) - und dort schon einmal ohne das
- * `scope = 'personal' AND` drifted war: `nc.scope = 'household' OR
- * nc.owner_user_id = @me` traf zufaellig dieselbe Menge, weil heute keine
- * dritte scope existiert, haette eine vierte scope das aber lautlos falsch
- * gemacht.
- */
-export function categoryVisibleWhere(alias, bind = '?') {
-  const col = (name) => (alias ? `${alias}.${name}` : name);
-  return `(${col('scope')} = 'household' OR (${col('scope')} = 'personal' AND ${col('owner_user_id')} = ${bind}))`;
-}
-
-/** Wie `categoryVisibleWhere()`, als JS-Praedikat auf eine schon geladene Zeile. */
-export function categoryVisibleTo(category, userId) {
-  return category.scope === 'household'
-    || (category.scope === 'personal' && Number(category.owner_user_id) === Number(userId));
 }
 
 export function listVisibleCategories(database, userId) {

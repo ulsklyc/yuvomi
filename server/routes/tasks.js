@@ -5,10 +5,15 @@
  */
 
 import { createLogger } from '../logger.js';
-import { mayWriteModule, requestHasCapability } from '../authorize/index.ts';
+import {
+  mayWriteModule,
+  requestHasCapability,
+  documentVisibleSql,
+  normalizeVisibility,
+  visibilityWhere,
+} from '../authorize/index.ts';
 import express from 'express';
 import * as db from '../db.js';
-import { documentVisibleSql } from '../services/document-access.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../services/document-links.js';
 import { nextDueAfterCompletion } from '../services/recurrence.js';
@@ -20,7 +25,6 @@ import {
 import { activeAccountSql } from '../services/account-state.js';
 import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/task-completions.js';
 import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
-import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
 import {
   flushOutbound, markTodoOutbound, queueTodoDeletion, recurrenceFollowupTarget,
   continuesForeignSeries, handOverForeignSeries, takeBackForeignSeries,

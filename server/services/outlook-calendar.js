@@ -19,7 +19,7 @@ import crypto from 'node:crypto';
 import * as db from '../db.js';
 import { parseRRule } from './recurrence.js';
 import { outboundEvent } from './outbound-dtstart.js';
-import { visibilityWhere } from './visibility.js';
+import { visibilityWhere } from '../authorize/index.ts';
 import { householdTimeZone } from '../utils/timezone.js';
 import { newNonMembers, nonMemberMessage } from './household-members.js';
 

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
-import { visibilityWhere } from './visibility.js';
+import { visibilityWhere } from '../authorize/index.ts';
 
 // Die Standard-Zuweisung eines Kalenders laeuft ohne Person dahinter - ueber
 // den Auto-Sync, sobald jemand einen Termin im externen Client zwischen zwei

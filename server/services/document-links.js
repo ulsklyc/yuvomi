@@ -28,14 +28,13 @@
  *      Orakel fuer die verborgene ID. Eine leere Liste ist kein Verknuepfen und
  *      loest nach Regel 2 nichts, weil ohne Leserecht nichts sichtbar ist.
  *
- * Die Sichtbarkeit des einzelnen Dokuments kommt aus document-access.js, die
+ * Die Sichtbarkeit des einzelnen Dokuments kommt aus authorize/rows/documents.ts, die
  * Modulachse aus `mayReadDocuments()` hier - EINE Stelle fuer beide Achsen
  * (Mitgliedsrecht und Token-Scope), die jeder Aufrufer ueber
  * `documentViewer(req)` bekommt statt sie nachzubauen.
  */
 
-import { mayReadModule } from '../authorize/index.ts';
-import { documentVisibleSql, filterVisibleDocumentIds } from './document-access.js';
+import { mayReadModule, documentVisibleSql, filterVisibleDocumentIds } from '../authorize/index.ts';
 import { assertDocumentsNotDeleting } from './document-deletion-lock.js';
 
 /** Felder, die ein Beleg preisgibt. Bewusst ohne Dateiinhalt. */

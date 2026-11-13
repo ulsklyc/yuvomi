@@ -39,7 +39,7 @@ const remindersModule = await import('../server/routes/reminders.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
 const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
 const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
-const { TARGET_ENTITY_TYPES, HOUSEHOLD_CHANNEL_POLICY, reminderTargetPublicSql } = await import('../server/services/reminder-targets.js');
+const { TARGET_ENTITY_TYPES, HOUSEHOLD_CHANNEL_POLICY, reminderTargetPublicSql } = await import('../server/authorize/index.ts');
 
 const NOW = new Date('2024-06-15T12:00:00Z');
 const PAST = '2000-01-01T00:00:00';

@@ -1,7 +1,25 @@
+/**
+ * Module: row visibility of budget objects (phase 2, section B3; until then
+ *         server/services/budget-visibility.js, moved whole)
+ * Purpose: owner-based visibility of entries, loans and subscriptions: which rows
+ *          count, which hide their details, the view scope, and the write rule.
+ *
+ * Dependencies: none (the connection is a parameter). Erasable TS syntax only (runs
+ * through type stripping, no build).
+ */
+
+import type { Database } from '../catalog.ts';
+
+/** The household budget mode; anything but 'personal' behaves as 'shared'. */
+type BudgetModeOption = { mode?: string | null };
+
+/** The fields of a budget row the rules here read. */
+type BudgetRow = { visibility?: string | null; owner_id?: unknown };
+
 // --------------------------------------------------------
 // Owner-basierte Sichtbarkeit für Budget-Objekte (Einträge/Loans/Subscriptions).
 //
-// Lean-Modell (#476/#505). Anders als services/visibility.js (assignment-basiert,
+// Lean-Modell (#476/#505). Anders als rows/assignees.ts (assignment-basiert,
 // mehrere Zugewiesene pro Objekt) hat jedes Budget-Objekt genau eine:n
 // Eigentümer:in (owner_id, fix = Ersteller:in). Es gibt KEINEN Admin-Bypass —
 // auch Admins sehen/bearbeiten keine fremden privaten Objekte (konsistent mit
@@ -57,14 +75,14 @@ export const BUDGET_MASKED_CATEGORY = '__private__';
  * @param {{ prepare: Function }} database  better-sqlite3/node:sqlite-Instanz
  * @returns {'shared'|'personal'}
  */
-export function resolveBudgetMode(database) {
-  const row = database.prepare("SELECT value FROM sync_config WHERE key = 'budget_mode'").get();
+export function resolveBudgetMode(database: Pick<Database, 'prepare'>): 'shared' | 'personal' {
+  const row = database.prepare("SELECT value FROM sync_config WHERE key = 'budget_mode'").get() as { value?: string } | undefined;
   return row && row.value === 'personal' ? 'personal' : 'shared';
 }
 
 /** Normalisiert einen eingehenden Wert auf eine gültige Stufe. */
-export function normalizeBudgetVisibility(value, fallback = 'shared') {
-  return BUDGET_VISIBILITY_VALUES.includes(value) ? value : fallback;
+export function normalizeBudgetVisibility(value: unknown, fallback: string = 'shared'): string {
+  return BUDGET_VISIBILITY_VALUES.includes(value as string) ? value as string : fallback;
 }
 
 /**
@@ -76,9 +94,9 @@ export function normalizeBudgetVisibility(value, fallback = 'shared') {
  * das Gegenteil machen - die restriktivere Antwort ist die einzige, die keinen
  * Schaden anrichten kann.
  */
-export function normalizeObjectVisibility(value, fallback = 'shared') {
+export function normalizeObjectVisibility(value: unknown, fallback: string = 'shared'): string {
   if (value === 'shared_amount') return 'private';
-  return BUDGET_OBJECT_VISIBILITY_VALUES.includes(value) ? value : fallback;
+  return BUDGET_OBJECT_VISIBILITY_VALUES.includes(value as string) ? value as string : fallback;
 }
 
 /**
@@ -94,7 +112,7 @@ export function normalizeObjectVisibility(value, fallback = 'shared') {
  * @param {object} opts    { mode: 'shared' | 'personal' }
  * @returns {string} SQL-Fragment
  */
-export function budgetVisibilityWhere(alias, meBind, { mode } = {}) {
+export function budgetVisibilityWhere(alias: string, meBind: string, { mode }: BudgetModeOption = {}): string {
   if (mode !== 'personal') return '1=1'; // 'shared'/undefined: Altverhalten, alle sehen alles
   return `(${alias}.visibility <> 'private' OR ${alias}.owner_id = ${meBind})`;
 }
@@ -115,7 +133,7 @@ export function budgetVisibilityWhere(alias, meBind, { mode } = {}) {
  * @param {object} opts    { mode: 'shared' | 'personal' }
  * @returns {string} SQL-Fragment (ohne führendes AND)
  */
-export function budgetDetailsVisibleWhere(alias, meBind, { mode } = {}) {
+export function budgetDetailsVisibleWhere(alias: string, meBind: string, { mode }: BudgetModeOption = {}): string {
   if (mode !== 'personal') return '1=1';
   return `(${alias}.visibility = 'shared' OR ${alias}.owner_id = ${meBind})`;
 }
@@ -133,7 +151,7 @@ export function budgetDetailsVisibleWhere(alias, meBind, { mode } = {}) {
  * @param {object} opts    { mode: 'shared' | 'personal' }
  * @returns {string} SQL-Fragment
  */
-export function budgetDetailsHiddenWhere(alias, meBind, { mode } = {}) {
+export function budgetDetailsHiddenWhere(alias: string, meBind: string, { mode }: BudgetModeOption = {}): string {
   if (mode !== 'personal') return '0=1'; // shared-Modus maskiert nie
   return `(${alias}.visibility = 'shared_amount' AND ${alias}.owner_id <> ${meBind})`;
 }
@@ -152,7 +170,7 @@ export function budgetDetailsHiddenWhere(alias, meBind, { mode } = {}) {
  * @param {string} meBind Platzhalter der betrachtenden User-ID
  * @returns {string} SQL-Fragment (ohne führendes AND)
  */
-export function budgetScopeWhere(scope, alias, meBind) {
+export function budgetScopeWhere(scope: string, alias: string, meBind: string): string {
   if (scope === 'mine') return `${alias}.owner_id = ${meBind}`;
   return `${alias}.visibility <> 'private'`;
 }
@@ -163,7 +181,7 @@ export function budgetScopeWhere(scope, alias, meBind) {
  * @param {number} viewerId
  * @param {'shared'|'personal'} mode
  */
-export function hidesBudgetDetails(row, viewerId, mode) {
+export function hidesBudgetDetails(row: BudgetRow | null | undefined, viewerId: unknown, mode: string | null | undefined): boolean {
   if (mode !== 'personal' || !row) return false;
   return row.visibility === 'shared_amount' && row.owner_id !== viewerId;
 }
@@ -180,9 +198,9 @@ export function hidesBudgetDetails(row, viewerId, mode) {
  * @param {number} viewerId
  * @param {'shared'|'personal'} mode
  */
-export function maskBudgetEntry(row, viewerId, mode) {
+export function maskBudgetEntry<T extends BudgetRow>(row: T, viewerId: unknown, mode: string | null | undefined): T {
   if (!hidesBudgetDetails(row, viewerId, mode)) return row;
-  const masked = {
+  const masked: Record<string, unknown> = {
     ...row,
     title: '',
     category: BUDGET_MASKED_CATEGORY,
@@ -206,7 +224,7 @@ export function maskBudgetEntry(row, viewerId, mode) {
   delete masked.loan_installment_number;
   delete masked.loan_title;
   delete masked.loan_borrower;
-  return masked;
+  return masked as T;
 }
 
 /**
@@ -214,7 +232,10 @@ export function maskBudgetEntry(row, viewerId, mode) {
  * @param {{ owner_id?: number, created_by?: number } | null} entry
  * @param {{ id: number }} user
  */
-export function canEditEntry(entry, user) {
+export function canEditEntry(
+  entry: { owner_id?: unknown; created_by?: unknown } | null | undefined,
+  user: { id?: unknown } | null | undefined,
+): boolean {
   if (!entry || !user) return false;
   return entry.owner_id === user.id || entry.created_by === user.id;
 }

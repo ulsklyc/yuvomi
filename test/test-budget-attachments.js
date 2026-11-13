@@ -23,7 +23,7 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
-const { filterVisibleDocumentIds } = await import('../server/services/document-access.js');
+const { filterVisibleDocumentIds } = await import('../server/authorize/index.ts');
 const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
 const db = dbmod.get();
 

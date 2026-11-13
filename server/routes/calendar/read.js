@@ -14,7 +14,7 @@ import {
 } from '../../services/calendar-event-reader.js';
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
 import { buildMatchQuery, eventSearchWindow, resolveEventSearchRows } from '../../services/search.js';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from '../../services/visibility.js';
+import { icsSubscriptionVisibleWhere, visibilityWhere } from '../../authorize/index.ts';
 import { documentViewer } from '../../services/document-links.js';
 import {
   VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, isAdminUser, serializeEvents,
