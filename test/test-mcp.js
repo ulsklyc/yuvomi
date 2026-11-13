@@ -908,7 +908,7 @@ test('Loopback nicht erreichbar: der Betreiber sieht Ursache und Basisadresse im
   const warned = [];
   t.mock.method(console, 'warn', (/** @type {any[]} */ ...args) => { warned.push(args); });
   const previousBase = process.env.MCP_INTERNAL_BASE_URL;
-  process.env.MCP_INTERNAL_BASE_URL = 'http://ops:geheim@127.0.0.1:1/yuvomi';
+  process.env.MCP_INTERNAL_BASE_URL = 'http://ops:geheim@127.0.0.1:1/yuvomi?key=geheim#geheim';
   const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1'), { code: 'ECONNREFUSED' });
   installFetchMock(async () => { throw new TypeError('fetch failed', { cause }); });
   let res;
@@ -929,7 +929,7 @@ test('Loopback nicht erreichbar: der Betreiber sieht Ursache und Basisadresse im
   assert.equal(lines.length, 1, `genau eine Logzeile, bekommen: ${JSON.stringify(warned)}`);
   assert.deepEqual(lines[0], ['[MCP]', 'Loopback to the own API failed', {
     base: 'http://127.0.0.1:1/yuvomi',
-    cause: 'fetch failed',
+    cause: 'TypeError',
     code: 'ECONNREFUSED',
   }]);
   assert.doesNotMatch(JSON.stringify(warned), /geheim|ops:|Bearer|yuvomi\.sid/);

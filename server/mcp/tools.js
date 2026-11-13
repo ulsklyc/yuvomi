@@ -651,9 +651,13 @@ async function internalApiRequest(ctx, method, path, {
     const base = new URL(`${internalBaseUrl()}/`);
     base.username = '';
     base.password = '';
+    base.search = '';
+    base.hash = '';
+    // Name and code only, never the cause's text: undici quotes an invalid
+    // header value in its message, and the headers carry the forwarded token.
     log.warn('Loopback to the own API failed', {
       base: base.href.replace(/\/+$/, ''),
-      cause: cause instanceof Error ? cause.message : String(cause),
+      cause: cause instanceof Error ? cause.name : typeof cause,
       code: cause?.cause?.code,
     });
     throw new ToolError(
