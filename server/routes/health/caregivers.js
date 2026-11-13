@@ -11,7 +11,8 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
-import { log, viewerId, caredForIds } from './helpers.js';
+import { log, viewerId } from './helpers.js';
+import { caredForIds } from '../../authorize/index.ts';
 import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
 import { isActiveAccount } from '../../services/household-members.js';
 
@@ -24,7 +25,7 @@ const router = express.Router();
  */
 router.get('/caregivers/me', (req, res) => {
   try {
-    res.json({ data: caredForIds(viewerId(req)) });
+    res.json({ data: caredForIds(db.get(), viewerId(req)) });
   } catch (err) {
     log.error('Error listing own care grants:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });

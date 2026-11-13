@@ -23,7 +23,8 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { FastingError, requireFastingCapability } from '../../services/fasting.js';
-import { log, VISIBILITIES, OPEN_FAMILY, OPEN_ALL, viewerId, badRequest } from './helpers.js';
+import { log, VISIBILITIES, viewerId, badRequest } from './helpers.js';
+import { OPEN_ALL, OPEN_FAMILY } from '../../authorize/index.ts';
 
 const router = express.Router();
 

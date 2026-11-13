@@ -6,7 +6,8 @@
  * Abhängigkeiten: express
  *
  * Die eigentliche Logik liegt tab-weise in ./health/*.js:
- *   helpers.js      geteilte Helfer (Sichtbarkeit, Validierung/Update, CSV-Bausteine)
+ *   helpers.js      geteilte Helfer (Validierung/Update, CSV-Bausteine); the
+ *                   visibility and care rules live in server/authorize/care.ts
  *   vitals.js       Vitalwerte (health_vitals)
  *   medications.js  Medikamente + Einnahmeplan + Dosis-Log (+ take/skip)
  *   labs.js         Laborbefunde + Analyten
@@ -19,7 +20,7 @@
  *   prevention.js   Vorsorge & Impfungen: Typ-Register + Protokoll + Faelligkeit
  *   nutrition.js    Naehrwerte: Tagesziel je Person + Tagebuch + Tagesbilanz (#1326)
  *
- * Scoping/Visibility-Modell (siehe ./health/helpers.js):
+ * Scoping/Visibility-Modell (siehe ../authorize/care.ts):
  *   - Jede Zeile gehört einem Nutzer (`user_id`, "Eigentümer").
  *   - Lesen: erlaubt für den Eigentümer ODER wenn die Zeile offen steht. Der
  *     offene Wert ist `family`, ausser bei den Naehrwerten (#1326): die tragen

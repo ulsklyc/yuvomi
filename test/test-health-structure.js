@@ -11,7 +11,7 @@
  *
  * Dazu ein Scope-Guard (#884): ein abhängiger Datensatz - Zeitplan, Dosis-
  * Eintrag, Analyt - darf sein Schreibrecht nur über `writableChild()` aus
- * helpers.js beziehen. Ein handgeschriebenes `m.user_id = ?` sieht daneben
+ * server/authorize/care.ts beziehen. Ein handgeschriebenes `m.user_id = ?` sieht daneben
  * harmlos aus und schneidet die Betreuung (#584) still weg: anlegen ging,
  * wegräumen nicht. Der Guard ist deshalb eine Regel und keine Liste bekannter
  * Stellen - eine neue Route mit demselben Griff fällt sofort auf.
@@ -203,19 +203,17 @@ test('Default-Export ist ein montierbarer Router', () => {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROUTE_DIR = path.join(HERE, '..', 'server', 'routes', 'health');
 
-// helpers.js ist die eine Stelle, an der die Klausel gebaut werden DARF -
-// dort steht sie in Template-Strings und ist genau der Helfer, den alle
-// anderen benutzen sollen.
-const SCOPE_OWNER = 'helpers.js';
+// The clause is built in server/authorize/care.ts (phase 2 B4), outside this
+// directory, so no route file is exempt - helpers.js included.
 
 // Ein Alias vor `user_id` heisst: die Spalte gehoert einer gejointen
 // Eltern-Tabelle. Unqualifiziertes `user_id = ?` ist davon nicht betroffen -
 // das ist die eigene Spalte, etwa im bewusst rein persoenlichen cycle.js.
 const RAW_PARENT_SCOPE = /\b[a-z][a-z0-9_]*\.user_id\s*=\s*\?/;
 
-test('kein handgeschriebenes <alias>.user_id = ? ausserhalb von helpers.js (#884)', () => {
+test('kein handgeschriebenes <alias>.user_id = ? in den Health-Routen (#884)', () => {
   const offenders = [];
-  for (const file of fs.readdirSync(ROUTE_DIR).filter((f) => f.endsWith('.js') && f !== SCOPE_OWNER)) {
+  for (const file of fs.readdirSync(ROUTE_DIR).filter((f) => f.endsWith('.js'))) {
     const lines = fs.readFileSync(path.join(ROUTE_DIR, file), 'utf8').split('\n');
     lines.forEach((line, i) => {
       if (RAW_PARENT_SCOPE.test(line)) offenders.push(`${file}:${i + 1}: ${line.trim()}`);

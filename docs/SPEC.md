@@ -5030,8 +5030,8 @@ records, falling back to a `name` snapshot taken at delete time), `given_on`, op
 `dose_number`/`batch`/`provider`/`note`, a per-record `interval_months` override, an explicit
 `next_due_on` override, a per-record `reminder_offset_days` (NULL = the module default of 30 days),
 and the usual `private`/`family` visibility. Scoping and caregiving follow the exact vitals/meds/
-labs/activities pattern (`careAwareClause()`/`writableClause()`/`resolveOwner()` in
-`server/routes/health/helpers.js`) — a parent logging a child's shots is the archetypal caregiver
+labs/activities pattern (`careAwareClause()`/`writableClause()` in `server/authorize/care.ts`,
+`resolveOwner()` in `server/routes/health/helpers.js`) - a parent logging a child's shots is the archetypal caregiver
 case; the cycle tab remains the only area excluded from caregiving.
 
 `GET /health/prevention/due?user_id=` is the **single computation** of "what's next" (last

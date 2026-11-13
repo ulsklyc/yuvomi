@@ -5,7 +5,7 @@
  *        und nicht in der Route, weil zwei Aufrufer dieselbe Antwort brauchen:
  *        `GET /health/nutrition/summary` fuer den Tab und `/dashboard` fuer das
  *        Widget. Zwei Rechnungen waeren zwei Zahlen, die auseinanderlaufen.
- * Abhaengigkeiten: server/routes/health/helpers.js (die Sichtbarkeits-Klausel,
+ * Abhaengigkeiten: server/authorize/care.ts (die Sichtbarkeits-Klausel,
  *        die laut #884 nur dort gebaut werden darf)
  *
  * DIE ACHT SIND FEST (docs/DECISIONS.md Abschnitt 8). Sie stehen hier EINMAL
@@ -15,7 +15,7 @@
  * niemandem auffaellt.
  */
 
-import { careAwareClause, canWriteFor, OPEN_ALL } from '../routes/health/helpers.js';
+import { canWriteFor, careAwareClause, OPEN_ALL } from '../authorize/index.ts';
 
 /**
  * Die acht Naehrwerte in ihrer kanonischen Reihenfolge: Energie, Fett, davon
@@ -74,7 +74,7 @@ export function nutritionTargetFor(database, userId) {
  * `viewer` entscheidet, welche Eintraege ueberhaupt mitzaehlen: der Eigentuemer
  * und eine betreuende Person sehen alle, jeder andere nur die, die der
  * Eigentuemer fuer den Haushalt geoeffnet hat. Die Klausel kommt aus
- * helpers.js, die einzige Stelle, an der sie gebaut werden darf (#884).
+ * authorize/care.ts, die einzige Stelle, an der sie gebaut werden darf (#884).
  *
  * @param {object} database
  * @param {number} viewer   - die lesende Person
@@ -99,7 +99,7 @@ export function nutritionSummaryFor(database, viewer, ownerId, dayKey) {
     // jemanden eintraegt, muss dessen Ziel kennen, jeder andere nicht. Ohne
     // diese Zeile haette die Bilanz das Ziel auch dann ausgeliefert, wenn die
     // Eintraege daneben allesamt weggefiltert waren.
-    target: canWriteFor(viewer, ownerId) ? nutritionTargetFor(database, ownerId) : null,
+    target: canWriteFor(/** @type {import('../authorize/index.ts').Database} */ (database), viewer, ownerId) ? nutritionTargetFor(database, ownerId) : null,
     totals,
     entryCount: Number(row?.entry_count ?? 0),
   };

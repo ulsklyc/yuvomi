@@ -59,7 +59,6 @@ export {
   householdAudienceShows,
   householdVisibleWhere,
 } from './rows/household.ts';
-export { CARED_FOR_SUBQUERY, careAwareClause, OPEN_FAMILY } from './rows/health.ts';
 export {
   applyDocumentAccess,
   ATTACHMENT_NARROW_ONLY,
@@ -89,3 +88,19 @@ export {
   reminderTargetVisible,
   TARGET_ENTITY_TYPES,
 } from './rows/reminders.ts';
+// Care grants and health rows (B4): the one place for "may read / may write whose
+// health data" (health_care_grants, #584).
+export {
+  canWriteFor,
+  careAwareClause,
+  caredForIds,
+  caregiversOf,
+  fastingVisibleFilter,
+  hasCareGrant,
+  OPEN_ALL,
+  OPEN_FAMILY,
+  readableClause,
+  visibilityClause,
+  writableChild,
+  writableClause,
+} from './care.ts';
