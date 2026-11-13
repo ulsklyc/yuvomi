@@ -844,7 +844,13 @@
             "waited": "„{{item}}” nem került át ide: „{{target}}”. A(z) „{{back}}” szinkronizálása több mint egy hete ki van kapcsolva. A tétel újra megjelenik itt: „{{back}}”, amint bekapcsolod a listát."
         },
         "moreDetailsHint": "Ár, bolt, hivatkozás, jegyzet",
-        "toPantryAllToPlaceholder": "Válassz helyet …"
+        "toPantryAllToPlaceholder": "Válassz helyet …",
+        "summaryRemaining": "Megveendő",
+        "summaryPurchased": "A kosárban",
+        "summaryTotal": "Becsült összeg",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "körülbelül {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} hozzávaló",

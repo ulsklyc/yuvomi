@@ -285,6 +285,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failed request, with the session staying signed in. A backup made on 2.88.0 restored on
   2.87.0 through the admin restore. To go back, pin the image tag `2.87.0`.
 
+### Added
+- **Shopping: price estimation and cost calculator** (part 2 of #1003). Open items inherit
+  price estimates based on previous purchases of the same item name. A subtle summary bar
+  above the shopping list calculates remaining, purchased, and total estimated expenses,
+  updating dynamically as items are ticked off or priced.
+
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
   accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run

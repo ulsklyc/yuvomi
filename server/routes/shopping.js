@@ -116,6 +116,16 @@ function renameKitchenCategory(from, to) {
 }
 
 /**
+ * Schaetzung fuer den Preis eines Artikels (#1003): der zuletzt gezahlte Preis
+ * eines gleichnamigen Artikels aus der Kaufhistorie.
+ */
+const ESTIMATED_PRICE_SQL = `(
+  SELECT p.price_cents FROM shopping_purchases p
+  WHERE p.item_name = shopping_items.name COLLATE NOCASE
+  ORDER BY p.purchased_at DESC, p.id DESC LIMIT 1
+) AS estimated_price_cents`;
+
+/**
  * Artikel einer Liste in Anzeigereihenfolge: Kategorie in Gang-Reihenfolge,
  * abgehaktes ans Ende, davor die Handsortierung (#678), zuletzt die
  * Eingabereihenfolge als Gleichstand-Entscheider.
@@ -128,7 +138,7 @@ function renameKitchenCategory(from, to) {
 function loadListItems(listId, categories) {
   const categoryOrder = categories.map((c, i) => `WHEN '${c.name.replace(/'/g, "''")}' THEN ${i}`).join(' ');
   const items = db.get().prepare(`
-    SELECT * FROM shopping_items
+    SELECT *, ${ESTIMATED_PRICE_SQL} FROM shopping_items
     WHERE list_id = ?
     ORDER BY
       CASE category ${categoryOrder} ELSE ${categories.length} END,
@@ -799,7 +809,7 @@ router.patch('/items/:itemId', (req, res) => {
     });
 
     const updated = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE id = ?')
+      .prepare(`SELECT *, ${ESTIMATED_PRICE_SQL} FROM shopping_items WHERE id = ?`)
       .get(req.params.itemId);
 
     // Abhaken oder Umbenennen eines gespiegelten Artikels zieht auf dem
@@ -1291,7 +1301,7 @@ router.post('/:listId/items', (req, res) => {
     `).run(req.params.listId, vName.value, vQty.value, vCat.value || defaultCat, vNotes.value, vUrl.value));
 
     const item = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE id = ?')
+      .prepare(`SELECT *, ${ESTIMATED_PRICE_SQL} FROM shopping_items WHERE id = ?`)
       .get(result.lastInsertRowid);
     res.status(201).json({ data: item, list_change });
     // Gehört die Liste zu einer gespiegelten CalDAV-Liste, wandert der neue
