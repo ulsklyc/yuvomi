@@ -698,7 +698,7 @@
   "devDependencies": {
     "@oddbird/popover-polyfill": "0.7.3",
     "@swc/core": "1.16.22",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.6",
     "axe-core": "^4.14.0",
     "dependency-cruiser": "18.7.2",
     "esbuild": "0.28.2",
