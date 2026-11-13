@@ -33,7 +33,7 @@ import { locationLabel } from '/utils/pantry-locations.js';
 import { pantryQuantityLabel } from '/utils/pantry-units.js';
 import { findPageFab } from '/utils/fab.js';
 import { setLeaveGuard } from '/utils/leave-guard.js';
-import { openModal, closeModal, confirmModal, refocusAfterRender, lastInputWasKeyboard } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, refocusAfterRender, lastInputWasKeyboard, captureModalContext } from '/components/modal.js';
 import { renderAvatarStack, sharedSurname } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
 import { toggleRegion, durationToken, easingToken, expandIn } from '/utils/ux.js';
@@ -2763,6 +2763,12 @@ function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {
     (Array.isArray(data?.memberTodayTasks) ? data.memberTodayTasks : [])
       .map((r) => [r.user_id, Number(r.open_count) || 0])
   );
+  // Verfuegbarkeitsstatus je Mitglied (#1591): nur nicht abgelaufene Eintraege
+  // kommen vom Server; der Client prueft kein Verfallsdatum mehr.
+  const availByUser = new Map(
+    (Array.isArray(data?.familyStatuses) ? data.familyStatuses : [])
+      .map((r) => [r.user_id, r])
+  );
   // Eigene Termine je Mitglied (#1449): die Liste der Kachel ist bei fuenf
   // Kommenden gedeckelt und traegt deren „nur meine". Ein aelterer Server ohne
   // `familyEvents` faellt auf sie zurueck.
@@ -2809,12 +2815,18 @@ function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {
 
   const rows = shown.map((u) => {
     const mine = agenda.byPerson.get(Number(u.id)) ?? { nextToday: null, hadToday: false, sharedToday: false, nextLater: null };
+    const avail = availByUser.get(u.id) ?? null;
+    const stateLabel = avail ? t(`dashboard.availState_${avail.state}`) : null;
     const parts = [];
-    if (mine.nextToday) parts.push(familyEventLabel(mine.nextToday, todayKey));
-    const myShift = scheduleEntriesToday.find((entry) => Number(entry.user_id) === Number(u.id) && entry.shift_type);
-    if (myShift) {
-      const type = myShift.shift_type;
-      parts.push(esc(shiftTypeLabel(type)));
+    // Verfuegbarkeitsstatus voran (#1591): Label immer, Notiz danach wenn vorhanden.
+    // Status verdraengt die abgeleitete Zeile (Termine, Schicht) - wer einen Status
+    // gesetzt hat, will dass er das erste ist, was andere lesen.
+    if (avail) {
+      parts.push(esc(avail.note ? `${stateLabel}: ${avail.note}` : stateLabel));
+    } else {
+      if (mine.nextToday) parts.push(familyEventLabel(mine.nextToday, todayKey));
+      const myShift = scheduleEntriesToday.find((entry) => Number(entry.user_id) === Number(u.id) && entry.shift_type);
+      if (myShift) parts.push(esc(shiftTypeLabel(myShift.shift_type)));
     }
     const open = openByUser.get(u.id) ?? 0;
     if (open > 0) parts.push(esc(t('dashboard.memberOpenTasks', { count: open })));
@@ -2850,10 +2862,11 @@ function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {
     // sind Malerei (`aria-hidden`), der Satz sagt dasselbe.
     const firstName = String(u.display_name || '').trim().split(/\s+/)[0] || '';
     return `
-      <div class="list-row family-member">
+      <div class="list-row family-member" data-avail-set="${esc(String(u.id))}">
         <span class="list-row__lead family-member__face">
-          <span class="family-widget-avatar" style="background:${esc(u.avatar_color || AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color || AVATAR_FALLBACK_COLOR)}">
+          <span class="family-widget-avatar" style="background:${esc(u.avatar_color || AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color || AVATAR_FALLBACK_COLOR)}"${avail ? ` data-avail="${esc(avail.state)}"` : ''}>
             ${u.avatar_data ? `<img src="${esc(u.avatar_data)}" alt="" loading="lazy">` : esc(initials(u.display_name))}
+            ${avail ? `<span class="sr-only">${esc(stateLabel)}</span>` : ''}
           </span>
           ${/* DIE MARKE NENNT IHRE EINHEIT (Critique R21, clarify): eine nackte
                 "1" am Gesicht las sich wie eine Benachrichtigung. Das Zeichen der
@@ -2911,6 +2924,97 @@ function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {
       <p class="family-widget__footer">${footer}</p>
     </div>
   </div>`;
+}
+
+// STATUS-DIALOG (#1591): eigenen Verfuegbarkeitsstatus setzen oder loeschen.
+// Vier States, optionale Notiz, Ablaufdauer-Auswahl. Geoeffnet aus der
+// Familien-Kachel (data-avail-set) und aus dem Konto-Menue (router.js).
+export async function openAvailabilityModal(userId, currentAvail, refresh) {
+  const STATES = ['available', 'busy', 'do_not_disturb', 'away'];
+  const DURATIONS = [
+    { key: 'avail1h' },
+    { key: 'avail4h' },
+    { key: 'availEndOfDay' },
+    { key: 'availTomorrow' },
+    { key: 'avail1w' },
+  ];
+
+  function expiresAt(key) {
+    const now = new Date();
+    if (key === 'avail1h') return new Date(now.getTime() + 60 * 60 * 1000);
+    if (key === 'avail4h') return new Date(now.getTime() + 4 * 60 * 60 * 1000);
+    if (key === 'avail1w') return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    if (key === 'availEndOfDay') {
+      const d = new Date(now);
+      d.setHours(23, 59, 59, 0);
+      return d;
+    }
+    // availTomorrow: morgen 08:00
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    d.setHours(8, 0, 0, 0);
+    return d;
+  }
+
+  const defaultState = currentAvail?.state ?? 'available';
+  const defaultNote = currentAvail?.note ?? '';
+
+  const content = `
+    <form id="avail-form" class="widget-options">
+      <fieldset class="widget-options__group">
+        <legend class="widget-options__label">${esc(t('dashboard.availTitle'))}</legend>
+        ${STATES.map((s) => `
+          <label class="widget-options__choice">
+            <input type="radio" name="avail-state" value="${esc(s)}"${s === defaultState ? ' checked' : ''}>
+            <span>${esc(t(`dashboard.availState_${s}`))}</span>
+          </label>`).join('')}
+      </fieldset>
+      <label class="widget-options__field">
+        <span class="form-label">${esc(t('dashboard.availNoteLabel'))}</span>
+        <input type="text" name="avail-note" maxlength="200" value="${esc(defaultNote)}" class="form-input">
+      </label>
+      <label class="widget-options__field">
+        <select name="avail-duration" class="form-input">
+          ${DURATIONS.map((d) => `<option value="${esc(d.key)}">${esc(t(`dashboard.${d.key}`))}</option>`).join('')}
+        </select>
+      </label>
+      <div class="modal-panel__footer modal-panel__footer--plain">
+        ${currentAvail ? `<button type="button" class="btn btn--secondary" data-action="clear">${esc(t('dashboard.availClear'))}</button>` : ''}
+        <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
+        <button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button>
+      </div>
+    </form>`;
+
+  openModal({
+    title: t('dashboard.availTitle'),
+    size: 'sm',
+    content,
+    onSave(panel) {
+      panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
+      panel.querySelector('[data-action="clear"]')?.addEventListener('click', async () => {
+        const dialog = captureModalContext();
+        try {
+          await api.delete('/availability');
+          closeModal({ force: true, context: dialog });
+          refresh?.();
+        } catch { /* still closes */ closeModal({ force: true, context: dialog }); }
+      });
+      panel.querySelector('#avail-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const state = panel.querySelector('[name="avail-state"]:checked')?.value;
+        const note = panel.querySelector('[name="avail-note"]')?.value?.trim() || null;
+        const durKey = panel.querySelector('[name="avail-duration"]')?.value ?? 'avail1h';
+        const exp = expiresAt(durKey);
+        const expires_at = exp.toISOString().replace(/\.\d{3}Z$/, 'Z');
+        const dialog = captureModalContext();
+        try {
+          await api.put('/availability', { state, note, expires_at });
+          closeModal({ force: true, context: dialog });
+          refresh?.();
+        } catch { /* ignore */ }
+      });
+    },
+  });
 }
 
 // Sparziel-Fortschritt statt bloßer Sparquote, sobald ein Budgetplan-Sparziel
@@ -9463,6 +9567,25 @@ function wireLinks(container, refresh, { editing = false, user = null, signal = 
         openQuickLinksManager({ onChange: refresh });
       });
     });
+  }
+
+  // Eigene Familien-Kachel-Zeile: Klick oeffnet den Status-Dialog (#1591).
+  // Nur die Zeile der eingeloggten Person - die anderen sind nur lesbar.
+  if (!editing && user) {
+    const escId = globalThis.CSS?.escape ? CSS.escape(String(user.id)) : String(user.id).replace(/["\\]/g, '\\$&');
+    const selfRow = container.querySelector(`[data-avail-set="${escId}"]`);
+    if (selfRow) {
+      const currentAvail = selfRow.querySelector('.family-widget-avatar[data-avail]')
+        ? { state: selfRow.querySelector('.family-widget-avatar[data-avail]').dataset.avail }
+        : null;
+      selfRow.style.cursor = 'pointer';
+      selfRow.setAttribute('role', 'button');
+      selfRow.setAttribute('tabindex', '0');
+      selfRow.addEventListener('click', () => openAvailabilityModal(user.id, currentAvail, refresh));
+      selfRow.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAvailabilityModal(user.id, currentAvail, refresh); }
+      });
+    }
   }
 
   // Task-Items öffnen die Leseansicht statt zu navigieren (#918)

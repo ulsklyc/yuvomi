@@ -14,6 +14,7 @@ import { resolveCalendarSelection } from '../services/calendar-selection.js';
 import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryFilter } from '../services/task-scope.js';
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
+import { getAllStatuses } from './availability.js';
 import {
   hiddenModulesFor,
   requestHasCapability,
@@ -125,7 +126,7 @@ const DENIED_PAYLOAD = Object.freeze({
  * nur bei einer Listen-Auswahl, und ein Konto ohne den Einkauf bekommt es nie.
  */
 function emptyAnswer(context) {
-  const empty = { users: [], countdowns: [], countdownTotal: 0, quicklinks: [] };
+  const empty = { users: [], countdowns: [], countdownTotal: 0, quicklinks: [], familyStatuses: [] };
   for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
   return empty;
 }
@@ -1420,6 +1421,18 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('memberTodayTasks error:', err.message);
     result.memberTodayTasks = [];
+  }
+
+  // Verfuegbarkeitsstatus je Mitglied fuer die Familien-Kachel (#1591). Kein
+  // Modul-Gate: der Status gehoert der Person, nicht dem Family-Modul. Die
+  // Wand zeigt den Status nur lesend und ohne Notiz: eine Notiz ist Freitext
+  // und die Wand steht in einem gemeinsamen Raum (Review zu #1591).
+  try {
+    const statuses = getAllStatuses();
+    result.familyStatuses = isDisplay ? statuses.map(({ note: _note, ...rest }) => rest) : statuses;
+  } catch (err) {
+    log.error('familyStatuses error:', err.message);
+    result.familyStatuses = [];
   }
 
   // Die Wand nennt die Aufgaben beim Namen (#1817), siehe `wallTasksByMember`.

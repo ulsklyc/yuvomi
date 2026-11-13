@@ -1423,6 +1423,9 @@ const DELIBERATELY_EMPTY_ON_THE_WALL = Object.freeze({
   // Kalender: die Familienkarte, der Wochenstreifen und die Zahlen der Kachel.
   familyEvents: 'calendar', weekEvents: 'calendar',
   birthdayCount: 'calendar', birthdayTotal: 'calendar', birthdaySoonCount: 'calendar',
+  // Verfuegbarkeitsstatus (#1591): gehoert zur Familienkarte, keinem Modul -
+  // die Wand zeichnet die Familienkarte nicht, also auch nicht ihren Status.
+  familyStatuses: null,
   // Aufgaben: Kennzahlen der Kacheln und der Navigation.
   openTaskCount: 'tasks', overdueTaskCount: 'tasks', memberTodayTasks: 'tasks',
   // Einkauf: die Wand nennt nur die Zahl der offenen Artikel.
@@ -1662,4 +1665,24 @@ test('Wand-Display: gleiche Programm-Zeilen und gleicher Ueberlauf wie das Mitgl
     // Admin-Rechte wiederherstellen.
     setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
   })();
+});
+
+test('Wand-Display: familyStatuses zeigt den Status, nie die Notiz (#1591)', async () => {
+  db.prepare(`
+    INSERT INTO user_availability (user_id, state, note, expires_at)
+    VALUES (?, 'busy', 'In a call with the bank', strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+1 hour'))
+    ON CONFLICT(user_id) DO UPDATE SET state = excluded.state, note = excluded.note, expires_at = excluded.expires_at
+  `).run(ANNA);
+
+  const memberWall = await overview(ANNA);
+  const annaMember = memberWall.familyStatuses.find((s) => s.user_id === ANNA);
+  assert.equal(annaMember?.note, 'In a call with the bank', 'Mitglied sieht die Notiz');
+
+  const displayWall = await asCoupledDisplay(() => overview(DISPLAY));
+  const annaDisplay = displayWall.familyStatuses.find((s) => s.user_id === ANNA);
+  assert.equal(annaDisplay?.state, 'busy', 'Wand zeigt den Zustand');
+  assert.equal(annaDisplay?.note, undefined, 'Wand zeigt die Notiz nicht (#1591)');
+  assert.ok(!JSON.stringify(displayWall).includes('In a call with the bank'), 'Freitext erreicht die Wand nirgendwo');
+
+  db.prepare('DELETE FROM user_availability WHERE user_id = ?').run(ANNA);
 });

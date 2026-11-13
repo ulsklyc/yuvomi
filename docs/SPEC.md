@@ -5766,6 +5766,23 @@ The surface carries four things, in this order: **the time**, large (this is whe
   navigate, (b) changes nothing server-side, (c) stays on this device, and (d) is operable from two metres.
   `test-wall-timer.js` checks those four against the built markup rather than against the intent.
 
+**Member availability status (#1591).** Any household member sets their own availability — `available`,
+`busy`, `do_not_disturb` or `away` — with an optional note and a required expiry, from their row on the
+family widget or the account menu; the end is chosen at the same moment ("for 1 hour", "until <time>",
+"until end of day"). `user_availability` (migration 283) holds one row per `user_id` (`UNIQUE`), written
+through `PUT /api/v1/availability` (`state`, `note?`, `expires_at`) and cleared through
+`DELETE /api/v1/availability`; `expires_at` is a real ISO-8601 UTC timestamp, checked against `Date`
+parsing (not just the shape), must be in the future and capped at 30 days out — a status always ends.
+`GET /api/v1/availability` (also folded into `GET /dashboard` as `familyStatuses`) returns only
+non-expired rows for the caller's household, ordered by `updated_at` descending; a status needs no manual
+clearing, it drops out of the list on its own once `expires_at` passes. On the family widget the state and
+note (when one was given) replace the derived line (next appointment or shift) while active — the colour
+is never the only signal, the state is written out in text too, and the avatar carries a coloured dot
+(`[data-avail]`, `--color-success`/`--color-warning`/`--color-danger`/`--color-text-tertiary`) with an
+`sr-only` label for the state. The wall gets the state read-only but never the note: a note is free text
+and the wall stands in a shared room, so `GET /dashboard` strips `note` from `familyStatuses` for a
+coupled display (`req.authMethod === 'display'`) before it leaves the server.
+
 ### Tasks (`/tasks`)
 
 **Views:**
