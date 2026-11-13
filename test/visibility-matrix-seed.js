@@ -415,8 +415,8 @@ export function seedRowRules({ db, ids, dates, shiftDateKey }) {
       tasks.push({ name, id, owner, level });
     }
   }
-  // The display branch of PATCH /:id/status (tasks.js ~2287) sits behind
-  // mayAccessTask: a display is never creator or assignee in the household, so
+  // The display branch of PATCH /:id/status (householdVisible) sits behind
+  // rowVisible(db, 'tasks', ...): a display is never creator or assignee in the household, so
   // without this row the branch answers for no task. Not a realistic state.
   const displayName = 'wtask.admin.assignees.display';
   const displayTaskId = Number(insertTask.get(displayName, 'assignees', ids.admin).id);
@@ -427,9 +427,10 @@ export function seedRowRules({ db, ids, dates, shiftDateKey }) {
   // shared, its already spawned followup exists. Ticking the origin off spawns
   // nothing (one followup per completion) and reports the followup's due date
   // only to whom the read check lets see it: the display arm reads
-  // `visibility = 'all'` (~1864), people read mayAccessTask (~1865). Followups:
-  // the admin's private row, a shared row, and the admin's `assignees` row
-  // assigned to OTHER_OF.admin (the assignment branch of mayAccessTask).
+  // householdVisible (`visibility = 'all'`), people read rowVisible(db, 'tasks',
+  // ...). Followups: the admin's private row, a shared row, and the admin's
+  // `assignees` row assigned to OTHER_OF.admin (the assignment branch of
+  // rowVisible).
   const insertChain = db.prepare(`
     INSERT INTO tasks (title, category, priority, status, due_date, visibility, created_by, is_recurring,
                        recurrence_rule, recurrence_origin_id)
@@ -473,7 +474,8 @@ export function seedRowRules({ db, ids, dates, shiftDateKey }) {
   // The occurrence of a `private` or `assignees` series is shared (visibility
   // all, overridden): a viewer who may not see the series still gets the
   // occurrence in GET /calendar, the capability map loads the hidden master
-  // itself, and canOverrideOccurrence then hangs on actorCanSeeSeries alone -
+  // itself, and canOverrideOccurrence then hangs on rowVisible(database,
+  // 'events', ...) alone -
   // the rule becomes visible in both directions.
   const insertLinked = db.prepare(`
     INSERT INTO calendar_events (title, start_datetime, all_day, visibility, created_by, external_source,
@@ -501,7 +503,8 @@ export function seedRowRules({ db, ids, dates, shiftDateKey }) {
   }
   // Two series WITHOUT a linked occurrence: once the Outlook target makes them
   // local but not eligible, canDetachOccurrence (~686) is true for whom
-  // actorCanSeeSeries lets through - with a linked child it is false for
+  // rowVisible(database, 'events', ...) lets through - with a linked child it
+  // is false for
   // everyone (linkedParents). Both are seen by the target owner (member):
   // one through the assignment, one as its creator.
   for (const [owner, level] of [['admin', 'assignees'], ['member', 'private']]) {

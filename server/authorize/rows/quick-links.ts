@@ -23,9 +23,15 @@ export function quickLinkVisibleWhere(alias: string, viewer: string = '@me'): st
 /** The columns of a quick link the row rules read. */
 export type QuickLinkRow = { visibility?: unknown; created_by?: unknown };
 
-/** The row form of quickLinkVisibleWhere(): shared, or the viewer's own. */
+/**
+ * The row form of quickLinkVisibleWhere(): shared, or the viewer's own. As in SQL,
+ * where `created_by = @me` never matches NULL, a tile without a creator
+ * (quick_links.created_by is nullable) is nobody's own, and no viewer owns one.
+ */
 export function quickLinkRowVisible(row: QuickLinkRow, viewerId: unknown): boolean {
-  return row.visibility === 'all' || Number(row.created_by) === Number(viewerId);
+  if (row.visibility === 'all') return true;
+  if (row.created_by == null || viewerId == null) return false;
+  return Number(row.created_by) === Number(viewerId);
 }
 
 /**

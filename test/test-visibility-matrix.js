@@ -14,11 +14,16 @@
  *          empty list is `[]`, and a cell that has no such path is
  *          { "n/a": "<reason>" }. Every one of the 630 cells is explicit.
  *
- *          `row_rules` (phase 2, B8a) holds the row checks still written as
- *          JavaScript outside server/authorize: quick links, tasks on every
- *          mayAccessTask call site, series capabilities and occurrence
- *          routes, the Outlook auto-sync target. Their rows are seeded after
- *          every read path was measured (see `_meta.row_rules`).
+ *          `row_rules` (phase 2, B8a) holds the row checks that were still
+ *          written as JavaScript outside server/authorize: quick links, tasks
+ *          on every call site of the task row rule, series capabilities and
+ *          occurrence routes, the Outlook auto-sync target. Their rows are
+ *          seeded after every read path was measured (see `_meta.row_rules`).
+ *          Since B8b these rules live in server/authorize (mayAccessTask and
+ *          actorCanSeeSeries -> rowVisible, mayEdit -> canEditQuickLink, the
+ *          quick link 404 -> quickLinkHiddenFrom, the display branch ->
+ *          householdVisible); the cells measure the same call sites. The old
+ *          names stay in `_meta`, which is compared to the data file.
  *
  *          Rate limits: `apiLimiter` (300/min) and `feedLimiter` (30/min) key
  *          on the client address, and `trust proxy` is one hop, so every
@@ -907,7 +912,8 @@ let ruleSeed = null;
 
 /**
  * Quick links: list (with `can_edit`), the dashboard row, PUT {} and DELETE
- * per tile (quick-links.js: 404 at ~302/347, mayEdit ~145 -> 403).
+ * per tile (quick-links.js: 404 through quickLinkHiddenFrom, 403 through
+ * canEditQuickLink; until B8b the inline 404 at ~302/347 and mayEdit ~145).
  * @param {string} role
  */
 async function measureQuickLinks(role) {
@@ -951,8 +957,9 @@ async function measureQuickLinks(role) {
 }
 
 /**
- * Tasks on the write paths, one cell per call site of mayAccessTask
- * (tasks.js ~420), plus the next due date after ticking a chain off.
+ * Tasks on the write paths, one cell per call site of the task row rule
+ * (rowVisible(db, 'tasks', ...) since B8b; until then mayAccessTask, tasks.js
+ * ~420), plus the next due date after ticking a chain off.
  * @param {string} role
  */
 async function measureTaskWrites(role) {

@@ -251,8 +251,17 @@ const VIEWERS = [owner, assignee, stranger, display];
 const CREATORS = [owner, assignee, stranger];
 
 /**
- * One row per level and creator; 'all' and 'assignees' rows are assigned to the
- * next creator in the list, one 'assignees' row per creator has no assignment.
+ * A value outside all | assignees | private. tasks.visibility and
+ * calendar_events.visibility carry no CHECK, so a restored file or a direct write can
+ * store one; the SQL fragment shows such a row to its creator only, and so must the
+ * row form - an assignment must not open it.
+ */
+const OFF_DOMAIN = 'family';
+
+/**
+ * One row per level and creator; 'all', 'assignees' and the off-domain rows are
+ * assigned to the next creator in the list, one 'assignees' row per creator has no
+ * assignment.
  * @param {string} table
  * @param {string} assignTable
  * @param {string} assignCol
@@ -264,7 +273,7 @@ function seedLevels(table, assignTable, assignCol, mk) {
   const ids = [];
   CREATORS.forEach((creator, i) => {
     const other = CREATORS[(i + 1) % CREATORS.length];
-    for (const visibility of ['all', 'assignees', 'private']) {
+    for (const visibility of ['all', 'assignees', 'private', OFF_DOMAIN]) {
       const id = mk(creator, visibility);
       ids.push(id);
       if (visibility !== 'private') {
@@ -282,13 +291,17 @@ const eqTasks = seedLevels('tasks', 'task_assignments', 'task_id', (creator, vis
 const eqEvents = seedLevels('calendar_events', 'event_assignments', 'event_id', (creator, visibility) => Number(db.prepare(
   "INSERT INTO calendar_events (title, start_datetime, created_by, visibility) VALUES ('eq', '2026-01-01T10:00', ?, ?)",
 ).run(creator, visibility).lastInsertRowid));
-const eqLinks = CREATORS.flatMap((creator) => ['all', 'private'].map((visibility) => Number(db.prepare(
+// quick_links.created_by is nullable: a tile without a creator (NULL) per level is
+// nobody's own tile, as SQL `created_by = @me` never matches NULL.
+const eqLinks = [...CREATORS, null].flatMap((creator) => ['all', 'private'].map((visibility) => Number(db.prepare(
   "INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('eq', 'https://eq.example/', ?, ?, 0)",
 ).run(visibility, creator).lastInsertRowid)));
+/** The quick link viewers: every account, and no account at all. */
+const LINK_VIEWERS = [...VIEWERS, null];
 
 /**
  * The ids among `ids` the SQL fragment lets through for `viewer`.
- * @param {string} table @param {string} where @param {number[]} ids @param {number} viewer
+ * @param {string} table @param {string} where @param {number[]} ids @param {number | null} viewer
  */
 function sqlIds(table, where, ids, viewer) {
   return db.prepare(`SELECT x.id FROM ${table} x WHERE x.id IN (${ids.join(',')}) AND ${where} ORDER BY x.id`)
@@ -357,10 +370,11 @@ for (const [type, table, assignTable, assignCol, ids] of /** @type {const} */ ([
   });
 }
 
-test('rowVisible(quick_links): the same rows as visibleWhere for every viewer', () => {
+test('rowVisible(quick_links): the same rows as visibleWhere for every viewer, a NULL creator included', () => {
   const rowVisible = rowApi('rowVisible');
   const rows = rowsById('quick_links', eqLinks);
-  for (const viewer of VIEWERS) {
+  assert.ok(rows.some((row) => row.created_by === null && row.visibility === 'private'), 'the seed holds a private tile without creator');
+  for (const viewer of LINK_VIEWERS) {
     const c = counting();
     const js = rows.filter((row) => rowVisible(c.database, 'quick_links', row, viewer)).map((row) => row.id);
     assert.deepEqual(js, sqlIds('quick_links', visibleWhere('quick_links', 'x', '@v'), eqLinks, viewer), `viewer ${viewer}`);
@@ -386,6 +400,7 @@ test('householdVisible: the same rows as householdVisibleWhere', () => {
     .all().map((/** @type {any} */ r) => r.id);
   assert.deepEqual(js, sql);
   assert.ok(js.length > 0 && js.length < rows.length, 'the seed holds both answers');
+  assert.ok(rows.some((row) => row.visibility === OFF_DOMAIN), 'the seed holds an off-domain level');
 });
 
 test('canEditQuickLink: own tiles, and shared tiles for an admin; never a foreign private one', () => {
