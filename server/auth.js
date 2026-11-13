@@ -56,13 +56,14 @@ import { getSupportedLocales, isSupportedLocale, resolveHouseholdLocale } from '
 import { isValidTimeZone } from './utils/timezone.js';
 import { accountIdsByEmail, emailMatchKey } from './utils/email-match.js';
 import {
-  resolvePermissions, clientPermissions,
+  clientPermissions,
   invitePresetPermissions, isValidInvitePreset, writeSubjectPermissions,
   applyChildStartPermissions, INVITE_PRESET_DEFAULT,
   userForRequest,
 } from './authorize/index.ts';
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { resolveRequestModuleAccess } from './authorize/index.ts';
+import { actorForAccount, authorize } from './authorize/index.ts';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
 import * as twoFactor from './services/two-factor.js';
 import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
@@ -178,10 +179,12 @@ function othersCanRead(database, userId) {
       -- Ein Ehemaliger liest nichts mehr (#1381) und haelt keine Schutzfelder offen.
       AND ${activeAccountSql('u')}
   `).all(userId);
-  const resolved = others.map((other) => resolvePermissions(database, other, {
+  // One actor (one resolution) per other account, then the read question per key
+  // to server/authorize/ (phase 2 B9).
+  const actors = others.map((other) => actorForAccount(database, other, {
     isDisplay: other.access_scope === 'display',
-  }).modules);
-  return PRIVACY_MODULES.filter((key) => resolved.some((modules) => (modules[key] ?? 'write') !== 'none'));
+  }));
+  return PRIVACY_MODULES.filter((key) => actors.some((actor) => authorize(actor, 'read', { module: key }).allowed));
 }
 
 /**

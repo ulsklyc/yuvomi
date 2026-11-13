@@ -44,7 +44,8 @@ process.env.LOG_LEVEL = 'error';
 // server/db.js opens `:memory:` on import and runs every migration on it, on the
 // production driver; the actor reads through that same connection.
 const { get } = await import('../server/db.js');
-const { actorFromRequest, actorForUser, householdAudience, resolveRequestModuleAccess } = await import('../server/authorize/index.ts');
+const authorizeApi = await import('../server/authorize/index.ts');
+const { actorFromRequest, actorForUser, householdAudience, resolveRequestModuleAccess } = authorizeApi;
 const { requireAuth } = await import('../server/auth.js');
 const { listToolDefinitions } = await import('../server/mcp/tools.js');
 
@@ -423,6 +424,27 @@ test('actorForUser: a display account is a plain system actor with the matrix ri
   assert.equal(actor.kind, 'system');
   assert.equal(actor.moduleAccess, null);
   assert.equal(actorForUser(db, GUEST)?.kind, 'system');
+});
+
+// actorForAccount (B9): read as a property, so the suite turns red on its test
+// instead of failing on import before the export exists.
+test('actorForAccount: from a loaded row, no users query, the display flag resolves a display', () => {
+  const actorForAccount = /** @type {any} */ (authorizeApi).actorForAccount;
+  assert.equal(typeof actorForAccount, 'function', 'actorForAccount is exported from server/authorize/index.ts');
+  /** @type {string[]} */
+  const seen = [];
+  const counting = { prepare: (/** @type {string} */ sql) => { seen.push(sql); return db.prepare(sql); }, exec: (/** @type {string} */ sql) => db.exec(sql) };
+  const kidRow = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(KID);
+  assert.deepEqual({ ...actorForAccount(counting, kidRow) }, { ...actorForUser(db, KID) }, 'a family row: the actor of actorForUser');
+  assert.ok(seen.every((sql) => !/FROM users/.test(sql)), 'no second users query');
+  const displayRow = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(DISPLAY);
+  const display = actorForAccount(db, displayRow, { isDisplay: true });
+  assert.equal(display.kind, 'display');
+  assert.equal(display.moduleAccess?.documents, 'none', 'a display reads no documents');
+  assert.equal(display.moduleAccess?.calendar, 'read', 'a display reads the calendar');
+  assert.ok(Object.isFrozen(display));
+  const adminRow = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(ADMIN);
+  assert.equal(actorForAccount(db, adminRow, { isDisplay: true }).moduleAccess, null, 'an admin row stays unrestricted');
 });
 
 test('householdAudience: no account, nothing else', () => {

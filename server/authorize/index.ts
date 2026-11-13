@@ -4,7 +4,7 @@
  *          only, never from the files behind it.
  */
 
-export { actorForUser, actorFromRequest, householdAudience, resolveRequestModuleAccess } from './actor.ts';
+export { actorForAccount, actorForUser, actorFromRequest, householdAudience, resolveRequestModuleAccess } from './actor.ts';
 export type { Actor } from './types.ts';
 export type { Database } from './catalog.ts';
 export {
@@ -94,6 +94,7 @@ export {
 // Care grants and health rows (B4): the one place for "may read / may write whose
 // health data" (health_care_grants, #584).
 export {
+  allCareGrants,
   canWriteFor,
   careAwareClause,
   caredForIds,
@@ -105,6 +106,7 @@ export {
   OPEN_FAMILY,
   readableClause,
   readableRows,
+  replaceCaregivers,
   visibilityClause,
   writableChild,
   writableClause,

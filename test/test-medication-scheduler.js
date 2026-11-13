@@ -219,6 +219,31 @@ test('Betreuer bekommen die Erinnerung mit dem Namen der betreuten Person, die P
   );
 });
 
+// Phase 2 B9: the delivery order to two caregivers is the order of their ids, not
+// the order the grants were entered in. PRAGMA reverse_unordered_selects reverses
+// every list without ORDER BY, so the order is held as a promise of the query.
+test('zwei Betreuer bekommen die Erinnerung in der Reihenfolge ihrer IDs, nicht der Eintragung', async () => {
+  const db = buildTestDb();
+  const child = seedUser(db, 'anna');
+  const first = seedUser(db, 'berta');
+  const second = seedUser(db, 'carl');
+  grantCare(db, child, second);
+  grantCare(db, child, first);
+  db.pragma('reverse_unordered_selects = ON');
+  const med = seedMed(db, child, { name: 'Ibuprofen' });
+  seedSchedule(db, med, { time: '08:00' });
+  const m = makeMocks();
+  const store = makeRecordingChannelStore();
+
+  await processDueMedications({ database: db, now: MONDAY_0900, ...m, channelStore: store });
+
+  assert.deepEqual(
+    m.pushed.map((p) => [p.userId, p.payload.body]),
+    [[child, 'Ibuprofen'], [first, 'anna: Ibuprofen'], [second, 'anna: Ibuprofen']],
+  );
+  assert.deepEqual(store.asked, [child, first, second]);
+});
+
 test('eine Betreuung fuer eine ANDERE Person loest keine Erinnerung aus', async () => {
   const db = buildTestDb();
   const anna = seedUser(db, 'anna');

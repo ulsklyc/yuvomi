@@ -68,11 +68,42 @@ export function caredForIds(database: Database, viewer: unknown): unknown[] {
   return database.prepare(CARED_FOR_SUBQUERY).all(viewer).map((r) => (r as { subject_id: unknown }).subject_id);
 }
 
-/** The caregivers of `subjectId`, in the table's order. Without a grant: []. */
+/**
+ * The caregivers of `subjectId`, by caregiver id. Without a grant: [].
+ *
+ * The order is promised (B9): the medication scheduler delivers in it. Before B9 the
+ * query had no ORDER BY and came back in the same order through the primary key's
+ * covering index, without promising it.
+ */
 export function caregiversOf(database: Database, subjectId: unknown): unknown[] {
   return database.prepare(
-    'SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?'
+    'SELECT caregiver_id FROM health_care_grants WHERE subject_id = ? ORDER BY caregiver_id'
   ).all(subjectId).map((r) => (r as { caregiver_id: unknown }).caregiver_id);
+}
+
+/** Every care grant as `{ subject_id, caregiver_id }`, by subject, then caregiver. */
+export function allCareGrants(database: Database): { subject_id: number; caregiver_id: number }[] {
+  return database.prepare(
+    'SELECT subject_id, caregiver_id FROM health_care_grants ORDER BY subject_id, caregiver_id'
+  ).all() as { subject_id: number; caregiver_id: number }[];
+}
+
+/** A connection with better-sqlite3's transaction helper (the production driver). */
+type TransactionalDatabase = Database & { transaction<F extends () => void>(fn: F): F };
+
+/**
+ * Sets the caregivers of `subjectId` to exactly `caregiverIds`, in one transaction:
+ * the stored grants go, one row per id is written in the given order. The caller
+ * checks the ids (known, active, not the subject herself); this only writes.
+ * The transaction is better-sqlite3's db.transaction(), as in the route before B9
+ * (nested in an open transaction it becomes a savepoint).
+ */
+export function replaceCaregivers(database: TransactionalDatabase, subjectId: unknown, caregiverIds: readonly unknown[]): void {
+  const insert = database.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)');
+  database.transaction(() => {
+    database.prepare('DELETE FROM health_care_grants WHERE subject_id = ?').run(subjectId);
+    for (const id of caregiverIds) insert.run(subjectId, id);
+  })();
 }
 
 /**

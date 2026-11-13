@@ -292,3 +292,49 @@ test('readableRows: one owner\'s list as readableClause cuts it, whole for the o
   assert.deepEqual(readableRows(db, items, stranger, owner), [{ visibility: 'family' }]);
   assert.deepEqual(readableRows(db, items, stranger, Number.NaN), [{ visibility: 'family' }], 'no owner');
 });
+
+// ── 5. The grant table itself (B9): list, caregivers of one person, replace ──────
+// PRAGMA reverse_unordered_selects reverses every result without ORDER BY: the
+// primary key's covering index would otherwise hand back the sorted order by luck.
+
+test('allCareGrants and caregiversOf: sorted by promise, not by the planner', () => {
+  const allCareGrants = api('allCareGrants');
+  const caregiversOf = api('caregiversOf');
+  const [a, b, c] = [seedUser(), seedUser(), seedUser()];
+  const grant = db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)');
+  grant.run(b, c); grant.run(b, a); grant.run(a, c);
+  db.pragma('reverse_unordered_selects = ON');
+  try {
+    const rows = allCareGrants(db).filter((/** @type {any} */ r) => [a, b].includes(r.subject_id));
+    assert.deepEqual(rows, [
+      { subject_id: a, caregiver_id: c },
+      { subject_id: b, caregiver_id: a },
+      { subject_id: b, caregiver_id: c },
+    ]);
+    assert.deepEqual(allCareGrants(db)[0], { subject_id: owner, caregiver_id: caregiver }, 'the whole table, from the first subject');
+    assert.deepEqual(caregiversOf(db, b), [a, c]);
+  } finally {
+    db.pragma('reverse_unordered_selects = OFF');
+    db.prepare('DELETE FROM health_care_grants WHERE subject_id IN (?, ?)').run(a, b);
+  }
+});
+
+test('replaceCaregivers: the stored list goes, the new one is written in order, in one transaction', () => {
+  const replaceCaregivers = api('replaceCaregivers');
+  const [subject, x, y, z] = [seedUser(), seedUser(), seedUser(), seedUser()];
+  const rows = () => db.prepare('SELECT subject_id, caregiver_id FROM health_care_grants WHERE subject_id IN (?, ?) ORDER BY rowid')
+    .all(subject, owner).map((/** @type {any} */ r) => [r.subject_id, r.caregiver_id]);
+  try {
+    replaceCaregivers(db, subject, [z, x]);
+    assert.deepEqual(rows(), [[owner, caregiver], [subject, z], [subject, x]], 'other subjects stay');
+    replaceCaregivers(db, subject, [y]);
+    assert.deepEqual(rows(), [[owner, caregiver], [subject, y]]);
+    // A failing insert (the person herself, CHECK) rolls the delete back too.
+    assert.throws(() => replaceCaregivers(db, subject, [x, subject]), /CHECK/);
+    assert.deepEqual(rows(), [[owner, caregiver], [subject, y]], 'nothing changed');
+    replaceCaregivers(db, subject, []);
+    assert.deepEqual(rows(), [[owner, caregiver]]);
+  } finally {
+    db.prepare('DELETE FROM health_care_grants WHERE subject_id = ?').run(subject);
+  }
+});

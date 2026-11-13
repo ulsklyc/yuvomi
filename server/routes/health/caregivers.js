@@ -12,7 +12,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
 import { log, viewerId } from './helpers.js';
-import { caredForIds } from '../../authorize/index.ts';
+import { allCareGrants, caredForIds, caregiversOf, replaceCaregivers } from '../../authorize/index.ts';
 import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
 import { isActiveAccount } from '../../services/household-members.js';
 
@@ -38,11 +38,9 @@ router.get('/caregivers/me', (req, res) => {
  */
 router.get('/caregivers', requireAdmin, (req, res) => {
   try {
-    const rows = db.get().prepare(
-      'SELECT subject_id, caregiver_id FROM health_care_grants ORDER BY subject_id, caregiver_id'
-    ).all();
+    /** @type {Record<number, number[]>} */
     const bySubject = {};
-    for (const row of rows) {
+    for (const row of allCareGrants(db.get())) {
       (bySubject[row.subject_id] ||= []).push(row.caregiver_id);
     }
     res.json({ data: bySubject });
@@ -88,9 +86,7 @@ router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
       // Ein ehemaliges Konto betreut niemanden NEU (#1381). Das Deaktivieren
       // nimmt ihm seine Betreuungen; ohne diese Zeile liesse sich die naechste
       // gleich wieder eintragen, fuer ein Konto, das nie mehr hereinkommt.
-      const stored = new Set(db.get()
-        .prepare('SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?').all(subjectId)
-        .map((row) => row.caregiver_id));
+      const stored = new Set(caregiversOf(db.get(), subjectId));
       const former = ids.filter((id) => !stored.has(id) && !isActiveAccount(id, { db: db.get() }));
       if (former.length) {
         return res.status(400).json({
@@ -115,14 +111,7 @@ router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
       }
     }
 
-    const insert = db.get().prepare(
-      'INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)'
-    );
-    const tx = db.get().transaction(() => {
-      db.get().prepare('DELETE FROM health_care_grants WHERE subject_id = ?').run(subjectId);
-      for (const id of ids) insert.run(subjectId, id);
-    });
-    tx();
+    replaceCaregivers(db.get(), subjectId, ids);
 
     // Wirkt sofort: eine entzogene Betreuung darf nicht bis zum naechsten
     // periodischen Lauf weiter eine Vorsorge-Erinnerung an die betroffene

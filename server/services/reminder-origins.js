@@ -15,7 +15,7 @@
 import { householdDisabledModules } from './household-modules.js';
 // The delivery passes in its own connection; the actor without a request
 // (server/authorize/, phase 2 B1) reads through exactly that connection.
-import { actorForUser, authorize, deniedModules } from '../authorize/index.ts';
+import { actorForUser, authorize } from '../authorize/index.ts';
 
 /* ONE MAP OVER ALL ORIGINS, WITH NO EXCEPTION FOR THE NEWEST ONE.
  *
@@ -110,46 +110,6 @@ export function withoutSwitchedOffModules(database, rows) {
     }
     return !off.has(ORIGIN_MODULE[row.entity_type]);
   });
-}
-
-/**
- * The modules denied entirely to THIS recipient - or `null` if the recipient
- * does not exist (any more).
- *
- * THE SAME TWO STEPS AS IN THE ROUTER, not a second spelling:
- * `resolvePermissions()` -> `buildSessionModuleAccess()` -> `deniedModules()`
- * is exactly the path `req.sessionModuleAccess` takes in server/auth.js and
- * that `mayTouchOrigin()` in server/routes/reminders.js evaluates. The first
- * two run in `actorForUser()` (server/authorize/), the actor without a request;
- * it does not classify display or guest accounts (see there). So here as
- * there only `none` counts, not `read`: whoever may read a module may also
- * hear from it - a filter that took the message away would turn a read
- * permission into a lock. An admin falls through `buildSessionModuleAccess()`
- * to `null` and thus to the empty set.
- *
- * `null` INSTEAD OF THE EMPTY SET FOR AN UNKNOWN RECIPIENT, and that is not a
- * matter of taste (see `creatorLacksPantry()` in services/pantry-reminders.js):
- * a denylist answers "unknown id" with "nothing denied", i.e. with YES.
- * Without an account there is nobody the message belongs to. `created_by` is
- * NOT NULL with a foreign key to `users` - but relying on exactly that would
- * make the answer depend on a PRAGMA.
- *
- * NO PRODUCTION CALLER SINCE PHASE 2 B2: the delivery
- * (`withoutModulesDeniedToRecipient()` below), the medication scheduler
- * (#2602) and the calendar feeds (#2615, server/index.js) ask
- * `authorize(actor, 'receive', { module })` of server/authorize/, which gives
- * the same answer. It stays exported for one reader: test/test-visibility-matrix.js
- * records its answer for an unknown account (`recipientDeniedModulesIsNull`,
- * test/visibility-matrix.expected.json). No new caller.
- *
- * @param {import('../authorize/index.ts').Database} database
- * @param {number} userId
- * @returns {Set<string>|null}
- */
-export function recipientDeniedModules(database, userId) {
-  const actor = actorForUser(database, userId);
-  if (!actor) return null;
-  return deniedModules(actor.moduleAccess);
 }
 
 /**
