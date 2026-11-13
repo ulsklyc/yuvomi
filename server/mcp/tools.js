@@ -49,8 +49,9 @@ const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'];
  * Fehler mit für den aufrufenden Client (LLM) sichtbarer Nachricht.
  *
  * Kommt er aus einer Routenantwort (`internalApiRequest`), tragen die drei
- * Felder deren Angaben: ein Aufrufer, der die Brücke programmatisch nutzt, soll
- * den Grund nicht aus dem englischen Satz lesen müssen (#2616).
+ * Felder deren Angaben - nur für Aufrufer im Prozess und Tests (#2616). Ein
+ * MCP-Client sieht sie nie: `protocol.js` gibt nur `message` hinaus, `reason`
+ * steht dort als `[reason: ...]` im Text.
  */
 class ToolError extends Error {
   /** @type {number|null} HTTP-Status der Routenantwort, sonst null. */
@@ -154,13 +155,16 @@ function pickFields(row, fields) {
  * request body, so the ROUTE's default applies - that is the whole point of
  * going through it (default points, fallback category, fallback visibility).
  *
- * `null` COUNTS AS NOT PASSED, exactly as it did before #2616: a client that
- * serializes an unset optional argument as `null` sends `{ category: null }`.
- * The route reads that differently - `validateTaskInput` asks
- * `textShape(body.category)` and `textShape(body.priority)` WITHOUT
- * `{ nullable: true }` (server/routes/tasks.js), so an explicit `null` is
- * "category must be text.", a 400 for a call that created a task before. No
- * field of the three tool schemas is nullable.
+ * `null` AND `''` COUNT AS NOT PASSED, exactly as they did before #2616: the
+ * old tool read both through `v.str`/`v.oneOf`, which answer `null` for them. A
+ * client that serializes an unset optional argument as `null` sends
+ * `{ category: null }`, and the route reads that differently - `textShape`
+ * WITHOUT `{ nullable: true }` makes it "category must be text.", a 400. `''`
+ * passes the route's checks, but its defaults (`category = FALLBACK_CATEGORY`,
+ * `priority = 'none'`) apply to `undefined` only: the row got the orphan key
+ * `''` (cleaned up by migration v114), `priority: ''` ran into the CHECK as a
+ * 500, `description: ''` stored `''` instead of NULL. No field of the three
+ * tool schemas is nullable, and none gives `''` a meaning of its own.
  * @param {Record<string, any>} fields
  * @returns {Record<string, any>}
  */
@@ -168,9 +172,21 @@ function passedFields(fields) {
   /** @type {Record<string, any>} */
   const body = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (value != null) body[key] = value;
+    if (value != null && value !== '') body[key] = value;
   }
   return body;
+}
+
+/**
+ * A finite number in a TEXT field becomes its text, as the old tool's `v.str`
+ * did with `String(val)`: `{ title: 42 }` created a task "42" before #2616, and
+ * the route's `textShape` refuses a number. Only for the free-text fields -
+ * a number as category or priority was refused before as well.
+ * @param {any} value
+ * @returns {any}
+ */
+function asText(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : value;
 }
 
 // The limit of the `Idempotency-Key` header, as server/middleware/idempotency.js
@@ -192,7 +208,8 @@ const MAX_IDEMPOTENCY_KEY_LENGTH = 255;
  */
 function idempotencyHeader(args) {
   const raw = args.idempotency_key;
-  if (raw === undefined || raw === null) return undefined;
+  // `''` like `null`: not given, as for every other optional field.
+  if (raw === undefined || raw === null || raw === '') return undefined;
   const key = typeof raw === 'string' ? raw.trim() : '';
   if (!key || key.length > MAX_IDEMPOTENCY_KEY_LENGTH || /[^\x20-\x7E]/.test(key)) {
     throw new ToolError(
@@ -208,8 +225,8 @@ async function createTask(ctx, args) {
     // (#2616): the fixed list here refused a household's own category and still
     // wrote a default key the household had deleted.
     payload: passedFields({
-      title: args.title,
-      description: args.description,
+      title: asText(args.title),
+      description: asText(args.description),
       category: args.category,
       priority: args.priority,
       due_date: args.due_date,
@@ -252,7 +269,7 @@ async function addShoppingItem(ctx, args) {
     // No category of our own any more (#2616): the route checks it against
     // `validCategoryNames()` and falls back on the household's own rule. The
     // fixed 'Sonstiges' here wrote a name a renamed household no longer had.
-    payload: passedFields({ name: args.name, quantity: args.quantity, category: args.category }),
+    payload: passedFields({ name: asText(args.name), quantity: asText(args.quantity), category: args.category }),
     headers: idempotencyHeader(args),
   });
   // `list` as a NAME: the route answers with the item row, which only carries
@@ -300,8 +317,8 @@ async function createEvent(ctx, args) {
     // The route does that itself, and since #2616 it is the ONLY place that
     // does; it also flushes a waiting sync target right away.
     payload: passedFields({
-      title: args.title,
-      description: args.description,
+      title: asText(args.title),
+      description: asText(args.description),
       start_datetime: args.start_datetime,
       end_datetime: args.end_datetime,
       // THE TOOL'S OWN COERCION STAYS. The route reads `!!req.body.all_day`,
@@ -309,7 +326,7 @@ async function createEvent(ctx, args) {
       // appointment into an all-day entry and drop its time. This tool has
       // always accepted only the boolean `true`, and its schema says `boolean`.
       all_day: args.all_day == null ? undefined : args.all_day === true,
-      location: args.location,
+      location: asText(args.location),
     }),
     headers: idempotencyHeader(args),
   });

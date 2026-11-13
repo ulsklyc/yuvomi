@@ -279,6 +279,99 @@ test('null in jedem optionalen Feld der drei Schreibwerkzeuge heisst weggelassen
   assert.equal(parseContent(event).start_datetime, `${in3days}T11:15`);
 });
 
+// Dasselbe für den leeren String: das alte Werkzeug las `''` über `v.str` und
+// `v.oneOf` als "nicht angegeben". Die Route lässt `''` durch, und ihre
+// Vorgaben greifen nur bei `undefined` - ohne Fang stünde der Waisen-Key `''`
+// in der Zeile (v114), `priority: ''` liefe in den CHECK.
+test('tools/call create_task: category "" fällt auf misc', async () => {
+  const res = await toolCall('create_task', { title: 'Kategorie leer', category: '' });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.equal(row('SELECT category FROM tasks WHERE id = ?', parseContent(res).id).category, 'misc');
+});
+
+test('tools/call create_task: priority "" fällt auf none, kein 500', async () => {
+  const res = await toolCall('create_task', { title: 'Priorität leer', priority: '' });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.equal(parseContent(res).priority, 'none');
+});
+
+test('tools/call create_task: description "" speichert NULL', async () => {
+  const res = await toolCall('create_task', { title: 'Beschreibung leer', description: '' });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.equal(row('SELECT description FROM tasks WHERE id = ?', parseContent(res).id).description, null);
+});
+
+test('"" in jedem optionalen Feld der drei Schreibwerkzeuge heisst weggelassen', async () => {
+  const task = await toolCall('create_task', {
+    title: 'Alles leer', description: '', category: '', priority: '',
+    due_date: '', due_time: '', tags: '', idempotency_key: '',
+  });
+  assert.equal(task.result.isError, false, task.result.content?.[0]?.text);
+  assert.deepEqual(
+    row('SELECT description, category, priority, due_date, due_time FROM tasks WHERE id = ?', parseContent(task).id),
+    { description: null, category: 'misc', priority: 'none', due_date: null, due_time: null },
+  );
+  assert.deepEqual(parseContent(task).tags, []);
+  const item = await toolCall('add_shopping_item',
+    { name: 'Alles leer', quantity: '', category: '', list: '', idempotency_key: '' });
+  assert.equal(item.result.isError, false, item.result.content?.[0]?.text);
+  const itemRow = row('SELECT quantity, category, list_id FROM shopping_items WHERE id = ?', parseContent(item).id);
+  assert.equal(itemRow.quantity, null);
+  assert.equal(itemRow.category, 'Sonstiges');
+  assert.equal(itemRow.list_id, listId);
+  const event = await toolCall('create_event', {
+    title: 'Alles leer', start_datetime: `${in3days}T12:45`, description: '',
+    end_datetime: '', all_day: '', location: '', idempotency_key: '',
+  });
+  assert.equal(event.result.isError, false, event.result.content?.[0]?.text);
+  assert.deepEqual(
+    row('SELECT description, end_datetime, all_day, location, start_datetime FROM calendar_events WHERE id = ?', parseContent(event).id),
+    { description: null, end_datetime: null, all_day: 0, location: null, start_datetime: `${in3days}T12:45` },
+  );
+});
+
+test('"" in einem Pflichtfeld bleibt "is required", kein 500', async () => {
+  for (const [tool, args, field] of /** @type {const} */ ([
+    ['create_task', { title: '' }, 'title'],
+    ['add_shopping_item', { name: '' }, 'name'],
+    ['create_event', { title: 'Ohne Start leer', start_datetime: '' }, 'start_datetime'],
+  ])) {
+    const res = await toolCall(tool, args);
+    assert.equal(res.result.isError, true, tool);
+    assert.match(res.result.content[0].text, new RegExp(`${field} is required`), tool);
+  }
+});
+
+// Das alte `v.str` wandelte per `String(val)`; die Route verlangt Text. Eine
+// Zahl in einem Textfeld legte vorher an und bleibt deshalb erlaubt.
+test('tools/call create_task: eine Zahl als Titel wird Text', async () => {
+  const res = await toolCall('create_task', { title: 42, description: 7 });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.deepEqual(row('SELECT title, description FROM tasks WHERE id = ?', parseContent(res).id),
+    { title: '42', description: '7' });
+});
+
+test('tools/call add_shopping_item: eine Zahl als Menge wird Text', async () => {
+  const res = await toolCall('add_shopping_item', { name: 404, quantity: 2 });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.equal(parseContent(res).name, '404');
+  assert.equal(parseContent(res).quantity, '2');
+});
+
+test('tools/call create_event: Zahlen in Titel, Beschreibung und Ort werden Text', async () => {
+  const res = await toolCall('create_event',
+    { title: 2026, start_datetime: `${in3days}T13:00`, description: 1, location: 12 });
+  assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
+  assert.deepEqual(row('SELECT title, description, location FROM calendar_events WHERE id = ?', parseContent(res).id),
+    { title: '2026', description: '1', location: '12' });
+});
+
+test('tools/call create_task: eine Zahl als Kategorie bleibt abgewiesen', async () => {
+  const res = await toolCall('create_task', { title: 'Zahl als Kategorie', category: 5 });
+  assert.equal(res.result.isError, true);
+  assert.match(res.result.content[0].text, /category/);
+});
+
 test('tools/call create_task: ungültige Priorität → isError', async () => {
   const res = await toolCall('create_task', { title: 'X', priority: 'sofort' });
   assert.equal(res.result.isError, true);

@@ -43,12 +43,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   although the household had set a default value for them; your own task category was refused
   while a default category you had deleted was still accepted; a shopping item took any
   category name, even one that no longer exists, and without one it fell back on "Sonstiges"
-  even after you had renamed that category; and a new calendar event waited for the next sync
-  run instead of going up to the connected calendar right away. All three now take the same
-  route as the app, so there is nothing left to keep in step. They also accept an optional
-  `idempotency_key`: repeat a call with the same key after a lost answer and you get the first
-  result back instead of a duplicate. Writing over MCP now needs an API token or a sent-along
-  CSRF token - a client that authenticates with a browser session cookie alone is refused.
+  even after you had renamed that category; and with an iCloud calendar connected, which uploads
+  every local event, a new calendar event waited for the next sync run instead of going up right
+  away. All three now take the same route as the app, so there is nothing left to keep in step.
+  They also accept an optional `idempotency_key`: repeat a call with the same key after a lost
+  answer and you get the first result back instead of a duplicate. Writing over MCP now needs an
+  API token or a sent-along CSRF token - a client that authenticates with a browser session
+  cookie alone is refused. When the API refuses a call with a machine-readable reason, the error
+  text of these tools and of `call_api_operation` now ends in it, for example
+  `[reason: csrf_invalid]`.
 - **"Create backup now" no longer reports success when the backup failed.** The server answers
   a failed manual run with `200` and `success: false`, and the page showed "Backup created
   successfully." without reading the answer. It now shows the reason in your language, the
