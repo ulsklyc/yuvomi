@@ -6,13 +6,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
+// Recovery uses the production driver's transaction API.
+const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
 import { createPasswordResetService } from '../server/services/password-reset.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
 function makeDb() {
-  const db = new DatabaseSync(':memory:');
+  const db = new Database(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
     CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
