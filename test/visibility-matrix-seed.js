@@ -464,7 +464,8 @@ export function seedRowRules({ db, ids, dates, shiftDateKey }) {
   // One linked occurrence per series (its second day), written in the shape
   // PUT /calendar/:id/occurrences/:day writes for an override of the title
   // (and the visibility): recurrence_parent_id, recurrence_id in format A,
-  // overridden_fields, series_authored = 1, the series' assignment rows copied. Seeded directly and not through
+  // overridden_fields, series_authored = 1, the series' assignment rows copied,
+  // and the exception row on the master for that day. Seeded directly and not through
   // the route, because that route runs isEligibleLocalSeries - the rule under
   // test - and a mutant of it must turn cells red, not stop the seed.
   // PUT/DELETE /calendar/:childId reach the series rule through
@@ -479,6 +480,7 @@ export function seedRowRules({ db, ids, dates, shiftDateKey }) {
                                  recurrence_parent_id, recurrence_id, overridden_fields, series_authored)
     VALUES (?, ?, 1, ?, ?, 'local', ?, ?, ?, 1) RETURNING id
   `);
+  const insertException = db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)');
   /** @type {Array<RuleRow & { start: string, linkedChildId: number | null }>} */
   const series = [];
   const linkedDay = shiftDateKey(seriesStart, 1);
@@ -490,8 +492,10 @@ export function seedRowRules({ db, ids, dates, shiftDateKey }) {
       const fields = level === 'all' ? ['title'] : ['title', 'visibility'];
       const childId = Number(insertLinked.get(`${name} linked`, linkedDay, 'all', ids[owner], id, linkedDay,
         JSON.stringify(fields)).id);
-      // The route copies the series' assignment rows onto the occurrence.
+      // The route copies the series' assignment rows onto the occurrence and
+      // excludes the day from the master.
       if (level !== 'private') assignEvent.run(childId, ids[OTHER_OF[owner]]);
+      insertException.run(id, linkedDay);
       series.push({ name, id, owner, level, start: seriesStart, linkedChildId: childId });
     }
   }
