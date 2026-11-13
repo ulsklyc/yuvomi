@@ -19,6 +19,8 @@
  *               throws instead of answering silently.
  *            5. MCP keeps its one null-actor answer: listToolDefinitions(null)
  *               lists every tool, as before (toolAllowed catches null itself).
+ *            6. A second, independent oracle for receive: the permission matrix
+ *               (resolvePermissions on each actor's account), not the actor's map.
  *
  * Run: npm run test:authorize-modules
  */
@@ -181,6 +183,57 @@ test('receive asks no token scope: a delivery is not a request', () => {
     assert.equal(authorize(actor, 'read', { module: key }).reason, 'scope', `read / ${key}`);
     assert.deepEqual(authorize(actor, 'receive', { module: key }), { allowed: true, reason: null }, `receive / ${key}`);
   }
+});
+
+/**
+ * The account behind each actor of ACTORS, for the second receive oracle: which
+ * `users` row it resolves from, and whether it resolves as a display.
+ * @type {Record<string, { userId: number, isDisplay: boolean } | null>}
+ */
+const SUBJECTS = {
+  admin: { userId: ADMIN, isDisplay: false },
+  'member write': { userId: MEMBER_WRITE, isDisplay: false },
+  'member read': { userId: MEMBER_READ, isDisplay: false },
+  'member none': { userId: MEMBER_NONE, isDisplay: false },
+  'member mixed': { userId: MEMBER_MIXED, isDisplay: false },
+  'token, unscoped, member mixed': { userId: MEMBER_MIXED, isDisplay: false },
+  'token, scoped, member write': { userId: MEMBER_WRITE, isDisplay: false },
+  'token, scoped, member mixed': { userId: MEMBER_MIXED, isDisplay: false },
+  'token, scoped, admin': { userId: ADMIN, isDisplay: false },
+  display: { userId: DISPLAY, isDisplay: true },
+  null: null,
+};
+
+/**
+ * A SECOND, INDEPENDENT ORACLE for receive: not the actor's module map and not
+ * deniedModules(), but the permission matrix itself - resolvePermissions() on the
+ * account's `users` row. Level `none` -> no, `read` / `write` -> yes, an admin
+ * always, no actor never; token scopes play no part.
+ * @param {string} name @param {string} key
+ */
+function receiveFromMatrix(name, key) {
+  const subject = SUBJECTS[name];
+  if (subject == null) return false;
+  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(subject.userId);
+  const resolved = authorizeApi.resolvePermissions(db, user, { isDisplay: subject.isDisplay });
+  if (resolved.admin) return true;
+  return resolved.modules[key] !== 'none';
+}
+
+test('receive answers as the permission matrix says, without the actor\'s module map', () => {
+  assert.deepEqual(ACTORS.map(([name]) => name).sort(), Object.keys(SUBJECTS).sort(), 'every actor has its subject');
+  const diffs = [];
+  const seen = new Set();
+  for (const [name, actor] of ACTORS) {
+    for (const key of MODULES) {
+      const want = receiveFromMatrix(name, key);
+      seen.add(want);
+      const got = authorize(actor, 'receive', { module: key }).allowed;
+      if (got !== want) diffs.push(`${name} / ${key}: got ${got}, want ${want}`);
+    }
+  }
+  assert.deepEqual(diffs, []);
+  assert.deepEqual([...seen].sort(), [false, true], 'the matrix answers both ways');
 });
 
 test('an account that does not exist may nothing', () => {

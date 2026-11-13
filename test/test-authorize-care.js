@@ -14,7 +14,8 @@
  *               and the rows it lets through.
  *            4. readableClause (the "readable by the viewer" fragment of the lab
  *               report and medication lookups) and the fasting filter: same text as
- *               the inline SQL they replace, same rows.
+ *               the inline SQL they replace, same rows; readableClause with OPEN_ALL
+ *               and the fasting filter also against stored rows.
  *
  * Run: npm run test:authorize-care
  */
@@ -200,6 +201,59 @@ test('readableClause: the literal family value or a writable row, as the inline 
   assert.deepEqual(ids(caregiver), [ownerPrivate, ownerFamily, strangerFamily], 'cared for');
   assert.deepEqual(ids(stranger), [ownerFamily, strangerPrivate, strangerFamily], 'not cared for');
   assert.deepEqual(ids(admin), [ownerFamily, strangerFamily], 'admin without grant');
+});
+
+test('readableClause with OPEN_ALL: \'all\' is the open value, \'family\' is not', () => {
+  const readableClause = api('readableClause');
+  const OPEN_ALL = /** @type {any} */ (authorizeApi).OPEN_ALL;
+  const w = api('writableClause')('n', 7);
+  assert.deepEqual(readableClause('n', 7, OPEN_ALL), { sql: `(n.visibility = 'all' OR ${w.sql})`, params: w.params });
+  // health_nutrition_entries carries the canonical set (CHECK private | all).
+  const nutrition = (/** @type {number} */ userId, /** @type {string} */ visibility) => Number(db.prepare(
+    "INSERT INTO health_nutrition_entries (user_id, consumed_at, title, visibility, created_by) VALUES (?, '2026-01-01T08:00', 'n', ?, ?)",
+  ).run(userId, visibility, userId).lastInsertRowid);
+  const nOwnerPrivate = nutrition(owner, 'private');
+  const nOwnerAll = nutrition(owner, 'all');
+  const nStrangerPrivate = nutrition(stranger, 'private');
+  const nStrangerAll = nutrition(stranger, 'all');
+  try {
+    const ids = (/** @type {string} */ table, /** @type {number} */ viewer) => {
+      const clause = readableClause('n', viewer, OPEN_ALL);
+      return db.prepare(`SELECT n.id FROM ${table} n WHERE ${clause.sql} ORDER BY n.id`)
+        .all(...clause.params).map((/** @type {any} */ r) => r.id);
+    };
+    const n = 'health_nutrition_entries';
+    assert.deepEqual(ids(n, owner), [nOwnerPrivate, nOwnerAll, nStrangerAll], 'own data');
+    assert.deepEqual(ids(n, caregiver), [nOwnerPrivate, nOwnerAll, nStrangerAll], 'cared for');
+    assert.deepEqual(ids(n, stranger), [nOwnerAll, nStrangerPrivate, nStrangerAll], 'not cared for');
+    assert.deepEqual(ids(n, admin), [nOwnerAll, nStrangerAll], 'admin without grant');
+    // Over a table that writes 'family', OPEN_ALL opens nothing: only the writable rows.
+    assert.deepEqual(ids('medications', stranger), [strangerPrivate, strangerFamily], 'family is not open under OPEN_ALL');
+    assert.deepEqual(ids('medications', admin), [], 'admin without grant, nothing open');
+  } finally {
+    db.prepare(`DELETE FROM health_nutrition_entries WHERE id IN (${[nOwnerPrivate, nOwnerAll, nStrangerPrivate, nStrangerAll].join(',')})`).run();
+  }
+});
+
+test('fastingVisibleFilter against health_fasts: a stranger gets the family rows, never private ones', () => {
+  const fastingVisibleFilter = api('fastingVisibleFilter');
+  const ownerFast = (/** @type {string} */ visibility) => Number(db.prepare(`
+    INSERT INTO health_fasts (user_id, start_at, end_at, start_tzid, visibility)
+    VALUES (?, '2025-06-01T08:00:00Z', '2025-06-01T20:00:00Z', 'UTC', ?)
+  `).run(owner, visibility).lastInsertRowid);
+  const fPrivate = ownerFast('private');
+  const fFamily = ownerFast('family');
+  try {
+    const ids = (/** @type {number} */ viewer) => db.prepare(
+      `SELECT id FROM health_fasts WHERE ${fastingVisibleFilter(db, viewer, owner)} AND id IN (?, ?) ORDER BY id`,
+    ).all(owner, fPrivate, fFamily).map((/** @type {any} */ r) => r.id);
+    assert.deepEqual(ids(owner), [fPrivate, fFamily], 'own data');
+    assert.deepEqual(ids(caregiver), [fPrivate, fFamily], 'cared for');
+    assert.deepEqual(ids(stranger), [fFamily], 'not cared for: the family row');
+    assert.deepEqual(ids(admin), [fFamily], 'admin without grant: the family row');
+  } finally {
+    db.prepare('DELETE FROM health_fasts WHERE id IN (?, ?)').run(fPrivate, fFamily);
+  }
 });
 
 test('fastingVisibleFilter: full view for the owner and a caregiver, family rows for others', () => {

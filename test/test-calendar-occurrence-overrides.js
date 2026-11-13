@@ -527,6 +527,79 @@ test('Outlook auto-sync eligibility follows visible event ownership and assignme
   });
 });
 
+/**
+ * A private series whose creator is stored as TEXT: '0x2' stays TEXT in SQLite
+ * (only a restore or direct database access writes one; foreign keys off), and SQL
+ * `created_by = 2` never matches it. `numeric` stores the integer 2 instead, as the
+ * control that the same row is otherwise in reach of account 2.
+ * @param {any} database
+ * @param {{ numeric?: boolean, [column: string]: unknown }} [options]
+ */
+function textCreatorSeries(database, { numeric = false, ...values } = {}) {
+  database.exec('PRAGMA foreign_keys = OFF;');
+  try {
+    const id = Number(insertSeries(database, { visibility: 'private', created_by: numeric ? 2 : '0x2', ...values }));
+    const row = database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+    assert.equal(typeof row.created_by, numeric ? 'number' : 'string');
+    return row;
+  } finally {
+    database.exec('PRAGMA foreign_keys = ON;');
+  }
+}
+
+/** serializeEvent with its options typed loosely (its JSDoc names no options). */
+const serializeWith = /** @type {(row: any, options: any) => any} */ (serializeEvent);
+
+test('Outlook target check reads a TEXT creator through Number(): the series stays ineligible_series', () => {
+  // Decision (Ulas): the target check keeps comparing the creator through Number().
+  // The target's owner (account 2) counts as seeing a private series created by
+  // '0x2', so a writable auto-sync target exists and the series takes no linked
+  // overrides - a narrower answer would grant a capability nobody had before.
+  const database = createDatabase();
+  database.prepare(`INSERT INTO outlook_accounts (id, needs_reauth, auto_sync_calendar_id, owner_user_id)
+    VALUES (20, 0, 'family-calendar', 2)`).run();
+  database.prepare(`INSERT INTO outlook_calendar_selection
+    (account_id, calendar_id, enabled, can_edit) VALUES (20, 'family-calendar', 1, 1)`).run();
+  const row = textCreatorSeries(database);
+  assert.deepEqual(isEligibleLocalSeries(database, row, 1), { eligible: false, reason: 'ineligible_series' });
+  assert.deepEqual(isEligibleLocalSeries(database, row, 2), { eligible: false, reason: 'ineligible_series' });
+  assert.equal(serializeWith(row, { database, actorId: 1 }).can_override_occurrence, false);
+});
+
+test('a series the caller does not see, TEXT creator: no override and no detach through a shared occurrence', () => {
+  // #2740: the occurrence capabilities ask rowVisible like the whole-series routes,
+  // and rowVisible compares a TEXT creator as SQL does - account 2 does not own a
+  // series created by '0x2'. The numeric control shows the same rows grant both.
+  for (const numeric of [false, true]) {
+    const database = createDatabase();
+    // Override: an eligible private series, reached through a linked occurrence
+    // that is shared with the household.
+    const master = textCreatorSeries(database, { numeric });
+    const childId = Number(insertEvent(database, {
+      created_by: 1,
+      visibility: 'all',
+      recurrence_parent_id: master.id,
+      recurrence_id: '2026-11-30T09:00:00',
+      overridden_fields: '["visibility"]',
+      start_datetime: '2026-11-30T09:00:00',
+    }));
+    const childRow = database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(childId);
+    const shared = serializeWith(resolveOccurrence(database, childRow, master), { database, actorId: 2 });
+    assert.equal(shared.is_occurrence_override, true);
+    assert.equal(shared.can_override_occurrence, numeric, `override, numeric creator: ${numeric}`);
+
+    // Detach: a local series that cannot take linked overrides (an Outlook push
+    // link) and has no linked child.
+    const pushed = textCreatorSeries(database, { numeric, title: 'Pushed' });
+    database.prepare(`INSERT INTO outlook_event_links (event_id, account_id, outlook_calendar_id, outlook_event_id)
+      VALUES (?, 77, 'calendar-77', 'outlook-event-77')`).run(pushed.id);
+    const detached = serializeWith(pushed, { database, actorId: 2 });
+    assert.equal(detached.is_local_recurring_series, true);
+    assert.equal(detached.can_override_occurrence, false);
+    assert.equal(detached.can_detach_occurrence, numeric, `detach, numeric creator: ${numeric}`);
+  }
+});
+
 test('disabled, read-only and missing Outlook targets preserve linked capabilities and mutation eligibility', () => {
   for (const selection of [{ enabled: 0, canEdit: 1 }, { enabled: 1, canEdit: 0 }, null]) {
     const database = createDatabase();

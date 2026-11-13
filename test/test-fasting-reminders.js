@@ -100,6 +100,57 @@ for (const permission of [
   });
 }
 
+// userCanUseFasting() is not exported; syncFastingRemindersForUser() is the one
+// exported path that asks it (module receive through authorize(), then the
+// capability). Each account gets the same settings and fast as account 1; whether
+// the two reminders appear is the answer of the gate.
+
+/**
+ * @param {any} database a migrated better-sqlite3 connection
+ * @param {number} userId
+ * @returns {number} the reminders of `userId` after one sync
+ */
+function remindersAfterSync(database, userId) {
+  database.prepare('INSERT INTO health_fasting_settings (user_id, default_goal_minutes, remind_goal, remind_next_start) VALUES (?, 960, 1, 1)').run(userId);
+  database.prepare(`INSERT INTO health_fasts (user_id, start_at, end_at, start_tzid, goal_minutes)
+    VALUES (?, '2026-09-09T06:00:00.000Z', '2026-09-09T22:00:00.000Z', 'UTC', 960)`).run(userId);
+  syncFastingRemindersForUser(database, userId, new Date('2026-09-09T21:00:00Z'));
+  return database.prepare('SELECT count(*) AS n FROM reminders WHERE created_by = ?').get(userId).n;
+}
+
+test('the fasting gate: an admin needs no capability row', () => {
+  const database = setup();
+  database.prepare(`INSERT INTO users (id, username, display_name, password_hash, role, family_role)
+    VALUES (2, 'admin', 'Admin', 'hash', 'admin', 'other')`).run();
+  assert.equal(remindersAfterSync(database, 2), 2);
+  database.close();
+});
+
+for (const [level, expected] of /** @type {const} */ ([['read', 2], ['none', 0]])) {
+  test(`the fasting gate: a member with health: ${level} and the capability gets ${expected} reminders`, () => {
+    const database = setup();
+    database.prepare(`INSERT INTO users (id, username, display_name, password_hash, role, family_role)
+      VALUES (3, 'm', 'M', 'hash', 'member', 'other')`).run();
+    database.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+      VALUES ('user', '3', 'capability', 'health_use_fasting', 'allow'), ('user', '3', 'module', 'health', ?)`).run(level);
+    assert.equal(remindersAfterSync(database, 3), expected);
+    database.close();
+  });
+}
+
+test('the fasting gate: an account that does not exist gets nothing', () => {
+  const database = setup();
+  // Settings and a fast left behind by an account that is gone (foreign keys off,
+  // as after a restore): the gate, not the missing data, keeps the reminders out.
+  database.pragma('foreign_keys = OFF');
+  try {
+    assert.equal(remindersAfterSync(database, 99), 0);
+  } finally {
+    database.pragma('foreign_keys = ON');
+  }
+  database.close();
+});
+
 test('a later fast stably cancels an earlier next-start reminder', () => {
   const database = setup();
   database.prepare(`INSERT INTO health_fasts (user_id, start_at, end_at, start_tzid, goal_minutes)
