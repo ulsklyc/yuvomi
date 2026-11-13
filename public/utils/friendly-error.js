@@ -388,6 +388,10 @@ export const CASE_MESSAGES = new Map([
   ['calendar_calendar_not_found', 'calendar.errorCalendarGone'],
   ['calendar_name_invalid', 'calendar.errorCalendarNameInvalid'],
   ['calendar_order_changed', 'calendar.errorCalendarOrderChanged'],
+  // Deleting a local calendar with "move" (#2570): the target picked in the
+  // dialog is the one being deleted - can only happen if another session
+  // deleted calendars between opening the dialog and confirming it.
+  ['calendar_move_target_same', 'calendar.errorMoveTargetSame'],
   // Termine (#1909). Den Termin gibt es nicht mehr (geloescht, oder fuer diese
   // Person nicht mehr sichtbar): die Seite laedt nach, ein Loeschen mit diesem
   // Grund ist ein Erfolg. Der im Termin-Dialog GEWAEHLTE Kalender fehlt: der

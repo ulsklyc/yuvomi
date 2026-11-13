@@ -6674,6 +6674,77 @@ function localCalendarSheet(calendar = null) {
   });
 }
 
+/**
+ * Loeschen eines nicht-leeren Kalenders (#2570): bis hierher fielen seine
+ * Termine wortlos in den Standardkalender (ON DELETE SET NULL), und die
+ * Rueckfrage nannte das nur noch nachtraeglich im Beipackzettel. Jetzt eine
+ * echte Wahl - verschieben (Standard vorbelegt, jeder andere Kalender auch
+ * waehlbar) oder mit loeschen -, mit der Zahl der betroffenen Termine davor.
+ * Ohne Termine bleibt es bei der einfachen Rueckfrage von vorher (siehe
+ * Aufrufstelle).
+ *
+ * Loest zu { mode: 'delete' } | { mode: 'move', target_calendar_id } | null.
+ */
+function localCalendarDeleteChoice(calendar) {
+  const others = state.localCalendars.filter((item) => Number(item.id) !== Number(calendar.id));
+  const defaultCalendar = others.find((item) => item.is_default) ?? others[0];
+  const movesToIcloud = defaultCalendarUploadsToIcloud();
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      closeModal({ force: true });
+      resolve(value);
+    };
+    openSharedModal({
+      title: t('calendar.localCalendarDeleteConfirm', { name: calendar.name }),
+      size: 'sm',
+      content: `
+        <form id="local-calendar-delete-form" class="form-stack">
+          <p class="modal-confirm__detail">${esc(t('calendar.localCalendarEventCount', { count: calendar.event_count ?? 0 }))}</p>
+          <fieldset class="widget-options__group">
+            <label class="widget-options__choice">
+              <input type="radio" name="calendar-delete-mode" value="move" checked>
+              <span>${esc(t('calendar.localCalendarDeleteMoveLabel'))}</span>
+            </label>
+            <select class="form-input" id="local-calendar-delete-target">
+              ${others.map((item) => `<option value="${esc(String(item.id))}"${Number(item.id) === Number(defaultCalendar?.id) ? ' selected' : ''}>${esc(localCalendarDisplayName(item))}</option>`).join('')}
+            </select>
+            <label class="widget-options__choice">
+              <input type="radio" name="calendar-delete-mode" value="delete">
+              <span>${esc(t('calendar.localCalendarDeleteEventsLabel'))}</span>
+            </label>
+          </fieldset>
+          ${movesToIcloud ? `<p class="widget-options__hint">${esc(t('calendar.localCalendarDeleteIcloudHint'))}</p>` : ''}
+          <p class="modal-confirm__detail">${esc(t('calendar.localCalendarDeleteExportNote'))}</p>
+          <div class="modal-panel__footer">
+            <button type="button" class="btn btn--secondary" id="local-calendar-delete-cancel">${esc(t('common.cancel'))}</button>
+            <button type="submit" class="btn btn--danger">${esc(t('common.delete'))}</button>
+          </div>
+        </form>`,
+      onClose: () => finish(null),
+      onSave(panel) {
+        const form = panel.querySelector('#local-calendar-delete-form');
+        const select = panel.querySelector('#local-calendar-delete-target');
+        const radios = [...form.querySelectorAll('input[name="calendar-delete-mode"]')];
+        const syncSelect = () => {
+          select.disabled = radios.find((r) => r.checked)?.value !== 'move';
+        };
+        radios.forEach((radio) => radio.addEventListener('change', syncSelect));
+        syncSelect();
+        panel.querySelector('#local-calendar-delete-cancel')?.addEventListener('click', () => finish(null));
+        form?.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const mode = radios.find((r) => r.checked)?.value;
+          if (mode === 'delete') { finish({ mode: 'delete' }); return; }
+          finish({ mode: 'move', target_calendar_id: Number(select.value) });
+        });
+      },
+    });
+  });
+}
+
 async function copyText(value, toastKey) {
   if (navigator.clipboard?.writeText) {
     try {
@@ -6843,17 +6914,31 @@ async function openLocalCalendarsModal() {
         if (!ok) return;
         refocusAfterRender();
       } else if (e.target.closest('[data-action="calendar-delete"]')) {
-        const ok = await confirmOverModal(t('calendar.localCalendarDeleteConfirm', { name: calendar.name }), {
-          closeOnConfirm: false,
-          detail: defaultCalendarUploadsToIcloud()
-            ? t('calendar.localCalendarDeleteDetailIcloud')
-            : t('calendar.localCalendarDeleteDetail'),
-          confirmLabel: t('common.delete'),
-          danger: true,
-        });
-        if (!ok) return;
+        // Ohne Termine bleibt es die einfache Rueckfrage (#2570): eine Wahl
+        // zwischen Loeschen und Verschieben waere eine Attrappe, wenn es
+        // nichts zu verschieben oder zu loeschen gibt.
+        let decision;
+        if (calendar.event_count > 0) {
+          decision = await askOverModal(() => localCalendarDeleteChoice(calendar));
+          if (!decision) return;
+        } else {
+          const ok = await confirmOverModal(t('calendar.localCalendarDeleteConfirm', { name: calendar.name }), {
+            closeOnConfirm: false,
+            detail: defaultCalendarUploadsToIcloud()
+              ? t('calendar.localCalendarDeleteDetailIcloud')
+              : t('calendar.localCalendarDeleteDetail'),
+            confirmLabel: t('common.delete'),
+            danger: true,
+          });
+          if (!ok) return;
+          decision = { mode: 'move' };
+        }
         try {
-          await api.delete(`/calendar/calendars/${id}`);
+          await api.delete(`/calendar/calendars/${id}`, {
+            body: JSON.stringify(decision.mode === 'delete'
+              ? { mode: 'delete' }
+              : { mode: 'move', target_calendar_id: decision.target_calendar_id }),
+          });
         } catch (err) {
           // Schon geloescht (von jemand anderem im Haushalt): das ist, was
           // der Nutzer wollte - kein Fehler (#1909).

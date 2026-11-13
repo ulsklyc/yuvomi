@@ -1252,8 +1252,17 @@ This also handles ties and gaps introduced through the individual calendar updat
 created a calendar and grants no rights; the default calendar has no creator. The resolver in
 `server/services/local-calendars.js` supplies the default for an authored event whose
 `local_calendar_id` is NULL. Migration 245 creates the table and default row without rewriting
-existing events. Deleting a calendar uses `ON DELETE SET NULL`, so those events resolve to the
-default on their next read. Birthday, name-day and housekeeping events are identified through
+existing events. **Deleting a calendar with events asks what happens to them (#2570):**
+`DELETE /calendar/calendars/:id` takes an optional body, `{ mode?: 'move' | 'delete',
+target_calendar_id? }`. With no body, or `mode: 'move'`, its events move to
+`target_calendar_id` - the default calendar when that is omitted, written as a bare
+`local_calendar_id = NULL` for that case so existing callers see the same column as before
+(the resolver treats NULL and the default calendar's own id identically). `mode: 'delete'`
+removes the events with the calendar, through the same per-event cleanup
+(`queueEventDeletion`, then its reminders) the single-event route uses - a defensive no-op
+here, since a local-calendar event can never carry an active sync target (see below).
+`target_calendar_id` equal to the calendar being deleted answers 400 with
+`reason: calendar_move_target_same`. Birthday, name-day and housekeeping events are identified through
 their source links and have no local-calendar membership. MCP-created events are authored.
 
 A Google or CalDAV target (including Apple through CalDAV) and a local calendar are mutually
@@ -1263,7 +1272,9 @@ Legacy iCloud auto-upload includes events in the default local calendar, whether
 or implicit. Only events assigned to another local calendar stay local. Moving an event between
 local calendars therefore pushes nothing outward, with one exception: while the legacy Apple
 connection is configured, an event that arrives in the default calendar uploads to iCloud on the
-next sync. Deleting a calendar is such a move for all of its events. `GET /calendar/calendars`
+next sync. Deleting a calendar with `mode: 'move'` into the default calendar (the default when
+`target_calendar_id` is omitted) is such a move for all of its events; deleting the events
+instead, or moving them to a non-default calendar, uploads nothing. `GET /calendar/calendars`
 reports this as `uploads_to_icloud` on the default calendar (`uploadsLocalEvents()` in
 `server/services/apple-calendar.js`, the same condition the sync run starts on), and the delete
 confirmation then names the upload. The event form names it too (#1927): while the chosen calendar
