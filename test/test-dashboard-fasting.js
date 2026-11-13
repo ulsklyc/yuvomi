@@ -6,7 +6,7 @@ import http from 'node:http';
 import Database from 'better-sqlite3-multiple-ciphers';
 import express from 'express';
 import { WIDGET_IDS, DEFAULT_HIDDEN_WIDGETS, defaultWidgetSize } from '../public/utils/dashboard-widgets.js';
-import { PERMISSION_WIDGETS } from '../server/permissions.js';
+import { PERMISSION_WIDGETS } from '../server/authorize/index.ts';
 
 test('fasting dashboard widget is registered and sized as a compact timer', () => {
   assert.ok(WIDGET_IDS.includes('fasting'));
@@ -25,7 +25,7 @@ process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'dashboard-fasting-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 
 function buildMigratedDatabase(migrations) {

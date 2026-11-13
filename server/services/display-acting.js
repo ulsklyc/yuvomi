@@ -20,7 +20,7 @@
  */
 
 import { isHouseholdMember, nonMemberMessage } from './household-members.js';
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import * as dbModule from '../db.js';
 
 /**
@@ -29,7 +29,7 @@ import * as dbModule from '../db.js';
  * EINE FRAGE AN `req`, KEINE AN DIE DATENBANK. `requireAuth()` hat die Antwort
  * beim Anmelden schon gehabt und in `req.authMethod` hinterlegt; sie hier
  * nachzuschlagen hiesse, jede Route an die `display_accounts`-Tabelle zu
- * binden - genau der Fehler, den `permissions.js` im Kommentar zu `isDisplay`
+ * binden - genau der Fehler, den `server/authorize/catalog.ts` im Kommentar zu `isDisplay`
  * beschreibt (fuenf Suiten mit handgebautem Schema fielen daran um).
  */
 export function isDisplayRequest(req) {

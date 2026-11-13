@@ -28,7 +28,7 @@ process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'dashboard-permissions-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess, PERMISSION_MODULES } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess, PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 const { moduleForPath } = await import('../server/scopes.js');
 const { DISPLAY_SCOPES } = await import('../server/display-scopes.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');

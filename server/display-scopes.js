@@ -9,7 +9,7 @@
  * nur, was ein Display DARF, und das ist eine Tatsache ueber das Produkt, keine
  * ueber eine Zeile in einer Tabelle.
  *
- * Der Unterschied ist teuer bezahlt: `server/permissions.js` bekam die Regel
+ * Der Unterschied ist teuer bezahlt: `server/authorize/catalog.ts` bekam die Regel
  * zuerst per Import aus dem Dienst, und der zieht `server/db.js` mit. Damit
  * oeffnete jede Suite, die nur Rechte aufloeste, eine echte `yuvomi.db` im Repo
  * - `test:db-isolation` meldete vier davon namentlich. `server/scopes.js` traegt

@@ -60,7 +60,7 @@ import {
   invitePresetPermissions, isValidInvitePreset, writeSubjectPermissions,
   applyChildStartPermissions, INVITE_PRESET_DEFAULT,
   userForRequest,
-} from './permissions.js';
+} from './authorize/index.ts';
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { resolveRequestModuleAccess } from './authorize/index.ts';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';

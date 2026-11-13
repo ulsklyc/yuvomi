@@ -38,7 +38,7 @@ const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const remindersModule = await import('../server/routes/reminders.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
 const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { TARGET_ENTITY_TYPES, HOUSEHOLD_CHANNEL_POLICY, reminderTargetPublicSql } = await import('../server/services/reminder-targets.js');
 
 const NOW = new Date('2024-06-15T12:00:00Z');

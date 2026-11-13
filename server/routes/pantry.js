@@ -31,7 +31,7 @@ import { normalizePantryUnit, normalizePantryQuantity, convertPantryQuantity } f
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
 import { assignPantryProduct, productKey, writeMinimumThrough } from '../services/pantry-products.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
-import { mayReadModule } from '../permissions.js';
+import { mayReadModule } from '../authorize/index.ts';
 
 const log = createLogger('Pantry');
 const router = express.Router();

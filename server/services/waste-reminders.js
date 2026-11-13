@@ -21,7 +21,7 @@
  */
 
 import { localToUTC, householdTimeZone, todayKey, shiftDateKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { listTypes, getOccurrences } from './waste-store.js';
@@ -65,9 +65,7 @@ export function wasteDisabled(database) {
 }
 
 function lacksWaste(database, userId) {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return true;
-  return resolvePermissions(database, user).modules.waste === 'none';
+  return !authorize(actorForUser(database, userId), 'receive', { module: 'waste' }).allowed;
 }
 
 function dropAllForUser(database, userId) {

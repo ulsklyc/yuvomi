@@ -8,7 +8,7 @@
  *        Aenderst du die Regel hier, bleibt 250, wie sie ist; der
  *        Aequivalenztest in test/test-payment-task-backfill.js zeigt dann
  *        die Abweichung und wird mit Begruendung angepasst.
- * Abhaengigkeiten: server/permissions.js, server/services/household-members.js
+ * Abhaengigkeiten: server/authorize/, server/services/household-members.js
  *
  * WER DIE ZAHLUNGSAUFGABE SIEHT (Ulas 2026-10-17).
  *
@@ -37,7 +37,7 @@
  * darf ihn dann nicht sehen). Auf `all` bleibt keine.
  */
 
-import { userHasCapability } from '../permissions.js';
+import { userHasCapability } from '../authorize/index.ts';
 import { activeAccountSql, householdMemberSql } from './household-members.js';
 
 export const AMOUNTS_CAPABILITY = 'housekeeping_view_amounts';

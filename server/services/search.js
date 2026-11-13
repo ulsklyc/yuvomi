@@ -423,7 +423,7 @@ function birthdayFieldsByEvent(database, events) {
  * @param {object} [opts]
  * @param {Set<string>|null} [opts.hiddenModules] Module, die dem Betrachter
  *        entzogen sind (`access_permissions`, #467) oder die sein API-Token
- *        nicht lesen darf (`hiddenModulesFor` in permissions.js). Aus der
+ *        nicht lesen darf (`hiddenModulesFor` in server/authorize/modules.ts). Aus der
  *        Rollenachse gehört nur `'none'` hinein - `'read'` ist eine
  *        Leseberechtigung, keine Sperre. Ihre Trefferart wird gar nicht erst
  *        abgefragt und bleibt leer.

@@ -284,7 +284,7 @@ test('der Kalender kennt den Tag-Link: /calendar?date= ohne Termin oeffnet diese
 // --------------------------------------------------------------------------
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { todayKey: serverTodayKey, shiftDateKey, localToUTC } = await import('../server/utils/timezone.js');
 

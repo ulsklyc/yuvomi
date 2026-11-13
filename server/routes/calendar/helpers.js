@@ -10,7 +10,7 @@ import {
   applyDocumentAccess, attachmentAccessMode, eventAudienceChanged, filterVisibleDocumentIds,
 } from '../../services/document-access.js';
 import { documentViewer } from '../../services/document-links.js';
-import { mayWriteModule } from '../../permissions.js';
+import { mayWriteModule } from '../../authorize/index.ts';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';

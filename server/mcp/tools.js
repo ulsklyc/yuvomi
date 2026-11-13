@@ -11,7 +11,7 @@
  *      erbt exakt die Rechte des aufrufenden API-Tokens; Rollen- und
  *      CSRF-Prüfung greifen serverseitig auf `/api/v1/*` wie bei jedem Client.
  * Abhängigkeiten: server/middleware/validate.js, server/openapi.js,
- *                  server/scopes.js + server/permissions.js (Rechte-Durchsetzung)
+ *                  server/scopes.js + server/authorize/ (Rechte-Durchsetzung)
  *
  * Architektur: Jedes Tool ist EIN Eintrag in der Registry (Definition + Handler
  *   zusammen) — daraus werden `tools/list` und der Dispatch abgeleitet, damit
@@ -24,8 +24,7 @@
 import * as v from '../middleware/validate.js';
 import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
-import { tokenAllows } from '../scopes.js';
-import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
+import { authorize } from '../authorize/index.ts';
 import { householdTimeZone, todayKey } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { visibilityWhere } from '../services/visibility.js';
@@ -825,11 +824,13 @@ function toolAllowed(actor, tool) {
   // Gast-Konten für geteilte Ausgaben erreichen unter /api/v1 nur
   // /split-expenses; kein Kern-Tool liegt dort, also alle gesperrt.
   if (actor && actor.kind === 'guest') return false;
-  // The actor's scopes are read-only; tokenAllows() only reads them.
-  const scopes = /** @type {string[]|null} */ (actor ? (actor.scopes ?? null) : null);
-  if (!tokenAllows(scopes, tool.scope.module, tool.scope.access)) return false;
-  const moduleAccess = actor ? (actor.moduleAccess ?? null) : null;
-  return moduleAccessVerdict(moduleAccess, tool.scope.module, tool.scope.access) === MODULE_ACCESS_ALLOW;
+  // No actor: neither scopes nor module rights narrow anything, and the tool is
+  // allowed, as before B2 (`listToolDefinitions()` without an actor lists every
+  // tool). authorize() answers `null` with 'no_actor', so it is caught here.
+  if (!actor) return true;
+  // Token scopes, then the module rights - the module verdict of server/authorize/.
+  const verdict = authorize(/** @type {import('../authorize/index.ts').Actor} */ (actor), tool.scope.access, { module: tool.scope.module });
+  return verdict.allowed;
 }
 
 /**

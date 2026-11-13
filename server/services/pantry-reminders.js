@@ -20,7 +20,7 @@
 
 import { reminderDateBefore, reminderIsInThePast, REMINDER_TIME_SUFFIX } from '../utils/reminder-schedule.js';
 import { todayKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { activeAccountSql } from './account-state.js';
@@ -292,9 +292,7 @@ function creatorLacksPantry(database, userId, allowed = null) {
   // der Voll-Sync lief in einen Fremdschluessel-Fehler. Wer aufzaehlt, WER
   // darf, kann diese Frage nur einmal beantworten.
   if (allowed) return !allowed.has(userId);
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return true;
-  return resolvePermissions(database, user).modules.pantry === 'none';
+  return !authorize(actorForUser(database, userId), 'receive', { module: 'pantry' }).allowed;
 }
 
 /**
@@ -317,10 +315,12 @@ export function resolvePantryAccess(database) {
  */
 function usersWithPantry(database) {
   // Ohne Ehemalige (#1381): ein deaktiviertes Konto bekommt nichts mehr zugestellt.
-  const users = database.prepare(`SELECT id, role, family_role FROM users WHERE ${activeAccountSql('users')}`).all();
+  const users = database.prepare(`SELECT id FROM users WHERE ${activeAccountSql('users')}`).all();
   const allowed = new Set();
+  // One actor per account: the list above only says WHO is active, the actor
+  // reads the account again (one `users` query more per account than before B2).
   for (const user of users) {
-    if (resolvePermissions(database, user).modules.pantry !== 'none') allowed.add(user.id);
+    if (authorize(actorForUser(database, user.id), 'receive', { module: 'pantry' }).allowed) allowed.add(user.id);
   }
   return allowed;
 }

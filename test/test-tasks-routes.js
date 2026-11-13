@@ -1165,7 +1165,7 @@ test('Kommentare: wem das Modul entzogen ist, bekommt keine Erwähnungs-Meldung'
   // Sichtbarkeit der Zeile ist nicht die einzige Hürde: wem das Aufgaben-Modul
   // auf `none` steht, der kommt an die Aufgabe gar nicht heran - und bekäme mit
   // dem Push trotzdem ihren Titel und den Anfang des Kommentars zugestellt.
-  const { resolvePermissions } = await import('../server/permissions.js');
+  const { resolvePermissions } = await import('../server/authorize/index.ts');
   const bob = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(BOB);
   // Die Aufgabe selbst bleibt für ihn sichtbar (visibility `all`) - genau
   // deshalb reicht `findVisibleTask` als Prüfung nicht aus.

@@ -26,7 +26,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
-import { resolvePermissions } from '../permissions.js';
+import { resolvePermissions } from '../authorize/index.ts';
 import { DISPLAY_AREA_MODULES } from '../display-scopes.js';
 import { isEnrolled } from '../services/rewards.js';
 import { CURRENT_ONBOARDING_VERSION, LEGACY_SESSION_COOKIE, SESSION_COOKIE } from '../auth.js';

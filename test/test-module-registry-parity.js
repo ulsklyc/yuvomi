@@ -21,7 +21,7 @@ import { isPrecachedSource } from './dist-build.js';
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 const { MODULE_KEYS } = await import('../server/scopes.js');
-const { PERMISSION_MODULES } = await import('../server/permissions.js');
+const { PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 const { KITCHEN_CHILD_IDS } = await import('../public/settings/module-order.js');
 
 /**

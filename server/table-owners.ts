@@ -8,7 +8,7 @@
  *          (all migrations plus the tables created at runtime) and demands exactly one
  *          line here per table, no line for a table that does not exist, and an owner from
  *          OWNERS. A new table needs a new line; the owner is a design decision.
- * Owners:  the fifteen permission module keys of PERMISSION_MODULES (server/permissions.js)
+ * Owners:  the fifteen permission module keys of PERMISSION_MODULES (server/authorize/catalog.ts)
  *          plus five owners that no member permission gates, each explained in OWNERS.
  * Name rule, as applied (first match wins):
  *   1. Decided by name: users, sync_config, sessions, schema_migrations, search_index and
@@ -58,7 +58,7 @@ type Owner = (typeof OWNERS)[number];
 
 /** Table -> owner, sorted by table name, one line per table. */
 export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
-  access_permissions: 'auth', // the per-member module rights permissions.js resolves
+  access_permissions: 'auth', // the per-member module rights server/authorize/catalog.ts resolves
   api_tokens: 'auth',
   birthdays: 'calendar',
   budget_accounts: 'budget',

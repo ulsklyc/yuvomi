@@ -4,7 +4,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { collectErrors, date as validateDate, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { mayReadModule } from '../permissions.js';
+import { mayReadModule } from '../authorize/index.ts';
 import {
   deleteBirthdayArtifacts,
   hydrateBirthday,

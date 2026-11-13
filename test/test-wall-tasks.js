@@ -53,7 +53,7 @@ register('./test-browser-loader.mjs', import.meta.url);
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'wall-tasks-test-secret';
 
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');

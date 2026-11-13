@@ -741,7 +741,8 @@ function serverFiles(dir = join(ROOT, 'server')) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) out.push(...serverFiles(full));
-    else if (name.endsWith('.js')) out.push(relative(ROOT, full).split(sep).join('/'));
+    // .ts too: server/authorize/ reads `users` rows (phase 2, B2).
+    else if (/\.(js|ts)$/.test(name)) out.push(relative(ROOT, full).split(sep).join('/'));
   }
   return out.sort();
 }

@@ -34,7 +34,7 @@
  * `documentViewer(req)` bekommt statt sie nachzubauen.
  */
 
-import { mayReadModule } from '../permissions.js';
+import { mayReadModule } from '../authorize/index.ts';
 import { documentVisibleSql, filterVisibleDocumentIds } from './document-access.js';
 import { assertDocumentsNotDeleting } from './document-deletion-lock.js';
 

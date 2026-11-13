@@ -25,7 +25,7 @@ process.env.SESSION_SECRET = 'dashboard-split-balance-test-secret';
 register('./test-browser-loader.mjs', import.meta.url);
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
 

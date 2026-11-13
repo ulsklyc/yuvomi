@@ -17,7 +17,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { handleMcpRequest, LATEST_PROTOCOL_VERSION } from '../server/mcp/protocol.js';
 import { callTool, TOOL_DEFINITIONS } from '../server/mcp/tools.js';
-import { buildSessionModuleAccess, resolvePermissions } from '../server/permissions.js';
+import { buildSessionModuleAccess, resolvePermissions } from '../server/authorize/index.ts';
 
 // Deterministische Loopback-Basis für die OpenAPI-Brücke (fetch wird gemockt).
 process.env.MCP_INTERNAL_BASE_URL = 'http://mcp.test';

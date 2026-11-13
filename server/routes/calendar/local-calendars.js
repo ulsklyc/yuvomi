@@ -2,7 +2,7 @@ import { visibilityWhere } from '../../services/visibility.js';
 import express from 'express';
 import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
-import { mayWriteModule } from '../../permissions.js';
+import { mayWriteModule } from '../../authorize/index.ts';
 import {
   clearCalendarFeedToken,
   ensureDefaultCalendar,
