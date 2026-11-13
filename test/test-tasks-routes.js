@@ -931,7 +931,8 @@ test('auch eine gewoehnliche fremde Aufgabe ist nicht loeschbar (#748-Review)', 
 // PATCH /:id/status fragt die Sichtbarkeit wie jeder andere Schreibweg
 // --------------------------------------------------------
 //
-// PUT, DELETE, /archive und /check pruefen `mayAccessTask` seit #748/#769. Der
+// PUT, DELETE, /archive und /check pruefen die Sichtbarkeit seit #748/#769
+// (bis B8b `mayAccessTask`, seit B8b `rowVisible(db, 'tasks', ...)`). Der
 // Statusweg lud die Zeile per id und schrieb darauf - nur der Display-Zweig
 // fragte nach der Sichtbarkeit. Gemessen wird deshalb nicht nur der
 // Antwortcode, sondern alles, was der Uebergang schreibt: Status, Ablage,

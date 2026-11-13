@@ -32,7 +32,7 @@ import { uniqueKey } from '../utils/category-slug.js';
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { actorForUser, authorize } from '../authorize/index.ts';
+import { actorForUser, authorize, householdVisible, rowVisible } from '../authorize/index.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { householdMemberSql, isHouseholdMember, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
@@ -405,29 +405,11 @@ function reopensSettledVisit(d, taskId, fromStatus, toStatus) {
 }
 
 /** Alle Subtasks einer Aufgabe laden (eine Ebene tief). */
-/**
- * Darf `me` diese Aufgabe ueberhaupt sehen? Genau die Bedingung, die jede
- * Leseabfrage schon anlegt - hier fuer die schreibenden Routen, die sie nie
- * hatten: PUT und DELETE luden die Zeile per id und arbeiteten darauf, ohne zu
- * fragen. Wer eine fremde ID kannte, konnte eine private Aufgabe eines anderen
- * aendern oder loeschen. Aufgefallen ueber die Unteraufgaben (#748-Review), wo
- * die Liste fremde Titel mitlieferte und die IDs damit frei Haus kamen.
- *
- * Bewusst dieselbe Regel wie beim Lesen und keine engere: wer eine Aufgabe sieht,
- * darf sie im Haushalt auch bearbeiten - das ist die bestehende Zusage des
- * Moduls. Neu ist nur, dass Unsichtbares auch unantastbar ist.
- */
-function mayAccessTask(task, me) {
-  if (!task) return false;
-  if (task.visibility === 'all') return true;
-  if (task.created_by === me) return true;
-  if (task.visibility === 'assignees') {
-    return !!db.get().prepare(
-      'SELECT 1 FROM task_assignments WHERE task_id = ? AND user_id = ?'
-    ).get(task.id, me);
-  }
-  return false;
-}
+// Who may see a task is asked of server/authorize: rowVisible(db, 'tasks', row, me)
+// for a loaded row, the same rule every read query applies. The write routes below
+// ask it before they act (#748/#769: PUT and DELETE used to load the row by id and
+// work on it - a foreign private task could be changed or deleted by its id). The
+// reasoning stands at rowVisible's rule, authorize/rows/assignees.ts.
 
 /**
  * Die Aufgabe, deren Sperre hier gilt - sie selbst, ihre Elternaufgabe, oder
@@ -1396,7 +1378,7 @@ router.post('/', (req, res) => {
       // gegen 404 die Kennung, und der Punkt stuende in einer fremden Checkliste.
       // Der Grund (#1909): die Aufgabe, an die der Teilschritt sollte, wurde
       // inzwischen geloescht oder privat gestellt - die Leseansicht sagt das.
-      if (!parent || !mayAccessTask(parent, req.authUserId || req.session.userId))
+      if (!parent || !rowVisible(db.get(), 'tasks', parent, req.authUserId || req.session.userId))
         return res.status(404).json({ error: 'Parent task not found.', code: 404, reason: 'tasks_parent_not_found' });
       if (parent.parent_task_id)
         return res.status(400).json({ error: 'At most 2 levels of nesting are allowed.', code: 400 });
@@ -1487,7 +1469,7 @@ router.put('/:id', (req, res) => {
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
-    if (!mayAccessTask(task, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', task, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
@@ -1848,8 +1830,8 @@ function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
  * (discardRecurrenceFollowup), oder das Vorkommen HINTER ihr.
  *
  * SICHTBARKEIT DES AUFRUFERS: ein Display sieht nur, was alle sehen (dieselbe
- * Regel wie fuer die Aufgabe selbst, #1209), ein Mensch, was mayAccessTask
- * ihm zeigt.
+ * Regel wie fuer die Aufgabe selbst, #1209: householdVisible), ein Mensch, was
+ * rowVisible ihm zeigt.
  *
  * @param {import('express').Request} req
  * @param {number|string} taskId
@@ -1861,8 +1843,8 @@ function nextDueDateAfter(req, taskId, prevStatus, status) {
   if (status !== 'done' || prevStatus === 'done') return null;
   const viewer = req.authUserId || req.session.userId;
   const mayRead = isDisplayRequest(req)
-    ? (task) => task.visibility === 'all'
-    : (task) => mayAccessTask(task, viewer);
+    ? (task) => householdVisible(task)
+    : (task) => rowVisible(db.get(), 'tasks', task, viewer);
   return nextPendingOccurrenceOf(taskId, mayRead)?.due_date ?? null;
 }
 
@@ -2241,7 +2223,7 @@ router.patch('/:id/status', (req, res) => {
     // am Uebergang haengt: Punkte, Verlauf, Folgeinstanz. Die Pruefung steht
     // VOR dem Display-Block und vor der Ablage-Abkuerzung, weil beide selbst
     // antworten; dieselbe Regel wie PUT, /archive, /check und DELETE.
-    if (!mayAccessTask(prev, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', prev, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
@@ -2284,7 +2266,7 @@ router.patch('/:id/status', (req, res) => {
     // derselben 404 wie fuer eine, die es nie gab.
     let displayDoneBy = null;
     if (isDisplayRequest(req)) {
-      if (prev.visibility !== 'all') {
+      if (!householdVisible(prev)) {
         return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
       }
       if (status !== 'done') {
@@ -2415,7 +2397,7 @@ router.patch('/:id/archive', (req, res) => {
     // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
     // Dieser Weg hat das nie geprueft - eine geratene id genuegte, um eine
     // fremde private Aufgabe abzulegen (Muster aus #769).
-    if (!mayAccessTask(task, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', task, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
     // Ablegen nimmt die Aufgabe allen aus der Ansicht (#830).
@@ -2468,7 +2450,7 @@ router.patch('/:id/check', (req, res) => {
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
-    if (!mayAccessTask(task, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', task, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
@@ -2526,7 +2508,7 @@ router.delete('/:id', (req, res) => {
     const victim = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!victim) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
-    if (!mayAccessTask(victim, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', victim, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
     // Loeschen ist der endgueltigste Eingriff in die Definition (#830).
@@ -2601,7 +2583,7 @@ router.get('/:id/completions', (req, res) => {
   try {
     const me = req.authUserId || req.session.userId;
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-    if (!task || !mayAccessTask(task, me)) {
+    if (!task || !rowVisible(db.get(), 'tasks', task, me)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
     res.json({ data: seriesHistory(db.get(), { me, taskId: Number(req.params.id), limit: req.query.limit }) });

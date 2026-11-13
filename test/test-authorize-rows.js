@@ -227,3 +227,216 @@ test('filterVisible: quick_links', () => {
   ).run(visibility, owner).lastInsertRowid);
   assertViewers('quick_links', { open: mk('all'), foreignPrivate: mk('private') });
 });
+
+// ── 4. The row form of the rules (B8b) ──────────────────────────────────────────
+//
+// rowVisible(), householdVisible(), canEditQuickLink() and quickLinkHiddenFrom()
+// answer for ONE row the routes already loaded. Held against the SQL fragment of
+// the same type over a seed with every level, own, foreign and assigned rows
+// (the row_rules seed of test/visibility-matrix-seed.js is the model), for every
+// viewer; rowVisible with the assignments handed in against rowVisible reading them.
+
+/**
+ * @param {string} name
+ * @returns {(...args: any[]) => any}
+ */
+function rowApi(name) {
+  const fn = /** @type {any} */ (authorizeApi)[name];
+  assert.equal(typeof fn, 'function', `${name} is exported from server/authorize/index.ts`);
+  return fn;
+}
+
+const display = seedUser();
+const VIEWERS = [owner, assignee, stranger, display];
+const CREATORS = [owner, assignee, stranger];
+
+/**
+ * A value outside all | assignees | private. tasks.visibility and
+ * calendar_events.visibility carry no CHECK, so a restored file or a direct write can
+ * store one; the SQL fragment shows such a row to its creator only, and so must the
+ * row form - an assignment must not open it.
+ */
+const OFF_DOMAIN = 'family';
+
+/**
+ * One row per level and creator; 'all', 'assignees' and the off-domain rows are
+ * assigned to the next creator in the list, one 'assignees' row per creator has no
+ * assignment.
+ * @param {string} table
+ * @param {string} assignTable
+ * @param {string} assignCol
+ * @param {(creator: number, visibility: string) => number} mk
+ * @returns {number[]} the ids
+ */
+function seedLevels(table, assignTable, assignCol, mk) {
+  /** @type {number[]} */
+  const ids = [];
+  CREATORS.forEach((creator, i) => {
+    const other = CREATORS[(i + 1) % CREATORS.length];
+    for (const visibility of ['all', 'assignees', 'private', OFF_DOMAIN]) {
+      const id = mk(creator, visibility);
+      ids.push(id);
+      if (visibility !== 'private') {
+        db.prepare(`INSERT INTO ${assignTable} (${assignCol}, user_id) VALUES (?, ?)`).run(id, other);
+      }
+    }
+    ids.push(mk(creator, 'assignees'));
+  });
+  return ids;
+}
+
+const eqTasks = seedLevels('tasks', 'task_assignments', 'task_id', (creator, visibility) => Number(db.prepare(
+  "INSERT INTO tasks (title, created_by, visibility) VALUES ('eq', ?, ?)",
+).run(creator, visibility).lastInsertRowid));
+const eqEvents = seedLevels('calendar_events', 'event_assignments', 'event_id', (creator, visibility) => Number(db.prepare(
+  "INSERT INTO calendar_events (title, start_datetime, created_by, visibility) VALUES ('eq', '2026-01-01T10:00', ?, ?)",
+).run(creator, visibility).lastInsertRowid));
+// quick_links.created_by is nullable: a tile without a creator (NULL) per level is
+// nobody's own tile, as SQL `created_by = @me` never matches NULL.
+const eqLinks = [...CREATORS, null].flatMap((creator) => ['all', 'private'].map((visibility) => Number(db.prepare(
+  "INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES ('eq', 'https://eq.example/', ?, ?, 0)",
+).run(visibility, creator).lastInsertRowid)));
+/** The quick link viewers: every account, and no account at all. */
+const LINK_VIEWERS = [...VIEWERS, null];
+
+/**
+ * The ids among `ids` the SQL fragment lets through for `viewer`.
+ * @param {string} table @param {string} where @param {number[]} ids @param {number | null} viewer
+ */
+function sqlIds(table, where, ids, viewer) {
+  return db.prepare(`SELECT x.id FROM ${table} x WHERE x.id IN (${ids.join(',')}) AND ${where} ORDER BY x.id`)
+    .all({ v: viewer }).map((/** @type {any} */ r) => r.id);
+}
+
+/** @param {string} table @param {number[]} ids @returns {any[]} */
+function rowsById(table, ids) {
+  return db.prepare(`SELECT * FROM ${table} WHERE id IN (${ids.join(',')}) ORDER BY id`).all();
+}
+
+/** A connection that counts its prepare() calls. */
+function counting() {
+  let calls = 0;
+  return {
+    database: { prepare: (/** @type {string} */ sql) => { calls += 1; return db.prepare(sql); } },
+    get calls() { return calls; },
+  };
+}
+
+for (const [type, table, assignTable, assignCol, ids] of /** @type {const} */ ([
+  ['tasks', 'tasks', 'task_assignments', 'task_id', eqTasks],
+  ['events', 'calendar_events', 'event_assignments', 'event_id', eqEvents],
+])) {
+  test(`rowVisible(${type}): the same rows as visibleWhere for every viewer`, () => {
+    const rowVisible = rowApi('rowVisible');
+    const rows = rowsById(table, ids);
+    for (const viewer of VIEWERS) {
+      const js = rows.filter((row) => rowVisible(db, type, row, viewer)).map((row) => row.id);
+      assert.deepEqual(js, sqlIds(table, visibleWhere(type, 'x', '@v'), ids, viewer), `${type}: viewer ${viewer}`);
+    }
+  });
+
+  test(`rowVisible(${type}): assignedIds handed in answer as the table does, without a read`, () => {
+    const rowVisible = rowApi('rowVisible');
+    for (const row of rowsById(table, ids)) {
+      const assignedIds = db.prepare(`SELECT user_id FROM ${assignTable} WHERE ${assignCol} = ?`)
+        .all(row.id).map((/** @type {any} */ r) => r.user_id);
+      for (const viewer of VIEWERS) {
+        const c = counting();
+        assert.equal(
+          rowVisible(c.database, type, row, viewer, { assignedIds }),
+          rowVisible(db, type, row, viewer),
+          `${type} ${row.id} viewer ${viewer}`,
+        );
+        assert.equal(c.calls, 0, 'assignedIds: no read');
+        // Ids as strings (a request body) count the same.
+        assert.equal(
+          rowVisible(c.database, type, row, viewer, { assignedIds: assignedIds.map(String) }),
+          rowVisible(db, type, row, viewer),
+        );
+      }
+    }
+  });
+
+  test(`rowVisible(${type}): reads ${assignTable} only on the assignees branch`, () => {
+    const rowVisible = rowApi('rowVisible');
+    for (const row of rowsById(table, ids)) {
+      for (const viewer of VIEWERS) {
+        const c = counting();
+        rowVisible(c.database, type, row, viewer);
+        const expected = row.visibility === 'assignees' && row.created_by !== viewer ? 1 : 0;
+        assert.equal(c.calls, expected, `${type} ${row.id} (${row.visibility}) viewer ${viewer}`);
+      }
+    }
+  });
+}
+
+test('rowVisible(quick_links): the same rows as visibleWhere for every viewer, a NULL creator included', () => {
+  const rowVisible = rowApi('rowVisible');
+  const rows = rowsById('quick_links', eqLinks);
+  assert.ok(rows.some((row) => row.created_by === null && row.visibility === 'private'), 'the seed holds a private tile without creator');
+  for (const viewer of LINK_VIEWERS) {
+    const c = counting();
+    const js = rows.filter((row) => rowVisible(c.database, 'quick_links', row, viewer)).map((row) => row.id);
+    assert.deepEqual(js, sqlIds('quick_links', visibleWhere('quick_links', 'x', '@v'), eqLinks, viewer), `viewer ${viewer}`);
+    assert.equal(c.calls, 0, 'quick links read nothing');
+  }
+});
+
+test('rowVisible: an unknown type or one without a row check throws, a missing row is not visible', () => {
+  const rowVisible = rowApi('rowVisible');
+  const [row] = rowsById('tasks', eqTasks);
+  assert.throws(() => rowVisible(db, 'contacts', row, owner), /unknown row type/);
+  assert.throws(() => rowVisible(db, 'toString', row, owner), /unknown row type/);
+  assert.throws(() => rowVisible(db, 'notes', row, owner), /no row check/);
+  assert.equal(rowVisible(db, 'tasks', null, owner), false);
+  assert.equal(rowVisible(db, 'events', undefined, owner), false);
+});
+
+test('householdVisible: the same rows as householdVisibleWhere', () => {
+  const householdVisible = rowApi('householdVisible');
+  const rows = rowsById('tasks', eqTasks);
+  const js = rows.filter((row) => householdVisible(row)).map((row) => row.id);
+  const sql = db.prepare(`SELECT x.id FROM tasks x WHERE x.id IN (${eqTasks.join(',')}) AND ${authorizeApi.householdVisibleWhere('x')} ORDER BY x.id`)
+    .all().map((/** @type {any} */ r) => r.id);
+  assert.deepEqual(js, sql);
+  assert.ok(js.length > 0 && js.length < rows.length, 'the seed holds both answers');
+  assert.ok(rows.some((row) => row.visibility === OFF_DOMAIN), 'the seed holds an off-domain level');
+});
+
+test('canEditQuickLink: own tiles, and shared tiles for an admin; never a foreign private one', () => {
+  const canEditQuickLink = rowApi('canEditQuickLink');
+  const own = { created_by: owner, visibility: 'private' };
+  const shared = { created_by: owner, visibility: 'all' };
+  assert.equal(canEditQuickLink(own, owner, false), true, 'own private');
+  assert.equal(canEditQuickLink(shared, owner, false), true, 'own shared');
+  assert.equal(canEditQuickLink(shared, stranger, true), true, 'shared, admin');
+  assert.equal(canEditQuickLink(shared, stranger, false), false, 'shared, member');
+  assert.equal(canEditQuickLink(own, stranger, true), false, 'foreign private, admin');
+  assert.equal(canEditQuickLink(shared, stranger, 1), false, 'only isAdmin === true counts');
+  // Every seeded tile, every viewer, both roles: an editable tile is a visible one.
+  const rowVisible = rowApi('rowVisible');
+  for (const row of rowsById('quick_links', eqLinks)) {
+    for (const viewer of VIEWERS) {
+      for (const isAdmin of [false, true]) {
+        if (canEditQuickLink(row, viewer, isAdmin)) assert.equal(rowVisible(db, 'quick_links', row, viewer), true);
+      }
+    }
+  }
+});
+
+test('quickLinkHiddenFrom: the 404 of PUT/DELETE, the complement of rowVisible on both stored levels', () => {
+  const quickLinkHiddenFrom = rowApi('quickLinkHiddenFrom');
+  const rowVisible = rowApi('rowVisible');
+  for (const row of rowsById('quick_links', eqLinks)) {
+    for (const viewer of VIEWERS) {
+      assert.equal(quickLinkHiddenFrom(row, viewer), !rowVisible(db, 'quick_links', row, viewer), `${row.id} viewer ${viewer}`);
+    }
+  }
+  // quick_links.visibility has no CHECK: a third value (not writable through the
+  // route, possible in a restored file) is hidden by the SQL fragment but not by
+  // the 404 of PUT/DELETE, which then answers 403 through canEditQuickLink. Held
+  // as it is; B8b moves the check without changing an answer.
+  const odd = { id: 0, created_by: owner, visibility: 'family' };
+  assert.equal(quickLinkHiddenFrom(odd, stranger), false);
+  assert.equal(rowVisible(db, 'quick_links', odd, stranger), false);
+});

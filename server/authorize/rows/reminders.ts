@@ -28,7 +28,7 @@
  *
  * HIER STEHT KEINE ZWEITE REGEL. Jede Herkunft reicht die Klausel durch, die
  * ihr eigenes Modul beim Lesen zieht:
- *   task          `visibilityWhere()` wie GET /tasks und `mayAccessTask()`
+ *   task          `visibilityWhere()` wie GET /tasks und `rowVisible('tasks')`
  *   event         `visibilityWhere()` UND der Abo-Filter, wie die Kalenderliste
  *                 (routes/calendar/read.js), die Suche und `getUpcomingEvents()`:
  *                 ein ICS-Termin nur aus einem geteilten oder eigenen Abo

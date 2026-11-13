@@ -214,3 +214,81 @@ test('the open values', () => {
   assert.equal(/** @type {any} */ (authorizeApi).OPEN_FAMILY, 'family');
   assert.equal(/** @type {any} */ (authorizeApi).OPEN_ALL, 'all');
 });
+
+// ── 5. The row form of readableClause (B8b) ────────────────────────────────────
+//
+// healthRowReadable() answers for one loaded row (fasting.js loadWritable),
+// readableRows() filters the derived list of one owner (prevention due). Held
+// against readableClause over health_fasts (CHECK private | family) for every viewer.
+
+/** @param {number} userId @param {string} visibility @param {number} day @returns {number} */
+function seedFast(userId, visibility, day) {
+  return Number(db.prepare(`
+    INSERT INTO health_fasts (user_id, start_at, end_at, start_tzid, visibility)
+    VALUES (?, ?, ?, 'UTC', ?)
+  `).run(userId, `2026-01-${String(day).padStart(2, '0')}T08:00:00Z`, `2026-01-${String(day).padStart(2, '0')}T20:00:00Z`, visibility).lastInsertRowid);
+}
+let fastDay = 1;
+for (const person of [owner, caregiver, stranger, admin]) {
+  for (const visibility of ['private', 'family']) seedFast(person, visibility, fastDay++);
+}
+const FAST_VIEWERS = [owner, caregiver, stranger, admin];
+/** @returns {any[]} */
+const fastRows = () => db.prepare('SELECT * FROM health_fasts ORDER BY id').all();
+
+/** A connection that counts its prepare() calls. */
+function countingDb() {
+  let calls = 0;
+  return {
+    database: { prepare: (/** @type {string} */ sql) => { calls += 1; return db.prepare(sql); } },
+    get calls() { return calls; },
+  };
+}
+
+test('healthRowReadable: the same rows as readableClause for every viewer', () => {
+  const healthRowReadable = api('healthRowReadable');
+  const readableClause = api('readableClause');
+  for (const viewer of FAST_VIEWERS) {
+    const clause = readableClause('', viewer);
+    const sql = db.prepare(`SELECT id FROM health_fasts WHERE ${clause.sql} ORDER BY id`)
+      .all(...clause.params).map((/** @type {any} */ r) => r.id);
+    const js = fastRows().filter((row) => healthRowReadable(db, row, viewer)).map((row) => row.id);
+    assert.deepEqual(js, sql, `viewer ${viewer}`);
+  }
+  assert.equal(healthRowReadable(db, null, owner), false, 'no row');
+  assert.throws(() => healthRowReadable(db, fastRows()[0], owner, 'shared'), TypeError, 'only a known open value');
+});
+
+test('healthRowReadable: reads the grant only for a foreign row that is not open', () => {
+  const healthRowReadable = api('healthRowReadable');
+  for (const row of fastRows()) {
+    for (const viewer of FAST_VIEWERS) {
+      const c = countingDb();
+      healthRowReadable(c.database, row, viewer);
+      const expected = row.visibility !== 'family' && row.user_id !== viewer ? 1 : 0;
+      assert.equal(c.calls, expected, `row ${row.id} viewer ${viewer}`);
+    }
+  }
+});
+
+test('readableRows: one owner\'s list as readableClause cuts it, whole for the owner and a caregiver', () => {
+  const readableRows = api('readableRows');
+  const readableClause = api('readableClause');
+  for (const ownerId of FAST_VIEWERS) {
+    const rows = fastRows().filter((row) => row.user_id === ownerId);
+    for (const viewer of FAST_VIEWERS) {
+      const clause = readableClause('', viewer);
+      const sql = db.prepare(`SELECT id FROM health_fasts WHERE user_id = ? AND ${clause.sql} ORDER BY id`)
+        .all(ownerId, ...clause.params).map((/** @type {any} */ r) => r.id);
+      const c = countingDb();
+      const js = readableRows(c.database, rows, viewer, ownerId).map((/** @type {any} */ row) => row.id);
+      assert.deepEqual(js, sql, `owner ${ownerId} viewer ${viewer}`);
+      assert.equal(c.calls, viewer === ownerId ? 0 : 1, 'one grant read for the whole list');
+    }
+  }
+  // Derived items carry no user_id; the owner is the parameter.
+  const items = [{ visibility: 'private' }, { visibility: 'family' }, { visibility: null }];
+  assert.equal(readableRows(db, items, caregiver, owner), items, 'cared for: the list itself');
+  assert.deepEqual(readableRows(db, items, stranger, owner), [{ visibility: 'family' }]);
+  assert.deepEqual(readableRows(db, items, stranger, Number.NaN), [{ visibility: 'family' }], 'no owner');
+});

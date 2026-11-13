@@ -15,12 +15,12 @@
  */
 
 import type { Database } from '../catalog.ts';
-import { visibilityWhere } from './assignees.ts';
+import { assignableRowVisible, visibilityWhere } from './assignees.ts';
 import { budgetVisibilityWhere } from './budget.ts';
 import { documentVisibleWhere, filterVisibleIds } from './documents.ts';
 import { icsSubscriptionVisibleWhere } from './ics-subscriptions.ts';
 import { categoryVisibleWhere, noteVisibleWhere } from './notes.ts';
-import { quickLinkVisibleWhere } from './quick-links.ts';
+import { quickLinkRowVisible, quickLinkVisibleWhere } from './quick-links.ts';
 import { reminderTargetVisibleSql } from './reminders.ts';
 
 /** The data types with a "visible to this viewer" rule. */
@@ -50,10 +50,19 @@ function required<T>(value: T | null | undefined, what: string, type: string): T
   return value;
 }
 
+/**
+ * The assignment table and its key column per assignable type: the one list both
+ * visibleWhere() and rowVisible() read.
+ */
+const ASSIGNMENTS = Object.freeze({
+  tasks: Object.freeze(['task_assignments', 'task_id'] as const),
+  events: Object.freeze(['event_assignments', 'event_id'] as const),
+});
+
 /** Per type: the rule with its fixed tables and the default viewer of the old function. */
 const ROW_RULES: Readonly<Record<RowType, RowRule>> = Object.freeze({
-  tasks: (alias, viewer = '?') => visibilityWhere(alias, 'task_assignments', 'task_id', viewer),
-  events: (alias, viewer = '?') => visibilityWhere(alias, 'event_assignments', 'event_id', viewer),
+  tasks: (alias, viewer = '?') => visibilityWhere(alias, ...ASSIGNMENTS.tasks, viewer),
+  events: (alias, viewer = '?') => visibilityWhere(alias, ...ASSIGNMENTS.events, viewer),
   notes: (alias, viewer = '?') => noteVisibleWhere(alias, viewer),
   note_categories: (alias, viewer = '?') => categoryVisibleWhere(alias, viewer),
   documents: (alias, viewer = '@userId') => documentVisibleWhere(alias, viewer),
@@ -108,4 +117,46 @@ export function filterVisible(
   const table = Object.hasOwn(ROW_TABLES, type) ? ROW_TABLES[type] : undefined;
   if (!table) throw new TypeError(`filterVisible: no table for row type '${String(type)}'`);
   return filterVisibleIds(database, table, visible, ids, viewerId);
+}
+
+/** `assignedIds`: the assignments of a task or event row, handed in instead of read. */
+type RowVisibleOptions = { assignedIds?: readonly unknown[] };
+
+type RowCheck = (database: Database, row: Record<string, unknown>, viewerId: unknown, options: RowVisibleOptions) => boolean;
+
+/**
+ * Per type: the row form of the rule in ROW_RULES, from the same rule file. Only the
+ * types a caller asks about one loaded row (B8b) have one.
+ */
+const ROW_CHECKS: Readonly<Partial<Record<RowType, RowCheck>>> = Object.freeze({
+  tasks: (database, row, viewerId, { assignedIds }) =>
+    assignableRowVisible(database, ...ASSIGNMENTS.tasks, row, viewerId, assignedIds),
+  events: (database, row, viewerId, { assignedIds }) =>
+    assignableRowVisible(database, ...ASSIGNMENTS.events, row, viewerId, assignedIds),
+  quick_links: (_database, row, viewerId) => quickLinkRowVisible(row, viewerId),
+});
+
+/**
+ * Does `viewerId` see this row of `type`, already loaded by the caller? The row
+ * form of visibleWhere() - the same rule, the same answer (test:authorize-rows
+ * holds both against each other) - for the write paths that load a row by id and
+ * must not act on one the viewer cannot see.
+ *
+ * Throws for an unknown type and for a type without a row form instead of
+ * answering; a missing row is not visible. `options.assignedIds` (tasks, events):
+ * see assignableRowVisible() - with it nothing is read; without it the assignment
+ * table is read at most once, on the 'assignees' branch.
+ */
+export function rowVisible(
+  database: Database,
+  type: RowType,
+  row: Record<string, unknown> | null | undefined,
+  viewerId: unknown,
+  options: RowVisibleOptions = {},
+): boolean {
+  if (!Object.hasOwn(ROW_RULES, type)) throw new TypeError(`rowVisible: unknown row type '${String(type)}'`);
+  const check = Object.hasOwn(ROW_CHECKS, type) ? ROW_CHECKS[type] : undefined;
+  if (!check) throw new TypeError(`rowVisible: no row check for row type '${String(type)}'`);
+  if (row == null) return false;
+  return check(database, row, viewerId, options);
 }
