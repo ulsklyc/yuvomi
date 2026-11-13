@@ -1595,7 +1595,15 @@ router.put('/:id', (req, res) => {
         recurrence_from_completion: recurrence_from_completion ? 1 : 0,
         countdown: countdown ? 1 : 0, points, visibility,
       };
-      let touchesDefinition = Object.keys(wanted).some((k) => !sameFieldValue(wanted[k], task[k]));
+      // Die Beschreibung auf BEIDEN Seiten so gelesen, wie normalizeBlankTaskFields
+      // die gesendete liest (getrimmt, leer -> NULL). Ein alter Schreibweg liess
+      // sie ungetrimmt in der Zeile; wer sie unveraendert zurueckschickt, aendert
+      // nichts an der Definition und bekam bisher 200, nicht 403.
+      const descriptionKey = (/** @type {any} */ value) =>
+        (typeof value === 'string' ? (value.trim() || null) : value);
+      let touchesDefinition = Object.keys(wanted).some((k) => (k === 'description'
+        ? !sameFieldValue(descriptionKey(wanted[k]), descriptionKey(task[k]))
+        : !sameFieldValue(wanted[k], task[k])));
 
       if (req.body.tags !== undefined
           && tagsKey(normalizeTags(req.body.tags)) !== tagsKey(tagsBefore)) touchesDefinition = true;

@@ -220,6 +220,31 @@ test('PUT /:id: leere Kategorie/Prioritaet lassen den Bestand, leere Beschreibun
   assert.equal(rowOf(id).description, null);
 });
 
+// Ein alter Schreibweg liess die Beschreibung ungetrimmt in der Zeile. Wer sie
+// an einer gesperrten Aufgabe unveraendert zurueckschickt, aendert nichts an der
+// Definition: 200 wie vor dem Trimmen, nicht 403. Leere Kategorie/Prioritaet
+// fallen weg und lassen den Bestand - ebenfalls keine Aenderung.
+test('PUT /:id: gesperrte Aufgabe mit ungetrimmt gespeicherter Beschreibung bleibt bedienbar', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  const bob = { id: BOB, role: 'member' };
+  const id = (await call('POST', '/', {
+    as: admin, body: { title: 'Gesperrt', category: 'school', priority: 'high', locked: 1 },
+  })).body.data.id;
+  db.prepare('UPDATE tasks SET description = ? WHERE id = ?').run('  alt  ', id);
+
+  const same = await call('PUT', `/${id}`, {
+    as: bob, body: { title: 'Gesperrt', description: '  alt  ', status: 'in_progress' },
+  });
+  assert.equal(same.status, 200, JSON.stringify(same.body));
+
+  const blanks = await call('PUT', `/${id}`, { as: bob, body: { category: '', priority: '', status: 'open' } });
+  assert.equal(blanks.status, 200, JSON.stringify(blanks.body));
+
+  const changed = await call('PUT', `/${id}`, { as: bob, body: { description: 'neu' } });
+  assert.equal(changed.status, 403);
+  assert.equal(changed.body.reason, 'task_locked');
+});
+
 // --------------------------------------------------------
 // GET-Filter + GET /:id
 // --------------------------------------------------------
