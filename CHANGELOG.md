@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Each member can choose a custom accent colour for any module** (Refs #1115). Open
+  Settings > Appearance and pick a colour for the light and the dark design separately.
+  The sidebar icon, widget seal, and every element tied to that module's accent reflect
+  the chosen colour without affecting anyone else in the household. Any colour that falls
+  below a 3:1 contrast ratio on its background shows a note; the choice is saved either way.
+  The API accepts `module_colors` as a PATCH-semantic object of `{light, dark}` pairs; a
+  `null` value removes an entry; unknown module ids are silently ignored.
 - **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
   system information there is a section with what the installation runs on: version and build,
   whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema
