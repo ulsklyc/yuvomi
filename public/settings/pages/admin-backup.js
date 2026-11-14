@@ -22,8 +22,11 @@ import {
 
 // Zeitplan-Zelle: der Klartext trägt die Aussage, der Cron-Ausdruck bleibt als
 // Beleg daneben stehen. Ohne erkanntes Muster ist der Ausdruck die Aussage.
-function scheduleValue(schedule) {
-  const readable = formatCronSchedule(schedule);
+// Die Uhrzeit kommt aus dem nächsten Lauf in der Haushaltszone - dieselbe, die
+// "Nächstes Backup" nennt. Ohne nächsten Lauf steht ebenfalls der Ausdruck.
+/** @param {BackupSchedulerStatus} scheduler */
+function scheduleValue({ schedule, nextRun }) {
+  const readable = formatCronSchedule(schedule, nextRun);
   if (!readable) return { value: schedule, code: true };
 
   // DER AUSDRUCK STEHT HINTER "MEHR DAZU" (Critique R24 G6-Einst-P3-4):
@@ -45,7 +48,7 @@ function scheduleValue(schedule) {
   chevron.setAttribute('aria-hidden', 'true');
   summary.append(chevron);
   const expression = document.createElement('code');
-  expression.textContent = schedule;
+  expression.textContent = schedule ?? '';
   more.append(summary, expression);
   wrapper.append(text, more);
   return { value: wrapper, code: false };
@@ -431,7 +434,7 @@ async function loadBackupSchedulerStatus(container) {
     }
 
     renderDatabaseKeyCard(container, res.data?.database_key);
-    const { enabled, schedule, keepCount } = scheduler;
+    const { enabled, keepCount } = scheduler;
     // EIN "jetzt" für die ganze Karte: der Ton an "Aktiv" und die Warnung am
     // letzten Backup messen dasselbe und dürfen sich nicht widersprechen.
     const now = Date.now();
@@ -445,7 +448,7 @@ async function loadBackupSchedulerStatus(container) {
     ];
 
     if (enabled) {
-      rows.push(createInfoRow({ label: t('settings.backupSchedulerSchedule'), ...scheduleValue(schedule) }));
+      rows.push(createInfoRow({ label: t('settings.backupSchedulerSchedule'), ...scheduleValue(scheduler) }));
       rows.push(createInfoRow({
         label: t('settings.backupSchedulerKeep'),
         value: t('settings.backupSchedulerKeepCount', { count: keepCount }),
