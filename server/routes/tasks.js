@@ -2578,15 +2578,25 @@ function loadTaskDocuments(taskId, viewer) {
 // Erst die Aufgabe selbst prüfen, dann ihre Serie: die Einträge tragen den
 // Titel der Aufgabe, und eine geratene ID darf darüber nichts verraten - 404
 // statt 403, weil die bloße Existenz schon eine Auskunft ist (Muster aus #769).
+//
+// A paired display reads the history under the wall rule (householdVisible), the
+// same rule PATCH /:id/status and nextDueDateAfter apply to it: the wall shows
+// only what the whole household sees, even for a task that names the display, and
+// seriesHistory applies the same rule to every earlier instance of the series.
 // --------------------------------------------------------
 router.get('/:id/completions', (req, res) => {
   try {
     const me = req.authUserId || req.session.userId;
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-    if (!task || !rowVisible(db.get(), 'tasks', task, me)) {
+    const visible = task != null && (isDisplayRequest(req)
+      ? householdVisible(task)
+      : rowVisible(db.get(), 'tasks', task, me));
+    if (!visible) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
-    res.json({ data: seriesHistory(db.get(), { me, taskId: Number(req.params.id), limit: req.query.limit }) });
+    res.json({ data: seriesHistory(db.get(), {
+      me, taskId: Number(req.params.id), limit: req.query.limit, householdOnly: isDisplayRequest(req),
+    }) });
   } catch (err) {
     log.error('GET /:id/completions error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
