@@ -15,7 +15,7 @@
  */
 
 import { t, formatTime, getLocale } from '/i18n.js';
-import { zonedFields, zonedWeekday } from '/utils/timezone.js';
+import { isValidTimeZone, zonedFields, zonedWeekday } from '/utils/timezone.js';
 
 const NUMBER = /^\d+$/;
 const STEP = /^\*\/(\d+)$/;
@@ -105,16 +105,36 @@ function parseCronSchedule(expression) {
 }
 
 /**
- * Der Versatz der Haushaltszone gegen UTC zu einem Zeitpunkt, in Minuten.
- * Aus `zonedFields` gerechnet: dieselbe Zone, in der die Karte schreibt.
+ * Der Versatz einer Zone gegen UTC zu einem Zeitpunkt, in Minuten. Aus
+ * `zonedFields` gerechnet; ohne `zone` die Haushaltszone, in der die Karte
+ * schreibt.
  * @param {number} ms
+ * @param {string | null} [zone]
  * @returns {number | null}
  */
-function householdOffsetMinutes(ms) {
-  const f = zonedFields(ms);
+function offsetMinutes(ms, zone) {
+  const f = zone === undefined ? zonedFields(ms) : zonedFields(ms, zone);
   if (!f) return null;
   const wall = Date.UTC(f.year, f.month - 1, f.day, f.hour, f.minute, f.second);
   return Math.round((wall - ms) / 60_000);
+}
+
+/**
+ * Trifft der nächste Lauf in der Zone des Servers die Uhrzeit und den Tag des
+ * Ausdrucks? Wenn nicht, gehört er nicht zu diesem Zeitplan.
+ * @param {CronPattern} pattern
+ * @param {number} ms
+ * @param {string} serverZone
+ * @returns {boolean}
+ */
+function matchesServerClock(pattern, ms, serverZone) {
+  const f = zonedFields(ms, serverZone);
+  if (!f || f.minute !== pattern.minute) return false;
+  if (pattern.kind === 'hourly') return f.hour % pattern.count === 0;
+  if (f.hour !== pattern.hour) return false;
+  if (pattern.kind === 'weekly') return new Date(Date.UTC(f.year, f.month - 1, f.day)).getUTCDay() === pattern.weekday;
+  if (pattern.kind === 'monthly') return f.day === pattern.day;
+  return true;
 }
 
 /**
@@ -128,62 +148,66 @@ function householdOffsetMinutes(ms) {
  * - Ein Monatstag kippt nur, wo es Ausgangs- und Zieltag in jedem Monat gibt
  *   (1.-28.). Der 31. um 23:00 UTC ist in Berlin der 1. - aber nur nach
  *   Monaten mit 31 Tagen.
- * - Stellt die Haushaltszone zwischen dem nächsten und dem übernächsten Lauf
- *   die Uhr um, stimmte der Satz nur noch einmal: null.
+ * - Ändert sich der Abstand zwischen Haushalts- und Serverzone bis zum
+ *   übernächsten Lauf (eine der beiden stellt um, die andere nicht), stimmte
+ *   der Satz nur noch einmal: null.
  *
- * Nennt der nächste Lauf in der Haushaltszone genau Uhrzeit und Tag des
- * Ausdrucks, stehen Server und Haushalt (dort) auf derselben Wanduhr; der Satz
- * ist dann der Ausdruck selbst, und die Umstellungsprüfung entfällt - der Cron
- * folgt der Wanduhr des Servers, in derselben Zone also auch über die
- * Umstellung.
+ * GLEICHE FELDER SIND KEINE GLEICHE ZONE. Ein UTC-Server und ein Haushalt in
+ * London nennen im Winter dieselbe Uhrzeit, nach der Umstellung nicht mehr.
+ * Deshalb zählt die Zone, die der Server nennt (`scheduler.timezone`): mit ihr
+ * wird an beiden Zonen geprüft, und in derselben Zone (oder einer mit
+ * denselben Regeln) bleibt der Abstand 0 und der Satz über die Umstellung
+ * stehen - der Cron folgt der Wanduhr des Servers. Nennt der Server keine
+ * (älterer Server, neue Oberfläche aus dem Cache), gilt UTC, der Standard des
+ * Schedulers: geprüft wird dann immer, an der Haushaltszone.
  *
  * @param {CronPattern} pattern
  * @param {unknown} nextRun
+ * @param {unknown} serverZone
  * @returns {CronPattern | null}
  */
-function householdPattern(pattern, nextRun) {
+function householdPattern(pattern, nextRun, serverZone) {
   if (typeof nextRun !== 'string' || !nextRun) return null;
   const ms = Date.parse(nextRun);
   if (Number.isNaN(ms)) return null;
   const f = zonedFields(ms);
   if (!f) return null;
+  const server = isValidTimeZone(serverZone) ? /** @type {string} */ (serverZone) : null;
+  if (server && !matchesServerClock(pattern, ms, server)) return null;
 
   /** @type {CronPattern} */
   let local;
-  let literal;
   if (pattern.kind === 'hourly') {
     local = { kind: 'hourly', count: pattern.count, minute: f.minute };
-    literal = f.minute === pattern.minute;
   } else if (pattern.kind === 'daily') {
     local = { kind: 'daily', hour: f.hour, minute: f.minute };
-    literal = f.hour === pattern.hour && f.minute === pattern.minute;
   } else if (pattern.kind === 'weekly') {
     const weekday = zonedWeekday(ms);
     if (weekday == null) return null;
     const shift = (weekday - pattern.weekday + 7) % 7;
     if (shift !== 0 && shift !== 1 && shift !== 6) return null;
     local = { kind: 'weekly', weekday, hour: f.hour, minute: f.minute };
-    literal = shift === 0 && f.hour === pattern.hour && f.minute === pattern.minute;
   } else {
     const day = f.day;
     if (day !== pattern.day) {
       if (Math.abs(day - pattern.day) !== 1 || pattern.day > 28 || day < 1 || day > 28) return null;
     }
     local = { kind: 'monthly', day, hour: f.hour, minute: f.minute };
-    literal = day === pattern.day && f.hour === pattern.hour && f.minute === pattern.minute;
   }
-  if (literal) return local;
 
-  // Der übernächste Lauf liegt in einer Serverzone ohne Umstellung genau einen
-  // Abstand weiter (beim Monat höchstens). Ändert die Haushaltszone bis dahin
-  // ihren Versatz, nennt der Satz für ihn eine andere Uhrzeit.
-  const interval = intervalOf(pattern);
-  const now = householdOffsetMinutes(ms);
-  const then = householdOffsetMinutes(ms + interval);
-  if (now == null || then == null) return null;
+  // Der übernächste Lauf liegt einen Abstand weiter (beim Monat höchstens).
+  // Ändert sich bis dahin der Abstand der beiden Zonen, nennt der Satz für ihn
+  // eine andere Uhrzeit.
+  const later = ms + intervalOf(pattern);
+  const householdNow = offsetMinutes(ms);
+  const householdLater = offsetMinutes(later);
+  const serverNow = server ? offsetMinutes(ms, server) : 0;
+  const serverLater = server ? offsetMinutes(later, server) : 0;
+  if (householdNow == null || householdLater == null || serverNow == null || serverLater == null) return null;
+  const drift = (householdLater - serverLater) - (householdNow - serverNow);
   // Beim Stundenintervall steht nur die Minute im Satz: eine volle Stunde
   // Umstellung lässt sie stehen.
-  const changed = pattern.kind === 'hourly' ? (now - then) % 60 !== 0 : now !== then;
+  const changed = pattern.kind === 'hourly' ? drift % 60 !== 0 : drift !== 0;
   return changed ? null : local;
 }
 
@@ -196,12 +220,13 @@ function householdPattern(pattern, nextRun) {
  *
  * @param {unknown} expression
  * @param {unknown} nextRun Der nächste Lauf als ISO-Zeitpunkt (`scheduler.nextRun`)
+ * @param {unknown} [serverZone] Die Zone des Crons (`scheduler.timezone`); fehlt sie, gilt UTC
  * @returns {string | null}
  */
-export function formatCronSchedule(expression, nextRun) {
+export function formatCronSchedule(expression, nextRun, serverZone) {
   const parsed = parseCronSchedule(expression);
   if (!parsed) return null;
-  const pattern = householdPattern(parsed, nextRun);
+  const pattern = householdPattern(parsed, nextRun, serverZone);
   if (!pattern) return null;
 
   if (pattern.kind === 'hourly') {

@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **The backup schedule shows the same time as the next backup.** On a server running in
   another time zone than the household, the backup card said "Daily at 02:00" above "Next
-  backup 03:00" for the same run. The schedule now reads its time, weekday and day from the
-  next run in the household's time zone; where that would not hold for every run, it shows
-  the raw schedule instead.
+  backup 03:00" for the same run. The server now names the zone its schedule runs in, and the
+  schedule reads its time, weekday and day from the next run in the household's time zone;
+  where that would not hold for every run, for example shortly before only one of the two
+  zones changes to summer time, it shows the configured value (`BACKUP_SCHEDULE=0 2 * * *`)
+  instead.
 
 ## [2.90.0] - 2026-11-14
 

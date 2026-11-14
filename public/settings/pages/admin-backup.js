@@ -20,16 +20,22 @@ import {
   settingSwitchRowHtml,
 } from '/settings/components.js';
 
-// Zeitplan-Zelle: der Klartext trägt die Aussage, der Cron-Ausdruck bleibt als
-// Beleg daneben stehen. Ohne erkanntes Muster ist der Ausdruck die Aussage.
+// Zeitplan-Zelle: der Klartext trägt die Aussage, der Konfigwert bleibt als
+// Beleg daneben stehen. Ohne erkanntes Muster ist der Konfigwert die Aussage.
 // Die Uhrzeit kommt aus dem nächsten Lauf in der Haushaltszone - dieselbe, die
-// "Nächstes Backup" nennt. Ohne nächsten Lauf steht ebenfalls der Ausdruck.
+// "Nächstes Backup" nennt. Ohne nächsten Lauf steht ebenfalls der Konfigwert.
+//
+// DER BELEG IST DIE ZEILE AUS DER UMGEBUNG, NICHT NUR DER AUSDRUCK:
+// "BACKUP_SCHEDULE=0 2 * * *" unter "Täglich um 03:00" liest sich als das, was
+// in der .env steht, nicht als zweite Uhrzeit. Dieselbe Schreibweise auch
+// dort, wo der Wert allein steht: er ist dann ebenso Konfiguration.
 /** @param {BackupSchedulerStatus} scheduler */
-function scheduleValue({ schedule, nextRun }) {
-  const readable = formatCronSchedule(schedule, nextRun);
-  if (!readable) return { value: schedule, code: true };
+function scheduleValue({ schedule, nextRun, timezone }) {
+  const setting = `BACKUP_SCHEDULE=${schedule ?? ''}`;
+  const readable = formatCronSchedule(schedule, nextRun, timezone);
+  if (!readable) return { value: setting, code: true };
 
-  // DER AUSDRUCK STEHT HINTER "MEHR DAZU" (Critique R24 G6-Einst-P3-4):
+  // DER BELEG STEHT HINTER "MEHR DAZU" (Critique R24 G6-Einst-P3-4):
   // unter "Taeglich um 02:00" stand "0 2 * * *" fuer jeden sichtbar - ein
   // Beleg fuer wenige, Rauschen fuer alle. Ein natives <details> wie die
   // Hinweise der Blaetter (hintFoldHtml).
@@ -48,7 +54,7 @@ function scheduleValue({ schedule, nextRun }) {
   chevron.setAttribute('aria-hidden', 'true');
   summary.append(chevron);
   const expression = document.createElement('code');
-  expression.textContent = schedule ?? '';
+  expression.textContent = setting;
   more.append(summary, expression);
   wrapper.append(text, more);
   return { value: wrapper, code: false };
@@ -101,6 +107,7 @@ export function backupErrorRow(lastError) {
  *   lastError?: { timestamp?: string, reason?: string | null, message?: string } | null,
  *   lastSuccess?: string | null,
  *   nextRun?: string | null,
+ *   timezone?: string,
  * }} BackupSchedulerStatus
  */
 
