@@ -14,13 +14,49 @@ import { readdirSync, readFileSync } from 'node:fs';
 // Geprüft wird damit die Musterzuordnung und die Parameterbelegung; die Texte
 // selbst deckt die Locale-Vollständigkeit weiter unten ab.
 const { formatCronSchedule, cronScheduleIntervalMs } = await import('../public/settings/cron-label.js');
+const { setDisplayTimeZone } = await import('../public/utils/timezone.js');
 
-const parse = (expr) => {
-  const out = formatCronSchedule(expr);
+// Die Haushaltszone, in der die Karte ihre Uhrzeit nennt. localStorage gibt es
+// in Node nicht; setDisplayTimeZone hält den Wert dann im Prozess-Cache.
+/** @template T @param {string} zone @param {() => T} fn @returns {T} */
+const inZone = (zone, fn) => {
+  setDisplayTimeZone(zone);
+  try { return fn(); } finally { setDisplayTimeZone(null); }
+};
+
+// Der Sonntag, an dem die Musterfälle unten ihren nächsten Lauf haben (UTC).
+const SUNDAY = Date.UTC(2026, 10, 15);
+/** Der nächste Lauf `day` Tage nach SUNDAY um `hour`:`minute` UTC, als ISO-Text wie vom Server. */
+const runAt = (/** @type {number} */ day, /** @type {number} */ hour, minute = 0) => new Date(SUNDAY + ((day * 24 + hour) * 60 + minute) * 60_000).toISOString();
+
+/**
+ * Der Satz zu `expr`, zerlegt in Schlüssel und Parameter. Ohne `nextRun`
+ * stehen Server- und Haushaltszone beide auf UTC und der nächste Lauf ist der,
+ * den der Ausdruck dort nennt - dann prüfen die Fälle nur die Musterzuordnung.
+ */
+/** @param {unknown} expr @param {unknown} [nextRun] @param {string} [zone] */
+const parse = (expr, nextRun = literalRun(expr), zone = 'UTC') => {
+  const out = inZone(zone, () => formatCronSchedule(expr, nextRun));
   if (out == null) return null;
   const at = out.indexOf('{');
   return { key: out.slice(0, at), params: JSON.parse(out.slice(at)) };
 };
+
+const DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+/** Der Lauf, den ein Ausdruck der vier Muster in UTC nach SUNDAY als nächsten hätte. */
+/** @param {unknown} expr */
+function literalRun(expr) {
+  const [minute, hour, dom, , dow] = String(expr ?? '').trim().split(/\s+/);
+  const m = Number(minute) || 0;
+  if (/^\*\//.test(hour ?? '')) return runAt(0, 0, m);
+  const h = Number(hour) || 0;
+  if (dom && dom !== '*') return new Date(Date.UTC(2026, 11, Number(dom), h, m)).toISOString();
+  if (dow && dow !== '*') {
+    const index = /^\d+$/.test(dow) ? Number(dow) % 7 : DOW.indexOf(dow.slice(0, 3).toLowerCase());
+    return runAt(Math.max(index, 0), h, m);
+  }
+  return runAt(0, h, m);
+}
 
 test('täglich: Standardplan 0 2 * * *', () => {
   const result = parse('0 2 * * *');
@@ -72,7 +108,7 @@ test('wöchentlich ist nur EIN Wochentag: Liste, Bereich und Namensrest sind kei
     '0 2 * * 1#2', // zweiter Montag im Monat
     '0 2 * * 5L', // letzter Freitag im Monat
   ]) {
-    assert.equal(formatCronSchedule(expr), null, `${expr} ist kein einzelner Wochentag`);
+    assert.equal(formatCronSchedule(expr, runAt(1, 2)), null, `${expr} ist kein einzelner Wochentag`);
     assert.equal(cronScheduleIntervalMs(expr), null, `${expr} hat keinen ablesbaren Abstand`);
   }
 
@@ -111,8 +147,106 @@ test('unbekannte Muster liefern null, damit der Ausdruck selbst stehen bleibt', 
     '0 */0 * * *', // ungültiger Schritt
     '', null, undefined,
   ]) {
-    assert.equal(formatCronSchedule(expr), null, `${JSON.stringify(expr)} sollte null liefern`);
+    assert.equal(formatCronSchedule(expr, runAt(0, 2)), null, `${JSON.stringify(expr)} sollte null liefern`);
   }
+});
+
+// ── Die Uhrzeit des Haushalts, nicht die des Servers ────────────────────────
+//
+// Der Cron läuft in der Serverzone (`TZ`, sonst UTC), die Zeile "Nächstes
+// Backup" steht in der Haushaltszone. Der Satz nimmt seine Uhrzeit deshalb aus
+// dem tatsächlichen nächsten Lauf (`nextRun`) und nennt sie in der
+// Haushaltszone - eine Uhrzeit, eine Zone. Server UTC, Haushalt Berlin:
+
+test('Haushaltszone: täglich um 02:00 UTC steht als 03:00 da', () => {
+  const daily = parse('0 2 * * *', runAt(1, 2), 'Europe/Berlin');
+  assert.equal(daily?.key, 'settings.backupSchedulerCronDaily');
+  assert.equal(daily?.params.time, '03:00');
+});
+
+test('Haushaltszone: der Wochentag kippt mit, wenn der Lauf über Mitternacht rutscht', () => {
+  // Sonntag 23:00 UTC ist Montag 00:00 in Berlin.
+  const weekly = parse('0 23 * * sun', runAt(0, 23), 'Europe/Berlin');
+  assert.equal(weekly?.key, 'settings.backupSchedulerCronWeekly');
+  assert.equal(weekly?.params.weekday, 'Montag');
+  assert.equal(weekly?.params.time, '00:00');
+
+  // Und rückwärts: Montag 03:00 UTC ist Sonntag 22:00 in New York.
+  const back = parse('0 3 * * mon', runAt(1, 3), 'America/New_York');
+  assert.equal(back?.params.weekday, 'Sonntag');
+  assert.equal(back?.params.time, '22:00');
+});
+
+test('Haushaltszone: der Monatstag kippt mit, solange es ihn in jedem Monat gibt', () => {
+  // Am 14. um 23:00 UTC ist in Berlin schon der 15.
+  const monthly = parse('0 23 14 * *', '2026-12-14T23:00:00.000Z', 'Europe/Berlin');
+  assert.equal(monthly?.key, 'settings.backupSchedulerCronMonthly');
+  assert.equal(monthly?.params.day, 15);
+  assert.equal(monthly?.params.time, '00:00');
+
+  // Der 31. um 23:00 UTC ist in Berlin der 1. des Folgemonats - aber nur in
+  // Monaten mit 31 Tagen. "Monatlich am 1." wäre falsch: der Ausdruck bleibt.
+  assert.equal(parse('0 23 31 * *', '2026-12-31T23:00:00.000Z', 'Europe/Berlin'), null);
+  // Der 28. um 23:00 UTC wird in Berlin der 29. oder (im Februar) der 1. März.
+  assert.equal(parse('0 23 28 * *', '2026-12-28T23:00:00.000Z', 'Europe/Berlin'), null);
+  // Der 1. um 00:30 UTC ist in New York der letzte Tag des Vormonats.
+  assert.equal(parse('30 0 1 * *', '2026-12-01T00:30:00.000Z', 'America/New_York'), null);
+});
+
+test('Haushaltszone mit halber Stunde (+05:30): die Minute wandert mit', () => {
+  const daily = parse('0 2 * * *', runAt(1, 2), 'Asia/Kolkata');
+  assert.equal(daily?.params.time, '07:30');
+
+  // Alle 6 Stunden zur Minute 00 in UTC sind in Indien alle 6 Stunden zur Minute 30.
+  const every6 = parse('0 */6 * * *', runAt(1, 0), 'Asia/Kolkata');
+  assert.equal(every6?.key, 'settings.backupSchedulerCronHourly');
+  assert.equal(every6?.params.count, 6);
+  assert.equal(every6?.params.minute, '30');
+
+  // Eine volle Stunde Versatz lässt die Minute stehen.
+  assert.equal(parse('15 */6 * * *', runAt(1, 0, 15), 'Europe/Berlin')?.params.minute, '15');
+});
+
+test('Sommerzeit des Haushalts vor dem übernächsten Lauf: der Ausdruck bleibt', () => {
+  // Berlin stellt am 28.03.2027 um. Der Lauf am 27. ist 03:00 MEZ, der am 28.
+  // schon 04:00 MESZ - "Täglich um 03:00" stimmte nur noch einmal.
+  assert.equal(parse('0 2 * * *', '2027-03-27T02:00:00.000Z', 'Europe/Berlin'), null);
+  assert.equal(parse('0 2 * * sat', '2027-03-27T02:00:00.000Z', 'Europe/Berlin'), null);
+  assert.equal(parse('0 2 1 * *', '2027-03-01T02:00:00.000Z', 'Europe/Berlin'), null);
+  // Gegenprobe: eine Woche früher steht der Satz.
+  assert.equal(parse('0 2 * * *', '2027-03-20T02:00:00.000Z', 'Europe/Berlin')?.params.time, '03:00');
+});
+
+test('Server und Haushalt in derselben Zone: der Satz ist der Ausdruck, auch vor der Umstellung', () => {
+  // TZ=Europe/Berlin am Server: der Lauf um 02:00 MEZ ist 01:00 UTC. Der Cron
+  // folgt der Wanduhr des Servers, also bleibt es über die Umstellung 02:00.
+  const daily = parse('0 2 * * *', '2027-03-27T01:00:00.000Z', 'Europe/Berlin');
+  assert.equal(daily?.params.time, '02:00');
+});
+
+test('ohne nächsten Lauf kein Satz: dann steht der Ausdruck', () => {
+  // Ohne `nextRun` wüsste der Satz nicht, in welcher Zone sein "02:00" gilt.
+  for (const nextRun of [null, undefined, '', 'kein Zeitpunkt']) {
+    assert.equal(inZone('Europe/Berlin', () => formatCronSchedule('0 2 * * *', nextRun)), null, String(nextRun));
+  }
+});
+
+test('ein nächster Lauf, der nicht zum Ausdruck passt, ergibt keinen Satz', () => {
+  // Montag 02:00 ist nie der Lauf eines Mittwochsplans - weiter weg als einen
+  // Tag kann keine Zone verschieben.
+  assert.equal(parse('0 2 * * wed', runAt(1, 2), 'Europe/Berlin'), null);
+  assert.equal(parse('0 2 15 * *', '2026-12-10T02:00:00.000Z', 'Europe/Berlin'), null);
+});
+
+test('der Abstand für "überfällig" hängt nicht an der Zone', () => {
+  // cronScheduleIntervalMs liest nur den Ausdruck: ein Tag bleibt ein Tag.
+  const day = 24 * 60 * 60 * 1000;
+  inZone('Asia/Kolkata', () => {
+    assert.equal(cronScheduleIntervalMs('0 2 * * *'), day);
+    assert.equal(cronScheduleIntervalMs('0 23 * * sun'), 7 * day);
+    assert.equal(cronScheduleIntervalMs('0 */6 * * *'), day / 4);
+    assert.equal(cronScheduleIntervalMs('0 23 31 * *'), 62 * day);
+  });
 });
 
 test('alle Locales kennen die vier Zeitplan-Muster', () => {
