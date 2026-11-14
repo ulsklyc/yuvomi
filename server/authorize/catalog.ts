@@ -33,7 +33,7 @@
  * file, never the other way round.
  *
  * Dependencies without side effects only (server/scopes.js,
- * server/display-scopes.js; no express, NEVER server/db.js, not even
+ * server/display-scopes.js, manage.ts; no express, NEVER server/db.js, not even
  * transitively - see actor.ts) - usable in middleware, routes, migrations and
  * tests. The connection is always a parameter.
  * Erasable TS syntax only (runs through type stripping, no build).
@@ -44,6 +44,7 @@ import { MODULE_KEYS, getModuleKeys } from '../scopes.js';
 // legte jede Suite, die bloss Rechte aufloest, eine echte yuvomi.db im Repo an
 // (test:db-isolation nannte vier davon).
 import { DISPLAY_SCOPE_MODULES } from '../display-scopes.js';
+import { managesHousehold } from './manage.ts';
 
 /** The statement surface used here; better-sqlite3 and node:sqlite both provide it. */
 type Statement = {
@@ -404,7 +405,7 @@ export function resolvePermissions(
   user: PermissionUser | null | undefined,
   { isDisplay = false }: { isDisplay?: boolean } = {},
 ): ResolvedPermissions {
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = managesHousehold(user?.role);
   const modules: Record<string, ModuleLevel> = {};
   const widgets: Record<string, GrantLevel> = {};
   const capabilities: Record<string, GrantLevel> = {};
@@ -689,7 +690,7 @@ export function invitePresetPermissions(
  * @returns {number} Anzahl geschriebener Zeilen
  */
 export function applyChildStartPermissions(database: Database, user: PermissionUser | null | undefined): number {
-  if (!user || user.id == null || user.role === 'admin' || user.family_role !== 'child') return 0;
+  if (!user || user.id == null || managesHousehold(user.role) || user.family_role !== 'child') return 0;
   const current = resolvePermissions(database, user);
   const upsert = database.prepare(`
     INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)

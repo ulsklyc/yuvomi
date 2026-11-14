@@ -29,14 +29,16 @@
  * parameter - from requireAuth for a request, from the caller for actorForUser().
  * test:authorize-actor holds this in a child process.
  *
- * Dependencies: server/logger.js, server/middleware/require-admin.js,
- *   catalog.ts, modules.ts, types.ts (none of them loads db.js).
+ * Dependencies: server/logger.js, catalog.ts, manage.ts, modules.ts, types.ts
+ *   (none of them loads db.js). Not server/middleware/require-admin.js: that
+ *   file asks authorize() through index.ts since C1, and an import back would
+ *   close a cycle.
  * Erasable TS syntax only (runs through type stripping, no build).
  */
 
 import { createLogger } from '../logger.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
 import { resolvePermissions } from './catalog.ts';
+import { managesHousehold } from './manage.ts';
 import { buildSessionModuleAccess, userForRequest } from './modules.ts';
 import type { Actor, ActorKind, ModuleAccess } from './types.ts';
 
@@ -91,11 +93,16 @@ function roleOf(role: string | null | undefined): Actor['role'] {
  * session branch's own `SELECT u.role FROM users` is not done: that one is not
  * guarded, and a failure there (a database without `family_role`) would turn
  * today's swallowed error into a 500.
+ *
+ * THE ADMIN QUESTION HERE ASKS THE RULE, NOT THE ACTOR (C1): this runs inside
+ * requireAuth, before `req.sessionModuleAccess` is set, and actorFromRequest()
+ * remembers its actor per request - one built here would carry
+ * `moduleAccess: null` (unrestricted) for the rest of the request.
  */
 export function resolveRequestModuleAccess(database: Database, req: AuthenticatedRequest): ModuleAccess | null {
   const entry = { database, familyRole: null as string | null };
   requests.set(req, entry);
-  if (isAdminRequest(req)) return null;
+  if (managesHousehold(roleOf(req.authRole))) return null;
   try {
     const user = database
       .prepare('SELECT id, role, family_role FROM users WHERE id = ?')

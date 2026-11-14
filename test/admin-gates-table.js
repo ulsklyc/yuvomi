@@ -19,8 +19,8 @@
  *                        call inside assertMayTouchSettled() counts once per
  *                        route that calls that helper;
  *   form 'inline'        a 403 right behind a negated admin question
- *                        (`!isAdminRequest(req)`, `!isAdminUser(req)`,
- *                        `!isAdmin`) within three lines.
+ *                        (`!isAdminRequest(req)`, `!isAdmin`) within three
+ *                        lines.
  *
  * `key` is `<METHOD> <router-local path>` of the enclosing route (`USE ` for
  * `router.use(requireAdmin)`), so it survives line shifts. `path` is the full

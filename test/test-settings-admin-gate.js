@@ -336,18 +336,14 @@ function adminPredicates(source) {
 }
 
 /** Datei -> erlaubte Vorkommen als `<Ausdruck> @ <Anweisung>`, mit Grund. */
+// Seit Phase 2 C1 vergleicht ausser der einen Stelle unten keine mehr `authRole`
+// mit 'admin': die Regel
+// steht in managesHousehold() (server/authorize/manage.ts) und vergleicht eine
+// Rolle, kein Request-Feld; isAdminRequest() fragt authorize().
 const ADMIN_PREDICATE_EXCEPTIONS = new Map([
-  // Die Definition des Helfers selbst.
-  ['server/middleware/require-admin.js', [
-    "authRole==='admin' @ return req.authRole==='admin'",
-  ]],
   // test-sso-only.js haelt die woertliche Schreibweise per Regex.
   ['server/auth.js', [
     "authRole==='admin' @ const isAdmin=req.authRole==='admin'",
-  ]],
-  // Ausserhalb dieses Schnitts geblieben; zieht beim naechsten Anfassen nach.
-  ['server/routes/dashboard.js', [
-    "authRole==='admin' @ result.quicklinks=listQuickLinksFor(userId,req.authRole==='admin')",
   ]],
 ]);
 

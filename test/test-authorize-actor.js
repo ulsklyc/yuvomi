@@ -26,7 +26,9 @@
  *            8. server/authorize/ never loads server/db.js, which opens a database
  *               on import - checked in a child process, for the module itself and
  *               for server/openapi.js, which reaches it through
- *               services/reminder-origins.js.
+ *               services/reminder-origins.js. Since C1 the same for
+ *               server/middleware/require-admin.js, which asks authorize():
+ *               no database and no SESSION_SECRET (server/auth.js) on import.
  *
  * Run: npm run test:authorize-actor
  */
@@ -577,15 +579,24 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * @returns {string[]}
  */
 function filesAfterImport(file) {
+  const { run, dir } = importInChild(file, process.env);
+  assert.equal(run.status, 0, `import of ${file} failed:\n${run.stderr}`);
+  return readdirSync(dir);
+}
+
+/**
+ * @param {string} file path from the repository root
+ * @param {NodeJS.ProcessEnv} env
+ */
+function importInChild(file, env) {
   const dir = tempDir('authorize-no-db');
   const run = spawnSync(process.execPath, [
     '--input-type=module', '-e', `await import(${JSON.stringify(pathToFileURL(join(ROOT, file)).href)});`,
   ], {
-    env: { ...process.env, DB_PATH: join(dir, 'never.db'), LOG_LEVEL: 'error', DB_ENCRYPTION_AUTO_KEY: 'false' },
+    env: { ...env, DB_PATH: join(dir, 'never.db'), LOG_LEVEL: 'error', DB_ENCRYPTION_AUTO_KEY: 'false' },
     encoding: 'utf8',
   });
-  assert.equal(run.status, 0, `import of ${file} failed:\n${run.stderr}`);
-  return readdirSync(dir);
+  return { run, dir };
 }
 
 test('the probe sees a database: importing server/db.js creates one', () => {
@@ -598,4 +609,16 @@ test('server/authorize/ does not load server/db.js', () => {
 
 test('server/openapi.js does not load server/db.js (it reaches server/authorize/)', () => {
   assert.deepEqual(filesAfterImport('server/openapi.js'), []);
+});
+
+test('server/middleware/require-admin.js loads neither server/db.js nor server/auth.js (C1)', () => {
+  const env = { ...process.env };
+  delete env.SESSION_SECRET;
+  // The probe sees server/auth.js: without SESSION_SECRET its import fails.
+  const control = importInChild('server/auth.js', env).run;
+  assert.notEqual(control.status, 0, 'server/auth.js imports without SESSION_SECRET');
+  assert.match(control.stderr, /SESSION_SECRET/);
+  const { run, dir } = importInChild('server/middleware/require-admin.js', env);
+  assert.equal(run.status, 0, `import of require-admin.js without SESSION_SECRET failed:\n${run.stderr}`);
+  assert.deepEqual(readdirSync(dir), []);
 });

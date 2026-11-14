@@ -103,11 +103,14 @@ async function login(username, password) {
 }
 
 const adminHeaders = await login('admin', 'admin-pass-123');
-const created = await http('POST', '/api/v1/auth/users', {
-  headers: adminHeaders,
-  body: { username: 'member', display_name: 'Member', password: 'member-pass-123', family_role: 'parent' },
-});
-assert.equal(created.status, 201, `create member: ${JSON.stringify(created.body)}`);
+// The member straight into the database, not through POST /auth/users: that
+// route is itself an admin gate, and the seed must not depend on the rule the
+// suite measures (under the mutant "the admin rule says no" it would refuse).
+const { hashPassword } = await import('../server/utils/password.js');
+const memberId = db.prepare(`
+  INSERT INTO users (username, display_name, password_hash, role, family_role)
+  VALUES ('member', 'Member', ?, 'member', 'parent') RETURNING id
+`).get(await hashPassword('member-pass-123')).id;
 const memberHeaders = await login('member', 'member-pass-123');
 
 const device = await http('POST', '/api/v1/auth/devices', {
@@ -120,7 +123,7 @@ const deviceHeaders = { Authorization: `Bearer ${device.body.credential}` };
 /** @type {Record<string, number>} */
 const ids = {
   admin: db.prepare("SELECT id FROM users WHERE username = 'admin'").get().id,
-  member: created.body.user.id,
+  member: memberId,
 };
 
 // A done task of the member whose payment visit is paid (tasks.js reopensSettledVisit,
@@ -269,7 +272,7 @@ function gateSites() {
     lines.forEach((line, i) => {
       if (!/status\(403\)/.test(line)) return;
       const window = lines.slice(Math.max(0, i - 2), i + 1).join('\n');
-      if (!/!\s*(?:isAdminRequest\(req\)|isAdminUser\(req\)|isAdmin\b)/.test(window)) return;
+      if (!/!\s*(?:isAdminRequest\(req\)|isAdmin\b)/.test(window)) return;
       const key = enclosing(src, lineStart(i));
       if (GATE_DEFINITIONS.has(key.replace(/^function /, ''))) return;
       for (const k of routeKeys(src, key)) sites.push(`inline|${file}|${k}`);
