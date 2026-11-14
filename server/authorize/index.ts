@@ -35,6 +35,7 @@ export {
   hiddenModulesFor,
   mayChangeRecord,
   mayReadModule,
+  mayReceiveFeed,
   mayWriteModule,
   MODULE_ACCESS_ALLOW,
   MODULE_ACCESS_DENIED,

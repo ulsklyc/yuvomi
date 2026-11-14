@@ -17,8 +17,11 @@
  *            4. A device token of an admin is a member, as requireAuth decides.
  *            5. `actorFromRequest` builds once per request; a second call runs no
  *               query and returns the same object.
- *            6. `actorForUser` is `null` for an unknown account and does NOT
- *               classify a display account (see the comment at that test).
+ *            6. `actorForUser` is `null` for an unknown account and classifies
+ *               display and guest like kindOf(): a guest receives from no
+ *               module, a display only from its scope card (narrowed by its
+ *               matrix rights), a failed lookup closes; `mayReceiveFeed` gives
+ *               a display no feed.
  *            7. `householdAudience` is the actor without an account.
  *            8. server/authorize/ never loads server/db.js, which opens a database
  *               on import - checked in a child process, for the module itself and
@@ -412,18 +415,123 @@ test('actorForUser: role, family role and module rights from users and the matri
   assert.ok(Object.isFrozen(admin));
 });
 
-test('actorForUser: a display account is a plain system actor with the matrix rights (known divergence)', () => {
-  // KNOWN DIVERGENCE, HELD ON PURPOSE (visibility matrix, `divergent`, four
-  // cells: due_reminders and ics_feed for display and split_guest). Without a
-  // request the actor is not classified as display or guest, so a display
-  // account resolves like an unrestricted member here while every REST path
-  // narrows it. A later behaviour PR turns this; until then this test says
-  // what is true today.
-  const actor = actorForUser(db, DISPLAY);
-  assert.ok(actor);
-  assert.equal(actor.kind, 'system');
-  assert.equal(actor.moduleAccess, null);
-  assert.equal(actorForUser(db, GUEST)?.kind, 'system');
+// --------------------------------------------------------------------------
+// actorForUser classifies display and guest (#2745)
+// --------------------------------------------------------------------------
+
+// Accounts only this table reads, seeded here so the tests above keep theirs.
+const GUEST_ADMIN = seedUser('admin', 'parent'); // a guest row on an admin users row
+const DISPLAY_ADMIN = seedUser('admin', 'parent'); // a display row on an admin users row
+const DISPLAY_NARROW = seedUser('member'); // a display whose stored matrix denies the calendar
+db.prepare('INSERT INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)').run(GUEST_ADMIN, groupId, ADMIN);
+for (const id of [DISPLAY_ADMIN, DISPLAY_NARROW]) {
+  db.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').run(id, ADMIN);
+}
+db.prepare(`
+  INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+  VALUES ('user', ?, 'module', 'calendar', 'none')
+`).run(String(DISPLAY_NARROW));
+
+const { authorize, PERMISSION_MODULES } = authorizeApi;
+const { DISPLAY_SCOPE_MODULES } = await import('../server/display-scopes.js');
+const MODULE_KEYS = PERMISSION_MODULES.map((m) => m.key);
+const ALL = Object.fromEntries(MODULE_KEYS.map((key) => [key, true]));
+const NOTHING = Object.fromEntries(MODULE_KEYS.map((key) => [key, false]));
+const CARD = Object.fromEntries(MODULE_KEYS.map((key) => [key, DISPLAY_SCOPE_MODULES.includes(key)]));
+
+/** @param {any} actor @returns {Record<string, boolean>} */
+function receives(actor) {
+  return Object.fromEntries(MODULE_KEYS.map((key) => [key, authorize(actor, 'receive', { module: key }).allowed]));
+}
+
+test('actorForUser: the display card holds modules a display reads, and others it does not', () => {
+  // Precondition for the table: a card that said yes or no to everything would
+  // not tell a display from a member or a guest.
+  assert.ok(Object.values(CARD).includes(true) && Object.values(CARD).includes(false), JSON.stringify(CARD));
+  assert.equal(CARD.calendar, true);
+  assert.equal(CARD.health, false);
+});
+
+test('actorForUser: kind, unresolved and receive over every permission module, per account', () => {
+  /** @type {Array<[string, number, { kind: string, role: string, unresolved: boolean, receive: Record<string, boolean> }]>} */
+  const rows = [
+    ['member', MEMBER, { kind: 'system', role: 'member', unresolved: false, receive: ALL }],
+    ['member with tasks: none', KID, { kind: 'system', role: 'member', unresolved: false, receive: { ...ALL, tasks: false } }],
+    ['admin', ADMIN, { kind: 'system', role: 'admin', unresolved: false, receive: ALL }],
+    ['display account', DISPLAY, { kind: 'display', role: 'member', unresolved: false, receive: CARD }],
+    ['display on an admin row', DISPLAY_ADMIN, { kind: 'display', role: 'member', unresolved: false, receive: CARD }],
+    ['display with a stored calendar: none', DISPLAY_NARROW, { kind: 'display', role: 'member', unresolved: false, receive: { ...CARD, calendar: false } }],
+    ['split guest', GUEST, { kind: 'guest', role: 'member', unresolved: false, receive: NOTHING }],
+    ['split guest on an admin row', GUEST_ADMIN, { kind: 'guest', role: 'admin', unresolved: false, receive: NOTHING }],
+    ['guest and display at once', BOTH, { kind: 'guest', role: 'member', unresolved: true, receive: NOTHING }],
+  ];
+  for (const [name, id, want] of rows) {
+    const actor = actorForUser(db, id);
+    assert.ok(actor, name);
+    assert.deepEqual(
+      { kind: actor.kind, role: actor.role, unresolved: actor.unresolved, receive: receives(actor) },
+      want,
+      name,
+    );
+    assert.ok(Object.isFrozen(actor), name);
+  }
+});
+
+test('actorForUser: an account that does not exist receives nothing', () => {
+  assert.deepEqual(receives(actorForUser(db, 999999)), NOTHING);
+});
+
+test('actorForUser: a failed guest lookup closes like a guest, for member and admin', () => {
+  for (const id of [MEMBER, ADMIN]) {
+    const actor = withTableMissing('split_expense_guest_users', () => actorForUser(db, id));
+    assert.ok(actor);
+    assert.deepEqual({ kind: actor.kind, unresolved: actor.unresolved, receive: receives(actor) },
+      { kind: 'guest', unresolved: true, receive: NOTHING }, `user ${id}`);
+  }
+});
+
+test('actorForUser: a failed display lookup closes like a display, for member and admin', () => {
+  for (const id of [MEMBER, ADMIN]) {
+    const actor = withTableMissing('display_accounts', () => actorForUser(db, id));
+    assert.ok(actor);
+    assert.deepEqual({ kind: actor.kind, unresolved: actor.unresolved, receive: receives(actor) },
+      { kind: 'display', unresolved: true, receive: CARD }, `user ${id}`);
+  }
+  // A guest stays a guest when only the display lookup fails.
+  const guest = withTableMissing('display_accounts', () => actorForUser(db, GUEST));
+  assert.deepEqual({ kind: guest?.kind, unresolved: guest?.unresolved }, { kind: 'guest', unresolved: true });
+});
+
+test('actorForUser: two lookups more than the users row and the matrix, for every account', () => {
+  const member = countQueries(() => actorForUser(db, MEMBER)).queries;
+  assert.equal(member.filter((sql) => /split_expense_guest_users/.test(sql)).length, 1, member.join('\n'));
+  assert.equal(member.filter((sql) => /display_accounts/.test(sql)).length, 1, member.join('\n'));
+  assert.equal(countQueries(() => actorForUser(db, 999999)).queries.length, 1, 'no lookup without a users row');
+});
+
+test('receive refuses a guest for every module; read and write of a request actor do not ask the kind', () => {
+  // A request actor of a guest: the /api/v1 guest gate closes before any module
+  // verdict, so read and write keep answering from scopes and module rights only.
+  const req = sessionReq(GUEST);
+  const actor = actorFromRequest(req);
+  assert.equal(actor.kind, 'guest');
+  for (const key of MODULE_KEYS) {
+    assert.equal(authorize(actor, 'read', { module: key }).allowed, true, `read ${key}`);
+    assert.equal(authorize(actor, 'write', { module: key }).allowed, true, `write ${key}`);
+    assert.deepEqual({ ...authorize(actor, 'receive', { module: key }) }, { allowed: false, reason: 'guest' }, `receive ${key}`);
+  }
+});
+
+test('mayReceiveFeed: receive, and never for a display; exported from server/authorize/index.ts', () => {
+  const mayReceiveFeed = /** @type {any} */ (authorizeApi).mayReceiveFeed;
+  assert.equal(typeof mayReceiveFeed, 'function');
+  /** @type {Array<[number|null, Record<string, boolean>]>} */
+  const rows = [[MEMBER, ALL], [KID, { ...ALL, tasks: false }], [ADMIN, ALL], [DISPLAY, NOTHING], [DISPLAY_ADMIN, NOTHING],
+    [GUEST, NOTHING], [GUEST_ADMIN, NOTHING], [BOTH, NOTHING], [999999, NOTHING]];
+  for (const [id, want] of rows) {
+    const actor = actorForUser(db, id);
+    assert.deepEqual(Object.fromEntries(MODULE_KEYS.map((key) => [key, mayReceiveFeed(actor, key)])), want, `user ${id}`);
+  }
 });
 
 // actorForAccount (B9): read as a property, so the suite turns red on its test

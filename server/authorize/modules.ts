@@ -196,6 +196,7 @@ const ALLOWED: Verdict = Object.freeze({ allowed: true, reason: null });
 const SCOPE: Verdict = Object.freeze({ allowed: false, reason: 'scope' });
 const MODULE_NONE: Verdict = Object.freeze({ allowed: false, reason: 'module_none' });
 const MODULE_READ_ONLY: Verdict = Object.freeze({ allowed: false, reason: 'module_read_only' });
+const GUEST: Verdict = Object.freeze({ allowed: false, reason: 'guest' });
 
 /**
  * May this actor read, write or receive from this module? The ONE answer to the
@@ -210,8 +211,13 @@ const MODULE_READ_ONLY: Verdict = Object.freeze({ allowed: false, reason: 'modul
  *     entirely (`none`); `read` is enough - whoever may read a module may hear
  *     from it. NO token scopes: a scope belongs to a request, and a delivery is
  *     not one (see withoutModulesDeniedToRecipient() in
- *     services/reminder-origins.js). An admin (`moduleAccess: null`) always
- *     receives.
+ *     services/reminder-origins.js). An admin (`moduleAccess: null`) receives
+ *     everything - unless the account is a split guest: a guest (`kind: 'guest'`,
+ *     see actorForUser()) receives nothing from any module, whatever its matrix
+ *     rights or its role say. Only `receive` asks the kind: `read` and `write` of
+ *     a request actor stay with the guest gate in server/index.js.
+ *
+ * mayReceiveFeed() below adds the one rule a feed has on top of `receive`.
  *
  * The channel rules of /mcp (a display or an unresolved actor reaches no tool, a
  * guest no core tool) are not module verdicts; they stay in toolAllowed.
@@ -226,6 +232,7 @@ export function authorize(actor: Actor | null, action: Action, resource: { modul
   if (actor == null) return NO_ACTOR;
   const key = resource.module;
   if (action === 'receive') {
+    if (actor.kind === 'guest') return GUEST;
     return moduleAccessVerdict(actor.moduleAccess, key, 'read') === MODULE_ACCESS_DENIED ? MODULE_NONE : ALLOWED;
   }
   if (action !== 'read' && action !== 'write') {
@@ -236,6 +243,19 @@ export function authorize(actor: Actor | null, action: Action, resource: { modul
   const verdict = moduleAccessVerdict(actor.moduleAccess, key, action);
   if (verdict === MODULE_ACCESS_ALLOW) return ALLOWED;
   return verdict === MODULE_ACCESS_DENIED ? MODULE_NONE : MODULE_READ_ONLY;
+}
+
+/**
+ * May this actor's personal feed token (the ICS feeds in server/index.js) carry
+ * the module's content? `receive`, and on top of it: a display account gets no
+ * feed at all. A display reads the calendar on its wall through its scope list,
+ * but a feed token is a subscription that leaves the house - the app offers a
+ * display no way to mint one, and its feed stays the empty calendar, as for an
+ * account without the module. A guest is already refused by `receive`.
+ */
+export function mayReceiveFeed(actor: Actor | null, moduleKey: string): boolean {
+  if (actor == null || actor.kind === 'display') return false;
+  return authorize(actor, 'receive', { module: moduleKey }).allowed;
 }
 
 /**
