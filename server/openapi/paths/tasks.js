@@ -165,7 +165,7 @@ export function tasksPaths() {
         summary: 'List completions of this task and its repetition chain',
         tag: 'Tasks',
         params: [idParam(), { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } }],
-        description: 'Answers "when was this last done" for a recurring task (#791). A completed repeating task spawns a follow-up instance, so its history is spread across a chain of rows; this walks the chain to its root and returns the whole series, newest first. A task the caller cannot see answers 404.',
+        description: 'Answers "when was this last done" for a recurring task (#791). A completed repeating task spawns a follow-up instance, so its history is spread across a chain of rows; this walks the chain to its root and returns the whole series, newest first. A task the caller cannot see answers 404; a paired display sees only tasks with visibility `all` (the wall rule), even one that names it as an assignee.',
       }),
     },
     '/api/v1/tasks/{id}/comments': {

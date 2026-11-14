@@ -475,7 +475,8 @@ payment. `test:task-completion-writers` fails for any statement that sets `tasks
 
 API: `GET /api/v1/tasks/completions` (household feed, newest first, cursor-paged over
 `(completed_at, id)` because a bulk action puts several completions in the same second), and
-`GET /api/v1/tasks/{id}/completions` (the whole series behind one task). No date range on either:
+`GET /api/v1/tasks/{id}/completions` (the whole series behind one task; a paired display reads it
+only for a task with visibility `all`, the same wall rule as ticking off, #1209). No date range on either:
 which calendar day an instant belongs to is a question for the display timezone
 (`public/utils/timezone.js`), and a server taking a `from` day would have to keep a second clock for
 it. **The history starts empty** — recording began with this migration, and nothing wrote down what
@@ -3206,7 +3207,10 @@ detail: the other way round, a payload with any status other than `done` answere
 that exists and 404 for one that does not, and the difference between those two answers is exactly
 the disclosure the 404 is there to prevent. Only the
 transition into `done` is allowed; taking it back reverses points and discards a recurrence
-follow-up, and corrections stay with the household. Deciding a redemption stays wherever the
+follow-up, and corrections stay with the household. The same wall rule holds for what the display reads
+about a task it may tick off: `GET /api/v1/tasks/{id}/completions` answers a display only for a
+task with visibility `all`, and the same 404 otherwise, even for a task that names the display as an
+assignee (a state the app cannot produce: a display is never offered or accepted as an assignee). Deciding a redemption stays wherever the
 household put it (`rewards_require_approval`) - the display asks, it never approves.
 
 `GET /api/v1/displays/people` fills the picker: household members with name, colour and picture,
