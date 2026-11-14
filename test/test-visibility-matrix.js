@@ -973,6 +973,45 @@ async function measureTaskWrites(role) {
   };
   const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?');
   const assignmentRows = db.prepare('SELECT * FROM task_assignments WHERE task_id = ?');
+
+  // The task reads: one cell per read path that answers with a task row. A display
+  // reads them under the wall rule (householdVisible), people under the task row rule.
+  const nameOfTask = new Map(seedRules.tasks.map((t) => [t.id, t.name]));
+  /** @param {any[]} rows @param {(row: any) => unknown} idOf */
+  const seededNames = (rows, idOf) => rows.map((row) => Number(idOf(row)))
+    .filter((id) => nameOfTask.has(id)).map((id) => /** @type {string} */ (nameOfTask.get(id))).sort();
+  /** @type {Record<string, any>} */
+  const reads = {};
+  const list = await ruleCall(role, 'task_writes', 'GET', '/tasks');
+  const listRefusal = readRefusal(list, `${where} / list`);
+  if (listRefusal) reads.list = listRefusal;
+  else {
+    const field = listField(list.body, 'data', `${where} / list`);
+    reads.list = 'list' in field ? seededNames(field.list, (row) => row.id) : field.value;
+  }
+  // One completion entry per seeded task for the household feed, removed again below.
+  const insertCompletion = db.prepare(`
+    INSERT INTO task_completions (task_id, series_id, user_id, completed_at)
+    VALUES (?, ?, ?, '2099-01-01T00:00:00Z') RETURNING id
+  `);
+  const completionIds = seedRules.tasks.map((t) => insertCompletion.get(t.id, t.id, seed.ids.admin).id);
+  const feed = await ruleCall(role, 'task_writes', 'GET', '/tasks/completions?limit=200');
+  for (const id of completionIds) db.prepare('DELETE FROM task_completions WHERE id = ?').run(id);
+  const feedRefusal = readRefusal(feed, `${where} / feed`);
+  if (feedRefusal) reads.feed = feedRefusal;
+  else {
+    const field = listField(feed.body, 'data', `${where} / feed`);
+    reads.feed = 'list' in field ? seededNames(field.list, (entry) => entry.task_id) : field.value;
+  }
+  const detail = new WriteCell(`${where} / detail`, { status: 200 }, notFound);
+  const comments = new WriteCell(`${where} / comments`, { status: 200 }, notFound);
+  for (const task of seedRules.tasks) {
+    detail.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}`));
+    comments.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}/comments`));
+  }
+  reads.detail = detail.value();
+  reads.comments = comments.value();
+
   for (const task of seedRules.tasks) {
     cells.completions.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}/completions`));
     // Unchanged line: `changed: false`, no write.
@@ -991,7 +1030,7 @@ async function measureTaskWrites(role) {
     }
   }
   /** @type {Record<string, any>} */
-  const out = Object.fromEntries(Object.entries(cells).map(([key, cell]) => [key, cell.value()]));
+  const out = { ...reads, ...Object.fromEntries(Object.entries(cells).map(([key, cell]) => [key, cell.value()])) };
 
   // Next due date (nextDueDateAfter, tasks.js): tick each shared origin
   // off; the answer names the followup's date or null. A display has to name
@@ -1264,7 +1303,7 @@ const meta = {
   row_rules_cells: 'write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route\'s success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route\'s own reason (a route with two 404 reasons keeps them by row: not_found: { row: reason }), refused = any 403; any other answer fails the suite. The reads (list, overview, capabilities) accept 200 and the gate\'s 403; anything else is flagged, also in update mode',
   row_rules_display: 'the display writes like the wall: display cookie plus the session cookie and CSRF token its first GET below /api/v1 (GET /quick-links) handed out (csrfMiddleware keeps the token in req.session)',
   row_rules_quick_links: 'quicklink.<owner>.<all|private> for admin/member/child, seeded directly. list = GET /quick-links as { visible, editable (can_edit) }; overview / overview_household = the quicklinks row of GET /dashboard (personal, audience=household) in the same shape; change = PUT /quick-links/:id with {} (every field keeps its value, only updated_at moves), ok 200; remove = DELETE /quick-links/:id, ok 204, the row goes back with the same id and values after each 204; detail is n/a',
-  row_rules_task_writes: 'wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description "- [ ] mx item", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branches of PATCH /:id/status and GET /:id/completions (householdVisible) answer for no task because the task row rule runs first). One cell per call site of the task row rule rowVisible(db, \'tasks\', ...): completions = GET /:id/completions (then for the display householdVisible, the same wall rule as the status cell), check = PATCH /:id/check {line 0, checked false} (unchanged line, no write), archive = PATCH /:id/archive {archived false}, status = PATCH /:id/status {status open} on an open task (then the display branch, householdVisible), subtask = POST /tasks {title, parent_task_id} (ok 201, the subtask is deleted), remove = DELETE /:id (the row and its assignments go back with the same id). next_due_date / next_due_date_all / next_due_date_assignees = PATCH /:id/status {status done} on wtask.chain.origin / wtask.chain-all.origin / wtask.chain-assignees.origin (shared, weekly) whose followup already exists: wtask.chain.followup (admin, private), wtask.chain-all.followup (admin, all), wtask.chain-assignees.followup (admin, assignees, assigned to OTHER_OF.admin = member); next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter: the display reads householdVisible, people rowVisible(db, \'tasks\', ...)); the display names done_by_user_id = admin; each origin is reopened and its completion row deleted after each 200',
+  row_rules_task_writes: 'wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description "- [ ] mx item", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branches of PATCH /:id/status and GET /:id/completions (householdVisible) answer for no task because the task row rule runs first). The task reads, under the wall rule (householdVisible) for the display and the task row rule for people: list = the seeded tasks in GET /tasks, feed = the seeded tasks in GET /tasks/completions?limit=200 (one completion entry per seeded task, inserted before the call and deleted after it), detail = GET /tasks/:id, comments = GET /tasks/:id/comments. One cell per call site of the task row rule rowVisible(db, \'tasks\', ...): completions = GET /:id/completions (then for the display householdVisible, the same wall rule as the status cell), check = PATCH /:id/check {line 0, checked false} (unchanged line, no write), archive = PATCH /:id/archive {archived false}, status = PATCH /:id/status {status open} on an open task (then the display branch, householdVisible), subtask = POST /tasks {title, parent_task_id} (ok 201, the subtask is deleted), remove = DELETE /:id (the row and its assignments go back with the same id). next_due_date / next_due_date_all / next_due_date_assignees = PATCH /:id/status {status done} on wtask.chain.origin / wtask.chain-all.origin / wtask.chain-assignees.origin (shared, weekly) whose followup already exists: wtask.chain.followup (admin, private), wtask.chain-all.followup (admin, all), wtask.chain-assignees.followup (admin, assignees, assigned to OTHER_OF.admin = member); next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter: the display reads householdVisible, people rowVisible(db, \'tasks\', ...)); the display names done_by_user_id = admin; each origin is reopened and its completion row deleted after each 200',
   row_rules_series: 'series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=' + SERIES_DAYS + ' from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day, seeded directly in the shape PUT /calendar/:id/occurrences/:day writes (recurrence_parent_id, recurrence_id, overridden_fields, series_authored 1, the series\' assignment rows copied, the exception row on the master; not through the route, which runs the rule under test); the occurrence of a private or assignees series is overridden to visibility all, so a viewer who may not see the series still gets the occurrence in GET /calendar and the capability map loads the hidden master itself (canOverrideOccurrence then hangs on rowVisible(database, \'events\', ...) for the series alone). Plus series.admin.assignees.unlinked (assigned to member) and series.member.private.unlinked without a linked occurrence: after the Outlook target they are local and not eligible, the only state in which can_detach can be true (a linked child makes it false for everyone). capabilities = GET /calendar over the series days as { visible (series with at least one row in the answer, a shared occurrence included), can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written ("past the checks"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found by row = 404 calendar_event_not_found (the occurrence row hidden) or calendar_series_not_found (the occurrence shared, its series hidden); the unlinked series have no linked_* answer',
   row_rules_coverage: 'what the cells do NOT measure: exceptions_post reaches only loadVisibleEvent and refuseForeignEvent (calendar/crud.js ~1967); isEligibleLocalSeries there only supplies the reason for a series that is not locally owned, so the cell is no evidence for rowVisible(database, \'events\', ...) on the series. canDetachOccurrence (buildRecurrenceCapabilityMap in services/calendar-occurrence-overrides.js) is measured only in the stricter direction: a row of a series without a linked child reaches a viewer only when the master itself is visible, which is the same rule as rowVisible on the series; a looser rule cannot show there. quick_links.overview_household is empty for every role that reads it: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks, so householdAudienceAnswer() keeps the empty form',
   row_rules_outlook: 'series_outlook_target = the capabilities cell again after seedOutlookTarget: one outlook_accounts row (auto_sync_calendar_id, owner_user_id = ' + OUTLOOK_TARGET_OWNER + ') with one outlook_calendar_selection row (enabled 1, can_edit 1); MS_CLIENT_ID / MS_CLIENT_SECRET / MS_REDIRECT_URI are pinned empty, so the sync tick returns before any request. outlook_classification = classifyLocalSeries (exported production function) per series before and after the target: the calendar answer shows eligibility only through can_override_occurrence',
