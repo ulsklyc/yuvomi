@@ -397,6 +397,24 @@ test('the wall rule also holds for the history of a task (GET /tasks/:id/complet
   const member = await asVera('GET', `/tasks/${forDisplay}/completions`);
   assert.equal(member.status, 200, 'a person assigned to the task still reads its history');
   assert.equal(member.body.data.length, 1);
+
+  // THE SERIES TOO, NOT ONLY THE ASKED ROW. The answer is the history of the whole
+  // repetition chain, and every earlier instance is filtered on its own. A shared
+  // instance whose predecessor is an assignees task naming the display would carry
+  // that predecessor's entry to the wall if only the asked row met the wall rule.
+  const earlier = seeded('Fenster putzen (vorher)', 'assignees', [displayId, VERA]);
+  const later = seeded('Fenster putzen (jetzt)', 'all', []);
+  db.prepare('UPDATE tasks SET is_recurring = 1, recurrence_origin_id = ? WHERE id = ?').run(earlier, later);
+  db.prepare('UPDATE task_completions SET series_id = ? WHERE task_id = ?').run(earlier, later);
+
+  const wallSeries = await display('GET', `/tasks/${later}/completions`);
+  assert.equal(wallSeries.status, 200);
+  assert.deepEqual(wallSeries.body.data.map((/** @type {any} */ e) => e.task_id), [later],
+    'the wall shows only the household-visible instance of the series');
+
+  const memberSeries = await asVera('GET', `/tasks/${later}/completions`);
+  assert.deepEqual(memberSeries.body.data.map((/** @type {any} */ e) => e.task_id).sort(), [earlier, later].sort(),
+    'an assigned person still reads the whole series');
 });
 
 test('jede andere Schreibroute der beiden Module bleibt zu', async () => {
