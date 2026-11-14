@@ -964,6 +964,8 @@ async function measureTaskWrites(role) {
   const where = `${role} / row_rules / task_writes`;
   const notFound = 'tasks_task_not_found';
   const cells = {
+    detail: new WriteCell(`${where} / detail`, { status: 200 }, notFound),
+    comments: new WriteCell(`${where} / comments`, { status: 200 }, notFound),
     completions: new WriteCell(`${where} / completions`, { status: 200 }, notFound),
     check: new WriteCell(`${where} / check`, { status: 200 }, notFound),
     archive: new WriteCell(`${where} / archive`, { status: 200 }, notFound),
@@ -974,45 +976,27 @@ async function measureTaskWrites(role) {
   const taskRow = db.prepare('SELECT * FROM tasks WHERE id = ?');
   const assignmentRows = db.prepare('SELECT * FROM task_assignments WHERE task_id = ?');
 
-  // The task reads: one cell per read path that answers with a task row. A display
-  // reads them under the wall rule (householdVisible), people under the task row rule.
+  // The task reads (list, feed, detail, comments): a display reads them under the wall
+  // rule (householdVisible), people under the task row rule.
   const nameOfTask = new Map(seedRules.tasks.map((t) => [t.id, t.name]));
-  /** @param {any[]} rows @param {(row: any) => unknown} idOf */
-  const seededNames = (rows, idOf) => rows.map((row) => Number(idOf(row)))
-    .filter((id) => nameOfTask.has(id)).map((id) => /** @type {string} */ (nameOfTask.get(id))).sort();
+  /** @param {string} key @param {{ status: number, body: any }} res @param {(row: any) => unknown} idOf */
+  const seededList = (key, res, idOf) => {
+    const refusal = readRefusal(res, `${where} / ${key}`);
+    const field = refusal ? { value: refusal } : listField(res.body, 'data', `${where} / ${key}`);
+    return 'list' in field ? field.list.map((row) => nameOfTask.get(Number(idOf(row)))).filter(Boolean).sort() : field.value;
+  };
   /** @type {Record<string, any>} */
-  const reads = {};
-  const list = await ruleCall(role, 'task_writes', 'GET', '/tasks');
-  const listRefusal = readRefusal(list, `${where} / list`);
-  if (listRefusal) reads.list = listRefusal;
-  else {
-    const field = listField(list.body, 'data', `${where} / list`);
-    reads.list = 'list' in field ? seededNames(field.list, (row) => row.id) : field.value;
-  }
-  // One completion entry per seeded task for the household feed, removed again below.
-  const insertCompletion = db.prepare(`
-    INSERT INTO task_completions (task_id, series_id, user_id, completed_at)
-    VALUES (?, ?, ?, '2099-01-01T00:00:00Z') RETURNING id
-  `);
+  const reads = { list: seededList('list', await ruleCall(role, 'task_writes', 'GET', '/tasks'), (row) => row.id) };
+  // One completion entry per seeded task for the feed, deleted again right after the call.
+  const insertCompletion = db.prepare("INSERT INTO task_completions (task_id, series_id, user_id, completed_at) VALUES (?, ?, ?, '2099-01-01T00:00:00Z') RETURNING id");
   const completionIds = seedRules.tasks.map((t) => insertCompletion.get(t.id, t.id, seed.ids.admin).id);
   const feed = await ruleCall(role, 'task_writes', 'GET', '/tasks/completions?limit=200');
   for (const id of completionIds) db.prepare('DELETE FROM task_completions WHERE id = ?').run(id);
-  const feedRefusal = readRefusal(feed, `${where} / feed`);
-  if (feedRefusal) reads.feed = feedRefusal;
-  else {
-    const field = listField(feed.body, 'data', `${where} / feed`);
-    reads.feed = 'list' in field ? seededNames(field.list, (entry) => entry.task_id) : field.value;
-  }
-  const detail = new WriteCell(`${where} / detail`, { status: 200 }, notFound);
-  const comments = new WriteCell(`${where} / comments`, { status: 200 }, notFound);
-  for (const task of seedRules.tasks) {
-    detail.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}`));
-    comments.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}/comments`));
-  }
-  reads.detail = detail.value();
-  reads.comments = comments.value();
+  reads.feed = seededList('feed', feed, (entry) => entry.task_id);
 
   for (const task of seedRules.tasks) {
+    cells.detail.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}`));
+    cells.comments.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}/comments`));
     cells.completions.add(task.name, await ruleCall(role, 'task_writes', 'GET', `/tasks/${task.id}/completions`));
     // Unchanged line: `changed: false`, no write.
     cells.check.add(task.name, await ruleCall(role, 'task_writes', 'PATCH', `/tasks/${task.id}/check`, { line: 0, checked: false }));
