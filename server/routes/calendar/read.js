@@ -15,9 +15,10 @@ import {
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
 import { buildMatchQuery, eventSearchWindow, resolveEventSearchRows } from '../../services/search.js';
 import { visibleWhere } from '../../authorize/index.ts';
+import { isAdminRequest } from '../../middleware/require-admin.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
-  VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, isAdminUser, serializeEvents,
+  VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, serializeEvents,
 } from './helpers.js';
 import { todayKey } from '../../utils/timezone.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from '../../services/household-modules.js';
@@ -121,7 +122,7 @@ router.get('/', (req, res) => {
       database,
       viewer: documentViewer(req),
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
     };
     const events = serializeEvents(
       expandAndResolveEventRows(database, rawEvents, from, to),
@@ -152,7 +153,7 @@ router.get('/upcoming', (req, res) => {
       database,
       viewer: documentViewer(req),
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
     });
 
     res.json({ data: expanded });
@@ -251,7 +252,7 @@ router.get('/search', (req, res) => {
         viewer: documentViewer(req),
         database,
         actorId: userId,
-        isAdmin: isAdminUser(req),
+        isAdmin: isAdminRequest(req),
       }),
       total,
     });

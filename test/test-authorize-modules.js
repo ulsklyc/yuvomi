@@ -21,6 +21,10 @@
  *               lists every tool, as before (toolAllowed catches null itself).
  *            6. A second oracle for receive: the permission matrix
  *               (resolvePermissions on each actor's account), not the actor's map.
+ *            7. 'manage' on `{ household: true }` (C1): the admin question - an
+ *               admin may, a member gets 'admin_required', an admin's signed-in
+ *               device 'device_credential', no actor 'no_actor'; and the actor an
+ *               admin gate remembers carries the request's module rights.
  *
  * Run: npm run test:authorize-modules
  */
@@ -255,6 +259,71 @@ test('what B2 does not answer throws instead of answering silently', () => {
   assert.throws(() => authorize(actor, 'read', { type: 'task', id: 1 }), /not implemented in B2/);
   assert.throws(() => authorize(actor, 'write', { type: 'task', ownerId: 1 }), /not implemented in B2/);
   assert.throws(() => authorize(null, 'manage', { module: 'tasks' }), /not implemented in B2/);
+});
+
+// C1 below: 'manage' answers for the household (the admin question) and still
+// throws for a module.
+
+// ---------------------------------------------------------------------------
+// 'manage' on the household (phase 2, C1): the admin question
+// ---------------------------------------------------------------------------
+
+test("manage household: an admin may, a member may not ('admin_required')", () => {
+  const admin = requestActor({ authMethod: 'session', authUserId: ADMIN, authRole: 'admin', authScopes: null });
+  assert.deepEqual(authorize(admin, 'manage', { household: true }), { allowed: true, reason: null });
+  const member = requestActor({ authMethod: 'session', authUserId: MEMBER_WRITE, authScopes: null });
+  assert.deepEqual(authorize(member, 'manage', { household: true }), { allowed: false, reason: 'admin_required' });
+  // A token carries its subject's role: an admin's integration token manages.
+  const adminToken = requestActor({ authMethod: 'api_token', authUserId: ADMIN, authRole: 'admin', authScopes: TOKEN_SCOPES });
+  assert.deepEqual(authorize(adminToken, 'manage', { household: true }), { allowed: true, reason: null });
+  // A display is a member on every request path.
+  const display = requestActor({ authMethod: 'display', authUserId: DISPLAY, authScopes: [...DISPLAY_SCOPES] });
+  assert.deepEqual(authorize(display, 'manage', { household: true }), { allowed: false, reason: 'admin_required' });
+});
+
+test("manage household: an admin's signed-in device is a member and says so ('device_credential')", () => {
+  // requireAuth fixes the role of a device credential to `member` (server/auth.js).
+  /** @type {any} */
+  const req = { authMethod: 'api_token', authUserId: ADMIN, authRole: 'member', authDeviceId: 7, authScopes: null };
+  req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
+  const actor = actorFromRequest(req);
+  assert.equal(actor.deviceId, 7);
+  assert.deepEqual(authorize(actor, 'manage', { household: true }), { allowed: false, reason: 'device_credential' });
+});
+
+test("manage household: no actor may nothing ('no_actor')", () => {
+  assert.deepEqual(authorize(null, 'manage', { household: true }), { allowed: false, reason: 'no_actor' });
+});
+
+test('manage household: the actor without a request (actorForUser) of an admin account manages', () => {
+  assert.deepEqual(authorize(actorForUser(db, ADMIN), 'manage', { household: true }), { allowed: true, reason: null });
+  assert.deepEqual(authorize(actorForUser(db, MEMBER_WRITE), 'manage', { household: true }),
+    { allowed: false, reason: 'admin_required' });
+});
+
+test("'manage' on a module, and any action on the household other than 'manage', still throw", () => {
+  const actor = actorForUser(db, ADMIN);
+  assert.throws(() => authorize(actor, 'manage', { module: 'tasks' }), /not implemented/);
+  assert.throws(() => authorize(actor, 'read', { household: true }), /not implemented/);
+  assert.throws(() => authorize(actor, 'manage', { household: false }), /not implemented/);
+});
+
+test('the admin gate keeps the remembered actor whole: moduleAccess is that of the request', async () => {
+  // requireAuth resolves the module rights first and sets req.sessionModuleAccess
+  // (server/auth.js, applyRoleModuleAccess); a gate behind it then asks the admin
+  // question. The actor that question builds and remembers must carry the same
+  // module rights - an actor built before the field is set would carry `null`,
+  // which means unrestricted.
+  const { requireAdmin } = await import('../server/middleware/require-admin.js');
+  /** @type {any} */
+  const req = { authMethod: 'session', authUserId: MEMBER_MIXED, authRole: 'member', authDeviceId: null, authScopes: null };
+  req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
+  assert.ok(req.sessionModuleAccess && Object.keys(req.sessionModuleAccess).length > 0, 'precondition: restricted');
+  let status = 0;
+  const res = { status(/** @type {number} */ code) { status = code; return { json() {} }; } };
+  requireAdmin(req, res, () => { throw new Error('a member passed requireAdmin'); });
+  assert.equal(status, 403);
+  assert.deepEqual(actorFromRequest(req).moduleAccess, req.sessionModuleAccess);
 });
 
 test('MCP keeps its null-actor answer: every tool is listed', () => {

@@ -33,7 +33,7 @@ import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
 import { finishedVisitsInMonth, latestVisit } from '../services/housekeeping-month.js';
 import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/timezone.js';
-import { isAdminUser, serializeEvents } from './calendar/helpers.js';
+import { serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
 import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
@@ -578,7 +578,7 @@ router.get('/', (req, res) => {
     result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
       userId, limit: eventsLimit, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
       keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, calendars: eventCalendars,
-    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
+    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
   } catch (err) {
     log.error('upcomingEvents error:', err.message);
     result.upcomingEvents = [];
@@ -603,7 +603,7 @@ router.get('/', (req, res) => {
     result.weekEvents = serializeEvents(getEventsOverlappingDays(d, {
       userId, fromKey: shiftDateKey(todayLocalKey, -1), days: 9,
       assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience, calendars: eventCalendars,
-    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) })
+    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) })
       .map(weekEventFields);
   } catch (err) {
     log.error('weekEvents error:', err.message);
@@ -936,7 +936,7 @@ router.get('/', (req, res) => {
       }
     }
     merged.sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
-    result.familyEvents = serializeEvents(merged, { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
+    result.familyEvents = serializeEvents(merged, { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
   } catch (err) {
     log.error('familyEvents error:', err.message);
     result.familyEvents = [];
@@ -1037,7 +1037,7 @@ router.get('/', (req, res) => {
   // Person durch - eine fremde private Kachel liegt also auch dann nicht auf der
   // Leitung, wenn der Browser sie nie zeichnen wuerde.
   if (wants('quicklinks')) try {
-    result.quicklinks = listQuickLinksFor(userId, req.authRole === 'admin');
+    result.quicklinks = listQuickLinksFor(userId, isAdminRequest(req));
   } catch (err) {
     log.error('quick links error:', err.message);
     result.quicklinks = [];

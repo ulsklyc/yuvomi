@@ -5,17 +5,17 @@
  *          per module across both axes (role rights and token scopes), the
  *          capability questions, and the refusal for a record someone else
  *          created. What rights exist and how they are stored lives in catalog.ts.
- *          authorize() (B2) answers read, write and receive per module for an actor.
+ *          authorize() (B2) answers read, write and receive per module for an actor,
+ *          and (C1) whether the actor manages the household.
  *
- * Dependencies: catalog.ts, types.ts, server/scopes.js,
- * server/middleware/require-admin.js
+ * Dependencies: catalog.ts, manage.ts, types.ts, server/scopes.js
  * (none of them loads server/db.js; see actor.ts). The connection is a parameter.
  * Erasable TS syntax only (runs through type stripping, no build).
  */
 
 import { tokenAllows } from '../scopes.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
 import { resolvePermissions } from './catalog.ts';
+import { managesHousehold } from './manage.ts';
 import type { Database, PermissionUser, ResolvedPermissions } from './catalog.ts';
 import type { Actor } from './types.ts';
 
@@ -190,6 +190,7 @@ export function moduleAccessVerdict(
 
 type Action = 'read' | 'write' | 'manage' | 'receive';
 type Verdict = Readonly<{ allowed: boolean; reason: string | null }>;
+type Resource = { module: string } | { household: true };
 
 const NO_ACTOR: Verdict = Object.freeze({ allowed: false, reason: 'no_actor' });
 const ALLOWED: Verdict = Object.freeze({ allowed: true, reason: null });
@@ -197,6 +198,8 @@ const SCOPE: Verdict = Object.freeze({ allowed: false, reason: 'scope' });
 const MODULE_NONE: Verdict = Object.freeze({ allowed: false, reason: 'module_none' });
 const MODULE_READ_ONLY: Verdict = Object.freeze({ allowed: false, reason: 'module_read_only' });
 const GUEST: Verdict = Object.freeze({ allowed: false, reason: 'guest' });
+const ADMIN_REQUIRED: Verdict = Object.freeze({ allowed: false, reason: 'admin_required' });
+const DEVICE_CREDENTIAL: Verdict = Object.freeze({ allowed: false, reason: 'device_credential' });
 
 /**
  * May this actor read, write or receive from this module? The ONE answer to the
@@ -222,15 +225,26 @@ const GUEST: Verdict = Object.freeze({ allowed: false, reason: 'guest' });
  * The channel rules of /mcp (a display or an unresolved actor reaches no tool, a
  * guest no core tool) are not module verdicts; they stay in toolAllowed.
  *
- * 'manage' and resources other than a module come with B3/B4/C; until then they
- * throw, so nobody uses them silently.
+ * 'manage' on `{ household: true }` (C1) is the admin question: may this actor
+ * manage the household? Yes for the role `admin` (managesHousehold() in
+ * manage.ts, the one rule). No otherwise, with the reason `device_credential`
+ * when the actor is a signed-in device - requireAuth makes an admin's device a
+ * member, and the person may be an admin, only not from this device - and
+ * `admin_required` for everyone else. `actor == null`: `no_actor`.
+ *
+ * 'manage' on a module, any other action on the household and any other
+ * resource throw, so nobody uses them silently.
  */
-export function authorize(actor: Actor | null, action: Action, resource: { module: string }): Verdict {
-  if (action === 'manage' || typeof resource?.module !== 'string') {
-    throw new Error(`authorize: ${action} on ${JSON.stringify(resource)} is not implemented in B2`);
+export function authorize(actor: Actor | null, action: Action, resource: Resource): Verdict {
+  if (action === 'manage') {
+    if ((resource as { household?: unknown } | null)?.household !== true) notImplemented(action, resource);
+    if (actor == null) return NO_ACTOR;
+    if (managesHousehold(actor.role)) return ALLOWED;
+    return actor.deviceId != null ? DEVICE_CREDENTIAL : ADMIN_REQUIRED;
   }
+  const key = (resource as { module?: unknown } | null)?.module;
+  if (typeof key !== 'string') notImplemented(action, resource);
   if (actor == null) return NO_ACTOR;
-  const key = resource.module;
   if (action === 'receive') {
     if (actor.kind === 'guest') return GUEST;
     return moduleAccessVerdict(actor.moduleAccess, key, 'read') === MODULE_ACCESS_DENIED ? MODULE_NONE : ALLOWED;
@@ -243,6 +257,10 @@ export function authorize(actor: Actor | null, action: Action, resource: { modul
   const verdict = moduleAccessVerdict(actor.moduleAccess, key, action);
   if (verdict === MODULE_ACCESS_ALLOW) return ALLOWED;
   return verdict === MODULE_ACCESS_DENIED ? MODULE_NONE : MODULE_READ_ONLY;
+}
+
+function notImplemented(action: string, resource: unknown): never {
+  throw new Error(`authorize: ${action} on ${JSON.stringify(resource)} is not implemented in B2`);
 }
 
 /**
@@ -280,7 +298,8 @@ export function clientPermissions(
  */
 export function requestHasCapability(database: Database, req: PermissionRequest | null | undefined, key: string): boolean {
   if (!req) return false;
-  if (isAdminRequest(req)) return true;
+  // The admin rule on the request's role; no actor is built here (manage.ts).
+  if (managesHousehold(req.authRole)) return true;
   const id = req.authUserId ?? req.session?.userId;
   if (id == null) return false;
   return userHasCapability(database, id, key, {
@@ -320,7 +339,7 @@ export function userHasCapability(
     | undefined;
   if (!row) return false;
   const user = actingAsMember ? { ...row, role: 'member' } : row;
-  if (user.role === 'admin') return true;
+  if (managesHousehold(user.role)) return true;
   return resolvePermissions(database, user, { isDisplay }).capabilities[key] === 'allow';
 }
 

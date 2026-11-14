@@ -336,20 +336,11 @@ function adminPredicates(source) {
 }
 
 /** Datei -> erlaubte Vorkommen als `<Ausdruck> @ <Anweisung>`, mit Grund. */
-const ADMIN_PREDICATE_EXCEPTIONS = new Map([
-  // Die Definition des Helfers selbst.
-  ['server/middleware/require-admin.js', [
-    "authRole==='admin' @ return req.authRole==='admin'",
-  ]],
-  // test-sso-only.js haelt die woertliche Schreibweise per Regex.
-  ['server/auth.js', [
-    "authRole==='admin' @ const isAdmin=req.authRole==='admin'",
-  ]],
-  // Ausserhalb dieses Schnitts geblieben; zieht beim naechsten Anfassen nach.
-  ['server/routes/dashboard.js', [
-    "authRole==='admin' @ result.quicklinks=listQuickLinksFor(userId,req.authRole==='admin')",
-  ]],
-]);
+// Seit Phase 2 C1 vergleicht keine Stelle mehr `authRole` mit 'admin': die Regel
+// steht in managesHousehold() (server/authorize/manage.ts) und vergleicht eine
+// Rolle, kein Request-Feld; isAdminRequest() fragt authorize(). Die Karte ist
+// leer und bleibt als Ort fuer eine begruendete Ausnahme stehen.
+const ADMIN_PREDICATE_EXCEPTIONS = new Map([]);
 
 // `.ts` as well: phase 2 moves server code into TypeScript (server/authorize/),
 // and a walk over `.js` alone would not see a predicate that moved there.

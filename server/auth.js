@@ -3600,12 +3600,13 @@ router.get('/users', requireAuth, (req, res) => {
     // und nicht in die Query geschrieben, damit hier keine zusammengesetzte SQL
     // steht, der man erst ansehen muss, dass ihre Bestandteile konstant sind.
     //
-    // `req.authRole` und NICHT `req.session.role`: `requireAuth` bedient beide
-    // Anmeldearten und legt die geltende Rolle dort ab. Ein Admin-API-Token hat
-    // gar keine Session und verloere das Feld; ein Mitglieds-Token neben einem
-    // Admin-Cookie bekaeme es umgekehrt zu Unrecht. Jede andere Rollenpruefung
-    // in dieser Datei fragt aus genau diesem Grund `authRole`.
-    const isAdmin = req.authRole === 'admin';
+    // Die geltende Rolle des Requests und NICHT `req.session.role`: `requireAuth`
+    // bedient beide Anmeldearten und legt die geltende Rolle in `authRole` ab,
+    // und `isAdminRequest()` fragt damit die eine Admin-Regel in
+    // server/authorize/. Ein Admin-API-Token hat gar keine Session und verloere
+    // das Feld; ein Mitglieds-Token neben einem Admin-Cookie bekaeme es umgekehrt
+    // zu Unrecht.
+    const isAdmin = isAdminRequest(req);
     // WANDTABLETTS STEHEN HIER NICHT (#1208). Diese Liste ist die
     // Kontenverwaltung, und die Familien-Seite rendert jede Zeile daraus als
     // bearbeitbares Familienmitglied - samt Familienrolle, Loeschknopf und,
