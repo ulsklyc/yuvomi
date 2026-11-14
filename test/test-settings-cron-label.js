@@ -219,12 +219,17 @@ test('Sommerzeit des Haushalts vor dem übernächsten Lauf: der Ausdruck bleibt'
 });
 
 test('Server und Haushalt in derselben Zone: der Satz ist der Ausdruck, auch vor der Umstellung', () => {
-  // TZ=Europe/Berlin am Server: der Lauf um 02:00 MEZ ist 01:00 UTC. Der Cron
-  // folgt der Wanduhr des Servers, also bleibt es über die Umstellung 02:00.
-  const daily = parse('0 2 * * *', '2027-03-27T01:00:00.000Z', 'Europe/Berlin', 'Europe/Berlin');
-  assert.equal(daily?.params.time, '02:00');
-  // Zwei Namen mit denselben Regeln: der Abstand der Zonen bleibt 0.
-  assert.equal(parse('0 2 * * *', '2027-03-27T01:00:00.000Z', 'Europe/Berlin', 'Europe/Paris')?.params.time, '02:00');
+  // TZ=Europe/Berlin am Server: der Lauf um 04:00 MEZ ist 03:00 UTC, der am
+  // 28.03.2027 um 04:00 MESZ 02:00 UTC. Der Cron folgt der Wanduhr des
+  // Servers, also bleibt es über die Umstellung 04:00.
+  const daily = parse('0 4 * * *', '2027-03-27T03:00:00.000Z', 'Europe/Berlin', 'Europe/Berlin');
+  assert.equal(daily?.params.time, '04:00');
+  // Zwei Namen mit denselben Regeln: dieselbe Wanduhr.
+  assert.equal(parse('0 4 * * *', '2027-03-27T03:00:00.000Z', 'Europe/Berlin', 'Europe/Paris')?.params.time, '04:00');
+  // 02:00 gibt es am 28.03.2027 in Berlin nicht: wann der Cron dann läuft,
+  // sagt keine Wanduhr. Am Tag davor steht deshalb der Konfigwert.
+  assert.equal(parse('0 2 * * *', '2027-03-27T01:00:00.000Z', 'Europe/Berlin', 'Europe/Berlin'), null);
+  assert.equal(parse('0 2 * * *', '2027-03-20T01:00:00.000Z', 'Europe/Berlin', 'Europe/Berlin')?.params.time, '02:00');
 });
 
 test('gleiche Felder zu einem Zeitpunkt sind keine gleiche Zone (UTC-Server, Haushalt London)', () => {

@@ -15,7 +15,7 @@
  */
 
 import { t, formatTime, getLocale } from '/i18n.js';
-import { isValidTimeZone, zonedFields, zonedWeekday } from '/utils/timezone.js';
+import { isValidTimeZone, wallTimeCandidates, zonedFields, zonedWeekday } from '/utils/timezone.js';
 
 const NUMBER = /^\d+$/;
 const STEP = /^\*\/(\d+)$/;
@@ -105,21 +105,6 @@ function parseCronSchedule(expression) {
 }
 
 /**
- * Der Versatz einer Zone gegen UTC zu einem Zeitpunkt, in Minuten. Aus
- * `zonedFields` gerechnet; ohne `zone` die Haushaltszone, in der die Karte
- * schreibt.
- * @param {number} ms
- * @param {string | null} [zone]
- * @returns {number | null}
- */
-function offsetMinutes(ms, zone) {
-  const f = zone === undefined ? zonedFields(ms) : zonedFields(ms, zone);
-  if (!f) return null;
-  const wall = Date.UTC(f.year, f.month - 1, f.day, f.hour, f.minute, f.second);
-  return Math.round((wall - ms) / 60_000);
-}
-
-/**
  * Trifft der nächste Lauf in der Zone des Servers die Uhrzeit und den Tag des
  * Ausdrucks? Wenn nicht, gehört er nicht zu diesem Zeitplan.
  * @param {CronPattern} pattern
@@ -138,6 +123,68 @@ function matchesServerClock(pattern, ms, serverZone) {
 }
 
 /**
+ * Der Lauf nach `ms`, so wie der Cron ihn rechnet: eine Wanduhrzeit der
+ * Serverzone, als Zeitpunkt. null, wenn es diese Wanduhrzeit dort nicht oder
+ * doppelt gibt (Umstellung) - dann ist keine Aussage sicher.
+ * @param {CronPattern} pattern
+ * @param {number} ms
+ * @param {string} serverZone
+ * @returns {number | null}
+ */
+function followingRunMs(pattern, ms, serverZone) {
+  const f = zonedFields(ms, serverZone);
+  if (!f) return null;
+  // Kalenderrechnung auf Date.UTC: nur Felder, keine Zone.
+  let day = Date.UTC(f.year, f.month - 1, f.day);
+  let hour = f.hour;
+  if (pattern.kind === 'hourly') {
+    hour += pattern.count;
+    if (hour > 23) { hour = 0; day += DAY_MS; }
+  } else if (pattern.kind === 'daily') {
+    day += DAY_MS;
+  } else if (pattern.kind === 'weekly') {
+    day += 7 * DAY_MS;
+  } else {
+    // Der nächste Monat, der diesen Tag hat: höchstens zwei weiter (31. Januar
+    // -> 31. März).
+    const next = [1, 2]
+      .map((step) => new Date(Date.UTC(f.year, f.month - 1 + step, pattern.day)))
+      .find((date) => date.getUTCDate() === pattern.day);
+    if (!next) return null;
+    day = next.getTime();
+  }
+  const date = new Date(day);
+  const wall = `${String(date.getUTCFullYear()).padStart(4, '0')}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}T${pad2(hour)}:${pad2(f.minute)}`;
+  const candidates = wallTimeCandidates(wall, serverZone);
+  return candidates.length === 1 ? Date.parse(candidates[0].instant) : null;
+}
+
+/**
+ * Das Muster eines Laufs in der Haushaltszone, oder null.
+ * @param {CronPattern} pattern
+ * @param {number} ms
+ * @returns {CronPattern | null}
+ */
+function localPatternAt(pattern, ms) {
+  const f = zonedFields(ms);
+  if (!f) return null;
+  if (pattern.kind === 'hourly') return { kind: 'hourly', count: pattern.count, minute: f.minute };
+  if (pattern.kind === 'daily') return { kind: 'daily', hour: f.hour, minute: f.minute };
+  if (pattern.kind === 'weekly') {
+    const weekday = zonedWeekday(ms);
+    if (weekday == null) return null;
+    const shift = (weekday - pattern.weekday + 7) % 7;
+    if (shift !== 0 && shift !== 1 && shift !== 6) return null;
+    return { kind: 'weekly', weekday, hour: f.hour, minute: f.minute };
+  }
+  const day = f.day;
+  if (day !== pattern.day) {
+    if (Math.abs(day - pattern.day) !== 1 || pattern.day > 28 || day < 1 || day > 28) return null;
+  }
+  return { kind: 'monthly', day, hour: f.hour, minute: f.minute };
+}
+
+/**
  * Das Muster in der Haushaltszone, abgelesen am nächsten Lauf, oder null.
  *
  * - Uhrzeit (und beim Stundenintervall die Minute) ist die des nächsten Laufs
@@ -148,18 +195,22 @@ function matchesServerClock(pattern, ms, serverZone) {
  * - Ein Monatstag kippt nur, wo es Ausgangs- und Zieltag in jedem Monat gibt
  *   (1.-28.). Der 31. um 23:00 UTC ist in Berlin der 1. - aber nur nach
  *   Monaten mit 31 Tagen.
- * - Ändert sich der Abstand zwischen Haushalts- und Serverzone bis zum
- *   übernächsten Lauf (eine der beiden stellt um, die andere nicht), stimmte
- *   der Satz nur noch einmal: null.
+ * - Der Satz muss auch für den Lauf danach stimmen. Den rechnet diese Datei
+ *   so, wie der Cron es tut - eine Wanduhrzeit der Serverzone -, und liest ihn
+ *   in der Haushaltszone. Nennt er eine andere Uhrzeit (oder einen anderen
+ *   Tag), stellt eine der beiden Zonen vorher um und die andere nicht: null.
+ *
+ * AM FOLGELAUF, NICHT AN EINEM MESSPUNKT. Ein Punkt einen Abstand weiter
+ * übersprang Lagen, die nur dazwischen gelten: ein Monatslauf am 29. liegt
+ * 62 Tage weit, und zwischen New York und Berlin weicht der Abstand drei
+ * Wochen im Frühjahr und eine im Herbst ab. Der 29.10.2026 ist in Berlin
+ * 07:00, der 29.09. und der 30.11. aber 08:00.
  *
  * GLEICHE FELDER SIND KEINE GLEICHE ZONE. Ein UTC-Server und ein Haushalt in
  * London nennen im Winter dieselbe Uhrzeit, nach der Umstellung nicht mehr.
- * Deshalb zählt die Zone, die der Server nennt (`scheduler.timezone`): mit ihr
- * wird an beiden Zonen geprüft, und in derselben Zone (oder einer mit
- * denselben Regeln) bleibt der Abstand 0 und der Satz über die Umstellung
- * stehen - der Cron folgt der Wanduhr des Servers. Nennt der Server keine
- * (älterer Server, neue Oberfläche aus dem Cache), gilt UTC, der Standard des
- * Schedulers: geprüft wird dann immer, an der Haushaltszone.
+ * Deshalb zählt die Zone, die der Server nennt (`scheduler.timezone`). Nennt
+ * er keine (älterer Server, neue Oberfläche aus dem Cache), gilt UTC, der
+ * Standard des Schedulers.
  *
  * @param {CronPattern} pattern
  * @param {unknown} nextRun
@@ -170,45 +221,16 @@ function householdPattern(pattern, nextRun, serverZone) {
   if (typeof nextRun !== 'string' || !nextRun) return null;
   const ms = Date.parse(nextRun);
   if (Number.isNaN(ms)) return null;
-  const f = zonedFields(ms);
-  if (!f) return null;
-  const server = isValidTimeZone(serverZone) ? /** @type {string} */ (serverZone) : null;
-  if (server && !matchesServerClock(pattern, ms, server)) return null;
+  const known = isValidTimeZone(serverZone);
+  const server = known ? /** @type {string} */ (serverZone) : 'UTC';
+  if (known && !matchesServerClock(pattern, ms, server)) return null;
 
-  /** @type {CronPattern} */
-  let local;
-  if (pattern.kind === 'hourly') {
-    local = { kind: 'hourly', count: pattern.count, minute: f.minute };
-  } else if (pattern.kind === 'daily') {
-    local = { kind: 'daily', hour: f.hour, minute: f.minute };
-  } else if (pattern.kind === 'weekly') {
-    const weekday = zonedWeekday(ms);
-    if (weekday == null) return null;
-    const shift = (weekday - pattern.weekday + 7) % 7;
-    if (shift !== 0 && shift !== 1 && shift !== 6) return null;
-    local = { kind: 'weekly', weekday, hour: f.hour, minute: f.minute };
-  } else {
-    const day = f.day;
-    if (day !== pattern.day) {
-      if (Math.abs(day - pattern.day) !== 1 || pattern.day > 28 || day < 1 || day > 28) return null;
-    }
-    local = { kind: 'monthly', day, hour: f.hour, minute: f.minute };
-  }
-
-  // Der übernächste Lauf liegt einen Abstand weiter (beim Monat höchstens).
-  // Ändert sich bis dahin der Abstand der beiden Zonen, nennt der Satz für ihn
-  // eine andere Uhrzeit.
-  const later = ms + intervalOf(pattern);
-  const householdNow = offsetMinutes(ms);
-  const householdLater = offsetMinutes(later);
-  const serverNow = server ? offsetMinutes(ms, server) : 0;
-  const serverLater = server ? offsetMinutes(later, server) : 0;
-  if (householdNow == null || householdLater == null || serverNow == null || serverLater == null) return null;
-  const drift = (householdLater - serverLater) - (householdNow - serverNow);
-  // Beim Stundenintervall steht nur die Minute im Satz: eine volle Stunde
-  // Umstellung lässt sie stehen.
-  const changed = pattern.kind === 'hourly' ? drift % 60 !== 0 : drift !== 0;
-  return changed ? null : local;
+  const local = localPatternAt(pattern, ms);
+  if (!local) return null;
+  const following = followingRunMs(pattern, ms, server);
+  if (following == null) return null;
+  const then = localPatternAt(pattern, following);
+  return then && JSON.stringify(then) === JSON.stringify(local) ? local : null;
 }
 
 /**

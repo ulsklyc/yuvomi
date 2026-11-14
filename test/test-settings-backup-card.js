@@ -539,8 +539,9 @@ test('Zeitplan mit der Zone des Servers: London und eine Server-Umstellung falle
   assert.equal(india.textContent, 'BACKUP_SCHEDULE=0 2 * * *');
 
   // Berlin und Berlin: der Satz bleibt über die Umstellung.
-  const berlin = scheduleCell(await renderInZone('Europe/Berlin', { ...HEALTHY, timezone: 'Europe/Berlin', nextRun: '2027-03-27T01:00:00.000Z' }));
-  assert.ok(berlin.textContent.startsWith(`settings.backupSchedulerCronDaily${JSON.stringify({ time: '02:00' })}`), berlin.textContent);
+  // (04:00, weil es 02:00 am 28.03.2027 in Berlin nicht gibt.)
+  const berlin = scheduleCell(await renderInZone('Europe/Berlin', { ...HEALTHY, schedule: '0 4 * * *', timezone: 'Europe/Berlin', nextRun: '2027-03-27T03:00:00.000Z' }));
+  assert.ok(berlin.textContent.startsWith(`settings.backupSchedulerCronDaily${JSON.stringify({ time: '04:00' })}`), berlin.textContent);
 });
 
 test('die Zone ändert nichts an "überfällig"', async () => {
