@@ -30,13 +30,14 @@ const SUNDAY = Date.UTC(2026, 10, 15);
 const runAt = (/** @type {number} */ day, /** @type {number} */ hour, minute = 0) => new Date(SUNDAY + ((day * 24 + hour) * 60 + minute) * 60_000).toISOString();
 
 /**
- * Der Satz zu `expr`, zerlegt in Schlüssel und Parameter. Ohne `nextRun`
- * stehen Server- und Haushaltszone beide auf UTC und der nächste Lauf ist der,
+ * Der Satz zu `expr`, zerlegt in Schlüssel und Parameter. Die Serverzone
+ * (`scheduler.timezone`) ist UTC, wenn nichts anderes genannt ist. Ohne
+ * `nextRun` stehen Server- und Haushaltszone beide auf UTC und der nächste Lauf ist der,
  * den der Ausdruck dort nennt - dann prüfen die Fälle nur die Musterzuordnung.
  */
-/** @param {unknown} expr @param {unknown} [nextRun] @param {string} [zone] */
-const parse = (expr, nextRun = literalRun(expr), zone = 'UTC') => {
-  const out = inZone(zone, () => formatCronSchedule(expr, nextRun));
+/** @param {unknown} expr @param {unknown} [nextRun] @param {string} [zone] @param {string | null} [serverZone] */
+const parse = (expr, nextRun = literalRun(expr), zone = 'UTC', serverZone = 'UTC') => {
+  const out = inZone(zone, () => formatCronSchedule(expr, nextRun, serverZone));
   if (out == null) return null;
   const at = out.indexOf('{');
   return { key: out.slice(0, at), params: JSON.parse(out.slice(at)) };
@@ -220,8 +221,48 @@ test('Sommerzeit des Haushalts vor dem übernächsten Lauf: der Ausdruck bleibt'
 test('Server und Haushalt in derselben Zone: der Satz ist der Ausdruck, auch vor der Umstellung', () => {
   // TZ=Europe/Berlin am Server: der Lauf um 02:00 MEZ ist 01:00 UTC. Der Cron
   // folgt der Wanduhr des Servers, also bleibt es über die Umstellung 02:00.
-  const daily = parse('0 2 * * *', '2027-03-27T01:00:00.000Z', 'Europe/Berlin');
+  const daily = parse('0 2 * * *', '2027-03-27T01:00:00.000Z', 'Europe/Berlin', 'Europe/Berlin');
   assert.equal(daily?.params.time, '02:00');
+  // Zwei Namen mit denselben Regeln: der Abstand der Zonen bleibt 0.
+  assert.equal(parse('0 2 * * *', '2027-03-27T01:00:00.000Z', 'Europe/Berlin', 'Europe/Paris')?.params.time, '02:00');
+});
+
+test('gleiche Felder zu einem Zeitpunkt sind keine gleiche Zone (UTC-Server, Haushalt London)', () => {
+  // Im Winter steht London auf UTC: der Lauf am 27.03.2027 ist dort 02:00,
+  // der am 28. aber 03:00 BST. "Täglich um 02:00" stimmte nur noch einmal.
+  assert.equal(parse('0 2 * * *', '2027-03-27T02:00:00.000Z', 'Europe/London', 'UTC'), null);
+  // Gegenprobe: eine Woche früher steht der Satz.
+  assert.equal(parse('0 2 * * *', '2027-03-20T02:00:00.000Z', 'Europe/London', 'UTC')?.params.time, '02:00');
+});
+
+test('die Serverzone stellt um, der Haushalt nicht: der Ausdruck bleibt', () => {
+  // TZ=Europe/Berlin am Server, Haushalt in Indien (keine Sommerzeit). Der Lauf
+  // am 27.03.2027 (02:00 MEZ) ist 06:30, der am 28. (02:00 MESZ) schon 05:30.
+  assert.equal(parse('0 2 * * *', '2027-03-27T01:00:00.000Z', 'Asia/Kolkata', 'Europe/Berlin'), null);
+  // Gegenprobe: eine Woche früher steht der Satz in indischer Zeit.
+  assert.equal(parse('0 2 * * *', '2027-03-20T01:00:00.000Z', 'Asia/Kolkata', 'Europe/Berlin')?.params.time, '06:30');
+});
+
+test('ohne Serverzone (alter Server): immer prüfen, keine Abkürzung', () => {
+  // Fehlt `scheduler.timezone`, kann die Oberfläche nicht wissen, ob Server
+  // und Haushalt dieselbe Wanduhr haben. Sie prüft die Umstellung des
+  // Haushalts, als liefe der Server auf UTC - auch dann, wenn der nächste
+  // Lauf zufällig genau die Uhrzeit des Ausdrucks nennt.
+  // Direkt aufgerufen: `parse` setzte für `undefined` seine Vorgabe UTC ein.
+  const inBerlin = (/** @type {string} */ nextRun, /** @type {unknown} */ serverZone) => (
+    inZone('Europe/Berlin', () => formatCronSchedule('0 2 * * *', nextRun, serverZone)));
+  for (const serverZone of [null, undefined, '', 'Mars/Olympus_Mons']) {
+    assert.equal(inBerlin('2027-03-27T01:00:00.000Z', serverZone), null, String(serverZone));
+    assert.equal(inBerlin('2026-11-16T01:00:00.000Z', serverZone), `settings.backupSchedulerCronDaily${JSON.stringify({ time: '02:00' })}`, String(serverZone));
+  }
+  assert.equal(inZone('Europe/Berlin', () => formatCronSchedule('0 2 * * *', '2026-11-16T01:00:00.000Z')), `settings.backupSchedulerCronDaily${JSON.stringify({ time: '02:00' })}`, 'ohne drittes Argument');
+});
+
+test('mit Serverzone muss der nächste Lauf dort die Uhrzeit des Ausdrucks treffen', () => {
+  // 03:00 UTC ist nie ein Lauf von "0 2 * * *" auf einem UTC-Server.
+  assert.equal(parse('0 2 * * *', '2026-11-16T03:00:00.000Z', 'Europe/Berlin', 'UTC'), null);
+  // Sonntag 23:00 in Berlin ist Sonntag 22:00 UTC - kein Lauf von "0 23 * * sun" in UTC.
+  assert.equal(parse('0 23 * * sun', '2026-11-15T22:00:00.000Z', 'Europe/Berlin', 'UTC'), null);
 });
 
 test('ohne nächsten Lauf kein Satz: dann steht der Ausdruck', () => {

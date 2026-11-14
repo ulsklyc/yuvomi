@@ -117,6 +117,8 @@ const HEALTHY = {
   lastError: null,
   lastSuccess: ago(8 * HOUR),
   nextRun: new Date(NOW + 16 * HOUR).toISOString(),
+  // Die Zone, in der der Cron läuft (`TZ`, sonst UTC).
+  timezone: 'UTC',
 };
 
 /**
@@ -381,7 +383,7 @@ test('ein Zeitplan über mehrere Wochentage steht als Ausdruck da und warnt nie 
     const old = { ...HEALTHY, schedule, lastSuccess: ago(400 * DAY), lastBackup: { timestamp: ago(400 * DAY), success: true } };
     assert.equal(backupSuccessOverdue(old, NOW), false, schedule);
     const info = await renderCard({ statuses: [old] });
-    assert.equal(rowOf(info, 'settings.backupSchedulerSchedule')?.value, schedule);
+    assert.equal(rowOf(info, 'settings.backupSchedulerSchedule')?.value, `BACKUP_SCHEDULE=${schedule}`);
     assert.equal(rowOf(info, 'settings.backupSchedulerLastBackup')?.valueClass, 'settings-info-value', schedule);
   }
 
@@ -492,8 +494,8 @@ test('Zeitplan in der Haushaltszone: dieselbe Uhrzeit wie "Nächstes Backup"', a
   const schedule = rowOf(info, 'settings.backupSchedulerSchedule')?.value ?? '';
   assert.ok(schedule.startsWith(`settings.backupSchedulerCronDaily${JSON.stringify({ time: '03:00' })}`), schedule);
   assert.match(rowOf(info, 'settings.backupSchedulerNextRun')?.value ?? '', /03:00/);
-  // Der Ausdruck bleibt als Beleg hinter "Mehr dazu".
-  assert.ok(schedule.endsWith('0 2 * * *'), schedule);
+  // Hinter "Mehr dazu" steht der Konfigwert, keine zweite Uhrzeit.
+  assert.ok(schedule.endsWith('settings.hintMoreBACKUP_SCHEDULE=0 2 * * *'), schedule);
 });
 
 test('Zeitplan in der Haushaltszone: Tageswechsel und Zone mit halber Stunde', async () => {
@@ -514,11 +516,31 @@ test('Zeitplan ohne nächsten Lauf oder vor der Umstellung des Haushalts: der Au
     { ...HEALTHY, nextRun: '2027-03-27T02:00:00.000Z' },
   ]) {
     const info = await renderInZone('Europe/Berlin', scheduler);
-    const [row] = byClass(info, 'settings-info-row').filter((el) => byClass(el, 'settings-info-label')[0]?.textContent === 'settings.backupSchedulerSchedule');
-    const [value] = byClass(row, 'settings-info-value');
-    assert.equal(value.textContent, '0 2 * * *', JSON.stringify(scheduler.nextRun));
+    const value = scheduleCell(info);
+    assert.equal(value.textContent, 'BACKUP_SCHEDULE=0 2 * * *', JSON.stringify(scheduler.nextRun));
     assert.equal(value.childNodes[0]?.tagName?.toLowerCase(), 'code', JSON.stringify(scheduler.nextRun));
   }
+});
+
+/** Die Wertzelle der Zeile "Zeitplan". @param {any} info */
+function scheduleCell(info) {
+  const [row] = byClass(info, 'settings-info-row').filter((el) => byClass(el, 'settings-info-label')[0]?.textContent === 'settings.backupSchedulerSchedule');
+  return byClass(row, 'settings-info-value')[0];
+}
+
+test('Zeitplan mit der Zone des Servers: London und eine Server-Umstellung fallen auf den Konfigwert zurück', async () => {
+  // UTC-Server, Haushalt London im Winter: gleiche Uhrzeit am 27.03.2027, am
+  // 28. aber 03:00 BST.
+  const london = scheduleCell(await renderInZone('Europe/London', { ...HEALTHY, nextRun: '2027-03-27T02:00:00.000Z' }));
+  assert.equal(london.textContent, 'BACKUP_SCHEDULE=0 2 * * *');
+
+  // Server Berlin, Haushalt Indien: der Server stellt um, der Haushalt nicht.
+  const india = scheduleCell(await renderInZone('Asia/Kolkata', { ...HEALTHY, timezone: 'Europe/Berlin', nextRun: '2027-03-27T01:00:00.000Z' }));
+  assert.equal(india.textContent, 'BACKUP_SCHEDULE=0 2 * * *');
+
+  // Berlin und Berlin: der Satz bleibt über die Umstellung.
+  const berlin = scheduleCell(await renderInZone('Europe/Berlin', { ...HEALTHY, timezone: 'Europe/Berlin', nextRun: '2027-03-27T01:00:00.000Z' }));
+  assert.ok(berlin.textContent.startsWith(`settings.backupSchedulerCronDaily${JSON.stringify({ time: '02:00' })}`), berlin.textContent);
 });
 
 test('die Zone ändert nichts an "überfällig"', async () => {
