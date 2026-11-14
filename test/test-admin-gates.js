@@ -1,24 +1,27 @@
 /**
- * Test: Admin gates - what a member, an admin and an admin's device get at every admin gate (phase 2, C1)
- * Purpose: a CHARACTERISATION. Every admin gate of the server is one row in
- *          test/admin-gates-table.js with the answer a MEMBER gets today
- *          (status 403 and the whole body: `error`, `code`, `reason` or its
- *          absence). C1 moves the admin question into server/authorize/; not
- *          one of these answers may change, and the three texts stay where
- *          they are until C2.
+ * Test: Admin gates - what a member, an admin and an admin's device get at every admin gate (phase 2, C1 and C2)
+ * Purpose: every admin gate of the server is one row in
+ *          test/admin-gates-table.js with the answer a MEMBER gets (status 403
+ *          and the whole body: `error`, `code`, `reason` or its absence). C1
+ *          recorded the answers as they were and moved the admin question
+ *          into server/authorize/; C2 gave every pure admin gate one refusal,
+ *          `403 { error: 'Admin access required.', code: 403, reason:
+ *          'admin_required' }`, sent by refuseAdmin() in
+ *          server/middleware/require-admin.js.
  *
  *          Measured over the REAL server (test/server-ready.js) on an
  *          in-memory database: session, CSRF, the /api/v1 gate chain and the
  *          auth router mounted before it are part of what a member meets.
  *
- *          Three more groups: an admin gets through (not 403) once per form;
- *          an admin on a signed-in device gets the shared middleware's own
- *          reason (`device_credential`) and a local copy's plain text.
+ *          Two more groups: an admin gets through (not 403) once per form;
+ *          an admin on a signed-in device gets `device_credential` at every
+ *          form (the same function sends both refusals).
  *
  *          COMPLETENESS: one case counts the gate sites in the source -
  *          `requireAdmin` as a route argument or in `router.use`, every
- *          `assertAdmin(` call, every 403 within three lines behind a negated
- *          admin question - per file and route, and compares that multiset
+ *          `assertAdmin(` call, every `refuseAdmin(` call, every other 403
+ *          within three lines behind a negated admin question - per file and
+ *          route, and compares that multiset
  *          with the table plus its EXCEPTIONS and MIXED lists. A new gate
  *          without a row is red.
  *
@@ -174,11 +177,15 @@ test('an admin gets through, once per form', async () => {
   assert.deepEqual(failed, []);
 });
 
-test("an admin's signed-in device: the shared middleware names the device, a local copy does not", async () => {
+test("an admin's signed-in device: every form names the device", async () => {
+  const failed = [];
   for (const c of DEVICE_CASES) {
     const res = await http(c.method, c.path, { headers: deviceHeaders });
-    assert.deepEqual({ status: res.status, body: res.body }, { status: 403, body: c.expect }, `${c.form} ${c.method} ${c.path}`);
+    if (res.status !== 403 || JSON.stringify(res.body) !== JSON.stringify(c.expect)) {
+      failed.push(`${c.form} ${c.method} ${c.path}: ${res.status} ${JSON.stringify(res.body)}`);
+    }
   }
+  assert.deepEqual(failed, []);
 });
 
 for (const row of ROWS) {
@@ -203,8 +210,10 @@ test('the seeded state the stateful gates read is still there', () => {
 
 const ROUTE_START = /\b(?:router|targetRouter|app)\.(get|post|put|patch|delete|use)\(\s*(?:\[\s*)?(?:'([^']*)')?/g;
 const FUNCTION_START = /\bfunction\s+([\w$]+)\s*\(/g;
-/** The definitions of a gate: their own 403 is counted at their uses. */
+/** The definitions of a gate: their own refusal is counted at their uses. */
 const GATE_DEFINITIONS = new Set(['requireAdmin', 'assertAdmin']);
+/** The one refusal of an admin gate (C2): a call of it is an inline site. */
+const REFUSE_CALL = /\brefuseAdmin\(/;
 
 /** @param {string} dir */
 function serverFiles(dir = join(ROOT, 'server')) {
@@ -270,9 +279,12 @@ function gateSites() {
       for (const key of routeKeys(src, enclosing(src, m.index))) sites.push(`assertAdmin|${file}|${key}`);
     }
     lines.forEach((line, i) => {
-      if (!/status\(403\)/.test(line)) return;
-      const window = lines.slice(Math.max(0, i - 2), i + 1).join('\n');
-      if (!/!\s*(?:isAdminRequest\(req\)|isAdmin\b)/.test(window)) return;
+      if (/^\s*(?:import|export)\b/.test(line) || /function\s+refuseAdmin\b/.test(line)) return;
+      if (!REFUSE_CALL.test(line)) {
+        if (!/status\(403\)/.test(line)) return;
+        const window = lines.slice(Math.max(0, i - 2), i + 1).join('\n');
+        if (!/!\s*(?:isAdminRequest\(req\)|isAdmin\b)/.test(window)) return;
+      }
       const key = enclosing(src, lineStart(i));
       if (GATE_DEFINITIONS.has(key.replace(/^function /, ''))) return;
       for (const k of routeKeys(src, key)) sites.push(`inline|${file}|${k}`);

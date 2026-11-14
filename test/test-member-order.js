@@ -246,7 +246,7 @@ test('a non-admin cannot reorder: 403 with reason, nothing written', async () =>
   const r = await reorder(CALL.Zoe, ids('Zoe', 'Mara', 'Anna', 'Ben', 'Ömer'));
   assert.equal(r.status, 403);
   assert.equal(r.body.reason, 'admin_required');
-  assert.equal(r.body.error, 'Only administrators can change the member order.');
+  assert.equal(r.body.error, 'Admin access required.');
   assert.equal(r.body.code, 403);
   assert.deepEqual(rawPositions(), before);
 });

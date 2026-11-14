@@ -37,6 +37,8 @@ export const REFUSAL_MESSAGES = new Map([
   ['not_owner', 'common.errorNotOwner'],
   // Die Handordnung der Aufgaben ohne `tasks_reorder_family` (R23, D15).
   ['reorder_not_allowed', 'tasks.errorReorderNotAllowed'],
+  // Die eine Absage jedes Admin-Gates (Phase 2, C2): derselbe Satz wie ohne Grund.
+  ['admin_required', 'common.errorNoPermission'],
 ]);
 
 /**

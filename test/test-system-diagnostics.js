@@ -152,7 +152,7 @@ test('a scoped API token does not reach the path, whatever its scopes', () => {
 test('a member gets 403 and none of the fields', async () => {
   const res = await diagnostics({ role: 'member' });
   assert.equal(res.status, 403);
-  assert.deepEqual(res.body, { error: 'Permission denied.', code: 403 });
+  assert.deepEqual(res.body, { error: 'Admin access required.', code: 403, reason: 'admin_required' });
 });
 
 test('a device credential gets 403 with its reason', async () => {

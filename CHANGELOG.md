@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Every "administrators only" refusal of the API has the same answer.** Routes that only an
+  administrator may use refused everyone else with one of four texts ("Permission denied.",
+  "Admin access required.", "Not authorized.", and one of its own for the member order), most
+  of them without a `reason`. They now all answer `403` with
+  `{ "error": "Admin access required.", "code": 403, "reason": "admin_required" }`. A signed-in
+  device gets `reason: "device_credential"` at every one of these routes, where some of them
+  used to send the plain text. API clients that compared the text should read the `reason`
+  instead. Who may use a route has not changed, and the web app shows the same sentence as
+  before.
+
 ### Fixed
 - **The backup schedule shows the same time as the next backup.** On a server running in
   another time zone than the household, the backup card said "Daily at 02:00" above "Next

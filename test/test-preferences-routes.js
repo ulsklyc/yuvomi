@@ -929,7 +929,7 @@ async function assertPatchAppliesNothing(patch, expected, actorOpts = {}) {
   const res = await put(patch, actorOpts);
   assert.equal(res.status, expected.status);
   // Die Antwort selbst bleibt, wie sie war: Status und Body des abgelehnten Feldes.
-  assert.deepEqual(res.body, { error: expected.error, code: expected.status });
+  assert.deepEqual(res.body, { error: expected.error, code: expected.status, ...(expected.reason ? { reason: expected.reason } : {}) });
   const after = (await get(actorOpts)).body.data;
   for (const key of expected.untouched) {
     assert.deepEqual(after[key], before[key], `${key} wurde trotz ${expected.status} geschrieben`);
@@ -978,7 +978,7 @@ test('abgelehnte Patch: auch ein 403 nimmt die Felder davor zurueck (#1622)', as
   cfgSet('hidden_modules:user:1', '["budget"]');
   await assertPatchAppliesNothing(
     { week_start: 'saturday', hidden_modules: ['tasks'], holiday_show_public: true },
-    { status: 403, error: 'Admin access required.', untouched: ['week_start', 'hidden_modules'] },
+    { status: 403, error: 'Admin access required.', reason: 'admin_required', untouched: ['week_start', 'hidden_modules'] },
     { role: 'member' },
   );
   cfgDelete('week_start'); cfgDelete('hidden_modules:user:1');
