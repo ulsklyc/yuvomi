@@ -5148,7 +5148,8 @@ test('jede Übergabe in den Einkauf geht über die eine Dublettenregel', () => {
   const routesDir = new URL('../server/routes/', import.meta.url);
   let checked = 0;
   for (const entry of readdirSync(routesDir)) {
-    if (!entry.endsWith('.js')) continue;
+    // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+    if (!/\.(js|ts)$/.test(entry)) continue;
     for (const route of transferRoutes(read(`../server/routes/${entry}`))) {
       if (route.path.endsWith('import-shopping')) continue;
       checked += 1;
@@ -5279,7 +5280,8 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
   const routesDir = new URL('../server/routes/', import.meta.url);
   let routesChecked = 0;
   for (const entry of readdirSync(routesDir)) {
-    if (!entry.endsWith('.js')) continue;
+    // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+    if (!/\.(js|ts)$/.test(entry)) continue;
     for (const route of transferRoutes(read(`../server/routes/${entry}`))) {
       // Der Weg in den VORRAT nimmt ueber seine eigene Route zurueck (R23, D3);
       // dafuer steht unten eine eigene Zusicherung.

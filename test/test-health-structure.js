@@ -213,7 +213,8 @@ const RAW_PARENT_SCOPE = /\b[a-z][a-z0-9_]*\.user_id\s*=\s*\?/;
 
 test('kein handgeschriebenes <alias>.user_id = ? in den Health-Routen (#884)', () => {
   const offenders = [];
-  for (const file of fs.readdirSync(ROUTE_DIR).filter((f) => f.endsWith('.js'))) {
+  // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+  for (const file of fs.readdirSync(ROUTE_DIR).filter((f) => /\.(js|ts)$/.test(f))) {
     const lines = fs.readFileSync(path.join(ROUTE_DIR, file), 'utf8').split('\n');
     lines.forEach((line, i) => {
       if (RAW_PARENT_SCOPE.test(line)) offenders.push(`${file}:${i + 1}: ${line.trim()}`);

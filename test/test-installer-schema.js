@@ -1055,7 +1055,8 @@ function serviceFiles(dir = '../server/services/') {
   const out = [];
   for (const entry of readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })) {
     if (entry.isDirectory()) out.push(...serviceFiles(`${dir}${entry.name}/`));
-    else if (entry.name.endsWith('.js')) out.push(`${dir}${entry.name}`);
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(js|ts)$/.test(entry.name)) out.push(`${dir}${entry.name}`);
   }
   return out;
 }
@@ -1368,7 +1369,8 @@ function literalEnvReads() {
       if (entry.name === 'node_modules') continue;
       const rel = `${dir}/${entry.name}`;
       if (entry.isDirectory()) { walk(rel); continue; }
-      if (!entry.name.endsWith('.js')) continue;
+      // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+      if (!/\.(js|ts)$/.test(entry.name)) continue;
       const src = readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
       const hits = [
         ...src.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g),

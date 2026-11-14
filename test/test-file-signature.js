@@ -203,7 +203,8 @@ function routeFiles(dir = ROUTES_DIR) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) return routeFiles(full);
-    return entry.name.endsWith('.js') ? [path.relative(ROUTES_DIR, full)] : [];
+    // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+    return /\.(js|ts)$/.test(entry.name) ? [path.relative(ROUTES_DIR, full)] : [];
   });
 }
 

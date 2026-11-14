@@ -138,7 +138,8 @@ test('withCaseReasons gibt es genau einmal, in server/openapi/helpers.js', () =>
   const dir = new URL('../server/openapi/paths/', import.meta.url);
   const copies = [];
   const unshared = [];
-  for (const name of readdirSync(dir).filter((file) => file.endsWith('.js'))) {
+  // .ts too: a path module written in TypeScript (phase 2 onward) is a path module.
+  for (const name of readdirSync(dir).filter((file) => /\.(js|ts)$/.test(file))) {
     const src = withoutCommentsKeepingLines(readFileSync(new URL(name, dir), 'utf8'));
     if (/\bfunction\s+withCaseReasons\b|\bwithCaseReasons\s*=/.test(src)) copies.push(name);
     if (/\bwithCaseReasons\s*\(/.test(src) && !/import\s*\{[^}]*\bwithCaseReasons\b[^}]*\}\s*from\s*'\.\.\/helpers\.js'/.test(src)) {

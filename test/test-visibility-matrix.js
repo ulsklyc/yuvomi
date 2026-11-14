@@ -19,11 +19,11 @@
  *          on every call site of the task row rule, series capabilities and
  *          occurrence routes, the Outlook auto-sync target. Their rows are
  *          seeded after every read path was measured (see `_meta.row_rules`).
- *          Since B8b these rules live in server/authorize (mayAccessTask and
- *          actorCanSeeSeries -> rowVisible, mayEdit -> canEditQuickLink, the
- *          quick link 404 -> rowVisible (in B8b first quickLinkHiddenFrom),
- *          the display branch -> householdVisible); the cells measure the same call sites. The old
- *          names stay in `_meta`, which is compared to the data file.
+ *          Since B8b these rules live in server/authorize: rowVisible (the
+ *          task and series row rule, the quick link 404), canEditQuickLink
+ *          (the quick link edit right) and householdVisible (the display
+ *          branch); the cells measure the same call sites. `_meta` names
+ *          them the same way and is compared to the data file.
  *
  *          Rate limits: `apiLimiter` (300/min) and `feedLimiter` (30/min) key
  *          on the client address, and `trust proxy` is one hop, so every
@@ -911,8 +911,7 @@ let ruleSeed = null;
 
 /**
  * Quick links: list (with `can_edit`), the dashboard row, PUT {} and DELETE
- * per tile (quick-links.js: 404 through rowVisible, 403 through canEditQuickLink;
- * until B8b the inline 404 at ~302/347 and mayEdit ~145, in B8b quickLinkHiddenFrom).
+ * per tile (quick-links.js: 404 through rowVisible, 403 through canEditQuickLink).
  * @param {string} role
  */
 async function measureQuickLinks(role) {
@@ -957,8 +956,7 @@ async function measureQuickLinks(role) {
 
 /**
  * Tasks on the write paths, one cell per call site of the task row rule
- * (rowVisible(db, 'tasks', ...) since B8b; until then mayAccessTask, tasks.js
- * ~420), plus the next due date after ticking a chain off.
+ * (rowVisible(db, 'tasks', ...)), plus the next due date after ticking a chain off.
  * @param {string} role
  */
 async function measureTaskWrites(role) {
@@ -995,7 +993,7 @@ async function measureTaskWrites(role) {
   /** @type {Record<string, any>} */
   const out = Object.fromEntries(Object.entries(cells).map(([key, cell]) => [key, cell.value()]));
 
-  // Next due date (nextDueDateAfter, tasks.js ~1860): tick each shared origin
+  // Next due date (nextDueDateAfter, tasks.js): tick each shared origin
   // off; the answer names the followup's date or null. A display has to name
   // the person (displayActingPerson); everyone else does not.
   const body = role === 'display' ? { status: 'done', done_by_user_id: seed.ids.admin } : { status: 'done' };
@@ -1020,7 +1018,7 @@ async function measureTaskWrites(role) {
 
 /**
  * The series capabilities in the calendar answer (buildRecurrenceCapabilityMap,
- * calendar-occurrence-overrides.js ~643): which seeded series the role sees and
+ * calendar-occurrence-overrides.js): which seeded series the role sees and
  * for which it may override or detach an occurrence.
  * @param {string} role
  * @param {string} block
@@ -1052,7 +1050,7 @@ async function seriesCapabilities(role, block) {
 
 /**
  * Series: the capability fields, then every write route that reaches
- * isEligibleLocalSeries (calendar-occurrence-overrides.js ~695). The
+ * isEligibleLocalSeries (calendar-occurrence-overrides.js). The
  * occurrence routes get a well-formed key one day before the series start:
  * baseOccurrenceFor() refuses it with 400 `invalid_recurrence_id` AFTER the
  * visibility, ownership and series checks, so nothing is written and that 400
@@ -1266,9 +1264,9 @@ const meta = {
   row_rules_cells: 'write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route\'s success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route\'s own reason (a route with two 404 reasons keeps them by row: not_found: { row: reason }), refused = any 403; any other answer fails the suite. The reads (list, overview, capabilities) accept 200 and the gate\'s 403; anything else is flagged, also in update mode',
   row_rules_display: 'the display writes like the wall: display cookie plus the session cookie and CSRF token its first GET below /api/v1 (GET /quick-links) handed out (csrfMiddleware keeps the token in req.session)',
   row_rules_quick_links: 'quicklink.<owner>.<all|private> for admin/member/child, seeded directly. list = GET /quick-links as { visible, editable (can_edit) }; overview / overview_household = the quicklinks row of GET /dashboard (personal, audience=household) in the same shape; change = PUT /quick-links/:id with {} (every field keeps its value, only updated_at moves), ok 200; remove = DELETE /quick-links/:id, ok 204, the row goes back with the same id and values after each 204; detail is n/a',
-  row_rules_task_writes: 'wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description "- [ ] mx item", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branch of PATCH /:id/status, tasks.js ~2287, answers for no task because mayAccessTask runs first). One cell per mayAccessTask call site: completions = GET /:id/completions (~2604), check = PATCH /:id/check {line 0, checked false} (~2471, unchanged line, no write), archive = PATCH /:id/archive {archived false} (~2418), status = PATCH /:id/status {status open} on an open task (~2244, then the display branch ~2287), subtask = POST /tasks {title, parent_task_id} (~1399, ok 201, the subtask is deleted), remove = DELETE /:id (~2529, the row and its assignments go back with the same id). next_due_date / next_due_date_all / next_due_date_assignees = PATCH /:id/status {status done} on wtask.chain.origin / wtask.chain-all.origin / wtask.chain-assignees.origin (shared, weekly) whose followup already exists: wtask.chain.followup (admin, private), wtask.chain-all.followup (admin, all), wtask.chain-assignees.followup (admin, assignees, assigned to OTHER_OF.admin = member); next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter ~1860: display reads visibility all, people mayAccessTask); the display names done_by_user_id = admin; each origin is reopened and its completion row deleted after each 200',
-  row_rules_series: 'series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=' + SERIES_DAYS + ' from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day, seeded directly in the shape PUT /calendar/:id/occurrences/:day writes (recurrence_parent_id, recurrence_id, overridden_fields, series_authored 1, the series\' assignment rows copied, the exception row on the master; not through the route, which runs the rule under test); the occurrence of a private or assignees series is overridden to visibility all, so a viewer who may not see the series still gets the occurrence in GET /calendar and the capability map loads the hidden master itself (canOverrideOccurrence then hangs on actorCanSeeSeries alone). Plus series.admin.assignees.unlinked (assigned to member) and series.member.private.unlinked without a linked occurrence: after the Outlook target they are local and not eligible, the only state in which can_detach can be true (a linked child makes it false for everyone). capabilities = GET /calendar over the series days as { visible (series with at least one row in the answer, a shared occurrence included), can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written ("past the checks"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found by row = 404 calendar_event_not_found (the occurrence row hidden) or calendar_series_not_found (the occurrence shared, its series hidden); the unlinked series have no linked_* answer',
-  row_rules_coverage: 'what the cells do NOT measure: exceptions_post reaches only loadVisibleEvent and refuseForeignEvent (calendar/crud.js ~1967); isEligibleLocalSeries there only supplies the reason for a series that is not locally owned, so the cell is no evidence for actorCanSeeSeries. canDetachOccurrence (~686-688) is measured only in the stricter direction: a row of a series without a linked child reaches a viewer only when the master itself is visible, which is the same rule as actorCanSeeSeries; a looser actorCanSeeSeries cannot show there. quick_links.overview_household is empty for every role that reads it: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks, so householdAudienceAnswer() keeps the empty form',
+  row_rules_task_writes: 'wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description "- [ ] mx item", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branch of PATCH /:id/status (householdVisible) answers for no task because the task row rule runs first). One cell per call site of the task row rule rowVisible(db, \'tasks\', ...): completions = GET /:id/completions, check = PATCH /:id/check {line 0, checked false} (unchanged line, no write), archive = PATCH /:id/archive {archived false}, status = PATCH /:id/status {status open} on an open task (then the display branch, householdVisible), subtask = POST /tasks {title, parent_task_id} (ok 201, the subtask is deleted), remove = DELETE /:id (the row and its assignments go back with the same id). next_due_date / next_due_date_all / next_due_date_assignees = PATCH /:id/status {status done} on wtask.chain.origin / wtask.chain-all.origin / wtask.chain-assignees.origin (shared, weekly) whose followup already exists: wtask.chain.followup (admin, private), wtask.chain-all.followup (admin, all), wtask.chain-assignees.followup (admin, assignees, assigned to OTHER_OF.admin = member); next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter: the display reads householdVisible, people rowVisible(db, \'tasks\', ...)); the display names done_by_user_id = admin; each origin is reopened and its completion row deleted after each 200',
+  row_rules_series: 'series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=' + SERIES_DAYS + ' from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day, seeded directly in the shape PUT /calendar/:id/occurrences/:day writes (recurrence_parent_id, recurrence_id, overridden_fields, series_authored 1, the series\' assignment rows copied, the exception row on the master; not through the route, which runs the rule under test); the occurrence of a private or assignees series is overridden to visibility all, so a viewer who may not see the series still gets the occurrence in GET /calendar and the capability map loads the hidden master itself (canOverrideOccurrence then hangs on rowVisible(database, \'events\', ...) for the series alone). Plus series.admin.assignees.unlinked (assigned to member) and series.member.private.unlinked without a linked occurrence: after the Outlook target they are local and not eligible, the only state in which can_detach can be true (a linked child makes it false for everyone). capabilities = GET /calendar over the series days as { visible (series with at least one row in the answer, a shared occurrence included), can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written ("past the checks"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found by row = 404 calendar_event_not_found (the occurrence row hidden) or calendar_series_not_found (the occurrence shared, its series hidden); the unlinked series have no linked_* answer',
+  row_rules_coverage: 'what the cells do NOT measure: exceptions_post reaches only loadVisibleEvent and refuseForeignEvent (calendar/crud.js ~1967); isEligibleLocalSeries there only supplies the reason for a series that is not locally owned, so the cell is no evidence for rowVisible(database, \'events\', ...) on the series. canDetachOccurrence (buildRecurrenceCapabilityMap in services/calendar-occurrence-overrides.js) is measured only in the stricter direction: a row of a series without a linked child reaches a viewer only when the master itself is visible, which is the same rule as rowVisible on the series; a looser rule cannot show there. quick_links.overview_household is empty for every role that reads it: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks, so householdAudienceAnswer() keeps the empty form',
   row_rules_outlook: 'series_outlook_target = the capabilities cell again after seedOutlookTarget: one outlook_accounts row (auto_sync_calendar_id, owner_user_id = ' + OUTLOOK_TARGET_OWNER + ') with one outlook_calendar_selection row (enabled 1, can_edit 1); MS_CLIENT_ID / MS_CLIENT_SECRET / MS_REDIRECT_URI are pinned empty, so the sync tick returns before any request. outlook_classification = classifyLocalSeries (exported production function) per series before and after the target: the calendar answer shows eligibility only through can_override_occurrence',
 };
 

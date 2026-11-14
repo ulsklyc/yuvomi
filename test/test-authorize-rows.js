@@ -14,6 +14,9 @@
  *               serves: a row visible to all, a foreign private one, and (tasks,
  *               events) one the viewer is assigned to; unknown and invalid ids drop
  *               out silently, order as given, no duplicates.
+ *            5. The budget rule against data (owner, stranger, NULL and TEXT owner)
+ *               per mode, against a written-out expectation.
+ *            6. isOwnRow: a viewer given as a string owns nothing.
  *
  * Run: npm run test:authorize-rows
  */
@@ -509,4 +512,69 @@ test('rowVisible(quick_links): a third visibility value is the creator\'s alone,
   } finally {
     db.prepare(`DELETE FROM quick_links WHERE id IN (${odd.join(',')})`).run();
   }
+});
+
+// ── 5. The budget rule against data, not only as its own text ──────────────────
+//
+// budget_entries.owner_id is INTEGER without CHECK: NULL (an owner removed, ON
+// DELETE SET NULL) and, with foreign keys off, TEXT such as '0x<id>' (SQLite keeps
+// it as TEXT, SQL `owner_id = @v` never matches it). One row per visibility and
+// owner kind; the expectation is written out, not taken from the fragment.
+
+/** @type {Array<{ id: number, visibility: string, owner: number | string | null }>} */
+const budgetRows = [];
+db.pragma('foreign_keys = OFF');
+try {
+  for (const owner_ of [owner, stranger, null, `0x${owner.toString(16)}`]) {
+    for (const visibility of ['private', 'shared', 'shared_amount']) {
+      const id = Number(db.prepare(`
+        INSERT INTO budget_entries (title, amount, date, created_by, owner_id, visibility)
+        VALUES ('b', 1, '2026-01-01', ?, ?, ?)
+      `).run(owner, owner_, visibility).lastInsertRowid);
+      budgetRows.push({ id, visibility, owner: owner_ });
+    }
+  }
+} finally {
+  db.pragma('foreign_keys = ON');
+}
+
+/**
+ * The written-out rule: shared mode shows everything; personal mode shows a row
+ * unless it is private and not the viewer's own - and only an integer owner equal
+ * to the viewer is own (NULL and TEXT are nobody's).
+ * @param {string} mode @param {number} viewer
+ */
+function budgetExpected(mode, viewer) {
+  return budgetRows
+    .filter((row) => mode !== 'personal' || row.visibility !== 'private'
+      || (typeof row.owner === 'number' && row.owner === viewer))
+    .map((row) => row.id);
+}
+
+test('budget: visibleWhere lets through exactly the written-out rows, per mode and viewer', () => {
+  const ids = budgetRows.map((row) => row.id);
+  const stored = db.prepare(`SELECT typeof(owner_id) AS t FROM budget_entries WHERE id IN (${ids.join(',')})`).all()
+    .map((/** @type {any} */ r) => r.t);
+  assert.deepEqual([...new Set(stored)].sort(), ['integer', 'null', 'text'], 'the seed holds every owner kind');
+  for (const mode of ['personal', 'shared']) {
+    for (const viewer of [owner, assignee, stranger]) {
+      const sql = db.prepare(`SELECT x.id FROM budget_entries x WHERE x.id IN (${ids.join(',')}) AND ${visibleWhere('budget', 'x', '@v', { mode })} ORDER BY x.id`)
+        .all({ v: viewer }).map((/** @type {any} */ r) => r.id);
+      assert.deepEqual(sql, budgetExpected(mode, viewer), `${mode}: viewer ${viewer}`);
+    }
+  }
+  assert.ok(budgetExpected('personal', stranger).length < budgetRows.length, 'personal mode hides rows');
+});
+
+// ── 6. isOwnRow: a viewer as a string owns nothing ─────────────────────────────
+
+test('isOwnRow: a viewer given as a string (\'2\') is deliberately not the owner', async () => {
+  const { isOwnRow } = await import('../server/authorize/rows/creator.ts');
+  assert.equal(isOwnRow(owner, owner), true, 'number and number');
+  assert.equal(isOwnRow(owner, String(owner)), false, 'viewer as a string');
+  assert.equal(isOwnRow(String(owner), owner), false, 'creator as a string');
+  // The same through the row form: a private tile is hidden from its creator's id as a string.
+  const rowVisible = rowApi('rowVisible');
+  assert.equal(rowVisible(db, 'quick_links', { id: 0, created_by: owner, visibility: 'private' }, String(owner)), false);
+  assert.equal(rowVisible(db, 'tasks', { id: 0, created_by: owner, visibility: 'private' }, String(owner)), false);
 });

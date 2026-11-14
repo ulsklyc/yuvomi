@@ -51,7 +51,8 @@ function sourceFiles(dir) {
   return readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
     const rel = `${dir}/${entry.name}`;
     if (entry.isDirectory()) return sourceFiles(rel);
-    return entry.name.endsWith('.js') ? [rel] : [];
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    return /\.(js|ts)$/.test(entry.name) ? [rel] : [];
   });
 }
 

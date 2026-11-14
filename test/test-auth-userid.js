@@ -16,7 +16,8 @@ const routesDir = new URL('../server/routes/', import.meta.url);
 
 function routeFiles() {
   return readdirSync(routesDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
+    // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+    .filter((entry) => entry.isFile() && /\.(js|ts)$/.test(entry.name))
     .map((entry) => entry.name);
 }
 
