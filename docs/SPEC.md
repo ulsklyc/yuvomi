@@ -3210,7 +3210,9 @@ transition into `done` is allowed; taking it back reverses points and discards a
 follow-up, and corrections stay with the household. The same wall rule holds for what the display reads
 about a task it may tick off: `GET /api/v1/tasks/{id}/completions` answers a display only for a
 task with visibility `all`, and the same 404 otherwise, even for a task that names the display as an
-assignee (a state the app cannot produce: a display is never offered or accepted as an assignee). Deciding a redemption stays wherever the
+assignee (a state the app cannot produce: a display is never offered or accepted as an assignee).
+The rule covers every entry of the answer, so an earlier instance of a repeating task that the
+household does not see stays off the wall too. Deciding a redemption stays wherever the
 household put it (`rewards_require_approval`) - the display asks, it never approves.
 
 `GET /api/v1/displays/people` fills the picker: household members with name, colour and picture,

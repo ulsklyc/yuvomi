@@ -22,7 +22,7 @@
  * der Serie ist das Abhaken der Hauptaufgabe.
  */
 
-import { visibleWhere } from '../authorize/index.ts';
+import { householdVisibleWhere, visibleWhere } from '../authorize/index.ts';
 import { personAvatarUrlSql } from './person-avatar.js';
 
 /**
@@ -176,6 +176,10 @@ export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId
  */
 const VISIBLE_SQL = visibleWhere('tasks', 't', '@me');
 
+// The wall rule (householdVisibleWhere): a paired display reads only what the whole
+// household sees, for every instance of a series, not only the one it asked about.
+const HOUSEHOLD_VISIBLE_SQL = householdVisibleWhere('t');
+
 /**
  * Spalten, die beide Lesepfade teilen.
  *
@@ -279,8 +283,12 @@ export function completionFeed(d, { me, limit = 50, userId = null, beforeAt = nu
  *   3. Einträge, die dieselbe Serie tragen wie ein Kettenglied - das holt die
  *      Instanzen VOR einem Riss zurück, deren eigene Glieder nicht mehr in der
  *      Kette stehen.
+ *
+ * `householdOnly` (a paired display) filters every entry by the wall rule instead
+ * of the person rule: an earlier instance shared only with its assignees stays off
+ * the wall even when it names the display.
  */
-export function seriesHistory(d, { me, taskId, limit = 20 }) {
+export function seriesHistory(d, { me, taskId, limit = 20, householdOnly = false }) {
   const size = Math.min(Math.max(Number(limit) || 20, 1), 100);
   return d.prepare(`
     ${CHAIN_CTE}
@@ -289,8 +297,8 @@ export function seriesHistory(d, { me, taskId, limit = 20 }) {
       c.task_id   IN (SELECT id FROM chain)
       OR c.series_id IN (SELECT id FROM chain)
       OR c.series_id IN (SELECT series_id FROM task_completions WHERE task_id IN (SELECT id FROM chain))
-    ) AND ${VISIBLE_SQL}
+    ) AND ${householdOnly ? HOUSEHOLD_VISIBLE_SQL : VISIBLE_SQL}
     ORDER BY c.completed_at DESC, c.id DESC
     LIMIT @size
-  `).all({ me, task: taskId, size });
+  `).all(householdOnly ? { task: taskId, size } : { me, task: taskId, size });
 }

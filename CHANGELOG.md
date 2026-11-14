@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   history of a task (`GET /api/v1/tasks/:id/completions`) asked a paired display the same
   question as a person, so a task shared only with its assignees would show its history on
   the wall if the display itself was assigned, while ticking it off there answered "not
-  found". The history now follows the same wall rule. In the app this state could not be
+  found". The history now follows the same wall rule, for the asked task and for every earlier
+  instance of a repeating task. In the app this state could not be
   reached: a display is never offered as an assignee, and the server refuses it as one.
 
 ## [2.90.0] - 2026-11-14
