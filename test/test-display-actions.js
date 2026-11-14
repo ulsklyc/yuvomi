@@ -367,7 +367,10 @@ test('the wall rule also holds for the history of a task (GET /tasks/:id/complet
   const VERA = vera.body.user.id;
   const asVera = as(await login('vera', 'verapass12345'));
 
-  /** A task with one completion entry and the given assignees. */
+  /**
+   * A task with one completion entry and the given assignees.
+   * @param {string} title @param {string} visibility @param {number[]} assignees
+   */
   const seeded = (title, visibility, assignees) => {
     const id = addTask(title, visibility);
     for (const userId of assignees) {
