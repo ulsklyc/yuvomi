@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.90.0] - 2026-11-14
+
+### Foundation
+- **Every access rule is answered in one place.** Who may see a row, who may use an area and
+  who cares for whom was decided in many files: as SQL in the routes, as comparisons on loaded
+  rows, in the scheduler, the feeds, the push sender and the MCP tools. All of it now lives in
+  `server/authorize/` and is asked through one function, and lint rules refuse a new rule
+  written anywhere else. Nothing changes for a household: the rules are the same, apart from
+  the corrections listed under "Fixed" and "Security" below, which this move brought to light.
+- **A matrix test holds what each role sees on every read path.** For every kind of account
+  (admin, member, child, caregiver, wall display, split-expense guest) and every path that
+  reads data (lists, detail views, search, overview, feeds, reminders, MCP) the expected answer
+  is written down and checked on every change, so a rule that drifts on one path turns a test
+  red before it reaches a release.
+- **No change to the database, and the way back is open.** This release brings no migration.
+  Before the tag the previous image and this build ran in turn on the same database, and a
+  backup made on this build restored on the previous one; pinning the previous version works
+  as described in the installation guide ("Pinning a version").
+
 ### Added
 - **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
   system information there is a section with what the installation runs on: version and build,
