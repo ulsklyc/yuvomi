@@ -554,7 +554,7 @@ test('#2602: der Entzug zaehlt auch aus dem Rollenprofil, nicht nur aus dem Mitg
 });
 
 // --------------------------------------------------------
-// Display und Ausgaben-Gast hoeren nichts von einer Dosis (Abweichung 4)
+// Display und Ausgaben-Gast hoeren nichts von einer Dosis (#2745)
 // --------------------------------------------------------
 // Der Akteur ohne Request stuft beide ein wie der Anfrageweg: ein Gast empfaengt
 // aus keinem Modul, ein Display nur aus seiner Scope-Liste - Health steht nicht

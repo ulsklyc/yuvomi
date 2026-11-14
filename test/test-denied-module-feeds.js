@@ -231,7 +231,7 @@ for (const spec of FEEDS) {
 }
 
 // --------------------------------------------------------------------------
-// 3b. A DISPLAY AND A SPLIT GUEST GET THE EMPTY FEED (Abweichung 4)
+// 3b. A DISPLAY AND A SPLIT GUEST GET THE EMPTY FEED (#2745)
 //
 // The actor without a request classifies both as the request path does: a
 // guest receives from no module, and a display gets no feed at all, although

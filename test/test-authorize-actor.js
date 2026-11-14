@@ -416,7 +416,7 @@ test('actorForUser: role, family role and module rights from users and the matri
 });
 
 // --------------------------------------------------------------------------
-// actorForUser classifies display and guest (Abweichung 4, phase 2)
+// actorForUser classifies display and guest (#2745)
 // --------------------------------------------------------------------------
 
 // Accounts only this table reads, seeded here so the tests above keep theirs.

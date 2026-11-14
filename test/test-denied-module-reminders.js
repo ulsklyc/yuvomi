@@ -330,7 +330,7 @@ test('ein Admin faellt nie heraus, auch mit einer Sperrzeile auf seiner ID', asy
 });
 
 // --------------------------------------------------------------------------
-// 3b. DISPLAY UND AUSGABEN-GAST (Abweichung 4)
+// 3b. DISPLAY UND AUSGABEN-GAST (#2745)
 //
 // Der Akteur ohne Request stuft beide ein wie der Anfrageweg: ein Gast empfaengt
 // keine Herkunft, ein Display nur die Herkuenfte seiner Scope-Module. Ein

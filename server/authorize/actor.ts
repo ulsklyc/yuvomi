@@ -253,7 +253,13 @@ function narrowerModules(
  * `unresolved` as in kindOf(): a lookup failed, or the account is guest and
  * display at once. Both lookups run for every account, so a failure is seen.
  * A failed lookup never opens: the database always has both tables, a schema
- * without them is a broken one (hand-built test schemas carry them).
+ * without them is a broken one (every hand-built test schema that reaches this
+ * function carries them).
+ *
+ * A GUEST KEEPS ITS MATRIX RIGHTS FOR `read` AND `write`: only `receive` asks the
+ * kind. Today the one caller that asks `write` of this actor (displayActingPerson)
+ * has turned guests and displays away before. A new request-less caller that asks
+ * `read` or `write` must close for a guest itself, or this function must.
  */
 export function actorForUser(database: Database, userId: number | null | undefined): Actor | null {
   const user = database
@@ -291,9 +297,11 @@ export function actorForUser(database: Database, userId: number | null | undefin
 /**
  * The actor of an account row the caller has already loaded (B9; othersCanRead in
  * server/auth.js): no second `users` query, module rights from ONE resolution with
- * the display flag the caller knows. Unlike actorForUser() a display is resolved as
- * a display (#1208) and gets `kind: 'display'`; every other row is `system`.
- * Not classified as a guest: the caller decides which rows it asks about.
+ * the display flag the caller knows. A display (#1208) gets `kind: 'display'` and
+ * its scope card alone; every other row is `system`. Unlike actorForUser() it runs
+ * no lookup: the display flag comes from the caller, a display's card is not
+ * narrowed by its matrix rows, and no row is classified as a guest - the caller
+ * decides which rows it asks about.
  */
 export function actorForAccount(
   database: Database,
