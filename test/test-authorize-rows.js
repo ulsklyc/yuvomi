@@ -470,6 +470,40 @@ test('householdVisible: the same rows as householdVisibleWhere', () => {
   assert.ok(rows.some((row) => row.visibility === OFF_DOMAIN), 'the seed holds an off-domain level');
 });
 
+test('task reader: the wall rule for a paired display, the task row rule for everyone else', () => {
+  const taskReader = rowApi('taskReader');
+  const taskVisibleWhere = rowApi('taskVisibleWhere');
+  const taskRowVisible = rowApi('taskRowVisible');
+  assert.deepEqual({ ...taskReader({ authMethod: 'display', authUserId: display }) }, { userId: display, wall: true });
+  assert.deepEqual({ ...taskReader({ authMethod: 'session', session: { userId: owner } }) }, { userId: owner, wall: false });
+  assert.deepEqual({ ...taskReader({ authMethod: 'api_token', authUserId: owner }) }, { userId: owner, wall: false });
+
+  const rows = rowsById('tasks', eqTasks);
+  const household = rows.filter((row) => authorizeApi.householdVisible(row)).map((row) => row.id);
+  for (const viewer of VIEWERS) {
+    for (const wall of [false, true]) {
+      const reader = { userId: viewer, wall };
+      const sql = db.prepare(`SELECT x.id FROM tasks x WHERE x.id IN (${eqTasks.join(',')}) AND ${taskVisibleWhere(reader, 'x')} ORDER BY x.id`)
+        .all({ me: viewer }).map((/** @type {any} */ r) => r.id);
+      const js = rows.filter((row) => taskRowVisible(db, reader, row)).map((row) => row.id);
+      assert.deepEqual(js, sql, `viewer ${viewer}, wall ${wall}: the row form equals the fragment`);
+      const person = rows.filter((row) => authorizeApi.rowVisible(db, 'tasks', row, viewer)).map((row) => row.id);
+      assert.deepEqual(js, wall ? household : person, `viewer ${viewer}, wall ${wall}`);
+    }
+  }
+  // An assignment does not open a row to the wall: the display is assigned here.
+  const named = Number(db.prepare(
+    "INSERT INTO tasks (title, visibility, created_by) VALUES ('reader.assignees', 'assignees', ?) RETURNING id",
+  ).get(owner).id);
+  db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(named, display);
+  const [row] = rowsById('tasks', [named]);
+  assert.equal(taskRowVisible(db, { userId: display, wall: false }, row), true, 'the row rule shows it to its assignee');
+  assert.equal(taskRowVisible(db, { userId: display, wall: true }, row), false, 'the wall rule does not');
+  assert.equal(taskRowVisible(db, { userId: display, wall: true }, null), false);
+  db.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(named);
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(named);
+});
+
 test('canEditQuickLink: own tiles, and shared tiles for an admin; never a foreign private one', () => {
   const canEditQuickLink = rowApi('canEditQuickLink');
   const own = { created_by: owner, visibility: 'private' };

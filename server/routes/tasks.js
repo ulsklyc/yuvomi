@@ -32,7 +32,9 @@ import { uniqueKey } from '../utils/category-slug.js';
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { actorForUser, authorize, householdVisible, rowVisible } from '../authorize/index.ts';
+import {
+  actorForUser, authorize, householdVisible, rowVisible, taskReader, taskRowVisible, taskVisibleWhere,
+} from '../authorize/index.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { householdMemberSql, isHouseholdMember, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
@@ -499,7 +501,8 @@ function sameFieldValue(a, b) {
   return String(a ?? '') === String(b ?? '');
 }
 
-function loadSubtasks(taskId, me) {
+/** @param {number} taskId @param {import('../authorize/index.ts').TaskReader} reader */
+function loadSubtasks(taskId, reader) {
   // Eine Unteraufgabe trägt eine eigene Sichtbarkeit (POST nimmt das Feld
   // entgegen). Sie hing hier noch nie an der Regel: unter einer geteilten
   // Elternaufgabe wurde eine private Unteraufgabe samt Titel ausgeliefert.
@@ -510,9 +513,9 @@ function loadSubtasks(taskId, me) {
     FROM tasks t
     LEFT JOIN users u ON t.assigned_to = u.id
     WHERE t.parent_task_id = ?
-      AND ${visibleWhere('tasks', 't', '@me')}
+      AND ${taskVisibleWhere(reader, 't')}
     ORDER BY t.created_at ASC
-  `).all(taskId, { me }).map(addAssignedUsers);
+  `).all(taskId, { me: reader.userId }).map(addAssignedUsers);
   // Unteraufgaben sind Aufgaben und können Tags tragen - über den CalDAV-Spiegel
   // bekommen sie welche, ohne dass jemand sie hier vergibt. Ohne das Anhängen
   // wären sie in der Antwort einfach nicht da, und ein PUT auf Basis dieser
@@ -673,9 +676,9 @@ router.get('/sync-targets', (req, res) => {
 // --------------------------------------------------------
 router.get('/completions', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
+    // A paired display reads the feed under the wall rule (taskReader).
     const { entries, hasMore } = completionFeed(db.get(), {
-      me,
+      reader: taskReader(req),
       limit: req.query.limit,
       userId: req.query.user_id ? Number(req.query.user_id) : null,
       beforeAt: req.query.before_at || null,
@@ -1098,6 +1101,9 @@ router.delete('/categories/:key', (req, res) => {
 router.get('/', (req, res) => {
   try {
     const { status, priority, assigned_to, category, tag, include_future, archived } = req.query;
+    // A paired display reads the list under the wall rule (taskReader), the parent
+    // rows and the three subtask subqueries alike; people under the task row rule.
+    const reader = taskReader(req);
 
     let sql = `
       SELECT
@@ -1113,12 +1119,12 @@ router.get('/', (req, res) => {
         -- dieselbe Regel fehlte hier. Ohne den Filter zeigt die Zeile fremde
         -- private Titel und bietet Aktionen darauf an.
         (SELECT COUNT(*) FROM tasks s WHERE s.parent_task_id = t.id
-           AND ${visibleWhere('tasks', 's', '?')})                         AS subtask_total,
+           AND ${taskVisibleWhere(reader, 's')})                           AS subtask_total,
         (SELECT COUNT(*) FROM tasks s WHERE s.parent_task_id = t.id AND s.status = 'done'
-           AND ${visibleWhere('tasks', 's', '?')})                         AS subtask_done,
+           AND ${taskVisibleWhere(reader, 's')})                           AS subtask_done,
         (SELECT json_group_array(json_object('id', s.id, 'title', s.title, 'status', s.status))
            FROM (SELECT s.id, s.title, s.status FROM tasks s WHERE s.parent_task_id = t.id
-                   AND ${visibleWhere('tasks', 's', '?')}
+                   AND ${taskVisibleWhere(reader, 's')}
                  ORDER BY s.created_at ASC) s) AS subtasks
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
@@ -1127,8 +1133,8 @@ router.get('/', (req, res) => {
     const params = [];
 
     // DER TAGESSCHLÜSSEL MUSS ALS ERSTER PARAMETER STEHEN: das Scope-Fragment
-    // sitzt am Anfang der WHERE-Klausel, also vor jedem Filter unten. Die
-    // SELECT-Klausel bindet ihre sechs `me` erst am Ende per unshift davor.
+    // sitzt am Anfang der WHERE-Klausel, also vor jedem Filter unten. The viewer
+    // binds by name (@me, the trailing bind object), so it takes no position here.
     if (taskScopeNeedsToday({ includeFuture: !!include_future })) params.push(todayInHouseholdZone());
 
     // Status, Priorität und Person nehmen mehrere Werte entgegen und verknüpfen
@@ -1205,17 +1211,9 @@ router.get('/', (req, res) => {
       params.push(tagKey(value));
     }
 
-    // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare.
-    const me = req.authUserId || req.session.userId;
-    sql += ` AND ${visibleWhere('tasks', 't', '?')}`;
-    params.push(me, me);
-
-    // Die drei Unteraufgaben-Subqueries oben tragen dieselbe Bedingung und damit
-    // je zwei Platzhalter. Sie stehen in der SELECT-Klausel, also VOR jedem
-    // anderen Platzhalter dieser Anfrage - deshalb unshift und nicht push. Die
-    // SELECT-Klausel bindet sonst nichts; wer dort einen Platzhalter ergänzt,
-    // muss diese Reihenfolge mitziehen.
-    params.unshift(me, me, me, me, me, me);
+    // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare;
+    // for a paired display only what the whole household sees (the wall rule).
+    sql += ` AND ${taskVisibleWhere(reader, 't')}`;
 
     sql += `
       ORDER BY
@@ -1226,7 +1224,7 @@ router.get('/', (req, res) => {
         t.created_at DESC
     `;
 
-    const rows = db.get().prepare(sql).all(...params).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
+    const rows = db.get().prepare(sql).all(...params, { me: reader.userId }).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
     res.json({ data: attachRotation(attachTags(attachDocumentCounts(rows, documentViewer(req)))) });
   } catch (err) {
     log.error('GET / error:', err);
@@ -1241,20 +1239,21 @@ router.get('/', (req, res) => {
 // --------------------------------------------------------
 router.get('/:id', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
+    // A paired display reads the task and its subtasks under the wall rule.
+    const reader = taskReader(req);
     const task = db.get().prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
         ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.id = ? AND t.parent_task_id IS NULL
-        AND ${visibleWhere('tasks', 't', '?')}
-    `).get(req.params.id, me, me);
+        AND ${taskVisibleWhere(reader, 't')}
+    `).get(req.params.id, { me: reader.userId });
 
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
 
     addAssignedUsers(task);
-    task.subtasks = loadSubtasks(task.id, me);
+    task.subtasks = loadSubtasks(task.id, reader);
     const viewer = documentViewer(req);
     attachDocumentCounts([task], viewer);
     // Die verknüpften Dokumente beim Namen, nicht nur gezählt (#733). Die
@@ -1729,7 +1728,7 @@ router.put('/:id', (req, res) => {
     })();
 
     addAssignedUsers(updated);
-    updated.subtasks = loadSubtasks(updated.id, req.authUserId || req.session.userId);
+    updated.subtasks = loadSubtasks(updated.id, taskReader(req));
     updated.next_due_date = nextDueDate;
 
     res.json({ data: updated });
@@ -1794,6 +1793,9 @@ function recurrenceFollowupOf(taskId) {
  * Sichtbarkeit, laesst sich danach aber einzeln umstellen. Wer das fruehere
  * Vorkommen abhakt, darf das Datum eines spaeteren, das er nicht sieht, nicht
  * ueber diese Antwort erfahren - dann gibt es fuer ihn kein „naechstes Mal".
+ *
+ * @param {number|string} taskId
+ * @param {(task: any) => boolean} [mayRead]
  */
 function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
   const seen = new Set([Number(taskId)]);
@@ -1830,8 +1832,8 @@ function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
  * (discardRecurrenceFollowup), oder das Vorkommen HINTER ihr.
  *
  * SICHTBARKEIT DES AUFRUFERS: ein Display sieht nur, was alle sehen (dieselbe
- * Regel wie fuer die Aufgabe selbst, #1209: householdVisible), ein Mensch, was
- * rowVisible ihm zeigt.
+ * Regel wie fuer die Aufgabe selbst, #1209: the wall rule), ein Mensch, was
+ * die Zeilenregel ihm zeigt - both through taskRowVisible (taskReader).
  *
  * @param {import('express').Request} req
  * @param {number|string} taskId
@@ -1841,11 +1843,8 @@ function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
  */
 function nextDueDateAfter(req, taskId, prevStatus, status) {
   if (status !== 'done' || prevStatus === 'done') return null;
-  const viewer = req.authUserId || req.session.userId;
-  const mayRead = isDisplayRequest(req)
-    ? (task) => householdVisible(task)
-    : (task) => rowVisible(db.get(), 'tasks', task, viewer);
-  return nextPendingOccurrenceOf(taskId, mayRead)?.due_date ?? null;
+  const reader = taskReader(req);
+  return nextPendingOccurrenceOf(taskId, (task) => taskRowVisible(db.get(), reader, task))?.due_date ?? null;
 }
 
 /**
@@ -2542,12 +2541,21 @@ router.delete('/:id', (req, res) => {
 // Sichtbarkeits-Fragment für ein Dokument (Alias `d`, benannter Bind @me).
 const DOC_VISIBLE_SQL = visibleWhere('documents', 'd', '@me');
 
-/** Aufgabe nur zurückgeben, wenn sie für die betrachtende Person sichtbar ist. */
-function findVisibleTask(id, me) {
+/**
+ * Die Aufgabe, wenn dieser Leser sie sieht (taskReader: a paired display under the
+ * wall rule, people under the task row rule), sonst undefined.
+ * @param {unknown} id @param {import('../authorize/index.ts').TaskReader} reader
+ */
+function findReadableTask(id, reader) {
   return db.get().prepare(`
     SELECT t.id, t.locked, t.created_by, t.parent_task_id FROM tasks t
-    WHERE t.id = ? AND ${visibleWhere('tasks', 't', '?')}
-  `).get(id, me, me);
+    WHERE t.id = ? AND ${taskVisibleWhere(reader, 't')}
+  `).get(id, { me: reader.userId });
+}
+
+/** Aufgabe nur zurückgeben, wenn sie für die betrachtende Person sichtbar ist. */
+function findVisibleTask(id, me) {
+  return findReadableTask(id, { userId: me, wall: false });
 }
 
 /**
@@ -2579,24 +2587,19 @@ function loadTaskDocuments(taskId, viewer) {
 // Titel der Aufgabe, und eine geratene ID darf darüber nichts verraten - 404
 // statt 403, weil die bloße Existenz schon eine Auskunft ist (Muster aus #769).
 //
-// A paired display reads the history under the wall rule (householdVisible), the
-// same rule PATCH /:id/status and nextDueDateAfter apply to it: the wall shows
-// only what the whole household sees, even for a task that names the display, and
-// seriesHistory applies the same rule to every earlier instance of the series.
+// A paired display reads the history under the wall rule (taskReader), the same
+// rule PATCH /:id/status, nextDueDateAfter and every other task read apply to it:
+// the wall shows only what the whole household sees, even for a task that names the
+// display, and seriesHistory applies the same rule to every earlier instance.
 // --------------------------------------------------------
 router.get('/:id/completions', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
+    const reader = taskReader(req);
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-    const visible = task != null && (isDisplayRequest(req)
-      ? householdVisible(task)
-      : rowVisible(db.get(), 'tasks', task, me));
-    if (!visible) {
+    if (!taskRowVisible(db.get(), reader, task)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
-    res.json({ data: seriesHistory(db.get(), {
-      me, taskId: Number(req.params.id), limit: req.query.limit, householdOnly: isDisplayRequest(req),
-    }) });
+    res.json({ data: seriesHistory(db.get(), { reader, taskId: Number(req.params.id), limit: req.query.limit }) });
   } catch (err) {
     log.error('GET /:id/completions error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -2769,8 +2772,8 @@ function commentForWrite(req, { allowAdmin = false } = {}) {
 // GET /api/v1/tasks/:id/comments → { data: Comment[] }
 router.get('/:id/comments', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
-    const task = findVisibleTask(req.params.id, me);
+    // A paired display reads the comments under the wall rule (taskReader).
+    const task = findReadableTask(req.params.id, taskReader(req));
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     res.json({ data: loadTaskComments(task.id) });
   } catch (err) {
