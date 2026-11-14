@@ -92,8 +92,9 @@ export function displayActingPerson(req, rawId, moduleKey, { db } = {}) {
   // Der Akteur ohne Request (server/authorize/): dieselbe `users`-Zeile und
   // dieselbe Aufloesung der Rechte-Matrix wie vorher hier von Hand. Ein Display,
   // ein Gast oder Personal kommt nicht bis hierher - `isHouseholdMember` hat sie
-  // eben abgewiesen -, deshalb schadet es nicht, dass `actorForUser()` sie nicht
-  // als solche erkennt (KNOWN DIVERGENCE dort).
+  // eben abgewiesen. Fuer jede Person, die hier ankommt, stuft `actorForUser()`
+  // deshalb `system` ein, und die Antwort haengt wie zuvor nur an der Matrix
+  // (test/test-household-members.js haelt die Tabelle).
   const actor = actorForUser(database, userId);
   // Die Zeile GIBT es - `isHouseholdMember` hat sie eben gefunden. Der Guard
   // steht trotzdem: zwischen beiden Abfragen liegt kein `await` und damit kein

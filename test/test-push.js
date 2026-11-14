@@ -23,6 +23,10 @@ function makeDb() {
       -- D6: der Subjekt-Name auf der geerbten Vorsorge-Erinnerung
       -- kommt aus users.display_name.
       display_name TEXT NOT NULL DEFAULT '');
+    -- actorForUser fragt fuer jeden Empfaenger nach Ausgaben-Gast und Display;
+    -- fehlt eine der Tabellen, schliesst das Nachschlagen (wie in Produktion nie).
+    CREATE TABLE split_expense_guest_users (user_id INTEGER PRIMARY KEY, group_id INTEGER);
+    CREATE TABLE display_accounts (user_id INTEGER PRIMARY KEY);
     CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT);
     -- Zweite Rechte-Achse des Vorrats-Voll-Syncs (#467).
     CREATE TABLE access_permissions (

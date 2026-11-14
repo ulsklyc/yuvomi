@@ -39,7 +39,8 @@ const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const remindersModule = await import('../server/routes/reminders.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
 const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
-const { ORIGIN_MODULE } = await import('../server/services/reminder-origins.js');
+const { ORIGIN_MODULE, withoutModulesDeniedToRecipient } = await import('../server/services/reminder-origins.js');
+const { DISPLAY_SCOPE_MODULES } = await import('../server/display-scopes.js');
 const { PERMISSION_MODULES, resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 
 // Fest und in der Vergangenheit, gleiche Begruendung wie in der Schwestersuite:
@@ -325,6 +326,74 @@ test('ein Admin faellt nie heraus, auch mit einer Sperrzeile auf seiner ID', asy
   const run = await deliver(database);
   assertDelivered(run, adminId, 'ein Admin wurde von einer Rechtezeile ausgesperrt - er umgeht das System vollstaendig');
   assertNotDelivered(run, memberId, 'ein Mitglied ohne Aufgaben bekam die Meldung trotzdem');
+  database.close();
+});
+
+// --------------------------------------------------------------------------
+// 3b. DISPLAY UND AUSGABEN-GAST (#2745)
+//
+// Der Akteur ohne Request stuft beide ein wie der Anfrageweg: ein Gast empfaengt
+// keine Herkunft, ein Display nur die Herkuenfte seiner Scope-Module. Ein
+// Mitglied daneben bekommt alles.
+// --------------------------------------------------------------------------
+/** @param {any} database @param {number|bigint} userId */
+function markGuest(database, userId) {
+  const groupId = database.prepare('INSERT INTO expense_groups (name, created_by) VALUES (?, ?)').run('Trip', userId).lastInsertRowid;
+  database.prepare('INSERT INTO split_expense_guest_users (user_id, group_id) VALUES (?, ?)').run(userId, groupId);
+}
+
+/** @param {any} database @param {number|bigint} userId */
+function markDisplay(database, userId) {
+  database.prepare('INSERT INTO display_accounts (user_id) VALUES (?)').run(userId);
+}
+
+test('withoutModulesDeniedToRecipient: Gast keine Herkunft, Display nur seine Scope-Module, Mitglied alle', () => {
+  const database = freshDb();
+  const member = freshUser(database);
+  const guest = freshUser(database);
+  const guestAdmin = freshUser(database, { role: 'admin' });
+  const display = freshUser(database);
+  markGuest(database, guest);
+  markGuest(database, guestAdmin);
+  markDisplay(database, display);
+  /** @type {Record<string, string>} */
+  const originModule = ORIGIN_MODULE;
+  const types = Object.keys(originModule);
+  const passed = (/** @type {number|bigint} */ userId) => withoutModulesDeniedToRecipient(
+    database, types.map((entityType) => ({ entity_type: entityType, created_by: Number(userId) })),
+  ).map((row) => row.entity_type);
+  assert.deepEqual(passed(member), types, 'ein Mitglied verliert eine Herkunft');
+  assert.deepEqual(passed(guest), [], 'ein Gast empfaengt eine Herkunft');
+  assert.deepEqual(passed(guestAdmin), [], 'ein Gast auf einer Admin-Zeile empfaengt eine Herkunft');
+  const displayTypes = types.filter((type) => DISPLAY_SCOPE_MODULES.includes(originModule[type]));
+  assert.ok(displayTypes.length > 0 && displayTypes.length < types.length, `Vorbedingung: ${displayTypes.join(', ')}`);
+  assert.deepEqual(passed(display), displayTypes, 'ein Display empfaengt mehr oder weniger als seine Scope-Module');
+  database.close();
+});
+
+test('Zustellung: Display hoert von Aufgabe und Termin, nicht vom Dokument; Gast von nichts', async () => {
+  const database = freshDb();
+  const display = freshUser(database);
+  const guest = freshUser(database);
+  markDisplay(database, display);
+  markGuest(database, guest);
+  /** @type {Record<string, Record<string, number|bigint>>} */
+  const ids = {};
+  for (const [who, owner] of /** @type {Array<[string, number|bigint]>} */ ([['display', display], ['guest', guest]])) {
+    ids[who] = {
+      task: insertReminder(database, owner, 'task', makeTask(database, owner)),
+      event: insertReminder(database, owner, 'event', makeEvent(database, owner)),
+      document_expiry: insertReminder(database, owner, 'document_expiry', makeDocument(database, owner)),
+    };
+  }
+  const run = await deliver(database);
+  assertDelivered(run, ids.display.task, 'Display: Aufgaben stehen auf seiner Scope-Liste');
+  assertDelivered(run, ids.display.event, 'Display: der Kalender steht auf seiner Scope-Liste');
+  assertNotDelivered(run, ids.display.document_expiry, 'Display: Dokumente stehen nicht auf seiner Scope-Liste');
+  for (const [type, id] of Object.entries(ids.guest)) {
+    assertNotDelivered(run, id, `Gast: ${type}`);
+    assert.equal(reminderRow(database, id).pushed_at, null, `Gast: ${type} - ueberspringen, nicht loeschen`);
+  }
   database.close();
 });
 

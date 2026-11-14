@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without the green that would say all is well next to a red line.
 
 ### Fixed
+- **A wall display or a split-expense guest account no longer receives medication reminders or
+  calendar feeds.** Reminders, pushes and the subscription feeds are sent without a request, and
+  there the account was looked up like an ordinary member: a display or a guest whose medication
+  schedule or feed token had been set directly in the database heard about its own doses, and its
+  calendar feed carried every household event, while the app itself refuses both accounts these
+  areas. Now a guest receives nothing from any area, a display receives only from the areas its
+  wall shows (tasks, calendar, rewards), and every feed of a display or a guest - calendar,
+  birthdays, inventory deadlines, cycle, shift plan and waste - answers with an empty calendar,
+  as for a member without the area. The app offers neither account a way to get there, so only
+  an installation edited by hand was affected. Members and admins are not affected.
 - **An AI assistant now creates tasks, shopping items and events exactly as the app does**
   (#2616). The MCP tools `create_task`, `add_shopping_item` and `create_event` wrote with their
   own queries beside the app's own path, and the result differed: a new task got no points,
