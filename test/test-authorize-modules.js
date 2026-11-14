@@ -19,7 +19,7 @@
  *               throws instead of answering silently.
  *            5. MCP keeps its one null-actor answer: listToolDefinitions(null)
  *               lists every tool, as before (toolAllowed catches null itself).
- *            6. A second, independent oracle for receive: the permission matrix
+ *            6. A second oracle for receive: the permission matrix
  *               (resolvePermissions on each actor's account), not the actor's map.
  *
  * Run: npm run test:authorize-modules
@@ -205,7 +205,7 @@ const SUBJECTS = {
 };
 
 /**
- * A SECOND, INDEPENDENT ORACLE for receive: not the actor's module map and not
+ * A SECOND ORACLE for receive: not the actor's module map and not
  * deniedModules(), but the permission matrix itself - resolvePermissions() on the
  * account's `users` row. Level `none` -> no, `read` / `write` -> yes, an admin
  * always, no actor never; token scopes play no part.

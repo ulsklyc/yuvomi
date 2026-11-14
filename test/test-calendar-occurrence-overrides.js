@@ -551,7 +551,7 @@ function textCreatorSeries(database, { numeric = false, ...values } = {}) {
 const serializeWith = /** @type {(row: any, options: any) => any} */ (serializeEvent);
 
 test('Outlook target check reads a TEXT creator through Number(): the series stays ineligible_series', () => {
-  // Decision (Ulas): the target check keeps comparing the creator through Number().
+  // Decision in #2740: the target check keeps comparing the creator through Number().
   // The target's owner (account 2) counts as seeing a private series created by
   // '0x2', so a writable auto-sync target exists and the series takes no linked
   // overrides - a narrower answer would grant a capability nobody had before.

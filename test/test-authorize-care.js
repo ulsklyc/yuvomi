@@ -203,8 +203,9 @@ test('readableClause: the literal family value or a writable row, as the inline 
   assert.deepEqual(ids(admin), [ownerFamily, strangerFamily], 'admin without grant');
 });
 
-test('readableClause with OPEN_ALL: \'all\' is the open value, \'family\' is not', () => {
+test('readableClause and careAwareClause with OPEN_ALL: \'all\' is the open value, \'family\' is not', () => {
   const readableClause = api('readableClause');
+  const careAwareClause = api('careAwareClause');
   const OPEN_ALL = /** @type {any} */ (authorizeApi).OPEN_ALL;
   const w = api('writableClause')('n', 7);
   assert.deepEqual(readableClause('n', 7, OPEN_ALL), { sql: `(n.visibility = 'all' OR ${w.sql})`, params: w.params });
@@ -216,10 +217,21 @@ test('readableClause with OPEN_ALL: \'all\' is the open value, \'family\' is not
   const nOwnerAll = nutrition(owner, 'all');
   const nStrangerPrivate = nutrition(stranger, 'private');
   const nStrangerAll = nutrition(stranger, 'all');
+  /** @type {Record<string, number[]>} */
+  const seeded = {
+    health_nutrition_entries: [nOwnerPrivate, nOwnerAll, nStrangerPrivate, nStrangerAll],
+    medications: [ownerPrivate, ownerFamily, strangerPrivate, strangerFamily],
+  };
   try {
     const ids = (/** @type {string} */ table, /** @type {number} */ viewer) => {
       const clause = readableClause('n', viewer, OPEN_ALL);
-      return db.prepare(`SELECT n.id FROM ${table} n WHERE ${clause.sql} ORDER BY n.id`)
+      return db.prepare(`SELECT n.id FROM ${table} n WHERE n.id IN (${seeded[table].join(',')}) AND ${clause.sql} ORDER BY n.id`)
+        .all(...clause.params).map((/** @type {any} */ r) => r.id);
+    };
+    // The path the nutrition routes take: careAwareClause without a person, open value bound.
+    const aware = (/** @type {number} */ viewer) => {
+      const clause = careAwareClause('n', viewer, null, OPEN_ALL);
+      return db.prepare(`SELECT n.id FROM health_nutrition_entries n WHERE n.id IN (${seeded.health_nutrition_entries.join(',')}) AND ${clause.sql} ORDER BY n.id`)
         .all(...clause.params).map((/** @type {any} */ r) => r.id);
     };
     const n = 'health_nutrition_entries';
@@ -227,6 +239,10 @@ test('readableClause with OPEN_ALL: \'all\' is the open value, \'family\' is not
     assert.deepEqual(ids(n, caregiver), [nOwnerPrivate, nOwnerAll, nStrangerAll], 'cared for');
     assert.deepEqual(ids(n, stranger), [nOwnerAll, nStrangerPrivate, nStrangerAll], 'not cared for');
     assert.deepEqual(ids(n, admin), [nOwnerAll, nStrangerAll], 'admin without grant');
+    assert.deepEqual(aware(owner), [nOwnerPrivate, nOwnerAll, nStrangerAll], 'care-aware: own data');
+    assert.deepEqual(aware(caregiver), [nOwnerPrivate, nOwnerAll, nStrangerAll], 'care-aware: cared for');
+    assert.deepEqual(aware(stranger), [nOwnerAll, nStrangerPrivate, nStrangerAll], 'care-aware: not cared for');
+    assert.deepEqual(aware(admin), [nOwnerAll, nStrangerAll], 'care-aware: admin without grant');
     // Over a table that writes 'family', OPEN_ALL opens nothing: only the writable rows.
     assert.deepEqual(ids('medications', stranger), [strangerPrivate, strangerFamily], 'family is not open under OPEN_ALL');
     assert.deepEqual(ids('medications', admin), [], 'admin without grant, nothing open');

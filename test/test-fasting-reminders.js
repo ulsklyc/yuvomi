@@ -141,7 +141,8 @@ for (const [level, expected] of /** @type {const} */ ([['read', 2], ['none', 0]]
 test('the fasting gate: an account that does not exist gets nothing', () => {
   const database = setup();
   // Settings and a fast left behind by an account that is gone (foreign keys off,
-  // as after a restore): the gate, not the missing data, keeps the reminders out.
+  // as after a restore): no reminder appears. The missing `users` row refuses twice,
+  // as no actor and as no capability; this case pins the outcome, not which of the two.
   database.pragma('foreign_keys = OFF');
   try {
     assert.equal(remindersAfterSync(database, 99), 0);
