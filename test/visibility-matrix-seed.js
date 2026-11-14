@@ -415,9 +415,10 @@ export function seedRowRules({ db, ids, dates, shiftDateKey }) {
       tasks.push({ name, id, owner, level });
     }
   }
-  // The display branch of PATCH /:id/status (householdVisible) sits behind
-  // rowVisible(db, 'tasks', ...): a display is never creator or assignee in the household, so
-  // without this row the branch answers for no task. Not a realistic state.
+  // The display branches of PATCH /:id/status and GET /:id/completions
+  // (householdVisible) sit behind or beside rowVisible(db, 'tasks', ...): a display is
+  // never creator or assignee in the household, so without this row neither branch
+  // answers for a task the row rule would show it. Not a realistic state.
   const displayName = 'wtask.admin.assignees.display';
   const displayTaskId = Number(insertTask.get(displayName, 'assignees', ids.admin).id);
   assignTask.run(displayTaskId, ids.display);

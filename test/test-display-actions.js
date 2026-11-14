@@ -352,6 +352,50 @@ test('eine unsichtbare Aufgabe antwortet auf JEDE Nutzlast gleich - und wie eine
   }
 });
 
+test('the wall rule also holds for the history of a task (GET /tasks/:id/completions)', async () => {
+  // The same rule as PATCH /:id/status above: a display sees only what the whole
+  // household sees (householdVisible). Before this, GET /:id/completions asked the
+  // task row rule rowVisible(db, 'tasks', ...) for the display account too, so a task
+  // with visibility `assignees` that names the display showed its history to the
+  // wall while ticking it off answered 404. The app never offers a display as an
+  // assignee (meta/options and newNonMembers go through householdMemberSql), so
+  // the row is seeded directly - the rule must not hang on that.
+  const vera = await admin('POST', '/auth/users', {
+    username: 'vera', display_name: 'Vera', password: 'verapass12345', role: 'member',
+  });
+  assert.equal(vera.status, 201, `create member: ${JSON.stringify(vera.body)}`);
+  const VERA = vera.body.user.id;
+  const asVera = as(await login('vera', 'verapass12345'));
+
+  /** A task with one completion entry and the given assignees. */
+  const seeded = (title, visibility, assignees) => {
+    const id = addTask(title, visibility);
+    for (const userId of assignees) {
+      db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(id, userId);
+    }
+    db.prepare(`
+      INSERT INTO task_completions (task_id, series_id, user_id, completed_at)
+      VALUES (?, ?, 1, '2026-01-02T10:00:00Z')
+    `).run(id, id);
+    return id;
+  };
+  const forDisplay = seeded('Fenster putzen', 'assignees', [displayId, VERA]);
+  const forAll = seeded('Muell rausbringen', 'all', []);
+
+  const hidden = await display('GET', `/tasks/${forDisplay}/completions`);
+  const unknown = await display('GET', '/tasks/999999/completions');
+  assert.equal(hidden.status, 404, 'an assignees task is not on the wall, even when it names the display');
+  assert.deepEqual(hidden.body, unknown.body, 'the refusal must equal the one for an unknown id');
+
+  const shared = await display('GET', `/tasks/${forAll}/completions`);
+  assert.equal(shared.status, 200, 'a household task keeps its history on the wall');
+  assert.equal(shared.body.data.length, 1);
+
+  const member = await asVera('GET', `/tasks/${forDisplay}/completions`);
+  assert.equal(member.status, 200, 'a person assigned to the task still reads its history');
+  assert.equal(member.body.data.length, 1);
+});
+
 test('jede andere Schreibroute der beiden Module bleibt zu', async () => {
   // DIE EIGENTLICHE ZUSAGE DES TICKETS: „no creating, editing or deleting, and
   // no settings". Sie haengt daran, dass die Erlaubnis eine Liste von zwei
