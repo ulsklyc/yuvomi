@@ -93,7 +93,7 @@ import { pairingRouter } from './routes/displays.js';
 import { peopleRouter } from './routes/displays.js';
 import { displayMayAct } from './display-scopes.js';
 import { splitGuestMayReach } from './split-guest-scope.js';
-import { actorForUser, actorFromRequest, authorize } from './authorize/index.ts';
+import { actorForUser, actorFromRequest, mayReceiveFeed } from './authorize/index.ts';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -576,9 +576,10 @@ const feedLimiter = rateLimit({
 // the delivery of reminders since #1289). `read` keeps delivering, an admin is
 // never affected. The household module switch stays deliberately open for
 // feeds (docs/DECISIONS.md). A feed is a delivery, not a request: `receive`,
-// without token scopes (server/authorize/).
+// without token scopes, and no feed for a display or a split guest
+// (mayReceiveFeed in server/authorize/).
 function feedModuleDenied(userId, feed) {
-  return !authorize(actorForUser(db.get(), userId), 'receive', { module: FEED_MODULE[feed] }).allowed;
+  return !mayReceiveFeed(actorForUser(db.get(), userId), FEED_MODULE[feed]);
 }
 
 app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {

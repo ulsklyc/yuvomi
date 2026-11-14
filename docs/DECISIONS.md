@@ -1269,7 +1269,10 @@ server's, and the recipient's own permission is not asked there.
 - `authorize(actor, 'receive', { module })` in `server/authorize/` (phase 2 B2), with the actor
   from `actorForUser()`: `resolvePermissions()` -> `buildSessionModuleAccess()`, the same
   resolution `req.sessionModuleAccess` takes; only `none` refuses, no token scopes, and an owner
-  that does not resolve has no actor and receives nothing. Until B2 this was a helper of its own
+  that does not resolve has no actor and receives nothing. Since phase 2 (Abweichung 4)
+  `actorForUser()` classifies a display account and a split guest as the request path does: a
+  guest receives from no module, a display only from its scope card (never more than its matrix
+  rights), and `mayReceiveFeed()` gives a display no feed at all; a failed lookup closes. Until B2 this was a helper of its own
   in `server/services/reminder-origins.js`; phase 2 B9 removed it.
 - `ORIGIN_MODULE` and `FEED_MODULE` next to it, the one map per kind of output;
   `withoutModulesDeniedToRecipient()` for the delivery in `server/services/notifications.js`,

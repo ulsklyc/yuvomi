@@ -1362,12 +1362,11 @@
           "household": []
         },
         "medications": {
-          "divergent": "the delivery predicates resolve without the display flag and without the guest gate (actorForUser, asked by mayHearAboutHealth in services/medication-scheduler.js and withoutModulesDeniedToRecipient in services/reminder-origins.js): they say yes while every REST health path refuses this account",
           "hearsCaredForDose": {
             "n/a": "no health_care_grants row names this account as caregiver"
           },
-          "hearsOwnDose": true,
-          "notLacksHealth": true
+          "hearsOwnDose": false,
+          "notLacksHealth": false
         },
         "notes": {
           "n/a": "notes have no reminder origin"
@@ -1391,21 +1390,7 @@
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": {
-          "divergent": "feedModuleDenied (server/index.js) resolves without the display flag and without the guest gate: the feed carries the whole calendar while the app refuses or narrows it; the token was set in the database, the app offers this account no way to mint one",
-          "ids": [
-            "event.admin.all",
-            "event.admin.assignees",
-            "event.admin.private",
-            "event.child.all",
-            "event.child.assignees",
-            "event.child.private",
-            "event.member.all",
-            "event.member.assignees",
-            "event.member.ics-shared",
-            "event.member.private"
-          ]
-        },
+        "events": [],
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2430,12 +2415,11 @@
           }
         },
         "medications": {
-          "divergent": "the delivery predicates resolve without the display flag and without the guest gate (actorForUser, asked by mayHearAboutHealth in services/medication-scheduler.js and withoutModulesDeniedToRecipient in services/reminder-origins.js): they say yes while every REST health path refuses this account",
           "hearsCaredForDose": {
             "n/a": "no health_care_grants row names this account as caregiver"
           },
-          "hearsOwnDose": true,
-          "notLacksHealth": true
+          "hearsOwnDose": false,
+          "notLacksHealth": false
         },
         "notes": {
           "n/a": "notes have no reminder origin"
@@ -2461,21 +2445,7 @@
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": {
-          "divergent": "feedModuleDenied (server/index.js) resolves without the display flag and without the guest gate: the feed carries the whole calendar while the app refuses or narrows it; the token was set in the database, the app offers this account no way to mint one",
-          "ids": [
-            "event.admin.all",
-            "event.admin.assignees",
-            "event.admin.private",
-            "event.child.all",
-            "event.child.assignees",
-            "event.child.private",
-            "event.member.all",
-            "event.member.assignees",
-            "event.member.ics-shared",
-            "event.member.private"
-          ]
-        },
+        "events": [],
         "medications": {
           "n/a": "the calendar feed carries events only"
         },

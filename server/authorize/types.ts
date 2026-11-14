@@ -28,7 +28,8 @@ export type Actor = Readonly<{
    * A lookup that decides the kind failed, the two lookups contradict each other
    * (a split guest that is also a display), or the request carries no account /
    * never passed requireAuth. A caller that must fail closed treats it as closed.
-   * Always false for actorForUser() and householdAudience().
+   * actorForUser() sets it on the same two lookups; always false for
+   * actorForAccount() and householdAudience().
    */
   unresolved: boolean;
 }>;

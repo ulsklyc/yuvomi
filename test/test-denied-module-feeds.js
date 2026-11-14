@@ -231,6 +231,46 @@ for (const spec of FEEDS) {
 }
 
 // --------------------------------------------------------------------------
+// 3b. A DISPLAY AND A SPLIT GUEST GET THE EMPTY FEED (Abweichung 4)
+//
+// The actor without a request classifies both as the request path does: a
+// guest receives from no module, and a display gets no feed at all, although
+// it reads the calendar on its wall (mayReceiveFeed in server/authorize/). The
+// answer is byte for byte the one of an account with the module `none`. The
+// token can only be set in the database: the app offers neither a way to mint
+// one. A member next to them keeps the full feed.
+// --------------------------------------------------------------------------
+const groupOwner = insertUser();
+const guestGroup = Number(db.prepare('INSERT INTO expense_groups (name, created_by) VALUES (?, ?) RETURNING id')
+  .get('Feed trip', groupOwner).id);
+/** @type {Record<string, (userId: number) => unknown>} */
+const MARK = {
+  display: (userId) => db.prepare('INSERT INTO display_accounts (user_id) VALUES (?)').run(userId),
+  'split guest': (userId) => db.prepare('INSERT INTO split_expense_guest_users (user_id, group_id) VALUES (?, ?)')
+    .run(userId, guestGroup),
+};
+
+for (const spec of FEEDS) {
+  for (const [kind, mark] of Object.entries(MARK)) {
+    test(`/feed/${spec.feed}: a ${kind} gets the empty feed of an account with ${spec.module} none`, async () => {
+      const s = await subscriber(spec);
+      const none = await subscriber(spec);
+      setModuleAccess('user', none.id, spec.module, 'none');
+      mark(s.id);
+      const feed = await fetchFeed(spec.feed, s.token);
+      const reference = await fetchFeed(spec.feed, none.token);
+      assert.equal(feed.status, 200, 'the subscription stays valid');
+      assert.ok(!hasEvent(feed), `/feed/${spec.feed} still delivers to a ${kind}:\n${feed.body}`);
+      assert.equal(feed.body, reference.body, 'not the empty feed of an account without the module');
+      assert.deepEqual(feed.headers, s.before.headers, 'the HTTP headers changed');
+
+      const member = await subscriber(spec);
+      assert.ok(hasEvent(await fetchFeed(spec.feed, member.token)), 'a member next to it lost the feed');
+    });
+  }
+}
+
+// --------------------------------------------------------------------------
 // 4. THE GUARD AGAINST TOMORROW'S GAP
 //
 // A feed whose module is not a key of the permission matrix would pass this

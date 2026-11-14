@@ -554,6 +554,53 @@ test('#2602: der Entzug zaehlt auch aus dem Rollenprofil, nicht nur aus dem Mitg
 });
 
 // --------------------------------------------------------
+// Display und Ausgaben-Gast hoeren nichts von einer Dosis (Abweichung 4)
+// --------------------------------------------------------
+// Der Akteur ohne Request stuft beide ein wie der Anfrageweg: ein Gast empfaengt
+// aus keinem Modul, ein Display nur aus seiner Scope-Liste - Health steht nicht
+// darauf. Die Dosis entsteht trotzdem (ueberspringen, nicht loeschen).
+
+/** @param {any} db @param {number|bigint} userId */
+function markGuest(db, userId) {
+  const groupId = db.prepare('INSERT INTO expense_groups (name, created_by) VALUES (?, ?)').run('Trip', userId).lastInsertRowid;
+  db.prepare('INSERT INTO split_expense_guest_users (user_id, group_id) VALUES (?, ?)').run(userId, groupId);
+}
+
+/** @param {any} db @param {number|bigint} userId */
+function markDisplay(db, userId) {
+  db.prepare('INSERT INTO display_accounts (user_id) VALUES (?)').run(userId);
+}
+
+for (const [kind, mark] of /** @type {Array<[string, (db: any, userId: number|bigint) => void]>} */ (
+  [['Display', markDisplay], ['Ausgaben-Gast', markGuest]])) {
+  test(`${kind} als Eigentuemer und als Betreuer hoert nichts, die Dosis entsteht trotzdem`, async () => {
+    const db = buildTestDb();
+    const owner = seedUser(db, 'owner');
+    const anna = seedUser(db, 'anna');
+    const carer = seedUser(db, 'carer');
+    mark(db, owner);
+    mark(db, carer);
+    grantCare(db, anna, carer);
+    const ownMed = seedMed(db, owner, { name: 'Eigen' });
+    const annaMed = seedMed(db, anna, { name: 'Ibuprofen' });
+    seedSchedule(db, ownMed, { time: '08:00' });
+    seedSchedule(db, annaMed, { time: '08:00' });
+
+    const { res, m } = await runCareCase(db);
+
+    assert.deepEqual(delivered(m), {
+      push: [[anna, 'Ibuprofen']],
+      channel: [[100 + anna, 'Ibuprofen']],
+    }, `nur das Mitglied hoert von seiner Dosis, ${kind} weder von der eigenen noch als Betreuer`);
+    assert.equal(/** @type {any} */ (res).created, 2);
+    for (const med of [ownMed, annaMed]) {
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs WHERE medication_id = ?').get(med).n, 1,
+        'ueberspringen, nicht loeschen: der Dosis-Log entsteht weiter');
+    }
+  });
+}
+
+// --------------------------------------------------------
 // Haushaltskanaele bekommen nie eine Medikamenten-Erinnerung (#2598, E1)
 // --------------------------------------------------------
 // Jede Health-Herkunft ist im Haushaltskanal `'personal'`

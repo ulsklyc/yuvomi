@@ -9,7 +9,8 @@
  *     request from the fields requireAuth set (server/auth.js), plus the two
  *     lookups that decide the kind (split guest, display account).
  *   - actorForUser(database, userId): the actor without a request (scheduler, push,
- *     feeds), from the `users` row and the permission matrix.
+ *     feeds), from the `users` row, the same two lookups (guest, display) and the
+ *     permission matrix.
  *   - actorForAccount(database, row, { isDisplay }): the same from a `users` row the
  *     caller has already loaded, with the display flag (B9).
  *   - householdAudience(): the household as a whole, no account behind it.
@@ -219,32 +220,71 @@ export function actorFromRequest(req: AuthenticatedRequest): Actor {
   return actor;
 }
 
+const LEVEL_RANK: Readonly<Record<string, number>> = Object.freeze({ none: 0, read: 1, write: 2 });
+
+/** Per module the narrower of two resolutions (both list the same module keys). */
+function narrowerModules(
+  a: Readonly<Record<string, string>>,
+  b: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const out: Record<string, string> = { ...a };
+  for (const [key, level] of Object.entries(b)) {
+    if (!(key in out) || (LEVEL_RANK[level] ?? 0) < (LEVEL_RANK[out[key]] ?? 0)) out[key] = level;
+  }
+  return out;
+}
+
 /**
- * The actor without a request (scheduler, push, feeds): `kind: 'system'`, role and
- * family role from `users`, module rights from the permission matrix. `null` if
- * the account does not exist (any more).
+ * The actor without a request (scheduler, push, feeds), from the `users` row.
+ * `null` if the account does not exist (any more). The kind is decided by the same
+ * two lookups as kindOf(), in the same order and with the same closing answer on a
+ * failed lookup:
  *
- * KNOWN DIVERGENCE: this actor is NOT classified as display or guest. A display
- * account or a split guest resolves here like a member through the matrix, without
- * the display flag and without the guest gate, while every REST path narrows it.
- * The visibility matrix holds this as `divergent` in four cells (due_reminders /
- * medications and ics_feed / events, for display and split_guest); a later
- * behaviour PR turns it. B1 only moves the place, not the answer.
+ *   1. guest lookup yes or failed  -> `guest`. Its module rights stay the matrix
+ *      rights; authorize() denies a guest every `receive`, whatever the matrix or
+ *      the role says (the /api/v1 guest gate lets a guest reach nothing but split
+ *      expenses, and no delivery or feed belongs to those).
+ *   2. display lookup yes or failed -> `display`, a member: module rights from its
+ *      scope list (resolvePermissions with `isDisplay`, as for the display cookie),
+ *      narrowed by the matrix rights it had before - a stored `none` row stays
+ *      `none`, so the classification can only take away, never add.
+ *   3. otherwise                    -> `system`, rights from the matrix.
+ *
+ * `unresolved` as in kindOf(): a lookup failed, or the account is guest and
+ * display at once. Both lookups run for every account, so a failure is seen.
+ * A failed lookup never opens: the database always has both tables, a schema
+ * without them is a broken one (hand-built test schemas carry them).
  */
 export function actorForUser(database: Database, userId: number | null | undefined): Actor | null {
   const user = database
     .prepare('SELECT id, role, family_role FROM users WHERE id = ?')
     .get(userId) as UserRow | undefined;
   if (!user) return null;
+  const guest = guestLookup(database, user.id);
+  const display = displayAccountLookup(database, user.id);
+  const unresolved = guest === 'failed' || display === 'failed' || (guest === 'yes' && display === 'yes');
+  const matrix = resolvePermissions(database, user);
+  let kind: ActorKind = 'system';
+  let role = roleOf(user.role);
+  let resolved: { admin: boolean; modules: Readonly<Record<string, string>> } = matrix;
+  if (guest !== 'no') {
+    kind = 'guest';
+  } else if (display !== 'no') {
+    // A display is a member on every request path (requireAuth fixes `authRole`).
+    kind = 'display';
+    role = 'member';
+    const card = resolvePermissions(database, { ...user, role: 'member' }, { isDisplay: true });
+    resolved = { admin: false, modules: narrowerModules(matrix.modules, card.modules) };
+  }
   return Object.freeze({
-    kind: 'system',
+    kind,
     userId: user.id,
-    role: roleOf(user.role),
+    role,
     familyRole: user.family_role ?? null,
     scopes: null,
-    moduleAccess: buildSessionModuleAccess(resolvePermissions(database, user)),
+    moduleAccess: buildSessionModuleAccess(resolved),
     deviceId: null,
-    unresolved: false,
+    unresolved,
   });
 }
 

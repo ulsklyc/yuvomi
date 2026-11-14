@@ -29,6 +29,9 @@ function makeDb({ withNotificationTables = true } = {}) {
       -- Vorsorge-Erinnerung kommt aus users.display_name.
       display_name TEXT NOT NULL DEFAULT ''
     );
+    -- actorForUser fragt je Empfaenger Gast und Display; fehlt eine Tabelle, schliesst es.
+    CREATE TABLE split_expense_guest_users (user_id INTEGER PRIMARY KEY, group_id INTEGER);
+    CREATE TABLE display_accounts (user_id INTEGER PRIMARY KEY);
     -- Der Vorrats-Voll-Sync fragt beide Rechte-Achsen (#467): sync_config fuer
     -- die haushaltweite Abschaltung, access_permissions je Empfaenger. Fehlt
     -- eine der Tabellen, scheitert er still im try/catch von
