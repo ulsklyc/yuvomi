@@ -243,6 +243,26 @@ test('die Serverzone stellt um, der Haushalt nicht: der Ausdruck bleibt', () => 
   assert.equal(parse('0 2 * * *', '2027-03-20T01:00:00.000Z', 'Asia/Kolkata', 'Europe/Berlin')?.params.time, '06:30');
 });
 
+test('gemessen wird am tatsächlichen Folgelauf, nicht an einem Messpunkt danach', () => {
+  // Server New York, Haushalt Berlin, Lauf am 29.: der 29.09.2026 ist 08:00 in
+  // Berlin, der 29.10. aber 07:00 (Berlin hat am 25.10. umgestellt, New York
+  // erst am 01.11.). 62 Tage später, am 30.11., stimmt der Abstand wieder.
+  assert.equal(parse('0 2 29 * *', '2026-09-29T06:00:00.000Z', 'Europe/Berlin', 'America/New_York'), null);
+  // Dasselbe beim 31-Tage-Abstand: der 27.02.2027 ist 08:00, der 27.03. schon
+  // 07:00 (New York stellt am 14.03. um, Berlin am 28.03.), am Messpunkt 30.03.
+  // haben beide umgestellt.
+  assert.equal(parse('0 2 27 * *', '2027-02-27T07:00:00.000Z', 'Europe/Berlin', 'America/New_York'), null);
+
+  // Gegenfall: im Sommer liegen beide Läufe in derselben Lage, der Satz bleibt.
+  const summer = parse('0 2 29 * *', '2026-06-29T06:00:00.000Z', 'Europe/Berlin', 'America/New_York');
+  assert.equal(summer?.key, 'settings.backupSchedulerCronMonthly');
+  assert.equal(summer?.params.day, 29);
+  assert.equal(summer?.params.time, '08:00');
+  // Und ein Zwischenstand, der keinen Lauf trifft, kostet den Satz nicht: der
+  // 01.03.2027 und der 01.04.2027 sind beide 08:00 in Berlin.
+  assert.equal(parse('0 2 1 * *', '2027-03-01T07:00:00.000Z', 'Europe/Berlin', 'America/New_York')?.params.time, '08:00');
+});
+
 test('ohne Serverzone (alter Server): immer prüfen, keine Abkürzung', () => {
   // Fehlt `scheduler.timezone`, kann die Oberfläche nicht wissen, ob Server
   // und Haushalt dieselbe Wanduhr haben. Sie prüft die Umstellung des
