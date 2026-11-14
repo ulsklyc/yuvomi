@@ -417,6 +417,109 @@ test('the wall rule also holds for the history of a task (GET /tasks/:id/complet
     'an assigned person still reads the whole series');
 });
 
+test('the wall rule holds at every task read: list, detail, comments and the household feed', async () => {
+  // The same rule as PATCH /:id/status and GET /:id/completions above: a display
+  // reads only what the whole household sees (householdVisible). These four reads
+  // asked the task row rule with the display account as the viewer, so a task with
+  // visibility `assignees` that names the display stood on the wall. The app never
+  // offers a display as an assignee, so the rows are seeded directly.
+  const wanda = await admin('POST', '/auth/users', {
+    username: 'wanda', display_name: 'Wanda', password: 'wandapass12345', role: 'member',
+  });
+  assert.equal(wanda.status, 201, `create member: ${JSON.stringify(wanda.body)}`);
+  const WANDA = wanda.body.user.id;
+  const asWanda = as(await login('wanda', 'wandapass12345'));
+
+  /**
+   * A task with one completion entry, one comment and the given assignees.
+   * @param {string} title @param {string} visibility @param {number[]} assignees
+   * @param {number | null} [parent]
+   */
+  const seeded = (title, visibility, assignees, parent = null) => {
+    const id = addTask(title, visibility);
+    if (parent != null) db.prepare('UPDATE tasks SET parent_task_id = ? WHERE id = ?').run(parent, id);
+    for (const userId of assignees) {
+      db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(id, userId);
+    }
+    db.prepare(`
+      INSERT INTO task_completions (task_id, series_id, user_id, completed_at)
+      VALUES (?, ?, 1, '2099-01-02T10:00:00Z')
+    `).run(id, id);
+    db.prepare('INSERT INTO task_comments (task_id, user_id, comment) VALUES (?, 1, ?)').run(id, `note on ${title}`);
+    return id;
+  };
+  const forDisplay = seeded('Keller aufraeumen', 'assignees', [displayId, WANDA]);
+  const forAll = seeded('Blumen giessen', 'all', []);
+  // A household task whose subtask is shared only with its assignees, the display
+  // among them: the list carries subtasks, counts and progress, the detail the rows.
+  const parent = seeded('Fahrrad warten', 'all', []);
+  const hiddenSub = seeded('Fahrrad: Schloss tauschen', 'assignees', [displayId, WANDA], parent);
+  const sharedSub = seeded('Fahrrad: Reifen pumpen', 'all', [], parent);
+
+  /** @param {(m: string, p: string) => Promise<{ status: number, body: any }>} who */
+  const listed = async (who) => {
+    const res = await who('GET', '/tasks');
+    assert.equal(res.status, 200);
+    return res.body.data;
+  };
+  /** @param {(m: string, p: string) => Promise<{ status: number, body: any }>} who */
+  const feedIds = async (who) => {
+    const res = await who('GET', '/tasks/completions?limit=200');
+    assert.equal(res.status, 200);
+    return res.body.data.map((/** @type {any} */ e) => e.task_id);
+  };
+
+  // GET /tasks
+  const wall = await listed(display);
+  assert.ok(!wall.some((/** @type {any} */ t) => t.id === forDisplay), 'the list leaves an assignees task off the wall');
+  assert.ok(wall.some((/** @type {any} */ t) => t.id === forAll), 'a household task stays in the wall list');
+  const wallParent = wall.find((/** @type {any} */ t) => t.id === parent);
+  assert.ok(wallParent, 'the household parent stays in the wall list');
+  assert.deepEqual(wallParent.subtasks.map((/** @type {any} */ s) => s.id), [sharedSub],
+    'the list carries only the household subtask to the wall');
+  assert.equal(wallParent.subtask_total, 1, 'the subtask count counts only household subtasks');
+  assert.equal(wallParent.subtask_done, 0);
+  const people = await listed(asWanda);
+  assert.ok(people.some((/** @type {any} */ t) => t.id === forDisplay), 'an assigned person still lists the task');
+  const personParent = people.find((/** @type {any} */ t) => t.id === parent);
+  assert.deepEqual(personParent.subtasks.map((/** @type {any} */ s) => s.id).sort(), [hiddenSub, sharedSub].sort(),
+    'an assigned person still sees both subtasks');
+  assert.equal(personParent.subtask_total, 2);
+
+  // GET /tasks/:id
+  const unknownTask = await display('GET', '/tasks/999999');
+  const hiddenTask = await display('GET', `/tasks/${forDisplay}`);
+  assert.equal(hiddenTask.status, 404, 'the detail of an assignees task answers 404 on the wall');
+  assert.deepEqual(hiddenTask.body, unknownTask.body, 'the refusal must equal the one for an unknown id');
+  assert.equal((await display('GET', `/tasks/${forAll}`)).status, 200, 'a household task keeps its detail');
+  const wallDetail = await display('GET', `/tasks/${parent}`);
+  assert.deepEqual(wallDetail.body.data.subtasks.map((/** @type {any} */ s) => s.id), [sharedSub],
+    'the detail carries only the household subtask to the wall');
+  assert.equal((await asWanda('GET', `/tasks/${forDisplay}`)).status, 200, 'an assigned person still reads the detail');
+  const personDetail = await asWanda('GET', `/tasks/${parent}`);
+  assert.equal(personDetail.body.data.subtasks.length, 2, 'an assigned person still reads both subtasks');
+
+  // GET /tasks/:id/comments
+  const unknownComments = await display('GET', '/tasks/999999/comments');
+  const hiddenComments = await display('GET', `/tasks/${forDisplay}/comments`);
+  assert.equal(hiddenComments.status, 404, 'the comments of an assignees task answer 404 on the wall');
+  assert.deepEqual(hiddenComments.body, unknownComments.body, 'the refusal must equal the one for an unknown id');
+  const sharedComments = await display('GET', `/tasks/${forAll}/comments`);
+  assert.equal(sharedComments.status, 200, 'a household task keeps its comments');
+  assert.equal(sharedComments.body.data.length, 1);
+  const personComments = await asWanda('GET', `/tasks/${forDisplay}/comments`);
+  assert.equal(personComments.status, 200, 'an assigned person still reads the comments');
+  assert.equal(personComments.body.data.length, 1);
+
+  // GET /tasks/completions
+  const wallFeed = await feedIds(display);
+  assert.ok(!wallFeed.includes(forDisplay), 'the feed leaves the entry of an assignees task off the wall');
+  assert.ok(!wallFeed.includes(hiddenSub), 'the feed leaves the entry of an assignees subtask off the wall');
+  assert.ok(wallFeed.includes(forAll) && wallFeed.includes(sharedSub), 'household entries stay in the wall feed');
+  const personFeed = await feedIds(asWanda);
+  assert.ok(personFeed.includes(forDisplay) && personFeed.includes(hiddenSub), 'an assigned person still reads both entries');
+});
+
 test('jede andere Schreibroute der beiden Module bleibt zu', async () => {
   // DIE EIGENTLICHE ZUSAGE DES TICKETS: „no creating, editing or deleting, and
   // no settings". Sie haengt daran, dass die Erlaubnis eine Liste von zwei

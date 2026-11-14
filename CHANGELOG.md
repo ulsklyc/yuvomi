@@ -15,13 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   where that would not hold for every run, for example shortly before only one of the two
   zones changes to summer time, it shows the configured value (`BACKUP_SCHEDULE=0 2 * * *`)
   instead.
-- **A wall display shows a task's history only for tasks the whole household sees.** The
-  history of a task (`GET /api/v1/tasks/:id/completions`) asked a paired display the same
-  question as a person, so a task shared only with its assignees would show its history on
-  the wall if the display itself was assigned, while ticking it off there answered "not
-  found". The history now follows the same wall rule, for the asked task and for every earlier
-  instance of a repeating task. In the app this state could not be
-  reached: a display is never offered as an assignee, and the server refuses it as one.
+- **A wall display reads only the tasks the whole household sees.** The task list, a single
+  task with its subtasks, its comments, its history and the household's completion feed
+  (`GET /api/v1/tasks`, `/tasks/:id`, `/tasks/:id/comments`, `/tasks/:id/completions`,
+  `/tasks/completions`) asked a paired display the same question as a person, so a task or
+  subtask shared only with its assignees would show on the wall if the display itself was
+  assigned, while ticking it off there answered "not found". Every one of these reads now
+  follows the same wall rule: such a task answers "not found" like an unknown one, and the
+  list, its subtask counts and the feeds leave it out, also for every earlier instance of a
+  repeating task. Nothing changes for people. In the app this state could not be reached: a
+  display is never offered as an assignee, and the server refuses it as one.
 
 ## [2.90.0] - 2026-11-14
 
