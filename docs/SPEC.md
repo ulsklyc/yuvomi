@@ -475,8 +475,8 @@ payment. `test:task-completion-writers` fails for any statement that sets `tasks
 
 API: `GET /api/v1/tasks/completions` (household feed, newest first, cursor-paged over
 `(completed_at, id)` because a bulk action puts several completions in the same second), and
-`GET /api/v1/tasks/{id}/completions` (the whole series behind one task; a paired display reads it
-only for a task with visibility `all`, the same wall rule as ticking off, #1209). No date range on either:
+`GET /api/v1/tasks/{id}/completions` (the whole series behind one task). A paired display reads both
+only for tasks with visibility `all`, the same wall rule as ticking off (#1209). No date range on either:
 which calendar day an instant belongs to is a question for the display timezone
 (`public/utils/timezone.js`), and a server taking a `from` day would have to keep a second clock for
 it. **The history starts empty** — recording began with this migration, and nothing wrote down what
@@ -3207,12 +3207,16 @@ detail: the other way round, a payload with any status other than `done` answere
 that exists and 404 for one that does not, and the difference between those two answers is exactly
 the disclosure the 404 is there to prevent. Only the
 transition into `done` is allowed; taking it back reverses points and discards a recurrence
-follow-up, and corrections stay with the household. The same wall rule holds for what the display reads
-about a task it may tick off: `GET /api/v1/tasks/{id}/completions` answers a display only for a
-task with visibility `all`, and the same 404 otherwise, even for a task that names the display as an
-assignee (a state the app cannot produce: a display is never offered or accepted as an assignee).
-The rule covers every entry of the answer, so an earlier instance of a repeating task that the
-household does not see stays off the wall too. Deciding a redemption stays wherever the
+follow-up, and corrections stay with the household. The same wall rule holds for every task the
+display reads: the list (`GET /api/v1/tasks`, with its subtasks, subtask counts and progress), a
+single task with its subtasks (`GET /api/v1/tasks/{id}`), its comments (`/comments`), its history
+(`/completions`) and the household feed (`GET /api/v1/tasks/completions`) show a display only tasks
+with visibility `all`. A task by id answers the same 404 as an unknown one, the list and the feeds
+leave it out, even for a task that names the display as an assignee (a state the app cannot
+produce: a display is never offered or accepted as an assignee). The history covers every entry of
+the answer, so an earlier instance of a repeating task that the household does not see stays off
+the wall too. One function in `server/authorize/` picks the rule per request (`taskReader`: the wall
+rule for a paired display, the task row rule for everyone else). Deciding a redemption stays wherever the
 household put it (`rewards_require_approval`) - the display asks, it never approves.
 
 `GET /api/v1/displays/people` fills the picker: household members with name, colour and picture,
