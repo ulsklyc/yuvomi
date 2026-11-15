@@ -66,6 +66,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { germanIn, outboundLiterals } from './error-language.js';
 
 const ROUTES = new URL('../server/routes/', import.meta.url);
+// The settings registry (phase 2, C3) holds the refusal texts of
+// PUT /api/v1/preferences since they moved out of the route: leg 1 reads it too.
+const SETTINGS = new URL('../server/settings/', import.meta.url);
 
 /**
  * Deutsche Stellen je Routen-Datei, Stand 26.10.2026. NUR SENKEN: wer ein
@@ -86,7 +89,11 @@ function routeFiles(dir = ROUTES, prefix = '') {
 /** Datei -> ihre deutschen Stellen. */
 function germanByFile() {
   const out = new Map();
-  for (const { rel, url } of routeFiles()) {
+  const files = [
+    ...routeFiles(),
+    ...routeFiles(SETTINGS).map((file) => ({ ...file, rel: `../settings/${file.rel}` })),
+  ];
+  for (const { rel, url } of files) {
     const hits = outboundLiterals(readFileSync(url, 'utf8'))
       .map((lit) => ({ ...lit, word: germanIn(lit.text) }))
       .filter((lit) => lit.word);
