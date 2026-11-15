@@ -17,7 +17,7 @@
  */
 
 import express from 'express';
-import { mayWriteModule } from '../../permissions.js';
+import { mayWriteModule } from '../../authorize/index.ts';
 import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 
 import { createLogger } from '../../logger.js';

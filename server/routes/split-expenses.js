@@ -26,7 +26,7 @@ import {
 } from '../services/household-members.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts } from '../services/contact-identity.js';
 import { todayKey } from '../utils/timezone.js';
-import { mayReadModule, mayWriteModule } from '../permissions.js';
+import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 
 const log = createLogger('SplitExpenses');
 const router = express.Router();

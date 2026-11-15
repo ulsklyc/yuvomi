@@ -2,7 +2,7 @@
 import express from 'express';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { requireAdmin } from '../middleware/require-admin.js';
 import { SCREENSAVER_PHOTO_ID } from '../display-scopes.js';
 
 const router = express.Router();
@@ -22,11 +22,6 @@ function config() {
     albumId: UUID_RE.test(albumId) ? albumId : '',
     enabled: Boolean(baseUrl && apiKey && /^https?:\/\//i.test(baseUrl)),
   };
-}
-
-function requireAdmin(req, res, next) {
-  if (!isAdminRequest(req)) return res.status(403).json({ error: 'Admin access required.', code: 403 });
-  next();
 }
 
 function cfgSet(key, value) {

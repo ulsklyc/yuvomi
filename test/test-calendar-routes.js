@@ -1442,7 +1442,7 @@ test('DELETE /subscriptions/:id - Mitglieds-Token neben einer Admin-Sitzung 403,
   const withToken = await call('DELETE', `/subscriptions/${subId}`, {
     actor: { ...TOM, cookieSession: { userId: ADMIN.id, role: 'admin' } },
   });
-  assert.equal(withToken.status, 403, 'isAdminUser urteilt nach der Rolle des Token-Subjekts');
+  assert.equal(withToken.status, 403, 'isAdminRequest urteilt nach der Rolle des Token-Subjekts');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM ics_subscriptions WHERE id=?').get(subId).n, 1);
   assert.equal((await call('DELETE', `/subscriptions/${subId}`, { actor: ADMIN })).status, 204);
 });

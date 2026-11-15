@@ -1,8 +1,7 @@
-import { visibilityWhere } from '../../services/visibility.js';
 import express from 'express';
 import * as db from '../../db.js';
-import { requireAdmin } from '../../middleware/require-admin.js';
-import { mayWriteModule } from '../../permissions.js';
+import { isAdminRequest, requireAdmin } from '../../middleware/require-admin.js';
+import { mayWriteModule, visibleWhere } from '../../authorize/index.ts';
 import {
   clearCalendarFeedToken,
   ensureDefaultCalendar,
@@ -18,7 +17,7 @@ import {
 import { uploadsLocalEvents } from '../../services/apple-calendar.js';
 import { calendarSources } from '../../services/calendar-selection.js';
 import { createLogger } from '../../logger.js';
-import { feedUrl, getUserId, isAdminUser } from './helpers.js';
+import { feedUrl, getUserId } from './helpers.js';
 
 const log = createLogger('CalendarLocalCalendars');
 const router = express.Router();
@@ -45,7 +44,7 @@ function loadCalendars(database, viewerId) {
   ensureDefaultCalendar(database);
   return database.prepare(`
     SELECT lc.*,
-           (SELECT COUNT(*) FROM calendar_events e WHERE ${localCalendarIdSql()} = lc.id AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@viewerId')}) AS event_count
+           (SELECT COUNT(*) FROM calendar_events e WHERE ${localCalendarIdSql()} = lc.id AND ${visibleWhere('events', 'e', '@viewerId')}) AS event_count
     FROM local_calendars lc
     ORDER BY lc.sort_order ASC, lc.name COLLATE NOCASE ASC, lc.id ASC
   `).all({ viewerId });
@@ -65,7 +64,7 @@ router.get('/calendars', (req, res) => {
     // Displays steht sie neben `data`, damit `data` die eigenen Kalender bleibt.
     res.json({
       data: rows.map((row) => ({
-        ...serializeCalendar(req, row, feedUrl, { includeFeedToken: isAdminUser(req) }),
+        ...serializeCalendar(req, row, feedUrl, { includeFeedToken: isAdminRequest(req) }),
         event_count: row.event_count ?? 0,
         uploads_to_icloud: icloudUpload && !!row.is_default,
       })),
@@ -179,7 +178,7 @@ router.put('/calendars/:id', (req, res) => {
         sort_order: changes.sort_order ?? null,
       });
     }
-    res.json({ data: serializeCalendar(req, localCalendarById(database, id), feedUrl, { includeFeedToken: isAdminUser(req) }) });
+    res.json({ data: serializeCalendar(req, localCalendarById(database, id), feedUrl, { includeFeedToken: isAdminRequest(req) }) });
   } catch (err) {
     log.error('PUT /calendars/:id', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -200,7 +199,7 @@ router.delete('/calendars/:id', (req, res) => {
     }
     // Das Mitglied sieht den Abo-Link nicht (nur Admins bekommen ihn), also
     // auch nicht, warum das Loeschen scheitert: der Grund sagt es (#1909).
-    if (row.feed_token && !isAdminUser(req)) {
+    if (row.feed_token && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403, reason: 'calendar_feed_admin_only' });
     }
     database.transaction(() => {

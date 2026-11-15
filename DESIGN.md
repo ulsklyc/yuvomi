@@ -3267,7 +3267,7 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
 
 ### Kinderkonten: Startrechte und eigene Sicht (R20, entschieden 2026-10-17)
 Ein NEUES Konto mit Familienrolle Kind startet mit Mitglied-Zeilen
-(`CHILD_START_PERMISSIONS`, server/permissions.js): Budget `none`, Haushaltshilfe `read`,
+(`CHILD_START_PERMISSIONS`, server/authorize/catalog.ts): Budget `none`, Haushaltshilfe `read`,
 Fasten aus, `housekeeping_view_amounts` aus. Nur verschaerfend, nur beim Anlegen (Admin,
 Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt.
 Seit R21 (D6) startet es ausserdem ohne Zyklus-Tab (`CHILD_START_PREFERENCES`): keine Rechte-Zeile,

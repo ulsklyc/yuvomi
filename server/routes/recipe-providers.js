@@ -12,7 +12,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { str, MAX_TITLE, MAX_URL } from '../middleware/validate.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 import { getAdapter, SUPPORTED_PROVIDERS } from '../services/recipe-providers/index.js';
 import {
   isBlockedBaseUrl, isPrivateNetworkRefusal, withPrivateNetworkHint, PRIVATE_NETWORK_MESSAGE,
@@ -50,7 +50,7 @@ function externalUrlInvalid(res) {
 
 router.get('/accounts', (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const rows = db.get().prepare('SELECT * FROM recipe_provider_accounts ORDER BY name COLLATE NOCASE').all();
     res.json({ data: rows.map(publicAccount) });
   } catch (err) {
@@ -61,7 +61,7 @@ router.get('/accounts', (req, res) => {
 
 router.post('/accounts', async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const provider = SUPPORTED_PROVIDERS.includes(req.body.provider) ? req.body.provider : 'mealie';
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl = str(req.body.base_url, 'Base URL', { max: MAX_URL });
@@ -124,7 +124,7 @@ router.post('/accounts', async (req, res) => {
 
 router.patch('/accounts/:id', (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.params.id));
     if (!account) return accountGone(res);
 
@@ -159,7 +159,7 @@ router.patch('/accounts/:id', (req, res) => {
 
 router.delete('/accounts/:id', (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const id = Number(req.params.id);
     const existing = getAccount(id);
     if (!existing) return accountGone(res);
@@ -176,7 +176,7 @@ router.delete('/accounts/:id', (req, res) => {
 
 router.post('/accounts/:id/test', async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.params.id));
     if (!account) return accountGone(res);
     const probe = await getAdapter(account).testConnection();
@@ -205,7 +205,7 @@ router.post('/accounts/:id/test', async (req, res) => {
 
 router.post('/accounts/:id/sync', async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.params.id));
     if (!account) return accountGone(res);
     const result = await syncOne(account.id);
@@ -218,7 +218,7 @@ router.post('/accounts/:id/sync', async (req, res) => {
 
 router.post('/sync', async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const result = await sync();
     res.json({ data: result });
   } catch (err) {

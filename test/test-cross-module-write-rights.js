@@ -52,7 +52,7 @@ const { default: recipesRouter } = await import('../server/routes/recipes.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { default: pantryRouter } = await import('../server/routes/pantry.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 const U = db.prepare(`

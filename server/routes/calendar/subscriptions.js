@@ -7,7 +7,8 @@ import express from 'express';
 import * as db from '../../db.js';
 import * as icsSubscription from '../../services/ics-subscription.js';
 import { color } from '../../middleware/validate.js';
-import { ICS_COLOR_RE, getUserId, isAdminUser } from './helpers.js';
+import { ICS_COLOR_RE, getUserId } from './helpers.js';
+import { isAdminRequest } from '../../middleware/require-admin.js';
 import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';
 import { validateCalendarId } from '../../services/local-calendars.js';
 import { BlockedAddressError } from '../../utils/ssrf.js';
@@ -120,7 +121,7 @@ router.patch('/subscriptions/:id', (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
     if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    const isAdmin = isAdminUser(req);
+    const isAdmin = isAdminRequest(req);
     const fields  = {};
     if (req.body.name  !== undefined) {
       if (typeof req.body.name !== 'string' || req.body.name.trim().length === 0 || req.body.name.length > 100)
@@ -156,7 +157,7 @@ router.delete('/subscriptions/:id', (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
     if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    const isAdmin = isAdminUser(req);
+    const isAdmin = isAdminRequest(req);
     const ok      = icsSubscription.remove(getUserId(req), subId, isAdmin);
     if (!ok) return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'calendar_subscription_not_found' });
     res.status(204).end();
@@ -173,7 +174,7 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
     if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    const isAdmin = isAdminUser(req);
+    const isAdmin = isAdminRequest(req);
     const sub     = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
     if (!sub) return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'calendar_subscription_not_found' });
     if (!isAdmin && sub.created_by !== getUserId(req))

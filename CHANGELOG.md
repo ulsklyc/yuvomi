@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Every "administrators only" refusal of the API has the same answer.** Routes that only an
+  administrator may use refused everyone else with one of four texts ("Permission denied.",
+  "Admin access required.", "Not authorized.", and one of its own for the member order), most
+  of them without a `reason`. They now all answer `403` with
+  `{ "error": "Admin access required.", "code": 403, "reason": "admin_required" }`. A signed-in
+  device gets `reason: "device_credential"` at every one of these routes, where some of them
+  used to send the plain text. API clients that compared the text should read the `reason`
+  instead. Who may use a route has not changed, and the web app shows the same sentence as
+  before.
+
+### Fixed
+- **The backup schedule shows the same time as the next backup.** On a server running in
+  another time zone than the household, the backup card said "Daily at 02:00" above "Next
+  backup 03:00" for the same run. The server now names the zone its schedule runs in, and the
+  schedule reads its time, weekday and day from the next run in the household's time zone;
+  where that would not hold for every run, for example shortly before only one of the two
+  zones changes to summer time, it shows the configured value (`BACKUP_SCHEDULE=0 2 * * *`)
+  instead.
+- **A wall display reads only the tasks the whole household sees.** The task list, a single
+  task with its subtasks, its comments, its history and the household's completion feed
+  (`GET /api/v1/tasks`, `/tasks/:id`, `/tasks/:id/comments`, `/tasks/:id/completions`,
+  `/tasks/completions`) asked a paired display the same question as a person, so a task or
+  subtask shared only with its assignees would show on the wall if the display itself was
+  assigned, while ticking it off there answered "not found". Every one of these reads now
+  follows the same wall rule: such a task answers "not found" like an unknown one, and the
+  list, its subtask counts and the feeds leave it out, also for every earlier instance of a
+  repeating task. Nothing changes for people. In the app this state could not be reached: a
+  display is never offered as an assignee, and the server refuses it as one.
+- **A task reminder without a lead time says so, at the lead time.** With the reminder switched on
+  and "None" chosen as lead time, saving the task said "Set a due date to enable task reminders.",
+  even when a date was set, and the line stood at the bottom of the dialog. The message now names
+  the missing lead time and stands under that field, which the dialog moves to.
+
+## [2.90.0] - 2026-11-14
+
+### Foundation
+- **Every access rule is answered in one place.** Who may see a row, who may use an area and
+  who cares for whom was decided in many files: as SQL in the routes, as comparisons on loaded
+  rows, in the scheduler, the feeds, the push sender and the MCP tools. All of it now lives in
+  `server/authorize/` and is asked through one function, and lint rules refuse a new rule
+  written anywhere else. Nothing changes for a household: the rules are the same, apart from
+  the corrections listed under "Fixed" and "Security" below, which this move brought to light.
+- **A matrix test holds what each role sees on every read path.** For every kind of account
+  (admin, member, child, caregiver, wall display, split-expense guest) and every path that
+  reads data (lists, detail views, search, overview, feeds, reminders, MCP) the expected answer
+  is written down and checked on every change, so a rule that drifts on one path turns a test
+  red before it reaches a release.
+- **No change to the database, and the way back is open.** This release brings no migration.
+  Before the tag the previous image and this build ran in turn on the same database, and a
+  backup made on this build restored on the previous one; pinning the previous version works
+  as described in the installation guide ("Pinning a version").
+
 ### Added
 - **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
   system information there is a section with what the installation runs on: version and build,
@@ -37,10 +90,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without the green that would say all is well next to a red line.
 
 ### Fixed
-- **A task reminder without a lead time says so, at the lead time.** With the reminder switched on
-  and "None" chosen as lead time, saving the task said "Set a due date to enable task reminders.",
-  even when a date was set, and the line stood at the bottom of the dialog. The message now names
-  the missing lead time and stands under that field, which the dialog moves to.
+- **A wall display or a split-expense guest account no longer receives medication reminders or
+  calendar feeds.** Reminders, pushes and the subscription feeds are sent without a request, and
+  there the account was looked up like an ordinary member: a display or a guest whose medication
+  schedule or feed token had been set directly in the database heard about its own doses, and its
+  calendar feed carried every household event, while the app itself refuses both accounts these
+  areas. Now a guest receives nothing from any area, a display receives only from the areas its
+  wall shows (tasks, calendar, rewards), and every feed of a display or a guest - calendar,
+  birthdays, inventory deadlines, cycle, shift plan and waste - answers with an empty calendar,
+  as for a member without the area. The app offers neither account a way to get there, so only
+  an installation edited by hand was affected. Members and admins are not affected.
+- **An AI assistant now creates tasks, shopping items and events exactly as the app does**
+  (#2616). The MCP tools `create_task`, `add_shopping_item` and `create_event` wrote with their
+  own queries beside the app's own path, and the result differed: a new task got no points,
+  although the household had set a default value for them; your own task category was refused
+  while a default category you had deleted was still accepted; a shopping item took any
+  category name, even one that no longer exists, and without one it fell back on "Sonstiges"
+  even after you had renamed that category; and with an iCloud calendar connected, which uploads
+  every local event, a new calendar event waited for the next sync run instead of going up right
+  away. All three now take the same route as the app, so there is nothing left to keep in step.
+  They also accept an optional `idempotency_key`: repeat a call with the same key after a lost
+  answer and you get the first result back instead of a duplicate. Writing over MCP now needs an
+  API token or a sent-along CSRF token - a client that authenticates with a browser session
+  cookie alone is refused. When the API refuses a call with a machine-readable reason, the error
+  text of these tools and of `call_api_operation` now ends in it, for example
+  `[reason: csrf_invalid]`.
+- **Creating or editing a task with an empty category or priority no longer breaks it.** An
+  API client that sent `category: ""` got a task with an empty category that none of your
+  categories matches, and `priority: ""` failed with "Internal server error.". An empty value
+  now counts as not given, exactly as leaving the field out: a new task gets "Miscellaneous"
+  and no priority, an edited one keeps what it had. The app itself sent an empty category when
+  its category list had not loaded. The description is now stored without leading and trailing spaces, and one
+  that is empty or only spaces is stored as no description - also when you clear it on edit.
+  When an AI assistant cannot reach the API from the server itself, the server log now says so
+  with the cause and the address it tried, not only the assistant.
 - **"Create backup now" no longer reports success when the backup failed.** The server answers
   a failed manual run with `200` and `success: false`, and the page showed "Backup created
   successfully." without reading the answer. It now shows the reason in your language, the
@@ -52,6 +135,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured - only the description was wrong. Such a schedule now stands there as the
   expression itself, like every other list or range; a single weekday is still spelled out,
   as a number or as a short or full name (`mon`, `Monday`).
+- **The global search finds the tasks your task list shows.** It only found tasks you had
+  created yourself or that named you in the old single-assignee field. A task someone else
+  shared with everyone, or one you were assigned to together with others, stood in your list
+  and was missing from the search. The search now applies the rule of the list.
+- **The global search finds the notes your notes page shows.** It only found notes you had
+  written yourself. A note someone else shared with everyone stood on your notes page and was
+  missing from the search. The search now applies the rule of the page: notes visible to
+  everyone, and your own. A note set to "only me" is still found by nobody but its author.
+- **The global search finds the medications and activities of a person you care for.** If an
+  admin has entered you as someone's caregiver, the Health pages show you that person's
+  entries, including the ones marked private. The search left those out: it only knew your
+  own entries and the ones shared with the family. It now applies the rule of the Health
+  pages. Nothing else changes - without a care grant nobody finds another person's private
+  entry, an admin included.
+- **An archived task says so in the search results.** The global search finds archived tasks,
+  so that a task you put away can be found again - but the hit looked like any open task. It
+  now reads "Archived" before the due date and stands at the end of the task hits, after the
+  done ones. With many hits an archived task can drop off the end of the list; a more exact
+  search term brings it back. `GET /api/v1/search` returns `archived_at` on a task hit.
+- **Changing or deleting a quick link that your list does not show answers "not found".**
+  `PUT` and `DELETE /api/v1/quick-links/:id` now apply the same visibility rule as the list. A
+  quick link with a visibility other than "all" or "private", which only a restored backup or
+  direct database access can produce, was hidden from everyone but its creator in the list,
+  yet changing or deleting it answered `403` and so gave away that it exists. It now answers
+  `404` with `quick_links_link_not_found`, like a private quick link of someone else. Nothing
+  changes for the two levels the app writes.
+- **Recurring events decide "is this series mine" the way the calendar list does.** If the
+  creator stored with a series is not an account number - possible only after restoring a
+  backup or editing the database directly, for example `0x2` - the calendar never counted the
+  series as anyone's own, but a single occurrence of it that is shared with everyone could
+  still offer "change this occurrence" to the account that text resembles. It no longer does.
+  Events the app wrote itself are not affected.
+
+### Security
+- **The global search no longer finds a private task of someone else.** A task set to "only
+  me" was found by a second person if the old single-assignee field still named them - a
+  field the task list ignores for a private task. Title, status, priority and due date of that
+  task appeared in the search results, with a matching word from its description or tags as an
+  excerpt. The task list, the detail view and the overview never showed it. The search now
+  asks the same rule as the list: visible to everyone, created by you, or shared with the
+  assigned people and you are one of them.
 
 ## [2.89.1] - 2026-11-12
 

@@ -1,4 +1,31 @@
 /**
+ * Module: row visibility and ownership of documents (phase 2, section B3; until then
+ *         server/services/document-access.js, moved whole)
+ * Purpose: who sees a document of the documents module, who may write a visible one,
+ *          and how an attachment follows the audience of the event it hangs on.
+ *
+ * Dependencies: none (the connection is a parameter). Erasable TS syntax only (runs
+ * through type stripping, no build).
+ */
+
+import type { Database } from '../catalog.ts';
+
+/** The audience of an event as eventAudienceChanged() compares it. */
+type EventAudience = { visibility?: string | null; userIds?: readonly unknown[] | null };
+
+/** The switches of applyDocumentAccess(). */
+type DocumentAccessTarget = {
+  visibility: string;
+  userIds?: readonly unknown[];
+  mayWiden?: boolean;
+  mayNarrow?: boolean;
+  grantAssignees?: boolean;
+};
+
+/** What documentWidenPredicate() and documentClonePredicate() know about the caller. */
+type AttachmentCaller = { actorId?: number | null; isAdmin?: boolean | null; documentsWritable?: unknown };
+
+/**
  * Modul: Dokument-Sichtbarkeit und -Besitz
  * Zweck: Die eine Regel, wer ein Dokument aus dem Dokumente-Modul sehen darf,
  *        und die eine, wer ein sichtbares Dokument schreiben darf.
@@ -19,13 +46,23 @@
  * @param {string} param - Name des benannten Bind-Parameters mit der User-ID
  * @returns {string}
  */
-export function documentVisibleSql(alias = 'd', param = 'userId') {
+export function documentVisibleSql(alias: string = 'd', param: string = 'userId'): string {
+  return documentVisibleWhere(alias, `@${param}`);
+}
+
+/**
+ * The same fragment with the viewer as a bind token ('@me', '?', a column
+ * expression), the form visibleWhere('documents', ...) passes on. The text for
+ * documentVisibleSql(alias, param) is the one documentVisibleWhere(alias, '@' + param)
+ * builds.
+ */
+export function documentVisibleWhere(alias: string, viewer: string): string {
   return `(
-    ${alias}.created_by = @${param}
+    ${alias}.created_by = ${viewer}
     OR ${alias}.visibility = 'family'
     OR EXISTS (
       SELECT 1 FROM family_document_access a
-      WHERE a.document_id = ${alias}.id AND a.user_id = @${param}
+      WHERE a.document_id = ${alias}.id AND a.user_id = ${viewer}
     )
   )`;
 }
@@ -39,19 +76,35 @@ export function documentVisibleSql(alias = 'd', param = 'userId') {
  * @param {number} userId
  * @returns {number[]} sichtbare IDs, Reihenfolge wie uebergeben, ohne Duplikate
  */
-export function filterVisibleDocumentIds(database, ids, userId) {
+function filterVisibleDocumentIds(database: Database, ids: readonly unknown[] | null | undefined, userId: unknown): number[] {
+  return filterVisibleIds(database, 'family_documents', documentVisibleSql('d'), ids, userId);
+}
+
+/**
+ * The query behind filterVisibleDocumentIds() for any table: `visible` is a
+ * fragment over the alias `d` with the viewer bound as `@userId`. filterVisible()
+ * (rows/index.ts) passes visibleWhere(type, 'd', '@userId'); for documents that is
+ * the text filterVisibleDocumentIds() builds, so both run the same SQL.
+ */
+export function filterVisibleIds(
+  database: Database,
+  table: string,
+  visible: string,
+  ids: readonly unknown[] | null | undefined,
+  userId: unknown,
+): number[] {
   const wanted = [...new Set((ids || [])
     .map((id) => Number(id))
     .filter((id) => Number.isInteger(id) && id > 0))];
   if (!wanted.length) return [];
 
   const placeholders = wanted.map(() => '?').join(', ');
-  const visible = new Set(database.prepare(`
-    SELECT d.id FROM family_documents d
-    WHERE d.id IN (${placeholders}) AND ${documentVisibleSql('d')}
-  `).all(...wanted, { userId }).map((row) => row.id));
+  const rows = new Set((database.prepare(`
+    SELECT d.id FROM ${table} d
+    WHERE d.id IN (${placeholders}) AND ${visible}
+  `).all(...wanted, { userId }) as { id: number }[]).map((row) => row.id));
 
-  return wanted.filter((id) => visible.has(id));
+  return wanted.filter((id) => rows.has(id));
 }
 
 /**
@@ -66,7 +119,10 @@ export function filterVisibleDocumentIds(database, ids, userId) {
  * @param {{userId: number, isAdmin: boolean}} actor
  * @returns {boolean}
  */
-export function canManageDocument(document, { userId, isAdmin }) {
+export function canManageDocument(
+  document: { created_by?: unknown },
+  { userId, isAdmin }: { userId: unknown; isAdmin?: boolean | null },
+): boolean {
   return isAdmin || document.created_by === userId;
 }
 
@@ -104,11 +160,11 @@ export function canManageDocument(document, { userId, isAdmin }) {
  * @param {number} documentId
  * @param {{ visibility: 'private'|'restricted'|'family', userIds: number[], mayWiden: boolean, mayNarrow: boolean }} target
  */
-export function applyDocumentAccess(database, documentId, {
+export function applyDocumentAccess(database: Database, documentId: unknown, {
   visibility, userIds = [], mayWiden = false, mayNarrow = false, grantAssignees = false,
-}) {
+}: DocumentAccessTarget): void {
   if (!documentId) return;
-  const current = database.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId);
+  const current = database.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId) as { visibility: string } | undefined;
   if (!current) return;
   const setVisibility = database.prepare('UPDATE family_documents SET visibility = ? WHERE id = ?');
   const clearAccess = database.prepare('DELETE FROM family_document_access WHERE document_id = ?');
@@ -144,8 +200,8 @@ export function applyDocumentAccess(database, documentId, {
   if (visibility === 'family') return;
   // restricted -> restricted: nur Personen herausnehmen, niemanden hinzufuegen.
   const keep = new Set(wanted);
-  const existing = database.prepare('SELECT user_id FROM family_document_access WHERE document_id = ?')
-    .all(documentId).map((row) => row.user_id);
+  const existing = (database.prepare('SELECT user_id FROM family_document_access WHERE document_id = ?')
+    .all(documentId) as { user_id: number }[]).map((row) => row.user_id);
   const drop = database.prepare('DELETE FROM family_document_access WHERE document_id = ? AND user_id = ?');
   for (const userId of existing) if (!keep.has(userId)) drop.run(documentId, userId);
 }
@@ -166,12 +222,12 @@ export function applyDocumentAccess(database, documentId, {
  * @param {{ visibility: string, userIds: number[] }} after
  * @returns {boolean}
  */
-export function eventAudienceChanged(before, after) {
+export function eventAudienceChanged(before: EventAudience | null | undefined, after: EventAudience): boolean {
   if (!before) return true;
   const visibility = before.visibility ?? 'all';
   if (visibility !== (after.visibility ?? 'all')) return true;
   if (visibility !== 'assignees') return false;
-  const ids = (list) => new Set((list || []).map(Number).filter((id) => Number.isInteger(id) && id > 0));
+  const ids = (list: readonly unknown[] | null | undefined) => new Set((list || []).map(Number).filter((id) => Number.isInteger(id) && id > 0));
   const was = ids(before.userIds);
   const is = ids(after.userIds);
   return was.size !== is.size || [...was].some((id) => !is.has(id));
@@ -193,7 +249,7 @@ export const ATTACHMENT_NARROW_ONLY = 'narrow-only';
  * verengt nur, alles andere laesst das Dokument unangetastet.
  * @returns {{ mayWiden: boolean, mayNarrow: boolean }}
  */
-export function attachmentAccessMode(verdict) {
+export function attachmentAccessMode(verdict: unknown): { mayWiden: boolean; mayNarrow: boolean } {
   return { mayWiden: verdict === true, mayNarrow: verdict === ATTACHMENT_NARROW_ONLY };
 }
 
@@ -207,12 +263,15 @@ export function attachmentAccessMode(verdict) {
  * den Termin angelegt hat (`created_by` des Dokuments), sie behaelt das Recht.
  * @returns {(documentId: number) => boolean}
  */
-export function documentWidenPredicate(database, { actorId, isAdmin = false, documentsWritable }) {
-  return (documentId) => {
+export function documentWidenPredicate(
+  database: Database,
+  { actorId, isAdmin = false, documentsWritable }: AttachmentCaller,
+): (documentId: number) => boolean {
+  return (documentId: number) => {
     if (documentsWritable !== true || actorId == null) return false;
     if (!documentSeenBy(database, documentId, actorId)) return false;
-    const document = database.prepare('SELECT created_by FROM family_documents WHERE id = ?').get(documentId);
-    return Boolean(document) && canManageDocument(document, { userId: actorId, isAdmin });
+    const document = database.prepare('SELECT created_by FROM family_documents WHERE id = ?').get(documentId) as { created_by: number } | undefined;
+    return Boolean(document) && canManageDocument(document as { created_by: number }, { userId: actorId, isAdmin });
   };
 }
 
@@ -223,12 +282,15 @@ export function documentWidenPredicate(database, { actorId, isAdmin = false, doc
  * geoeffnet.
  * @returns {(documentId: number) => boolean}
  */
-export function documentClonePredicate(database, { actorId, documentsWritable }) {
-  return (documentId) => documentsWritable === true
+export function documentClonePredicate(
+  database: Database,
+  { actorId, documentsWritable }: AttachmentCaller,
+): (documentId: number) => boolean {
+  return (documentId: number) => documentsWritable === true
     && actorId != null
     && documentSeenBy(database, documentId, actorId);
 }
 
-function documentSeenBy(database, documentId, userId) {
+function documentSeenBy(database: Database, documentId: number, userId: number): boolean {
   return filterVisibleDocumentIds(database, [documentId], userId).length > 0;
 }

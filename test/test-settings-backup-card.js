@@ -69,6 +69,7 @@ class LiveElement extends MiniElement {
 const { backupErrorRow, backupStatusTone, backupSuccessOverdue, render } = await import('../public/settings/pages/admin-backup.js');
 const { cronScheduleIntervalMs } = await import('../public/settings/cron-label.js');
 const { dateTimeText } = await import('../public/utils/date-format.js');
+const { setDisplayTimeZone, zonedTimeKey } = await import('../public/utils/timezone.js');
 
 const hasClass = (/** @type {any} */ el, /** @type {string} */ name) => el.className.split(/\s+/).includes(name);
 const byClass = (/** @type {any} */ root, /** @type {string} */ name) => [...elements(root)].filter((el) => hasClass(el, name));
@@ -116,6 +117,8 @@ const HEALTHY = {
   lastError: null,
   lastSuccess: ago(8 * HOUR),
   nextRun: new Date(NOW + 16 * HOUR).toISOString(),
+  // Die Zone, in der der Cron läuft (`TZ`, sonst UTC).
+  timezone: 'UTC',
 };
 
 /**
@@ -380,12 +383,12 @@ test('ein Zeitplan über mehrere Wochentage steht als Ausdruck da und warnt nie 
     const old = { ...HEALTHY, schedule, lastSuccess: ago(400 * DAY), lastBackup: { timestamp: ago(400 * DAY), success: true } };
     assert.equal(backupSuccessOverdue(old, NOW), false, schedule);
     const info = await renderCard({ statuses: [old] });
-    assert.equal(rowOf(info, 'settings.backupSchedulerSchedule')?.value, schedule);
+    assert.equal(rowOf(info, 'settings.backupSchedulerSchedule')?.value, `BACKUP_SCHEDULE=${schedule}`);
     assert.equal(rowOf(info, 'settings.backupSchedulerLastBackup')?.valueClass, 'settings-info-value', schedule);
   }
 
   // Gegenprobe: ein einzelner Wochentag bleibt Klartext mit sieben Tagen Abstand.
-  const weekly = { ...HEALTHY, schedule: '0 2 * * mon' };
+  const weekly = { ...HEALTHY, schedule: '0 2 * * mon', nextRun: '2026-11-16T02:00:00.000Z' };
   const info = await renderCard({ statuses: [weekly] });
   assert.ok(rowOf(info, 'settings.backupSchedulerSchedule')?.value.startsWith('settings.backupSchedulerCronWeekly'));
   assert.equal(cronScheduleIntervalMs(weekly.schedule), 7 * DAY);
@@ -460,6 +463,98 @@ test('ohne Zeitpunkt und ohne aktiven Zeitplan gibt es keine Zeile zum nächsten
   }
   const disabled = await renderCard({ statuses: [{ ...HEALTHY, enabled: false }] });
   assert.deepEqual(labelsOf(disabled), ['settings.backupSchedulerStatus']);
+});
+
+// ── Zeitplan und nächster Lauf nennen dieselbe Uhrzeit ──────────────────────
+//
+// Der Cron läuft in der Serverzone (hier UTC), "Nächstes Backup" steht in der
+// Haushaltszone (hier Berlin). Vorher stand "Täglich um 02:00" über
+// "13.11. 03:00": zwei Uhrzeiten für denselben Lauf.
+
+/**
+ * Rendert die Karte mit Haushaltszone `zone`. Der i18n-Stub schreibt eine
+ * Uhrzeit sonst als rohen Text; hier nennt er einen Zeitpunkt wie das Original
+ * in der Haushaltszone (HH:MM), eine Wanduhr ('03:00') unverändert.
+ * @param {string} zone @param {object} scheduler
+ */
+async function renderInZone(zone, scheduler) {
+  setDisplayTimeZone(zone);
+  /** @type {any} */ (globalThis).__formatTime = (/** @type {unknown} */ v) => (/\d{4}-\d{2}-\d{2}T/.test(String(v)) ? zonedTimeKey(String(v)) : String(v));
+  try {
+    return await renderCard({ statuses: [scheduler] });
+  } finally {
+    setDisplayTimeZone(null);
+    delete (/** @type {any} */ (globalThis)).__formatTime;
+  }
+}
+
+test('Zeitplan in der Haushaltszone: dieselbe Uhrzeit wie "Nächstes Backup"', async () => {
+  // HEALTHY: täglich 02:00 UTC, nächster Lauf 13.11. 02:00 UTC = 03:00 in Berlin.
+  const info = await renderInZone('Europe/Berlin', HEALTHY);
+  const schedule = rowOf(info, 'settings.backupSchedulerSchedule')?.value ?? '';
+  assert.ok(schedule.startsWith(`settings.backupSchedulerCronDaily${JSON.stringify({ time: '03:00' })}`), schedule);
+  assert.match(rowOf(info, 'settings.backupSchedulerNextRun')?.value ?? '', /03:00/);
+  // Hinter "Mehr dazu" steht der Konfigwert, keine zweite Uhrzeit.
+  assert.ok(schedule.endsWith('settings.hintMoreBACKUP_SCHEDULE=0 2 * * *'), schedule);
+});
+
+test('Zeitplan in der Haushaltszone: Tageswechsel und Zone mit halber Stunde', async () => {
+  // Sonntag 23:00 UTC ist Montag 00:00 in Berlin.
+  const sunday = { ...HEALTHY, schedule: '0 23 * * sun', nextRun: '2026-11-15T23:00:00.000Z' };
+  const weekly = rowOf(await renderInZone('Europe/Berlin', sunday), 'settings.backupSchedulerSchedule')?.value ?? '';
+  assert.ok(weekly.startsWith(`settings.backupSchedulerCronWeekly${JSON.stringify({ weekday: 'Montag', time: '00:00' })}`), weekly);
+
+  // +05:30: 02:00 UTC ist 07:30 in Indien.
+  const india = rowOf(await renderInZone('Asia/Kolkata', HEALTHY), 'settings.backupSchedulerSchedule')?.value ?? '';
+  assert.ok(india.startsWith(`settings.backupSchedulerCronDaily${JSON.stringify({ time: '07:30' })}`), india);
+});
+
+test('Zeitplan ohne nächsten Lauf oder vor der Umstellung des Haushalts: der Ausdruck als Code', async () => {
+  for (const scheduler of [
+    { ...HEALTHY, nextRun: null },
+    // Berlin stellt am 28.03.2027 um: der Lauf danach stünde eine Stunde später.
+    { ...HEALTHY, nextRun: '2027-03-27T02:00:00.000Z' },
+  ]) {
+    const info = await renderInZone('Europe/Berlin', scheduler);
+    const value = scheduleCell(info);
+    assert.equal(value.textContent, 'BACKUP_SCHEDULE=0 2 * * *', JSON.stringify(scheduler.nextRun));
+    assert.equal(value.childNodes[0]?.tagName?.toLowerCase(), 'code', JSON.stringify(scheduler.nextRun));
+  }
+});
+
+/** Die Wertzelle der Zeile "Zeitplan". @param {any} info */
+function scheduleCell(info) {
+  const [row] = byClass(info, 'settings-info-row').filter((el) => byClass(el, 'settings-info-label')[0]?.textContent === 'settings.backupSchedulerSchedule');
+  return byClass(row, 'settings-info-value')[0];
+}
+
+test('Zeitplan mit der Zone des Servers: London und eine Server-Umstellung fallen auf den Konfigwert zurück', async () => {
+  // UTC-Server, Haushalt London im Winter: gleiche Uhrzeit am 27.03.2027, am
+  // 28. aber 03:00 BST.
+  const london = scheduleCell(await renderInZone('Europe/London', { ...HEALTHY, nextRun: '2027-03-27T02:00:00.000Z' }));
+  assert.equal(london.textContent, 'BACKUP_SCHEDULE=0 2 * * *');
+
+  // Server Berlin, Haushalt Indien: der Server stellt um, der Haushalt nicht.
+  const india = scheduleCell(await renderInZone('Asia/Kolkata', { ...HEALTHY, timezone: 'Europe/Berlin', nextRun: '2027-03-27T01:00:00.000Z' }));
+  assert.equal(india.textContent, 'BACKUP_SCHEDULE=0 2 * * *');
+
+  // Berlin und Berlin: der Satz bleibt über die Umstellung.
+  // (04:00, weil es 02:00 am 28.03.2027 in Berlin nicht gibt.)
+  const berlin = scheduleCell(await renderInZone('Europe/Berlin', { ...HEALTHY, schedule: '0 4 * * *', timezone: 'Europe/Berlin', nextRun: '2027-03-27T03:00:00.000Z' }));
+  assert.ok(berlin.textContent.startsWith(`settings.backupSchedulerCronDaily${JSON.stringify({ time: '04:00' })}`), berlin.textContent);
+});
+
+test('die Zone ändert nichts an "überfällig"', async () => {
+  // Ein Erfolg vor 47 Stunden ist bei täglichem Plan noch nicht überfällig,
+  // vor 49 Stunden schon - in jeder Haushaltszone.
+  for (const zone of ['Europe/Berlin', 'Asia/Kolkata', 'America/New_York']) {
+    const at = (/** @type {number} */ ms) => ({ ...HEALTHY, lastSuccess: ago(ms), lastBackup: { timestamp: ago(ms), success: true } });
+    setDisplayTimeZone(zone);
+    try {
+      assert.equal(backupSuccessOverdue(at(47 * HOUR), NOW), false, zone);
+      assert.equal(backupSuccessOverdue(at(49 * HOUR), NOW), true, zone);
+    } finally { setDisplayTimeZone(null); }
+  }
 });
 
 // ── "Jetzt Backup erstellen" ─────────────────────────────────────────────────

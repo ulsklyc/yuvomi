@@ -3,12 +3,15 @@
  * Zweck: Reine Suchlogik gegen den FTS5-Index `search_index` (Migration 44).
  *        Keine Abhängigkeit auf db.js - die Datenbank wird hereingereicht, damit
  *        die Logik direkt mit node:sqlite getestet werden kann.
- * Abhaengigkeiten: server/services/visibility.js, document-access.js und
- *        budget-visibility.js (reine SQL-Bausteine, kein db.js)
+ * Abhaengigkeiten: server/authorize/index.ts (rows/: assignees, notes, ics-subscriptions,
+ *        health, documents, budget - reine SQL-Bausteine, kein db.js)
  */
-import { icsSubscriptionVisibleWhere, noteVisibleWhere, visibilityWhere } from './visibility.js';
-import { documentVisibleSql } from './document-access.js';
-import { budgetDetailsVisibleWhere, resolveBudgetMode } from './budget-visibility.js';
+import {
+  careAwareClause,
+  budgetDetailsVisibleWhere,
+  resolveBudgetMode,
+  visibleWhere,
+} from '../authorize/index.ts';
 
 import {
   expandRecurringEvents, loadEventExceptions, seriesReadingZone,
@@ -423,7 +426,7 @@ function birthdayFieldsByEvent(database, events) {
  * @param {object} [opts]
  * @param {Set<string>|null} [opts.hiddenModules] Module, die dem Betrachter
  *        entzogen sind (`access_permissions`, #467) oder die sein API-Token
- *        nicht lesen darf (`hiddenModulesFor` in permissions.js). Aus der
+ *        nicht lesen darf (`hiddenModulesFor` in server/authorize/modules.ts). Aus der
  *        Rollenachse gehört nur `'none'` hinein - `'read'` ist eine
  *        Leseberechtigung, keine Sperre. Ihre Trefferart wird gar nicht erst
  *        abgefragt und bleibt leer.
@@ -444,14 +447,25 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
   const results = emptySearchResults();
   const allows = bucketFilter({ hiddenModules, disabledNav });
 
+  // The row rule of the task list (GET /tasks): `all`, the creator, and for
+  // `assignees` a row in task_assignments. The legacy column `assigned_to` is
+  // no access path: a private task that only names someone there stays with
+  // its creator.
+  // The archive is a wish of the viewer at the list, no limit of what the list
+  // may hold (services/task-scope.js): an archived task stays a hit, as does
+  // one that starts later. It says so (`archived_at`, as in the list row) and
+  // stands last - behind the limit, too: with enough open hits an archived
+  // one drops out, and a narrower query brings it back.
   if (allows('tasks')) results.tasks = database.prepare(`
-    SELECT t.id, t.title, t.status, t.priority, t.due_date, s.body AS _body
+    SELECT t.id, t.title, t.status, t.priority, t.due_date,
+           t.archived_at, s.body AS _body
     FROM search_index s
     JOIN tasks t ON t.id = s.entity_id
     WHERE s.entity = 'task' AND s.search_index MATCH @match
       AND t.parent_task_id IS NULL
-      AND (t.created_by = @userId OR t.assigned_to = @userId)
-    ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
+      AND ${visibleWhere('tasks', 't', '@userId')}
+    ORDER BY t.archived_at IS NOT NULL,
+             CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
              t.due_date ASC NULLS LAST
     LIMIT @limit
   `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row._body]));
@@ -475,8 +489,8 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
       FROM search_index s
       JOIN calendar_events e ON e.id = s.entity_id
       WHERE s.entity = 'event' AND s.search_index MATCH @match
-        AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}${
+        AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
+        AND ${visibleWhere('events', 'e', '@userId')}${
           // Geburtstagstermine stehen in dieser Trefferart, gehoeren aber dem
           // Schalter `birthdays` - wie in der Kalendersuche (#1660).
           disabledNav?.has('birthdays') ? ` AND ${notBirthdayEventSql('e')}` : ''}
@@ -515,16 +529,15 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     }, q, [event.description, event.location]));
   }
 
+  // The row rule of the note list (GET /notes, #1514): `all` notes of anyone
+  // and the viewer's own. Nothing narrower, nothing wider - a note the list
+  // shows is a note the search finds.
   if (allows('notes')) results.notes = database.prepare(`
     SELECT n.id, n.title, n.content
     FROM search_index s
     JOIN notes n ON n.id = s.entity_id
     WHERE s.entity = 'note' AND s.search_index MATCH @match
-      AND n.created_by = @userId
-      -- Die Sichtbarkeitsregel (#1514) steht auch hier, obwohl die Suche heute
-      -- nur eigene Notizen findet: wer die engere Klausel loest, soll die
-      -- private Notiz eines anderen nicht mit freigeben.
-      AND ${noteVisibleWhere('n', '@userId')}
+      AND ${visibleWhere('notes', 'n', '@userId')}
     ORDER BY n.pinned DESC, n.updated_at DESC
     LIMIT @limit
   `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.content]));
@@ -547,27 +560,38 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     LIMIT @limit
   `).all({ match, limit }).map((row) => withExcerpt(row, q, [row._body]));
 
-  // Health: Medikamente — Treffer auf Name/Dosistext, Sichtbarkeits-Scoping.
-  if (allows('meds')) results.meds = database.prepare(`
-    SELECT m.id, m.name AS title, m.dosage_text, m.active
-    FROM search_index s
-    JOIN medications m ON m.id = s.entity_id
-    WHERE s.entity = 'medication' AND s.search_index MATCH @match
-      AND (m.user_id = @userId OR m.visibility = 'family')
-    ORDER BY m.active DESC, m.name ASC
-    LIMIT @limit
-  `).all({ match, userId, limit });
+  // Health: the row rule of the health lists (GET /health/medications,
+  // GET /health/activities) - the viewer's own rows, `family` rows, and every
+  // row of a person whose care was granted to the viewer (#584). The clause
+  // binds positionally, so these two queries do as a whole: match, the
+  // clause's parameters, limit - in the order of the placeholders.
+  // Medications: hits on name and dosage text.
+  if (allows('meds')) {
+    const visible = careAwareClause('m', userId, null);
+    results.meds = database.prepare(`
+      SELECT m.id, m.name AS title, m.dosage_text, m.active
+      FROM search_index s
+      JOIN medications m ON m.id = s.entity_id
+      WHERE s.entity = 'medication' AND s.search_index MATCH ?
+        AND ${visible.sql}
+      ORDER BY m.active DESC, m.name ASC
+      LIMIT ?
+    `).all(match, ...visible.params, limit);
+  }
 
-  // Health: Aktivitäten — Treffer auf Typ/Notiz, Sichtbarkeits-Scoping.
-  if (allows('activities')) results.activities = database.prepare(`
-    SELECT a.id, a.type AS title, a.note, a.performed_at
-    FROM search_index s
-    JOIN health_activities a ON a.id = s.entity_id
-    WHERE s.entity = 'activity' AND s.search_index MATCH @match
-      AND (a.user_id = @userId OR a.visibility = 'family')
-    ORDER BY a.performed_at DESC
-    LIMIT @limit
-  `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.note]));
+  // Activities: hits on type and note, the same row rule.
+  if (allows('activities')) {
+    const visible = careAwareClause('a', userId, null);
+    results.activities = database.prepare(`
+      SELECT a.id, a.type AS title, a.note, a.performed_at
+      FROM search_index s
+      JOIN health_activities a ON a.id = s.entity_id
+      WHERE s.entity = 'activity' AND s.search_index MATCH ?
+        AND ${visible.sql}
+      ORDER BY a.performed_at DESC
+      LIMIT ?
+    `).all(match, ...visible.params, limit).map((row) => withExcerpt(row, q, [row.note]));
+  }
 
   // Waste: nur der Typ-Katalog ist indiziert (Migration 206) - nie die von
   // waste-domain.js berechneten, potenziell unbegrenzten Termine (siehe dortige
@@ -670,7 +694,7 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
     results.documents = firstMatches(database.prepare(`
       SELECT d.id, d.name AS title, d.description, d.category, d.updated_at
       FROM family_documents d
-      WHERE ${documentVisibleSql('d', 'userId')} AND d.status = 'active'
+      WHERE ${visibleWhere('documents', 'd', '@userId')} AND d.status = 'active'
       ORDER BY d.updated_at DESC, d.id DESC
     `).all({ userId }), matches, (d) => [d.title, d.description], limit)
       .map((d) => withExcerpt(pick(d, ['id', 'title', 'category']), q, [d.description]));

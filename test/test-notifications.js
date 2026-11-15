@@ -29,6 +29,9 @@ function makeDb({ withNotificationTables = true } = {}) {
       -- Vorsorge-Erinnerung kommt aus users.display_name.
       display_name TEXT NOT NULL DEFAULT ''
     );
+    -- actorForUser fragt je Empfaenger Gast und Display; fehlt eine Tabelle, schliesst es.
+    CREATE TABLE split_expense_guest_users (user_id INTEGER PRIMARY KEY, group_id INTEGER);
+    CREATE TABLE display_accounts (user_id INTEGER PRIMARY KEY);
     -- Der Vorrats-Voll-Sync fragt beide Rechte-Achsen (#467): sync_config fuer
     -- die haushaltweite Abschaltung, access_permissions je Empfaenger. Fehlt
     -- eine der Tabellen, scheitert er still im try/catch von
@@ -56,7 +59,7 @@ function makeDb({ withNotificationTables = true } = {}) {
       goal_minutes INTEGER
     );
     -- Die Sichtbarkeitsspalten und Zuweisungstabellen, an denen die Zustellung
-    -- seit services/reminder-targets.js haengt - mit den Vorgaben des echten
+    -- seit authorize/rows/reminders.ts haengt - mit den Vorgaben des echten
     -- Schemas, damit eine Zeile ohne Angabe wie in Produktion fuer alle da ist.
     CREATE TABLE tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,7 +109,7 @@ function makeDb({ withNotificationTables = true } = {}) {
     );
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
     -- Sichtbarkeit und Freigaben wie im echten Schema: die Zustellung fragt
-    -- seit services/reminder-targets.js, ob ein Dokument fuer alle da ist.
+    -- seit authorize/rows/reminders.ts, ob ein Dokument fuer alle da ist.
     CREATE TABLE family_documents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -822,7 +825,7 @@ test('next-fast channel notification uses household-localized actionable copy', 
   const db = makeDb();
   const store = createNotificationChannelStore({ db });
   // Fasten ist Gesundheit und geht nur an die Person selbst: an ihren eigenen
-  // Kanal, nie an den des Haushalts (services/reminder-targets.js). Beide
+  // Kanal, nie an den des Haushalts (authorize/rows/reminders.ts). Beide
   // stehen hier, damit der Test auch sieht, wohin die Meldung NICHT geht.
   store.createChannel({ provider: 'ntfy', name: 'household', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
   store.createChannel({ provider: 'ntfy', name: 'mine', enabled: true, scope: 'user', userId: 1, config: { baseUrl: 'https://ntfy.test', topic: 'me' }, secrets: {} });

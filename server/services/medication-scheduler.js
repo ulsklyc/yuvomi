@@ -11,7 +11,7 @@
  *          them (#2602), and never through a channel the household shares
  *          (#2598).
  * Dependencies: server/db.js, push.js, notification-channels.js, channel-delivery.js,
- *               household-modules.js, reminder-origins.js, utils/timezone.js.
+ *               household-modules.js, server/authorize/, utils/timezone.js.
  */
 import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
@@ -20,7 +20,7 @@ import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
 import { defaultProviders, sendToChannel } from './channel-delivery.js';
 import { householdDisabledModules } from './household-modules.js';
-import { recipientDeniedModules } from './reminder-origins.js';
+import { actorForUser, authorize, caregiversOf } from '../authorize/index.ts';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 
@@ -71,8 +71,9 @@ function scheduleDueOnDate(schedule, dateKey) {
  * a tap target (`/health/meds`) the route guard refuses.
  *
  * Only `none` counts, not `read`: whoever may read Health may hear from it.
- * An admin resolves to the empty set and is never filtered. An unknown
- * recipient (`null`) is dropped - there is nobody the reminder belongs to.
+ * An admin is never filtered. An unknown recipient (no actor) is dropped -
+ * there is nobody the reminder belongs to. The verdict is `receive` of
+ * server/authorize/.
  *
  * SKIP, DO NOT DELETE: the dose log is written before this question is asked
  * and stays, like a reminder row under #1289. A revoked right is an
@@ -80,8 +81,7 @@ function scheduleDueOnDate(schedule, dateKey) {
  * part of it.
  */
 function mayHearAboutHealth(database, userId) {
-  const denied = recipientDeniedModules(database, userId);
-  return denied !== null && !denied.has('health');
+  return authorize(actorForUser(database, userId), 'receive', { module: 'health' }).allowed;
 }
 
 /**
@@ -154,15 +154,6 @@ async function processDueMedicationsUntracked({
     WHERE s.active = 1 AND m.active = 1
   `).all();
 
-  // Caregivers of the affected person (#584). The grant is given per person by
-  // an admin and is never derived from a role - so it is looked up here
-  // exactly as when it is entered, not guessed from "is a parent". Until
-  // D#1041 the scheduler did not query the table at all: a child without a
-  // device got the reminder, the parents did not.
-  const caregiversOf = activeDb.prepare(
-    'SELECT caregiver_id FROM health_care_grants WHERE subject_id = ? ORDER BY caregiver_id'
-  );
-
   const findLog = activeDb.prepare(
     'SELECT id FROM medication_logs WHERE medication_id = ? AND schedule_id = ? AND scheduled_at = ?'
   );
@@ -215,7 +206,12 @@ async function processDueMedicationsUntracked({
   const deliveries = newlyDue.map((dose) => {
     const medBody = dose.medName || FALLBACK_BODY;
     const recipients = [{ userId: dose.ownerId, body: medBody }];
-    for (const { caregiver_id: caregiverId } of caregiversOf.all(dose.ownerId)) {
+    // Caregivers of the affected person (#584), by id (caregiversOf() in
+    // server/authorize/). The grant is given per person by an admin and is never
+    // derived from a role - so it is looked up exactly as when it is entered, not
+    // guessed from "is a parent". Until D#1041 the scheduler did not query the
+    // table at all: a child without a device got the reminder, the parents did not.
+    for (const caregiverId of caregiversOf(activeDb, dose.ownerId)) {
       if (caregiverId === dose.ownerId) continue;
       recipients.push({ userId: caregiverId, body: `${dose.ownerName}: ${medBody}` });
     }
@@ -247,7 +243,7 @@ async function processDueMedicationsUntracked({
 
       // ONLY THE RECIPIENT'S OWN CHANNELS, NEVER ONE THE HOUSEHOLD SHARES (#2598).
       // Every Health origin is `'personal'` for household channels
-      // (HOUSEHOLD_CHANNEL_POLICY in reminder-targets.js), and SECURITY.md
+      // (HOUSEHOLD_CHANNEL_POLICY in authorize/rows/reminders.ts), and SECURITY.md
       // promises that a channel shared by the household never receives a
       // health reminder. A medication's row visibility does not change that:
       // a family-visible one still goes out by push and to the person's own
