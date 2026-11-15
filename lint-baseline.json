@@ -574,7 +574,7 @@
  "test/test-pantry-expiry-reminders.js\toxlint/no-restricted-syntax/UTC-DAY-KEY": 1,
  "test/test-pantry-ux.js\toxlint/max-lines": 1,
  "test/test-pwa-manifest.js\tdirective/disable": 1,
- "test/test-readme-consistency.js\toxlint/no-sparse-arrays": 2,
+ "test/test-readme-consistency.js\toxlint/no-sparse-arrays": 1,
  "test/test-reminders-upcoming.js\toxlint/no-restricted-syntax/UTC-DAY-KEY": 1,
  "test/test-rename-migration.js\toxlint/no-unused-vars": 1,
  "test/test-restore-swap.js\toxlint/max-lines": 1,
