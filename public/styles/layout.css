@@ -243,7 +243,15 @@
  * Spaltenfluss, mittig. Ohne diese Regeln saesse er ab 1024px in der Zeile der
  * Shell als schmale Spalte am linken Rand. Der Container nimmt keinen Fokus
  * (R19 Nachlese): er sagt sich als Alarm an, Tab erreicht Details und
- * Knopf. */
+ * Knopf.
+ *
+ * KEIN TEXT DIREKT AUF DEM FELD (tokens.css, `--brand-field`): der Zustand
+ * steht auf derselben Tafel wie die Zugangsseiten (`.auth-page` in auth.css,
+ * dort Herleitung der Werte), in derselben Breite. Bis v2.91.0 stand er nackt
+ * auf dem Feld - Satz 4,36:1 und "Technische Details" 4,01:1 (hell,
+ * gemessen). Die Regeln stehen hier und nicht als Selektor in auth.css, weil
+ * der Router auth.css nur fuer die Zugangsseiten laedt; test:material haelt
+ * beide Tafeln gleich und rechnet jeden Text gegen den schlechtesten Grund. */
 .app-shell:has(> .session-unreachable) {
   flex-direction: column;
   background-color: var(--color-bg);
@@ -253,7 +261,21 @@
 
 .app-shell > .session-unreachable {
   margin: auto;
-  max-width: var(--content-max-width-narrow);
+  inline-size: min(100% - 2 * var(--space-4), 380px + 2 * var(--space-4));
+  /* Das Polster der Tafel ersetzt das des Leerzustands (48px oben). */
+  padding: var(--space-6) var(--space-4) var(--space-4);
+  background-color: var(--color-surface);
+  border: var(--space-px) solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-inset-elevated), var(--glass-shadow-lg);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .app-shell > .session-unreachable {
+    background-color: var(--glass-bg-elevated);
+    backdrop-filter: var(--blur-lg) saturate(var(--lg-glass-saturate));
+    -webkit-backdrop-filter: var(--blur-lg) saturate(var(--lg-glass-saturate));
+  }
 }
 
 /* --------------------------------------------------------

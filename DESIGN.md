@@ -2850,7 +2850,7 @@ Bremse, Serverfehler, offline, keine Verbindung) - die Beschreibung des Aufrufer
 Rueckfall. Der Statuscode steht zugeklappt unter "Technische Details", nie als sichtbarer Chip.
 Zeigt die Flaeche den Fehler, gibt es keinen Toast daneben. Die Sitzungspruefung beim Start
 hat denselben Zustand als Shell-Fassung (`utils/session-unreachable.js`, im Lichtfeld des
-Ladebilds): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
+Ladebilds auf der Glastafel der Zugangsseiten - kein Text direkt auf dem Feld): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
 und nach `Retry-After` selbst erneut. Ihr Titel folgt der Ursache wie der Satz darunter
 (`unreachableTitleKey`: Verbindung, Server nicht bereit, zu viele Anfragen; R20). Scheitert ein
 SEITENWECHSEL am Netz, zeichnet `showPageUnreachable()` denselben Ton in den Inhaltsbereich

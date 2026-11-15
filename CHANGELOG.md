@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The "session cannot be checked" screen is readable on the light field.** When the server
+  did not answer the sign-in check at startup (offline, a server error, too many requests), the
+  title, the sentence and "Technical details" stood directly on the violet light field behind
+  them, and in the light theme the sentence and the details link fell below the WCAG AA
+  contrast of 4.5:1. The screen now sits on the same glass panel as the sign-in page.
+
 ## [2.91.0] - 2026-11-15
 
 ### Changed
