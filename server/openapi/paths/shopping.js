@@ -330,6 +330,7 @@ export function shoppingPaths() {
     '/api/v1/shopping/webhook': {
       get: op({
         summary: 'Get the shopping webhook configuration',
+        operationId: 'getShoppingWebhookConfig',
         tag: 'Shopping',
         admin: true,
         description: 'The household webhook URL that `POST /api/v1/shopping/{listId}/send-webhook` posts to. '
@@ -339,12 +340,13 @@ export function shoppingPaths() {
       }),
       put: op({
         summary: 'Set or clear the shopping webhook URL',
+        operationId: 'setShoppingWebhookConfig',
         tag: 'Shopping',
         admin: true,
         stateChanging: true,
         description: '`url` must be an absolute `http`/`https` URL, or `null`/`""` to clear it. Returns the new value '
           + 'in the same shape as the GET.',
-        requestBody: jsonBody(null),
+        requestBody: /** @type {any} */ (jsonBody(null)),
       }),
     },
     '/api/v1/shopping/{listId}/send-webhook': {

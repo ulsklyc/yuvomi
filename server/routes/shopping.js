@@ -40,7 +40,11 @@ function cfgGet(key) {
   return row ? row.value : null;
 }
 
-/** Wie cfgGet, nur schreibend - dasselbe INSERT/UPDATE wie storeValue() im Register. */
+/**
+ * Wie cfgGet, nur schreibend - dasselbe INSERT/UPDATE wie storeValue() im Register.
+ * @param {string} key
+ * @param {string} value
+ */
 function cfgSet(key, value) {
   db.get().prepare(`
     INSERT INTO sync_config (key, value)
@@ -601,19 +605,27 @@ router.get('/price-history', validateRequest(), (req, res) => {
 // nur den Menuepunkt in der Einkaufsliste frei (public/pages/shopping.js).
 // --------------------------------------------------------
 
-router.get('/webhook', (req, res) => {
-  if (!isAdminRequest(req)) return refuseAdmin(req, res);
-  try {
-    res.json({ data: { url: cfgGet('shopping_webhook_url') || null } });
-  } catch (err) {
-    log.error('GET /webhook error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
-});
+// Kein eigener try/catch um einen 500: ein unerwarteter Fehler soll zum
+// zentralen Error-Handler durchfallen (LOG-PLUS-500), nicht hier geloggt und
+// beantwortet werden - beide Handler sind synchron, Express faengt den Wurf.
 
-router.put('/webhook', (req, res) => {
-  if (!isAdminRequest(req)) return refuseAdmin(req, res);
-  try {
+router.get('/webhook',
+  /**
+   * @param {{ body: any }} req
+   * @param {{ status(code: number): { json(body: unknown): unknown }, json(body: unknown): unknown }} res
+   */
+  (req, res) => {
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
+    res.json({ data: { url: cfgGet('shopping_webhook_url') || null } });
+  });
+
+router.put('/webhook',
+  /**
+   * @param {{ body: any }} req
+   * @param {{ status(code: number): { json(body: unknown): unknown }, json(body: unknown): unknown }} res
+   */
+  (req, res) => {
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const { url: rawUrl } = req.body;
     if (rawUrl === null || rawUrl === undefined || rawUrl === '') {
       cfgSet('shopping_webhook_url', '');
@@ -632,11 +644,7 @@ router.put('/webhook', (req, res) => {
     }
     cfgSet('shopping_webhook_url', parsed.toString());
     res.json({ data: { url: parsed.toString() } });
-  } catch (err) {
-    log.error('PUT /webhook error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
-});
+  });
 
 // --------------------------------------------------------
 // Artikel aktualisieren (is_checked, name, quantity, category, notes, url)

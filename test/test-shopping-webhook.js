@@ -1,10 +1,11 @@
 /**
  * Test: Die offenen Artikel einer Liste an einen Webhook (#2502)
  * Zweck: Der Weg nach draussen hatte keine einzige Probe. Festgenagelt wird -
- *        - die Adresse ist admin-only im SCHREIBEN (PUT /preferences -> 403)
- *          und im LESEN (GET gibt sie nur der Adminperson, allen anderen das
- *          Flag `shopping_webhook_configured`): eine Webhook-Adresse ist oft
- *          selbst der Zugang
+ *        - die Adresse ist admin-only im SCHREIBEN und im LESEN, ueber ihre
+ *          eigene Route GET/PUT /api/v1/shopping/webhook, ausserhalb von
+ *          /preferences (Review): eine Webhook-Adresse ist oft selbst der
+ *          Zugang, und jedes Mitglied bekommt dort nur das Flag
+ *          `shopping_webhook_configured`
  *        - sie wird validiert: keine Adresse, ein anderes Schema -> 400
  *        - `null`/`''` loescht sie
  *        - die Absagen der Route mit ihren Gruenden:
@@ -88,7 +89,7 @@ async function call(method, path, { as, body } = {}) {
 }
 
 const setUrl = (value, as = asAdmin) =>
-  call('PUT', '/api/v1/preferences', { as, body: { shopping_webhook_url: value } });
+  call('PUT', '/api/v1/shopping/webhook', { as, body: { url: value } });
 
 /** Eine Liste mit den angegebenen Artikeln; `checked` kommt abgehakt hinein. */
 function seedList(name, items) {
@@ -104,42 +105,52 @@ function seedList(name, items) {
 }
 
 // --------------------------------------------------------
-// Die Adresse: wer sie setzen und wer sie sehen darf
+// Die Adresse: ihre eigene Route, ausserhalb von /preferences
 // --------------------------------------------------------
 
-test('PUT /preferences: ein Mitglied darf die Webhook-Adresse nicht setzen', async () => {
-  const r = await setUrl('https://example.com/hook', asMember);
-  assert.equal(r.status, 403);
-  const after = await call('GET', '/api/v1/preferences', { as: asAdmin });
-  assert.equal(after.body.data.shopping_webhook_url, null, 'der abgewiesene PUT hat nichts geschrieben');
+test('GET/PUT /shopping/webhook: ein Mitglied darf weder lesen noch schreiben', async () => {
+  const putR = await call('PUT', '/api/v1/shopping/webhook', { as: asMember, body: { url: 'https://example.com/hook' } });
+  assert.equal(putR.status, 403);
+  assert.equal(putR.body.reason, 'admin_required');
+
+  const getR = await call('GET', '/api/v1/shopping/webhook', { as: asMember });
+  assert.equal(getR.status, 403);
+  assert.equal(getR.body.reason, 'admin_required');
+
+  const after = await call('GET', '/api/v1/shopping/webhook', { as: asAdmin });
+  assert.equal(after.body.data.url, null, 'der abgewiesene PUT hat nichts geschrieben');
 });
 
-test('GET /preferences: nur die Adminperson bekommt die Adresse, das Mitglied das Flag', async () => {
+test('GET /shopping/webhook: nur die Adminperson bekommt die Adresse; GET /preferences gibt jedem nur das Flag', async () => {
   await setUrl('https://example.com/hook', asAdmin);
 
-  const admin = await call('GET', '/api/v1/preferences', { as: asAdmin });
-  assert.equal(admin.body.data.shopping_webhook_url, 'https://example.com/hook');
-  assert.equal(admin.body.data.shopping_webhook_configured, true);
+  const admin = await call('GET', '/api/v1/shopping/webhook', { as: asAdmin });
+  assert.equal(admin.status, 200);
+  assert.equal(admin.body.data.url, 'https://example.com/hook');
 
-  const member = await call('GET', '/api/v1/preferences', { as: asMember });
-  // DAS IST DER PUNKT: eine Webhook-Adresse ist oft selbst das Geheimnis.
-  assert.ok(!('shopping_webhook_url' in member.body.data),
-    'das Mitglied darf die Adresse nicht bekommen - sie traegt oft Webhook-Id oder Token');
-  assert.equal(member.body.data.shopping_webhook_configured, true,
+  // DAS IST DER PUNKT: eine Webhook-Adresse ist oft selbst das Geheimnis, und
+  // /preferences traegt sie unter keiner Rolle - nur die Tatsache.
+  const adminPrefs = await call('GET', '/api/v1/preferences', { as: asAdmin });
+  assert.ok(!('shopping_webhook_url' in adminPrefs.body.data), '/preferences traegt die Adresse auch der Adminperson nicht mehr');
+  assert.equal(adminPrefs.body.data.shopping_webhook_configured, true);
+
+  const memberPrefs = await call('GET', '/api/v1/preferences', { as: asMember });
+  assert.ok(!('shopping_webhook_url' in memberPrefs.body.data));
+  assert.equal(memberPrefs.body.data.shopping_webhook_configured, true,
     'die Tatsache bekommt es: nur daran haengt der Menuepunkt der Liste');
 });
 
-test('PUT /preferences: ungueltige Adressen werden abgewiesen', async () => {
+test('PUT /shopping/webhook: ungueltige Adressen werden abgewiesen', async () => {
   await setUrl('https://example.com/hook', asAdmin);
   for (const invalid of ['keine-adresse', 'ftp://example.com/hook', 'javascript:alert(1)']) {
     const r = await setUrl(invalid, asAdmin);
     assert.equal(r.status, 400, `${invalid} muss 400 sein`);
   }
-  const after = await call('GET', '/api/v1/preferences', { as: asAdmin });
-  assert.equal(after.body.data.shopping_webhook_url, 'https://example.com/hook', 'unveraendert');
+  const after = await call('GET', '/api/v1/shopping/webhook', { as: asAdmin });
+  assert.equal(after.body.data.url, 'https://example.com/hook', 'unveraendert');
 });
 
-test('PUT /preferences: die abgewiesene Adresse nennt ihren Grund (#1909)', async () => {
+test('PUT /shopping/webhook: die abgewiesene Adresse nennt ihren Grund (#1909)', async () => {
   // DER SERVER BENENNT DEN FALL, DIE APP BESITZT DEN SATZ. Ohne `reason` bliebe
   // der Oberflaeche nur der Allgemeinsatz - und den Text des Servers zu zeigen
   // verbietet test:frontend-audit (die Seite steht dort auf 0). Der Grund hat
@@ -156,15 +167,17 @@ test('PUT /preferences: die abgewiesene Adresse nennt ihren Grund (#1909)', asyn
   assert.ok(locale.settings.shoppingWebhookUrlInvalid, 'und den Schluessel in den Sprachdateien');
 });
 
-test('PUT /preferences: null und der leere String loeschen die Adresse', async () => {
+test('PUT /shopping/webhook: null und der leere String loeschen die Adresse', async () => {
   for (const clearing of [null, '']) {
     await setUrl('https://example.com/hook', asAdmin);
     const r = await setUrl(clearing, asAdmin);
     assert.equal(r.status, 200);
-    const after = await call('GET', '/api/v1/preferences', { as: asAdmin });
-    assert.equal(after.body.data.shopping_webhook_url, null,
+    assert.equal(r.body.data.url, null);
+    const after = await call('GET', '/api/v1/shopping/webhook', { as: asAdmin });
+    assert.equal(after.body.data.url, null,
       `${JSON.stringify(clearing)} loescht die Adresse, und GET antwortet null (nicht '')`);
-    assert.equal(after.body.data.shopping_webhook_configured, false);
+    const prefs = await call('GET', '/api/v1/preferences', { as: asAdmin });
+    assert.equal(prefs.body.data.shopping_webhook_configured, false);
   }
 });
 
