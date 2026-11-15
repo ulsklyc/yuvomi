@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   used to send the plain text. API clients that compared the text should read the `reason`
   instead. Who may use a route has not changed, and the web app shows the same sentence as
   before.
+- **Four household settings are for administrators only.** The currency, the app name, the
+  housekeeping payment tasks and the default length of new events count for the whole
+  household, but every member could change them through the API. A member who sends
+  `currency`, `app_name`, `housekeeping_payment_tasks` or `calendar_default_duration` to
+  `PUT /api/v1/preferences` now gets `403` with `reason: "admin_required"`, also for an invalid
+  value, which used to answer `400`, and nothing of that request is saved. Every member still
+  reads all four. In the web app members never saw these controls; on the Appearance page they
+  now see the household currency as a read-only row.
 
 ### Fixed
 - **The backup schedule shows the same time as the next backup.** On a server running in

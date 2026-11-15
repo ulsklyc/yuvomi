@@ -392,11 +392,13 @@ const ENTRIES: readonly Entry[] = [
       return null;
     },
   },
+  // The household's currency - admin only since C4 (E9), like region and data
+  // language: every amount of the budget is shown in it.
   {
     field: 'currency',
     storage: ['currency'],
     scope: 'household',
-    write: 'member',
+    write: 'admin',
     read: (ctx) => ctx.get('currency') ?? DEFAULT_CURRENCY,
     apply(input, ctx) {
       if (!CURRENCY_CODES.includes(input as string)) return invalid(`Invalid currency. Allowed: ${CURRENCY_CODES.join(', ')}`);
@@ -535,11 +537,12 @@ const ENTRIES: readonly Entry[] = [
     write: 'none',
     read: (ctx) => resolveHouseholdLocale(ctx.db, { ignoreExplicit: true }),
   },
+  // The household's name in the title bar - admin only since C4 (E9).
   {
     field: 'app_name',
     storage: ['app_name'],
     scope: 'household',
-    write: 'member',
+    write: 'admin',
     read: (ctx) => ctx.get('app_name') ?? DEFAULT_APP_NAME,
     apply(input, ctx) {
       const checked = str(input, 'Application name', { max: MAX_SHORT, required: false });
@@ -721,12 +724,14 @@ const ENTRIES: readonly Entry[] = [
       return null;
     },
   },
-  householdFlag('housekeeping_payment_tasks', 'member', 'housekeeping_payment_tasks must be a boolean', (v) => v === '1'),
+  // Housekeeping payment tasks and the default length of new events count for
+  // the whole household - admin only since C4 (E9).
+  householdFlag('housekeeping_payment_tasks', 'admin', 'housekeeping_payment_tasks must be a boolean', (v) => v === '1'),
   {
     field: 'calendar_default_duration',
     storage: ['calendar_default_duration'],
     scope: 'household',
-    write: 'member',
+    write: 'admin',
     read: (ctx) => Number(ctx.get('calendar_default_duration')) || DEFAULT_CALENDAR_DURATION,
     apply(input, ctx) {
       const minutes = Number(input);

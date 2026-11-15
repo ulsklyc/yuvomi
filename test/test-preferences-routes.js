@@ -462,6 +462,54 @@ test('PUT calendar_default_duration: unzulässig -> 400, gültig -> persist', as
 });
 
 // --------------------------------------------------------
+// Vier Haushaltsfelder nur fuer Admins (Phase 2, C4 / E9)
+// --------------------------------------------------------
+// Waehrung, App-Name, Zahlungsaufgaben der Haushaltshilfe und die
+// Standarddauer neuer Termine gelten fuer den ganzen Haushalt. Bis C4 durfte
+// jedes Mitglied sie ueber die Route setzen, obwohl die Oberflaeche sie nur
+// Admins zeigt. Je Feld: das Mitglied bekommt die eine Admin-Absage (ganze
+// Antwort verglichen) und der gespeicherte Wert bleibt; der Admin kommt durch.
+const ADMIN_REQUIRED = { error: 'Admin access required.', code: 403, reason: 'admin_required' };
+const C4_FIELDS = [
+  { field: 'currency', start: 'CHF', member: 'USD', invalid: 'XYZ' },
+  { field: 'app_name', start: 'Haus Admin', member: 'Haus Mitglied', invalid: 'x'.repeat(101) },
+  { field: 'housekeeping_payment_tasks', start: false, member: true, invalid: 'yes' },
+  { field: 'calendar_default_duration', start: 45, member: 90, invalid: 4 },
+];
+for (const { field, start, member, invalid } of C4_FIELDS) {
+  test(`PUT ${field}: Mitglied -> 403 mit der Admin-Absage, der Wert bleibt (C4)`, async () => {
+    assert.equal((await put({ [field]: start })).status, 200);
+    const res = await put({ [field]: member }, { role: 'member', userId: 2 });
+    assert.deepEqual(res, { status: 403, body: ADMIN_REQUIRED });
+    assert.equal((await get({ role: 'member', userId: 2 })).body.data[field], start, 'das Mitglied liest weiter den alten Wert');
+    assert.equal((await get()).body.data[field], start, 'ein 403 hat nichts geschrieben');
+  });
+  test(`PUT ${field}: Admin kommt durch, der Wert ist gespeichert (C4)`, async () => {
+    const res = await put({ [field]: member });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data[field], member);
+    assert.equal((await get({ role: 'member', userId: 2 })).body.data[field], member, 'Mitglieder lesen den Wert weiter');
+  });
+  // Die Rechtepruefung laeuft vor der Wertpruefung: ein ungueltiger Wert eines
+  // Mitglieds war bis C4 eine 400, jetzt ist es dieselbe 403.
+  test(`PUT ${field}: ungueltiger Wert eines Mitglieds -> 403 statt 400, Admin weiter 400 (C4)`, async () => {
+    assert.equal((await put({ [field]: invalid })).status, 400);
+    assert.deepEqual(await put({ [field]: invalid }, { role: 'member', userId: 2 }), { status: 403, body: ADMIN_REQUIRED });
+  });
+}
+test('PUT gemischtes Patch eines Mitglieds (erlaubtes Feld + Admin-Feld) -> 403, nichts geschrieben (C4)', async () => {
+  assert.equal((await put({ week_start: 'monday', currency: 'CHF' })).status, 200);
+  const res = await put({ week_start: 'sunday', currency: 'USD' }, { role: 'member', userId: 2 });
+  assert.deepEqual(res, { status: 403, body: ADMIN_REQUIRED });
+  const after = (await get()).body.data;
+  assert.equal(after.week_start, 'monday', 'auch das erlaubte Feld ist nicht geschrieben');
+  assert.equal(after.currency, 'CHF');
+  // Das erlaubte Feld allein darf das Mitglied weiter setzen.
+  assert.equal((await put({ week_start: 'sunday' }, { role: 'member', userId: 2 })).status, 200);
+  assert.equal((await put({ week_start: 'monday' })).status, 200);
+});
+
+// --------------------------------------------------------
 // calendar_default_reminders / assign_me (per-user)
 // --------------------------------------------------------
 test('PUT calendar_default_reminders: Validierung + dedup/sort persist', async () => {
