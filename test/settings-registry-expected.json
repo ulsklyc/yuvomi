@@ -51,6 +51,7 @@
       "health_prevention_notify_caregivers": false,
       "rewards_require_approval": true,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "tasks_default_points": 0,
       "countdown_grace_days": 7,
       "tasks_late_decay_enabled": false,
@@ -141,6 +142,7 @@
       "health_prevention_notify_caregivers": false,
       "rewards_require_approval": true,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "tasks_default_points": 0,
       "countdown_grace_days": 7,
       "tasks_late_decay_enabled": false,
@@ -207,6 +209,7 @@
       "dashboard_widgets": [],
       "dashboard_today_glance": true,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "holiday_show_public": false,
       "holiday_show_school": false,
       "holiday_public_color": "#FF3B30",
@@ -330,6 +333,7 @@
       "health_prevention_notify_caregivers": true,
       "rewards_require_approval": false,
       "tasks_subtasks_expanded": true,
+      "tasks_show_creator": true,
       "tasks_default_points": 15,
       "countdown_grace_days": 0,
       "tasks_late_decay_enabled": true,
@@ -484,6 +488,7 @@
       "health_prevention_notify_caregivers": true,
       "rewards_require_approval": false,
       "tasks_subtasks_expanded": true,
+      "tasks_show_creator": true,
       "tasks_default_points": 15,
       "countdown_grace_days": 0,
       "tasks_late_decay_enabled": true,
@@ -580,6 +585,7 @@
       ],
       "dashboard_today_glance": false,
       "tasks_subtasks_expanded": true,
+      "tasks_show_creator": true,
       "holiday_show_public": true,
       "holiday_show_school": true,
       "holiday_public_color": "#112233",
@@ -642,6 +648,7 @@
       "health_prevention_notify_caregivers": false,
       "rewards_require_approval": true,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "tasks_default_points": 0,
       "countdown_grace_days": 90,
       "tasks_late_decay_enabled": false,
@@ -727,6 +734,7 @@
       "health_prevention_notify_caregivers": false,
       "rewards_require_approval": true,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "tasks_default_points": 0,
       "countdown_grace_days": 90,
       "tasks_late_decay_enabled": false,
@@ -791,6 +799,7 @@
       "dashboard_widgets": [],
       "dashboard_today_glance": true,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "holiday_show_public": false,
       "holiday_show_school": false,
       "holiday_public_color": "red",
@@ -868,6 +877,7 @@
       "health_prevention_notify_caregivers": false,
       "rewards_require_approval": true,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "tasks_default_points": 10000,
       "countdown_grace_days": 3,
       "tasks_late_decay_enabled": false,
@@ -974,6 +984,7 @@
       "health_prevention_notify_caregivers": false,
       "rewards_require_approval": true,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "tasks_default_points": 10000,
       "countdown_grace_days": 3,
       "tasks_late_decay_enabled": false,
@@ -1056,6 +1067,7 @@
       ],
       "dashboard_today_glance": false,
       "tasks_subtasks_expanded": false,
+      "tasks_show_creator": false,
       "holiday_show_public": false,
       "holiday_show_school": false,
       "holiday_public_color": "#FF3B30",
@@ -1115,6 +1127,7 @@
    "health_prevention_notify_caregivers": false,
    "rewards_require_approval": true,
    "tasks_subtasks_expanded": false,
+   "tasks_show_creator": false,
    "tasks_default_points": 0,
    "countdown_grace_days": 7,
    "tasks_late_decay_enabled": false,
@@ -1191,6 +1204,7 @@
    "health_prevention_notify_caregivers": false,
    "rewards_require_approval": true,
    "tasks_subtasks_expanded": false,
+   "tasks_show_creator": false,
    "tasks_default_points": 0,
    "countdown_grace_days": 7,
    "tasks_late_decay_enabled": false,
@@ -2998,6 +3012,45 @@
     },
     "changed": {
      "tasks_subtasks_expanded": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_show_creator true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_show_creator": "1"
+    },
+    "changed": {
+     "tasks_show_creator": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_show_creator not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_show_creator must be a boolean",
+     "code": 400
     }
    },
    "member": {

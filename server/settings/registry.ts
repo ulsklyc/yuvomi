@@ -897,6 +897,8 @@ const ENTRIES: readonly Entry[] = [
   },
   householdFlag('rewards_require_approval', 'admin', 'rewards_require_approval must be a boolean', (v) => v !== '0'),
   householdFlag('tasks_subtasks_expanded', 'admin', 'tasks_subtasks_expanded must be a boolean', (v) => v === '1'),
+  // Shows who created each task in the list and card (#2451), admin-only.
+  householdFlag('tasks_show_creator', 'admin', 'tasks_show_creator must be a boolean', (v) => v === '1'),
   // Default points for new tasks (#578). 0 switches the default off.
   {
     field: 'tasks_default_points',
@@ -1203,7 +1205,7 @@ const ANSWER_ORDER = [
   'calendar_default_reminders', 'calendar_default_assign_me', 'calendar_default_target',
   'health_cycle_enabled', 'health_cycle_enabled_user', 'health_cycle_effective',
   'health_prevention_notify_caregivers', 'rewards_require_approval', 'tasks_subtasks_expanded',
-  'tasks_default_points', 'countdown_grace_days', 'tasks_late_decay_enabled',
+  'tasks_show_creator', 'tasks_default_points', 'countdown_grace_days', 'tasks_late_decay_enabled',
   'tasks_default_target', 'tasks_default_visibility', 'tasks_default_locked', 'schedule_hidden_templates',
   'weather_provider', 'weather_lat', 'weather_lon', 'weather_city', 'weather_units', 'weather_auto_locate',
   'weather_user',
