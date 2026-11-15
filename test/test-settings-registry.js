@@ -82,6 +82,7 @@ const { DISPLAY_COOKIE, issuePairingCode, redeemPairingCode } = await import('..
 const { hashPassword } = await import('../server/utils/password.js');
 const { expandAndResolveEventRows } = await import('../server/services/calendar-event-reader.js');
 const { deleteOccurrence, upsertOccurrenceOverride } = await import('../server/services/calendar-occurrence-overrides.js');
+const { readSetting, readSettings, settingsCatalog, writeSettings } = await import('../server/settings/registry.ts');
 
 // --------------------------------------------------------------------------
 // HTTP: one client address per request (the limiters key on it), a timeout
@@ -980,8 +981,6 @@ test('health_prevention_notify_caregivers: a failing sync is only logged, the pa
 //    and the rows a valid write left. Data against data, no source text.
 // --------------------------------------------------------------------------
 
-const { settingsCatalog, writeSettings } = await import('../server/settings/registry.ts');
-
 /** GET fields the route builds itself (they need a service or the request). */
 const ROUTE_VIEWS = ['weather_source', 'screensaver_enabled', 'display_device_settings'];
 
@@ -1053,21 +1052,32 @@ test('registry: `scope` and `storage` of every written field match the rows a va
   assert.deepEqual(mismatches, []);
 });
 
+test('registry: readSettings and readSetting answer what GET answered on the recorded states (but the route views)', () => {
+  for (const state of ['fresh', 'fallback']) {
+    for (const role of ['admin', 'member']) {
+      restore();
+      applySeed(GET_STATES[state].seed, role);
+      const { weather_source: _ws, screensaver_enabled: _se, ...recorded } = EXPECTED.get[state][role].body.data;
+      assert.deepEqual(readSettings(db, USER_IDS[role]), recorded, `${state} ${role}`);
+      for (const [field, value] of Object.entries(recorded)) {
+        assert.deepEqual(readSetting(db, field, USER_IDS[role]), value, `${state} ${role} ${field}`);
+      }
+    }
+  }
+});
+
 test('registry: `weather_user` without an account is `unauthenticated` (the 401 the server cannot reach)', () => {
   /** @type {any} */
   const actor = Object.freeze({
     kind: 'session', userId: null, role: 'member', familyRole: null, scopes: null, moduleAccess: null, deviceId: null, unresolved: true,
   });
   const effects = { householdZoneChanged() {}, healthModuleToggled() {}, preventionCaregiversChanged() {} };
-  db.exec('SAVEPOINT registry_unit');
-  try {
-    assert.deepEqual(writeSettings(db, actor, { weather_user: { city: 'X' } }, effects), { kind: 'unauthenticated' });
-    // The object check comes first, as in the route.
-    assert.deepEqual(writeSettings(db, actor, { weather_user: 'x' }, effects), { kind: 'invalid', message: 'weather_user must be an object.' });
-  } finally {
-    db.exec('ROLLBACK TO registry_unit');
-    db.exec('RELEASE registry_unit');
-  }
+  restore();
+  const before = snapshot();
+  assert.deepEqual(writeSettings(db, actor, { weather_user: { city: 'X' } }, effects), { kind: 'unauthenticated' });
+  // The object check comes first, as in the route.
+  assert.deepEqual(writeSettings(db, actor, { weather_user: 'x' }, effects), { kind: 'invalid', message: 'weather_user must be an object.' });
+  assert.deepEqual(rowDiff(before, snapshot()), {}, 'nothing written');
 });
 
 // --------------------------------------------------------------------------
