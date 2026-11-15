@@ -26,6 +26,10 @@
  *          4. Side effects: the household zone re-keys a series' exceptions
  *             and linked occurrences and sets the hint flag; the holiday keys
  *             delete their dependants (in the PUT cases, with seeds).
+ *          5. The two other side effects by what they do: `disabled_modules`
+ *             re-syncs the fasting reminders when health changes (and only
+ *             then), `health_prevention_notify_caregivers` syncs the person's
+ *             prevention reminders, and a failing sync there is only logged.
  *
  *          The expected values live in test/settings-registry-expected.json.
  *          They were recorded from the unchanged route (commit b7a78addd) and
@@ -812,6 +816,162 @@ test('timezone: a patch refused AFTER the zone was written rolls the re-keying b
   assert.deepEqual(actual.after, actual.before, 'nothing moved');
   assert.deepEqual(actual.rows, {});
   assert.deepEqual(actual, EXPECTED.zone?.refused);
+});
+
+// --------------------------------------------------------------------------
+// 5. Side effects of `disabled_modules` and `health_prevention_notify_caregivers`
+//    (phase 2, C3 stage 2): the cases above hold only their sync_config rows.
+//    These hold what the two syncs do, so a refactor that stops calling them
+//    is red. Expectations as data next to the cases, not in the JSON file.
+// --------------------------------------------------------------------------
+
+// A fast far in the future: its goal reminder (start + 16 h) is never in the
+// past, whatever the clock says.
+const FAST_START = '2099-01-01T00:00:00.000Z';
+const FAST_GOAL_REMINDER = '2099-01-01T16:00:00.000Z';
+
+/** The admin's pending fasting reminders, as data. */
+function fastingReminders() {
+  return db.prepare(`SELECT entity_type, remind_at FROM reminders
+    WHERE created_by = ? AND entity_type IN ('fasting_goal', 'fasting_next_start') ORDER BY id`).all(adminId)
+    .map((/** @type {any} */ row) => ({ ...row }));
+}
+
+/**
+ * The admin fasts with a goal reminder switched on; `reminder` seeds a pending
+ * goal reminder row (or none), `disabled` the stored module list.
+ * @param {{ disabled: string, reminder: string | null }} seed @param {unknown} disabledModules
+ */
+async function fastingCase({ disabled, reminder }, disabledModules) {
+  restore();
+  db.prepare("DELETE FROM reminders WHERE entity_type IN ('fasting_goal', 'fasting_next_start')").run();
+  db.prepare('DELETE FROM health_fasts').run();
+  db.prepare('DELETE FROM health_fasting_settings').run();
+  applySeed({ disabled_modules: disabled }, 'admin');
+  db.prepare(`INSERT INTO health_fasting_settings (user_id, default_goal_minutes, remind_goal, remind_next_start)
+    VALUES (?, 960, 1, 0)`).run(adminId);
+  const fastId = Number(db.prepare(`INSERT INTO health_fasts (user_id, start_at, end_at, start_tzid, goal_minutes, created_by)
+    VALUES (?, ?, NULL, 'UTC', 960, ?)`).run(adminId, FAST_START, adminId).lastInsertRowid);
+  if (reminder) {
+    db.prepare("INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES ('fasting_goal', ?, ?, ?)")
+      .run(fastId, reminder, adminId);
+  }
+  const before = fastingReminders();
+  const res = await http('PUT', '/api/v1/preferences', { headers: HEADERS.admin, body: { disabled_modules: disabledModules } });
+  const result = { status: res.status, before, after: fastingReminders() };
+  db.prepare("DELETE FROM reminders WHERE entity_type IN ('fasting_goal', 'fasting_next_start')").run();
+  db.prepare('DELETE FROM health_fasts').run();
+  db.prepare('DELETE FROM health_fasting_settings').run();
+  return result;
+}
+
+const FASTING_EXPECTED = {
+  // health switched off: the sync removes the pending reminder (#1279 path).
+  off: {
+    status: 200,
+    before: [{ entity_type: 'fasting_goal', remind_at: FAST_GOAL_REMINDER }],
+    after: [],
+  },
+  // health switched back on: the sync creates the reminder that is due.
+  on: {
+    status: 200,
+    before: [],
+    after: [{ entity_type: 'fasting_goal', remind_at: FAST_GOAL_REMINDER }],
+  },
+  // health unchanged: no sync, a stale row stays as it is.
+  unchanged: {
+    status: 200,
+    before: [{ entity_type: 'fasting_goal', remind_at: '2099-02-02T00:00:00.000Z' }],
+    after: [{ entity_type: 'fasting_goal', remind_at: '2099-02-02T00:00:00.000Z' }],
+  },
+};
+
+test('disabled_modules: switching health off re-syncs the fasting reminders (the pending one goes)', async () => {
+  const actual = await fastingCase({ disabled: '[]', reminder: FAST_GOAL_REMINDER }, ['health']);
+  assert.deepEqual(actual, FASTING_EXPECTED.off);
+});
+
+test('disabled_modules: switching health back on re-syncs the fasting reminders (the due one comes)', async () => {
+  const actual = await fastingCase({ disabled: '["health"]', reminder: null }, []);
+  assert.deepEqual(actual, FASTING_EXPECTED.on);
+});
+
+test('disabled_modules: a list without a change for health does not re-sync the fasting reminders', async () => {
+  const actual = await fastingCase({ disabled: '[]', reminder: '2099-02-02T00:00:00.000Z' }, ['tasks']);
+  assert.deepEqual(actual, FASTING_EXPECTED.unchanged);
+});
+
+/** The prevention reminders of the household, as data. */
+function preventionReminders() {
+  return db.prepare(`SELECT created_by, assigned_from, remind_at FROM reminders
+    WHERE entity_type = 'health_prevention_due' ORDER BY id`).all()
+    .map((/** @type {any} */ row) => ({ ...row, created_by: ID_LABELS[String(row.created_by)] ?? row.created_by }));
+}
+
+/**
+ * The admin has one prevention record due in 2099 and no reminder for it.
+ * `failing` makes every insert of a prevention reminder abort (a temporary
+ * trigger on this connection), so the sync throws.
+ * @param {unknown} value @param {{ failing?: boolean }} [options]
+ */
+async function preventionCase(value, { failing = false } = {}) {
+  restore();
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'health_prevention_due'").run();
+  db.prepare('DELETE FROM health_prevention_records').run();
+  db.prepare('DELETE FROM health_prevention_types').run();
+  const typeId = Number(db.prepare(`INSERT INTO health_prevention_types (name, kind, default_interval_months)
+    VALUES ('Tetanus', 'vaccination', 120)`).run().lastInsertRowid);
+  db.prepare(`INSERT INTO health_prevention_records (user_id, type_id, given_on, next_due_on, visibility, created_by)
+    VALUES (?, ?, '2089-06-01', '2099-06-01', 'private', ?)`).run(adminId, typeId, adminId);
+  if (failing) {
+    db.exec(`CREATE TEMP TRIGGER settings_registry_probe BEFORE INSERT ON reminders
+      WHEN NEW.entity_type = 'health_prevention_due' BEGIN SELECT RAISE(ABORT, 'probe: prevention sync fails'); END`);
+  }
+  const before = { reminders: preventionReminders(), rows: snapshot() };
+  let res;
+  try {
+    res = await http('PUT', '/api/v1/preferences', { headers: HEADERS.admin, body: { health_prevention_notify_caregivers: value } });
+  } finally {
+    if (failing) db.exec('DROP TRIGGER IF EXISTS temp.settings_registry_probe');
+  }
+  const result = {
+    status: res.status,
+    before: before.reminders,
+    after: preventionReminders(),
+    rows: rowDiff(before.rows, snapshot()),
+  };
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'health_prevention_due'").run();
+  db.prepare('DELETE FROM health_prevention_records').run();
+  db.prepare('DELETE FROM health_prevention_types').run();
+  return result;
+}
+
+const PREVENTION_EXPECTED = {
+  // The flag is written and the sync runs at once for the person: the record
+  // due in 2099 gets its own reminder (30 days before, 09:00 household time).
+  on: {
+    status: 200,
+    before: [],
+    after: [{ created_by: 'admin', assigned_from: null, remind_at: '2099-05-02T09:00' }],
+    rows: { 'health_prevention_notify_caregivers:user:admin': '1' },
+  },
+  // A failing sync is only logged: the answer is 200 and the flag stands.
+  failing: {
+    status: 200,
+    before: [],
+    after: [],
+    rows: { 'health_prevention_notify_caregivers:user:admin': '1' },
+  },
+};
+
+test('health_prevention_notify_caregivers: writing the flag syncs the prevention reminders of the person', async () => {
+  const actual = await preventionCase(true);
+  assert.deepEqual(actual, PREVENTION_EXPECTED.on);
+});
+
+test('health_prevention_notify_caregivers: a failing sync is only logged, the patch stands', async () => {
+  const actual = await preventionCase(true, { failing: true });
+  assert.deepEqual(actual, PREVENTION_EXPECTED.failing);
 });
 
 // --------------------------------------------------------------------------
