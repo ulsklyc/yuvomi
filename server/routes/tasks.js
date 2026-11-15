@@ -704,9 +704,10 @@ router.get('/completions', (req, res) => {
 // und zwar aus dem Teil davon, den die fragende Person sehen darf: ein Tag ist
 // Freitext und verriete sonst den Inhalt einer privaten Aufgabe (#474).
 // Muss wie /categories vor den /:id-Routen stehen, sonst matcht „tags" als :id.
+// A paired display lists the tags under the wall rule (taskReader).
 router.get('/tags', (req, res) => {
   try {
-    res.json({ data: allTags(db.get(), req.authUserId || req.session.userId) });
+    res.json({ data: allTags(db.get(), null, { reader: taskReader(req) }) });
   } catch (err) {
     log.error('GET /tags error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -2609,8 +2610,9 @@ router.get('/:id/completions', (req, res) => {
 // GET /api/v1/tasks/:id/documents → { data: LinkedDocument[] }
 router.get('/:id/documents', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
-    const task = findVisibleTask(req.params.id, me);
+    // A paired display asks under the wall rule (taskReader): a task the whole
+    // household does not see answers 404 like an unknown id, before the 403 below.
+    const task = findReadableTask(req.params.id, taskReader(req));
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     // Die Route liefert nur Dokumente: ohne Leserecht dort dieselbe Antwort,
     // die der Pfad-Guard vor /documents gaebe (#1358). Erst nach der Aufgabe
@@ -2877,7 +2879,8 @@ router.get('/meta/options', (req, res) => {
       categories: loadTaskCategories(),
       // Sichtbare Tags für Filterleiste und Vorschläge - beim Seitenaufbau
       // mitgeliefert, damit dafür kein zweiter Aufruf nötig ist (#586).
-      tags: allTags(db.get(), req.authUserId || req.session.userId),
+      // A paired display gets them under the wall rule (taskReader), like GET /tags.
+      tags: allTags(db.get(), null, { reader: taskReader(req) }),
       default_points: defaultTaskPoints(),
     });
   } catch (err) {

@@ -22,6 +22,8 @@ import {
   householdAudienceShows,
   householdVisibleWhere,
   resolveBudgetMode,
+  taskReader,
+  taskVisibleWhere,
   visibleWhere,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
@@ -422,9 +424,13 @@ router.get('/', (req, res) => {
    * Die normale Uebersicht derselben Sitzung fragt ohne ihn und bleibt
    * persoenlich. */
   const householdAudience = asksHouseholdAudience(req.query);
+  // A paired display reads the task parts under the wall rule with or without the
+  // parameter (taskReader): the personal answer of a display is the wall too. Only
+  // the task parts follow it here; the other blocks keep their own rules.
+  const tasksReader = taskReader(req);
   const taskVisibleSql = householdAudience
     ? householdVisibleWhere('t')
-    : visibleWhere('tasks', 't', '@me');
+    : taskVisibleWhere(tasksReader, 't');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
   // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
   // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
@@ -1016,6 +1022,8 @@ router.get('/', (req, res) => {
       userId,
       todayKey: todayLocalKey,
       hiddenModules: denied,
+      // The task countdowns of a paired display follow the wall rule (taskReader).
+      taskReader: tasksReader,
     });
     result.countdowns = countdowns.items;
     // Wie `birthdayCount` neben `birthdays`: die Liste ist der Vorrat für die
