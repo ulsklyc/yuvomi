@@ -46,7 +46,11 @@ export function germanIn(sentence) {
 // verlaesst: ein `error:`, ein `refusal(`, ein Aufruf eines geteilten
 // Validators (dessen zweites Argument als Feldname im Satz landet). Kommentare
 // bleiben deutsch und zaehlen nicht.
-const OUTBOUND = /\berror:|\brefusal\(|\b(?:str|num|oneOf|rrule|collectErrors|validateDate|validateMonth|validateColor)\(/;
+// Seit Phase 2 C3 dazu die Absagen des Einstellungs-Registers
+// (server/settings/registry.ts): `invalid('...')` traegt den 400-Satz, und die
+// Eintrags-Helfer `householdFlag(`, `personalFlag(`, `householdChoice(` reichen
+// ihren Satz bzw. das Wort darin als Argument durch.
+const OUTBOUND = /\berror:|\brefusal\(|\binvalid\(|\b(?:householdFlag|personalFlag|householdChoice)\(|\b(?:str|num|oneOf|rrule|collectErrors|validateDate|validateMonth|validateColor)\(/;
 const LITERAL = /'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g;
 
 /** Die Literale der Zeilen, an denen ein Satz oder Feldname hinausgeht. */

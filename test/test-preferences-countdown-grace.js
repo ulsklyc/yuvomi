@@ -23,7 +23,7 @@ process.env.SESSION_SECRET = 'preferences-countdown-grace-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
-const { DEFAULT_OVERDUE_GRACE_DAYS } = await import('../server/services/countdowns.js');
+const { DEFAULT_OVERDUE_GRACE_DAYS } = await import('../server/settings/values.ts');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
