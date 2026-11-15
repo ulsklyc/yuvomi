@@ -1,7 +1,6 @@
 {
- ".github/scripts/review-verdict.mjs\tTS2339": 7,
+ ".github/scripts/review-verdict.mjs\tTS2339": 6,
  ".github/scripts/review-verdict.mjs\tTS2345": 2,
- ".github/scripts/review-verdict.mjs\tTS2353": 1,
  ".github/scripts/review-verdict.mjs\tTS7006": 24,
  ".github/scripts/review-verdict.mjs\tTS7053": 1,
  "public/api.js\tTS2339": 5,
@@ -6125,7 +6124,6 @@
  "test/test-restore-swap.js\tTS7034": 11,
  "test/test-restore-swap.js\tTS7053": 8,
  "test/test-review-proof.js\tTS2322": 5,
- "test/test-review-proof.js\tTS2353": 26,
  "test/test-review-proof.js\tTS7006": 11,
  "test/test-review-proof.js\tTS7031": 2,
  "test/test-reward-icon-null-migration.js\tTS18048": 4,
