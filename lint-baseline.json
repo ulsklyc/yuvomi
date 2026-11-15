@@ -266,8 +266,6 @@
  "server/routes/pantry.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 13,
  "server/routes/people.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 1,
  "server/routes/permissions.js\toxlint/no-restricted-syntax/ERROR-TEXT": 2,
- "server/routes/preferences.js\toxlint/max-lines": 1,
- "server/routes/preferences.js\toxlint/max-lines-per-function": 1,
  "server/routes/preferences.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 3,
  "server/routes/preferences.js\toxlint/no-restricted-syntax/TX-MANUAL": 3,
  "server/routes/push.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 5,

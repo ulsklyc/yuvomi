@@ -1052,6 +1052,20 @@ test('registry: `scope` and `storage` of every written field match the rows a va
   assert.deepEqual(mismatches, []);
 });
 
+test('registry: the answers keep the field ORDER recorded from the route before C3 (deepEqual does not see it)', async () => {
+  for (const role of ['admin', 'member', 'display']) {
+    restore();
+    const got = await http('GET', '/api/v1/preferences', { headers: HEADERS[role] });
+    assert.equal(got.status, 200, `GET ${role}: ${JSON.stringify(got.body)}`);
+    assert.deepEqual(Object.keys(got.body.data), Object.keys(EXPECTED.get.fresh[role].body.data), `GET ${role}`);
+  }
+  for (const role of ['admin', 'member']) {
+    restore();
+    const put = await http('PUT', '/api/v1/preferences', { headers: HEADERS[role], body: {} });
+    assert.deepEqual(Object.keys(put.body.data), Object.keys(EXPECTED.putBaseline[role]), `PUT ${role}`);
+  }
+});
+
 test('registry: readSettings and readSetting answer what GET answered on the recorded states (but the route views)', () => {
   for (const state of ['fresh', 'fallback']) {
     for (const role of ['admin', 'member']) {

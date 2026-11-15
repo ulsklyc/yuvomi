@@ -153,7 +153,7 @@ export const MAX_TASK_POINTS = 10000;
  * It stands here, in the registry of the setting, and services/countdowns.js
  * reads it from here: one answer, not two (docs/DECISIONS.md #2).
  */
-const DEFAULT_OVERDUE_GRACE_DAYS = 7;
+export const DEFAULT_OVERDUE_GRACE_DAYS = 7;
 // The maximum grace period in days (#969, household-wide).
 export const MAX_COUNTDOWN_GRACE_DAYS = 90;
 
