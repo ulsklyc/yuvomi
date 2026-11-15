@@ -975,6 +975,102 @@ test('health_prevention_notify_caregivers: a failing sync is only logged, the pa
 });
 
 // --------------------------------------------------------------------------
+// 6. The registry (phase 2, C3 stage 2): its catalog against what the route
+//    was MEASURED to do above - the fields of GET and PUT, the member's 403,
+//    and the rows a valid write left. Data against data, no source text.
+// --------------------------------------------------------------------------
+
+const { settingsCatalog, writeSettings } = await import('../server/settings/registry.ts');
+
+/** GET fields the route builds itself (they need a service or the request). */
+const ROUTE_VIEWS = ['weather_source', 'screensaver_enabled', 'display_device_settings'];
+
+/** Every field of a GET answer, over every recorded state and role. */
+const GET_FIELDS = [...new Set(Object.values(EXPECTED.get).flatMap((byRole) => Object.values(byRole)
+  .flatMap((/** @type {any} */ answer) => Object.keys(answer.body.data))))].sort();
+
+/** Every field a PUT case sends, but for the case that sends unknown fields. */
+const PUT_FIELDS = [...new Set(PUT_CASES.filter((c) => c.name !== 'unknown field only' && !Array.isArray(c.body))
+  .flatMap((c) => Object.keys(/** @type {object} */ (c.body))))].sort();
+
+/** The cases that send exactly one field, by field. */
+const SINGLE_FIELD_CASES = Object.groupBy(
+  PUT_CASES.filter((c) => !Array.isArray(c.body) && Object.keys(/** @type {object} */ (c.body)).length === 1
+    && PUT_FIELDS.includes(Object.keys(/** @type {object} */ (c.body))[0])),
+  (c) => Object.keys(/** @type {object} */ (c.body))[0],
+);
+
+const catalogByField = () => new Map(settingsCatalog().map((entry) => [entry.field, entry]));
+
+test('registry: the measured fields are what this suite expects (52 PUT fields, the route views)', () => {
+  assert.equal(PUT_FIELDS.length, 52, PUT_FIELDS.join(', '));
+  for (const field of PUT_FIELDS) assert.ok(SINGLE_FIELD_CASES[field]?.length, `a single-field case for ${field}`);
+  for (const view of ROUTE_VIEWS) assert.ok(GET_FIELDS.includes(view), view);
+});
+
+test('registry: every GET field (but the route views) and every PUT field stands in settingsCatalog()', () => {
+  const catalog = catalogByField();
+  const wanted = [...new Set([...GET_FIELDS.filter((f) => !ROUTE_VIEWS.includes(f)), ...PUT_FIELDS])].sort();
+  assert.deepEqual(wanted.filter((field) => !catalog.has(field)), [], 'fields missing in the catalog');
+  assert.deepEqual([...catalog.keys()].filter((field) => !wanted.includes(field)).sort(), [], 'catalog fields neither GET nor PUT answers');
+  assert.equal(catalog.size, settingsCatalog().length, 'one entry per field');
+});
+
+test('registry: `write` of every field is the measured right (member 403 = admin, else member; not written = none)', () => {
+  const catalog = catalogByField();
+  const mismatches = [];
+  const fields = [...new Set([...GET_FIELDS.filter((f) => !ROUTE_VIEWS.includes(f)), ...PUT_FIELDS])].sort();
+  for (const field of fields) {
+    let measured = 'none';
+    if (PUT_FIELDS.includes(field)) {
+      const statuses = new Set((SINGLE_FIELD_CASES[field] ?? []).map((c) => EXPECTED.put[c.name].member.status === 403));
+      assert.equal(statuses.size, 1, `${field}: the member's cases agree on 403 or not`);
+      measured = statuses.has(true) ? 'admin' : 'member';
+    }
+    if (catalog.get(field)?.write !== measured) mismatches.push(`${field}: catalog ${catalog.get(field)?.write}, route ${measured}`);
+  }
+  assert.deepEqual(mismatches, []);
+});
+
+test('registry: `scope` and `storage` of every written field match the rows a valid write left', () => {
+  const catalog = catalogByField();
+  const mismatches = [];
+  for (const field of PUT_FIELDS) {
+    const entry = catalog.get(field);
+    const written = new Set((SINGLE_FIELD_CASES[field] ?? [])
+      .filter((c) => EXPECTED.put[c.name].admin.status === 200)
+      .flatMap((c) => Object.keys(EXPECTED.put[c.name].admin.rows))
+      .map((key) => key.replace(/:user:admin$/, ':user:<id>')));
+    assert.ok(written.size, `${field}: a valid case writes a row`);
+    const personal = [...written].every((key) => key.endsWith(':user:<id>'));
+    const household = [...written].every((key) => !key.includes(':user:'));
+    const measured = personal ? 'personal' : household ? 'household' : 'mixed';
+    const declared = entry?.scope === 'household-default' ? 'household' : entry?.scope;
+    if (declared !== measured) mismatches.push(`${field}: scope ${entry?.scope}, rows ${[...written].join(', ')}`);
+    const unlisted = [...written].filter((key) => !entry?.storage.includes(key));
+    if (unlisted.length) mismatches.push(`${field}: storage lacks ${unlisted.join(', ')}`);
+  }
+  assert.deepEqual(mismatches, []);
+});
+
+test('registry: `weather_user` without an account is `unauthenticated` (the 401 the server cannot reach)', () => {
+  /** @type {any} */
+  const actor = Object.freeze({
+    kind: 'session', userId: null, role: 'member', familyRole: null, scopes: null, moduleAccess: null, deviceId: null, unresolved: true,
+  });
+  const effects = { householdZoneChanged() {}, healthModuleToggled() {}, preventionCaregiversChanged() {} };
+  db.exec('SAVEPOINT registry_unit');
+  try {
+    assert.deepEqual(writeSettings(db, actor, { weather_user: { city: 'X' } }, effects), { kind: 'unauthenticated' });
+    // The object check comes first, as in the route.
+    assert.deepEqual(writeSettings(db, actor, { weather_user: 'x' }, effects), { kind: 'invalid', message: 'weather_user must be an object.' });
+  } finally {
+    db.exec('ROLLBACK TO registry_unit');
+    db.exec('RELEASE registry_unit');
+  }
+});
+
+// --------------------------------------------------------------------------
 // Completeness of the data: every expectation belongs to a case
 // --------------------------------------------------------------------------
 
