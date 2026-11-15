@@ -269,11 +269,12 @@ function attachDocumentCounts(tasks, viewer) {
  * und Wiederöffnen bringt die Glocke zurück - dieselbe Bedingung wie
  * OPEN_TASK_REMINDER_SQL in routes/reminders.js.
  * @param {any[]} tasks
- * @param {number} userId
+ * @param {unknown} userId Wer liest (`taskReader(req).userId`); der Wandmodus hat niemanden.
  */
 function attachReminderFlags(tasks, userId) {
   if (!tasks.length) return tasks;
-  const ids = ownReminderIds(db.get(), 'task', tasks.map((t) => t.id), userId);
+  const viewer = typeof userId === 'number' ? userId : null;
+  const ids = ownReminderIds(db.get(), 'task', tasks.map((t) => t.id), viewer);
   for (const task of tasks) {
     task.has_reminder = task.status !== 'done' && task.archived_at == null && ids.has(Number(task.id));
   }
