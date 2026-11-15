@@ -12,7 +12,7 @@ import * as db from '../db.js';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
 import { collectErrors, color, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
 import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import {
@@ -708,9 +708,11 @@ function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
   };
 }
 
+// The callers need a yes/no to stop; the refusal itself is the one of every
+// admin gate (refuseAdmin, phase 2 C2).
 function assertAdmin(req, res) {
   if (isAdminRequest(req)) return true;
-  res.status(403).json({ error: 'Permission denied.', code: 403 });
+  refuseAdmin(req, res);
   return false;
 }
 

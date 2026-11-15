@@ -9,7 +9,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, date as validateDate, num, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 import {
   mayReadModule,
   budgetDetailsVisibleWhere,
@@ -462,7 +462,7 @@ function configProtected(message, options = {}) {
 router.get('/storage/config', (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ error: 'Not authorized.', code: 403 });
+      return refuseAdmin(req, res);
     }
     res.json({ data: storageConfigStatus() });
   } catch (err) {
@@ -475,7 +475,7 @@ router.get('/storage/config', (req, res) => {
 router.put('/storage/config', async (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ error: 'Not authorized.', code: 403 });
+      return refuseAdmin(req, res);
     }
     if (
       req.body.selected_upload_backend !== undefined
@@ -613,7 +613,7 @@ router.put('/storage/config', async (req, res) => {
 router.post('/storage/test', async (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ error: 'Not authorized.', code: 403 });
+      return refuseAdmin(req, res);
     }
     await assertWebdavTargetAllowed(resolveConfig(req.body));
     const result = await testStorageConnection(req.body);

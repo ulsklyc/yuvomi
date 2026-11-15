@@ -43,17 +43,28 @@ export function isAdminRequest(req) {
 }
 
 /**
- * Lets only admins through; everyone else gets 403. A signed-in device gets
- * its own reason: the person may be an admin, only not from this device (see
- * requireAuth in server/auth.js).
+ * THE refusal of an admin gate (phase 2, C2) - every route that answers "only
+ * for administrators" sends it through here, so there is one text and one
+ * reason: `403 { error: 'Admin access required.', code: 403, reason:
+ * 'admin_required' }`. A signed-in device gets its own reason instead: the
+ * person may be an admin, only not from this device (see requireAuth in
+ * server/auth.js). Call it only where the admin question said no.
+ * @param {object} req
+ * @param {{ status(code: number): { json(body: unknown): unknown } }} res
  */
-export function requireAdmin(req, res, next) {
-  const verdict = manageVerdict(req);
-  if (verdict.allowed) {
-    return next();
-  }
-  if (verdict.reason === 'device_credential') {
+export function refuseAdmin(req, res) {
+  if (manageVerdict(req).reason === 'device_credential') {
     return res.status(403).json({ error: 'This is not available on a signed-in device.', code: 403, reason: 'device_credential' });
   }
-  res.status(403).json({ error: 'Permission denied.', code: 403 });
+  return res.status(403).json({ error: 'Admin access required.', code: 403, reason: 'admin_required' });
+}
+
+/**
+ * Lets only admins through; everyone else gets the one refusal (refuseAdmin).
+ */
+export function requireAdmin(req, res, next) {
+  if (manageVerdict(req).allowed) {
+    return next();
+  }
+  return refuseAdmin(req, res);
 }

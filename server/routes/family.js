@@ -8,7 +8,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 import {
   householdMemberSql, memberOrderProblem, memberOrderSql, memberPositionSql, writeMemberOrder,
 } from '../services/household-members.js';
@@ -57,8 +57,8 @@ router.get('/members', (req, res) => {
 //
 // NUR ADMINISTRATOREN. Die Reihenfolge gilt fuer alle, die hinsehen - sie ist
 // eine Einstellung des Haushalts wie die Familienrollen, keine Vorliebe einer
-// Person. Die Absage traegt einen `reason`, weil `requireAdmin` keinen hat und
-// die Oberflaeche sonst nur "Permission denied." weiterreichen koennte.
+// Person. Die Absage ist die eine Admin-Absage (refuseAdmin, Phase 2 C2) mit
+// `reason: 'admin_required'`.
 //
 // KEIN `await` VOR DER DATENBANK: Pruefen und Schreiben laufen ohne
 // Yield-Punkt hintereinander, sonst koennte zwischen beidem ein Mitglied
@@ -67,9 +67,7 @@ router.get('/members', (req, res) => {
 router.patch('/members/reorder', (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({
-        error: 'Only administrators can change the member order.', code: 403, reason: 'admin_required',
-      });
+      return refuseAdmin(req, res);
     }
     const order = req.body?.order;
     const problem = memberOrderProblem(order);
