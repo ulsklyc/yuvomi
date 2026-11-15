@@ -13,7 +13,7 @@ import { composeDisplayName, normalizeNameParts } from '../../public/utils/conta
 import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { birthDateInput, placeholderBirthDate, validateYearUnknown, birthdayLinkSuggestion, contactBirthdayMatch } from '../services/birthdays.js';
-import { mayReadModule } from '../permissions.js';
+import { mayReadModule } from '../authorize/index.ts';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
@@ -487,7 +487,7 @@ const CONTACT_SELECT = `
  * eines Haushaltsmitglieds dessen Profil-Geburtstag (#2214). Die
  * Kontaktseite fuehrt damit einen Link "In Geburtstagen anzeigen".
  *
- * Geburtstage gehoeren dem Modul `calendar` (server/permissions.js) - eine
+ * Geburtstage gehoeren dem Modul `calendar` (server/authorize/catalog.ts) - eine
  * Mischstelle wie der Import in die Gegenrichtung (routes/birthdays.js,
  * `contactsHidden`). Wer den Kalender nicht lesen darf, bekommt keine id:
  * sie verriete sonst, wer im Geburtstagsmodul steht.

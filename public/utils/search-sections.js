@@ -29,10 +29,17 @@
 
 const dateMeta = (field) => (item, fmt) => (item[field] ? fmt.dateText(item[field]) : '');
 
+// An archived task is still a hit (the list reaches it through its archive
+// filter), so the line has to say what it is before it says when it was due.
+const taskMeta = (/** @type {any} */ item, /** @type {any} */ fmt) => [
+  item.archived_at ? fmt.archivedText() : '',
+  item.due_date ? fmt.dateText(item.due_date) : '',
+].filter(Boolean).join(' · ');
+
 /** @type {ReadonlyArray<SearchSection>} */
 export const SEARCH_SECTIONS = Object.freeze([
   { bucket: 'tasks', labelKey: 'nav.tasks', module: 'tasks',
-    route: (i) => `/tasks?open=${i.id}`, meta: dateMeta('due_date') },
+    route: (i) => `/tasks?open=${i.id}`, meta: taskMeta },
   { bucket: 'events', labelKey: 'nav.calendar', module: 'calendar',
     // DER LINK TRAEGT DEN TAG DES TREFFERS (#1607). Ohne ihn faellt der Kalender
     // auf den Start der Stammzeile zurueck - bei einem Geburtstag das

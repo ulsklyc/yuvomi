@@ -87,7 +87,8 @@ test('keine Datei trägt die Grenze mehr selbst', () => {
       if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
       const path = `${dir}/${entry.name}`;
       if (entry.isDirectory()) { walk(path); continue; }
-      if (!entry.name.endsWith('.js')) continue;
+      // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+      if (!/\.(js|ts)$/.test(entry.name)) continue;
       const rel = path.replace(/^\.\//, '');
       if (ERLAUBT.has(rel)) continue;
       if (/5\s*\*\s*1024\s*\*\s*1024/.test(readFileSync(path, 'utf8'))) treffer.push(rel);
@@ -116,7 +117,8 @@ test('keine Server-Meldung nennt eine feste Megabyte-Zahl', () => {
       if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
       const path = `${dir}/${entry.name}`;
       if (entry.isDirectory()) { walk(path); continue; }
-      if (!entry.name.endsWith('.js')) continue;
+      // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+      if (!/\.(js|ts)$/.test(entry.name)) continue;
       const rel = path.replace(/^\.\//, '');
       if (ERLAUBT.has(rel)) continue;
       for (const line of readFileSync(path, 'utf8').split('\n')) {

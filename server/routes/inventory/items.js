@@ -7,13 +7,13 @@
  * Herkunftsnachweis (nullable, ON DELETE SET NULL) - und seit R23 (D5) auch die
  * Antwort auf "eigen": ohne `inventory_edit_others` aendert ein Konto nur
  * Gegenstaende, die es angelegt hat, ohne `inventory_view_prices` fehlen
- * Kaufpreis und Waehrung in jeder Antwort (server/permissions.js).
+ * Kaufpreis und Waehrung in jeder Antwort (server/authorize/).
  */
 
 import express from 'express';
 import * as db from '../../db.js';
 import { createLogger } from '../../logger.js';
-import { mayChangeRecord, requestHasCapability, sendNotOwner } from '../../permissions.js';
+import { mayChangeRecord, requestHasCapability, sendNotOwner } from '../../authorize/index.ts';
 import {
   str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT,
 } from '../../middleware/validate.js';

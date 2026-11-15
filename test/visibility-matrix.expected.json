@@ -7,10 +7,19 @@
     "detail_statuses": "per route exactly three answers: its success status (200; thumbnail 415) = visible, 404 = not visible, 403 = refused; refusals next to visible rows stay in the cell as { visible, refused: { row: status } }",
     "due_reminders": "one due reminder per task, event and document row for each of these accounts (created_by = caller): admin, member, child, caregiver, member_none, split_guest, display; document_expiry rows are seeded directly like the others; token roles read the member's rows",
     "health_delivery": "due_reminders / medications is measured on the production path: one processDueMedications() run (medication-scheduler.js) after every other measurement, every seeded medication with one active 00:00 schedule, push spy, no channels; hearsOwnDose = the account received a push for a medication it owns, hearsCaredForDose = for one it does not own (n/a without a care grant); notLacksHealth = !lacksHealth(db, id) (cycle-reminders.js ~71). caregiver, member_none, split_guest and display own one private medication each so they can be addressed",
-    "health_unknown_account": "unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded are the two exported production answers for such an id: recipientDeniedModulesIsNull (reminder-origins.js, null = drop the recipient) and notLacksHealth",
+    "health_unknown_account": "unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded is the exported production answer for such an id: notLacksHealth",
     "mcp": "list_tasks with include_future=true, list_upcoming_events with limit=100; the bridge calls call_api_operation with method GET and the /api/v1 path of each list route; a refused call is { status: tool_error, reason }",
     "role_accounts": "token_read / token_write / token_unscoped act for the member account",
+    "row_rules": "row_rules holds the JavaScript row checks outside server/authorize (phase 2, B8a). Its rows are seeded AFTER every read path and the module level were measured and BEFORE the medication run (seedRowRules in the seed file); they are not in seed_counts and no read-path cell sees them. Blocks quick_links, task_writes, series and series_outlook_target are keyed by role (all ten), then by cell; outlook_classification is keyed by series. One cell = one leaf under a role (or one series in outlook_classification). Every block sends from its own client address 10.10.<role>.<block>; setup requests from 10.10.250.x",
+    "row_rules_cells": "write cells are { ok, not_found, refused?: { row: { status, reason } } } over every seeded row of the block, or the one { status, reason } when the gate refused every row the same way. ok = the route's success status (or, where noted, the input check behind the rights check), not_found = its 404 with the route's own reason (a route with two 404 reasons keeps them by row: not_found: { row: reason }), refused = any 403; any other answer fails the suite. The reads (list, overview, capabilities) accept 200 and the gate's 403; anything else is flagged, also in update mode",
+    "row_rules_coverage": "what the cells do NOT measure: exceptions_post reaches only loadVisibleEvent and refuseForeignEvent (calendar/crud.js ~1967); isEligibleLocalSeries there only supplies the reason for a series that is not locally owned, so the cell is no evidence for rowVisible(database, 'events', ...) on the series. canDetachOccurrence (buildRecurrenceCapabilityMap in services/calendar-occurrence-overrides.js) is measured only in the stricter direction: a row of a series without a linked child reaches a viewer only when the master itself is visible, which is the same rule as rowVisible on the series; a looser rule cannot show there. quick_links.overview_household is empty for every role that reads it: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks, so householdAudienceAnswer() keeps the empty form",
+    "row_rules_display": "the display writes like the wall: display cookie plus the session cookie and CSRF token its first GET below /api/v1 (GET /quick-links) handed out (csrfMiddleware keeps the token in req.session)",
+    "row_rules_outlook": "series_outlook_target = the capabilities cell again after seedOutlookTarget: one outlook_accounts row (auto_sync_calendar_id, owner_user_id = member) with one outlook_calendar_selection row (enabled 1, can_edit 1); MS_CLIENT_ID / MS_CLIENT_SECRET / MS_REDIRECT_URI are pinned empty, so the sync tick returns before any request. outlook_classification = classifyLocalSeries (exported production function) per series before and after the target: the calendar answer shows eligibility only through can_override_occurrence",
+    "row_rules_quick_links": "quicklink.<owner>.<all|private> for admin/member/child, seeded directly. list = GET /quick-links as { visible, editable (can_edit) }; overview / overview_household = the quicklinks row of GET /dashboard (personal, audience=household) in the same shape; change = PUT /quick-links/:id with {} (every field keeps its value, only updated_at moves), ok 200; remove = DELETE /quick-links/:id, ok 204, the row goes back with the same id and values after each 204; detail is n/a",
+    "row_rules_series": "series.<owner>.<all|private|assignees> for admin/member/child: local, all-day, FREQ=DAILY;COUNT=3 from today+40 (all and assignees assigned to OTHER_OF[owner] via event_assignments), each with one linked occurrence on its second day, seeded directly in the shape PUT /calendar/:id/occurrences/:day writes (recurrence_parent_id, recurrence_id, overridden_fields, series_authored 1, the series' assignment rows copied, the exception row on the master; not through the route, which runs the rule under test); the occurrence of a private or assignees series is overridden to visibility all, so a viewer who may not see the series still gets the occurrence in GET /calendar and the capability map loads the hidden master itself (canOverrideOccurrence then hangs on rowVisible(database, 'events', ...) for the series alone). Plus series.admin.assignees.unlinked (assigned to member) and series.member.private.unlinked without a linked occurrence: after the Outlook target they are local and not eligible, the only state in which can_detach can be true (a linked child makes it false for everyone). capabilities = GET /calendar over the series days as { visible (series with at least one row in the answer, a shared occurrence included), can_override (can_override_occurrence), can_detach (can_detach_occurrence) } per series. occurrence_put / occurrence_put_following / occurrence_delete / occurrence_delete_following / exceptions_post send the well-formed key of the day before the series start: ok = 400 invalid_recurrence_id, which baseOccurrenceFor() answers only AFTER visibility, ownership (not_owner) and isEligibleLocalSeries, so nothing is written (\"past the checks\"); exceptions_post computes the eligibility but only uses its reason for a series that is not locally owned. linked_put / linked_delete = PUT {} / DELETE on the linked occurrence row: ok = 400 calendar_occurrence_route_required (rejectLinkedOccurrenceResource, behind the same checks); not_found by row = 404 calendar_event_not_found (the occurrence row hidden) or calendar_series_not_found (the occurrence shared, its series hidden); the unlinked series have no linked_* answer",
+    "row_rules_task_writes": "wtask.<owner>.<all|private|assignees> for admin/member/child (all and assignees assigned to OTHER_OF[owner] via task_assignments, description \"- [ ] mx item\", no due date), plus wtask.admin.assignees.display assigned to the display account (not a realistic state: without it the display branches of PATCH /:id/status and GET /:id/completions (householdVisible) answer for no task because the task row rule runs first). The task reads, under the wall rule (householdVisible) for the display and the task row rule for people: list = the seeded tasks in GET /tasks, feed = the seeded tasks in GET /tasks/completions?limit=200 (one completion entry per seeded task, inserted before the call and deleted after it), detail = GET /tasks/:id, comments = GET /tasks/:id/comments. One cell per call site of the task row rule rowVisible(db, 'tasks', ...): completions = GET /:id/completions (then for the display householdVisible, the same wall rule as the status cell), check = PATCH /:id/check {line 0, checked false} (unchanged line, no write), archive = PATCH /:id/archive {archived false}, status = PATCH /:id/status {status open} on an open task (then the display branch, householdVisible), subtask = POST /tasks {title, parent_task_id} (ok 201, the subtask is deleted), remove = DELETE /:id (the row and its assignments go back with the same id). next_due_date / next_due_date_all / next_due_date_assignees = PATCH /:id/status {status done} on wtask.chain.origin / wtask.chain-all.origin / wtask.chain-assignees.origin (shared, weekly) whose followup already exists: wtask.chain.followup (admin, private), wtask.chain-all.followup (admin, all), wtask.chain-assignees.followup (admin, assignees, assigned to OTHER_OF.admin = member); next names the followup when the answer carries its due date, null otherwise (nextDueDateAfter: the display reads householdVisible, people rowVisible(db, 'tasks', ...)); the display names done_by_user_id = admin; each origin is reopened and its completion row deleted after each 200",
     "seed_counts": {
+      "activities": 6,
       "budget": 9,
       "documents": 9,
       "events": 11,
@@ -24,6 +33,9 @@
   "cells": {
     "admin": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -61,6 +73,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -108,6 +123,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -127,7 +145,7 @@
             "event.member.ics-shared",
             "event.member.private"
           ],
-          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, header of server/authorize/rows/assignees.ts)"
         },
         "medications": {
           "n/a": "the calendar feed carries events only"
@@ -140,6 +158,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.admin.private",
+          "activity.child.family",
+          "activity.member.family"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -192,6 +216,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.admin.private",
+          "activity.child.family",
+          "activity.member.family"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -244,6 +274,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -274,9 +307,12 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -311,7 +347,7 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -323,7 +359,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -340,6 +376,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -365,7 +404,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -379,6 +418,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.admin.private",
+          "activity.child.family",
+          "activity.member.family"
+        ],
         "budget": {
           "ids": [
             "budget.admin.private",
@@ -410,26 +455,27 @@
           "medication.child.family",
           "medication.member.family"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.admin.all",
-            "note.admin.private"
-          ]
-        },
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.all",
-            "task.admin.assignees",
-            "task.admin.private",
-            "task.admin.private.legacy-assigned-member"
-          ]
-        }
+        "notes": [
+          "note.admin.all",
+          "note.admin.private",
+          "note.child.all",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.admin.private",
+          "task.admin.private.legacy-assigned-member",
+          "task.child.all",
+          "task.member.all"
+        ]
       }
     },
     "caregiver": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -464,6 +510,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -505,6 +554,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -524,7 +576,7 @@
             "event.member.ics-shared",
             "event.member.private"
           ],
-          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, header of server/authorize/rows/assignees.ts)"
         },
         "medications": {
           "n/a": "the calendar feed carries events only"
@@ -537,6 +589,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -581,6 +639,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -625,6 +689,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -652,9 +719,12 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -686,7 +756,7 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -697,7 +767,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -712,6 +782,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -737,7 +810,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -751,6 +824,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -772,27 +851,31 @@
           "event.member.all",
           "event.member.ics-shared"
         ],
-        "medications": {
-          "divergent": "search uses an inline rule without care grants (server/services/search.js:556); list and detail show the cared-for person's private medication",
-          "ids": [
-            "medication.admin.family",
-            "medication.caregiver.private",
-            "medication.child.family",
-            "medication.member.family"
-          ]
-        },
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": []
-        },
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": []
-        }
+        "medications": [
+          "medication.admin.family",
+          "medication.caregiver.private",
+          "medication.child.family",
+          "medication.child.private",
+          "medication.member.family"
+        ],
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.member.all"
+        ]
       }
     },
     "child": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -832,6 +915,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -881,6 +967,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -900,7 +989,7 @@
             "event.member.ics-shared",
             "event.member.private"
           ],
-          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, header of server/authorize/rows/assignees.ts)"
         },
         "medications": {
           "n/a": "the calendar feed carries events only"
@@ -913,6 +1002,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "household": {
             "reason": "module_access_denied",
@@ -962,6 +1057,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": {
           "household": {
             "reason": "module_access_denied",
@@ -1011,6 +1112,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -1042,9 +1146,12 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -1084,7 +1191,7 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -1098,7 +1205,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1115,6 +1222,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -1140,7 +1250,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1154,6 +1264,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.child.private",
+          "activity.member.family"
+        ],
         "budget": [],
         "documents": [
           "document.admin.family",
@@ -1178,25 +1294,27 @@
           "medication.child.private",
           "medication.member.family"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.child.all",
-            "note.child.private"
-          ]
-        },
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.child.all",
-            "task.child.assignees",
-            "task.child.private"
-          ]
-        }
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.child.private",
+          "note.member.all"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.child.all",
+          "task.child.assignees",
+          "task.child.private",
+          "task.member.all",
+          "task.member.assignees"
+        ]
       }
     },
     "display": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -1224,6 +1342,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -1241,12 +1362,11 @@
           "household": []
         },
         "medications": {
-          "divergent": "the delivery predicates resolve without the display flag and without the guest gate (server/services/reminder-origins.js:146): they say yes while every REST health path refuses this account",
           "hearsCaredForDose": {
             "n/a": "no health_care_grants row names this account as caregiver"
           },
-          "hearsOwnDose": true,
-          "notLacksHealth": true
+          "hearsOwnDose": false,
+          "notLacksHealth": false
         },
         "notes": {
           "n/a": "notes have no reminder origin"
@@ -1261,27 +1381,16 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": {
-          "divergent": "feedModuleDenied resolves without the display flag and without the guest gate (server/index.js:578): the feed carries the whole calendar while the app refuses or narrows it; the token was set in the database, the app offers this account no way to mint one",
-          "ids": [
-            "event.admin.all",
-            "event.admin.assignees",
-            "event.admin.private",
-            "event.child.all",
-            "event.child.assignees",
-            "event.child.private",
-            "event.member.all",
-            "event.member.assignees",
-            "event.member.ics-shared",
-            "event.member.private"
-          ]
-        },
+        "events": [],
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -1293,6 +1402,10 @@
         }
       },
       "list": {
+        "activities": {
+          "reason": "token_scope",
+          "status": 403
+        },
         "budget": {
           "household": {
             "reason": "token_scope",
@@ -1328,6 +1441,10 @@
         ]
       },
       "mcp_bridge": {
+        "activities": {
+          "reason": "tool_not_permitted",
+          "status": "tool_error"
+        },
         "budget": {
           "household": {
             "reason": "tool_not_permitted",
@@ -1360,6 +1477,9 @@
         }
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -1382,9 +1502,12 @@
         }
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": []
@@ -1411,14 +1534,14 @@
         },
         "medications": {
           "health.hasMeds": false,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1432,6 +1555,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -1457,7 +1583,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1471,6 +1597,10 @@
         }
       },
       "search": {
+        "activities": {
+          "reason": "token_scope",
+          "status": 403
+        },
         "budget": {
           "reason": "token_scope",
           "status": 403
@@ -1499,6 +1629,9 @@
     },
     "member": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -1539,6 +1672,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -1589,6 +1725,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -1609,7 +1748,7 @@
             "event.member.ics-unshared",
             "event.member.private"
           ],
-          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, server/services/visibility.js:10)"
+          "note": "the personal calendar feed deliberately ignores row visibility (docs/SPEC.md, header of server/authorize/rows/assignees.ts)"
         },
         "medications": {
           "n/a": "the calendar feed carries events only"
@@ -1622,6 +1761,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -1677,6 +1822,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -1732,6 +1883,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -1764,9 +1918,12 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -1809,7 +1966,7 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -1823,7 +1980,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -1840,6 +1997,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -1865,7 +2025,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1879,6 +2039,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -1913,26 +2079,27 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.member.all",
-            "note.member.private"
-          ]
-        },
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.private.legacy-assigned-member",
-            "task.member.all",
-            "task.member.assignees",
-            "task.member.private"
-          ]
-        }
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
       }
     },
     "member_none": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -1957,6 +2124,9 @@
         }
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -2002,6 +2172,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2020,6 +2193,10 @@
         }
       },
       "list": {
+        "activities": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
         "budget": {
           "household": {
             "reason": "module_access_denied",
@@ -2052,6 +2229,10 @@
         }
       },
       "mcp_bridge": {
+        "activities": {
+          "reason": "module_access_denied",
+          "status": "tool_error"
+        },
         "budget": {
           "household": {
             "reason": "module_access_denied",
@@ -2084,6 +2265,9 @@
         }
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -2106,9 +2290,12 @@
         }
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": []
@@ -2121,19 +2308,22 @@
         },
         "medications": {
           "health.hasMeds": false,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [],
           "wallTasks": []
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -2154,12 +2344,13 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [],
           "wallTasks": []
         }
       },
       "search": {
+        "activities": [],
         "budget": [],
         "documents": [],
         "events": [],
@@ -2170,6 +2361,9 @@
     },
     "split_guest": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -2194,6 +2388,9 @@
         }
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -2218,12 +2415,11 @@
           }
         },
         "medications": {
-          "divergent": "the delivery predicates resolve without the display flag and without the guest gate (server/services/reminder-origins.js:146): they say yes while every REST health path refuses this account",
           "hearsCaredForDose": {
             "n/a": "no health_care_grants row names this account as caregiver"
           },
-          "hearsOwnDose": true,
-          "notLacksHealth": true
+          "hearsOwnDose": false,
+          "notLacksHealth": false
         },
         "notes": {
           "n/a": "notes have no reminder origin"
@@ -2240,27 +2436,16 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
         "documents": {
           "n/a": "the calendar feed carries events only"
         },
-        "events": {
-          "divergent": "feedModuleDenied resolves without the display flag and without the guest gate (server/index.js:578): the feed carries the whole calendar while the app refuses or narrows it; the token was set in the database, the app offers this account no way to mint one",
-          "ids": [
-            "event.admin.all",
-            "event.admin.assignees",
-            "event.admin.private",
-            "event.child.all",
-            "event.child.assignees",
-            "event.child.private",
-            "event.member.all",
-            "event.member.assignees",
-            "event.member.ics-shared",
-            "event.member.private"
-          ]
-        },
+        "events": [],
         "medications": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2272,6 +2457,10 @@
         }
       },
       "list": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
         "budget": {
           "household": {
             "reason": "split_guest_scope",
@@ -2304,6 +2493,10 @@
         }
       },
       "mcp_bridge": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": "tool_error"
+        },
         "budget": {
           "household": {
             "reason": "split_guest_scope",
@@ -2336,6 +2529,9 @@
         }
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -2358,6 +2554,10 @@
         }
       },
       "overview": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
         "budget": {
           "reason": "split_guest_scope",
           "status": 403
@@ -2384,6 +2584,10 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
         "budget": {
           "reason": "split_guest_scope",
           "status": 403
@@ -2410,6 +2614,10 @@
         }
       },
       "search": {
+        "activities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
         "budget": {
           "reason": "split_guest_scope",
           "status": 403
@@ -2438,6 +2646,9 @@
     },
     "token_read": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -2478,6 +2689,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -2528,6 +2742,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2548,6 +2765,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -2603,6 +2826,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -2658,6 +2887,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -2690,9 +2922,12 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -2735,7 +2970,7 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -2749,7 +2984,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -2766,6 +3001,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -2791,7 +3029,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -2805,6 +3043,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -2839,26 +3083,27 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.member.all",
-            "note.member.private"
-          ]
-        },
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.private.legacy-assigned-member",
-            "task.member.all",
-            "task.member.assignees",
-            "task.member.private"
-          ]
-        }
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
       }
     },
     "token_unscoped": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -2899,6 +3144,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -2949,6 +3197,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -2969,6 +3220,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -3024,6 +3281,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -3079,6 +3342,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -3111,9 +3377,12 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -3156,7 +3425,7 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3170,7 +3439,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3187,6 +3456,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -3212,7 +3484,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -3226,6 +3498,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -3260,26 +3538,27 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.member.all",
-            "note.member.private"
-          ]
-        },
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.private.legacy-assigned-member",
-            "task.member.all",
-            "task.member.assignees",
-            "task.member.private"
-          ]
-        }
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
       }
     },
     "token_write": {
       "detail": {
+        "activities": {
+          "n/a": "health activities have no read-by-id route"
+        },
         "budget": {
           "n/a": "budget entries have no read-by-id route"
         },
@@ -3320,6 +3599,9 @@
         ]
       },
       "due_reminders": {
+        "activities": {
+          "n/a": "health activities have no reminder origin"
+        },
         "budget": {
           "n/a": "the budget reminder origin is the subscription, not the entry"
         },
@@ -3370,6 +3652,9 @@
         }
       },
       "ics_feed": {
+        "activities": {
+          "n/a": "the calendar feed carries events only"
+        },
         "budget": {
           "n/a": "the calendar feed carries events only"
         },
@@ -3390,6 +3675,12 @@
         }
       },
       "list": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -3445,6 +3736,12 @@
         ]
       },
       "mcp_bridge": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "household": [
             "budget.admin.shared",
@@ -3500,6 +3797,9 @@
         ]
       },
       "mcp_core": {
+        "activities": {
+          "n/a": "no core MCP tool reads this type"
+        },
         "budget": {
           "n/a": "no core MCP tool reads this type"
         },
@@ -3532,9 +3832,12 @@
         ]
       },
       "overview": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id, server/routes/dashboard.js:1075), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -3577,7 +3880,7 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id, server/routes/dashboard.js:1222), by design a viewer-only block (#1900)"
+          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3591,7 +3894,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3608,6 +3911,9 @@
         }
       },
       "overview_household": {
+        "activities": {
+          "n/a": "the overview carries no health activities"
+        },
         "budget": {
           "budget.entryCount": 0
         },
@@ -3633,7 +3939,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasks spells visibility = all inline (server/routes/dashboard.js:271) instead of householdVisibleWhere; same rows today",
+          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -3647,6 +3953,12 @@
         }
       },
       "search": {
+        "activities": [
+          "activity.admin.family",
+          "activity.child.family",
+          "activity.member.family",
+          "activity.member.private"
+        ],
         "budget": {
           "ids": [
             "budget.admin.shared",
@@ -3681,22 +3993,20 @@
           "medication.member.family",
           "medication.member.private"
         ],
-        "notes": {
-          "divergent": "search returns own notes only (server/services/search.js:523); the list also carries others' all notes",
-          "ids": [
-            "note.member.all",
-            "note.member.private"
-          ]
-        },
-        "tasks": {
-          "divergent": "search reads tasks by created_by or the legacy column assigned_to (server/services/search.js:453), not through visibilityWhere: others' all rows and task_assignments rows are missing, a private task with a legacy assignee is found",
-          "ids": [
-            "task.admin.private.legacy-assigned-member",
-            "task.member.all",
-            "task.member.assignees",
-            "task.member.private"
-          ]
-        }
+        "notes": [
+          "note.admin.all",
+          "note.child.all",
+          "note.member.all",
+          "note.member.private"
+        ],
+        "tasks": [
+          "task.admin.all",
+          "task.admin.assignees",
+          "task.child.all",
+          "task.member.all",
+          "task.member.assignees",
+          "task.member.private"
+        ]
       }
     }
   },
@@ -3904,10 +4214,3251 @@
       }
     }
   },
+  "row_rules": {
+    "outlook_classification": {
+      "series.admin.all": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.admin.assignees": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.admin.assignees.unlinked": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.admin.private": {
+        "after": {
+          "eligible": true,
+          "reason": null
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.child.all": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.child.assignees": {
+        "after": {
+          "eligible": true,
+          "reason": null
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.child.private": {
+        "after": {
+          "eligible": true,
+          "reason": null
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.member.all": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.member.assignees": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.member.private": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      },
+      "series.member.private.unlinked": {
+        "after": {
+          "eligible": false,
+          "reason": "ineligible_series"
+        },
+        "before": {
+          "eligible": true,
+          "reason": null
+        }
+      }
+    },
+    "quick_links": {
+      "admin": {
+        "change": {
+          "not_found": [
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [
+            "quicklink.admin.all",
+            "quicklink.admin.private",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        }
+      },
+      "caregiver": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "child": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.member.private"
+          ],
+          "ok": [
+            "quicklink.child.all",
+            "quicklink.child.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.child.all",
+            "quicklink.child.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.child.private",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.child.all",
+            "quicklink.child.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.child.private",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.member.private"
+          ],
+          "ok": [
+            "quicklink.child.all",
+            "quicklink.child.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "display": {
+        "change": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "member": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "member_none": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview": {
+          "editable": [],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private",
+            "quicklink.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.member.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "split_guest": {
+        "change": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "overview": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "overview_household": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "remove": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "token_read": {
+        "change": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "token_unscoped": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      },
+      "token_write": {
+        "change": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        },
+        "detail": {
+          "n/a": "quick links have no read-by-id route"
+        },
+        "list": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview": {
+          "editable": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "visible": [
+            "quicklink.admin.all",
+            "quicklink.child.all",
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ]
+        },
+        "overview_household": {
+          "editable": [],
+          "note": "Empty for every role: the wall allowlist (HOUSEHOLD_AUDIENCE_SHOWS, authorize/rows/household.ts) does not carry quicklinks.",
+          "visible": []
+        },
+        "remove": {
+          "not_found": [
+            "quicklink.admin.private",
+            "quicklink.child.private"
+          ],
+          "ok": [
+            "quicklink.member.all",
+            "quicklink.member.private"
+          ],
+          "refused": {
+            "quicklink.admin.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            },
+            "quicklink.child.all": {
+              "reason": "You cannot modify this entry.",
+              "status": 403
+            }
+          }
+        }
+      }
+    },
+    "series": {
+      "admin": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "linked_delete": {
+          "not_found": {
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found",
+            "series.member.assignees": "calendar_series_not_found",
+            "series.member.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "linked_put": {
+          "not_found": {
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found",
+            "series.member.assignees": "calendar_series_not_found",
+            "series.member.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.member.all"
+          ]
+        }
+      },
+      "caregiver": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "linked_delete": {
+          "not_found": {
+            "series.admin.assignees": "calendar_series_not_found",
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found",
+            "series.member.assignees": "calendar_series_not_found",
+            "series.member.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "linked_put": {
+          "not_found": {
+            "series.admin.assignees": "calendar_series_not_found",
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found",
+            "series.member.assignees": "calendar_series_not_found",
+            "series.member.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.private",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.member.all"
+          ]
+        }
+      },
+      "child": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "linked_delete": {
+          "not_found": {},
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.admin.assignees": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.admin.private": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.member.private": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "linked_put": {
+          "not_found": {},
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.admin.assignees": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.admin.private": {
+              "reason": "not_owner",
+              "status": 403
+            },
+            "series.member.private": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "ok": [
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees"
+          ],
+          "refused": {
+            "series.admin.all": {
+              "reason": "not_owner",
+              "status": 403
+            }
+          }
+        }
+      },
+      "display": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.child.all",
+            "series.member.all"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "exceptions_post": {
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "reason": "token_scope",
+          "status": 403
+        },
+        "linked_delete": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "linked_put": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_delete": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_delete_following": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_put": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_put_following": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "member": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "linked_delete": {
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_put": {
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        }
+      },
+      "member_none": {
+        "capabilities": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "exceptions_post": {
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "linked_delete": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "linked_put": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "occurrence_delete": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "occurrence_delete_following": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "occurrence_put": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "occurrence_put_following": {
+          "reason": "module_access_denied",
+          "status": 403
+        }
+      },
+      "split_guest": {
+        "capabilities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "exceptions_post": {
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "linked_delete": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "linked_put": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "occurrence_delete": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "occurrence_delete_following": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "occurrence_put": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "occurrence_put_following": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "token_read": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "exceptions_post": {
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "reason": "token_scope",
+          "status": 403
+        },
+        "linked_delete": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "linked_put": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_delete": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_delete_following": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_put": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "occurrence_put_following": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "token_unscoped": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "linked_delete": {
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_put": {
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        }
+      },
+      "token_write": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "exceptions_post": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "note": "Reaches only loadVisibleEvent and refuseForeignEvent; isEligibleLocalSeries here only supplies a reason, so this cell is no evidence for rowVisible(database, 'events', ...) on the series.",
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "linked_delete": {
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "linked_put": {
+          "not_found": {
+            "series.admin.private": "calendar_series_not_found",
+            "series.child.assignees": "calendar_series_not_found",
+            "series.child.private": "calendar_series_not_found"
+          },
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        },
+        "occurrence_delete": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_delete_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_put": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        },
+        "occurrence_put_following": {
+          "not_found": [
+            "series.admin.private",
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "ok": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.child.all",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        }
+      }
+    },
+    "series_outlook_target": {
+      "admin": {
+        "capabilities": {
+          "can_detach": [
+            "series.admin.assignees.unlinked"
+          ],
+          "can_override": [
+            "series.admin.private"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "caregiver": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.child.assignees"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "child": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [
+            "series.child.assignees",
+            "series.child.private"
+          ],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "display": {
+        "capabilities": {
+          "can_detach": [],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private"
+          ]
+        }
+      },
+      "member": {
+        "capabilities": {
+          "can_detach": [
+            "series.admin.assignees.unlinked",
+            "series.member.private.unlinked"
+          ],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        }
+      },
+      "member_none": {
+        "capabilities": {
+          "reason": "module_access_denied",
+          "status": 403
+        }
+      },
+      "split_guest": {
+        "capabilities": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "token_read": {
+        "capabilities": {
+          "can_detach": [
+            "series.admin.assignees.unlinked",
+            "series.member.private.unlinked"
+          ],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        }
+      },
+      "token_unscoped": {
+        "capabilities": {
+          "can_detach": [
+            "series.admin.assignees.unlinked",
+            "series.member.private.unlinked"
+          ],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        }
+      },
+      "token_write": {
+        "capabilities": {
+          "can_detach": [
+            "series.admin.assignees.unlinked",
+            "series.member.private.unlinked"
+          ],
+          "can_override": [],
+          "visible": [
+            "series.admin.all",
+            "series.admin.assignees",
+            "series.admin.assignees.unlinked",
+            "series.admin.private",
+            "series.child.all",
+            "series.child.assignees",
+            "series.child.private",
+            "series.member.all",
+            "series.member.assignees",
+            "series.member.private",
+            "series.member.private.unlinked"
+          ]
+        }
+      }
+    },
+    "task_writes": {
+      "admin": {
+        "archive": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "comments": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "detail": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "feed": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.admin.assignees.display",
+          "wtask.admin.private",
+          "wtask.child.all",
+          "wtask.member.all"
+        ],
+        "list": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.admin.assignees.display",
+          "wtask.admin.private",
+          "wtask.child.all",
+          "wtask.member.all"
+        ],
+        "next_due_date": {
+          "next": "wtask.chain.followup",
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": "wtask.chain-assignees.followup",
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        }
+      },
+      "caregiver": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "comments": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "detail": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "feed": [
+          "wtask.admin.all",
+          "wtask.child.all",
+          "wtask.child.assignees",
+          "wtask.member.all"
+        ],
+        "list": [
+          "wtask.admin.all",
+          "wtask.child.all",
+          "wtask.child.assignees",
+          "wtask.member.all"
+        ],
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.member.all"
+          ]
+        }
+      },
+      "child": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "comments": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "detail": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "feed": [
+          "wtask.admin.all",
+          "wtask.child.all",
+          "wtask.child.assignees",
+          "wtask.child.private",
+          "wtask.member.all",
+          "wtask.member.assignees"
+        ],
+        "list": [
+          "wtask.admin.all",
+          "wtask.child.all",
+          "wtask.child.assignees",
+          "wtask.child.private",
+          "wtask.member.all",
+          "wtask.member.assignees"
+        ],
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.all",
+            "wtask.member.assignees"
+          ]
+        }
+      },
+      "display": {
+        "archive": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "check": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "comments": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "detail": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.child.all",
+            "wtask.member.all"
+          ]
+        },
+        "feed": [
+          "wtask.admin.all",
+          "wtask.child.all",
+          "wtask.member.all"
+        ],
+        "list": [
+          "wtask.admin.all",
+          "wtask.child.all",
+          "wtask.member.all"
+        ],
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": null,
+          "status": 200
+        },
+        "remove": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees",
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ],
+          "ok": [],
+          "refused": {
+            "wtask.admin.all": {
+              "reason": "display_action",
+              "status": 403
+            },
+            "wtask.child.all": {
+              "reason": "display_action",
+              "status": 403
+            },
+            "wtask.member.all": {
+              "reason": "display_action",
+              "status": 403
+            }
+          }
+        },
+        "subtask": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "member": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "comments": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "detail": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "feed": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.child.all",
+          "wtask.member.all",
+          "wtask.member.assignees",
+          "wtask.member.private"
+        ],
+        "list": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.child.all",
+          "wtask.member.all",
+          "wtask.member.assignees",
+          "wtask.member.private"
+        ],
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": "wtask.chain-assignees.followup",
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        }
+      },
+      "member_none": {
+        "archive": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "check": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "comments": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "completions": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "detail": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "feed": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "list": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "next_due_date": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "next_due_date_all": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "next_due_date_assignees": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "remove": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "status": {
+          "reason": "module_access_denied",
+          "status": 403
+        },
+        "subtask": {
+          "reason": "module_access_denied",
+          "status": 403
+        }
+      },
+      "split_guest": {
+        "archive": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "check": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "comments": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "completions": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "detail": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "feed": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "list": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "next_due_date": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "next_due_date_all": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "next_due_date_assignees": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "remove": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "status": {
+          "reason": "split_guest_scope",
+          "status": 403
+        },
+        "subtask": {
+          "reason": "split_guest_scope",
+          "status": 403
+        }
+      },
+      "token_read": {
+        "archive": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "check": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "comments": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "detail": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "feed": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.child.all",
+          "wtask.member.all",
+          "wtask.member.assignees",
+          "wtask.member.private"
+        ],
+        "list": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.child.all",
+          "wtask.member.all",
+          "wtask.member.assignees",
+          "wtask.member.private"
+        ],
+        "next_due_date": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "next_due_date_all": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "next_due_date_assignees": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "remove": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "status": {
+          "reason": "token_scope",
+          "status": 403
+        },
+        "subtask": {
+          "reason": "token_scope",
+          "status": 403
+        }
+      },
+      "token_unscoped": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "comments": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "detail": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "feed": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.child.all",
+          "wtask.member.all",
+          "wtask.member.assignees",
+          "wtask.member.private"
+        ],
+        "list": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.child.all",
+          "wtask.member.all",
+          "wtask.member.assignees",
+          "wtask.member.private"
+        ],
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": "wtask.chain-assignees.followup",
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        }
+      },
+      "token_write": {
+        "archive": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "check": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "comments": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "completions": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "detail": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "feed": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.child.all",
+          "wtask.member.all",
+          "wtask.member.assignees",
+          "wtask.member.private"
+        ],
+        "list": [
+          "wtask.admin.all",
+          "wtask.admin.assignees",
+          "wtask.child.all",
+          "wtask.member.all",
+          "wtask.member.assignees",
+          "wtask.member.private"
+        ],
+        "next_due_date": {
+          "next": null,
+          "status": 200
+        },
+        "next_due_date_all": {
+          "next": "wtask.chain-all.followup",
+          "status": 200
+        },
+        "next_due_date_assignees": {
+          "next": "wtask.chain-assignees.followup",
+          "status": 200
+        },
+        "remove": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "status": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        },
+        "subtask": {
+          "not_found": [
+            "wtask.admin.assignees.display",
+            "wtask.admin.private",
+            "wtask.child.assignees",
+            "wtask.child.private"
+          ],
+          "ok": [
+            "wtask.admin.all",
+            "wtask.admin.assignees",
+            "wtask.child.all",
+            "wtask.member.all",
+            "wtask.member.assignees",
+            "wtask.member.private"
+          ]
+        }
+      }
+    }
+  },
   "unknown_account": {
     "health_predicates": {
-      "notLacksHealth": false,
-      "recipientDeniedModulesIsNull": true
+      "notLacksHealth": false
     }
   }
 }

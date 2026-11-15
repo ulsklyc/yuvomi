@@ -38,7 +38,8 @@ function jsFilesUnder(dir, prefix = '') {
     if (entry.name === 'node_modules') continue;
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) out.push(...jsFilesUnder(join(dir, entry.name), rel));
-    else if (entry.name.endsWith('.js')) out.push(rel);
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(js|ts)$/.test(entry.name)) out.push(rel);
   }
   return out;
 }

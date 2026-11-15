@@ -139,7 +139,7 @@ test('shared-Modus: B sieht und bearbeitet A-Eintrag (Altverhalten)', async () =
 // Dritte Stufe: Betrag zaehlt, Zweck bleibt privat (#659)
 //
 // Diese Tests gehen bewusst ueber die ROUTEN und nicht ueber die Helfer aus
-// services/budget-visibility.js. Deren Suite pruefen die SQL-Fragmente und die
+// server/authorize/rows/budget.ts. Deren Suite pruefen die SQL-Fragmente und die
 // Maskierungsfunktion isoliert - waere das alles, bliebe ein Lesepfad, dem
 // jemand die Maskierung wieder herausnimmt, gruen. Die Maske muss dort sitzen,
 // wo die Antwort das Haus verlaesst.

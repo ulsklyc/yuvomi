@@ -722,6 +722,27 @@ test('403 ohne lesbaren Rumpf: kein Urteil ueber Rechte', async () => {
   );
 });
 
+// Phase 2, C2: jedes reine Admin-Gate antwortet mit EINER Absage, und die
+// traegt `reason: 'admin_required'`. Ohne Eintrag in REFUSAL_MESSAGES griffe
+// keiner der beiden Zweige in api.js, und die Seite zeigte den englischen Satz.
+test("403 mit reason 'admin_required': der allgemeine Satz in message UND data.error", async () => {
+  setup();
+  const body = { error: 'Admin access required.', code: 403, reason: 'admin_required' };
+  _mockFetch = () => mockResponse(403, body);
+  await assert.rejects(
+    () => api.get('/backup/status'),
+    (err) => {
+      assert.ok(err instanceof ApiError);
+      assert.equal(err.status, 403);
+      assert.equal(err.message, 'common.errorNoPermission', 'message');
+      assert.equal(err.data.error, 'common.errorNoPermission', 'data.error');
+      assert.equal(err.data.reason, 'admin_required', 'der Grund bleibt im Rumpf');
+      assert.equal(err.data.code, 403);
+      return true;
+    },
+  );
+});
+
 test('andere Statuscodes ohne reason behalten ihren Servertext', async () => {
   for (const [status, serverText] of [
     [400, 'Title is required.'], [404, 'Task not found.'], [409, 'Category already exists.'], [500, 'Internal server error.'],
@@ -864,9 +885,6 @@ const REASONS_WITHOUT_SENTENCE = new Set([
   // Fremde Terminserie (Einzelausnahme): der Grund reist als `reason: error.code`
   // durch eine Variable und fehlte dem Leser bis #1669. Der Servertext ist deutsch.
   'not_authorized',
-  // Haushaltsreihenfolge (#1644): das Blatt, das sie setzt, erreicht nur ein
-  // Administrator, und es zeigt bei jedem Scheitern seinen eigenen Satz.
-  'admin_required',
 ]);
 
 // ─── #1669: ein Grund, der durch eine Variable gereicht wird ────────────────
@@ -890,6 +908,10 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/calendar/subscriptions.js: assignees.reason', { sites: 3, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['services/calendar-occurrence-overrides.js: eligible ? null : \'ineligible_series\'', { sites: 1, at403: [],
     why: 'keine Antwort; wird zu error.code und reist mit 400' }],
+  // authorize() (phase 2 B2): the Verdict type and the allowed verdict. No response:
+  // in B2 every caller reads `allowed` only, no route sends the reason.
+  ['authorize/modules.ts: string | null', { sites: 1, at403: [], why: 'keine Antwort; Typ des Verdict von authorize()' }],
+  ['authorize/modules.ts: null', { sites: 1, at403: [], why: 'keine Antwort; das erlaubte Verdict von authorize()' }],
   ['routes/tasks.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
     why: 'displayActingPerson: 400 ohne Grund oder 403 mit diesem' }],
   ['routes/rewards.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
@@ -913,13 +935,19 @@ const REASONS_PASSED_THROUGH = new Map([
   // Die zweite Stelle ist die Logzeile daneben, keine Antwort.
   ['auth.js: err.reason', { sites: 2, at403: [], why: 'Gravatar-Import: 400/404/413/415/502 oder 500, nie 403' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  // MCP (#2616): KEINE Antwort, sondern der fuer das LLM sichtbare Text eines
+  // ToolError - `<error> [reason: <REASON>]`. Der Grund stammt aus der Antwort
+  // DER ROUTE, die ihn selbst als Literal sendet (jeder Status, 403 inbegriffen);
+  // diese Stelle haengt ihn nur an einen Satz an und sendet nichts.
+  ['mcp/tools.js: ${reason}', { sites: 1, at403: [],
+    why: 'keine Antwort; angehaengt an die Meldung eines ToolError, der Grund kommt aus der Routenantwort' }],
   ['routes/calendar/local-calendars.js: withReason.reason', { sites: 1, at403: [],
     why: 'sendValidationErrors: feste 400 (calendar_name_invalid)' }],
   // SMTP (Re-Critique 2026-10-17): die Absage beim Speichern und der Fall der
   // Testmail. Beides reist an einer festen 400 bzw. in einer 200, nie an 403.
   ['routes/email.js: refusal.reason', { sites: 1, at403: [], why: 'emailConfigRefusal: feste 400' }],
   ['services/email.js: smtpFailureReason(err)', { sites: 1, at403: [], why: 'sendTest: in der 200-Antwort von POST /email/test' }],
-  ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben traegt ein Literal' }],
+  ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben sendet refuseAdmin' }],
   // parseDataUrl (#1909): der Fall einer gewaehlten Datei (Typ, Inhalt, leer).
   ['routes/documents.js: parsed.reason', { sites: 1, at403: [], why: 'parseDataUrl: feste 400' }],
   // problemBody (#1909): der Grund einer Abo-Pruefung, nur bei genau einem Befund.
@@ -1015,7 +1043,8 @@ function nonLiteralReasonSites(root = serverRoot, source = null) {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) { walk(new URL(`${name}/`, dir), `${rel}${name}/`); continue; }
-      if (name.endsWith('.js')) scan(`${rel}${name}`, readFileSync(url, 'utf8'));
+      // .ts too: server/authorize/ is TypeScript, and sendNotOwner() builds a 403 with a reason there (B2).
+      if (/\.(js|ts)$/.test(name)) scan(`${rel}${name}`, readFileSync(url, 'utf8'));
     }
   }(root, ''));
   return sites;
@@ -1076,7 +1105,8 @@ function refusalReasonsAtTheServer() {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) { walk(new URL(`${name}/`, dir), `${rel}${name}/`); continue; }
-      if (!name.endsWith('.js')) continue;
+      // .ts too: sendNotOwner() in server/authorize/modules.ts sends `not_owner` (B2).
+      if (!/\.(js|ts)$/.test(name)) continue;
       const src = readFileSync(url, 'utf8');
       // `{ error: ..., code: 403, reason: 'x' }`, auch ueber mehrere Zeilen:
       // die Anweisung beginnt an der letzten Zeile mit `return` oder `const`.
@@ -1175,7 +1205,7 @@ test('jeder 403-Satz ohne reason sagt nur, dass die Berechtigung fehlt', () => {
       if (rel === '' && name === 'openapi') continue;
       const url = new URL(name, dir);
       if (statSync(url).isDirectory()) walk(new URL(`${name}/`, dir), `${rel}${name}/`);
-      else if (name.endsWith('.js')) files.push(`${rel}${name}`);
+      else if (/\.(js|ts)$/.test(name)) files.push(`${rel}${name}`);
     }
   }(serverRoot, ''));
 
@@ -1195,7 +1225,9 @@ test('jeder 403-Satz ohne reason sagt nur, dass die Berechtigung fehlt', () => {
       if (!PLAIN_REFUSALS.has(text)) unclassified.push(`${file}:${index + 1}: ${text}`);
     });
   }
-  assert.ok(found.length > 80, `zu wenige Absagen gelesen (${found.length}) - das Muster greift nicht mehr`);
+  // Phase 2, C2: die reinen Admin-Gates (rund 45 Zeilen) senden seither die
+  // eine Absage mit `reason` und zaehlen hier nicht mehr; gemessen 54 danach.
+  assert.ok(found.length > 45, `zu wenige Absagen gelesen (${found.length}) - das Muster greift nicht mehr`);
   assert.deepEqual(
     unclassified, [],
     'eine 403 ohne reason, deren Satz nicht als allgemein gefuehrt ist: entweder traegt sie eine Auskunft '

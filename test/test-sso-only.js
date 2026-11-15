@@ -509,7 +509,7 @@ test('die Sichtbarkeit von sso_only haengt am geltenden Zugang, nicht an der Ses
   // Feld; ein Mitglieds-Token neben einem Admin-Cookie bekaeme es zu Unrecht.
   const users = authSrc.slice(authSrc.indexOf("router.get('/users'"));
   const body = users.slice(0, users.indexOf("router.get('/api-tokens'"));
-  assert.match(body, /const isAdmin = req\.authRole === 'admin'/);
+  assert.match(body, /const isAdmin = isAdminRequest\(req\)/);
   assert.doesNotMatch(body, /req\.session\?\.role/,
     'die Session ist hier die falsche Quelle');
 });

@@ -8,6 +8,8 @@ import {
   categoryNameKey,
   NOTE_CATEGORY_NAME_MAX_LENGTH,
 } from '../../public/utils/note-category-name.js';
+// The visibility rule itself lives in server/authorize/rows/notes.ts (phase 2, B3).
+import { categoryVisibleTo, visibleWhere } from '../authorize/index.ts';
 export { categoryNameKey };
 
 export class NoteCategoryInputError extends Error {
@@ -34,7 +36,7 @@ export function listVisibleCategories(database, userId) {
   return database.prepare(`
     SELECT id, name, scope, owner_user_id, sort_order
     FROM note_categories
-    WHERE scope = 'household' OR (scope = 'personal' AND owner_user_id = ?)
+    WHERE ${visibleWhere('note_categories', '', '?')}
     ORDER BY CASE scope WHEN 'household' THEN 0 ELSE 1 END,
              sort_order ASC, name COLLATE NOCASE ASC, id ASC
   `).all(userId);
@@ -55,7 +57,7 @@ export function hydrateNotesWithCategories(database, notes, userId) {
       FROM note_category_assignments a
       JOIN note_categories c ON c.id = a.category_id
       WHERE a.note_id IN (${placeholders})
-        AND (c.scope = 'household' OR (c.scope = 'personal' AND c.owner_user_id = ?))
+        AND ${visibleWhere('note_categories', 'c', '?')}
       ORDER BY CASE c.scope WHEN 'household' THEN 0 ELSE 1 END,
                c.sort_order ASC, c.name COLLATE NOCASE ASC, c.id ASC
     `).all(...chunk, userId));
@@ -90,7 +92,7 @@ export function replaceEditableAssignments(database, {
     `).all(...ids);
     if (categories.length !== ids.length) throw new NoteCategoryInputError('Category is not available', 400, 'notes_selected_category_not_found');
     for (const category of categories) {
-      if (category.scope === 'personal' && Number(category.owner_user_id) !== Number(userId)) {
+      if (!categoryVisibleTo(category, userId)) {
         throw new NoteCategoryInputError('Category is not available', 400, 'notes_selected_category_not_found');
       }
     }
@@ -101,7 +103,7 @@ export function replaceEditableAssignments(database, {
       DELETE FROM note_category_assignments
       WHERE note_id = ? AND category_id IN (
         SELECT id FROM note_categories
-        WHERE owner_user_id = ? OR scope = 'household'
+        WHERE ${visibleWhere('note_categories', '', '?')}
       )
     `).run(noteId, userId);
     const insert = database.prepare(`

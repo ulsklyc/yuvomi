@@ -2136,7 +2136,8 @@ test('the currency list exists exactly once in the repo', async () => {
       if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
       const rel = `${dir}${entry.name}`;
       if (entry.isDirectory()) await walk(`${rel}/`);
-      else if (/\.(js|mjs)$/.test(entry.name)) files.push(rel);
+      // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+      else if (/\.(js|mjs|ts)$/.test(entry.name)) files.push(rel);
     }
   };
   await walk('public/');
@@ -3120,9 +3121,10 @@ test('S2: kein Link in App, Server oder Uebersetzung zeigt auf eine Adresse von 
       const child = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, url);
       if (skip.test(child.pathname)) continue;
       if (entry.isDirectory()) { await walk(child); continue; }
-      if (!/\.(js|json|html)$/.test(entry.name)) continue;
+      // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+      if (!/\.(js|ts|json|html)$/.test(entry.name)) continue;
       let text = await readFile(child, 'utf8');
-      if (entry.name.endsWith('.js')) text = withoutComments(text);
+      if (/\.(js|ts)$/.test(entry.name)) text = withoutComments(text);
       scanned += 1;
       for (const [path] of text.matchAll(/\/settings\/[a-z]+\/[a-z-]+/g)) {
         const where = child.pathname.replace(/^.*\/(public|server)\//, '$1/');

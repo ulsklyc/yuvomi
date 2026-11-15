@@ -1272,7 +1272,7 @@ test('der Hinweis in den Einstellungen nennt genau die Bereiche, die ein Display
   );
   assert.ok(DISPLAY_SCOPES.includes('dashboard:read'), 'Vorbedingung: die Uebersicht ist ein Scope - und wird trotzdem nicht aufgezaehlt');
 
-  // UND GEGEN DIE RECHTEAUFLOESUNG (server/permissions.js, Display-Zweig): was
+  // UND GEGEN DIE RECHTEAUFLOESUNG (server/authorize/catalog.ts, Display-Zweig): was
   // ein gekoppeltes Geraet dort als lesbares Modul bekommt, steht im Hinweis.
   const created = await admin('POST', '/displays', { display_name: 'Bereichsprobe' });
   const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});

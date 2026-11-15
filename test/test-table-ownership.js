@@ -33,7 +33,7 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 const db = await import('../server/db.js');
 // Creates `sessions` on import, as the server does at start.
 await import('../server/auth.js');
-const { PERMISSION_MODULES } = await import('../server/permissions.js');
+const { PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 const { OWNERS, TABLE_OWNERS } = await import('../server/table-owners.ts');
 
 /** @returns {string[]} every table and view of the main schema, without sqlite_* */

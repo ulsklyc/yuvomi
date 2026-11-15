@@ -10,7 +10,7 @@
  * Diese Routen nehmen deshalb acht Zahlen entgegen und rechnen nur eines: die
  * Summe dessen, was schon dasteht.
  *
- * Sichtbarkeit/Betreuung folgen dem Muster von prevention.js - `helpers.js` ist
+ * Sichtbarkeit/Betreuung folgen dem Muster von prevention.js - `authorize/care.ts` ist
  * die einzige Stelle, an der die Klausel gebaut werden darf (#884). Der
  * Unterschied zu allen aelteren Bereichen ist das Vokabular: diese Tabelle
  * fuehrt `private` und `all`, den kanonischen Satz aus Abschnitt 5, und nicht
@@ -26,10 +26,11 @@ import {
   NUTRIENT_KEYS, MEAL_TYPES, nutritionTargetFor, nutritionSummaryFor,
 } from '../../services/health-nutrition.js';
 import {
-  log, NUTRITION_VISIBILITIES, OPEN_ALL,
-  viewerId, careAwareClause, applyUpdate, badRequest,
-  resolveOwner, writableClause, canWriteFor, wallClockInput,
+  log, NUTRITION_VISIBILITIES,
+  viewerId, applyUpdate, badRequest,
+  resolveOwner, wallClockInput,
 } from './helpers.js';
+import { canWriteFor, careAwareClause, OPEN_ALL, writableClause } from '../../authorize/index.ts';
 
 const router = express.Router();
 
@@ -68,7 +69,7 @@ function readNutrients(body) {
 
 /** Darf `viewer` das Ziel von `ownerId` sehen? Eigenes plus jedes betreute. */
 function mayReadTarget(viewer, ownerId) {
-  return canWriteFor(viewer, ownerId);
+  return canWriteFor(db.get(), viewer, ownerId);
 }
 
 // --------------------------------------------------------

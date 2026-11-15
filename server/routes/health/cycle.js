@@ -39,9 +39,10 @@ import {
 } from '../../../public/utils/health-cycle.js';
 import {
   log, VISIBILITIES, FLOW_LEVELS,
-  viewerId, visibilityClause, toBit, applyUpdate, badRequest,
+  viewerId, toBit, applyUpdate, badRequest,
   exportFilename, sendCsv, exportRange,
 } from './helpers.js';
+import { visibilityClause } from '../../authorize/index.ts';
 
 const router = express.Router();
 

@@ -78,7 +78,8 @@ function routeFiles(dir = ROUTES, prefix = '') {
   return readdirSync(dir).flatMap((name) => {
     const url = new URL(name, dir);
     if (statSync(url).isDirectory()) return routeFiles(new URL(`${name}/`, dir), `${prefix}${name}/`);
-    return name.endsWith('.js') ? [{ rel: `${prefix}${name}`, url }] : [];
+    // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+    return /\.(js|ts)$/.test(name) ? [{ rel: `${prefix}${name}`, url }] : [];
   });
 }
 
