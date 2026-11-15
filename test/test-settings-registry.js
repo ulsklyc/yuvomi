@@ -54,12 +54,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
+import { tempDir } from './tmp-dir.js';
 import EXPECTED_JSON from './settings-registry-expected.json' with { type: 'json' };
 
 /** @type {any} Recorded answers, read by case name and role. */
@@ -1126,7 +1126,7 @@ test('registry: the answers keep the field ORDER recorded from the route before 
  * @param {string} file from the repository root
  */
 function filesAfterImport(file) {
-  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-settings-leaf-'));
+  const dir = tempDir('yuvomi-settings-leaf-');
   try {
     const url = pathToFileURL(fileURLToPath(new URL(`../${file}`, import.meta.url))).href;
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(url)});`], {
