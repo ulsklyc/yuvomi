@@ -51,7 +51,7 @@ import { expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS } 
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { notCancelledEventSql } from './reminder-deleted-occurrence.js';
-import { visibleWhere } from '../authorize/index.ts';
+import { taskVisibleWhere, visibleWhere } from '../authorize/index.ts';
 import { hasExplicitZone, householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
 import { DEFAULT_OVERDUE_GRACE_DAYS } from '../settings/values.ts';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
@@ -249,13 +249,17 @@ export const COUNTDOWN_MODULES = COUNTDOWN_SOURCES.map((source) => source.module
  *        entzogen sind (`access_permissions`, #467) - eine andere Achse als die
  *        haushaltweite Abschaltung unten, die dieselbe Antwort verdient.
  * @param {number} [opts.limit]
+ * @param {import('../authorize/index.ts').TaskReader | null} [opts.taskReader] der Leser der
+ *        Anfrage (taskReader in server/authorize) for the task countdowns only: a
+ *        paired display reads them under the wall rule. Without it the person rule
+ *        for `userId` applies, so existing callers keep their answer.
  * @returns {{items: Array<{source: 'event'|'task'|'document', id: number, title: string,
  *                  date: string, days_until: number, icon: string|null,
  *                  color: string|null, recurring: boolean,
  *                  person_name?: string|null}>, total: number}}
  */
 export function getCountdowns(d, {
-  userId = null, todayKey, hiddenModules = null, limit = DEFAULT_LIMIT,
+  userId = null, todayKey, hiddenModules = null, limit = DEFAULT_LIMIT, taskReader = null,
 } = {}) {
   /* EIN ABGESCHALTETES MODUL LIEFERT HIER GAR NICHTS MEHR (Review zu PR #793).
    *
@@ -287,7 +291,7 @@ export function getCountdowns(d, {
   const graceDays = overdueGraceDays(d);
   const items = COUNTDOWN_SOURCES
     .filter((source) => !hidden.has(source.module))
-    .flatMap((source) => source.read(d, { userId, todayKey, graceDays, hidden }));
+    .flatMap((source) => source.read(d, { userId, todayKey, graceDays, hidden, taskReader }));
 
   const sorted = items
     // Nächstes zuerst - überfällige also ganz oben, weil ihre Tageszahl negativ
@@ -407,7 +411,12 @@ function eventCountdowns(d, { userId, todayKey, graceDays, hidden }) {
   return out;
 }
 
-function taskCountdowns(d, { userId, todayKey, graceDays }) {
+/**
+ * @param {any} d
+ * @param {{ userId: any, todayKey: string, graceDays: number,
+ *           taskReader?: import('../authorize/index.ts').TaskReader | null }} opts
+ */
+function taskCountdowns(d, { userId, todayKey, graceDays, taskReader }) {
   // Eine erledigte oder abgelegte Aufgabe zählt nicht mehr herunter: bei einer
   // wiederkehrenden hat das Abhaken die NÄCHSTE Instanz schon erzeugt (die dann
   // ihrerseits hier steht), und eine abgelegte ist aus dem Lauf genommen -
@@ -418,6 +427,9 @@ function taskCountdowns(d, { userId, todayKey, graceDays }) {
   // Wiederkehrende sind ausgenommen - für sie hat das Abhaken ein nächstes Mal,
   // sie laufen nicht ab.
   const floor = shiftKey(todayKey, -graceDays) ?? todayKey;
+  // A paired display reads under the wall rule (taskReader), everyone else under
+  // the task row rule for `userId`.
+  const reader = taskReader ?? { userId, wall: false };
   const rows = d.prepare(`
     SELECT t.id, t.title, t.due_date, t.is_recurring, t.recurrence_from_completion
     FROM tasks t
@@ -426,8 +438,8 @@ function taskCountdowns(d, { userId, todayKey, graceDays }) {
       AND t.archived_at IS NULL
       AND t.due_date IS NOT NULL
       AND t.due_date >= CASE WHEN t.is_recurring = 1 THEN @today ELSE @floor END
-      AND ${visibleWhere('tasks', 't', '@me')}
-  `).all({ today: todayKey, floor, me: userId });
+      AND ${taskVisibleWhere(reader, 't')}
+  `).all({ today: todayKey, floor, me: reader.userId });
 
   const out = [];
   for (const row of rows) {

@@ -35,15 +35,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zones changes to summer time, it shows the configured value (`BACKUP_SCHEDULE=0 2 * * *`)
   instead.
 - **A wall display reads only the tasks the whole household sees.** The task list, a single
-  task with its subtasks, its comments, its history and the household's completion feed
-  (`GET /api/v1/tasks`, `/tasks/:id`, `/tasks/:id/comments`, `/tasks/:id/completions`,
-  `/tasks/completions`) asked a paired display the same question as a person, so a task or
-  subtask shared only with its assignees would show on the wall if the display itself was
-  assigned, while ticking it off there answered "not found". Every one of these reads now
-  follows the same wall rule: such a task answers "not found" like an unknown one, and the
-  list, its subtask counts and the feeds leave it out, also for every earlier instance of a
-  repeating task. Nothing changes for people. In the app this state could not be reached: a
-  display is never offered as an assignee, and the server refuses it as one.
+  task with its subtasks, its comments, its linked documents, its history, the household's
+  completion feed, the tag lists, the task parts of the overview and the task named by a
+  points entry (`GET /api/v1/tasks`, `/tasks/:id`, `/tasks/:id/comments`,
+  `/tasks/:id/documents`, `/tasks/:id/completions`, `/tasks/completions`, `/tasks/tags`,
+  `/tasks/meta/options`, `/dashboard` without `audience=household`, `/rewards/ledger`) asked a
+  paired display the same question as a person, so a task or subtask shared only with its
+  assignees would show on the wall if the display itself was assigned, while ticking it off
+  there answered "not found". Every one of these reads now follows the same wall rule: such a
+  task answers "not found" like an unknown one, also where a household task answers "no
+  access to documents", and the list, its subtask counts, the feeds, the tags, the overview
+  with its counts and countdowns leave it out, also for every earlier instance of a repeating
+  task; a points entry keeps its row and its points, only without the task's name. Nothing
+  changes for people. In the app this state could not be reached: a display is never offered
+  as an assignee, and the server refuses it as one.
 
 ## [2.90.0] - 2026-11-14
 
