@@ -89,10 +89,8 @@ function routeFiles(dir = ROUTES, prefix = '') {
 /** Datei -> ihre deutschen Stellen. */
 function germanByFile() {
   const out = new Map();
-  const files = [
-    ...routeFiles(),
-    ...routeFiles(SETTINGS).map((file) => ({ ...file, rel: `../settings/${file.rel}` })),
-  ];
+  const files = routeFiles();
+  for (const { rel, url } of routeFiles(SETTINGS)) files.push({ rel: `../settings/${rel}`, url });
   for (const { rel, url } of files) {
     const hits = outboundLiterals(readFileSync(url, 'utf8'))
       .map((lit) => ({ ...lit, word: germanIn(lit.text) }))

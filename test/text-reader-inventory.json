@@ -9,7 +9,7 @@
   "test-account-password-card.js": {"class":"M","sBlocks":3,"targets":["public/settings/pages/personal-account.js","public/settings/shell.js","server/auth.js"],"fate":"falls-with:public/settings/pages/personal-account.js"},
   "test-admin-gates.js": {"class":"V","sBlocks":0,"targets":["server/"],"fate":"stays:coupling"},
   "test-after-response-jobs.js": {"class":"M","sBlocks":2,"targets":["server/"],"fate":"falls-with:server/"},
-  "test-api-error-language.js": {"class":"M","sBlocks":3,"targets":["server/routes/"],"fate":"falls-with:server/routes/"},
+  "test-api-error-language.js": {"class":"M","sBlocks":3,"targets":["server/routes/","server/settings/"],"fate":"falls-with:server/routes/"},
   "test-api-token-defaults.js": {"class":"M","sBlocks":2,"targets":["public/settings/pages/admin-api.js"],"fate":"falls-with:public/settings/pages/admin-api.js"},
   "test-api-token-remove.js": {"class":"M","sBlocks":2,"targets":["public/settings/pages/admin-api.js","public/settings/pages/admin-displays.js"],"fate":"falls-with:public/settings/pages/admin-api.js"},
   "test-api-token-subject.js": {"class":"M","sBlocks":1,"targets":["public/settings/pages/admin-api.js"],"fate":"falls-with:public/settings/pages/admin-api.js"},
