@@ -49,6 +49,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   task; a points entry keeps its row and its points, only without the task's name. Nothing
   changes for people. In the app this state could not be reached: a display is never offered
   as an assignee, and the server refuses it as one.
+- **A wall display reads only the events the whole household sees.** The calendar, the next
+  events, the event search, a single event, the event count and the synced calendars of the
+  calendar list, and the event parts of the overview without `audience=household` showed a
+  display an event shared only with its assignees if the display itself was assigned. They
+  now follow the same wall rule as the tasks: such an event answers "not found" like an
+  unknown one and stays off every list, count and countdown. Nothing changes for people, and
+  as with the tasks the state could not be reached in the app.
 
 ## [2.90.0] - 2026-11-14
 

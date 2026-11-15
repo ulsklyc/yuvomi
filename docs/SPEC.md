@@ -3221,8 +3221,16 @@ where a household task answers the 403 `cross_module_access` of a reader without
 lists, the counts and the feeds leave it out, even for a task that names the display as an assignee (a state the app cannot
 produce: a display is never offered or accepted as an assignee). The history covers every entry of
 the answer, so an earlier instance of a repeating task that the household does not see stays off
-the wall too. One function in `server/authorize/` picks the rule per request (`taskReader`: the wall
-rule for a paired display, the task row rule for everyone else). Deciding a redemption stays wherever the
+the wall too. The same holds for every event the display reads: the calendar range
+(`GET /api/v1/calendar`), the next events (`/calendar/upcoming`), the event search
+(`/calendar/search`), a single event (`/calendar/{id}`, the same 404 as an unknown one), the event
+count and the synced calendars of `/calendar/calendars`, and the event parts of the overview with
+or without `audience=household` (`upcomingEvents`, `weekEvents`, `familyEvents`, the event
+countdowns) show a display only events with visibility `all` from a local or synced calendar or a
+shared subscription - the answer `audience=household` already gave. One function in
+`server/authorize/` picks the rule per request (`rowReader`, `rows/reader.ts`, with `taskReader` as
+its task name: the wall rule for a paired display, the row rule of the type for everyone else).
+Deciding a redemption stays wherever the
 household put it (`rewards_require_approval`) - the display asks, it never approves.
 
 `GET /api/v1/displays/people` fills the picker: household members with name, colour and picture,
