@@ -53,6 +53,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
 import EXPECTED_JSON from './settings-registry-expected.json' with { type: 'json' };
@@ -1064,6 +1069,67 @@ test('registry: the answers keep the field ORDER recorded from the route before 
     const put = await http('PUT', '/api/v1/preferences', { headers: HEADERS[role], body: {} });
     assert.deepEqual(Object.keys(put.body.data), Object.keys(EXPECTED.putBaseline[role]), `PUT ${role}`);
   }
+});
+
+/**
+ * Imports `file` in a fresh process whose DB_PATH points into an empty
+ * directory and returns what is in it afterwards: server/db.js opens (and
+ * creates) its database on import, so any file there means db.js was loaded.
+ * @param {string} file from the repository root
+ */
+function filesAfterImport(file) {
+  const dir = mkdtempSync(join(tmpdir(), 'yuvomi-settings-leaf-'));
+  try {
+    const url = pathToFileURL(fileURLToPath(new URL(`../${file}`, import.meta.url))).href;
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(url)});`], {
+      env: { ...process.env, DB_PATH: join(dir, 'never.db'), LOG_LEVEL: 'error', DB_ENCRYPTION_AUTO_KEY: 'false' },
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, `import of ${file} failed:\n${run.stderr}`);
+    return readdirSync(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('registry: the probe sees a database - importing server/db.js creates one', () => {
+  assert.ok(filesAfterImport('server/db.js').includes('never.db'));
+});
+
+test('registry: importing server/settings/registry.ts opens no database (a leaf, the connection is a parameter)', () => {
+  assert.deepEqual(filesAfterImport('server/settings/registry.ts'), []);
+});
+
+test('registry: the route reads and writes no setting itself - every sync_config statement of GET and PUT comes from elsewhere', async () => {
+  // The calls are watched on the connection itself: each statement that names
+  // sync_config is attributed to the frame that prepared it. A statement prepared
+  // in server/routes/preferences.js is the route reaching past the registry.
+  const ROUTE = fileURLToPath(new URL('../server/routes/preferences.js', import.meta.url));
+  const original = db.prepare;
+  /** @type {string[]} */
+  const callers = [];
+  db.prepare = function prepare(/** @type {string} */ sql) {
+    if (/sync_config/.test(sql)) {
+      const frame = (new Error().stack ?? '').split('\n')[2] ?? '';
+      callers.push(frame.replace(/^\s*at\s+/, ''));
+    }
+    return original.call(this, sql);
+  };
+  try {
+    restore();
+    applySeed(GET_STATES.valid.seed, 'admin');
+    for (const role of ['admin', 'member', 'display']) {
+      assert.equal((await http('GET', '/api/v1/preferences', { headers: HEADERS[role] })).status, 200);
+    }
+    const everyField = { .../** @type {object} */ (PUT_CASES.find((c) => c.name === 'mixed: all member fields at once')?.body),
+      timezone: 'Europe/Berlin', timezone_hint_dismissed: true, holiday_country: 'DE', weather_user: { city: 'X' },
+      disabled_modules: ['budget'], health_prevention_notify_caregivers: false, schedule_hidden_templates: ['work'] };
+    assert.equal((await http('PUT', '/api/v1/preferences', { headers: HEADERS.admin, body: everyField })).status, 200);
+  } finally {
+    db.prepare = original;
+  }
+  assert.ok(callers.length >= 50, `only ${callers.length} sync_config statements seen - the probe does not reach the route`);
+  assert.deepEqual(callers.filter((frame) => frame.includes(ROUTE)), []);
 });
 
 test('registry: readSettings and readSetting answer what GET answered on the recorded states (but the route views)', () => {

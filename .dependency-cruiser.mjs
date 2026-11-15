@@ -205,6 +205,17 @@ export default {
       to: { path: '^server/db\\.[jt]s$', reachable: true },
     },
     {
+      name: 'settings-is-a-leaf',
+      comment: 'server/settings/ (the settings registry, phase 2, C3) is a leaf under the services: it imports no '
+        + 'service, no route and not server/db.js - the connection is a parameter, the side effects of a write come '
+        + 'in as `effects`. So every service may ask it without closing a cycle. The one file under services/ it may '
+        + 'import is module-capabilities.js, the pure widget-id grammar (no import but node:path). '
+        + 'test:settings-registry holds that importing the registry opens no database.',
+      severity: 'error',
+      from: { path: '^server/settings/' },
+      to: { path: '^server/(routes/|services/|db\\.[jt]s$)', pathNot: '^server/services/module-capabilities\\.[jt]s$' },
+    },
+    {
       name: 'rights-only-through-authorize',
       comment: 'A rights predicate has exactly one door (phase 2, F2): outside server/authorize/ a module imports '
         + 'only server/authorize/index.ts, never an inner seam (actor, catalog, modules, care, rows/). '
