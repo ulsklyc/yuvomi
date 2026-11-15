@@ -740,6 +740,54 @@ for (const { name, body, seed = {} } of PUT_CASES) {
   }
 }
 
+// The order in which the route checks the fields, measured from the handler
+// before C3 (b7a78addd): the two early fields first, then the handler's blocks
+// top to bottom. Fields without a 400 (`calendar_default_assign_me`,
+// `weather_city`) have no place in a pair and are left out. For every two
+// neighbours, a patch with both invalid answers with the first one's refusal -
+// so a swap of any two neighbours is red, not only the pairs named above.
+const CHECK_ORDER = [
+  'schedule_hidden_templates', 'timezone_hint_dismissed',
+  'visible_meal_types', 'meal_type_names', 'currency', 'date_format', 'time_format', 'week_start',
+  'budget_mode', 'region', 'timezone', 'language', 'app_name',
+  'dashboard_widgets', 'dashboard_widgets_phone', 'dashboard_today_glance',
+  'dashboard_widgets_default', 'dashboard_today_glance_default',
+  'disabled_modules', 'hidden_modules', 'module_order', 'mobile_nav_order',
+  'housekeeping_payment_tasks', 'calendar_default_duration', 'calendar_default_reminders',
+  'calendar_default_target', 'tasks_default_target', 'tasks_default_visibility', 'tasks_default_locked',
+  'health_cycle_enabled', 'health_cycle_enabled_user', 'health_prevention_notify_caregivers',
+  'rewards_require_approval', 'tasks_subtasks_expanded', 'tasks_default_points', 'tasks_late_decay_enabled',
+  'countdown_grace_days',
+  'weather_provider', 'weather_lat', 'weather_lon', 'weather_units', 'weather_auto_locate', 'weather_user',
+  'holiday_country', 'holiday_subdivision', 'holiday_group', 'holiday_show_public', 'holiday_show_school',
+  'holiday_public_color', 'holiday_school_color',
+];
+
+/** The first recorded single-field case of `field` that the admin got a 400 for. */
+function invalidCase(/** @type {string} */ field) {
+  return PUT_CASES.find((c) => !Array.isArray(c.body) && Object.keys(/** @type {object} */ (c.body)).length === 1
+    && field in /** @type {object} */ (c.body) && !c.seed && EXPECTED.put[c.name]?.admin.status === 400);
+}
+
+test('order: for every two neighbours in the check order, the first one\'s refusal wins (admin)', async () => {
+  assert.equal(new Set(CHECK_ORDER).size, CHECK_ORDER.length);
+  const mismatches = [];
+  for (let i = 0; i + 1 < CHECK_ORDER.length; i += 1) {
+    const [first, second] = [invalidCase(CHECK_ORDER[i]), invalidCase(CHECK_ORDER[i + 1])];
+    assert.ok(first && second, `a 400 case for ${CHECK_ORDER[i]} and ${CHECK_ORDER[i + 1]}`);
+    restore();
+    const before = snapshot();
+    const body = { .../** @type {object} */ (second.body), .../** @type {object} */ (first.body) };
+    const res = await http('PUT', '/api/v1/preferences', { headers: HEADERS.admin, body });
+    const want = EXPECTED.put[first.name].admin.body;
+    if (res.status !== 400 || JSON.stringify(res.body) !== JSON.stringify(want)) {
+      mismatches.push(`${CHECK_ORDER[i]} before ${CHECK_ORDER[i + 1]}: ${res.status} ${JSON.stringify(res.body)}`);
+    }
+    assert.deepEqual(rowDiff(before, snapshot()), {}, 'a refused patch writes nothing');
+  }
+  assert.deepEqual(mismatches, []);
+});
+
 test('the empty-patch answer is the GET answer without weather_source and screensaver_enabled', async () => {
   for (const role of ['admin', 'member']) {
     restore();
