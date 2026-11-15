@@ -3210,9 +3210,15 @@ transition into `done` is allowed; taking it back reverses points and discards a
 follow-up, and corrections stay with the household. The same wall rule holds for every task the
 display reads: the list (`GET /api/v1/tasks`, with its subtasks, subtask counts and progress), a
 single task with its subtasks (`GET /api/v1/tasks/{id}`), its comments (`/comments`), its history
-(`/completions`) and the household feed (`GET /api/v1/tasks/completions`) show a display only tasks
-with visibility `all`. A task by id answers the same 404 as an unknown one, the list and the feeds
-leave it out, even for a task that names the display as an assignee (a state the app cannot
+(`/completions`), its linked documents (`/documents`), the household feed
+(`GET /api/v1/tasks/completions`), the tag lists (`GET /api/v1/tasks/tags` and the `tags` of
+`/tasks/meta/options`), the task parts of the overview (`GET /api/v1/dashboard` with or without
+`audience=household`: `urgentTasks`, the task counts, `memberTodayTasks`, `wallTasks` and the task
+countdowns) and the task reference of a points entry (`GET /api/v1/rewards/ledger`: `task_id`,
+`reason`, `decay_days`, `base_points`; the row and its points stay) show a display only tasks
+with visibility `all`. A task by id answers the same 404 as an unknown one, also on `/documents`,
+where a household task answers the 403 `cross_module_access` of a reader without documents; the
+lists, the counts and the feeds leave it out, even for a task that names the display as an assignee (a state the app cannot
 produce: a display is never offered or accepted as an assignee). The history covers every entry of
 the answer, so an earlier instance of a repeating task that the household does not see stays off
 the wall too. One function in `server/authorize/` picks the rule per request (`taskReader`: the wall
