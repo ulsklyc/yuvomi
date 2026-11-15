@@ -35,6 +35,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, posix, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withoutCommentsKeepingLines } from './source-text.js';
+import { settingsCatalog } from '../server/settings/registry.ts';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -102,6 +103,11 @@ function collectMounts() {
   return expanded;
 }
 
+/** Schreibt das Einstellungs-Register (server/settings/registry.ts) irgendein
+ *  Feld pro Nutzer? Ein Handler, der ueber `writeSettings(` schreibt, arbeitet
+ *  dann pro Nutzer - wie frueher einer mit `cfgUserSet(` im Text (Phase 2, C3). */
+const REGISTRY_WRITES_PER_USER = settingsCatalog().some((e) => e.write !== 'none' && e.scope === 'personal');
+
 /** Alle Handler mit vollem Pfad, Admin-Gate und Nutzerbezug. Geschnitten wird
  *  an den Handler-Grenzen, nie auf eine feste Laenge. */
 function collectHandlers() {
@@ -122,7 +128,8 @@ function collectHandlers() {
         path,
         // `requireAdmin` steht in der Argumentliste, nicht irgendwo im Koerper.
         gated: /requireAdmin/.test(block.slice(0, 200)),
-        perUser: /getUserId\(req\)|cfgUserSet\(/.test(block),
+        perUser: /getUserId\(req\)|cfgUserSet\(/.test(block)
+          || (REGISTRY_WRITES_PER_USER && /\bwriteSettings\(/.test(block)),
         file: mount.file,
       });
     });
@@ -198,34 +205,42 @@ test('kein adminOnly-Blatt bedient einen ungegateten per-Nutzer-Endpunkt', () =>
 // muesste ihn entweder ganz durchwinken oder jedes Blatt melden, das ihn
 // benutzt; beides waere wertlos.
 //
-// Gemessen wird deshalb `cfgUserSet('<key>')` in server/routes/preferences.js -
-// das IST die Definition von "wirkt pro Nutzer" - gegen die Schluessel, die ein
-// adminOnly-Blatt schickt. Die Blaetter rufen ueber `savePreferences()` aus
-// dem preferences-cache, nicht direkt ueber `api.put`; wer nur nach `api.put`
-// sucht, ist fuer sie blind, ohne es zu merken.
+// Gemessen wird deshalb die Reichweite (`scope`) jedes Feldes im Katalog des
+// Einstellungs-Registers (server/settings/registry.ts, Phase 2, C3) - das IST
+// die Definition von "wirkt pro Nutzer" - gegen die Felder, die ein
+// adminOnly-Blatt schickt. Bis C3 las der Guard dafuer `cfgUserSet('<key>')`
+// aus dem Text der Route; seitdem schreibt die Route nichts mehr selbst, und
+// der Katalog sagt es als Daten. Die Blaetter rufen ueber `savePreferences()`
+// aus dem preferences-cache, nicht direkt ueber `api.put`; wer nur nach
+// `api.put` sucht, ist fuer sie blind, ohne es zu merken.
 
-/** Nur Schluessel, die AUSSCHLIESSLICH pro Nutzer abgelegt werden.
+/** Die FELDER, die das Register pro Nutzer schreibt (`scope: 'personal'`).
  *
- *  Wetter und der Zyklus-Schalter kennen beide Wege: derselbe Name landet je
- *  nach Zweig in `cfgSet` (Haushalt) oder `cfgUserSet` (ich), und beim Wetter
- *  entscheidet darueber ein verschachteltes `weather_user`-Objekt im Request.
- *  Fuer die sagt der Schluesselname allein nichts, und ein Guard, der sie
- *  mitzaehlt, meldet das Haushalts-Wetterblatt als Verstoss - das war der
- *  erste Lauf dieser Sonde. Sie sind deshalb keine Ausnahmeliste, sondern eine
- *  KATEGORIE: was beide Wege kennt, ist kontextabhaengig und hier nicht
- *  entscheidbar. */
+ *  Wetter und der Zyklus-Schalter kennen in der ABLAGE beide Wege: derselbe
+ *  Schluessel liegt fuer den Haushalt (`weather_lat`) und je Konto
+ *  (`weather_lat:user:<id>`). Solange der Guard Ablageschluessel aus dem
+ *  Routentext las, sagte der Name allein dort nichts - ein Guard, der sie
+ *  mitzaehlte, meldete das Haushalts-Wetterblatt als Verstoss (der erste Lauf
+ *  dieser Sonde), also blieben sie als KATEGORIE aussen vor. Der Katalog
+ *  fuehrt FELDER: `weather_lat` ist Haushalt, `weather_user` ist persoenlich,
+ *  `health_cycle_enabled` Haushalt, `health_cycle_enabled_user` persoenlich -
+ *  eindeutig, und damit zaehlen sie jetzt mit. `ambiguous` misst weiter die
+ *  Ablageschluessel, die beide Wege kennen, damit ihr Wachsen sichtbar bleibt. */
 function personalPreferenceKeys() {
-  const src = read('server/routes/preferences.js');
-  const perUser = new Set([...src.matchAll(/cfgUserSet\(\s*'([a-z_]+)'/g)].map((m) => m[1]));
-  const household = new Set([...src.matchAll(/cfgSet\(\s*'([a-z_]+)'/g)].map((m) => m[1]));
+  const writable = settingsCatalog().filter((e) => e.write !== 'none');
+  const ownKey = /:user:<id>$/;
+  const perUser = new Set(writable.filter((e) => e.scope === 'personal')
+    .flatMap((e) => e.storage.filter((k) => ownKey.test(k)).map((k) => k.replace(ownKey, ''))));
+  const household = new Set(writable.filter((e) => e.scope !== 'personal')
+    .flatMap((e) => e.storage.filter((k) => !k.includes(':user:'))));
   const ambiguous = [...perUser].filter((k) => household.has(k));
-  return { keys: new Set([...perUser].filter((k) => !household.has(k))), ambiguous };
+  return { keys: new Set(writable.filter((e) => e.scope === 'personal').map((e) => e.field)), ambiguous };
 }
 
 test('kein adminOnly-Blatt schreibt eine per-Nutzer-Preference', () => {
   const { keys: personal, ambiguous } = personalPreferenceKeys();
   assert.ok(personal.size >= 4,
-    `nur ${personal.size} eindeutig persoenliche Schluessel gefunden - cfgUserSet trifft nicht mehr`);
+    `nur ${personal.size} persoenliche Felder im Katalog gefunden - der Katalog traegt keine Reichweite mehr`);
   // Waechst diese Menge, verliert der Guard still an Reichweite: jeder
   // kontextabhaengige Schluessel ist einer, ueber den er nichts sagen kann.
   assert.ok(ambiguous.length <= 6,
@@ -248,7 +263,7 @@ test('kein adminOnly-Blatt schreibt eine per-Nutzer-Preference', () => {
     scanned++;
     for (const key of src.matchAll(/(?:^|[{,\s])([a-z_]{3,})\s*:/gm)) {
       if (personal.has(key[1])) {
-        violations.push(`${leaf.id} schreibt '${key[1]}' - die Route legt den Wert per cfgUserSet pro Nutzer ab`);
+        violations.push(`${leaf.id} schreibt '${key[1]}' - das Register legt den Wert pro Nutzer ab (scope: personal)`);
       }
     }
   }

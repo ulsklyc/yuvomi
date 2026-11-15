@@ -35,7 +35,7 @@ const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 // gegen einen Stand, der die Exporte noch nicht hat (Gegenprobe gegen main),
 // und nur der Guard wird rot statt der ganzen Datei.
 const remindersModule = await import('../server/routes/reminders.js');
-const preferencesModule = await import('../server/routes/preferences.js');
+const settingsValues = await import('../server/settings/values.ts');
 const { processDueNotifications } = await import('../server/services/notifications.js');
 const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
 const { syncAllBirthdayReminders } = await import('../server/services/birthdays.js');
@@ -419,7 +419,7 @@ test('jede Herkunft, die die Datenbank annimmt, steht in ORIGIN_MODULE und zeigt
   assert.deepEqual(unmapped, [],
     'Herkunft ohne Modul in server/services/reminder-origins.js - sie faellt still aus /pending');
 
-  const toggleable = preferencesModule.TOGGLEABLE_MODULES;
+  const toggleable = settingsValues.TOGGLEABLE_MODULES;
   assert.ok(Array.isArray(toggleable) && toggleable.includes('birthdays'), 'TOGGLEABLE_MODULES ist nicht exportiert');
   const unswitchable = Object.entries(ORIGIN_MODULE).filter(([, moduleKey]) => !toggleable.includes(moduleKey));
   assert.deepEqual(unswitchable, [],
