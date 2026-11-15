@@ -50,7 +50,7 @@ const { installMiniDom } = await import('./mini-dom.js');
 installMiniDom();
 
 const serverScopes = await import('../server/scopes.js');
-const serverPerms = await import('../server/permissions.js');
+const serverPerms = await import('../server/authorize/index.ts');
 const { setPermissions, clearPermissions, isNavModuleReadOnly } = await import('../public/permissions.js');
 const access = await import('../public/utils/module-access.js');
 const fab = await import('../public/utils/fab.js');
@@ -184,7 +184,7 @@ test('Helfer: fuer das eigene Modul gleichwertig zu isNavModuleReadOnly()', () =
 test('Helfer: `dashboard` ist kein Rechte-Modul und sperrt nichts', () => {
   // Das strengste Mitglied: jedes Rechte-Modul auf `none`. Die Kachelreihe der
   // Uebersicht (`/quick-links`) und die Uebersicht selbst liegen trotzdem nicht
-  // darunter - server/permissions.js fuehrt `dashboard` nicht, und
+  // darunter - server/authorize/catalog.ts fuehrt `dashboard` nicht, und
   // moduleAccessVerdict() laesst ein nicht genanntes Modul durch. Ein Helfer,
   // der „nicht in der Payload" als `none` liest (die Allowlist-Reflexe aus
   // anderen Stellen), wuerde hier den Quick-Links-Verwalter sperren.

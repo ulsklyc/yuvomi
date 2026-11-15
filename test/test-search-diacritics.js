@@ -29,7 +29,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 // Prerequisite-Chain: 77 liest beim Rebuild index-weit aus allen Modul-Tabellen
 // (Health v65/66, Event-location v76). Das konsolidierte Test-Schema führt
 // shopping_items.notes bereits in der Basis, daher kein separates v68 nötig.
-for (const v of [1, 44, 65, 66, 76, 77]) db.exec(MIGRATIONS_SQL[v]);
+for (const v of [1, 44, 65, 66, 76, 77, 130]) db.exec(MIGRATIONS_SQL[v]);
 // Der Events-Bucket von runSearch() filtert seit dem #1055-Review nach Abo und
 // Sichtbarkeit und braucht dafuer ics_subscriptions (Migration 10) und die
 // Spalte subscription_id - wie in test-search.js.

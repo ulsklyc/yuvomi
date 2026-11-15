@@ -634,7 +634,7 @@ test('DELETE /pantry/products/:id: a product with batches is refused with 409 an
 
 test('DELETE /pantry/products/:id: behind the pantry write permission, like the delete of a batch', async () => {
   const { sessionModuleAccessRequirement, tokenAccessRequirement } = await import('../server/scopes.js');
-  const { moduleAccessVerdict, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED } = await import('../server/permissions.js');
+  const { moduleAccessVerdict, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED } = await import('../server/authorize/index.ts');
   // Both gates in server/index.js ask these two functions, at the path below /api/v1.
   for (const ask of [sessionModuleAccessRequirement, tokenAccessRequirement]) {
     assert.deepEqual(ask('/pantry/products/5', 'DELETE'), ask('/pantry/5', 'DELETE'), 'the same requirement as a batch');

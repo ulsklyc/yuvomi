@@ -35,7 +35,7 @@
 
 import { reminderDateBefore } from '../utils/reminder-schedule.js';
 import { todayKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { predictCycle } from '../../public/utils/health-cycle.js';
 import { healthCycleViews } from '../routes/preferences.js';
@@ -69,9 +69,7 @@ function cycleTabEnabled(database, userId) {
  * eine zweite Wahrheit (DECISIONS #2).
  */
 export function lacksHealth(database, userId) {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return true;
-  return resolvePermissions(database, user).modules.health === 'none';
+  return !authorize(actorForUser(database, userId), 'receive', { module: 'health' }).allowed;
 }
 
 /**

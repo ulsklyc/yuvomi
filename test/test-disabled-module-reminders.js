@@ -163,7 +163,7 @@ function assertDelivered(run, reminderId, message) {
 
 /**
  * Gesundheits-Herkuenfte gehen nur an die Person selbst: Push ja, der Kanal des
- * Haushalts nie (services/reminder-targets.js, HOUSEHOLD_CHANNEL_POLICY). Der
+ * Haushalts nie (authorize/rows/reminders.ts, HOUSEHOLD_CHANNEL_POLICY). Der
  * Kanal dieser Suite ist ein Haushaltskanal.
  */
 function assertDeliveredPersonally(run, reminderId, message) {

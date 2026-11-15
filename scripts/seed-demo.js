@@ -55,7 +55,7 @@ import { fileURLToPath } from 'node:url';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
 import { buildDemoPdf } from './seed-demo-pdf.js';
 import { assignPantryProduct, writeMinimumThrough } from '../server/services/pantry-products.js';
-import { applyChildStartPermissions } from '../server/permissions.js';
+import { applyChildStartPermissions } from '../server/authorize/index.ts';
 import { recordCompletion } from '../server/services/task-completions.js';
 
 const args = process.argv.slice(2);
@@ -422,7 +422,7 @@ const emmaId  = insertUser.run('emma',  'Emma Johnson',  pw, 'member', 'child', 
 const leoId   = insertUser.run('leo',   'Leo Johnson',   pw, 'member', 'child', '#F97316').lastInsertRowid;
 const mariaId = insertUser.run('maria', 'Maria Silva',   pw, 'member', 'other', '#7C3AED').lastInsertRowid;
 // Die Kinder entstehen wie in der App (POST /auth/users, Einladung): direkt
-// nach dem Konto die Kinder-Startrechte (server/permissions.js) - kein Budget,
+// nach dem Konto die Kinder-Startrechte (server/authorize/catalog.ts) - kein Budget,
 // Haushaltshilfe nur lesend und ohne Betraege, kein Fasten, Zyklus aus. Ohne
 // diesen Schritt zeigte die Demo ein Kinderkonto, das es so nie gaebe: Emma
 // sah Kontostaende, Loehne und den Zyklus (Critique 2026-10-21, D14).

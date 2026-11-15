@@ -4277,7 +4277,11 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // `dateKey` ist der Kalendertag in der ANZEIGEZONE: der Termin-Treffer baut
   // daraus den Tag seines Links (#1607), und ein synchronisierter Termin liegt
   // als Instant in der Zeile - sein UTC-Tag waere der falsche.
-  const fmt = { dateText, formatTime, activityLabel, dateKey: zonedDateKey, eventTitle: (item) => localizeBirthdayEvent(item).title };
+  const fmt = {
+    dateText, formatTime, activityLabel, dateKey: zonedDateKey,
+    eventTitle: (item) => localizeBirthdayEvent(item).title,
+    archivedText: () => t('tasks.statusArchived'),
+  };
   if (data) {
     SEARCH_SECTIONS.forEach((section) => {
       const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];

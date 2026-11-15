@@ -154,6 +154,7 @@ test('GET /status: liefert Schema-Version, Upload-Limit und Scheduler-Status', a
   assert.ok(d.scheduler, 'scheduler-Objekt vorhanden');
   assert.equal(d.scheduler.backupDir, BACKUP_DIR);
   assert.ok(d.scheduler.webdav, 'scheduler.webdav-Status eingebettet');
+  assert.equal(d.scheduler.timezone, process.env.TZ || 'UTC', 'scheduler.timezone nennt die Zone des Crons');
 });
 
 // ── POST /trigger: echter lokaler Backup (WebDAV noch aus) ──────────────────────

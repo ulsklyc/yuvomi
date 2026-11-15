@@ -94,7 +94,9 @@ function jsFiles(dir) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) out.push(...jsFiles(full));
-    else if (name.endsWith('.js')) out.push(full);
+    // .ts too: server/authorize/ is TypeScript, and applyDocumentAccess() (rows/documents.ts)
+    // writes - a caller after an await must still count as a late writer (B3).
+    else if (/\.(js|ts)$/.test(name)) out.push(full);
   }
   return out;
 }

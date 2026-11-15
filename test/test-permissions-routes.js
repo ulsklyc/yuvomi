@@ -22,6 +22,7 @@ import {
 const dbmod = await import('../server/db.js');
 const { default: permissionsRouter } = await import('../server/routes/permissions.js');
 const db = dbmod.get();
+const { resolveRequestModuleAccess } = await import('../server/authorize/index.ts');
 
 function mkUser(username, role = 'member', familyRole = 'child') {
   return db.prepare(
@@ -39,6 +40,11 @@ app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
+  // As requireAuth does (server/auth.js): the module rights, and the request
+  // registered for its actor. Since C1 the admin gate asks authorize() with the
+  // request's actor, which logs an error when built for a request that never
+  // passed requireAuth.
+  req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
   next();
 });
 app.use('/', permissionsRouter);

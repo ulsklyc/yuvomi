@@ -373,3 +373,19 @@ test('die Spec nennt den Header an jedem POST, den die Middleware erreicht', asy
     assert.ok(!names.includes('Idempotency-Key'), `${path} liegt vor der Middleware und darf nichts versprechen`);
   }
 });
+
+// --------------------------------------------------------
+// Die Handkopie der Grenze in der MCP-Schicht (#2616)
+// --------------------------------------------------------
+
+test('die MCP-Schicht nennt dieselbe Schlüssellänge wie diese Middleware', async () => {
+  // `server/mcp/tools.js` prüft `idempotency_key` selbst, bevor es den Kopf
+  // setzt: ein unbrauchbarer Wert liesse `fetch` werfen. Importieren kann es
+  // die Zahl nicht - dieses Modul zieht `server/db.js` mit, und die
+  // Tool-Schicht bleibt ohne Datenbankmodul ladbar. Also eine Handkopie, und
+  // diese Zeile bindet sie: sonst wäre ein Schlüssel für das Werkzeug gültig
+  // und für die Route nicht.
+  const { MAX_KEY_LENGTH } = await import('../server/middleware/idempotency.js');
+  const { MAX_IDEMPOTENCY_KEY_LENGTH } = await import('../server/mcp/tools.js');
+  assert.equal(MAX_IDEMPOTENCY_KEY_LENGTH, MAX_KEY_LENGTH);
+});

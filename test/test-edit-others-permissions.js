@@ -27,7 +27,7 @@ const { default: inventoryRouter } = await import('../server/routes/inventory/in
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const {
   applyChildStartPermissions, CHILD_START_PERMISSIONS, PERMISSION_CAPABILITIES, resolvePermissions,
-} = await import('../server/permissions.js');
+} = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 function user(username, role, familyRole) {

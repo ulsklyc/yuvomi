@@ -23,7 +23,7 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
-const { filterVisibleDocumentIds } = await import('../server/services/document-access.js');
+const { filterVisible } = await import('../server/authorize/index.ts');
 const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
 const db = dbmod.get();
 
@@ -254,18 +254,18 @@ test('gelöschtes Dokument nimmt seine Verknüpfung mit', async () => {
 
 // ── Sichtbarkeits-Helfer ────────────────────────────────────────────────────────
 
-test('filterVisibleDocumentIds: filtert, dedupliziert und hält die Reihenfolge', () => {
+test('filterVisible(documents): filtert, dedupliziert und hält die Reihenfolge', () => {
   const eigen = insertDocument({ name: 'Eigen', createdBy: A, visibility: 'private' });
   const offen = insertDocument({ name: 'Offen' });
   const fremd = insertDocument({ name: 'Fremd', createdBy: B, visibility: 'private' });
 
   assert.deepEqual(
-    filterVisibleDocumentIds(db, [offen, fremd, eigen, offen, 0, -1, 'x', null], A),
+    filterVisible(db, 'documents', [offen, fremd, eigen, offen, 0, -1, 'x', null], A),
     [offen, eigen]
   );
-  assert.deepEqual(filterVisibleDocumentIds(db, [], A), []);
-  assert.deepEqual(filterVisibleDocumentIds(db, [fremd], A), []);
-  assert.deepEqual(filterVisibleDocumentIds(db, [fremd], B), [fremd]);
+  assert.deepEqual(filterVisible(db, 'documents', [], A), []);
+  assert.deepEqual(filterVisible(db, 'documents', [fremd], A), []);
+  assert.deepEqual(filterVisible(db, 'documents', [fremd], B), [fremd]);
 });
 
 // ── Dokumentenrecht (#1358) ─────────────────────────────────────────────────────

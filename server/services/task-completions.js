@@ -4,7 +4,7 @@
  *        wieder abräumen, wenn er zurückgenommen wird - plus die beiden
  *        Lesepfade, die daraus einen Verlauf machen (#791).
  * Abhängigkeiten: better-sqlite3-Handle (synchron), wird vom Aufrufer übergeben;
- *        visibilityWhere aus services/visibility.js.
+ *        visibilityWhere aus authorize/rows/assignees.ts.
  *
  * WARUM DAS NEBEN rewards.js STEHT UND NICHT DARIN. Beide hängen am selben
  * Statuswechsel und sehen sich deshalb ähnlich, aber sie beantworten
@@ -22,7 +22,7 @@
  * der Serie ist das Abhaken der Hauptaufgabe.
  */
 
-import { visibilityWhere } from './visibility.js';
+import { taskVisibleWhere } from '../authorize/index.ts';
 import { personAvatarUrlSql } from './person-avatar.js';
 
 /**
@@ -173,8 +173,19 @@ export function syncTaskCompletion(d, taskId, oldStatus, newStatus, actingUserId
  * nachträglich auf privat stellt, hat sie versteckt, und der Verlauf darf sie
  * danach nicht weiter zeigen. Genau dafür trägt `task_completions` keine eigene
  * Kopie der Stufe.
+ *
+ * Both reads take the reader of the request (taskReader in server/authorize): a
+ * paired display reads under the wall rule, only what the whole household sees, for
+ * every entry and every instance of a series; people under the task row rule bound
+ * as @me. Without a reader the person rule for `me` applies.
+ *
+ * @param {{ me?: unknown, reader?: import('../authorize/index.ts').TaskReader }} opts
+ * @returns {{ sql: string, me: unknown }}
  */
-const VISIBLE_SQL = visibilityWhere('t', 'task_assignments', 'task_id', '@me');
+function visibleFor({ me, reader }) {
+  const r = reader ?? { userId: me, wall: false };
+  return { sql: taskVisibleWhere(r, 't'), me: r.userId };
+}
 
 /**
  * Spalten, die beide Lesepfade teilen.
@@ -220,16 +231,18 @@ const SELECT_SQL = `
  *
  * @param {object} d
  * @param {object} opts
- * @param {number} opts.me       betrachtende Person (Sichtbarkeit)
+ * @param {number} [opts.me]     betrachtende Person (Sichtbarkeit), ohne `reader`
+ * @param {import('../authorize/index.ts').TaskReader} [opts.reader] der Leser der Anfrage (taskReader)
  * @param {number} [opts.limit]  1..200
  * @param {number} [opts.userId] nur Erledigungen dieser Person
  * @param {string} [opts.beforeAt]  Cursor: `completed_at` des letzten Eintrags
  * @param {number} [opts.beforeId]  Cursor: `id` des letzten Eintrags
  */
-export function completionFeed(d, { me, limit = 50, userId = null, beforeAt = null, beforeId = null }) {
+export function completionFeed(d, { me, reader, limit = 50, userId = null, beforeAt = null, beforeId = null }) {
   const size = Math.min(Math.max(Number(limit) || 50, 1), 200);
-  const where = [VISIBLE_SQL];
-  const params = { me, size };
+  const visible = visibleFor({ me, reader });
+  const where = [visible.sql];
+  const params = { me: visible.me, size };
 
   // DER FILTER FOLGT DER ANZEIGE, NICHT DER SPALTE. Gefiltert wird über
   // dieselbe Rückfallregel, die auch `person_user_id` bildet: wer auf den Chip
@@ -279,9 +292,21 @@ export function completionFeed(d, { me, limit = 50, userId = null, beforeAt = nu
  *   3. Einträge, die dieselbe Serie tragen wie ein Kettenglied - das holt die
  *      Instanzen VOR einem Riss zurück, deren eigene Glieder nicht mehr in der
  *      Kette stehen.
+ *
+ * `reader` (taskReader) of a paired display filters every entry by the wall rule
+ * instead of the person rule: an earlier instance shared only with its assignees
+ * stays off the wall even when it names the display.
+ *
+ * @param {any} d  die Datenbankverbindung
+ * @param {object} opts
+ * @param {number} [opts.me]     betrachtende Person (Sichtbarkeit), ohne `reader`
+ * @param {import('../authorize/index.ts').TaskReader} [opts.reader] der Leser der Anfrage (taskReader)
+ * @param {number} opts.taskId
+ * @param {number | string} [opts.limit]  1..100
  */
-export function seriesHistory(d, { me, taskId, limit = 20 }) {
+export function seriesHistory(d, { me, reader, taskId, limit = 20 }) {
   const size = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  const visible = visibleFor({ me, reader });
   return d.prepare(`
     ${CHAIN_CTE}
     ${SELECT_SQL}
@@ -289,8 +314,8 @@ export function seriesHistory(d, { me, taskId, limit = 20 }) {
       c.task_id   IN (SELECT id FROM chain)
       OR c.series_id IN (SELECT id FROM chain)
       OR c.series_id IN (SELECT series_id FROM task_completions WHERE task_id IN (SELECT id FROM chain))
-    ) AND ${VISIBLE_SQL}
+    ) AND ${visible.sql}
     ORDER BY c.completed_at DESC, c.id DESC
     LIMIT @size
-  `).all({ me, task: taskId, size });
+  `).all({ me: visible.me, task: taskId, size });
 }
