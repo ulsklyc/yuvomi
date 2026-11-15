@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   title, the sentence and "Technical details" stood directly on the violet light field behind
   them, and in the light theme the sentence and the details link fell below the WCAG AA
   contrast of 4.5:1. The screen now sits on the same glass panel as the sign-in page.
+- **The retry countdown keeps number and unit together in Traditional Chinese.** On the same
+  screen, the hint "Trying again in 2 s" could break between the number and 秒 on a narrow
+  panel. Every other language already joined them with a non-breaking space; zh-Hant now does
+  too.
 
 ## [2.91.0] - 2026-11-15
 
