@@ -23,7 +23,10 @@
  *          within three lines behind a negated admin question - per file and
  *          route, and compares that multiset
  *          with the table plus its EXCEPTIONS and MIXED lists. A new gate
- *          without a row is red.
+ *          without a row is red. PUT /preferences (C3): the gates stand in
+ *          the settings registry as data, so the route's one `refuseAdmin(`
+ *          counts as one site per admin field of settingsCatalog() and one
+ *          per `gate` group (weather, holidays).
  *
  *          Every row sends input that is invalid or harmless where the route
  *          would act, and every request ends after a timeout: a mutant that
@@ -40,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 import { startTestServer, cookieHeader } from './server-ready.js';
 import { withoutCommentsKeepingLines } from './source-text.js';
 import { ROWS, EXCEPTIONS, MIXED, ADMIN_PASSES, DEVICE_CASES } from './admin-gates-table.js';
+import { settingsCatalog } from '../server/settings/registry.ts';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -214,6 +218,21 @@ const FUNCTION_START = /\bfunction\s+([\w$]+)\s*\(/g;
 const GATE_DEFINITIONS = new Set(['requireAdmin', 'assertAdmin']);
 /** The one refusal of an admin gate (C2): a call of it is an inline site. */
 const REFUSE_CALL = /\brefuseAdmin\(/;
+/**
+ * Routes whose admin gates stand in the settings registry (C3): the route
+ * sends the registry's `forbidden` through ONE `refuseAdmin(` call, the gates
+ * themselves are data. That one text site stands for one site per admin field
+ * of settingsCatalog() without a `gate` group, plus one per `gate` group
+ * (weather, holidays). Without the text site the catalog sites fall too.
+ */
+const REGISTRY_GATE_SITES = new Set(['inline|server/routes/preferences.js|PUT /']);
+
+/** The admin gates of the settings registry, one site per field or `gate` group. */
+function catalogGateSites() {
+  const admin = settingsCatalog().filter((entry) => entry.write === 'admin');
+  const groups = new Set(admin.filter((entry) => entry.gate).map((entry) => entry.gate));
+  return [...admin.filter((entry) => !entry.gate).map((entry) => entry.field), ...groups];
+}
 
 /** @param {string} dir */
 function serverFiles(dir = join(ROOT, 'server')) {
@@ -289,6 +308,12 @@ function gateSites() {
       if (GATE_DEFINITIONS.has(key.replace(/^function /, ''))) return;
       for (const k of routeKeys(src, key)) sites.push(`inline|${file}|${k}`);
     });
+  }
+  // The registry's refusal: its one text site per route becomes the catalog's sites.
+  for (const site of REGISTRY_GATE_SITES) {
+    const at = sites.indexOf(site);
+    if (at === -1) continue;
+    sites.splice(at, 1, ...catalogGateSites().map(() => site));
   }
   return sites;
 }
