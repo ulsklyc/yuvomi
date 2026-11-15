@@ -53,6 +53,7 @@ import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-
 import { notCancelledEventSql } from './reminder-deleted-occurrence.js';
 import { visibleWhere } from '../authorize/index.ts';
 import { hasExplicitZone, householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
+import { DEFAULT_OVERDUE_GRACE_DAYS } from '../settings/values.ts';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
 // currency-codes, ...), immer fuer abhaengigkeitsfreie geteilte Regeln.
@@ -64,16 +65,9 @@ import { expiryDueSoon } from '../../public/utils/document-expiry.js';
 // Vorrat ist für die größte Fassung bemessen, wie bei den Geburtstagen.
 const DEFAULT_LIMIT = 5;
 
-/**
- * So viele Tage bleibt ein abgelaufener Countdown stehen, bevor er still
- * herausfällt - solange der Haushalt nichts anderes einstellt (#969).
- *
- * Sieben, weil die Nachfrist eine Woche Alltag abdecken soll: wer freitags nicht
- * hinsieht, findet den verpassten Stichtag am Montag noch vor. Länger wäre keine
- * Nachfrist mehr, sondern eine zweite Aufgabenliste - und diese Kachel ist
- * ausdrücklich keine.
- */
-export const DEFAULT_OVERDUE_GRACE_DAYS = 7;
+// Die Standard-Nachfrist (#969, sieben Tage) steht beim Register der
+// Einstellung `countdown_grace_days` (server/settings/values.ts) - eine Antwort,
+// nicht zwei (docs/DECISIONS.md #2).
 
 // Das Ende des Fensters, in dem die Kachel das naechste Vorkommen sucht: keine
 // fachliche Grenze, sondern der letzte Tag, der als YYYY-MM-DD noch richtig

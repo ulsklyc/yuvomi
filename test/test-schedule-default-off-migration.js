@@ -56,8 +56,9 @@ test('invalid or non-array legacy settings are safely replaced', () => {
 });
 
 test('the Schedule slug is accepted by module preferences', async () => {
-  const source = await import('node:fs/promises').then((fs) => fs.readFile(new URL('../server/routes/preferences.js', import.meta.url), 'utf8'));
-  const list = source.match(/const TOGGLEABLE_MODULES = \[([\s\S]*?)\];/)?.[1];
-  assert.ok(list);
-  assert.match(list, /'schedule'/);
+  // The list lives in the settings registry since phase 2, C3: imported, and
+  // the read side asked, instead of cutting the route's text.
+  const { TOGGLEABLE_MODULES, parseDisabledModules } = await import('../server/settings/values.ts');
+  assert.ok(TOGGLEABLE_MODULES.includes('schedule'));
+  assert.deepEqual(parseDisabledModules(JSON.stringify(['schedule'])), ['schedule']);
 });

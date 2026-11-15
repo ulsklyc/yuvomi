@@ -99,9 +99,9 @@ test('Zweiter Lauf fuegt inventory kein zweites Mal hinzu', () => {
 test('inventory ist ein gueltiger Slug fuer die Lese-/Schreibseite', async () => {
   // parseDisabledModules filtert gegen TOGGLEABLE_MODULES - stuende inventory
   // dort nicht, waere der von der Migration geschriebene Wert wirkungslos.
-  const source = await import('node:fs/promises')
-    .then((fs) => fs.readFile(new URL('../server/routes/preferences.js', import.meta.url), 'utf8'));
-  const list = source.match(/const TOGGLEABLE_MODULES = \[([\s\S]*?)\];/)?.[1];
-  assert.ok(list, 'TOGGLEABLE_MODULES nicht gefunden');
-  assert.match(list, /'inventory'/);
+  // Seit dem Einstellungs-Register (Phase 2, C3) wird die Liste importiert und
+  // die Leseseite gefragt, nicht mehr der Routentext geschnitten.
+  const { TOGGLEABLE_MODULES, parseDisabledModules } = await import('../server/settings/values.ts');
+  assert.ok(TOGGLEABLE_MODULES.includes('inventory'));
+  assert.deepEqual(parseDisabledModules(JSON.stringify(['inventory'])), ['inventory']);
 });

@@ -64,7 +64,8 @@ const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.
 // PUSH-SEND. The rights rules keep the SQL visibility rules and the module verdict in
 // server/authorize/ (phase 2, B5): RIGHTS-MODULE (a module level compared with 'none'), the one door
 // (rights-only-through-authorize) and a permission module that never opens the database
-// (authorize-not-to-db). A blanket or no-restricted-syntax suppression would switch them
+// (authorize-not-to-db). The settings registry stays a leaf under the services (phase 2,
+// C3: settings-is-a-leaf). A blanket or no-restricted-syntax suppression would switch them
 // off, so it is hard as well.
 const HARD = new Set([
   'oxlint/no-restricted-syntax/HTML-STRING-WRITE',
@@ -79,6 +80,7 @@ const HARD = new Set([
   'oxlint/no-restricted-syntax/RIGHTS-MODULE',
   'depcruise/rights-only-through-authorize',
   'depcruise/authorize-not-to-db',
+  'depcruise/settings-is-a-leaf',
   'directive/blanket-disable',
   'directive/disable-no-restricted-syntax',
 ]);
