@@ -684,6 +684,16 @@ function renderPage(container, preferences, isAdmin) {
       <p class="form-hint settings-group__footer" id="formats-household-hint"${customHidden ? ' hidden' : ''}>${t('settings.formatsHouseholdHint')}</p>
     </section>
 
+    ${moduleColorsSectionHtml(preferences)}
+  `);
+}
+
+/**
+ * Der Abschnitt "Modulfarben" (#1115), aus renderPage() gezogen (max-lines-per-function).
+ * @param {any} preferences
+ */
+function moduleColorsSectionHtml(preferences) {
+  return `
     <section class="settings-section">
       <h2 class="settings-section__title">${t('settings.sectionModuleColors')}</h2>
       <p class="form-hint settings-group__footer">${esc(t('settings.moduleColorsHint'))}</p>
@@ -718,7 +728,7 @@ function renderPage(container, preferences, isAdmin) {
         }).join('')}
       </div>
     </section>
-  `);
+  `;
 }
 
 function applyTheme(value) {
