@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.91.0] - 2026-11-15
+
 ### Changed
 - **Every "administrators only" refusal of the API has the same answer.** Routes that only an
   administrator may use refused everyone else with one of four texts ("Permission denied.",
