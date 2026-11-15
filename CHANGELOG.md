@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen, the hint "Trying again in 2 s" could break between the number and 秒 on a narrow
   panel. Every other language already joined them with a non-breaking space; zh-Hant now does
   too.
+- **Numbers stay on one line with their unit in every language.** Texts such as "up to 25 MB",
+  "1 h 30 min", "45 %", the wind speed on the weather card or the Russian and Ukrainian "5 дн."
+  could break between the number and its abbreviated unit, leaving the unit alone at the start
+  of the next line. All 27 languages now join them with a non-breaking space, and a test keeps
+  new texts to the same rule.
 
 ## [2.91.0] - 2026-11-15
 
