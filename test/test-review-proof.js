@@ -183,6 +183,43 @@ test('"has not previously commented" ist kein Abbruch aus diesem Grund', () => {
   );
 });
 
+test('ein stiller Trivial-Abbruch bleibt rot und heisst so (#2765)', () => {
+  // Lauf 43758461498 (PR #2765, 15.11.2026): nur `tsc-baseline.json`, 2 Turns,
+  // keine Verweigerungen, kein Kommentar, deutscher result-Text. Die Tor-Formel
+  // aus #1029 ist englisch und greift nicht - richtig so, denn gruen darf das
+  // nicht werden: der Prompt verlangt fuer "trivial" einen Satz als Kommentar.
+  // Bis hierher meldete das Urteil "ohne eines der bekannten Muster"; der Fall
+  // hat aber einen Namen, und der schickt den Leser zum Prompt.
+  const ergebnis = fixture.ergebnisse['abbruch-trivial-still'];
+  assert.match(ergebnis.result, /Bedingung „trivial“ aus Schritt 1/);
+  const urteil = beurteile({
+    seit: '2026-11-15T20:32:31Z',
+    kopf: '2d74cf171dc51f5df2d4a54047244405d519339e',
+    ergebnis,
+    aeusserungen: [],
+    gepostet: NICHTS
+  });
+  assert.equal(urteil.ausgang, 'stumm');
+  assert.equal(urteil.grund, 'trivial-stumm');
+  assert.match(urteil.meldung, /ALS TRIVIAL EINGESTUFT/);
+  assert.doesNotMatch(urteil.meldung, /ohne eines der bekannten Muster/);
+});
+
+test('eine verneinte Trivial-Erwaehnung ist kein Trivial-Abbruch', () => {
+  // Der Name darf nur fallen, wenn der Text die Einstufung bejaht.
+  const urteil = beurteile({
+    seit: '2026-11-15T20:32:31Z',
+    ergebnis: {
+      num_turns: 6, subtype: 'success', is_error: false, permission_denials: [],
+      result: 'This is not trivial under step 1, but the review did not finish.'
+    },
+    aeusserungen: [],
+    gepostet: NICHTS
+  });
+  assert.equal(urteil.ausgang, 'stumm');
+  assert.equal(urteil.grund, 'unbekannt');
+});
+
 test('ohne Stand wird rot, nicht gruen', () => {
   // Der leere Fallback waere hier der gefaehrlichste: ein leerer Vergleichswert
   // laesst JEDE Aeusserung als "neu" durchgehen.
