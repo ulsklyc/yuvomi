@@ -638,6 +638,102 @@ test('the wall rule holds at the remaining task reads: tags, documents, dashboar
   assert.equal(personHidden.reason, 'Dachboden');
 });
 
+test('the wall rule holds at every event read: calendar, search, detail, calendars, dashboard', async () => {
+  // The event reads asked the event row rule with the display account as the viewer,
+  // so an event with visibility `assignees` that names the display showed on the wall
+  // without audience=household. The app never offers a display as an assignee
+  // (newNonMembers, #1207), so the rows are seeded directly.
+  const created = await admin('POST', '/auth/users', {
+    username: 'erna', display_name: 'Erna', password: 'ernapass12345', role: 'member',
+  });
+  assert.equal(created.status, 201, `create member: ${JSON.stringify(created.body)}`);
+  const ERNA = created.body.user.id;
+  const asErna = as(await login('erna', 'ernapass12345'));
+  const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
+  const day = shiftDateKey(todayKey(db), 1);
+  const calendarId = Number(db.prepare(
+    "INSERT INTO local_calendars (name, color, is_default, sort_order, created_by) VALUES ('Wandprobe', '#123456', 0, 9, 1) RETURNING id",
+  ).get().id);
+  const source = Number(db.prepare(
+    "INSERT INTO external_calendars (source, external_id, name, color) VALUES ('google', 'wall-probe', 'Wandquelle', NULL) RETURNING id",
+  ).get().id);
+
+  /**
+   * An all-day event tomorrow, flagged as a countdown, in the probe calendar (or, with
+   * `synced`, in the synced calendar Wandquelle).
+   * @param {string} title @param {string} visibility @param {number[]} assignees @param {boolean} [synced]
+   */
+  const addEvent = (title, visibility, assignees, synced = false) => {
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, all_day, visibility, created_by, external_source,
+                                   local_calendar_id, calendar_ref_id, countdown)
+      VALUES (?, ?, 1, ?, 1, ?, ?, ?, 1) RETURNING id
+    `).get(title, day, visibility, synced ? 'google' : 'local', synced ? null : calendarId, synced ? source : null).id);
+    for (const userId of assignees) db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, userId);
+    return id;
+  };
+  const forDisplay = addEvent('Wandprobe Zahnarzt', 'assignees', [displayId, ERNA]);
+  const forAll = addEvent('Wandprobe Elternabend', 'all', [ERNA]);
+  const syncedForDisplay = addEvent('Wandprobe Training', 'assignees', [displayId], true);
+
+  /** @typedef {(m: string, p: string) => Promise<{ status: number, body: any }>} Caller */
+  /** @param {any[]} list */
+  const ids = (list) => list.map((e) => e.id).filter((id) => [forDisplay, forAll, syncedForDisplay].includes(id)).sort();
+  /** @param {Caller} who @param {string} path @param {(body: any) => any[]} pick */
+  const read = async (who, path, pick = (b) => b.data) => {
+    const res = await who('GET', path);
+    assert.equal(res.status, 200, `${path}: ${JSON.stringify(res.body)}`);
+    return ids(pick(res.body));
+  };
+  /** @param {Caller} who */
+  const reads = async (who) => ({
+    list: await read(who, `/calendar?from=${day}&to=${day}`),
+    upcoming: await read(who, '/calendar/upcoming?limit=20'),
+    search: await read(who, '/calendar/search?q=Wandprobe'),
+    upcomingEvents: await read(who, `/dashboard?events_calendar=local:${calendarId}`, (b) => b.upcomingEvents),
+    weekEvents: await read(who, `/dashboard?events_calendar=local:${calendarId}`, (b) => b.weekEvents),
+    familyEvents: await read(who, '/dashboard', (b) => b.familyEvents),
+    countdowns: await read(who, '/dashboard', (b) => b.countdowns.filter((/** @type {any} */ c) => c.source === 'event')),
+  });
+  /** @param {Caller} who */
+  const calendars = async (who) => {
+    const res = await who('GET', '/calendar/calendars');
+    assert.equal(res.status, 200);
+    return {
+      count: res.body.data.find((/** @type {any} */ c) => c.id === calendarId)?.event_count,
+      sources: res.body.sources.map((/** @type {any} */ s) => s.key).includes(`cal:${source}`),
+    };
+  };
+
+  const both = [forDisplay, forAll].sort();
+  const wall = await reads(display);
+  for (const [key, list] of Object.entries(wall)) {
+    assert.deepEqual(list, [forAll], `${key}: the wall reads only the household event`);
+  }
+  for (const [key, list] of Object.entries(await reads(asErna))) {
+    assert.deepEqual(list, both, `${key}: an assigned person still reads both`);
+  }
+  assert.deepEqual(await calendars(display), { count: 1, sources: false }, 'GET /calendar/calendars counts and names only household events on the wall');
+  assert.deepEqual(await calendars(asErna), { count: 2, sources: false }, 'a person keeps the count of what she sees');
+
+  const unknown = await display('GET', '/calendar/999999');
+  const hidden = await display('GET', `/calendar/${forDisplay}`);
+  assert.equal(hidden.status, 404, 'the detail of an assignees event answers 404 on the wall');
+  assert.deepEqual(hidden.body, unknown.body, 'the refusal must equal the one for an unknown id');
+  assert.equal((await display('GET', `/calendar/${forAll}`)).status, 200, 'a household event stays readable');
+  assert.equal((await asErna('GET', `/calendar/${forDisplay}`)).status, 200, 'an assigned person still reads the detail');
+
+  // The household audience answers as before, for the display and for a person.
+  const household = await display('GET', `/dashboard?audience=household&events_calendar=local:${calendarId}`);
+  assert.deepEqual(ids(household.body.upcomingEvents), [forAll], 'audience=household on the wall as before');
+  const personHousehold = await asErna('GET', `/dashboard?audience=household&events_calendar=local:${calendarId}`);
+  assert.deepEqual(ids(personHousehold.body.upcomingEvents), [forAll], 'audience=household for a person as before');
+  // The admin created both and sees both: the creator branch stays for people.
+  assert.deepEqual(await read(admin, `/calendar?from=${day}&to=${day}`), [...both, syncedForDisplay].sort(), 'the creator still reads every row');
+  assert.equal((await calendars(admin)).sources, true, 'the creator still finds the synced calendar');
+  db.prepare('DELETE FROM calendar_events WHERE id IN (?, ?, ?)').run(forDisplay, forAll, syncedForDisplay);
+});
+
 test('jede andere Schreibroute der beiden Module bleibt zu', async () => {
   // DIE EIGENTLICHE ZUSAGE DES TICKETS: „no creating, editing or deleting, and
   // no settings". Sie haengt daran, dass die Erlaubnis eine Liste von zwei
