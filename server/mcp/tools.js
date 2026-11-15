@@ -1,51 +1,72 @@
 /**
  * Modul: MCP-Tools
  * Zweck: Tool-Set für den internen MCP-Endpoint in zwei bewusst getrennten Schichten:
- *   1. Kuratierte Kern-Tools als reine `(db, actor, args)`-Funktionen — schnell,
- *      in-process gegen SQLite, ohne laufenden Server testbar. Deckt die
- *      häufigsten Aktionen ab (Tasks, Shopping, Kalender lesen/anlegen).
+ *   1. Kuratierte Kern-Tools, die die häufigsten Aktionen abdecken (Tasks,
+ *      Shopping, Kalender lesen/anlegen). Die LESENDEN laufen in-process gegen
+ *      SQLite - schnell und ohne laufenden Server testbar; sie teilen ihre
+ *      Abfragen mit der REST-Seite (`visibleWhere`, der Kalender-Leser). Die
+ *      SCHREIBENDEN gehen seit #2616 per Loopback durch ihre eigene Route:
+ *      Standardpunkte, die eigenen Kategorien des Haushalts, der Listenstand
+ *      und der Sofort-Sync entstehen dort, und eine zweite Fassung davon wich
+ *      von der App ab, sobald eine von beiden sich bewegte.
  *   2. EINE generische OpenAPI-Brücke (`list_api_operations`, `get_api_operation`,
  *      `call_api_operation`), die jede dokumentierte REST-Operation erreichbar
- *      macht — ein Mechanismus statt hunderter handgepflegter Wrapper. Der Aufruf
- *      geht per authentifiziertem Loopback (`fetch` → eigener HTTP-Server) und
- *      erbt exakt die Rechte des aufrufenden API-Tokens; Rollen- und
- *      CSRF-Prüfung greifen serverseitig auf `/api/v1/*` wie bei jedem Client.
+ *      macht - ein Mechanismus statt hunderter handgepflegter Wrapper.
+ *   Beide Schreibwege nutzen denselben authentifizierten Loopback
+ *   (`internalApiRequest`: `fetch` → eigener HTTP-Server) und erben exakt die
+ *   Rechte des aufrufenden Tokens; Rollen-, Scope- und CSRF-Prüfung greifen
+ *   serverseitig auf `/api/v1/*` wie bei jedem anderen Client.
  * Abhängigkeiten: server/middleware/validate.js, server/openapi.js,
- *                  server/scopes.js + server/permissions.js (Rechte-Durchsetzung)
+ *                  server/scopes.js + server/authorize/ (Rechte-Durchsetzung)
  *
  * Architektur: Jedes Tool ist EIN Eintrag in der Registry (Definition + Handler
  *   zusammen) — daraus werden `tools/list` und der Dispatch abgeleitet, damit
  *   Name, Schema und Implementierung nicht auseinanderlaufen können.
  *
- * Quelle der Validierungs-/Enum-Regeln der Kern-Tools: server/routes/tasks.js,
- * shopping.js, calendar.js. Bei Änderungen dort diese Datei mitziehen.
+ * SCHREIBEN ÜBER MCP BRAUCHT EIN API-TOKEN ODER EIN MITGESCHICKTES CSRF-TOKEN:
+ * `/mcp` liegt ausserhalb der /api/v1-Gates und kennt kein CSRF, die Route
+ * dahinter schon (server/middleware/csrf.js nimmt nur `api_token` aus).
  */
 
 import * as v from '../middleware/validate.js';
 import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
-import { tokenAllows } from '../scopes.js';
-import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
-import { householdTimeZone, todayKey } from '../utils/timezone.js';
+import { authorize, visibleWhere } from '../authorize/index.ts';
+import { todayKey } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
-import { visibilityWhere } from '../services/visibility.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
-import { loadTagsFor, normalizeTags, setTags, tagKey } from '../utils/task-tags.js';
+import { loadTagsFor, normalizeTags, tagKey } from '../utils/task-tags.js';
 import { readBindAddress, selfCallHost } from '../utils/bind-address.js';
+import { createLogger } from '../logger.js';
 
+const log = createLogger('MCP');
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
-// Spiegelt server/routes/tasks.js (bewusst dupliziert, um die Tool-Schicht von
-// express/db in tasks.js zu entkoppeln — siehe Modul-Header).
+// Spiegelt server/routes/tasks.js. Diese Liste ist dort ebenfalls fest
+// verdrahtet; die Kategorien stehen dagegen in der Datenbank und werden
+// deshalb nicht mehr hier aufgezählt (#2616).
 const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'];
-const VALID_CATEGORIES = ['household', 'school', 'shopping', 'repair',
-                          'health', 'finance', 'leisure', 'misc'];
 
-/** Fehler mit für den aufrufenden Client (LLM) sichtbarer Nachricht. */
-class ToolError extends Error {}
+/**
+ * Fehler mit für den aufrufenden Client (LLM) sichtbarer Nachricht.
+ *
+ * Kommt er aus einer Routenantwort (`internalApiRequest`), tragen die drei
+ * Felder deren Angaben - nur für Aufrufer im Prozess und Tests (#2616). Ein
+ * MCP-Client sieht sie nie: `protocol.js` gibt nur `message` hinaus, `reason`
+ * steht dort als `[reason: ...]` im Text.
+ */
+class ToolError extends Error {
+  /** @type {number|null} HTTP-Status der Routenantwort, sonst null. */
+  status = null;
+  /** @type {number|string|null} `code` der Routenantwort, sonst null. */
+  code = null;
+  /** @type {string|null} `reason` der Routenantwort, sonst null. */
+  reason = null;
+}
 
 // --------------------------------------------------------
-// Kern-Tools: reine Funktionen (db, actorId, args)
+// Kern-Tools: lesend `(db, actorId, args)` in-process, schreibend
+// `(ctx, args)` per Loopback durch die eigene Route (#2616).
 // --------------------------------------------------------
 
 function listTasks(db, actorId, args) {
@@ -57,7 +78,7 @@ function listTasks(db, actorId, args) {
       -- anderer. Stand hier bisher nicht, obwohl die Termin-Abfrage sie führt -
       -- ein MCP-Token sah damit jede private Aufgabe des Haushalts, und mit den
       -- Tags (#586) käme deren Freitext gleich mit.
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
+      AND ${visibleWhere('tasks', 't', '@me')}
   `;
   // Dieselbe Auswahl wie `GET /api/v1/tasks` und die Uebersicht (#825): eine
   // Automatisierung, die andere Aufgaben sieht als das UI, ist der Grund, aus
@@ -110,43 +131,118 @@ function listTasks(db, actorId, args) {
   return rows;
 }
 
-function createTask(db, actorId, args) {
-  const title = v.str(args.title, 'title', { required: true });
-  const description = v.str(args.description, 'description', { required: false, max: v.MAX_TEXT });
-  const priority = v.oneOf(args.priority, VALID_PRIORITIES, 'priority');
-  const category = v.oneOf(args.category, VALID_CATEGORIES, 'category');
-  const dueDate = v.date(args.due_date, 'due_date');
-  const dueTime = v.time(args.due_time, 'due_time');
+// The slim field selection each write tool answers with, mapped out of the
+// route's `data`. The route answers with the whole row - assignments, rotation,
+// attachments, sync targets - and an LLM needs none of it; the selection lives
+// here so it does not grow with the route's answer.
+const TASK_FIELDS = ['id', 'title', 'status', 'priority', 'category', 'due_date', 'due_time', 'tags'];
+const ITEM_FIELDS = ['id', 'name', 'quantity', 'category', 'is_checked'];
+const EVENT_FIELDS = ['id', 'title', 'start_datetime', 'end_datetime', 'all_day', 'location'];
 
-  const errors = v.collectErrors([title, description, priority, category, dueDate, dueTime]);
-  if (errors.length) throw new ToolError(errors.join(' '));
+/**
+ * Exactly the listed fields of `row`, in that order; a missing one is null.
+ * @param {any} row
+ * @param {readonly string[]} fields
+ * @returns {Record<string, any>}
+ */
+function pickFields(row, fields) {
+  /** @type {Record<string, any>} */
+  const picked = {};
+  for (const field of fields) picked[field] = row?.[field] ?? null;
+  return picked;
+}
 
-  const result = db.prepare(`
-    INSERT INTO tasks (title, description, category, priority, due_date, due_time, created_by, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'open')
-  `).run(
-    title.value,
-    description.value,
-    // 'misc' ist der Key der Auffangkategorie, 'Sonstiges' war ihr Anzeigename
-    // vor v83. Der alte Fallback schrieb einen Key, den task_categories nie
-    // hatte: die Aufgabe fiel damit aus Dropdown und Filter und sprang beim
-    // ersten Speichern still auf die erste echte Kategorie. Migration v114
-    // hat den Bestand geputzt - diese Zeile hat ihn weiter nachgeliefert.
-    category.value || 'misc',
-    priority.value || 'none',
-    dueDate.value,
-    dueTime.value,
-    actorId,
-  );
+/**
+ * Only the fields the caller actually passed. A field left out stays out of the
+ * request body, so the ROUTE's default applies - that is the whole point of
+ * going through it (default points, fallback category, fallback visibility).
+ *
+ * `null` AND `''` COUNT AS NOT PASSED, exactly as they did before #2616: the
+ * old tool read both through `v.str`/`v.oneOf`, which answer `null` for them. A
+ * client that serializes an unset optional argument as `null` sends
+ * `{ category: null }`, and the route reads that differently - `textShape`
+ * WITHOUT `{ nullable: true }` makes it "category must be text.", a 400. `''`
+ * passes the route's checks; until the task route read it itself
+ * (`normalizeBlankTaskFields` in server/routes/tasks.js), its defaults
+ * (`category = FALLBACK_CATEGORY`, `priority = 'none'`) applied to `undefined`
+ * only: the row got the orphan key `''` (cleaned up by migration v114),
+ * `priority: ''` ran into the CHECK as a 500, `description: ''` stored `''`
+ * instead of NULL. Dropping `''` here keeps the tool independent of each
+ * route's reading. No field of the three tool schemas is nullable, and none
+ * gives `''` a meaning of its own.
+ * @param {Record<string, any>} fields
+ * @returns {Record<string, any>}
+ */
+function passedFields(fields) {
+  /** @type {Record<string, any>} */
+  const body = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value != null && value !== '') body[key] = value;
+  }
+  return body;
+}
 
-  // Tags mitschreiben (#586). normalizeTags nimmt Array wie kommaseparierten
-  // String - ein LLM-Client schickt mal das eine, mal das andere.
-  const tags = setTags(db, result.lastInsertRowid, args.tags ?? []);
+/**
+ * A finite number in a TEXT field becomes its text, as the old tool's `v.str`
+ * did with `String(val)`: `{ title: 42 }` created a task "42" before #2616, and
+ * the route's `textShape` refuses a number. Only for the free-text fields -
+ * a number as category or priority was refused before as well.
+ * @param {any} value
+ * @returns {any}
+ */
+function asText(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : value;
+}
 
-  const task = db.prepare(
-    'SELECT id, title, status, priority, category, due_date, due_time FROM tasks WHERE id = ?'
-  ).get(result.lastInsertRowid);
-  return { ...task, tags };
+// The limit of the `Idempotency-Key` header, as server/middleware/idempotency.js
+// draws it (MAX_KEY_LENGTH, printable ASCII). Named a second time instead of
+// imported: that module pulls in server/db.js, and this layer stays testable
+// without the database module; test:idempotency binds the two numbers. A value
+// the route judges differently still gets the route's own 400 - this check only
+// keeps `fetch` from throwing on a header value it cannot send.
+const MAX_IDEMPOTENCY_KEY_LENGTH = 255;
+
+/**
+ * The extra request headers for a write tool: opt-in retry safety (#2616).
+ * Without the argument no header goes out, so nothing changes for callers that
+ * do not ask for it. NOT derived from the JSON-RPC id: a client counting its
+ * ids up would get a promise it never ordered, and one reusing them would get a
+ * 409 for a genuinely new task.
+ * @param {any} args
+ * @returns {{ 'Idempotency-Key': string }|undefined}
+ */
+function idempotencyHeader(args) {
+  const raw = args.idempotency_key;
+  // `''` like `null`: not given, as for every other optional field.
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const key = typeof raw === 'string' ? raw.trim() : '';
+  if (!key || key.length > MAX_IDEMPOTENCY_KEY_LENGTH || /[^\x20-\x7E]/.test(key)) {
+    throw new ToolError(
+      `idempotency_key must be printable ASCII, 1 to ${MAX_IDEMPOTENCY_KEY_LENGTH} characters.`,
+    );
+  }
+  return { 'Idempotency-Key': key };
+}
+
+async function createTask(ctx, args) {
+  const data = await internalApiRequest(ctx, 'POST', '/api/v1/tasks', {
+    // Validation, the category check and the fallbacks all belong to the route
+    // (#2616): the fixed list here refused a household's own category and still
+    // wrote a default key the household had deleted.
+    payload: passedFields({
+      title: asText(args.title),
+      description: asText(args.description),
+      category: args.category,
+      priority: args.priority,
+      due_date: args.due_date,
+      due_time: args.due_time,
+      // Tags travel along (#586). The route's setTags takes an array as well as
+      // a comma-separated string - an LLM client sends one or the other.
+      tags: args.tags,
+    }),
+    headers: idempotencyHeader(args),
+  });
+  return pickFields(data?.data, TASK_FIELDS);
 }
 
 function listShoppingItems(db, args) {
@@ -160,17 +256,13 @@ function listShoppingItems(db, args) {
   return db.prepare(sql).all();
 }
 
-function addShoppingItem(db, actorId, args) {
-  const name = v.str(args.name, 'name', { required: true });
-  const quantity = v.str(args.quantity, 'quantity', { required: false, max: v.MAX_SHORT });
-  const category = v.str(args.category, 'category', { required: false, max: v.MAX_SHORT });
-
-  const errors = v.collectErrors([name, quantity, category]);
-  if (errors.length) throw new ToolError(errors.join(' '));
-
+async function addShoppingItem(ctx, args) {
+  // RESOLVING THE LIST BY NAME IS WHAT ONLY THIS TOOL CAN DO: the route knows
+  // its id, not its name, and an LLM names lists the way a person does. Read
+  // only, and the two messages stay word for word what they were.
   const list = args.list
-    ? db.prepare('SELECT id FROM shopping_lists WHERE name = ? ORDER BY id LIMIT 1').get(String(args.list).trim())
-    : db.prepare('SELECT id FROM shopping_lists ORDER BY id LIMIT 1').get();
+    ? ctx.db.prepare('SELECT id, name FROM shopping_lists WHERE name = ? ORDER BY id LIMIT 1').get(String(args.list).trim())
+    : ctx.db.prepare('SELECT id, name FROM shopping_lists ORDER BY id LIMIT 1').get();
 
   if (!list) {
     throw new ToolError(args.list
@@ -178,16 +270,16 @@ function addShoppingItem(db, actorId, args) {
       : 'No shopping list exists yet. Create one in the app first.');
   }
 
-  const result = db.prepare(`
-    INSERT INTO shopping_items (list_id, name, quantity, category)
-    VALUES (?, ?, ?, ?)
-  `).run(list.id, name.value, quantity.value, category.value || 'Sonstiges');
-
-  return db.prepare(`
-    SELECT si.id, si.name, si.quantity, si.category, si.is_checked, sl.name AS list
-    FROM shopping_items si JOIN shopping_lists sl ON sl.id = si.list_id
-    WHERE si.id = ?
-  `).get(result.lastInsertRowid);
+  const data = await internalApiRequest(ctx, 'POST', `/api/v1/shopping/${encodeURIComponent(list.id)}/items`, {
+    // No category of our own any more (#2616): the route checks it against
+    // `validCategoryNames()` and falls back on the household's own rule. The
+    // fixed 'Sonstiges' here wrote a name a renamed household no longer had.
+    payload: passedFields({ name: asText(args.name), quantity: asText(args.quantity), category: args.category }),
+    headers: idempotencyHeader(args),
+  });
+  // `list` as a NAME: the route answers with the item row, which only carries
+  // the list id. The name comes from the same row the id was resolved from.
+  return { ...pickFields(data?.data, ITEM_FIELDS), list: list.name };
 }
 
 function listUpcomingEvents(db, actorId, args) {
@@ -222,39 +314,28 @@ function listUpcomingEvents(db, actorId, args) {
   }));
 }
 
-function createEvent(db, actorId, args) {
-  const title = v.str(args.title, 'title', { required: true });
-  // Derselbe Weg wie POST /api/v1/calendar (#1364): ein `Z` oder Offset - von
-  // LLM-Clients die naheliegende Form - wird in die Haushaltszone umgerechnet
-  // statt abgeschnitten; ganztaegig zaehlt nur das Datum.
-  const zoneOpts = { to: 'wall', zone: householdTimeZone(db), allDay: args.all_day === true };
-  const start = v.datetime(args.start_datetime, 'start_datetime', true, zoneOpts);
-  const end = v.datetime(args.end_datetime, 'end_datetime', false, zoneOpts);
-  const location = v.str(args.location, 'location', { required: false, max: v.MAX_SHORT });
-  const description = v.str(args.description, 'description', { required: false, max: v.MAX_TEXT });
-
-  const errors = v.collectErrors([title, start, end, location, description]);
-  if (errors.length) throw new ToolError(errors.join(' '));
-
-  const result = db.prepare(`
-    INSERT INTO calendar_events
-      (title, description, start_datetime, end_datetime, all_day, location, created_by, external_source,
-       series_authored)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'local', 1)
-  `).run(
-    title.value,
-    description.value,
-    start.value,
-    end.value,
-    args.all_day === true ? 1 : 0,
-    location.value,
-    actorId,
-  );
-
-  return db.prepare(`
-    SELECT id, title, start_datetime, end_datetime, all_day, location
-    FROM calendar_events WHERE id = ?
-  `).get(result.lastInsertRowid);
+async function createEvent(ctx, args) {
+  const data = await internalApiRequest(ctx, 'POST', '/api/v1/calendar', {
+    // The same path as any other client (#1364 included): a `Z` or an offset -
+    // the obvious form for an LLM client - is converted into the household zone
+    // instead of being cut off, and for an all-day event only the date counts.
+    // The route does that itself, and since #2616 it is the ONLY place that
+    // does; it also flushes a waiting sync target right away.
+    payload: passedFields({
+      title: asText(args.title),
+      description: asText(args.description),
+      start_datetime: args.start_datetime,
+      end_datetime: args.end_datetime,
+      // THE TOOL'S OWN COERCION STAYS. The route reads `!!req.body.all_day`,
+      // so every truthy value counts - the string "false" would turn a 09:30
+      // appointment into an all-day entry and drop its time. This tool has
+      // always accepted only the boolean `true`, and its schema says `boolean`.
+      all_day: args.all_day == null ? undefined : args.all_day === true,
+      location: asText(args.location),
+    }),
+    headers: idempotencyHeader(args),
+  });
+  return pickFields(data?.data, EVENT_FIELDS);
 }
 
 // --------------------------------------------------------
@@ -506,7 +587,23 @@ async function readCappedBinary(response, cap = MAX_BINARY_RESPONSE_BYTES) {
   return Buffer.concat(chunks);
 }
 
-async function internalApiRequest(ctx, method, path, { query, payload, contentData, contentType } = {}) {
+// Die Zusatzkoepfe, die ein Werkzeug mitgeben darf (klein geschrieben). Eine
+// Erlaubnisliste statt einer Reihenfolge: nur so kann ein Zusatzkopf die
+// weitergereichte Authentifizierung in KEINER Schreibweise beruehren.
+const EXTRA_REQUEST_HEADERS = new Set(['idempotency-key']);
+
+/**
+ * Ein authentifizierter Loopback-Aufruf auf die eigene REST-API.
+ * @param {{ requestHeaders?: object }} ctx
+ * @param {string} method
+ * @param {string} path
+ * @param {{ query?: object, payload?: any, contentData?: string, contentType?: string, headers?: object }} [options]
+ * @returns {Promise<any>} der geparste Antwortrumpf
+ * @throws {ToolError} bei `!response.ok`, mit `status`, `code` und `reason`
+ */
+async function internalApiRequest(ctx, method, path, {
+  query, payload, contentData, contentType, headers: extraHeaders,
+} = {}) {
   const url = new URL(path, `${internalBaseUrl()}/`);
   for (const [key, value] of Object.entries(query || {})) {
     if (value === undefined || value === null) continue;
@@ -517,7 +614,15 @@ async function internalApiRequest(ctx, method, path, { query, payload, contentDa
     }
   }
 
-  const headers = { Accept: 'application/json', ...forwardedAuthHeaders(ctx) };
+  // Nur gelistete Zusatzkoepfe, die Auth danach: die Reihenfolge allein reicht
+  // nicht, `fetch` fasst `authorization` und `Authorization` zu EINEM Kopf mit
+  // beiden Werten zusammen.
+  /** @type {Record<string, string>} */
+  const allowed = { Accept: 'application/json' };
+  for (const [name, value] of Object.entries(extraHeaders || {})) {
+    if (EXTRA_REQUEST_HEADERS.has(name.toLowerCase())) allowed[name] = value;
+  }
+  const headers = { ...allowed, ...forwardedAuthHeaders(ctx) };
   const options = { method, headers };
   if (contentData !== undefined && contentData !== null) {
     options.body = contentBytes(contentData);
@@ -527,7 +632,41 @@ async function internalApiRequest(ctx, method, path, { query, payload, contentDa
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(url, options);
+  // EIN TRANSPORTFEHLER IST EINE MELDUNG, KEIN INTERNER FEHLER. Der Loopback
+  // folgt `MCP_INTERNAL_BASE_URL`, sonst `BASE_URL` - und das ist auf vielen
+  // Installationen die oeffentliche Adresse hinter einem Reverse Proxy, die aus
+  // dem Prozess selbst nicht erreichbar sein muss. Ohne diesen Fang wirft
+  // `fetch` einen TypeError, und der Aufrufer liest "Internal error executing
+  // tool." - ein Satz, aus dem niemand den Namen der Einstellung errät. Die
+  // Meldung ist fest: weder der Text der Bibliothek (Regel ERROR-TEXT) noch die
+  // interne Adresse geht hinaus. Der Originalfehler bleibt als `cause` am Fehler.
+  //
+  // Der Betreiber sieht ihn im Log: Ursache und Basisadresse, diese ohne
+  // Zugangsdaten aus der URL, und keine Koepfe - die tragen das weitergereichte
+  // Token oder den Session-Cookie. Pfad und Query der Anfrage bleiben draussen.
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (cause) {
+    const base = new URL(`${internalBaseUrl()}/`);
+    base.username = '';
+    base.password = '';
+    base.search = '';
+    base.hash = '';
+    // Name and code only, never the cause's text: undici quotes an invalid
+    // header value in its message, and the headers carry the forwarded token.
+    log.warn('Loopback to the own API failed', {
+      base: base.href.replace(/\/+$/, ''),
+      cause: cause instanceof Error ? cause.name : typeof cause,
+      code: cause?.cause?.code,
+    });
+    throw new ToolError(
+      'Could not reach the Yuvomi API from the server itself. '
+      + 'Set MCP_INTERNAL_BASE_URL to an address the app can reach locally '
+      + '(for example http://127.0.0.1:3000).',
+      { cause },
+    );
+  }
   const responseContentType = response.headers.get('content-type') || '';
   let data;
   if (responseContentType.includes('application/json')) {
@@ -546,18 +685,35 @@ async function internalApiRequest(ctx, method, path, { query, payload, contentDa
   }
 
   if (!response.ok) {
-    const message = data && typeof data === 'object' && data.error
-      ? data.error
-      : `HTTP ${response.status}`;
-    throw new ToolError(`${message}`);
+    const body = data && typeof data === 'object' ? /** @type {any} */ (data) : null;
+    const message = body && body.error ? body.error : `HTTP ${response.status}`;
+    // `reason` ist der maschinenlesbare Grund der Route (#1607): derselbe 403
+    // heisst "kein Modulzugriff", "nur lesen" oder "CSRF fehlt", und der
+    // englische Satz allein sagt dem Aufrufer nicht, was er aendern soll. Steht
+    // einer in der Antwort, haengt er sichtbar an der Meldung; ohne ihn bleibt
+    // der Text Zeichen fuer Zeichen der von vorher.
+    const reason = body && typeof body.reason === 'string' ? body.reason : null;
+    const error = new ToolError(reason ? `${message} [reason: ${reason}]` : `${message}`);
+    error.status = response.status;
+    error.code = body && body.code !== undefined ? body.code : null;
+    error.reason = reason;
+    throw error;
   }
   return data;
 }
 
 // --------------------------------------------------------
 // Registry: Definition + Handler je Tool an EINER Stelle.
-// `handler(ctx, args)` mit ctx = { db, actor: { id, role }, requestHeaders }.
+// `handler(ctx, args)` mit ctx = { db, actor, requestHeaders }; der Akteur kommt
+// aus server/authorize/ (`actorFromRequest`), die Handler lesen `actor.userId`.
 // --------------------------------------------------------
+
+// One wording for all three write tools (#2616): the same promise, so a client
+// that learned it on one tool can use it on the next.
+const IDEMPOTENCY_KEY_SCHEMA = {
+  type: 'string',
+  description: 'Optional retry safety: repeating the call with the same key does not create a second row but returns the first answer. Printable ASCII, at most 255 characters. Leave it out and every call creates its own row; reusing a key for different content is an error.',
+};
 
 const CORE_TOOLS = [
   {
@@ -576,7 +732,7 @@ const CORE_TOOLS = [
         },
       },
     },
-    handler: (ctx, args) => listTasks(ctx.db, ctx.actor.id, args),
+    handler: (ctx, args) => listTasks(ctx.db, ctx.actor.userId, args),
   },
   {
     name: 'create_task',
@@ -587,7 +743,10 @@ const CORE_TOOLS = [
       properties: {
         title:       { type: 'string', description: 'Short task title (required).' },
         description: { type: 'string', description: 'Optional longer description.' },
-        category:    { type: 'string', enum: VALID_CATEGORIES, description: 'Optional category.' },
+        // No enum: a household manages its own categories, and a fixed list
+        // refused them while still accepting a default key the household had
+        // deleted (#2616).
+        category:    { type: 'string', description: 'Optional category key. The valid keys are the household\'s own task categories, as listed by list_tasks and by GET /api/v1/tasks/categories; left out, the task falls back on "misc".' },
         priority:    { type: 'string', enum: VALID_PRIORITIES, description: 'Optional priority (default none).' },
         due_date:    { type: 'string', description: 'Optional due date, format YYYY-MM-DD.' },
         due_time:    { type: 'string', description: 'Optional due time, format HH:MM.' },
@@ -596,10 +755,11 @@ const CORE_TOOLS = [
           items: { type: 'string' },
           description: 'Optional free-form tags. Unlike the single category, a task can carry many. Mirrored to CATEGORIES on CalDAV task lists.',
         },
+        idempotency_key: IDEMPOTENCY_KEY_SCHEMA,
       },
       required: ['title'],
     },
-    handler: (ctx, args) => createTask(ctx.db, ctx.actor.id, args),
+    handler: createTask,
   },
   {
     name: 'list_shopping_items',
@@ -622,12 +782,13 @@ const CORE_TOOLS = [
       properties: {
         name:     { type: 'string', description: 'Item name (required).' },
         quantity: { type: 'string', description: 'Optional quantity, e.g. "2" or "500 g".' },
-        category: { type: 'string', description: 'Optional category.' },
+        category: { type: 'string', description: 'Optional category name. The valid names are the household\'s own shopping categories, as listed by list_shopping_items and by GET /api/v1/shopping/categories.' },
         list:     { type: 'string', description: 'Optional target list name.' },
+        idempotency_key: IDEMPOTENCY_KEY_SCHEMA,
       },
       required: ['name'],
     },
-    handler: (ctx, args) => addShoppingItem(ctx.db, ctx.actor.id, args),
+    handler: addShoppingItem,
   },
   {
     name: 'list_upcoming_events',
@@ -639,7 +800,7 @@ const CORE_TOOLS = [
         limit: { type: 'integer', description: 'Max number of events (1-100, default 20).' },
       },
     },
-    handler: (ctx, args) => listUpcomingEvents(ctx.db, ctx.actor.id, args),
+    handler: (ctx, args) => listUpcomingEvents(ctx.db, ctx.actor.userId, args),
   },
   {
     name: 'create_event',
@@ -654,10 +815,11 @@ const CORE_TOOLS = [
         all_day:        { type: 'boolean', description: 'Whether the event lasts all day.' },
         location:       { type: 'string', description: 'Optional location.' },
         description:    { type: 'string', description: 'Optional description.' },
+        idempotency_key: IDEMPOTENCY_KEY_SCHEMA,
       },
       required: ['title', 'start_datetime'],
     },
-    handler: (ctx, args) => createEvent(ctx.db, ctx.actor.id, args),
+    handler: createEvent,
   },
 ];
 
@@ -781,18 +943,24 @@ const TOOL_MAP = new Map(ALL_TOOLS.map((t) => [t.name, t]));
  *   2. Modulrechte des Nutzers (#467) — was das Mitglied hinter dem Token
  *      überhaupt darf. `moduleAccess === null` = Admin oder unbeschränkt.
  *
- * Punkt 2 fehlte hier (#823): die Kern-Tools laufen in-process gegen SQLite und
- * sehen die /api/v1-Middleware nie, ein Mitglied mit `tasks: none` bekam über
- * `list_tasks` trotzdem die Aufgaben. Ein Scope kann Rechte nur einschränken,
- * niemals erweitern — deshalb ist die Reihenfolge egal, aber die Konjunktion
- * nicht.
+ * Punkt 2 fehlte hier (#823): die LESENDEN Kern-Tools laufen in-process gegen
+ * SQLite und sehen die /api/v1-Middleware nie, ein Mitglied mit `tasks: none`
+ * bekam über `list_tasks` trotzdem die Aufgaben. Ein Scope kann Rechte nur
+ * einschränken, niemals erweitern - deshalb ist die Reihenfolge egal, aber die
+ * Konjunktion nicht.
+ *
+ * DIESE PRÜFUNG BLEIBT AUCH FÜR DIE SCHREIBENDEN, obwohl sie seit #2616 per
+ * Loopback über /api/v1 gehen und dort denselben Stapel noch einmal treffen:
+ * ein Werkzeug, das erst schreibt und dann meckert, wäre die schlimmere
+ * Variante, und `tools/list` soll kein Werkzeug nennen, das der nächste Aufruf
+ * verweigert. Sie steht deshalb VOR dem Loopback.
  *
  * Tools ohne `scope` (Meta-/Brücken-Tools) bleiben erlaubt: die OpenAPI-Brücke
  * ruft per Loopback über /api/v1 auf und erbt dort Scopes, Modulrechte und
  * Guest-Guard vom echten Middleware-Stapel. Ausnahme sind Split-Guests, die
  * gar keinen Haushaltszugriff haben — für sie sind alle Kern-Tools zu.
  *
- * @param {{ scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean, display?: boolean }|null} actor
+ * @param {{ kind?: string, userId?: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }|null} actor
  * @param {{ scope?: { module: string, access: 'read'|'write' } }} tool
  * @returns {boolean}
  */
@@ -817,21 +985,26 @@ function toolAllowed(actor, tool) {
   // OFFEN UND NICHT HIER ENTSCHIEDEN: dass ein Gast ueber die beiden anderen
   // den vollstaendigen OpenAPI-Katalog liest, obwohl `/openapi.json` ueber REST
   // administratorgesperrt ist. Das ist ein eigener Befund, aelter als #1208.
-  if (actor && actor.display) return false;
+  // `unresolved`: a lookup that decides the kind failed or contradicts the other
+  // (server/authorize/) - closed like a display, as the old lookups said true then.
+  if (actor && (actor.kind === 'display' || actor.unresolved)) return false;
   if (!tool.scope) return true;
   // Gast-Konten für geteilte Ausgaben erreichen unter /api/v1 nur
   // /split-expenses; kein Kern-Tool liegt dort, also alle gesperrt.
-  if (actor && actor.splitGuest) return false;
-  const scopes = actor ? (actor.scopes ?? null) : null;
-  if (!tokenAllows(scopes, tool.scope.module, tool.scope.access)) return false;
-  const moduleAccess = actor ? (actor.moduleAccess ?? null) : null;
-  return moduleAccessVerdict(moduleAccess, tool.scope.module, tool.scope.access) === MODULE_ACCESS_ALLOW;
+  if (actor && actor.kind === 'guest') return false;
+  // No actor: neither scopes nor module rights narrow anything, and the tool is
+  // allowed, as before B2 (`listToolDefinitions()` without an actor lists every
+  // tool). authorize() answers `null` with 'no_actor', so it is caught here.
+  if (!actor) return true;
+  // Token scopes, then the module rights - the module verdict of server/authorize/.
+  const verdict = authorize(/** @type {import('../authorize/index.ts').Actor} */ (actor), tool.scope.access, { module: tool.scope.module });
+  return verdict.allowed;
 }
 
 /**
  * Tool-Definitionen für `tools/list`, gefiltert auf das, was der Akteur wirklich
  * aufrufen darf — ein LLM sieht kein Tool, das ihm der nächste Aufruf verweigert.
- * @param {{ scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean, display?: boolean }|null} actor
+ * @param {{ kind?: string, userId?: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }|null} actor
  * @returns {Array<{ name: string, description: string, inputSchema: object }>}
  */
 function listToolDefinitions(actor = null) {
@@ -842,7 +1015,7 @@ function listToolDefinitions(actor = null) {
 
 /**
  * Führt ein Tool aus.
- * @param {{ db: object, actor: { id: number, role?: string, scopes?: string[]|null, moduleAccess?: object|null, splitGuest?: boolean }, requestHeaders?: object }} ctx
+ * @param {{ db: object, actor: { kind?: string, userId: number|null, role?: string|null, familyRole?: string|null, scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }, requestHeaders?: object }} ctx
  * @param {string} name  - Tool-Name
  * @param {object} args  - Tool-Argumente
  * @returns {Promise<any>} rohes Ergebnis (wird vom Protokoll-Layer serialisiert)
@@ -860,4 +1033,4 @@ async function callTool(ctx, name, args = {}) {
   return tool.handler(ctx, args || {});
 }
 
-export { TOOL_DEFINITIONS, listToolDefinitions, callTool, ToolError };
+export { TOOL_DEFINITIONS, listToolDefinitions, callTool, ToolError, MAX_IDEMPOTENCY_KEY_LENGTH };

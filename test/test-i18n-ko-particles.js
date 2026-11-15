@@ -555,7 +555,8 @@ function serverSourceFiles(dir = SERVER_DIR, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
     if (entry.isDirectory()) serverSourceFiles(url, out);
-    else if (entry.name.endsWith('.js')) out.push(url);
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(js|ts)$/.test(entry.name)) out.push(url);
   }
   return out;
 }

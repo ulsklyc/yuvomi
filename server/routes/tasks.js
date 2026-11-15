@@ -5,10 +5,14 @@
  */
 
 import { createLogger } from '../logger.js';
-import { mayWriteModule, requestHasCapability } from '../permissions.js';
+import {
+  mayWriteModule,
+  requestHasCapability,
+  normalizeVisibility,
+  visibleWhere,
+} from '../authorize/index.ts';
 import express from 'express';
 import * as db from '../db.js';
-import { documentVisibleSql } from '../services/document-access.js';
 import { sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../services/document-links.js';
 import { nextDueAfterCompletion } from '../services/recurrence.js';
@@ -20,7 +24,6 @@ import {
 import { activeAccountSql } from '../services/account-state.js';
 import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/task-completions.js';
 import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
-import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
 import {
   flushOutbound, markTodoOutbound, queueTodoDeletion, recurrenceFollowupTarget,
   continuesForeignSeries, handOverForeignSeries, takeBackForeignSeries,
@@ -29,8 +32,10 @@ import { uniqueKey } from '../utils/category-slug.js';
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { resolvePermissions } from '../permissions.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import {
+  actorForUser, authorize, householdVisible, rowVisible, taskReader, taskRowVisible, taskVisibleWhere,
+} from '../authorize/index.ts';
+import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 import { householdMemberSql, isHouseholdMember, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 import { pushService } from '../services/push.js';
@@ -402,29 +407,11 @@ function reopensSettledVisit(d, taskId, fromStatus, toStatus) {
 }
 
 /** Alle Subtasks einer Aufgabe laden (eine Ebene tief). */
-/**
- * Darf `me` diese Aufgabe ueberhaupt sehen? Genau die Bedingung, die jede
- * Leseabfrage schon anlegt - hier fuer die schreibenden Routen, die sie nie
- * hatten: PUT und DELETE luden die Zeile per id und arbeiteten darauf, ohne zu
- * fragen. Wer eine fremde ID kannte, konnte eine private Aufgabe eines anderen
- * aendern oder loeschen. Aufgefallen ueber die Unteraufgaben (#748-Review), wo
- * die Liste fremde Titel mitlieferte und die IDs damit frei Haus kamen.
- *
- * Bewusst dieselbe Regel wie beim Lesen und keine engere: wer eine Aufgabe sieht,
- * darf sie im Haushalt auch bearbeiten - das ist die bestehende Zusage des
- * Moduls. Neu ist nur, dass Unsichtbares auch unantastbar ist.
- */
-function mayAccessTask(task, me) {
-  if (!task) return false;
-  if (task.visibility === 'all') return true;
-  if (task.created_by === me) return true;
-  if (task.visibility === 'assignees') {
-    return !!db.get().prepare(
-      'SELECT 1 FROM task_assignments WHERE task_id = ? AND user_id = ?'
-    ).get(task.id, me);
-  }
-  return false;
-}
+// Who may see a task is asked of server/authorize: rowVisible(db, 'tasks', row, me)
+// for a loaded row, the same rule every read query applies. The write routes below
+// ask it before they act (#748/#769: PUT and DELETE used to load the row by id and
+// work on it - a foreign private task could be changed or deleted by its id). The
+// reasoning stands at rowVisible's rule, authorize/rows/assignees.ts.
 
 /**
  * Die Aufgabe, deren Sperre hier gilt - sie selbst, ihre Elternaufgabe, oder
@@ -514,7 +501,8 @@ function sameFieldValue(a, b) {
   return String(a ?? '') === String(b ?? '');
 }
 
-function loadSubtasks(taskId, me) {
+/** @param {number} taskId @param {import('../authorize/index.ts').TaskReader} reader */
+function loadSubtasks(taskId, reader) {
   // Eine Unteraufgabe trägt eine eigene Sichtbarkeit (POST nimmt das Feld
   // entgegen). Sie hing hier noch nie an der Regel: unter einer geteilten
   // Elternaufgabe wurde eine private Unteraufgabe samt Titel ausgeliefert.
@@ -525,9 +513,9 @@ function loadSubtasks(taskId, me) {
     FROM tasks t
     LEFT JOIN users u ON t.assigned_to = u.id
     WHERE t.parent_task_id = ?
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
+      AND ${taskVisibleWhere(reader, 't')}
     ORDER BY t.created_at ASC
-  `).all(taskId, { me }).map(addAssignedUsers);
+  `).all(taskId, { me: reader.userId }).map(addAssignedUsers);
   // Unteraufgaben sind Aufgaben und können Tags tragen - über den CalDAV-Spiegel
   // bekommen sie welche, ohne dass jemand sie hier vergibt. Ohne das Anhängen
   // wären sie in der Antwort einfach nicht da, und ein PUT auf Basis dieser
@@ -548,14 +536,34 @@ function validateTags(value) {
 }
 
 /**
- * Ein leerer String in einem Tagesfeld heisst "kein Wert". Die Validatoren
- * lassen '' durch, und die Zeile trug danach '' statt NULL, gegen
- * `format: date` in der Spec und gegen jede Abfrage auf `IS NULL`.
+ * Leere Strings lesen, bevor validiert und geschrieben wird - die eine Stelle
+ * fuer POST und PUT. Die Validatoren lassen '' durch (`v.oneOf` definiert es
+ * ausdruecklich als "nicht angegeben"), und danach trug die Zeile den Wert roh.
+ *
+ * - Tagesfelder: '' heisst "kein Wert" und wird NULL - sonst stand '' in der
+ *   Zeile, gegen `format: date` in der Spec und gegen jede Abfrage auf `IS NULL`.
+ * - Kategorie und Prioritaet: '' heisst "nicht angegeben", wie bei `v.oneOf`.
+ *   Das Feld faellt weg, damit dieselbe Vorgabe greift wie beim Weglassen:
+ *   beim Anlegen `misc`/`none`, beim Aktualisieren der Bestand. Vorher trug die
+ *   Zeile den Kategorie-Key '' (die Waisen, die Migration v114 geputzt hat),
+ *   und '' als Prioritaet lief in den CHECK und kam als 500 zurueck. Die App
+ *   schickt '' fuer die Kategorie, wenn ihre Kategorienliste leer geladen ist.
+ * - Beschreibung: getrimmt, leer oder nur Leerzeichen wird NULL - wie im
+ *   Kalender, der den Wert aus `v.str` schreibt. Vorher stand der rohe Wert in
+ *   der Zeile. Beim PUT ist '' damit ein gewolltes Leeren.
+ *
+ * Nur Strings werden angefasst: eine falsche Form bleibt, wie sie ist, und
+ * `v.textShape` weist sie ab.
  */
-function blankDayFieldsToNull(body) {
+function normalizeBlankTaskFields(body) {
+  if (!body || typeof body !== 'object') return;
   for (const field of ['start_date', 'due_date', 'due_time']) {
-    if (body?.[field] === '') body[field] = null;
+    if (body[field] === '') body[field] = null;
   }
+  for (const field of ['category', 'priority']) {
+    if (body[field] === '') delete body[field];
+  }
+  if (typeof body.description === 'string') body.description = body.description.trim() || null;
 }
 
 /**
@@ -668,9 +676,9 @@ router.get('/sync-targets', (req, res) => {
 // --------------------------------------------------------
 router.get('/completions', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
+    // A paired display reads the feed under the wall rule (taskReader).
     const { entries, hasMore } = completionFeed(db.get(), {
-      me,
+      reader: taskReader(req),
       limit: req.query.limit,
       userId: req.query.user_id ? Number(req.query.user_id) : null,
       beforeAt: req.query.before_at || null,
@@ -735,7 +743,7 @@ function visibleTaskIds(ids, me) {
   return db.get().prepare(`
     SELECT t.id AS id FROM tasks t
     WHERE t.id IN (${placeholders})
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
+      AND ${visibleWhere('tasks', 't', '@me')}
   `).all(...ids, { me }).map((r) => r.id);
 }
 
@@ -1093,6 +1101,9 @@ router.delete('/categories/:key', (req, res) => {
 router.get('/', (req, res) => {
   try {
     const { status, priority, assigned_to, category, tag, include_future, archived } = req.query;
+    // A paired display reads the list under the wall rule (taskReader), the parent
+    // rows and the three subtask subqueries alike; people under the task row rule.
+    const reader = taskReader(req);
 
     let sql = `
       SELECT
@@ -1108,12 +1119,12 @@ router.get('/', (req, res) => {
         -- dieselbe Regel fehlte hier. Ohne den Filter zeigt die Zeile fremde
         -- private Titel und bietet Aktionen darauf an.
         (SELECT COUNT(*) FROM tasks s WHERE s.parent_task_id = t.id
-           AND ${visibilityWhere('s', 'task_assignments', 'task_id')})                         AS subtask_total,
+           AND ${taskVisibleWhere(reader, 's')})                           AS subtask_total,
         (SELECT COUNT(*) FROM tasks s WHERE s.parent_task_id = t.id AND s.status = 'done'
-           AND ${visibilityWhere('s', 'task_assignments', 'task_id')})                         AS subtask_done,
+           AND ${taskVisibleWhere(reader, 's')})                           AS subtask_done,
         (SELECT json_group_array(json_object('id', s.id, 'title', s.title, 'status', s.status))
            FROM (SELECT s.id, s.title, s.status FROM tasks s WHERE s.parent_task_id = t.id
-                   AND ${visibilityWhere('s', 'task_assignments', 'task_id')}
+                   AND ${taskVisibleWhere(reader, 's')}
                  ORDER BY s.created_at ASC) s) AS subtasks
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
@@ -1122,8 +1133,8 @@ router.get('/', (req, res) => {
     const params = [];
 
     // DER TAGESSCHLÜSSEL MUSS ALS ERSTER PARAMETER STEHEN: das Scope-Fragment
-    // sitzt am Anfang der WHERE-Klausel, also vor jedem Filter unten. Die
-    // SELECT-Klausel bindet ihre sechs `me` erst am Ende per unshift davor.
+    // sitzt am Anfang der WHERE-Klausel, also vor jedem Filter unten. The viewer
+    // binds by name (@me, the trailing bind object), so it takes no position here.
     if (taskScopeNeedsToday({ includeFuture: !!include_future })) params.push(todayInHouseholdZone());
 
     // Status, Priorität und Person nehmen mehrere Werte entgegen und verknüpfen
@@ -1200,17 +1211,9 @@ router.get('/', (req, res) => {
       params.push(tagKey(value));
     }
 
-    // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare.
-    const me = req.authUserId || req.session.userId;
-    sql += ` AND ${visibilityWhere('t', 'task_assignments', 'task_id')}`;
-    params.push(me, me);
-
-    // Die drei Unteraufgaben-Subqueries oben tragen dieselbe Bedingung und damit
-    // je zwei Platzhalter. Sie stehen in der SELECT-Klausel, also VOR jedem
-    // anderen Platzhalter dieser Anfrage - deshalb unshift und nicht push. Die
-    // SELECT-Klausel bindet sonst nichts; wer dort einen Platzhalter ergänzt,
-    // muss diese Reihenfolge mitziehen.
-    params.unshift(me, me, me, me, me, me);
+    // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare;
+    // for a paired display only what the whole household sees (the wall rule).
+    sql += ` AND ${taskVisibleWhere(reader, 't')}`;
 
     sql += `
       ORDER BY
@@ -1221,7 +1224,7 @@ router.get('/', (req, res) => {
         t.created_at DESC
     `;
 
-    const rows = db.get().prepare(sql).all(...params).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
+    const rows = db.get().prepare(sql).all(...params, { me: reader.userId }).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
     res.json({ data: attachRotation(attachTags(attachDocumentCounts(rows, documentViewer(req)))) });
   } catch (err) {
     log.error('GET / error:', err);
@@ -1236,20 +1239,21 @@ router.get('/', (req, res) => {
 // --------------------------------------------------------
 router.get('/:id', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
+    // A paired display reads the task and its subtasks under the wall rule.
+    const reader = taskReader(req);
     const task = db.get().prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
         ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.id = ? AND t.parent_task_id IS NULL
-        AND ${visibilityWhere('t', 'task_assignments', 'task_id')}
-    `).get(req.params.id, me, me);
+        AND ${taskVisibleWhere(reader, 't')}
+    `).get(req.params.id, { me: reader.userId });
 
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
 
     addAssignedUsers(task);
-    task.subtasks = loadSubtasks(task.id, me);
+    task.subtasks = loadSubtasks(task.id, reader);
     const viewer = documentViewer(req);
     attachDocumentCounts([task], viewer);
     // Die verknüpften Dokumente beim Namen, nicht nur gezählt (#733). Die
@@ -1277,7 +1281,7 @@ router.get('/:id', (req, res) => {
 // --------------------------------------------------------
 router.post('/', (req, res) => {
   try {
-    blankDayFieldsToNull(req.body);
+    normalizeBlankTaskFields(req.body);
     const errors = validateTaskInput(req.body, true);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1373,7 +1377,7 @@ router.post('/', (req, res) => {
       // gegen 404 die Kennung, und der Punkt stuende in einer fremden Checkliste.
       // Der Grund (#1909): die Aufgabe, an die der Teilschritt sollte, wurde
       // inzwischen geloescht oder privat gestellt - die Leseansicht sagt das.
-      if (!parent || !mayAccessTask(parent, req.authUserId || req.session.userId))
+      if (!parent || !rowVisible(db.get(), 'tasks', parent, req.authUserId || req.session.userId))
         return res.status(404).json({ error: 'Parent task not found.', code: 404, reason: 'tasks_parent_not_found' });
       if (parent.parent_task_id)
         return res.status(400).json({ error: 'At most 2 levels of nesting are allowed.', code: 400 });
@@ -1464,11 +1468,11 @@ router.put('/:id', (req, res) => {
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
-    if (!mayAccessTask(task, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', task, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
-    blankDayFieldsToNull(req.body);
+    normalizeBlankTaskFields(req.body);
     const errors = validateTaskInput(req.body, false, task.recurrence_rule);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1506,7 +1510,7 @@ router.put('/:id', (req, res) => {
       return res.status(409).json(FOREIGN_SERIES_ERROR);
     }
     if (reopensSettledVisit(db.get(), task.id, task.status, status) && !isAdminRequest(req)) {
-      return res.status(403).json({ error: 'Permission denied.', code: 403 });
+      return refuseAdmin(req, res);
     }
 
     // Primaerperson zuerst, dann in Eintragungsreihenfolge (#2569). Ohne
@@ -1572,7 +1576,15 @@ router.put('/:id', (req, res) => {
         recurrence_from_completion: recurrence_from_completion ? 1 : 0,
         countdown: countdown ? 1 : 0, points, visibility,
       };
-      let touchesDefinition = Object.keys(wanted).some((k) => !sameFieldValue(wanted[k], task[k]));
+      // Die Beschreibung auf BEIDEN Seiten so gelesen, wie normalizeBlankTaskFields
+      // die gesendete liest (getrimmt, leer -> NULL). Ein alter Schreibweg liess
+      // sie ungetrimmt in der Zeile; wer sie unveraendert zurueckschickt, aendert
+      // nichts an der Definition und bekam bisher 200, nicht 403.
+      const descriptionKey = (/** @type {any} */ value) =>
+        (typeof value === 'string' ? (value.trim() || null) : value);
+      let touchesDefinition = Object.keys(wanted).some((k) => (k === 'description'
+        ? !sameFieldValue(descriptionKey(wanted[k]), descriptionKey(task[k]))
+        : !sameFieldValue(wanted[k], task[k])));
 
       if (req.body.tags !== undefined
           && tagsKey(normalizeTags(req.body.tags)) !== tagsKey(tagsBefore)) touchesDefinition = true;
@@ -1716,7 +1728,7 @@ router.put('/:id', (req, res) => {
     })();
 
     addAssignedUsers(updated);
-    updated.subtasks = loadSubtasks(updated.id, req.authUserId || req.session.userId);
+    updated.subtasks = loadSubtasks(updated.id, taskReader(req));
     updated.next_due_date = nextDueDate;
 
     res.json({ data: updated });
@@ -1781,6 +1793,9 @@ function recurrenceFollowupOf(taskId) {
  * Sichtbarkeit, laesst sich danach aber einzeln umstellen. Wer das fruehere
  * Vorkommen abhakt, darf das Datum eines spaeteren, das er nicht sieht, nicht
  * ueber diese Antwort erfahren - dann gibt es fuer ihn kein „naechstes Mal".
+ *
+ * @param {number|string} taskId
+ * @param {(task: any) => boolean} [mayRead]
  */
 function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
   const seen = new Set([Number(taskId)]);
@@ -1817,8 +1832,8 @@ function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
  * (discardRecurrenceFollowup), oder das Vorkommen HINTER ihr.
  *
  * SICHTBARKEIT DES AUFRUFERS: ein Display sieht nur, was alle sehen (dieselbe
- * Regel wie fuer die Aufgabe selbst, #1209), ein Mensch, was mayAccessTask
- * ihm zeigt.
+ * Regel wie fuer die Aufgabe selbst, #1209: the wall rule), ein Mensch, was
+ * die Zeilenregel ihm zeigt - both through taskRowVisible (taskReader).
  *
  * @param {import('express').Request} req
  * @param {number|string} taskId
@@ -1828,11 +1843,8 @@ function nextPendingOccurrenceOf(taskId, mayRead = () => true) {
  */
 function nextDueDateAfter(req, taskId, prevStatus, status) {
   if (status !== 'done' || prevStatus === 'done') return null;
-  const viewer = req.authUserId || req.session.userId;
-  const mayRead = isDisplayRequest(req)
-    ? (task) => task.visibility === 'all'
-    : (task) => mayAccessTask(task, viewer);
-  return nextPendingOccurrenceOf(taskId, mayRead)?.due_date ?? null;
+  const reader = taskReader(req);
+  return nextPendingOccurrenceOf(taskId, (task) => taskRowVisible(db.get(), reader, task))?.due_date ?? null;
 }
 
 /**
@@ -2210,7 +2222,7 @@ router.patch('/:id/status', (req, res) => {
     // am Uebergang haengt: Punkte, Verlauf, Folgeinstanz. Die Pruefung steht
     // VOR dem Display-Block und vor der Ablage-Abkuerzung, weil beide selbst
     // antworten; dieselbe Regel wie PUT, /archive, /check und DELETE.
-    if (!mayAccessTask(prev, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', prev, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
@@ -2253,7 +2265,7 @@ router.patch('/:id/status', (req, res) => {
     // derselben 404 wie fuer eine, die es nie gab.
     let displayDoneBy = null;
     if (isDisplayRequest(req)) {
-      if (prev.visibility !== 'all') {
+      if (!householdVisible(prev)) {
         return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
       }
       if (status !== 'done') {
@@ -2281,7 +2293,7 @@ router.patch('/:id/status', (req, res) => {
     if (completesForeignSeries(prev, status)) return res.status(409).json(FOREIGN_SERIES_ERROR);
 
     if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && !isAdminRequest(req)) {
-      return res.status(403).json({ error: 'Permission denied.', code: 403 });
+      return refuseAdmin(req, res);
     }
 
     // Benannt werden koennen nur Haushaltsmitglieder (#1207, DECISIONS 4) -
@@ -2384,7 +2396,7 @@ router.patch('/:id/archive', (req, res) => {
     // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
     // Dieser Weg hat das nie geprueft - eine geratene id genuegte, um eine
     // fremde private Aufgabe abzulegen (Muster aus #769).
-    if (!mayAccessTask(task, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', task, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
     // Ablegen nimmt die Aufgabe allen aus der Ansicht (#830).
@@ -2437,7 +2449,7 @@ router.patch('/:id/check', (req, res) => {
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
-    if (!mayAccessTask(task, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', task, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
@@ -2495,7 +2507,7 @@ router.delete('/:id', (req, res) => {
     const victim = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!victim) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     // 404 statt 403: ob es die Aufgabe gibt, ist selbst schon eine Auskunft.
-    if (!mayAccessTask(victim, req.authUserId || req.session.userId)) {
+    if (!rowVisible(db.get(), 'tasks', victim, req.authUserId || req.session.userId)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
     // Loeschen ist der endgueltigste Eingriff in die Definition (#830).
@@ -2527,14 +2539,23 @@ router.delete('/:id', (req, res) => {
 // --------------------------------------------------------
 
 // Sichtbarkeits-Fragment für ein Dokument (Alias `d`, benannter Bind @me).
-const DOC_VISIBLE_SQL = documentVisibleSql('d', 'me');
+const DOC_VISIBLE_SQL = visibleWhere('documents', 'd', '@me');
+
+/**
+ * Die Aufgabe, wenn dieser Leser sie sieht (taskReader: a paired display under the
+ * wall rule, people under the task row rule), sonst undefined.
+ * @param {unknown} id @param {import('../authorize/index.ts').TaskReader} reader
+ */
+function findReadableTask(id, reader) {
+  return db.get().prepare(`
+    SELECT t.id, t.locked, t.created_by, t.parent_task_id FROM tasks t
+    WHERE t.id = ? AND ${taskVisibleWhere(reader, 't')}
+  `).get(id, { me: reader.userId });
+}
 
 /** Aufgabe nur zurückgeben, wenn sie für die betrachtende Person sichtbar ist. */
 function findVisibleTask(id, me) {
-  return db.get().prepare(`
-    SELECT t.id, t.locked, t.created_by, t.parent_task_id FROM tasks t
-    WHERE t.id = ? AND ${visibilityWhere('t', 'task_assignments', 'task_id')}
-  `).get(id, me, me);
+  return findReadableTask(id, { userId: me, wall: false });
 }
 
 /**
@@ -2565,15 +2586,20 @@ function loadTaskDocuments(taskId, viewer) {
 // Erst die Aufgabe selbst prüfen, dann ihre Serie: die Einträge tragen den
 // Titel der Aufgabe, und eine geratene ID darf darüber nichts verraten - 404
 // statt 403, weil die bloße Existenz schon eine Auskunft ist (Muster aus #769).
+//
+// A paired display reads the history under the wall rule (taskReader), the same
+// rule PATCH /:id/status, nextDueDateAfter and every other task read apply to it:
+// the wall shows only what the whole household sees, even for a task that names the
+// display, and seriesHistory applies the same rule to every earlier instance.
 // --------------------------------------------------------
 router.get('/:id/completions', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
+    const reader = taskReader(req);
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-    if (!task || !mayAccessTask(task, me)) {
+    if (!taskRowVisible(db.get(), reader, task)) {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
-    res.json({ data: seriesHistory(db.get(), { me, taskId: Number(req.params.id), limit: req.query.limit }) });
+    res.json({ data: seriesHistory(db.get(), { reader, taskId: Number(req.params.id), limit: req.query.limit }) });
   } catch (err) {
     log.error('GET /:id/completions error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -2701,10 +2727,8 @@ function notifyMentions(task, comment, authorId, previousComment = '') {
     // Aufgaben-Modul entzogen ist, der kommt an die Aufgabe gar nicht heran -
     // und bekaeme mit dem Push trotzdem ihren Titel und den Kommentaranfang
     // zugestellt. Dieselbe Frage, die die /api/v1-Middleware beim Lesen stellt.
-    const target = db.get().prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(id);
-    if (!target) continue;
-    const perms = resolvePermissions(db.get(), target);
-    if (!perms.admin && perms.modules?.tasks === 'none') continue;
+    // An account that does not exist (any more) gets nothing either.
+    if (!authorize(actorForUser(db.get(), id), 'receive', { module: 'tasks' }).allowed) continue;
     // Als Job (#1532): der Versand schreibt nach dem await `last_used_at` oder
     // loescht eine erloschene Subscription. Ohne Job saehe ein Restore ihn nicht
     // und die Zeile landete in der eingespielten Datenbank. Waehrend eines
@@ -2748,8 +2772,8 @@ function commentForWrite(req, { allowAdmin = false } = {}) {
 // GET /api/v1/tasks/:id/comments → { data: Comment[] }
 router.get('/:id/comments', (req, res) => {
   try {
-    const me = req.authUserId || req.session.userId;
-    const task = findVisibleTask(req.params.id, me);
+    // A paired display reads the comments under the wall rule (taskReader).
+    const task = findReadableTask(req.params.id, taskReader(req));
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     res.json({ data: loadTaskComments(task.id) });
   } catch (err) {
@@ -2764,7 +2788,7 @@ router.post('/:id/comments', (req, res) => {
     const me = req.authUserId || req.session.userId;
     const task = db.get().prepare(`
       SELECT t.id, t.title FROM tasks t
-      WHERE t.id = ? AND ${visibilityWhere('t', 'task_assignments', 'task_id')}
+      WHERE t.id = ? AND ${visibleWhere('tasks', 't', '?')}
     `).get(req.params.id, me, me);
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
 
@@ -2874,7 +2898,7 @@ router.get('/meta/options', (req, res) => {
 router.get('/points/affected', (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      return refuseAdmin(req, res);
     }
     const points = Number(req.query.points);
     if (!Number.isInteger(points) || points < 0 || points > MAX_POINTS) {
@@ -2896,7 +2920,7 @@ router.get('/points/affected', (req, res) => {
 router.post('/points/rebase', (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      return refuseAdmin(req, res);
     }
     const from = Number(req.body.from);
     const to   = Number(req.body.to);

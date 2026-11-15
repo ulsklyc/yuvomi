@@ -22,7 +22,7 @@ import { memberEmail, listEmailableMembers } from '../services/member-email.js';
 import { isHouseholdMember } from '../services/household-members.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
-import { mayReadModule, mayWriteModule } from '../permissions.js';
+import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 
 const log = createLogger('Shopping');
 

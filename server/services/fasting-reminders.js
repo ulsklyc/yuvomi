@@ -2,7 +2,7 @@
  * Own-only fasting reminders.  A reminder points directly at the fasting row,
  * so reconciliation can be idempotent without an additional anchor table.
  */
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize, userHasCapability } from '../authorize/index.ts';
 import { householdDisabledModules } from './household-modules.js';
 
 const GOAL_TYPE = 'fasting_goal';
@@ -15,10 +15,8 @@ function iso(value) {
 
 function userCanUseFasting(database, userId) {
   if (householdDisabledModules(database).has('health')) return false;
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return false;
-  const permissions = resolvePermissions(database, user);
-  return permissions.modules.health !== 'none' && permissions.capabilities.health_use_fasting === 'allow';
+  return authorize(actorForUser(database, userId), 'receive', { module: 'health' }).allowed
+    && userHasCapability(database, userId, 'health_use_fasting');
 }
 
 function desiredReminder(userId, type, fastId, remindAt) {

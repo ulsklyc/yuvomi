@@ -7,7 +7,7 @@ import express from 'express';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, num, date as validateDate, month as validateMonth, MAX_TITLE, MAX_SHORT } from '../../middleware/validate.js';
-import { normalizeObjectVisibility } from '../../services/budget-visibility.js';
+import { normalizeObjectVisibility } from '../../authorize/index.ts';
 import { computeLoanSchedule, MAX_LOAN_MONTHS } from '../../services/loan-amortization.js';
 import { translate, resolveHouseholdLocale } from '../../utils/i18n.js';
 import { todayKey } from '../../utils/timezone.js';

@@ -1,33 +1,70 @@
 /**
- * Modul: requireAdmin-Middleware
- * Zweck: Admin-Gate für Routen, die Konfiguration schreiben.
+ * Module: requireAdmin middleware
+ * Purpose: the admin gate for routes that write configuration, and the request
+ *          adapter for the admin question.
  *
- * Steht bewusst hier und nicht in server/auth.js: dieses Modul ist frei von
- * Seiteneffekten. auth.js prüft beim Laden SESSION_SECRET und wirft ohne, sodass
- * jeder Router, der von dort nur das Admin-Gate zieht, in Tests eine vollständige
- * Umgebung erzwingen würde, obwohl er nichts davon braucht. auth.js exportiert
- * diese Funktion unverändert weiter - Bestandsimporte bleiben gültig.
+ * The rule itself lives in server/authorize/ (phase 2, C1): authorize(actor,
+ * 'manage', { household: true }) answers "may this actor manage the household",
+ * and managesHousehold() in server/authorize/manage.ts is the one place that
+ * compares a role with 'admin'. This file only turns a request into that
+ * question - the name isAdminRequest() stays because about ninety call sites
+ * ask it.
+ *
+ * Kept here on purpose and not in server/auth.js: this module has no side
+ * effects. auth.js checks SESSION_SECRET on load and throws without it, so any
+ * router that pulled only the admin gate from there would force a complete
+ * environment on its tests although it needs none of it. server/authorize/
+ * does not load server/db.js or server/auth.js either, not even transitively
+ * (test:authorize-actor holds that in a child process). auth.js re-exports
+ * requireAdmin unchanged - existing imports stay valid.
  */
 
+import { actorFromRequest, authorize } from '../authorize/index.ts';
+
 /**
- * Ob die Anfrage mit Admin-Rolle kommt. `requireAuth` legt die geltende Rolle
- * für Session und API-Token gleichermaßen in `req.authRole` ab.
+ * The admin verdict of a request. Call it only after requireAuth: the actor is
+ * built once per request from the fields requireAuth set and remembered (see
+ * actorFromRequest in server/authorize/actor.ts). requireAuth fixes the role of
+ * a signed-in device and of a wall display to `member`.
+ * @param {object} req
  */
-export function isAdminRequest(req) {
-  return req.authRole === 'admin';
+function manageVerdict(req) {
+  return authorize(actorFromRequest(req), 'manage', { household: true });
 }
 
 /**
- * Lässt nur Admins durch; alle anderen erhalten 403. Ein angemeldetes Gerät
- * bekommt seinen eigenen Grund: die Person mag Admin sein, nur eben nicht von
- * diesem Gerät aus (siehe `requireAuth` in server/auth.js).
+ * Whether the request comes with the admin role - for session and API token
+ * alike (requireAuth puts the role that counts into `req.authRole`).
+ * @param {object} req
+ * @returns {boolean}
  */
-export function requireAdmin(req, res, next) {
-  if (isAdminRequest(req)) {
-    return next();
-  }
-  if (req.authDeviceId != null) {
+export function isAdminRequest(req) {
+  return manageVerdict(req).allowed;
+}
+
+/**
+ * THE refusal of an admin gate (phase 2, C2) - every route that answers "only
+ * for administrators" sends it through here, so there is one text and one
+ * reason: `403 { error: 'Admin access required.', code: 403, reason:
+ * 'admin_required' }`. A signed-in device gets its own reason instead: the
+ * person may be an admin, only not from this device (see requireAuth in
+ * server/auth.js). Call it only where the admin question said no.
+ * @param {object} req
+ * @param {{ status(code: number): { json(body: unknown): unknown } }} res
+ */
+export function refuseAdmin(req, res) {
+  if (manageVerdict(req).reason === 'device_credential') {
     return res.status(403).json({ error: 'This is not available on a signed-in device.', code: 403, reason: 'device_credential' });
   }
-  res.status(403).json({ error: 'Permission denied.', code: 403 });
+  return res.status(403).json({ error: 'Admin access required.', code: 403, reason: 'admin_required' });
+}
+
+/**
+ * Lets only admins through; everyone else gets the one refusal (refuseAdmin).
+ */
+export function requireAdmin(req, res, next) {
+  if (manageVerdict(req).allowed) {
+    return next();
+  }
+  return refuseAdmin(req, res);
 }

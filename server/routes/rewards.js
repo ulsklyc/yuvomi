@@ -19,8 +19,8 @@ import {
 import { minorUnit } from '../services/split-expenses.js';
 import { isHouseholdMember } from '../services/household-members.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
-import { visibilityWhere } from '../services/visibility.js';
+import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
+import { visibleWhere } from '../authorize/index.ts';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 
 const log = createLogger('Rewards');
@@ -29,13 +29,6 @@ const router = express.Router();
 const MAX_COST = 1_000_000;
 const MAX_BONUS = 1_000_000;
 const MAX_QUANTITY = 1_000_000;
-
-function requireAdmin(req, res, next) {
-  if (!isAdminRequest(req)) {
-    return res.status(403).json({ error: 'Admin access required.', code: 403 });
-  }
-  next();
-}
 
 function actingUser(req) {
   return req.authUserId || req.session?.userId || null;
@@ -364,7 +357,7 @@ const LEDGER_TASK_VISIBLE_SQL = `(
   l.user_id = @me
   OR (l.task_id IS NOT NULL AND EXISTS (
         SELECT 1 FROM tasks t
-        WHERE t.id = l.task_id AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}))
+        WHERE t.id = l.task_id AND ${visibleWhere('tasks', 't', '@me')}))
   OR (l.task_id IS NULL AND (l.type IN ('bonus', 'adjust', 'redeem') OR l.redemption_id IS NOT NULL))
 )`;
 
@@ -817,7 +810,7 @@ router.patch('/redemptions/:id', (req, res) => {
 
     const isAdmin = isAdminRequest(req);
     if ((action === 'fulfill' || action === 'reject') && !isAdmin)
-      return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      return refuseAdmin(req, res);
     if (action === 'cancel' && !isAdmin && row.user_id !== me)
       return res.status(403).json({ error: 'Not allowed.', code: 403 });
     if (!['fulfill', 'reject', 'cancel'].includes(action))

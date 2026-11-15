@@ -36,7 +36,7 @@ import crypto from 'node:crypto';
 import * as dbModule from '../db.js';
 
 // Die reinen Listen liegen in server/display-scopes.js - OHNE Abhaengigkeiten,
-// damit server/permissions.js sie lesen kann, ohne ueber diese Datei
+// damit server/authorize/catalog.ts sie lesen kann, ohne ueber diese Datei
 // server/db.js mitzuziehen (genau daran hing test:db-isolation: vier Suiten
 // legten eine echte yuvomi.db im Repo an, weil sie nur Rechte aufloesten).
 // Hier durchgereicht, damit die Aufrufer eine Anlaufstelle behalten.

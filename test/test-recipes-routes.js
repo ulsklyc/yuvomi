@@ -824,7 +824,7 @@ test('MCP call_api_operation post_recipes: Felder neben payload → klare Meldun
   const previous = process.env.MCP_INTERNAL_BASE_URL;
   process.env.MCP_INTERNAL_BASE_URL = baseUrl;
   actor = { id: ADMIN, role: 'admin' };
-  const ctx = { actor: { id: ADMIN, role: 'admin' }, requestHeaders: {} };
+  const ctx = { actor: { kind: 'session', userId: ADMIN, role: 'admin' }, requestHeaders: {} };
   try {
     const before = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
     await assert.rejects(
