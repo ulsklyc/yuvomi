@@ -3,7 +3,8 @@
  * Zweck: Die eine Pruefung, die beide Display-Handlungen teilen - abhaken und
  *        eine Einloesung beantragen -, bevor sie in die jeweilige Route laufen.
  * Abhaengigkeiten: household-members (das Mitglieder-Praedikat aus #1207),
- *        permissions (die Modulrechte der GEWAEHLTEN Person).
+ *        server/authorize/ (die Modulrechte der GEWAEHLTEN Person: der Akteur
+ *        ohne Request und `authorize(actor, 'write', { module })`).
  *
  * WARUM DIESE DATEI NEBEN display-scopes.js UND display-accounts.js STEHT.
  * `display-scopes.js` sagt, welche Pfade ein Display erreicht - eine Tatsache
@@ -20,8 +21,13 @@
  */
 
 import { isHouseholdMember, nonMemberMessage } from './household-members.js';
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import * as dbModule from '../db.js';
+
+// The modules a display acts in. authorize() denies by list, so a key outside the
+// permission catalog would pass it; a key that is not one of these is refused here,
+// as it was when this file compared the resolved level itself.
+const ACTING_MODULES = new Set(['tasks', 'rewards']);
 
 /**
  * Handelt dieser Request als gekoppeltes Display?
@@ -29,7 +35,7 @@ import * as dbModule from '../db.js';
  * EINE FRAGE AN `req`, KEINE AN DIE DATENBANK. `requireAuth()` hat die Antwort
  * beim Anmelden schon gehabt und in `req.authMethod` hinterlegt; sie hier
  * nachzuschlagen hiesse, jede Route an die `display_accounts`-Tabelle zu
- * binden - genau der Fehler, den `permissions.js` im Kommentar zu `isDisplay`
+ * binden - genau der Fehler, den `server/authorize/catalog.ts` im Kommentar zu `isDisplay`
  * beschreibt (fuenf Suiten mit handgebautem Schema fielen daran um).
  */
 export function isDisplayRequest(req) {
@@ -83,19 +89,20 @@ export function displayActingPerson(req, rawId, moduleKey, { db } = {}) {
   if (!isHouseholdMember(userId, { db: database })) {
     return { ok: false, status: 400, error: nonMemberMessage([userId]) };
   }
-  const user = database
-    .prepare('SELECT id, role, family_role FROM users WHERE id = ?')
-    .get(userId);
+  // Der Akteur ohne Request (server/authorize/): dieselbe `users`-Zeile und
+  // dieselbe Aufloesung der Rechte-Matrix wie vorher hier von Hand. Ein Display,
+  // ein Gast oder Personal kommt nicht bis hierher - `isHouseholdMember` hat sie
+  // eben abgewiesen. Fuer jede Person, die hier ankommt, stuft `actorForUser()`
+  // deshalb `system` ein, und die Antwort haengt wie zuvor nur an der Matrix
+  // (test/test-household-members.js haelt die Tabelle).
+  const actor = actorForUser(database, userId);
   // Die Zeile GIBT es - `isHouseholdMember` hat sie eben gefunden. Der Guard
   // steht trotzdem: zwischen beiden Abfragen liegt kein `await` und damit kein
-  // Yield-Punkt, aber ein `user` von `undefined` liefe hier in einen
-  // TypeError und damit in eine 500, und das ist eine schlechtere Absage als
-  // die richtige.
-  if (!user) {
+  // Yield-Punkt, aber ein fehlender Akteur ist eine Absage, keine 500.
+  if (!actor) {
     return { ok: false, status: 400, error: nonMemberMessage([userId]) };
   }
-  const { admin, modules } = resolvePermissions(database, user);
-  if (!admin && modules[moduleKey] !== 'write') {
+  if (!ACTING_MODULES.has(moduleKey) || !authorize(actor, 'write', { module: moduleKey }).allowed) {
     return {
       ok: false,
       status: 403,

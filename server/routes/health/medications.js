@@ -11,9 +11,10 @@ import * as v from '../../middleware/validate.js';
 import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
   log, VISIBILITIES, LOG_STATUS, MAX_UNIT,
-  viewerId, careAwareClause, toBit, applyUpdate, badRequest,
-  resolveOwner, writableClause, writableChild, wallClockInput, wallClockNow,
+  viewerId, toBit, applyUpdate, badRequest,
+  resolveOwner, wallClockInput, wallClockNow,
 } from './helpers.js';
+import { careAwareClause, readableClause, writableChild, writableClause } from '../../authorize/index.ts';
 
 const router = express.Router();
 
@@ -137,10 +138,10 @@ const MAX_SCHEDULES_ON_CREATE = 48;
 
 /** Lädt ein Medikament, wenn der Betrachter es lesen darf; sonst null. */
 function medicationForRead(medId, viewer) {
-  const w = writableClause('', viewer);
+  const r = readableClause('', viewer);
   return db.get().prepare(
-    `SELECT * FROM medications WHERE id = ? AND (visibility = 'family' OR ${w.sql})`
-  ).get(medId, ...w.params) || null;
+    `SELECT * FROM medications WHERE id = ? AND ${r.sql}`
+  ).get(medId, ...r.params) || null;
 }
 
 /** Lädt ein Medikament, das der Betrachter ändern darf (eigenes oder betreutes). */
@@ -391,7 +392,7 @@ router.patch('/schedules/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
-    const existing = writableChild(`
+    const existing = writableChild(db.get(), `
       SELECT s.* FROM medication_schedules s
       JOIN medications m ON m.id = s.medication_id
       WHERE s.id = ?
@@ -434,7 +435,7 @@ router.delete('/schedules/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
-    const existing = writableChild(`
+    const existing = writableChild(db.get(), `
       SELECT s.id FROM medication_schedules s
       JOIN medications m ON m.id = s.medication_id
       WHERE s.id = ?
@@ -612,7 +613,7 @@ function updateLogStatus(req, res, newStatus) {
  * abhaken (#884).
  */
 function ownLogRow(id, viewer) {
-  return writableChild(`
+  return writableChild(db.get(), `
     SELECT l.*, m.user_id AS owner_id FROM medication_logs l
     JOIN medications m ON m.id = l.medication_id
     WHERE l.id = ?

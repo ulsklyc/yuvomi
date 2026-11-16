@@ -10,18 +10,19 @@ import * as v from '../../middleware/validate.js';
 import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
   log, VISIBILITIES, MAX_UNIT,
-  viewerId, careAwareClause, applyUpdate, badRequest, deriveFlag, attachResults,
-  resolveOwner, writableClause, writableChild,
+  viewerId, applyUpdate, badRequest, deriveFlag, attachResults,
+  resolveOwner,
 } from './helpers.js';
+import { careAwareClause, readableClause, writableChild, writableClause } from '../../authorize/index.ts';
 
 const router = express.Router();
 
 /** Lädt einen Laborbefund, wenn der Betrachter ihn lesen darf; sonst null. */
 function reportForRead(reportId, viewer) {
-  const w = writableClause('', viewer);
+  const r = readableClause('', viewer);
   return db.get().prepare(
-    `SELECT * FROM health_lab_reports WHERE id = ? AND (visibility = 'family' OR ${w.sql})`
-  ).get(reportId, ...w.params) || null;
+    `SELECT * FROM health_lab_reports WHERE id = ? AND ${r.sql}`
+  ).get(reportId, ...r.params) || null;
 }
 
 /** Lädt einen dem Betrachter gehörenden Laborbefund; sonst null. */
@@ -236,7 +237,7 @@ router.patch('/results/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
-    const existing = writableChild(`
+    const existing = writableChild(db.get(), `
       SELECT res.* FROM health_lab_results res
       JOIN health_lab_reports r ON r.id = res.report_id
       WHERE res.id = ?
@@ -280,7 +281,7 @@ router.delete('/results/:id', (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
-    const existing = writableChild(`
+    const existing = writableChild(db.get(), `
       SELECT res.id FROM health_lab_results res
       JOIN health_lab_reports r ON r.id = res.report_id
       WHERE res.id = ?

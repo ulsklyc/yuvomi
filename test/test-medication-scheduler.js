@@ -219,6 +219,31 @@ test('Betreuer bekommen die Erinnerung mit dem Namen der betreuten Person, die P
   );
 });
 
+// Phase 2 B9: the delivery order to two caregivers is the order of their ids, not
+// the order the grants were entered in. PRAGMA reverse_unordered_selects reverses
+// every list without ORDER BY, so the order is held as a promise of the query.
+test('zwei Betreuer bekommen die Erinnerung in der Reihenfolge ihrer IDs, nicht der Eintragung', async () => {
+  const db = buildTestDb();
+  const child = seedUser(db, 'anna');
+  const first = seedUser(db, 'berta');
+  const second = seedUser(db, 'carl');
+  grantCare(db, child, second);
+  grantCare(db, child, first);
+  db.pragma('reverse_unordered_selects = ON');
+  const med = seedMed(db, child, { name: 'Ibuprofen' });
+  seedSchedule(db, med, { time: '08:00' });
+  const m = makeMocks();
+  const store = makeRecordingChannelStore();
+
+  await processDueMedications({ database: db, now: MONDAY_0900, ...m, channelStore: store });
+
+  assert.deepEqual(
+    m.pushed.map((p) => [p.userId, p.payload.body]),
+    [[child, 'Ibuprofen'], [first, 'anna: Ibuprofen'], [second, 'anna: Ibuprofen']],
+  );
+  assert.deepEqual(store.asked, [child, first, second]);
+});
+
 test('eine Betreuung fuer eine ANDERE Person loest keine Erinnerung aus', async () => {
   const db = buildTestDb();
   const anna = seedUser(db, 'anna');
@@ -529,10 +554,57 @@ test('#2602: der Entzug zaehlt auch aus dem Rollenprofil, nicht nur aus dem Mitg
 });
 
 // --------------------------------------------------------
+// Display und Ausgaben-Gast hoeren nichts von einer Dosis (#2745)
+// --------------------------------------------------------
+// Der Akteur ohne Request stuft beide ein wie der Anfrageweg: ein Gast empfaengt
+// aus keinem Modul, ein Display nur aus seiner Scope-Liste - Health steht nicht
+// darauf. Die Dosis entsteht trotzdem (ueberspringen, nicht loeschen).
+
+/** @param {any} db @param {number|bigint} userId */
+function markGuest(db, userId) {
+  const groupId = db.prepare('INSERT INTO expense_groups (name, created_by) VALUES (?, ?)').run('Trip', userId).lastInsertRowid;
+  db.prepare('INSERT INTO split_expense_guest_users (user_id, group_id) VALUES (?, ?)').run(userId, groupId);
+}
+
+/** @param {any} db @param {number|bigint} userId */
+function markDisplay(db, userId) {
+  db.prepare('INSERT INTO display_accounts (user_id) VALUES (?)').run(userId);
+}
+
+for (const [kind, mark] of /** @type {Array<[string, (db: any, userId: number|bigint) => void]>} */ (
+  [['Display', markDisplay], ['Ausgaben-Gast', markGuest]])) {
+  test(`${kind} als Eigentuemer und als Betreuer hoert nichts, die Dosis entsteht trotzdem`, async () => {
+    const db = buildTestDb();
+    const owner = seedUser(db, 'owner');
+    const anna = seedUser(db, 'anna');
+    const carer = seedUser(db, 'carer');
+    mark(db, owner);
+    mark(db, carer);
+    grantCare(db, anna, carer);
+    const ownMed = seedMed(db, owner, { name: 'Eigen' });
+    const annaMed = seedMed(db, anna, { name: 'Ibuprofen' });
+    seedSchedule(db, ownMed, { time: '08:00' });
+    seedSchedule(db, annaMed, { time: '08:00' });
+
+    const { res, m } = await runCareCase(db);
+
+    assert.deepEqual(delivered(m), {
+      push: [[anna, 'Ibuprofen']],
+      channel: [[100 + anna, 'Ibuprofen']],
+    }, `nur das Mitglied hoert von seiner Dosis, ${kind} weder von der eigenen noch als Betreuer`);
+    assert.equal(/** @type {any} */ (res).created, 2);
+    for (const med of [ownMed, annaMed]) {
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM medication_logs WHERE medication_id = ?').get(med).n, 1,
+        'ueberspringen, nicht loeschen: der Dosis-Log entsteht weiter');
+    }
+  });
+}
+
+// --------------------------------------------------------
 // Haushaltskanaele bekommen nie eine Medikamenten-Erinnerung (#2598, E1)
 // --------------------------------------------------------
 // Jede Health-Herkunft ist im Haushaltskanal `'personal'`
-// (HOUSEHOLD_CHANNEL_POLICY in server/services/reminder-targets.js), und
+// (HOUSEHOLD_CHANNEL_POLICY in server/authorize/rows/reminders.ts), und
 // SECURITY.md sagt es zu: ein Kanal, den der Haushalt teilt, bekommt nie eine
 // Health-Erinnerung. Die Sichtbarkeit des Medikaments aendert daran nichts -
 // auch ein fuer die Familie sichtbares geht nur per Push und an Kanaele der

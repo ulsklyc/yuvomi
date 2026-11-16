@@ -28,7 +28,7 @@ process.env.SESSION_SECRET = 'search-permissions-test-secret';
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const {
   resolvePermissions, buildSessionModuleAccess, PERMISSION_MODULES,
-} = await import('../server/permissions.js');
+} = await import('../server/authorize/index.ts');
 const { moduleForPath } = await import('../server/scopes.js');
 const { default: searchRouter } = await import('../server/routes/search.js');
 

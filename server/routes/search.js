@@ -13,7 +13,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { searchEverything, emptySearchResults, SEARCH_MODULES } from '../services/search.js';
 import { householdDisabledModules } from '../services/household-modules.js';
-import { hiddenModulesFor } from '../permissions.js';
+import { hiddenModulesFor } from '../authorize/index.ts';
 
 const router = express.Router();
 

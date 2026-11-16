@@ -90,7 +90,7 @@
         "sessionUnreachableTitle": "連線中斷",
         "serverNotReadyTitle": "伺服器暫未就緒",
         "rateLimitedTitle": "請求過多",
-        "sessionRetryHint": "你仍保持登入狀態。{{seconds}} 秒後重試。",
+        "sessionRetryHint": "你仍保持登入狀態。{{seconds}} 秒後重試。",
         "sessionRetrying": "正在重試…",
         "searchNoResultsTitle": "沒有結果",
         "searchNoResultsDescription": "沒有符合你搜尋的內容。",

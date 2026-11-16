@@ -3,12 +3,15 @@
  * Zweck: Reine Suchlogik gegen den FTS5-Index `search_index` (Migration 44).
  *        Keine Abhängigkeit auf db.js - die Datenbank wird hereingereicht, damit
  *        die Logik direkt mit node:sqlite getestet werden kann.
- * Abhaengigkeiten: server/services/visibility.js, document-access.js und
- *        budget-visibility.js (reine SQL-Bausteine, kein db.js)
+ * Abhaengigkeiten: server/authorize/index.ts (rows/: assignees, notes, ics-subscriptions,
+ *        health, documents, budget - reine SQL-Bausteine, kein db.js)
  */
-import { careAwareClause, icsSubscriptionVisibleWhere, noteVisibleWhere, visibilityWhere } from './visibility.js';
-import { documentVisibleSql } from './document-access.js';
-import { budgetDetailsVisibleWhere, resolveBudgetMode } from './budget-visibility.js';
+import {
+  careAwareClause,
+  budgetDetailsVisibleWhere,
+  resolveBudgetMode,
+  visibleWhere,
+} from '../authorize/index.ts';
 
 import {
   expandRecurringEvents, loadEventExceptions, seriesReadingZone,
@@ -423,7 +426,7 @@ function birthdayFieldsByEvent(database, events) {
  * @param {object} [opts]
  * @param {Set<string>|null} [opts.hiddenModules] Module, die dem Betrachter
  *        entzogen sind (`access_permissions`, #467) oder die sein API-Token
- *        nicht lesen darf (`hiddenModulesFor` in permissions.js). Aus der
+ *        nicht lesen darf (`hiddenModulesFor` in server/authorize/modules.ts). Aus der
  *        Rollenachse gehört nur `'none'` hinein - `'read'` ist eine
  *        Leseberechtigung, keine Sperre. Ihre Trefferart wird gar nicht erst
  *        abgefragt und bleibt leer.
@@ -460,7 +463,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     JOIN tasks t ON t.id = s.entity_id
     WHERE s.entity = 'task' AND s.search_index MATCH @match
       AND t.parent_task_id IS NULL
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@userId')}
+      AND ${visibleWhere('tasks', 't', '@userId')}
     ORDER BY t.archived_at IS NOT NULL,
              CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
              t.due_date ASC NULLS LAST
@@ -486,8 +489,8 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
       FROM search_index s
       JOIN calendar_events e ON e.id = s.entity_id
       WHERE s.entity = 'event' AND s.search_index MATCH @match
-        AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}${
+        AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
+        AND ${visibleWhere('events', 'e', '@userId')}${
           // Geburtstagstermine stehen in dieser Trefferart, gehoeren aber dem
           // Schalter `birthdays` - wie in der Kalendersuche (#1660).
           disabledNav?.has('birthdays') ? ` AND ${notBirthdayEventSql('e')}` : ''}
@@ -534,7 +537,7 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     FROM search_index s
     JOIN notes n ON n.id = s.entity_id
     WHERE s.entity = 'note' AND s.search_index MATCH @match
-      AND ${noteVisibleWhere('n', '@userId')}
+      AND ${visibleWhere('notes', 'n', '@userId')}
     ORDER BY n.pinned DESC, n.updated_at DESC
     LIMIT @limit
   `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.content]));
@@ -691,7 +694,7 @@ export function runTableSearch(database, q, userId, { hiddenModules = null, disa
     results.documents = firstMatches(database.prepare(`
       SELECT d.id, d.name AS title, d.description, d.category, d.updated_at
       FROM family_documents d
-      WHERE ${documentVisibleSql('d', 'userId')} AND d.status = 'active'
+      WHERE ${visibleWhere('documents', 'd', '@userId')} AND d.status = 'active'
       ORDER BY d.updated_at DESC, d.id DESC
     `).all({ userId }), matches, (d) => [d.title, d.description], limit)
       .map((d) => withExcerpt(pick(d, ['id', 'title', 'category']), q, [d.description]));

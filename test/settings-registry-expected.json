@@ -1,0 +1,5193 @@
+{
+ "get": {
+  "fresh": {
+   "admin": {
+    "status": 200,
+    "body": {
+     "data": {
+      "visible_meal_types": [
+       "breakfast",
+       "lunch",
+       "dinner",
+       "snack"
+      ],
+      "meal_type_names": {},
+      "currency": "EUR",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": null,
+      "timezone": null,
+      "timezone_effective": "UTC",
+      "timezone_hint_dismissed": false,
+      "language": null,
+      "language_effective": "en",
+      "language_auto": "en",
+      "app_name": "Yuvomi",
+      "dashboard_widgets": [],
+      "dashboard_today_glance": true,
+      "dashboard_widgets_default": null,
+      "dashboard_today_glance_default": true,
+      "dashboard_follows_default": true,
+      "dashboard_widgets_phone": null,
+      "dashboard_follows_phone_default": true,
+      "disabled_modules": [
+       "inventory",
+       "schedule",
+       "waste"
+      ],
+      "hidden_modules": [],
+      "module_order": [],
+      "mobile_nav_order": [],
+      "housekeeping_payment_tasks": false,
+      "budget_mode": "shared",
+      "calendar_default_duration": 60,
+      "calendar_default_reminders": [],
+      "calendar_default_assign_me": false,
+      "calendar_default_target": "",
+      "health_cycle_enabled": true,
+      "health_cycle_enabled_user": true,
+      "health_cycle_effective": true,
+      "health_prevention_notify_caregivers": false,
+      "rewards_require_approval": true,
+      "tasks_subtasks_expanded": false,
+      "tasks_default_points": 0,
+      "countdown_grace_days": 7,
+      "tasks_late_decay_enabled": false,
+      "tasks_default_target": "",
+      "tasks_default_visibility": "all",
+      "tasks_default_locked": false,
+      "schedule_hidden_templates": [],
+      "weather_provider": null,
+      "weather_lat": null,
+      "weather_lon": null,
+      "weather_city": "",
+      "weather_units": "metric",
+      "weather_auto_locate": false,
+      "weather_user": {
+       "lat": null,
+       "lon": null,
+       "city": null,
+       "units": null,
+       "auto_locate": null
+      },
+      "weather_source": {
+       "source": "none",
+       "provider": null,
+       "lat": null,
+       "lon": null,
+       "city": null,
+       "units": null
+      },
+      "holiday_country": null,
+      "holiday_subdivision": null,
+      "holiday_group": null,
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "#FF3B30",
+      "holiday_school_color": "#34C759",
+      "holiday_last_sync": null,
+      "screensaver_enabled": false
+     }
+    }
+   },
+   "member": {
+    "status": 200,
+    "body": {
+     "data": {
+      "visible_meal_types": [
+       "breakfast",
+       "lunch",
+       "dinner",
+       "snack"
+      ],
+      "meal_type_names": {},
+      "currency": "EUR",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": null,
+      "timezone": null,
+      "timezone_effective": "UTC",
+      "timezone_hint_dismissed": false,
+      "language": null,
+      "language_effective": "en",
+      "language_auto": "en",
+      "app_name": "Yuvomi",
+      "dashboard_widgets": [],
+      "dashboard_today_glance": true,
+      "dashboard_widgets_default": null,
+      "dashboard_today_glance_default": true,
+      "dashboard_follows_default": true,
+      "dashboard_widgets_phone": null,
+      "dashboard_follows_phone_default": true,
+      "disabled_modules": [
+       "inventory",
+       "schedule",
+       "waste"
+      ],
+      "hidden_modules": [],
+      "module_order": [],
+      "mobile_nav_order": [],
+      "housekeeping_payment_tasks": false,
+      "budget_mode": "shared",
+      "calendar_default_duration": 60,
+      "calendar_default_reminders": [],
+      "calendar_default_assign_me": false,
+      "calendar_default_target": "",
+      "health_cycle_enabled": true,
+      "health_cycle_enabled_user": true,
+      "health_cycle_effective": true,
+      "health_prevention_notify_caregivers": false,
+      "rewards_require_approval": true,
+      "tasks_subtasks_expanded": false,
+      "tasks_default_points": 0,
+      "countdown_grace_days": 7,
+      "tasks_late_decay_enabled": false,
+      "tasks_default_target": "",
+      "tasks_default_visibility": "all",
+      "tasks_default_locked": false,
+      "schedule_hidden_templates": [],
+      "weather_provider": null,
+      "weather_lat": null,
+      "weather_lon": null,
+      "weather_city": "",
+      "weather_units": "metric",
+      "weather_auto_locate": false,
+      "weather_user": {
+       "lat": null,
+       "lon": null,
+       "city": null,
+       "units": null,
+       "auto_locate": null
+      },
+      "weather_source": {
+       "source": "none",
+       "provider": null,
+       "lat": null,
+       "lon": null,
+       "city": null,
+       "units": null
+      },
+      "holiday_country": null,
+      "holiday_subdivision": null,
+      "holiday_group": null,
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "#FF3B30",
+      "holiday_school_color": "#34C759",
+      "holiday_last_sync": null,
+      "screensaver_enabled": false
+     }
+    }
+   },
+   "display": {
+    "status": 200,
+    "body": {
+     "data": {
+      "app_name": "Yuvomi",
+      "language": null,
+      "language_effective": "en",
+      "language_auto": "en",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": null,
+      "currency": "EUR",
+      "timezone": null,
+      "timezone_effective": "UTC",
+      "disabled_modules": [
+       "inventory",
+       "schedule",
+       "waste"
+      ],
+      "hidden_modules": [],
+      "module_order": [],
+      "mobile_nav_order": [],
+      "dashboard_widgets": [],
+      "dashboard_today_glance": true,
+      "tasks_subtasks_expanded": false,
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "#FF3B30",
+      "holiday_school_color": "#34C759",
+      "screensaver_enabled": false,
+      "display_device_settings": null
+     }
+    }
+   }
+  },
+  "valid": {
+   "admin": {
+    "status": 200,
+    "body": {
+     "data": {
+      "visible_meal_types": [
+       "dinner",
+       "lunch"
+      ],
+      "meal_type_names": {
+       "lunch": "Zmittag",
+       "snack": "Znueni, spaet"
+      },
+      "currency": "CHF",
+      "date_format": "ymd_dot",
+      "time_format": "12h",
+      "week_start": "saturday",
+      "region": "de-CH",
+      "timezone": "Europe/Zurich",
+      "timezone_effective": "Europe/Zurich",
+      "timezone_hint_dismissed": true,
+      "language": "fr",
+      "language_effective": "fr",
+      "language_auto": "de",
+      "app_name": "Haus Sonnenberg",
+      "dashboard_widgets": [
+       {
+        "id": "notes",
+        "visible": true,
+        "order": 0,
+        "size": "2x1",
+        "options": {
+         "categories": [
+          2,
+          1
+         ],
+         "limit": 5
+        }
+       },
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 1,
+        "size": "1x1"
+       }
+      ],
+      "dashboard_today_glance": false,
+      "dashboard_widgets_default": [
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 0,
+        "size": "2x2"
+       },
+       {
+        "id": "notes",
+        "visible": true,
+        "order": 1,
+        "size": "1x1",
+        "options": {
+         "categories": [
+          1,
+          2
+         ]
+        }
+       }
+      ],
+      "dashboard_today_glance_default": false,
+      "dashboard_follows_default": false,
+      "dashboard_widgets_phone": [
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 0
+       },
+       {
+        "id": "notes",
+        "visible": false,
+        "order": 1
+       }
+      ],
+      "dashboard_follows_phone_default": false,
+      "disabled_modules": [
+       "budget",
+       "health"
+      ],
+      "hidden_modules": [
+       "notes"
+      ],
+      "module_order": [
+       "tasks",
+       "dashboard"
+      ],
+      "mobile_nav_order": [
+       "tasks",
+       "kitchen",
+       "notes"
+      ],
+      "housekeeping_payment_tasks": true,
+      "budget_mode": "personal",
+      "calendar_default_duration": 45,
+      "calendar_default_reminders": [
+       15,
+       60
+      ],
+      "calendar_default_assign_me": true,
+      "calendar_default_target": "google:primary",
+      "health_cycle_enabled": false,
+      "health_cycle_enabled_user": true,
+      "health_cycle_effective": false,
+      "health_prevention_notify_caregivers": true,
+      "rewards_require_approval": false,
+      "tasks_subtasks_expanded": true,
+      "tasks_default_points": 15,
+      "countdown_grace_days": 0,
+      "tasks_late_decay_enabled": true,
+      "tasks_default_target": "caldav:1|https://dav.example/c/",
+      "tasks_default_visibility": "private",
+      "tasks_default_locked": true,
+      "schedule_hidden_templates": [
+       "school",
+       "university"
+      ],
+      "weather_provider": "open-meteo",
+      "weather_lat": "47.37",
+      "weather_lon": "8.54",
+      "weather_city": "Zuerich",
+      "weather_units": "imperial",
+      "weather_auto_locate": true,
+      "weather_user": {
+       "lat": "48.1",
+       "lon": "11.5",
+       "city": "Muenchen",
+       "units": "metric",
+       "auto_locate": false
+      },
+      "weather_source": {
+       "source": "db",
+       "provider": "open-meteo",
+       "lat": "47.37",
+       "lon": "8.54",
+       "city": "Zuerich",
+       "units": "imperial"
+      },
+      "holiday_country": "CH",
+      "holiday_subdivision": "CH-BE",
+      "holiday_group": "CH-BE-VS",
+      "holiday_show_public": true,
+      "holiday_show_school": true,
+      "holiday_public_color": "#112233",
+      "holiday_school_color": "#445566",
+      "holiday_last_sync": "2035-01-02T03:04:05Z",
+      "screensaver_enabled": true
+     }
+    }
+   },
+   "member": {
+    "status": 200,
+    "body": {
+     "data": {
+      "visible_meal_types": [
+       "dinner",
+       "lunch"
+      ],
+      "meal_type_names": {
+       "lunch": "Zmittag",
+       "snack": "Znueni, spaet"
+      },
+      "currency": "CHF",
+      "date_format": "ymd_dot",
+      "time_format": "12h",
+      "week_start": "saturday",
+      "region": "de-CH",
+      "timezone": "Europe/Zurich",
+      "timezone_effective": "Europe/Zurich",
+      "timezone_hint_dismissed": true,
+      "language": "fr",
+      "language_effective": "fr",
+      "language_auto": "de",
+      "app_name": "Haus Sonnenberg",
+      "dashboard_widgets": [
+       {
+        "id": "notes",
+        "visible": true,
+        "order": 0,
+        "size": "2x1",
+        "options": {
+         "categories": [
+          1
+         ],
+         "limit": 5
+        }
+       },
+       {
+        "id": "tasks",
+        "visible": false,
+        "order": 1,
+        "size": "1x1"
+       }
+      ],
+      "dashboard_today_glance": true,
+      "dashboard_widgets_default": [
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 0,
+        "size": "2x2"
+       },
+       {
+        "id": "notes",
+        "visible": true,
+        "order": 1,
+        "size": "1x1",
+        "options": {
+         "categories": [
+          1
+         ]
+        }
+       }
+      ],
+      "dashboard_today_glance_default": false,
+      "dashboard_follows_default": false,
+      "dashboard_widgets_phone": [
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 0
+       },
+       {
+        "id": "notes",
+        "visible": false,
+        "order": 1
+       }
+      ],
+      "dashboard_follows_phone_default": false,
+      "disabled_modules": [
+       "budget",
+       "health"
+      ],
+      "hidden_modules": [
+       "notes",
+       "budget"
+      ],
+      "module_order": [
+       "dashboard",
+       "tasks"
+      ],
+      "mobile_nav_order": [
+       "tasks",
+       "kitchen",
+       "notes"
+      ],
+      "housekeeping_payment_tasks": true,
+      "budget_mode": "personal",
+      "calendar_default_duration": 45,
+      "calendar_default_reminders": [
+       15,
+       60
+      ],
+      "calendar_default_assign_me": true,
+      "calendar_default_target": "google:primary",
+      "health_cycle_enabled": false,
+      "health_cycle_enabled_user": false,
+      "health_cycle_effective": false,
+      "health_prevention_notify_caregivers": true,
+      "rewards_require_approval": false,
+      "tasks_subtasks_expanded": true,
+      "tasks_default_points": 15,
+      "countdown_grace_days": 0,
+      "tasks_late_decay_enabled": true,
+      "tasks_default_target": "caldav:1|https://dav.example/c/",
+      "tasks_default_visibility": "assignees",
+      "tasks_default_locked": true,
+      "schedule_hidden_templates": [
+       "school",
+       "university"
+      ],
+      "weather_provider": "open-meteo",
+      "weather_lat": "47.37",
+      "weather_lon": "8.54",
+      "weather_city": "Zuerich",
+      "weather_units": "imperial",
+      "weather_auto_locate": true,
+      "weather_user": {
+       "lat": "48.1",
+       "lon": "11.5",
+       "city": "Augsburg",
+       "units": "metric",
+       "auto_locate": true
+      },
+      "weather_source": {
+       "source": "db",
+       "provider": "open-meteo",
+       "lat": "47.37",
+       "lon": "8.54",
+       "city": "Zuerich",
+       "units": "imperial"
+      },
+      "holiday_country": "CH",
+      "holiday_subdivision": "CH-BE",
+      "holiday_group": "CH-BE-VS",
+      "holiday_show_public": true,
+      "holiday_show_school": true,
+      "holiday_public_color": "#112233",
+      "holiday_school_color": "#445566",
+      "holiday_last_sync": "2035-01-02T03:04:05Z",
+      "screensaver_enabled": true
+     }
+    }
+   },
+   "display": {
+    "status": 200,
+    "body": {
+     "data": {
+      "app_name": "Haus Sonnenberg",
+      "language": "fr",
+      "language_effective": "fr",
+      "language_auto": "de",
+      "date_format": "ymd_dot",
+      "time_format": "12h",
+      "week_start": "saturday",
+      "region": "de-CH",
+      "currency": "CHF",
+      "timezone": "Europe/Zurich",
+      "timezone_effective": "Europe/Zurich",
+      "disabled_modules": [
+       "budget",
+       "health"
+      ],
+      "hidden_modules": [
+       "notes"
+      ],
+      "module_order": [
+       "tasks",
+       "dashboard"
+      ],
+      "mobile_nav_order": [
+       "tasks",
+       "kitchen",
+       "notes"
+      ],
+      "dashboard_widgets": [
+       {
+        "id": "notes",
+        "visible": true,
+        "order": 0,
+        "size": "2x1",
+        "options": {
+         "categories": [
+          1
+         ],
+         "limit": 5
+        }
+       },
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 1,
+        "size": "1x1"
+       }
+      ],
+      "dashboard_today_glance": false,
+      "tasks_subtasks_expanded": true,
+      "holiday_show_public": true,
+      "holiday_show_school": true,
+      "holiday_public_color": "#112233",
+      "holiday_school_color": "#445566",
+      "screensaver_enabled": true,
+      "display_device_settings": {
+       "night_from": 21,
+       "night_until": 7,
+       "idle_seconds": 600,
+       "show_clock": false,
+       "cover_photo": true
+      }
+     }
+    }
+   }
+  },
+  "invalid": {
+   "admin": {
+    "status": 200,
+    "body": {
+     "data": {
+      "visible_meal_types": [],
+      "meal_type_names": {},
+      "currency": "XYZ",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": null,
+      "timezone": "Mars/Base",
+      "timezone_effective": "UTC",
+      "timezone_hint_dismissed": false,
+      "language": null,
+      "language_effective": "en",
+      "language_auto": "en",
+      "app_name": "",
+      "dashboard_widgets": [],
+      "dashboard_today_glance": true,
+      "dashboard_widgets_default": [],
+      "dashboard_today_glance_default": true,
+      "dashboard_follows_default": false,
+      "dashboard_widgets_phone": [],
+      "dashboard_follows_phone_default": false,
+      "disabled_modules": [],
+      "hidden_modules": [
+       "notes"
+      ],
+      "module_order": [],
+      "mobile_nav_order": [],
+      "housekeeping_payment_tasks": false,
+      "budget_mode": "shared",
+      "calendar_default_duration": 60,
+      "calendar_default_reminders": [
+       60
+      ],
+      "calendar_default_assign_me": false,
+      "calendar_default_target": "",
+      "health_cycle_enabled": true,
+      "health_cycle_enabled_user": true,
+      "health_cycle_effective": true,
+      "health_prevention_notify_caregivers": false,
+      "rewards_require_approval": true,
+      "tasks_subtasks_expanded": false,
+      "tasks_default_points": 0,
+      "countdown_grace_days": 90,
+      "tasks_late_decay_enabled": false,
+      "tasks_default_target": "",
+      "tasks_default_visibility": "nobody",
+      "tasks_default_locked": false,
+      "schedule_hidden_templates": [],
+      "weather_provider": "darksky",
+      "weather_lat": "north",
+      "weather_lon": "",
+      "weather_city": "",
+      "weather_units": "kelvin",
+      "weather_auto_locate": false,
+      "weather_user": {
+       "lat": "x",
+       "lon": "",
+       "city": "",
+       "units": "kelvin",
+       "auto_locate": false
+      },
+      "weather_source": {
+       "source": "none",
+       "provider": null,
+       "lat": null,
+       "lon": null,
+       "city": null,
+       "units": null
+      },
+      "holiday_country": "germany",
+      "holiday_subdivision": "",
+      "holiday_group": "",
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "red",
+      "holiday_school_color": "",
+      "holiday_last_sync": "",
+      "screensaver_enabled": false
+     }
+    }
+   },
+   "member": {
+    "status": 200,
+    "body": {
+     "data": {
+      "visible_meal_types": [],
+      "meal_type_names": {},
+      "currency": "XYZ",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": null,
+      "timezone": "Mars/Base",
+      "timezone_effective": "UTC",
+      "timezone_hint_dismissed": false,
+      "language": null,
+      "language_effective": "en",
+      "language_auto": "en",
+      "app_name": "",
+      "dashboard_widgets": [],
+      "dashboard_today_glance": true,
+      "dashboard_widgets_default": [],
+      "dashboard_today_glance_default": true,
+      "dashboard_follows_default": false,
+      "dashboard_widgets_phone": [],
+      "dashboard_follows_phone_default": false,
+      "disabled_modules": [],
+      "hidden_modules": [
+       "notes"
+      ],
+      "module_order": [],
+      "mobile_nav_order": [],
+      "housekeeping_payment_tasks": false,
+      "budget_mode": "shared",
+      "calendar_default_duration": 60,
+      "calendar_default_reminders": [
+       60
+      ],
+      "calendar_default_assign_me": false,
+      "calendar_default_target": "",
+      "health_cycle_enabled": true,
+      "health_cycle_enabled_user": true,
+      "health_cycle_effective": true,
+      "health_prevention_notify_caregivers": false,
+      "rewards_require_approval": true,
+      "tasks_subtasks_expanded": false,
+      "tasks_default_points": 0,
+      "countdown_grace_days": 90,
+      "tasks_late_decay_enabled": false,
+      "tasks_default_target": "",
+      "tasks_default_visibility": "nobody",
+      "tasks_default_locked": false,
+      "schedule_hidden_templates": [],
+      "weather_provider": "darksky",
+      "weather_lat": "north",
+      "weather_lon": "",
+      "weather_city": "",
+      "weather_units": "kelvin",
+      "weather_auto_locate": false,
+      "weather_user": {
+       "lat": "x",
+       "lon": "",
+       "city": "",
+       "units": "kelvin",
+       "auto_locate": false
+      },
+      "weather_source": {
+       "source": "none",
+       "provider": null,
+       "lat": null,
+       "lon": null,
+       "city": null,
+       "units": null
+      },
+      "holiday_country": "germany",
+      "holiday_subdivision": "",
+      "holiday_group": "",
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "red",
+      "holiday_school_color": "",
+      "holiday_last_sync": "",
+      "screensaver_enabled": false
+     }
+    }
+   },
+   "display": {
+    "status": 200,
+    "body": {
+     "data": {
+      "app_name": "",
+      "language": null,
+      "language_effective": "en",
+      "language_auto": "en",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": null,
+      "currency": "XYZ",
+      "timezone": "Mars/Base",
+      "timezone_effective": "UTC",
+      "disabled_modules": [],
+      "hidden_modules": [
+       "notes"
+      ],
+      "module_order": [],
+      "mobile_nav_order": [],
+      "dashboard_widgets": [],
+      "dashboard_today_glance": true,
+      "tasks_subtasks_expanded": false,
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "red",
+      "holiday_school_color": "",
+      "screensaver_enabled": false,
+      "display_device_settings": null
+     }
+    }
+   }
+  },
+  "fallback": {
+   "admin": {
+    "status": 200,
+    "body": {
+     "data": {
+      "visible_meal_types": [
+       "breakfast",
+       "lunch",
+       "dinner",
+       "snack"
+      ],
+      "meal_type_names": {},
+      "currency": "EUR",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": "fr-CA",
+      "timezone": null,
+      "timezone_effective": "UTC",
+      "timezone_hint_dismissed": false,
+      "language": null,
+      "language_effective": "fr",
+      "language_auto": "fr",
+      "app_name": "Yuvomi",
+      "dashboard_widgets": [
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 0,
+        "size": "1x1"
+       },
+       {
+        "id": "calendar",
+        "visible": false,
+        "order": 1,
+        "size": "2x1"
+       }
+      ],
+      "dashboard_today_glance": false,
+      "dashboard_widgets_default": null,
+      "dashboard_today_glance_default": true,
+      "dashboard_follows_default": true,
+      "dashboard_widgets_phone": null,
+      "dashboard_follows_phone_default": true,
+      "disabled_modules": [
+       "inventory",
+       "schedule",
+       "waste"
+      ],
+      "hidden_modules": [],
+      "module_order": [
+       "calendar",
+       "tasks"
+      ],
+      "mobile_nav_order": [],
+      "housekeeping_payment_tasks": false,
+      "budget_mode": "shared",
+      "calendar_default_duration": 60,
+      "calendar_default_reminders": [],
+      "calendar_default_assign_me": false,
+      "calendar_default_target": "",
+      "health_cycle_enabled": true,
+      "health_cycle_enabled_user": true,
+      "health_cycle_effective": true,
+      "health_prevention_notify_caregivers": false,
+      "rewards_require_approval": true,
+      "tasks_subtasks_expanded": false,
+      "tasks_default_points": 10000,
+      "countdown_grace_days": 3,
+      "tasks_late_decay_enabled": false,
+      "tasks_default_target": "",
+      "tasks_default_visibility": "all",
+      "tasks_default_locked": false,
+      "schedule_hidden_templates": [],
+      "weather_provider": null,
+      "weather_lat": "50",
+      "weather_lon": "7",
+      "weather_city": "",
+      "weather_units": "metric",
+      "weather_auto_locate": false,
+      "weather_user": {
+       "lat": null,
+       "lon": null,
+       "city": null,
+       "units": null,
+       "auto_locate": null
+      },
+      "weather_source": {
+       "source": "db",
+       "provider": "open-meteo",
+       "lat": "50",
+       "lon": "7",
+       "city": "",
+       "units": "metric"
+      },
+      "holiday_country": null,
+      "holiday_subdivision": null,
+      "holiday_group": null,
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "#FF3B30",
+      "holiday_school_color": "#34C759",
+      "holiday_last_sync": null,
+      "screensaver_enabled": false
+     }
+    }
+   },
+   "member": {
+    "status": 200,
+    "body": {
+     "data": {
+      "visible_meal_types": [
+       "breakfast",
+       "lunch",
+       "dinner",
+       "snack"
+      ],
+      "meal_type_names": {},
+      "currency": "EUR",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": "fr-CA",
+      "timezone": null,
+      "timezone_effective": "UTC",
+      "timezone_hint_dismissed": false,
+      "language": null,
+      "language_effective": "fr",
+      "language_auto": "fr",
+      "app_name": "Yuvomi",
+      "dashboard_widgets": [
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 0,
+        "size": "1x1"
+       },
+       {
+        "id": "calendar",
+        "visible": false,
+        "order": 1,
+        "size": "2x1"
+       }
+      ],
+      "dashboard_today_glance": false,
+      "dashboard_widgets_default": null,
+      "dashboard_today_glance_default": true,
+      "dashboard_follows_default": true,
+      "dashboard_widgets_phone": null,
+      "dashboard_follows_phone_default": true,
+      "disabled_modules": [
+       "inventory",
+       "schedule",
+       "waste"
+      ],
+      "hidden_modules": [],
+      "module_order": [
+       "calendar",
+       "tasks"
+      ],
+      "mobile_nav_order": [],
+      "housekeeping_payment_tasks": false,
+      "budget_mode": "shared",
+      "calendar_default_duration": 60,
+      "calendar_default_reminders": [],
+      "calendar_default_assign_me": false,
+      "calendar_default_target": "",
+      "health_cycle_enabled": true,
+      "health_cycle_enabled_user": false,
+      "health_cycle_effective": false,
+      "health_prevention_notify_caregivers": false,
+      "rewards_require_approval": true,
+      "tasks_subtasks_expanded": false,
+      "tasks_default_points": 10000,
+      "countdown_grace_days": 3,
+      "tasks_late_decay_enabled": false,
+      "tasks_default_target": "",
+      "tasks_default_visibility": "all",
+      "tasks_default_locked": false,
+      "schedule_hidden_templates": [],
+      "weather_provider": null,
+      "weather_lat": "50",
+      "weather_lon": "7",
+      "weather_city": "",
+      "weather_units": "metric",
+      "weather_auto_locate": false,
+      "weather_user": {
+       "lat": null,
+       "lon": null,
+       "city": null,
+       "units": null,
+       "auto_locate": null
+      },
+      "weather_source": {
+       "source": "db",
+       "provider": "open-meteo",
+       "lat": "50",
+       "lon": "7",
+       "city": "",
+       "units": "metric"
+      },
+      "holiday_country": null,
+      "holiday_subdivision": null,
+      "holiday_group": null,
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "#FF3B30",
+      "holiday_school_color": "#34C759",
+      "holiday_last_sync": null,
+      "screensaver_enabled": false
+     }
+    }
+   },
+   "display": {
+    "status": 200,
+    "body": {
+     "data": {
+      "app_name": "Yuvomi",
+      "language": null,
+      "language_effective": "fr",
+      "language_auto": "fr",
+      "date_format": "dmy",
+      "time_format": "24h",
+      "week_start": "monday",
+      "region": "fr-CA",
+      "currency": "EUR",
+      "timezone": null,
+      "timezone_effective": "UTC",
+      "disabled_modules": [
+       "inventory",
+       "schedule",
+       "waste"
+      ],
+      "hidden_modules": [],
+      "module_order": [
+       "calendar",
+       "tasks"
+      ],
+      "mobile_nav_order": [],
+      "dashboard_widgets": [
+       {
+        "id": "tasks",
+        "visible": true,
+        "order": 0,
+        "size": "1x1"
+       },
+       {
+        "id": "calendar",
+        "visible": false,
+        "order": 1,
+        "size": "2x1"
+       }
+      ],
+      "dashboard_today_glance": false,
+      "tasks_subtasks_expanded": false,
+      "holiday_show_public": false,
+      "holiday_show_school": false,
+      "holiday_public_color": "#FF3B30",
+      "holiday_school_color": "#34C759",
+      "screensaver_enabled": false,
+      "display_device_settings": null
+     }
+    }
+   }
+  }
+ },
+ "putBaseline": {
+  "admin": {
+   "visible_meal_types": [
+    "breakfast",
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "meal_type_names": {},
+   "currency": "EUR",
+   "date_format": "dmy",
+   "time_format": "24h",
+   "week_start": "monday",
+   "region": null,
+   "timezone": null,
+   "timezone_effective": "UTC",
+   "timezone_hint_dismissed": false,
+   "language": null,
+   "language_effective": "en",
+   "language_auto": "en",
+   "app_name": "Yuvomi",
+   "dashboard_widgets": [],
+   "dashboard_today_glance": true,
+   "dashboard_widgets_default": null,
+   "dashboard_today_glance_default": true,
+   "dashboard_follows_default": true,
+   "dashboard_widgets_phone": null,
+   "dashboard_follows_phone_default": true,
+   "disabled_modules": [
+    "inventory",
+    "schedule",
+    "waste"
+   ],
+   "hidden_modules": [],
+   "module_order": [],
+   "mobile_nav_order": [],
+   "housekeeping_payment_tasks": false,
+   "budget_mode": "shared",
+   "calendar_default_duration": 60,
+   "calendar_default_reminders": [],
+   "calendar_default_assign_me": false,
+   "calendar_default_target": "",
+   "health_cycle_enabled": true,
+   "health_cycle_enabled_user": true,
+   "health_cycle_effective": true,
+   "health_prevention_notify_caregivers": false,
+   "rewards_require_approval": true,
+   "tasks_subtasks_expanded": false,
+   "tasks_default_points": 0,
+   "countdown_grace_days": 7,
+   "tasks_late_decay_enabled": false,
+   "tasks_default_target": "",
+   "tasks_default_visibility": "all",
+   "tasks_default_locked": false,
+   "schedule_hidden_templates": [],
+   "weather_provider": null,
+   "weather_lat": null,
+   "weather_lon": null,
+   "weather_city": "",
+   "weather_units": "metric",
+   "weather_auto_locate": false,
+   "weather_user": {
+    "lat": null,
+    "lon": null,
+    "city": null,
+    "units": null,
+    "auto_locate": null
+   },
+   "holiday_country": null,
+   "holiday_subdivision": null,
+   "holiday_group": null,
+   "holiday_show_public": false,
+   "holiday_show_school": false,
+   "holiday_public_color": "#FF3B30",
+   "holiday_school_color": "#34C759",
+   "holiday_last_sync": null
+  },
+  "member": {
+   "visible_meal_types": [
+    "breakfast",
+    "lunch",
+    "dinner",
+    "snack"
+   ],
+   "meal_type_names": {},
+   "currency": "EUR",
+   "date_format": "dmy",
+   "time_format": "24h",
+   "week_start": "monday",
+   "region": null,
+   "timezone": null,
+   "timezone_effective": "UTC",
+   "timezone_hint_dismissed": false,
+   "language": null,
+   "language_effective": "en",
+   "language_auto": "en",
+   "app_name": "Yuvomi",
+   "dashboard_widgets": [],
+   "dashboard_today_glance": true,
+   "dashboard_widgets_default": null,
+   "dashboard_today_glance_default": true,
+   "dashboard_follows_default": true,
+   "dashboard_widgets_phone": null,
+   "dashboard_follows_phone_default": true,
+   "disabled_modules": [
+    "inventory",
+    "schedule",
+    "waste"
+   ],
+   "hidden_modules": [],
+   "module_order": [],
+   "mobile_nav_order": [],
+   "housekeeping_payment_tasks": false,
+   "budget_mode": "shared",
+   "calendar_default_duration": 60,
+   "calendar_default_reminders": [],
+   "calendar_default_assign_me": false,
+   "calendar_default_target": "",
+   "health_cycle_enabled": true,
+   "health_cycle_enabled_user": true,
+   "health_cycle_effective": true,
+   "health_prevention_notify_caregivers": false,
+   "rewards_require_approval": true,
+   "tasks_subtasks_expanded": false,
+   "tasks_default_points": 0,
+   "countdown_grace_days": 7,
+   "tasks_late_decay_enabled": false,
+   "tasks_default_target": "",
+   "tasks_default_visibility": "all",
+   "tasks_default_locked": false,
+   "schedule_hidden_templates": [],
+   "weather_provider": null,
+   "weather_lat": null,
+   "weather_lon": null,
+   "weather_city": "",
+   "weather_units": "metric",
+   "weather_auto_locate": false,
+   "weather_user": {
+    "lat": null,
+    "lon": null,
+    "city": null,
+    "units": null,
+    "auto_locate": null
+   },
+   "holiday_country": null,
+   "holiday_subdivision": null,
+   "holiday_group": null,
+   "holiday_show_public": false,
+   "holiday_show_school": false,
+   "holiday_public_color": "#FF3B30",
+   "holiday_school_color": "#34C759",
+   "holiday_last_sync": null
+  }
+ },
+ "put": {
+  "empty patch": {
+   "admin": {
+    "status": 200,
+    "rows": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {}
+   }
+  },
+  "unknown field only": {
+   "admin": {
+    "status": 200,
+    "rows": {},
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {},
+    "changed": {}
+   }
+  },
+  "array body": {
+   "admin": {
+    "status": 200,
+    "rows": {},
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {},
+    "changed": {}
+   }
+  },
+  "schedule_hidden_templates valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "schedule_hidden_templates": "[\"school\"]"
+    },
+    "changed": {
+     "schedule_hidden_templates": [
+      "school"
+     ]
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "schedule_hidden_templates empty": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "schedule_hidden_templates": "[]"
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "schedule_hidden_templates not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "schedule_hidden_templates must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "timezone_hint_dismissed true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "household_timezone_hint_dismissed": "1"
+    },
+    "changed": {
+     "timezone_hint_dismissed": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "timezone_hint_dismissed false": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "household_timezone_hint_dismissed": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "timezone_hint_dismissed not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "timezone_hint_dismissed must be true or false.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "visible_meal_types valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "visible_meal_types": "dinner,breakfast,dinner"
+    },
+    "changed": {
+     "visible_meal_types": [
+      "dinner",
+      "breakfast",
+      "dinner"
+     ]
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "visible_meal_types": "dinner,breakfast,dinner"
+    },
+    "changed": {
+     "visible_meal_types": [
+      "dinner",
+      "breakfast",
+      "dinner"
+     ]
+    }
+   }
+  },
+  "visible_meal_types not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "visible_meal_types must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "visible_meal_types must be an array.",
+     "code": 400
+    }
+   }
+  },
+  "visible_meal_types empty after filter": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "At least one meal type must be active.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "At least one meal type must be active.",
+     "code": 400
+    }
+   }
+  },
+  "meal_type_names valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "meal_type_names": "{\"lunch\":\"Zmittag\",\"snack\":\"Znueni, spaet\"}"
+    },
+    "changed": {
+     "meal_type_names": {
+      "lunch": "Zmittag",
+      "snack": "Znueni, spaet"
+     }
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "meal_type_names": "{\"lunch\":\"Zmittag\",\"snack\":\"Znueni, spaet\"}"
+    },
+    "changed": {
+     "meal_type_names": {
+      "lunch": "Zmittag",
+      "snack": "Znueni, spaet"
+     }
+    }
+   }
+  },
+  "meal_type_names null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "meal_type_names": ""
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "meal_type_names": ""
+    },
+    "changed": {}
+   }
+  },
+  "meal_type_names empty object": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "meal_type_names": ""
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "meal_type_names": ""
+    },
+    "changed": {}
+   }
+  },
+  "meal_type_names 40 characters": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "meal_type_names": "{\"lunch\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}"
+    },
+    "changed": {
+     "meal_type_names": {
+      "lunch": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     }
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "meal_type_names": "{\"lunch\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}"
+    },
+    "changed": {
+     "meal_type_names": {
+      "lunch": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     }
+    }
+   }
+  },
+  "meal_type_names string": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "meal_type_names must be an object.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "meal_type_names must be an object.",
+     "code": 400
+    }
+   }
+  },
+  "meal_type_names array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "meal_type_names must be an object.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "meal_type_names must be an object.",
+     "code": 400
+    }
+   }
+  },
+  "meal_type_names value not a string": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "meal_type_names.lunch must be a string.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "meal_type_names.lunch must be a string.",
+     "code": 400
+    }
+   }
+  },
+  "meal_type_names value too long": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "meal_type_names.lunch may be at most 40 characters long.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "meal_type_names.lunch may be at most 40 characters long.",
+     "code": 400
+    }
+   }
+  },
+  "currency valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "currency": "CHF"
+    },
+    "changed": {
+     "currency": "CHF"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "currency invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid currency. Allowed: AED, ARS, AUD, BBD, BOB, BRL, BSD, BYN, BZD, CAD, CHF, CLP, CNY, COP, CRC, CUP, CZK, DKK, DOP, EUR, GBP, GTQ, GYD, HKD, HNL, HTG, HUF, IDR, ILS, INR, IRR, JMD, JPY, KRW, KZT, MOP, MXN, MYR, NIO, NOK, NZD, PAB, PEN, PHP, PLN, PYG, RUB, SAR, SEK, SGD, SRD, TRY, TTD, TWD, UAH, USD, UYU, VES, VND, XCD, ZAR",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "date_format valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "date_format": "ymd_slash"
+    },
+    "changed": {
+     "date_format": "ymd_slash"
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "date_format": "ymd_slash"
+    },
+    "changed": {
+     "date_format": "ymd_slash"
+    }
+   }
+  },
+  "date_format invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid date format. Allowed: mdy, dmy, ymd, mdy_dot, dmy_dot, dmy_slash, dmy_dash, ymd_dot, ymd_slash",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid date format. Allowed: mdy, dmy, ymd, mdy_dot, dmy_dot, dmy_slash, dmy_dash, ymd_dot, ymd_slash",
+     "code": 400
+    }
+   }
+  },
+  "time_format valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "time_format": "12h"
+    },
+    "changed": {
+     "time_format": "12h"
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "time_format": "12h"
+    },
+    "changed": {
+     "time_format": "12h"
+    }
+   }
+  },
+  "time_format invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid time format. Allowed: 24h, 12h",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid time format. Allowed: 24h, 12h",
+     "code": 400
+    }
+   }
+  },
+  "week_start valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "week_start": "sunday"
+    },
+    "changed": {
+     "week_start": "sunday"
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "week_start": "sunday"
+    },
+    "changed": {
+     "week_start": "sunday"
+    }
+   }
+  },
+  "week_start invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid week start. Allowed: monday, sunday, saturday",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid week start. Allowed: monday, sunday, saturday",
+     "code": 400
+    }
+   }
+  },
+  "budget_mode valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "budget_mode": "personal"
+    },
+    "changed": {
+     "budget_mode": "personal"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "budget_mode invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid budget mode. Allowed: shared, personal",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "region valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "region": "fr-CA"
+    },
+    "changed": {
+     "region": "fr-CA",
+     "language_effective": "fr",
+     "language_auto": "fr"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "region custom": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "region": "custom"
+    },
+    "changed": {
+     "region": "custom"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "region null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "region": ""
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "region invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid region.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "timezone valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "household_timezone": "America/New_York",
+     "household_timezone_hint_dismissed": "1"
+    },
+    "changed": {
+     "timezone": "America/New_York",
+     "timezone_effective": "America/New_York",
+     "timezone_hint_dismissed": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "timezone null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "household_timezone": null,
+     "household_timezone_hint_dismissed": "1"
+    },
+    "changed": {
+     "timezone_hint_dismissed": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "timezone empty string": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "household_timezone": null,
+     "household_timezone_hint_dismissed": "1"
+    },
+    "changed": {
+     "timezone_hint_dismissed": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "timezone invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid time zone. Expected an IANA zone such as \"Europe/Berlin\".",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "language valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "language": "de"
+    },
+    "changed": {
+     "language": "de",
+     "language_effective": "de"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "language null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "language": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "language empty string": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "language": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "language invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid language. Allowed: ar, cs, de, el, en, es, fa, fil, fr, hi, hu, id, it, ja, ko, nb, nl, pl, pt, pt-BR, ru, sv, tr, uk, vi, zh, zh-Hant",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "app_name valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "app_name": "Haus"
+    },
+    "changed": {
+     "app_name": "Haus"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "app_name empty": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "app_name": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "app_name null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "app_name": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "app_name too long": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Application name may be at most 100 characters long.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "app_name not a string": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "app_name": "42"
+    },
+    "changed": {
+     "app_name": "42"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "dashboard_widgets valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets:user:admin": "[{\"id\":\"calendar\",\"visible\":true,\"order\":0,\"size\":\"1x1\"},{\"id\":\"tasks\",\"visible\":true,\"order\":1,\"size\":\"2x1\"},{\"id\":\"notes\",\"visible\":false,\"order\":2,\"size\":\"1x1\",\"options\":{\"categories\":[0,99999],\"flag\":true,\"label\":\"a\"}}]"
+    },
+    "changed": {
+     "dashboard_widgets": [
+      {
+       "id": "calendar",
+       "visible": true,
+       "order": 0,
+       "size": "1x1"
+      },
+      {
+       "id": "tasks",
+       "visible": true,
+       "order": 1,
+       "size": "2x1"
+      },
+      {
+       "id": "notes",
+       "visible": false,
+       "order": 2,
+       "size": "1x1",
+       "options": {
+        "flag": true,
+        "label": "a"
+       }
+      }
+     ],
+     "dashboard_follows_default": false
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets:user:member": "[{\"id\":\"calendar\",\"visible\":true,\"order\":0,\"size\":\"1x1\"},{\"id\":\"tasks\",\"visible\":true,\"order\":1,\"size\":\"2x1\"},{\"id\":\"notes\",\"visible\":false,\"order\":2,\"size\":\"1x1\",\"options\":{\"categories\":[0,99999],\"flag\":true,\"label\":\"a\"}}]"
+    },
+    "changed": {
+     "dashboard_widgets": [
+      {
+       "id": "calendar",
+       "visible": true,
+       "order": 0,
+       "size": "1x1"
+      },
+      {
+       "id": "tasks",
+       "visible": true,
+       "order": 1,
+       "size": "2x1"
+      },
+      {
+       "id": "notes",
+       "visible": false,
+       "order": 2,
+       "size": "1x1",
+       "options": {
+        "flag": true,
+        "label": "a"
+       }
+      }
+     ],
+     "dashboard_follows_default": false
+    }
+   }
+  },
+  "dashboard_widgets null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets:user:admin": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets:user:member": null
+    },
+    "changed": {}
+   }
+  },
+  "dashboard_widgets not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets must be an array.",
+     "code": 400
+    }
+   }
+  },
+  "dashboard_widgets invalid entry": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets contains invalid entries.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets contains invalid entries.",
+     "code": 400
+    }
+   }
+  },
+  "dashboard_widgets_phone valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets_phone:user:admin": "[{\"id\":\"calendar\",\"visible\":true,\"order\":0},{\"id\":\"tasks\",\"visible\":true,\"order\":1},{\"id\":\"notes\",\"visible\":false,\"order\":2}]"
+    },
+    "changed": {
+     "dashboard_widgets_phone": [
+      {
+       "id": "calendar",
+       "visible": true,
+       "order": 0
+      },
+      {
+       "id": "tasks",
+       "visible": true,
+       "order": 1
+      },
+      {
+       "id": "notes",
+       "visible": false,
+       "order": 2
+      }
+     ],
+     "dashboard_follows_phone_default": false
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets_phone:user:member": "[{\"id\":\"calendar\",\"visible\":true,\"order\":0},{\"id\":\"tasks\",\"visible\":true,\"order\":1},{\"id\":\"notes\",\"visible\":false,\"order\":2}]"
+    },
+    "changed": {
+     "dashboard_widgets_phone": [
+      {
+       "id": "calendar",
+       "visible": true,
+       "order": 0
+      },
+      {
+       "id": "tasks",
+       "visible": true,
+       "order": 1
+      },
+      {
+       "id": "notes",
+       "visible": false,
+       "order": 2
+      }
+     ],
+     "dashboard_follows_phone_default": false
+    }
+   }
+  },
+  "dashboard_widgets_phone null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets_phone:user:admin": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets_phone:user:member": null
+    },
+    "changed": {}
+   }
+  },
+  "dashboard_widgets_phone not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets_phone must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets_phone must be an array.",
+     "code": 400
+    }
+   }
+  },
+  "dashboard_widgets_phone invalid entry": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets_phone contains invalid entries.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets_phone contains invalid entries.",
+     "code": 400
+    }
+   }
+  },
+  "dashboard_today_glance false": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_today_glance:user:admin": "0"
+    },
+    "changed": {
+     "dashboard_today_glance": false,
+     "dashboard_follows_default": false
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "dashboard_today_glance:user:member": "0"
+    },
+    "changed": {
+     "dashboard_today_glance": false,
+     "dashboard_follows_default": false
+    }
+   }
+  },
+  "dashboard_today_glance null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_today_glance:user:admin": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "dashboard_today_glance:user:member": null
+    },
+    "changed": {}
+   }
+  },
+  "dashboard_today_glance not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_today_glance must be a boolean.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_today_glance must be a boolean.",
+     "code": 400
+    }
+   }
+  },
+  "dashboard_widgets_default valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets_default": "[{\"id\":\"calendar\",\"visible\":true,\"order\":0,\"size\":\"1x1\"},{\"id\":\"tasks\",\"visible\":true,\"order\":1,\"size\":\"2x1\"},{\"id\":\"notes\",\"visible\":false,\"order\":2,\"size\":\"1x1\",\"options\":{\"categories\":[0,99999],\"flag\":true,\"label\":\"a\"}}]"
+    },
+    "changed": {
+     "dashboard_widgets": [
+      {
+       "id": "calendar",
+       "visible": true,
+       "order": 0,
+       "size": "1x1"
+      },
+      {
+       "id": "tasks",
+       "visible": true,
+       "order": 1,
+       "size": "2x1"
+      },
+      {
+       "id": "notes",
+       "visible": false,
+       "order": 2,
+       "size": "1x1",
+       "options": {
+        "flag": true,
+        "label": "a"
+       }
+      }
+     ],
+     "dashboard_widgets_default": [
+      {
+       "id": "calendar",
+       "visible": true,
+       "order": 0,
+       "size": "1x1"
+      },
+      {
+       "id": "tasks",
+       "visible": true,
+       "order": 1,
+       "size": "2x1"
+      },
+      {
+       "id": "notes",
+       "visible": false,
+       "order": 2,
+       "size": "1x1",
+       "options": {
+        "flag": true,
+        "label": "a"
+       }
+      }
+     ]
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "dashboard_widgets_default null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_widgets_default": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "dashboard_widgets_default not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets_default must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "dashboard_widgets_default duplicate entry": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_widgets_default contains invalid entries.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "dashboard_today_glance_default false": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_today_glance_default": "0"
+    },
+    "changed": {
+     "dashboard_today_glance": false,
+     "dashboard_today_glance_default": false
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "dashboard_today_glance_default null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "dashboard_today_glance_default": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "dashboard_today_glance_default not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "dashboard_today_glance_default must be a boolean.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "disabled_modules valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "disabled_modules": "[\"health\",\"tasks\"]"
+    },
+    "changed": {
+     "disabled_modules": [
+      "health",
+      "tasks"
+     ]
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "disabled_modules not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "disabled_modules must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "hidden_modules valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "hidden_modules:user:admin": "[\"budget\"]"
+    },
+    "changed": {
+     "hidden_modules": [
+      "budget"
+     ]
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "hidden_modules:user:member": "[\"budget\"]"
+    },
+    "changed": {
+     "hidden_modules": [
+      "budget"
+     ]
+    }
+   }
+  },
+  "hidden_modules not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "hidden_modules must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "hidden_modules must be an array.",
+     "code": 400
+    }
+   }
+  },
+  "module_order valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "module_order:user:admin": "[\"tasks\",\"dashboard\",\"third-party-foo-bar\"]"
+    },
+    "changed": {
+     "module_order": [
+      "tasks",
+      "dashboard",
+      "third-party-foo-bar"
+     ]
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "module_order:user:member": "[\"tasks\",\"dashboard\",\"third-party-foo-bar\"]"
+    },
+    "changed": {
+     "module_order": [
+      "tasks",
+      "dashboard",
+      "third-party-foo-bar"
+     ]
+    }
+   }
+  },
+  "module_order not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "module_order must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "module_order must be an array.",
+     "code": 400
+    }
+   }
+  },
+  "mobile_nav_order valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "mobile_nav_order:user:admin": "[\"kitchen\",\"tasks\",\"calendar\"]"
+    },
+    "changed": {
+     "mobile_nav_order": [
+      "kitchen",
+      "tasks",
+      "calendar"
+     ]
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "mobile_nav_order:user:member": "[\"kitchen\",\"tasks\",\"calendar\"]"
+    },
+    "changed": {
+     "mobile_nav_order": [
+      "kitchen",
+      "tasks",
+      "calendar"
+     ]
+    }
+   }
+  },
+  "mobile_nav_order not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "mobile_nav_order must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "mobile_nav_order must be an array.",
+     "code": 400
+    }
+   }
+  },
+  "housekeeping_payment_tasks true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "housekeeping_payment_tasks": "1"
+    },
+    "changed": {
+     "housekeeping_payment_tasks": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "housekeeping_payment_tasks not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "housekeeping_payment_tasks must be a boolean",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "calendar_default_duration valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "calendar_default_duration": "90"
+    },
+    "changed": {
+     "calendar_default_duration": 90
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "calendar_default_duration numeric string": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "calendar_default_duration": "45"
+    },
+    "changed": {
+     "calendar_default_duration": 45
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "calendar_default_duration too small": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_duration must be an integer between 5 and 1440",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "calendar_default_duration too large": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_duration must be an integer between 5 and 1440",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "calendar_default_duration fraction": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_duration must be an integer between 5 and 1440",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "health_cycle_enabled false": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "health_cycle_enabled": "0"
+    },
+    "changed": {
+     "health_cycle_enabled": false,
+     "health_cycle_effective": false
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "health_cycle_enabled not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "health_cycle_enabled must be a boolean",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "rewards_require_approval false": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "rewards_require_approval": "0"
+    },
+    "changed": {
+     "rewards_require_approval": false
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "rewards_require_approval not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "rewards_require_approval must be a boolean",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_subtasks_expanded true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_subtasks_expanded": "1"
+    },
+    "changed": {
+     "tasks_subtasks_expanded": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_subtasks_expanded not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_subtasks_expanded must be a boolean",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_default_points valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_default_points": "25"
+    },
+    "changed": {
+     "tasks_default_points": 25
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_default_points zero": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_default_points": "0"
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_default_points negative": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_points must be an integer between 0 and 10000",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_default_points too large": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_points must be an integer between 0 and 10000",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_late_decay_enabled true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_late_decay_enabled": "1"
+    },
+    "changed": {
+     "tasks_late_decay_enabled": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "tasks_late_decay_enabled not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_late_decay_enabled must be a boolean",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "countdown_grace_days zero": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "countdown_grace_days": "0"
+    },
+    "changed": {
+     "countdown_grace_days": 0
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "countdown_grace_days ninety": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "countdown_grace_days": "90"
+    },
+    "changed": {
+     "countdown_grace_days": 90
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "countdown_grace_days negative": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "countdown_grace_days must be an integer between 0 and 90",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "countdown_grace_days too large": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "countdown_grace_days must be an integer between 0 and 90",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "calendar_default_reminders valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "calendar_default_reminders:user:admin": "[15,60]"
+    },
+    "changed": {
+     "calendar_default_reminders": [
+      15,
+      60
+     ]
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "calendar_default_reminders:user:member": "[15,60]"
+    },
+    "changed": {
+     "calendar_default_reminders": [
+      15,
+      60
+     ]
+    }
+   }
+  },
+  "calendar_default_reminders not an array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_reminders must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_reminders must be an array.",
+     "code": 400
+    }
+   }
+  },
+  "calendar_default_reminders unknown offset": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_reminders: allowed offsets (minutes): 0, 15, 60, 1440, 2880, 10080, 20160.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_reminders: allowed offsets (minutes): 0, 15, 60, 1440, 2880, 10080, 20160.",
+     "code": 400
+    }
+   }
+  },
+  "calendar_default_reminders too many": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_reminders may hold at most 5 reminders.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_reminders may hold at most 5 reminders.",
+     "code": 400
+    }
+   }
+  },
+  "calendar_default_assign_me true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "calendar_default_assign_me:user:admin": "1"
+    },
+    "changed": {
+     "calendar_default_assign_me": true
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "calendar_default_assign_me:user:member": "1"
+    },
+    "changed": {
+     "calendar_default_assign_me": true
+    }
+   }
+  },
+  "calendar_default_assign_me any truthy": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "calendar_default_assign_me:user:admin": "1"
+    },
+    "changed": {
+     "calendar_default_assign_me": true
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "calendar_default_assign_me:user:member": "1"
+    },
+    "changed": {
+     "calendar_default_assign_me": true
+    }
+   }
+  },
+  "calendar_default_assign_me zero": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "calendar_default_assign_me:user:admin": "0"
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "calendar_default_assign_me:user:member": "0"
+    },
+    "changed": {}
+   }
+  },
+  "calendar_default_target valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "calendar_default_target:user:admin": "google:primary"
+    },
+    "changed": {
+     "calendar_default_target": "google:primary"
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "calendar_default_target:user:member": "google:primary"
+    },
+    "changed": {
+     "calendar_default_target": "google:primary"
+    }
+   }
+  },
+  "calendar_default_target null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "calendar_default_target:user:admin": ""
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "calendar_default_target:user:member": ""
+    },
+    "changed": {}
+   }
+  },
+  "calendar_default_target not a string": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_target must be a string.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_target must be a string.",
+     "code": 400
+    }
+   }
+  },
+  "calendar_default_target too long": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_target may be at most 500 characters long.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_target may be at most 500 characters long.",
+     "code": 400
+    }
+   }
+  },
+  "calendar_default_target bad form": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_target: expected \"google:<id>\", \"caldav:<accountId>|<url>\" or \"outlook:<accountId>|<calendarId>\".",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_target: expected \"google:<id>\", \"caldav:<accountId>|<url>\" or \"outlook:<accountId>|<calendarId>\".",
+     "code": 400
+    }
+   }
+  },
+  "tasks_default_target valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_default_target:user:admin": "caldav:1|https://dav.example/c/"
+    },
+    "changed": {
+     "tasks_default_target": "caldav:1|https://dav.example/c/"
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "tasks_default_target:user:member": "caldav:1|https://dav.example/c/"
+    },
+    "changed": {
+     "tasks_default_target": "caldav:1|https://dav.example/c/"
+    }
+   }
+  },
+  "tasks_default_target empty": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_default_target:user:admin": ""
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "tasks_default_target:user:member": ""
+    },
+    "changed": {}
+   }
+  },
+  "tasks_default_target not a string": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_target must be a string.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_target must be a string.",
+     "code": 400
+    }
+   }
+  },
+  "tasks_default_target too long": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_target may be at most 500 characters long.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_target may be at most 500 characters long.",
+     "code": 400
+    }
+   }
+  },
+  "tasks_default_target google": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_target: expected \"caldav:<accountId>|<url>\".",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_target: expected \"caldav:<accountId>|<url>\".",
+     "code": 400
+    }
+   }
+  },
+  "tasks_default_target bad form": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_target: expected \"caldav:<accountId>|<url>\".",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_target: expected \"caldav:<accountId>|<url>\".",
+     "code": 400
+    }
+   }
+  },
+  "tasks_default_visibility valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_default_visibility:user:admin": "private"
+    },
+    "changed": {
+     "tasks_default_visibility": "private"
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "tasks_default_visibility:user:member": "private"
+    },
+    "changed": {
+     "tasks_default_visibility": "private"
+    }
+   }
+  },
+  "tasks_default_visibility invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_visibility must be \"all\", \"assignees\" or \"private\".",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_visibility must be \"all\", \"assignees\" or \"private\".",
+     "code": 400
+    }
+   }
+  },
+  "tasks_default_locked true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "tasks_default_locked:user:admin": "1"
+    },
+    "changed": {
+     "tasks_default_locked": true
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "tasks_default_locked:user:member": "1"
+    },
+    "changed": {
+     "tasks_default_locked": true
+    }
+   }
+  },
+  "tasks_default_locked not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_locked must be a boolean.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_locked must be a boolean.",
+     "code": 400
+    }
+   }
+  },
+  "health_cycle_enabled_user false": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "health_cycle_enabled:user:admin": "0"
+    },
+    "changed": {
+     "health_cycle_enabled_user": false,
+     "health_cycle_effective": false
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "health_cycle_enabled:user:member": "0"
+    },
+    "changed": {
+     "health_cycle_enabled_user": false,
+     "health_cycle_effective": false
+    }
+   }
+  },
+  "health_cycle_enabled_user not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "health_cycle_enabled_user must be a boolean",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "health_cycle_enabled_user must be a boolean",
+     "code": 400
+    }
+   }
+  },
+  "health_prevention_notify_caregivers true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "health_prevention_notify_caregivers:user:admin": "1"
+    },
+    "changed": {
+     "health_prevention_notify_caregivers": true
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "health_prevention_notify_caregivers:user:member": "1"
+    },
+    "changed": {
+     "health_prevention_notify_caregivers": true
+    }
+   }
+  },
+  "health_prevention_notify_caregivers not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "health_prevention_notify_caregivers must be a boolean",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "health_prevention_notify_caregivers must be a boolean",
+     "code": 400
+    }
+   }
+  },
+  "weather_provider valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_provider": "openweathermap"
+    },
+    "changed": {
+     "weather_provider": "openweathermap"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_provider null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_provider": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_provider invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid provider. Allowed: open-meteo, openweathermap",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_lat valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_lat": "52.5"
+    },
+    "changed": {
+     "weather_lat": "52.5"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_lat null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_lat": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_lat not a number": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid latitude (-90 to 90).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_lat out of range": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid latitude (-90 to 90).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_lon valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_lon": "13.4"
+    },
+    "changed": {
+     "weather_lon": "13.4"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_lon null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_lon": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_lon out of range": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid longitude (-180 to 180).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_city valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_city": "Berlin"
+    },
+    "changed": {
+     "weather_city": "Berlin"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_city number": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_city": "12345"
+    },
+    "changed": {
+     "weather_city": "12345"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_city empty": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_city": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_city null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_city": "null"
+    },
+    "changed": {
+     "weather_city": "null"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_units valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_units": "imperial"
+    },
+    "changed": {
+     "weather_units": "imperial"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_units invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid unit. Allowed: metric, imperial",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_auto_locate true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_auto_locate": "1"
+    },
+    "changed": {
+     "weather_auto_locate": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_auto_locate not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_auto_locate must be a boolean.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "weather_user valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_auto_locate:user:admin": "1",
+     "weather_city:user:admin": "Muenchen",
+     "weather_lat:user:admin": "48.1",
+     "weather_lon:user:admin": "11.5",
+     "weather_units:user:admin": "imperial"
+    },
+    "changed": {
+     "weather_user": {
+      "lat": "48.1",
+      "lon": "11.5",
+      "city": "Muenchen",
+      "units": "imperial",
+      "auto_locate": true
+     }
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "weather_auto_locate:user:member": "1",
+     "weather_city:user:member": "Muenchen",
+     "weather_lat:user:member": "48.1",
+     "weather_lon:user:member": "11.5",
+     "weather_units:user:member": "imperial"
+    },
+    "changed": {
+     "weather_user": {
+      "lat": "48.1",
+      "lon": "11.5",
+      "city": "Muenchen",
+      "units": "imperial",
+      "auto_locate": true
+     }
+    }
+   }
+  },
+  "weather_user all null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_auto_locate:user:admin": null,
+     "weather_city:user:admin": null,
+     "weather_lat:user:admin": null,
+     "weather_lon:user:admin": null,
+     "weather_units:user:admin": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "weather_auto_locate:user:member": null,
+     "weather_city:user:member": null,
+     "weather_lat:user:member": null,
+     "weather_lon:user:member": null,
+     "weather_units:user:member": null
+    },
+    "changed": {}
+   }
+  },
+  "weather_user empty object": {
+   "admin": {
+    "status": 200,
+    "rows": {},
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {},
+    "changed": {}
+   }
+  },
+  "weather_user empty city": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "weather_city:user:admin": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "weather_city:user:member": null
+    },
+    "changed": {}
+   }
+  },
+  "weather_user not an object": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_user must be an object.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_user must be an object.",
+     "code": 400
+    }
+   }
+  },
+  "weather_user null": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_user must be an object.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_user must be an object.",
+     "code": 400
+    }
+   }
+  },
+  "weather_user array": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_user must be an object.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_user must be an object.",
+     "code": 400
+    }
+   }
+  },
+  "weather_user lat not a number": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid latitude (-90 to 90).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid latitude (-90 to 90).",
+     "code": 400
+    }
+   }
+  },
+  "weather_user lon out of range": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid longitude (-180 to 180).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid longitude (-180 to 180).",
+     "code": 400
+    }
+   }
+  },
+  "weather_user units invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid unit. Allowed: metric, imperial",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid unit. Allowed: metric, imperial",
+     "code": 400
+    }
+   }
+  },
+  "weather_user auto_locate not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_user.auto_locate must be a boolean.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "weather_user.auto_locate must be a boolean.",
+     "code": 400
+    }
+   }
+  },
+  "holiday_country new country without group": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_country": "AT",
+     "holiday_group": null
+    },
+    "changed": {
+     "holiday_country": "AT",
+     "holiday_subdivision": "DE-BY"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_country same country": {
+   "admin": {
+    "status": 200,
+    "rows": {},
+    "changed": {
+     "holiday_country": "DE",
+     "holiday_subdivision": "DE-BY",
+     "holiday_group": "DE-BY-X"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_country new country with group": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_country": "BE",
+     "holiday_group": "BE-FR"
+    },
+    "changed": {
+     "holiday_country": "BE",
+     "holiday_subdivision": "DE-BY",
+     "holiday_group": "BE-FR"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_country null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_country": null,
+     "holiday_group": null,
+     "holiday_subdivision": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_country first time": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_country": "CH"
+    },
+    "changed": {
+     "holiday_country": "CH"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_country invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid country code (2 capital letters, e.g. DE).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_subdivision valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_subdivision": "DE-BY"
+    },
+    "changed": {
+     "holiday_subdivision": "DE-BY"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_subdivision null with stored subdivision": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_group": null,
+     "holiday_subdivision": null
+    },
+    "changed": {
+     "holiday_country": "CH"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_subdivision null without stored subdivision": {
+   "admin": {
+    "status": 200,
+    "rows": {},
+    "changed": {
+     "holiday_country": "BE",
+     "holiday_group": "BE-FR"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_subdivision null with new group": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_group": "CH-BE-DE",
+     "holiday_subdivision": null
+    },
+    "changed": {
+     "holiday_country": "CH",
+     "holiday_group": "CH-BE-DE"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_subdivision invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid region code (e.g. DE-BY).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_group valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_group": "CH-BE-VS"
+    },
+    "changed": {
+     "holiday_group": "CH-BE-VS"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_group empty": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_group": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_group null": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_group": null
+    },
+    "changed": {}
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_group invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid group code (e.g. CH-BE-VS).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_show_public true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_show_public": "1"
+    },
+    "changed": {
+     "holiday_show_public": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_show_public not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "holiday_show_public must be a boolean.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_show_school true": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_show_school": "1"
+    },
+    "changed": {
+     "holiday_show_school": true
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_show_school not boolean": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "holiday_show_school must be a boolean.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_public_color valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_public_color": "#123456"
+    },
+    "changed": {
+     "holiday_public_color": "#123456"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_public_color invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "holiday_public_color must be a valid hex color (e.g. #FF3B30).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_school_color valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_school_color": "#abcdef"
+    },
+    "changed": {
+     "holiday_school_color": "#abcdef"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_school_color invalid": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "holiday_school_color must be a valid hex color (e.g. #34C759).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "holiday_country and subdivision null together": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "holiday_country": "AT",
+     "holiday_group": null,
+     "holiday_subdivision": null
+    },
+    "changed": {
+     "holiday_country": "AT"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order schedule_hidden_templates before visible_meal_types": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "schedule_hidden_templates must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order timezone_hint_dismissed before visible_meal_types": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "timezone_hint_dismissed must be true or false.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order schedule_hidden_templates before timezone_hint_dismissed": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "schedule_hidden_templates must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order early 403 before an invalid member field": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "At least one meal type must be active.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order 400 before 403": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid currency. Allowed: AED, ARS, AUD, BBD, BOB, BRL, BSD, BYN, BZD, CAD, CHF, CLP, CNY, COP, CRC, CUP, CZK, DKK, DOP, EUR, GBP, GTQ, GYD, HKD, HNL, HTG, HUF, IDR, ILS, INR, IRR, JMD, JPY, KRW, KZT, MOP, MXN, MYR, NIO, NOK, NZD, PAB, PEN, PHP, PLN, PYG, RUB, SAR, SEK, SGD, SRD, TRY, TTD, TWD, UAH, USD, UYU, VES, VND, XCD, ZAR",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order 403 before 400": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "hidden_modules must be an array.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order two 400 in handler order": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid currency. Allowed: AED, ARS, AUD, BBD, BOB, BRL, BSD, BYN, BZD, CAD, CHF, CLP, CNY, COP, CRC, CUP, CZK, DKK, DOP, EUR, GBP, GTQ, GYD, HKD, HNL, HTG, HUF, IDR, ILS, INR, IRR, JMD, JPY, KRW, KZT, MOP, MXN, MYR, NIO, NOK, NZD, PAB, PEN, PHP, PLN, PYG, RUB, SAR, SEK, SGD, SRD, TRY, TTD, TWD, UAH, USD, UYU, VES, VND, XCD, ZAR",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order weather before weather_user": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid provider. Allowed: open-meteo, openweathermap",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order weather before holidays": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid unit. Allowed: metric, imperial",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order holiday fields in handler order": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid country code (2 capital letters, e.g. DE).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "order personal 400 before admin 403": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_reminders: allowed offsets (minutes): 0, 15, 60, 1440, 2880, 10080, 20160.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "calendar_default_reminders: allowed offsets (minutes): 0, 15, 60, 1440, 2880, 10080, 20160.",
+     "code": 400
+    }
+   }
+  },
+  "nothing written: member fields then a late 400": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid country code (2 capital letters, e.g. DE).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "nothing written: zone then a late 400": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid group code (e.g. CH-BE-VS).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "nothing written: disabled_modules then a late 400": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "tasks_default_points must be an integer between 0 and 10000",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "nothing written: member field then admin field": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "budget_mode": "personal",
+     "currency": "CHF"
+    },
+    "changed": {
+     "currency": "CHF",
+     "budget_mode": "personal"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "nothing written: personal fields then a late 400": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid latitude (-90 to 90).",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "Invalid latitude (-90 to 90).",
+     "code": 400
+    }
+   }
+  },
+  "mixed: zone then hint false": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "household_timezone": "Europe/Berlin"
+    },
+    "changed": {
+     "timezone": "Europe/Berlin",
+     "timezone_effective": "Europe/Berlin"
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  },
+  "mixed: all member fields at once": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "app_name": "X",
+     "calendar_default_duration": "30",
+     "currency": "USD",
+     "date_format": "mdy",
+     "housekeeping_payment_tasks": "1",
+     "meal_type_names": "{\"lunch\":\"Z\"}",
+     "time_format": "12h",
+     "visible_meal_types": "lunch",
+     "week_start": "saturday"
+    },
+    "changed": {
+     "visible_meal_types": [
+      "lunch"
+     ],
+     "meal_type_names": {
+      "lunch": "Z"
+     },
+     "currency": "USD",
+     "date_format": "mdy",
+     "time_format": "12h",
+     "week_start": "saturday",
+     "app_name": "X",
+     "housekeeping_payment_tasks": true,
+     "calendar_default_duration": 30
+    }
+   },
+   "member": {
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
+   }
+  }
+ },
+ "zone": {
+  "change": {
+   "status": 200,
+   "before": {
+    "exceptions": [
+     "2035-03-25T20:30:00Z",
+     "2035-03-26T20:30:00Z"
+    ],
+    "children": [
+     {
+      "title": "Eigener Titel",
+      "recurrence_id": "2035-03-26T20:30:00Z"
+     }
+    ]
+   },
+   "after": {
+    "exceptions": [
+     "2035-03-26T01:30:00Z",
+     "2035-03-27T01:30:00Z"
+    ],
+    "children": [
+     {
+      "title": "Eigener Titel",
+      "recurrence_id": "2035-03-27T01:30:00Z"
+     }
+    ]
+   },
+   "rows": {
+    "household_timezone": "America/New_York",
+    "household_timezone_hint_dismissed": "1"
+   }
+  },
+  "same": {
+   "status": 200,
+   "before": {
+    "exceptions": [
+     "2035-03-25T20:30:00Z",
+     "2035-03-26T20:30:00Z"
+    ],
+    "children": [
+     {
+      "title": "Eigener Titel",
+      "recurrence_id": "2035-03-26T20:30:00Z"
+     }
+    ]
+   },
+   "after": {
+    "exceptions": [
+     "2035-03-25T20:30:00Z",
+     "2035-03-26T20:30:00Z"
+    ],
+    "children": [
+     {
+      "title": "Eigener Titel",
+      "recurrence_id": "2035-03-26T20:30:00Z"
+     }
+    ]
+   },
+   "rows": {
+    "household_timezone_hint_dismissed": "1"
+   }
+  },
+  "refused": {
+   "status": 400,
+   "before": {
+    "exceptions": [
+     "2035-03-25T20:30:00Z",
+     "2035-03-26T20:30:00Z"
+    ],
+    "children": [
+     {
+      "title": "Eigener Titel",
+      "recurrence_id": "2035-03-26T20:30:00Z"
+     }
+    ]
+   },
+   "after": {
+    "exceptions": [
+     "2035-03-25T20:30:00Z",
+     "2035-03-26T20:30:00Z"
+    ],
+    "children": [
+     {
+      "title": "Eigener Titel",
+      "recurrence_id": "2035-03-26T20:30:00Z"
+     }
+    ]
+   },
+   "rows": {}
+  }
+ }
+}

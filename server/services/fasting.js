@@ -1,4 +1,4 @@
-import { resolvePermissions } from '../permissions.js';
+import { fastingVisibleFilter, hasCareGrant, healthRowReadable, resolvePermissions } from '../authorize/index.ts';
 import { summarizeFastingRows, fastingStreaks, weeklyFastingSeries } from './fasting-stats.js';
 import { fastingDateKeyFactory, parseFastingDateRange, rowMatchesFastingDateRange } from './fasting-dates.js';
 import { householdTimeZone, shiftDateKey, todayKey } from '../utils/timezone.js';
@@ -60,9 +60,7 @@ function ensureSubject(database, actorId, subjectId, { read = false } = {}) {
   if (!capabilityAllowed(database, subjectId)) {
     fail(403, 'FASTING_SUBJECT_FORBIDDEN', read ? 'This person does not permit fasting access.' : 'You cannot record fasting for this person.');
   }
-  const grant = database.prepare(
-    'SELECT 1 FROM health_care_grants WHERE subject_id = ? AND caregiver_id = ?'
-  ).get(subjectId, actorId);
+  const grant = hasCareGrant(database, actorId, subjectId);
   // An ungranted viewer may still read family-visible rows. The visibility
   // query below filters the result; only private access needs the grant.
   if (read && !grant) return;
@@ -177,12 +175,6 @@ function validateRange(startAt, endAt, now = new Date()) {
   if (endTime !== null && endTime > now.getTime()) fail(400, 'FASTING_FUTURE', 'A fast cannot end in the future.');
 }
 
-function visibleFilter(database, actorId, subjectId) {
-  const isOwner = actorId === subjectId;
-  const grant = !isOwner && database.prepare('SELECT 1 FROM health_care_grants WHERE subject_id = ? AND caregiver_id = ?').get(subjectId, actorId);
-  return isOwner || grant ? 'user_id = ?' : "user_id = ? AND visibility = 'family'";
-}
-
 export function getFastingHistory(database, actor, subjectId = Number(actor?.id), options = {}) {
   const actorId = asActor(actor);
   const subject = Number(subjectId);
@@ -197,7 +189,7 @@ export function getFastingHistory(database, actor, subjectId = Number(actor?.id)
   const range = parseFastingDateRange(options.from, options.to, invalidRange);
   const zone = householdTimeZone(database);
   const dateKey = fastingDateKeyFactory(zone);
-  const sql = `SELECT * FROM health_fasts WHERE ${visibleFilter(database, actorId, subject)}
+  const sql = `SELECT * FROM health_fasts WHERE ${fastingVisibleFilter(database, actorId, subject)}
     AND end_at IS NOT NULL ${hasCursor ? 'AND (start_at < ? OR (start_at = ? AND id < ?))' : ''}
     ORDER BY start_at DESC, id DESC`;
   const params = [subject, ...(hasCursor ? [beforeAt, beforeAt, beforeId] : [])];
@@ -226,7 +218,7 @@ export function getAllFastingHistory(database, actor, subjectId = Number(actor?.
   const zone = householdTimeZone(database);
   const dateKey = fastingDateKeyFactory(zone);
   const rows = [];
-  for (const row of database.prepare(`SELECT * FROM health_fasts WHERE ${visibleFilter(database, actorId, Number(subjectId))}
+  for (const row of database.prepare(`SELECT * FROM health_fasts WHERE ${fastingVisibleFilter(database, actorId, Number(subjectId))}
     AND end_at IS NOT NULL ORDER BY start_at DESC, id DESC`).iterate(Number(subjectId))) {
     if (rowMatchesFastingDateRange(row, range, zone, dateKey)) rows.push(row);
   }
@@ -274,10 +266,10 @@ export function getFastingState(database, actor, subjectId = Number(actor?.id)) 
   const actorId = asActor(actor);
   const subject = Number(subjectId);
   const history = getFastingHistory(database, actor, subject);
-  const canWrite = actorId === subject || !!database.prepare('SELECT 1 FROM health_care_grants WHERE subject_id = ? AND caregiver_id = ?').get(subject, actorId);
+  const canWrite = actorId === subject || hasCareGrant(database, actorId, subject);
   return {
     server_now: new Date().toISOString(),
-    active: database.prepare(`SELECT * FROM health_fasts WHERE ${visibleFilter(database, actorId, subject)} AND end_at IS NULL`).get(subject) || null,
+    active: database.prepare(`SELECT * FROM health_fasts WHERE ${fastingVisibleFilter(database, actorId, subject)} AND end_at IS NULL`).get(subject) || null,
     history: history.entries,
     history_has_more: history.has_more,
     history_next_cursor: history.next_cursor,
@@ -375,10 +367,8 @@ export function createFast(database, actor, input = {}) {
 function loadWritable(database, actorId, id) {
   const row = database.prepare('SELECT * FROM health_fasts WHERE id = ?').get(id);
   if (!row) fail(404, 'FASTING_NOT_FOUND', 'Fasting record not found.');
-  if (actorId !== row.user_id && row.visibility === 'private') {
-    const grant = database.prepare('SELECT 1 FROM health_care_grants WHERE subject_id = ? AND caregiver_id = ?').get(row.user_id, actorId);
-    if (!grant) fail(404, 'FASTING_NOT_FOUND', 'Fasting record not found.');
-  }
+  // A foreign private fast without a care grant does not exist for this actor.
+  if (!healthRowReadable(database, row, actorId)) fail(404, 'FASTING_NOT_FOUND', 'Fasting record not found.');
   ensureSubject(database, actorId, row.user_id);
   return row;
 }

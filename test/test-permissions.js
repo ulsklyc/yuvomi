@@ -1,5 +1,5 @@
 /**
- * Tests: Rollen & Rechte (server/permissions.js)
+ * Tests: Rollen & Rechte (server/authorize/)
  * Fokus:
  *   1. Auflösung: Admin-Bypass, Standard = Vollzugriff (rückwärtskompatibel),
  *      Rollen-Profil, Mitglied-Override gewinnt, Widget erbt Modulsperre.
@@ -28,7 +28,7 @@ import {
   PERMISSION_MODULES,
   PERMISSION_WIDGETS,
   PERMISSION_CAPABILITIES,
-} from '../server/permissions.js';
+} from '../server/authorize/index.ts';
 import { effectiveCapabilityAccess, isPermissionDeviation } from '../public/utils/permission-group.js';
 import { WIDGET_IDS } from '../public/utils/dashboard-widgets.js';
 
@@ -445,7 +445,7 @@ test('jedes Dashboard-Widget ist sperrbar und in der Rechte-UI benannt', () => {
   assert.deepEqual(
     [...dashboardIds].sort(),
     [...permissionIds].sort(),
-    'WIDGET_IDS (utils/dashboard-widgets.js) und PERMISSION_WIDGETS (server/permissions.js) sind auseinandergelaufen',
+    'WIDGET_IDS (utils/dashboard-widgets.js) und PERMISSION_WIDGETS (server/authorize/catalog.ts) sind auseinandergelaufen',
   );
   assert.deepEqual(
     [...dashboardIds].sort(),

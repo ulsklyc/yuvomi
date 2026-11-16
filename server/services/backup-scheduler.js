@@ -335,6 +335,16 @@ async function performBackup(opts = {}) {
 }
 
 /**
+ * The zone the schedule runs in: cron reads `BACKUP_SCHEDULE` as wall-clock
+ * time there. The one place this is read - the schedule and the status the
+ * backup card turns into household time both ask here.
+ * @returns {string}
+ */
+function scheduleTimeZone() {
+  return process.env.TZ || 'UTC';
+}
+
+/**
  * Start the backup scheduler
  */
 export function startScheduler() {
@@ -351,7 +361,7 @@ export function startScheduler() {
   // Laedt nach WebDAV hoch: waehrend eines Restores beginnt kein Lauf, ein
   // laufender wird abgewartet (Codex-Befund in #1431).
   scheduledTask = cron.schedule(BACKUP_SCHEDULE, () => runExternalJob(() => performBackup({ notify: true })), {
-    timezone: process.env.TZ || 'UTC',
+    timezone: scheduleTimeZone(),
   });
 
   log.info(`Backup scheduler started: ${BACKUP_SCHEDULE} (keeping last ${BACKUP_KEEP} backups)`);
@@ -387,6 +397,8 @@ export function getStatus() {
     lastSuccess,
     // When the schedule fires next, or null without a running schedule.
     nextRun: scheduledTask?.getNextRun()?.toISOString() ?? null,
+    // Whose wall clock `schedule` is, so a client can name the run in another zone.
+    timezone: scheduleTimeZone(),
     webdav: webdav.getStatus(),
   };
 }

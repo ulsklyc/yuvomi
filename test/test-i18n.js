@@ -778,6 +778,22 @@ test('timeSuffix: kein Stunden-Zaehlwort hinter einer Uhrzeit mit Doppelpunkt', 
   }
 });
 
+// Zahl und Einheit bleiben auf einer Zeile: auf der schmalen Tafel des
+// Zustands "Sitzung nicht erreichbar" (#2764) darf "2 s." nicht in "2" und
+// "s." zerfallen. Seit #2049 steht dort U+00A0; zh-Hant hatte als einzige
+// Locale ein normales Leerzeichen. In allen Sprachen folgt die Einheit der
+// Zahl, ko schreibt sie ohne Leerzeichen an.
+test('common.sessionRetryHint: zwischen Sekundenzahl und Einheit bricht keine Zeile um', () => {
+  const breakable = [];
+  for (const locale of LOCALES) {
+    const hint = flatten(JSON.parse(readLocale(locale))).get('common.sessionRetryHint');
+    const gap = hint.match(/\{\{seconds\}\}(\s*)\S/u);
+    assert.ok(gap, `${locale}: hinter {{seconds}} steht keine Einheit`);
+    if (/[^  ]/u.test(gap[1])) breakable.push(locale);
+  }
+  assert.deepEqual(breakable, []);
+});
+
 // D15 (Critique R21): die deutsche Oberflaeche spricht durchgehend "du". Zwei
 // Saetze im Fasten (Datumsfeld, Sicherheitsdialog) siezten, mitten zwischen
 // lauter du-Saetzen. "Sie" am Satzanfang kann "sie" (Dritte) sein - geprueft

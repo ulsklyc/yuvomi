@@ -35,8 +35,8 @@ function fail(id, code, message) {
 /**
  * Verarbeitet eine einzelne JSON-RPC-Nachricht.
  * @param {object} database - DB-Handle (better-sqlite3 oder node:sqlite)
- * @param {{ id: number, role?: string, scopes?: string[]|null,
- *           moduleAccess?: object|null, splitGuest?: boolean }} actor - authentifizierter Akteur
+ * @param {{ kind?: string, userId: number|null, role?: string|null, familyRole?: string|null,
+ *           scopes?: readonly string[]|null, moduleAccess?: object|null, unresolved?: boolean }} actor - authentifizierter Akteur (server/authorize/)
  * @param {any}    body      - geparster Request-Body
  * @param {(err: Error) => void} [onInternalError] - Logging-Hook für interne Fehler
  * @param {{ requestHeaders?: object }} [requestContext] - Request-Kontext für die

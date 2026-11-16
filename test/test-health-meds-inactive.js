@@ -29,7 +29,7 @@ import express from 'express';
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'health-meds-inactive-test-secret';
 
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: healthRouter } = await import('../server/routes/health.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');

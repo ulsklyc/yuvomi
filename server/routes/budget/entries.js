@@ -9,7 +9,7 @@ import { transferPair, mirrorTransfer, deleteTransfer } from '../../services/bud
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, date as validateDate, num, rrule, MAX_TITLE, MONTH_RE } from '../../middleware/validate.js';
-import { normalizeBudgetVisibility, BUDGET_MASKED_CATEGORY } from '../../services/budget-visibility.js';
+import { normalizeBudgetVisibility, BUDGET_MASKED_CATEGORY } from '../../authorize/index.ts';
 import { todayKey } from '../../utils/timezone.js';
 import { foldSearchText } from '../../services/search.js';
 import { sendDocumentDeletionConflict } from '../../services/document-deletion-lock.js';

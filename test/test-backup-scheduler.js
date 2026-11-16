@@ -574,3 +574,22 @@ describe('Backup status survives a restart', () => {
     assert.strictEqual(status.lastBackup.success, true);
   });
 });
+
+// The zone has its own block: the main one is at the length limit for one function.
+describe('Backup Scheduler: zone of the schedule', () => {
+  it('names the zone the schedule runs in: TZ, otherwise UTC', async () => {
+    const scheduler = await import('../server/services/backup-scheduler.js');
+    // The card turns the next run into household time and needs to know
+    // whose wall clock "0 2 * * *" is. Same source as the cron itself.
+    const saved = process.env.TZ;
+    try {
+      process.env.TZ = 'Europe/Berlin';
+      assert.strictEqual(scheduler.getStatus().timezone, 'Europe/Berlin');
+      delete process.env.TZ;
+      assert.strictEqual(scheduler.getStatus().timezone, 'UTC');
+    } finally {
+      if (saved === undefined) delete process.env.TZ;
+      else process.env.TZ = saved;
+    }
+  });
+});
