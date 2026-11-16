@@ -21,26 +21,20 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Ein Abbruch im Tor des Plugins ("stop and do not proceed"), der KEIN Befund
- * ist: der Diff traegt nichts, was eine Review lohnt. Das ist die einzige
- * Kategorie, die stumm gruen sein darf, deshalb muss sie eng greifen.
- * Wortlaut aus #1029: 'This matches the step 1 stop condition ("trivial change
- * that is obviously correct"), so per the review process I am stopping here'.
- */
-const TOR_STOPP = /\b(?:matches|meets|satisfies|triggers|hits)\b[^.]{0,60}\bstop\s+condition\b/i;
-const TRIVIAL = /\btrivial\b|obviously\s+correct/i;
-/**
- * Und selbst dann nicht, wenn der Satz sie VERNEINT. Zwei unabhaengige Muster
- * greifen sonst auch in "the stop condition does not apply because this is not
- * trivial" - der Text sagt das Gegenteil, und der Haken waere gruen geworden.
- */
-const VERNEINT = /\b(?:does\s+not|doesn'?t|did\s+not|didn'?t|no|not)\s+(?:apply|match|meet|trivial)\b|\bnot\s+a\s+trivial\b/i;
-
-/**
- * Der Abbruch, um den es hier geht. Er sieht dem obigen zum Verwechseln
- * aehnlich - gleiche Dauer, gleiche Turn-Zahl, keine Verweigerungen - und ist
- * doch das Gegenteil: der Stand ist ungeprueft. Er darf nie gruen werden und
- * wird deshalb VOR dem trivialen Fall geprueft: nennt ein Text beides, gilt
+ * ES GIBT KEINE STUMME GRUEN-KATEGORIE. Bis zum 16.11.2026 gab es eine: der
+ * Abbruch im Tor des Plugins, weil der Diff "trivial" sei (Wortlaut aus #1029:
+ * 'This matches the step 1 stop condition ("trivial change that is obviously
+ * correct"), so per the review process I am stopping here'), wurde ohne jede
+ * Aeusserung gruen mit Notiz. Seit #2768 verlangt der Prompt fuer genau diesen
+ * Fall einen Satz als Kommentar samt Vergleichsbasis, und an #2772 (Stand
+ * 2172c63) ist das live belegt: die Review schrieb ihn, der Haken wurde ueber
+ * den normalen Weg gruen. Ein Lauf, der trivial sagt und schweigt, ist seither
+ * rot (`trivial-stumm`, unten).
+ *
+ * Der Abbruch, um den es hier geht, sieht dem trivialen zum Verwechseln
+ * aehnlich - gleiche Dauer, gleiche Turn-Zahl, keine Verweigerungen - und hat
+ * doch eine andere Ursache: der Lauf hielt eine fruehere Aeusserung fuer
+ * genug. Er wird VOR dem trivialen Fall geprueft: nennt ein Text beides, gilt
  * die gefaehrlichere Lesart.
  */
 const SCHON_KOMMENTIERT = /already\s+(?:left\s+a\s+comment|commented|posted|reviewed)/i;
@@ -96,6 +90,21 @@ const PROMPT_VERWORFEN =
   /prompt[-\s]injection|(?:injected|embedded)\s+(?:instruction|directive|prompt|text|block|paragraph)|instructions?\s+embedded\s+in/i;
 
 /**
+ * DER STILLE TRIVIAL-ABBRUCH (#2765, 15.11.2026). Der Lauf stuft den Stand als
+ * trivial ein, verweist auf Schritt 1 und hinterlaesst nichts. Wortlaut aus
+ * Lauf 43758461498: 'Der PR bleibt hier ohne Review, weil er die Bedingung
+ * „trivial“ aus Schritt 1 erfuellt.' Seit diesem Anlass verlangt der Prompt
+ * dafuer einen Satz als Kommentar; wer das auslaesst, bleibt ROT.
+ *
+ * Dasselbe Muster trifft den englischen #1029-Wortlaut ('the step 1 stop
+ * condition ("trivial ...'), der bis zum 16.11.2026 gruen wurde. Es entscheidet
+ * nie ueber gruen - es gibt nur dem roten Fall seinen Namen, statt "ohne eines
+ * der bekannten Muster" zu melden.
+ */
+const TRIVIAL_STILL =
+  /\btrivial\b[^.\n]{0,40}\b(?:Schritt|step)\s*1\b|\b(?:Schritt|step)\s*1\b[^.\n]{0,40}\btrivial\b/i;
+
+/**
  * Der Ausstieg aus #865: die Sitzung endet, waehrend sie auf ihre eigenen
  * asynchronen Subagenten wartet. Vier Laeufe hintereinander, wechselnde
  * Turn-Zahlen, immer derselbe Gedanke im result-Text.
@@ -115,25 +124,15 @@ const WARTET_AUF_AGENTEN = /wait(?:ing|s)?\s+for\b[^.]{0,80}\bagents?\b|notified
 const VERNEINER = /\b(?:not|never|no|cannot|can'?t|couldn'?t|didn'?t|doesn'?t|won'?t|unable|failed|without)\b/i;
 const FENSTER = 30;
 
-/** Trifft das Muster, und steht davor kein Verneiner? */
-export function bejaht(text, muster) {
-  const treffer = muster.exec(String(text ?? ''));
-  if (!treffer) return false;
-  const von = Math.max(0, treffer.index - FENSTER);
-  return !VERNEINER.test(text.slice(von, treffer.index + treffer[0].length));
-}
-
 /**
- * Wie `bejaht`, aber JEDER Treffer zaehlt: reicht einer ohne Verneiner davor?
+ * Trifft das Muster, und steht vor IRGENDEINEM Treffer kein Verneiner?
  *
- * Fuer die Abbruch-Diagnose `schon-kommentiert` (#1101). "Claude has not
- * already reviewed this HEAD. Claude has already reviewed this PR, so I should
- * stop here." verneint die erste Erwaehnung und bejaht die zweite; `bejaht`
- * las nur die erste und machte daraus `unbekannt`. Dieselbe Form wie in
- * `hoertAuf`, dasselbe Fenster wie in `bejaht`.
- *
- * NICHT fuer die Tor-Ausnahme. Die kann gruen machen, und dort ist die engere
- * Lesart die sichere Richtung - diese hier waehlt nur zwischen roten Diagnosen.
+ * Fuer die Abbruch-Diagnosen (#1101). "Claude has not already reviewed this
+ * HEAD. Claude has already reviewed this PR, so I should stop here." verneint
+ * die erste Erwaehnung und bejaht die zweite; der Vorgaenger `bejaht` las nur
+ * die erste und machte daraus `unbekannt`. `bejaht` fiel am 16.11.2026 mit der
+ * Tor-Ausnahme, seinem letzten Leser. Dieselbe Form wie in `hoertAuf`; die
+ * Funktion waehlt nur zwischen roten Diagnosen.
  *
  * DAS FENSTER ENDET AM SATZENDE DAVOR, wie in `hoertAuf` (Codex zu #1121). Ein
  * kurzer verneinter Satz liegt sonst noch in den 30 Zeichen vor der naechsten
@@ -153,19 +152,16 @@ export function bejahtIrgendwo(text, muster) {
 /**
  * Sagt der Text, dass er aufhoert - und verneint er das NICHT?
  *
- * Nicht ueber `bejaht`, und der Unterschied ist Absicht. Zwei der Aufhoer-Formeln
- * verneinen selbst: "I will not proceed", "No review is needed". `bejaht` nimmt
- * den Treffer mit ins Fenster und las ihr eigenes "not"/"no" als Verneinung - ein
- * echter Abbruch fiel damit aus `schon-kommentiert` heraus und landete bei
- * `unbekannt` (Codex zu #1096, nach der dritten Runde; die dritte Runde hatte
- * `bejaht` hier erst eingefuehrt). Hier endet das Fenster deshalb VOR dem Treffer,
- * und es beginnt nach dem letzten Satzende: das "No" aus einem zitierten
- * "No issues found" im Satz davor gehoert nicht zum Aufhoeren.
+ * Das Fenster endet VOR dem Treffer, und das ist Absicht. Zwei der
+ * Aufhoer-Formeln verneinen selbst: "I will not proceed", "No review is
+ * needed". Ein Fenster, das den Treffer einschloss (das damalige `bejaht`), las
+ * ihr eigenes "not"/"no" als Verneinung - ein echter Abbruch fiel damit aus
+ * `schon-kommentiert` heraus und landete bei `unbekannt` (Codex zu #1096, nach
+ * der dritten Runde). Es beginnt nach dem letzten Satzende: das "No" aus einem
+ * zitierten "No issues found" im Satz davor gehoert nicht zum Aufhoeren.
  *
- * Lockerer als `bejaht` darf das sein, weil es nie ueber gruen entscheidet:
- * `HOERT_AUF` waehlt nur zwischen roten Diagnosen. Die Tor-Ausnahme, die gruen
- * machen kann, prueft die Tor-Formel weiter ueber `bejaht` und die Erwaehnung
- * von "schon kommentiert" ganz ohne Verneinung.
+ * So locker darf das sein, weil es nie ueber gruen entscheidet: `HOERT_AUF`
+ * waehlt nur zwischen roten Diagnosen.
  *
  * JEDER Treffer zaehlt, nicht nur der erste (Codex zu #1096, nach `8dc12582`):
  * "I did not stop here at the first check ... so I should stop here" verneint
@@ -311,13 +307,13 @@ export function zaehleSeit(aeusserungen, seit, kopf = '') {
 const ZEITSTEMPEL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 /**
- * Urteil ueber einen Lauf. Drei Ausgaenge, und jeder sagt etwas anderes:
- *   `geprueft`   - die Review hat zu diesem Stand gesprochen. Gruen.
- *   `ausgesetzt` - sie hat bewusst nicht gearbeitet, weil es nichts zu pruefen
- *                  gab. Gruen mit Notiz, damit der Haken nicht mehr behauptet,
- *                  als er weiss.
- *   `stumm`      - sie ist durchgelaufen und hat zu diesem Stand nichts
- *                  hinterlassen. Rot.
+ * Urteil ueber einen Lauf. Zwei Ausgaenge:
+ *   `geprueft` - die Review hat zu diesem Stand gesprochen. Gruen.
+ *   `stumm`    - sie ist durchgelaufen und hat zu diesem Stand nichts
+ *                hinterlassen. Rot, und `grund` sagt, warum.
+ * Bis zum 16.11.2026 gab es einen dritten, `ausgesetzt` (gruen mit Notiz fuer
+ * den trivialen Abbruch aus #1029). Er fiel mit der Tor-Ausnahme, siehe den
+ * Kopf der Datei.
  *
  * @param {object} eingabe
  * @param {string} eingabe.seit  Beginn dieses Laufs. BEWUSST NICHT die
@@ -328,6 +324,8 @@ const ZEITSTEMPEL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
  * @param {Array<{login: string, zeit: string, commit?: string}>} eingabe.aeusserungen
  * @param {string} [eingabe.kopf]  SHA des aktuellen Head, gegen die eine
  *        Aeusserung gebunden wird.
+ * @param {{adressen: number, erfolge: number}} [eingabe.gepostet]  Belege aus
+ *        dem Strom dieses Laufs (`zaehleBelege`).
  * @param {number} [eingabe.kaputt]  Zeilen, die nicht zu lesen waren.
  */
 export function beurteile({
@@ -399,7 +397,7 @@ export function beurteile({
   // `HOERT_AUF.test` traf auch "I did not stop here". Ein Lauf, der den neuen
   // Stand geprueft hat und am Posten scheiterte, galt damit als Abbruch im Tor,
   // und die Meldung schickte den Leser zum Prompt statt zur Werkzeugsperre.
-  // Geprueft ueber `hoertAuf` und nicht ueber `bejaht` - warum, steht dort.
+  // Geprueft ueber `hoertAuf` - warum mit eigenem Fenster, steht dort.
   // Die Erwaehnung selbst ebenso ueber JEDEN Treffer (`bejahtIrgendwo`, #1101):
   // eine verneinte erste Erwaehnung verdeckte sonst eine bejahte spaetere.
   if (
@@ -459,59 +457,20 @@ export function beurteile({
 
   if (sperren > 0) return stumm('werkzeugsperre', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
 
-  // ... UND DIE GEFAEHRLICHERE LESART GEWINNT WEITER, auch wenn oben der
-  // Aufhoer-Satz gefehlt hat.
+  // Der stille Trivial-Abbruch (#2765, dazu der #1029-Wortlaut): vor
+  // `nicht-zuzuordnen`, weil der Lauf hier selbst sagt, dass er nichts
+  // hinterlassen hat, und nach `schon-kommentiert`, `prompt-verworfen` und
+  // `werkzeugsperre`, die die genauere Ursache nennen.
   //
-  // Der `HOERT_AUF`-Zusatz im Zweig ganz oben hat diesen hier zur Hintertuer
-  // gemacht (Review zu #1096, von beiden Reviewern unabhaengig gefunden). Ein
-  // Text wie
-  //
-  //   "This matches the step 1 stop condition - Claude has already reviewed
-  //    this PR, and the remaining diff is a trivial change that is obviously
-  //    correct."
-  //
-  // sagt "schon geprueft" UND "trivial", nennt aber keine der Aufhoer-Formeln
-  // ("stop CONDITION" ist keine). Er rutschte damit an `schon-kommentiert`
-  // vorbei und wurde hier GRUEN - fuer einen Lauf, der woertlich sagt, dass er
-  // den PR schon kommentiert hat. Der Kommentar oben behauptete derweil, ein so
-  // durchgefallener Abbruch bleibe rot; das stimmte nur, solange dieser Zweig
-  // ihn nicht auffing.
-  //
-  // Die Bedingung steht deshalb hier ein zweites Mal: der triviale Abbruch ist
-  // die EINZIGE Kategorie, die stumm gruen sein darf, und wer "schon
-  // kommentiert" sagt, gehoert nie hinein. Der bestehende Test dazu ("nennt ein
-  // Text beides, gilt die gefaehrlichere Lesart") blieb gruen, weil sein
-  // Fixture-Text zufaellig auf "Stopping here." endet - eine Probe ohne diesen
-  // Satz steht jetzt daneben.
-  //
-  // UND HIER OHNE VERNEINUNGSPRUEFUNG (Codex zu #1096, nach `8dc12582`).
-  // `bejaht` sieht nur den ERSTEN Treffer: "Claude has not already reviewed the
-  // new HEAD ... Claude has already commented on this PR ... trivial ... matches
-  // the step 1 stop condition" war verneint im ersten und bejaht im zweiten
-  // Satz, und die Ausnahme wurde GRUEN. Eine fuenfte Regel, welche Verneinung
-  // welche Erwaehnung aufhebt, waere die naechste Sprosse derselben Leiter.
-  // Stattdessen gilt fuer den einzigen stillen Gruen-Pfad die grobe Regel:
-  // erwaehnt der Text "schon kommentiert/geprueft" UEBERHAUPT, gibt es keine
-  // Ausnahme. Ein trivialer Lauf, der das nur verneinend erwaehnt, wird dadurch
-  // rot statt gruen - die Richtung, in der dieses Modul im Zweifel irrt.
-  // Der echte #1029-Wortlaut sagt "has not previously commented" und trifft das
-  // Muster nicht; er bleibt die Ausnahme.
-  if (
-    bejaht(text, TOR_STOPP) &&
-    TRIVIAL.test(text) &&
-    !VERNEINT.test(text) &&
-    !SCHON_KOMMENTIERT.test(text)
-  ) {
-    return {
-      ausgang: 'ausgesetzt',
-      grund: 'trivial',
-      neu,
-      meldung:
-        'Die Review hat im Tor abgebrochen, weil der Diff nichts traegt, was zu ' +
-        'pruefen waere ("trivial change that is obviously correct"). Das ist eine ' +
-        'Zusicherung des Plugins und kein Fehler - der Haken meint hier "nichts zu ' +
-        'pruefen", nicht "geprueft".'
-    };
+  // Hier stand bis zum 16.11.2026 die Tor-Ausnahme aus #1029, die einen
+  // trivialen Abbruch ohne Aeusserung GRUEN machte. Zwei Reviews zu #1096
+  // fanden Texte, die "schon kommentiert" UND "trivial" sagten, an
+  // `schon-kommentiert` vorbeirutschten (keine Aufhoer-Formel, oder eine
+  // verneinte erste Erwaehnung) und dort gruen wurden. Seit #2768 verlangt der
+  // Prompt den Satz als Kommentar, also gibt es keinen Grund mehr fuer stilles
+  // Gruen: solche Texte enden jetzt rot, hier oder bei `unbekannt`.
+  if (bejahtIrgendwo(text, TRIVIAL_STILL)) {
+    return stumm('trivial-stumm', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
   }
 
   if (zahl.frei > 0) return stumm('nicht-zuzuordnen', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
@@ -549,6 +508,13 @@ const DIAGNOSE = {
     'nicht; der Prompt selbst muss kuerzer und sachlicher werden (auf `main`, nicht im ' +
     'roten PR). Bis dahin die Pruefung von Hand nachholen oder `@codex review` anfordern. ' +
     'Gemessen zwischen #1119 und #1259: sechs rote Laeufe dieser Sorte in sieben Tagen.',
+  'trivial-stumm':
+    'DER LAUF HAT DEN STAND ALS TRIVIAL EINGESTUFT UND DAZU NICHTS HINTERLASSEN - der Push ' +
+    'ist ungeprueft, und es ist KEIN Befund am Code. Der Prompt verlangt fuer diesen Fall ' +
+    'einen Satz als Kommentar (was trivial ist und womit verglichen wurde); kommt diese ' +
+    'Diagnose, hat das nicht getragen (#2765). Ein Rerun spielt denselben Prompt ab. Bis ' +
+    'das repariert ist, die Pruefung von Hand nachholen (`/code-review <PR> high`) oder ' +
+    '`@codex review` anfordern.',
   'lauf-fehler':
     'Der Lauf selbst ist gescheitert (`is_error` oder ein anderes `subtype` als ' +
     '"success"). Das ist kein Befund am Code: erst den Lauf reparieren, dann wieder ' +
@@ -734,9 +700,7 @@ function main() {
   console.log('');
   console.log(urteil.meldung);
 
-  if (urteil.ausgang === 'ausgesetzt') {
-    console.log(`::notice::${einzeilig(urteil.meldung)}`);
-  } else if (urteil.ausgang === 'stumm') {
+  if (urteil.ausgang === 'stumm') {
     console.log(`::error::${einzeilig(urteil.meldung)} Ein gruener Haken ohne Befund ist keiner.`);
     process.exitCode = 1;
   }

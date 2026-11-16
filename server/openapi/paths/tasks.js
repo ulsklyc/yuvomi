@@ -106,7 +106,7 @@ export function tasksPaths() {
       }),
     },
     '/api/v1/tasks/tags': {
-      get: op({ summary: 'List task tags', tag: 'Tasks', description: 'Every visible tag in use with its task count. Tags are free-form and have no registry: the list follows from the tasks themselves. Mirrored from VTODO CATEGORIES on CalDAV task lists, and distinct from the single category a task carries. Tags on tasks the caller cannot see are omitted, counts included.' }),
+      get: op({ summary: 'List task tags', tag: 'Tasks', description: 'Every visible tag in use with its task count. Tags are free-form and have no registry: the list follows from the tasks themselves. Mirrored from VTODO CATEGORIES on CalDAV task lists, and distinct from the single category a task carries. Tags on tasks the caller cannot see are omitted, counts included; a paired display sees only tasks with visibility `all` (the wall rule), even one that names it as an assignee.' }),
     },
     '/api/v1/tasks/tags/apply': {
       post: op({ summary: 'Add or remove tags on several tasks', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { ids, add?, remove? }. Applies to the tasks in `ids` the caller can see; the others are skipped silently. Locked tasks the caller may not edit are skipped as well and counted in `skipped`, so a partial run is visible rather than silent. Returns the number of tasks actually changed and the refreshed tag list.' }),
@@ -157,7 +157,7 @@ export function tasksPaths() {
       }),
     },
     '/api/v1/tasks/{id}/documents': {
-      get: op({ summary: 'List documents linked to a task', tag: 'Tasks', params: [idParam()], description: 'Returns family documents linked to the task that are visible to the current user. Needs access to the Documents module (for API tokens a `documents:read` scope): without it the answer is 403, after the task itself was found (an invisible task stays 404).', responses: { 200: { description: 'Successful response' }, 401: { $ref: '#/components/responses/Unauthorized' }, 403: { description: 'No access to the Documents module.' }, 404: { description: 'Task not found.' }, 500: { $ref: '#/components/responses/InternalServerError' } } }),
+      get: op({ summary: 'List documents linked to a task', tag: 'Tasks', params: [idParam()], description: 'Returns family documents linked to the task that are visible to the current user. Needs access to the Documents module (for API tokens a `documents:read` scope): without it the answer is 403, after the task itself was found (an invisible task stays 404). A paired display sees only tasks with visibility `all` (the wall rule), even one that names it as an assignee: any other task answers 404 like an unknown id.', responses: { 200: { description: 'Successful response' }, 401: { $ref: '#/components/responses/Unauthorized' }, 403: { description: 'No access to the Documents module.' }, 404: { description: 'Task not found.' }, 500: { $ref: '#/components/responses/InternalServerError' } } }),
       put: op({ summary: 'Set documents linked to a task', tag: 'Tasks', params: [idParam()], stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null), description: `Replace-set of document_ids; only documents visible to the user are linked. Attachments are part of the task definition, so a locked task answers 403 for anyone but its creator and administrators. ${DOCUMENT_LINK_REFUSAL} Without that access the response \`data\` is \`null\`.` }),
     },
     '/api/v1/tasks/{id}/completions': {

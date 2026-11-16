@@ -20,7 +20,7 @@ import { minorUnit } from '../services/split-expenses.js';
 import { isHouseholdMember } from '../services/household-members.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
-import { visibleWhere } from '../authorize/index.ts';
+import { taskReader, taskVisibleWhere } from '../authorize/index.ts';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 
 const log = createLogger('Rewards');
@@ -353,11 +353,16 @@ router.delete('/catalog/:id', requireAdmin, (req, res) => {
 // NULL) laesst sich nicht mehr fragen, wer sie sah. Der Schnappschuss bleibt
 // dann bei der Person, der die Zeile gehoert - die engere Antwort ist die
 // einzige, die nichts verraten kann.
-const LEDGER_TASK_VISIBLE_SQL = `(
+//
+// A PAIRED DISPLAY asks the task under the wall rule (taskReader): a row whose task
+// the whole household does not see goes out without its task reference, even when
+// the task names the display. The row, its points and every sum stay as they are.
+/** @param {import('../authorize/index.ts').TaskReader} reader */
+const ledgerTaskVisibleSql = (reader) => `(
   l.user_id = @me
   OR (l.task_id IS NOT NULL AND EXISTS (
         SELECT 1 FROM tasks t
-        WHERE t.id = l.task_id AND ${visibleWhere('tasks', 't', '@me')}))
+        WHERE t.id = l.task_id AND ${taskVisibleWhere(reader, 't')}))
   OR (l.task_id IS NULL AND (l.type IN ('bonus', 'adjust', 'redeem') OR l.redemption_id IS NOT NULL))
 )`;
 
@@ -365,15 +370,16 @@ router.get('/ledger', (req, res) => {
   try {
     const limit = Math.min(Math.max(toInt(req.query.limit) || 100, 1), 500);
     const userId = req.query.user_id != null && req.query.user_id !== '' ? toInt(req.query.user_id) : null;
+    const taskVisible = ledgerTaskVisibleSql(taskReader(req));
     const rows = db.get().prepare(`
       SELECT l.id, l.user_id, l.delta, l.type,
-             CASE WHEN ${LEDGER_TASK_VISIBLE_SQL} THEN l.reason  END AS reason,
-             CASE WHEN ${LEDGER_TASK_VISIBLE_SQL} THEN l.task_id END AS task_id,
+             CASE WHEN ${taskVisible} THEN l.reason  END AS reason,
+             CASE WHEN ${taskVisible} THEN l.task_id END AS task_id,
              -- Die Audit-Felder der Spaetabzug-Rechnung haengen an der Aufgabe
              -- fest wie die Spalte reason - wer eine private Aufgabe nicht sehen darf,
              -- darf auch nicht erfahren, wie spaet sie erledigt wurde.
-             CASE WHEN ${LEDGER_TASK_VISIBLE_SQL} THEN l.decay_days END AS decay_days,
-             CASE WHEN ${LEDGER_TASK_VISIBLE_SQL} THEN l.base_points END AS base_points,
+             CASE WHEN ${taskVisible} THEN l.decay_days END AS decay_days,
+             CASE WHEN ${taskVisible} THEN l.base_points END AS base_points,
              l.redemption_id, l.created_at,
              u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
              a.display_name AS actor_name

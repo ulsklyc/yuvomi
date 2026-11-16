@@ -1601,12 +1601,12 @@
     }
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "currency": "CHF"
-    },
-    "changed": {
-     "currency": "CHF"
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -1620,11 +1620,12 @@
     }
    },
    "member": {
-    "status": 400,
+    "status": 403,
     "rows": {},
     "body": {
-     "error": "Invalid currency. Allowed: AED, ARS, AUD, BBD, BOB, BRL, BSD, BYN, BZD, CAD, CHF, CLP, CNY, COP, CRC, CUP, CZK, DKK, DOP, EUR, GBP, GTQ, GYD, HKD, HNL, HTG, HUF, IDR, ILS, INR, IRR, JMD, JPY, KRW, KZT, MOP, MXN, MYR, NIO, NOK, NZD, PAB, PEN, PHP, PLN, PYG, RUB, SAR, SEK, SGD, SRD, TRY, TTD, TWD, UAH, USD, UYU, VES, VND, XCD, ZAR",
-     "code": 400
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2031,12 +2032,12 @@
     }
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "app_name": "Haus"
-    },
-    "changed": {
-     "app_name": "Haus"
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2049,11 +2050,13 @@
     "changed": {}
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "app_name": null
-    },
-    "changed": {}
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
    }
   },
   "app_name null": {
@@ -2065,11 +2068,13 @@
     "changed": {}
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "app_name": null
-    },
-    "changed": {}
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
+    }
    }
   },
   "app_name too long": {
@@ -2082,11 +2087,12 @@
     }
    },
    "member": {
-    "status": 400,
+    "status": 403,
     "rows": {},
     "body": {
-     "error": "Application name may be at most 100 characters long.",
-     "code": 400
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2101,12 +2107,12 @@
     }
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "app_name": "42"
-    },
-    "changed": {
-     "app_name": "42"
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2760,12 +2766,12 @@
     }
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "housekeeping_payment_tasks": "1"
-    },
-    "changed": {
-     "housekeeping_payment_tasks": true
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2779,11 +2785,12 @@
     }
    },
    "member": {
-    "status": 400,
+    "status": 403,
     "rows": {},
     "body": {
-     "error": "housekeeping_payment_tasks must be a boolean",
-     "code": 400
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2798,12 +2805,12 @@
     }
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "calendar_default_duration": "90"
-    },
-    "changed": {
-     "calendar_default_duration": 90
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2818,12 +2825,12 @@
     }
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "calendar_default_duration": "45"
-    },
-    "changed": {
-     "calendar_default_duration": 45
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2837,11 +2844,12 @@
     }
    },
    "member": {
-    "status": 400,
+    "status": 403,
     "rows": {},
     "body": {
-     "error": "calendar_default_duration must be an integer between 5 and 1440",
-     "code": 400
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2855,11 +2863,12 @@
     }
    },
    "member": {
-    "status": 400,
+    "status": 403,
     "rows": {},
     "body": {
-     "error": "calendar_default_duration must be an integer between 5 and 1440",
-     "code": 400
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -2873,11 +2882,12 @@
     }
    },
    "member": {
-    "status": 400,
+    "status": 403,
     "rows": {},
     "body": {
-     "error": "calendar_default_duration must be an integer between 5 and 1440",
-     "code": 400
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -4808,11 +4818,12 @@
     }
    },
    "member": {
-    "status": 400,
+    "status": 403,
     "rows": {},
     "body": {
-     "error": "Invalid currency. Allowed: AED, ARS, AUD, BBD, BOB, BRL, BSD, BYN, BZD, CAD, CHF, CLP, CNY, COP, CRC, CUP, CZK, DKK, DOP, EUR, GBP, GTQ, GYD, HKD, HNL, HTG, HUF, IDR, ILS, INR, IRR, JMD, JPY, KRW, KZT, MOP, MXN, MYR, NIO, NOK, NZD, PAB, PEN, PHP, PLN, PYG, RUB, SAR, SEK, SGD, SRD, TRY, TTD, TWD, UAH, USD, UYU, VES, VND, XCD, ZAR",
-     "code": 400
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -4845,11 +4856,12 @@
     }
    },
    "member": {
-    "status": 400,
+    "status": 403,
     "rows": {},
     "body": {
-     "error": "Invalid currency. Allowed: AED, ARS, AUD, BBD, BOB, BRL, BSD, BYN, BZD, CAD, CHF, CLP, CNY, COP, CRC, CUP, CZK, DKK, DOP, EUR, GBP, GTQ, GYD, HKD, HNL, HTG, HUF, IDR, ILS, INR, IRR, JMD, JPY, KRW, KZT, MOP, MXN, MYR, NIO, NOK, NZD, PAB, PEN, PHP, PLN, PYG, RUB, SAR, SEK, SGD, SRD, TRY, TTD, TWD, UAH, USD, UYU, VES, VND, XCD, ZAR",
-     "code": 400
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   },
@@ -5077,32 +5089,12 @@
     }
    },
    "member": {
-    "status": 200,
-    "rows": {
-     "app_name": "X",
-     "calendar_default_duration": "30",
-     "currency": "USD",
-     "date_format": "mdy",
-     "housekeeping_payment_tasks": "1",
-     "meal_type_names": "{\"lunch\":\"Z\"}",
-     "time_format": "12h",
-     "visible_meal_types": "lunch",
-     "week_start": "saturday"
-    },
-    "changed": {
-     "visible_meal_types": [
-      "lunch"
-     ],
-     "meal_type_names": {
-      "lunch": "Z"
-     },
-     "currency": "USD",
-     "date_format": "mdy",
-     "time_format": "12h",
-     "week_start": "saturday",
-     "app_name": "X",
-     "housekeeping_payment_tasks": true,
-     "calendar_default_duration": 30
+    "status": 403,
+    "rows": {},
+    "body": {
+     "error": "Admin access required.",
+     "code": 403,
+     "reason": "admin_required"
     }
    }
   }
