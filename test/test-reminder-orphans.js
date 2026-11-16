@@ -162,8 +162,10 @@ test('alle Trigger stehen auf der voll migrierten Datenbank', () => {
     "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_reminders_%'",
   ).all().map((r) => r.name).sort();
   // Seit v260 (#1912) dazu die Meldung "Umzug zurueckgenommen": sie geht mit
-  // ihrer Momentaufnahme.
-  assert.deepEqual(names, ['trg_reminders_events_ad', 'trg_reminders_shopping_move_notices_ad', 'trg_reminders_tasks_ad']);
+  // ihrer Momentaufnahme. Seit v283 (#2705) gehen die Erinnerungen einer
+  // Aufgabe auch dann, wenn ihr Faelligkeitsdatum geleert wird (Verhalten in
+  // test:tasks-routes).
+  assert.deepEqual(names, ['trg_reminders_events_ad', 'trg_reminders_shopping_move_notices_ad', 'trg_reminders_tasks_ad', 'trg_reminders_tasks_due_cleared']);
 });
 
 // --------------------------------------------------------
