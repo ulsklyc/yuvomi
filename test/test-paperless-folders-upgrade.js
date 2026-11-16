@@ -7,6 +7,22 @@ import { buildMigratedDatabase } from './helpers/migrated-database.js';
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS, migrate } = await import('../server/db.js');
 
+test('v284 policies and credentials survive the overview field migration', (t) => {
+  const db = buildMigratedDatabase(Database, MIGRATIONS.filter((m) => m.version <= 284));
+  t.after(() => db.close());
+  db.exec(`INSERT INTO users (id,username,display_name,password_hash,role) VALUES (1,'owner','Owner','x','admin');
+    INSERT INTO dms_accounts (id,provider,name,base_url,api_token) VALUES (1,'paperless','Archive','http://127.0.0.1','central');
+    INSERT INTO paperless_live_settings(account_id,token_mode,allowed_tag_ids,revision) VALUES (1,'personal','[7]',4);
+    INSERT INTO paperless_user_tokens(account_id,user_id,api_token) VALUES (1,1,'personal');`);
+  migrate(db);
+  const row = db.prepare('SELECT * FROM paperless_live_settings').get();
+  assert.equal(row.display_fields, '[]');
+  assert.equal(row.token_mode, 'personal');
+  assert.equal(row.allowed_tag_ids, '[7]');
+  assert.equal(row.revision, 4);
+  assert.equal(db.prepare('SELECT api_token FROM paperless_user_tokens').get().api_token, 'personal');
+});
+
 test('stock v282 gains folder/member tables while existing migration history and rewards remain unchanged', (t) => {
   const db = buildMigratedDatabase(Database, MIGRATIONS.filter((m) => m.version <= 282));
   t.after(() => db.close());

@@ -641,7 +641,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     scope: 'household',
     labelKey: 'settings.liveFolders.title',
     descriptionKey: 'settings.liveFolders.description',
-    options: ['settings.liveFolders.tags', 'settings.liveFolders.tokenMode'],
+    options: ['settings.liveFolders.tags', 'settings.liveFolders.tokenMode', 'settings.liveFolders.displayFields'],
     adminOnly: false,
     loader: () => import('/settings/pages/documents-live-folders.js'),
   },

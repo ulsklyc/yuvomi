@@ -2169,7 +2169,9 @@
             "tokenRequired": "Zapisz osobisty token Paperless w Ustawienia > Moduły > Dokumenty > Ustawienia folderów dynamicznych.",
             "tagsRestricted": "W folderach dynamicznych można zmieniać tylko centralnie dozwolone tagi. Zachowaj pozostałe istniejące przypisania.",
             "dmsForbidden": "Twój token Paperless nie ma dostępu do tego widoku lub dokumentu. Sprawdź jego uprawnienia w Paperless.",
-            "error": "Nie udało się wczytać lub zapisać ustawień folderów dynamicznych. Odśwież i spróbuj ponownie."
+            "error": "Nie udało się wczytać lub zapisać ustawień folderów dynamicznych. Odśwież i spróbuj ponownie.",
+            "displayFields": "Pola przeglądu",
+            "displayFieldsHint": "Wybierz dodatkowe dane dla wszystkich folderów na żywo tego połączenia. Nazwa jest zawsze widoczna."
         },
         "healthCycleEnableLabel": "Udostępnij cykl w gospodarstwie",
         "healthCycleHint": "Pokazuje lub ukrywa sekcję cyklu w module Zdrowie dla wszystkich członków rodziny.",
@@ -4338,6 +4340,16 @@
                 "changed": "Tagi w Paperless uległy zmianie. Odśwież przed zapisaniem.",
                 "forbidden": "Nie masz uprawnień do zmiany tych tagów.",
                 "invalid": "Nie udało się zapisać tagów. Odśwież i spróbuj ponownie."
+            },
+            "fields": {
+                "created": "Data dokumentu",
+                "added": "Dodano",
+                "modified": "Zmieniono",
+                "correspondent": "Korespondent",
+                "document_type": "Typ dokumentu",
+                "tags": "Tagi",
+                "archive_serial_number": "Numer archiwalny",
+                "filename": "Nazwa pliku"
             }
         },
         "title": "Dokumenty",

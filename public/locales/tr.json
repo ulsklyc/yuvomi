@@ -1975,7 +1975,9 @@
             "tokenRequired": "Kişisel Paperless belirtecinizi Ayarlar > Modüller > Belgeler > Dinamik klasör ayarları altında kaydedin.",
             "tagsRestricted": "Dinamik klasörlerde yalnızca merkezi olarak izin verilen etiketler değiştirilebilir. Diğer tüm mevcut atamaları koruyun.",
             "dmsForbidden": "Paperless belirteciniz bu görünüme veya belgeye erişemiyor. Paperless içindeki izinlerini denetleyin.",
-            "error": "Dinamik klasör ayarları yüklenemedi veya kaydedilemedi. Sayfayı yenileyip tekrar deneyin."
+            "error": "Dinamik klasör ayarları yüklenemedi veya kaydedilemedi. Sayfayı yenileyip tekrar deneyin.",
+            "displayFields": "Genel bakış alanları",
+            "displayFieldsHint": "Bu bağlantıdaki tüm canlı klasörler için ek bilgileri seçin. Ad her zaman görünür."
         },
         "healthCycleEnableLabel": "Döngüyü evde sun",
         "healthCycleHint": "Sağlık modülündeki döngü bölümünü tüm aile üyeleri için gösterir veya gizler.",
@@ -4044,6 +4046,16 @@
                 "changed": "Paperless içindeki etiketler değişti. Kaydetmeden önce yenileyin.",
                 "forbidden": "Bu etiketleri değiştirme izniniz yok.",
                 "invalid": "Etiketler kaydedilemedi. Yenileyip tekrar deneyin."
+            },
+            "fields": {
+                "created": "Belge tarihi",
+                "added": "Eklenme tarihi",
+                "modified": "Değiştirilme tarihi",
+                "correspondent": "Muhatap",
+                "document_type": "Belge türü",
+                "tags": "Etiketler",
+                "archive_serial_number": "Arşiv numarası",
+                "filename": "Dosya adı"
             }
         },
         "title": "Belgeler",

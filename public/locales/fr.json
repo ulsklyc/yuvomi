@@ -1975,7 +1975,9 @@
             "tokenRequired": "Enregistrez votre jeton Paperless personnel dans Paramètres > Modules > Documents > Paramètres des dossiers dynamiques.",
             "tagsRestricted": "Seules les étiquettes autorisées centralement peuvent être modifiées dans les dossiers dynamiques. Conservez toutes les autres associations.",
             "dmsForbidden": "Votre jeton Paperless ne permet pas d’accéder à cette vue ou à ce document. Vérifiez ses droits dans Paperless.",
-            "error": "Impossible de charger ou d’enregistrer les paramètres des dossiers dynamiques. Actualisez et réessayez."
+            "error": "Impossible de charger ou d’enregistrer les paramètres des dossiers dynamiques. Actualisez et réessayez.",
+            "displayFields": "Champs de l’aperçu",
+            "displayFieldsHint": "Choisissez les détails supplémentaires pour tous les dossiers dynamiques de cette connexion. Le nom reste toujours visible."
         },
         "healthCycleEnableLabel": "Proposer le cycle au foyer",
         "healthCycleHint": "Affiche ou masque la section cycle du module Santé pour tous les membres de la famille.",
@@ -4044,6 +4046,16 @@
                 "changed": "Les étiquettes ont changé dans Paperless. Actualisez avant d’enregistrer.",
                 "forbidden": "Vous ne pouvez pas modifier ces étiquettes.",
                 "invalid": "Impossible d’enregistrer les étiquettes. Actualisez et réessayez."
+            },
+            "fields": {
+                "created": "Date du document",
+                "added": "Ajouté",
+                "modified": "Modifié",
+                "correspondent": "Correspondant",
+                "document_type": "Type de document",
+                "tags": "Étiquettes",
+                "archive_serial_number": "Numéro d’archive",
+                "filename": "Nom du fichier"
             }
         },
         "title": "Documents",

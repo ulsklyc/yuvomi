@@ -1975,7 +1975,9 @@
             "tokenRequired": "Spara din personliga Paperless-token under Inställningar > Moduler > Dokument > Inställningar för dynamiska mappar.",
             "tagsRestricted": "Endast centralt tillåtna taggar får ändras i dynamiska mappar. Bevara alla andra befintliga tilldelningar.",
             "dmsForbidden": "Din Paperless-token saknar åtkomst till denna vy eller detta dokument. Kontrollera dess rättigheter i Paperless.",
-            "error": "Inställningarna för dynamiska mappar kunde inte laddas eller sparas. Uppdatera och försök igen."
+            "error": "Inställningarna för dynamiska mappar kunde inte laddas eller sparas. Uppdatera och försök igen.",
+            "displayFields": "Översiktsfält",
+            "displayFieldsHint": "Välj ytterligare uppgifter för alla livemappar i denna anslutning. Namnet visas alltid."
         },
         "healthCycleEnableLabel": "Erbjud cykeln i hushållet",
         "healthCycleHint": "Visar eller döljer cykeldelen i hälsomodulen för alla familjemedlemmar.",
@@ -4044,6 +4046,16 @@
                 "changed": "Taggarna har ändrats i Paperless. Uppdatera innan du sparar.",
                 "forbidden": "Du har inte behörighet att ändra dessa taggar.",
                 "invalid": "Taggarna kunde inte sparas. Uppdatera och försök igen."
+            },
+            "fields": {
+                "created": "Dokumentdatum",
+                "added": "Tillagt",
+                "modified": "Ändrat",
+                "correspondent": "Korrespondent",
+                "document_type": "Dokumenttyp",
+                "tags": "Etiketter",
+                "archive_serial_number": "Arkivnummer",
+                "filename": "Filnamn"
             }
         },
         "title": "Dokument",

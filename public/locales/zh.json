@@ -1975,7 +1975,9 @@
             "tokenRequired": "请在设置 > 模块 > 文档 > 动态文件夹设置中保存您的个人 Paperless 令牌。",
             "tagsRestricted": "动态文件夹中只能更改中央允许的标签。请保留其他所有现有标签分配。",
             "dmsForbidden": "您的 Paperless 令牌无权访问此视图或文档。请在 Paperless 中检查其权限。",
-            "error": "无法加载或保存动态文件夹设置。请刷新后重试。"
+            "error": "无法加载或保存动态文件夹设置。请刷新后重试。",
+            "displayFields": "概览字段",
+            "displayFieldsHint": "选择此连接下所有实时文件夹中显示的附加信息。名称始终显示。"
         },
         "healthCycleEnableLabel": "在家庭中提供周期",
         "healthCycleHint": "为所有家庭成员显示或隐藏健康模块中的周期部分。",
@@ -4044,6 +4046,16 @@
                 "changed": "Paperless 中的标签已更改。请刷新后再保存。",
                 "forbidden": "你没有更改这些标签的权限。",
                 "invalid": "无法保存标签。请刷新后重试。"
+            },
+            "fields": {
+                "created": "文档日期",
+                "added": "添加时间",
+                "modified": "修改时间",
+                "correspondent": "往来单位",
+                "document_type": "文档类型",
+                "tags": "标签",
+                "archive_serial_number": "归档编号",
+                "filename": "文件名"
             }
         },
         "title": "文档",

@@ -722,13 +722,14 @@ function paperlessLiveSettingsPaths() {
     + 'Deleting/deactivating a user clears their personal credentials.';
   return {
     [root]: { get: op({ summary: 'Read Live-folder policies and personal token status', tag: 'Documents',
-      description: 'Requires documents:read. Returns data [{id,name,token_mode,has_personal_token}] and meta {can_manage}. '
+      description: 'Requires documents:read. Returns data [{id,name,token_mode,display_fields,has_personal_token}] and meta {can_manage}. '
         + 'Administrators with Documents write access also receive allowed_tag_ids and revision. Token values are never returned.', responses }) },
     [`${root}/{id}`]: { put: op({ summary: 'Set Live-folder authentication and allowed tags', tag: 'Documents', admin: true,
       stateChanging: true, params: [id], description: 'Requires documents:write. expected_revision must match the current revision; a successful write increments it. '
-        + 'Returns data {token_mode,allowed_tag_ids,revision}. Personal mode requires each reader\'s own Paperless credentials.',
+        + 'Returns data {token_mode,allowed_tag_ids,display_fields,revision}. Optional display_fields selects overview metadata; omission preserves it and [] clears it. Personal mode requires each reader\'s own Paperless credentials.',
       requestBody: body(['token_mode', 'allowed_tag_ids', 'expected_revision'], {
         token_mode: mode, allowed_tag_ids: allowedTags, expected_revision: { type: 'integer', minimum: 0 },
+        display_fields: { type: 'array', maxItems: 8, items: { type: 'string', enum: ['created', 'added', 'modified', 'correspondent', 'document_type', 'tags', 'archive_serial_number', 'filename'] } },
       }), responses }) },
     [`${root}/{id}/tags`]: { get: op({ summary: 'Browse the central Live-folder tag catalogue', tag: 'Documents', admin: true,
       params: [id, { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100000, default: 1 } }],

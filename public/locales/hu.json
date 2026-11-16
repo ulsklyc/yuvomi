@@ -1975,7 +1975,9 @@
             "tokenRequired": "Mentsd el személyes Paperless-tokenedet a Beállítások > Modulok > Dokumentumok > Dinamikus mappák beállításai alatt.",
             "tagsRestricted": "A dinamikus mappákban csak a központilag engedélyezett címkék módosíthatók. Minden más meglévő hozzárendelést tarts meg.",
             "dmsForbidden": "A Paperless-tokened nem fér hozzá ehhez a nézethez vagy dokumentumhoz. Ellenőrizd a jogosultságait a Paperlessben.",
-            "error": "A dinamikus mappák beállításait nem sikerült betölteni vagy menteni. Frissítsd az oldalt, majd próbáld újra."
+            "error": "A dinamikus mappák beállításait nem sikerült betölteni vagy menteni. Frissítsd az oldalt, majd próbáld újra.",
+            "displayFields": "Áttekintő mezők",
+            "displayFieldsHint": "Válasszon további adatokat a kapcsolat összes élő mappájához. A név mindig látható marad."
         },
         "healthCycleEnableLabel": "Ciklus felajánlása a háztartásban",
         "healthCycleHint": "Megjeleníti vagy elrejti a ciklus részt az Egészség modulban minden családtag számára.",
@@ -4106,6 +4108,16 @@
                 "changed": "A címkék megváltoztak a Paperless rendszerben. Mentés előtt frissíts.",
                 "forbidden": "Nincs jogosultságod e címkék módosításához.",
                 "invalid": "A címkéket nem sikerült menteni. Frissíts, és próbáld újra."
+            },
+            "fields": {
+                "created": "Dokumentum dátuma",
+                "added": "Hozzáadva",
+                "modified": "Módosítva",
+                "correspondent": "Levelezőpartner",
+                "document_type": "Dokumentumtípus",
+                "tags": "Címkék",
+                "archive_serial_number": "Archív sorszám",
+                "filename": "Fájlnév"
             }
         },
         "title": "Dokumentumok",

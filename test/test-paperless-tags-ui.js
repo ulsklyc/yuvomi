@@ -19,6 +19,7 @@ class Node {
     return /** @type {Node} */ (this.controls.get(selector));
   }
   closest() { return null; }
+  querySelectorAll() { return []; }
   replaceChildren(/** @type {Node[]} */ ...children) { this.children = [...children]; this.markup = ''; }
   append(/** @type {Node[]} */ ...children) { this.children.push(...children); }
   addEventListener(/** @type {string} */ type, /** @type {(event: any) => unknown} */ listener) { this.events.set(type, listener); }

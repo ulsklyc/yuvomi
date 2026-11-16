@@ -160,6 +160,46 @@ test('adapter rejects an unknown filter before querying documents', async () => 
   assert.equal(urls.length, 1);
 });
 
+test('overview metadata resolves page references in batches and exposes only selected fields', async () => {
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    const u = new URL(String(url)); calls.push(u);
+    assert.equal(new Headers(options?.headers).get('Authorization'), 'Token reader-token');
+    const body = u.pathname.includes('saved_views') ? { id: 6, filter_rules: [] }
+      : u.pathname.includes('documents') ? { count: 2, next: null, results: [1, 2].map((id) => ({ id,
+        title: 'Receipt', created: '2026-11-01', added: '2026-11-02T10:00:00Z', content: 'PRIVATE_OCR',
+        original_file_name: 'original.pdf', archived_file_name: 'archive.pdf',
+        correspondent: 3, document_type: 4, tags: [7], archive_serial_number: 0 })) }
+      : { count: 1, next: null, results: [{ id: u.pathname.includes('correspondents') ? 3 : u.pathname.includes('document_types') ? 4 : 7,
+        name: '<Reference & name>' }] };
+    return new Response(JSON.stringify(body));
+  };
+  const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1235', api_token: 'reader-token' });
+  const displayFields = ['created', 'correspondent', 'document_type', 'tags', 'archive_serial_number', 'filename'];
+  const result = await source.listViewDocuments(6, { displayFields });
+  assert.equal(calls.length, 5, 'one request per reference kind, never per document');
+  assert.deepEqual(result.results[0].display, { created: '2026-11-01', correspondent: '<Reference & name>',
+    document_type: '<Reference & name>', tags: '<Reference & name>', archive_serial_number: 0, filename: 'original.pdf' });
+  assert.ok(!JSON.stringify(result).includes('PRIVATE_OCR'));
+  calls.length = 0;
+  const plain = await source.listViewDocuments(6);
+  assert.equal(calls.length, 1);
+  assert.equal('display' in plain.results[0], false);
+});
+
+test('overview references fall back to IDs if catalogue permissions are missing', async () => {
+  globalThis.fetch = async (url) => {
+    const path = new URL(String(url)).pathname;
+    if (path.includes('saved_views')) return Response.json({ id: 6, filter_rules: [] });
+    if (path.includes('documents')) return Response.json({ count: 1, next: null,
+      results: [{ id: 1, correspondent: 3, document_type: null, tags: [7] }] });
+    return new Response('', { status: 403 });
+  };
+  const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1236', api_token: 'limited-token' });
+  const result = await source.listViewDocuments(6, { displayFields: ['correspondent', 'document_type', 'tags'] });
+  assert.deepEqual(result.results[0].display, { correspondent: '#3', document_type: null, tags: '#7' });
+});
+
 test('saved-view picker is admin-only and paginated; strips filters and tokens', async () => {
   const result = await call('GET', `/saved-views?account_id=${accountId}&page=2`);
   assert.equal(result.status, 200);

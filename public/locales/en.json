@@ -1975,7 +1975,9 @@
             "tokenRequired": "Save your personal Paperless token under Settings > Modules > Documents > Live-folder settings.",
             "tagsRestricted": "Only centrally enabled tags may be changed in Live folders. Preserve all other existing assignments.",
             "dmsForbidden": "Your Paperless token cannot access this view or document. Check its permissions in Paperless.",
-            "error": "The Live-folder settings could not be saved or loaded. Refresh and try again."
+            "error": "The Live-folder settings could not be saved or loaded. Refresh and try again.",
+            "displayFields": "Overview fields",
+            "displayFieldsHint": "Choose additional details for all live folders on this connection. The name is always visible."
         },
         "healthCycleEnableLabel": "Offer the cycle in the household",
         "healthCycleHint": "Shows or hides the cycle area in the health module for all family members.",
@@ -4106,6 +4108,16 @@
                 "changed": "The tags have changed in Paperless. Refresh before saving again.",
                 "forbidden": "You do not have permission to change these Paperless tags.",
                 "invalid": "The selected tags could not be saved. Refresh and try again."
+            },
+            "fields": {
+                "created": "Document date",
+                "added": "Added",
+                "modified": "Modified",
+                "correspondent": "Correspondent",
+                "document_type": "Document type",
+                "tags": "Tags",
+                "archive_serial_number": "Archive serial number",
+                "filename": "Filename"
             }
         },
         "title": "Documents",

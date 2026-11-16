@@ -1975,7 +1975,9 @@
             "tokenRequired": "Guarde o seu token pessoal do Paperless em Definições > Módulos > Documentos > Definições de pastas dinâmicas.",
             "tagsRestricted": "Só podem ser alteradas nas pastas dinâmicas as etiquetas autorizadas centralmente. Preserve todas as restantes atribuições existentes.",
             "dmsForbidden": "O seu token do Paperless não permite aceder a esta vista ou documento. Verifique as permissões no Paperless.",
-            "error": "Não foi possível carregar ou guardar as definições de pastas dinâmicas. Atualize e tente novamente."
+            "error": "Não foi possível carregar ou guardar as definições de pastas dinâmicas. Atualize e tente novamente.",
+            "displayFields": "Campos da vista geral",
+            "displayFieldsHint": "Escolha detalhes adicionais para todas as pastas dinâmicas desta ligação. O nome fica sempre visível."
         },
         "healthCycleEnableLabel": "Disponibilizar o ciclo no agregado",
         "healthCycleHint": "Mostra ou oculta a secção de ciclo do módulo Saúde para todos os membros da família.",
@@ -4044,6 +4046,16 @@
                 "changed": "As etiquetas mudaram no Paperless. Atualize antes de guardar.",
                 "forbidden": "Não tem permissão para alterar estas etiquetas.",
                 "invalid": "Não foi possível guardar as etiquetas. Atualize e tente novamente."
+            },
+            "fields": {
+                "created": "Data do documento",
+                "added": "Adicionado",
+                "modified": "Alterado",
+                "correspondent": "Correspondente",
+                "document_type": "Tipo de documento",
+                "tags": "Etiquetas",
+                "archive_serial_number": "Número de arquivo",
+                "filename": "Nome do ficheiro"
             }
         },
         "title": "Documentos",

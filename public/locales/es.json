@@ -1975,7 +1975,9 @@
             "tokenRequired": "Guarda tu token personal de Paperless en Ajustes > Módulos > Documentos > Ajustes de carpetas dinámicas.",
             "tagsRestricted": "En las carpetas dinámicas solo se pueden cambiar las etiquetas habilitadas centralmente. Conserva las demás asignaciones existentes.",
             "dmsForbidden": "Tu token de Paperless no permite acceder a esta vista o documento. Comprueba sus permisos en Paperless.",
-            "error": "No se pudieron cargar o guardar los ajustes de carpetas dinámicas. Actualiza la página e inténtalo de nuevo."
+            "error": "No se pudieron cargar o guardar los ajustes de carpetas dinámicas. Actualiza la página e inténtalo de nuevo.",
+            "displayFields": "Campos de la vista",
+            "displayFieldsHint": "Elige los datos adicionales para todas las carpetas en vivo de esta conexión. El nombre siempre permanece visible."
         },
         "healthCycleEnableLabel": "Ofrecer el ciclo en el hogar",
         "healthCycleHint": "Muestra u oculta la sección de ciclo del módulo Salud para todos los miembros de la familia.",
@@ -4044,6 +4046,16 @@
                 "changed": "Las etiquetas cambiaron en Paperless. Actualiza antes de guardar.",
                 "forbidden": "No tienes permiso para modificar estas etiquetas.",
                 "invalid": "No se pudieron guardar las etiquetas. Actualiza e inténtalo de nuevo."
+            },
+            "fields": {
+                "created": "Fecha del documento",
+                "added": "Añadido",
+                "modified": "Modificado",
+                "correspondent": "Corresponsal",
+                "document_type": "Tipo de documento",
+                "tags": "Etiquetas",
+                "archive_serial_number": "Número de archivo",
+                "filename": "Nombre del archivo"
             }
         },
         "title": "Documentos",

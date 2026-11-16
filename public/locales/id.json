@@ -1993,7 +1993,9 @@
             "tokenRequired": "Simpan token Paperless pribadi di Pengaturan > Modul > Dokumen > Pengaturan folder dinamis.",
             "tagsRestricted": "Hanya tag yang diizinkan secara terpusat yang dapat diubah dalam folder dinamis. Pertahankan semua penetapan lainnya.",
             "dmsForbidden": "Token Paperless Anda tidak dapat mengakses tampilan atau dokumen ini. Periksa izinnya di Paperless.",
-            "error": "Pengaturan folder dinamis tidak dapat dimuat atau disimpan. Muat ulang dan coba lagi."
+            "error": "Pengaturan folder dinamis tidak dapat dimuat atau disimpan. Muat ulang dan coba lagi.",
+            "displayFields": "Kolom ringkasan",
+            "displayFieldsHint": "Pilih detail tambahan untuk semua folder langsung pada koneksi ini. Nama selalu ditampilkan."
         },
         "healthCycleEnableLabel": "Sediakan siklus untuk rumah tangga",
         "healthCycleHint": "Menampilkan atau menyembunyikan bagian siklus di modul Kesehatan untuk semua anggota keluarga.",
@@ -4106,6 +4108,16 @@
                 "changed": "Tag telah berubah di Paperless. Segarkan sebelum menyimpan.",
                 "forbidden": "Anda tidak berwenang mengubah tag ini.",
                 "invalid": "Tag tidak dapat disimpan. Segarkan dan coba lagi."
+            },
+            "fields": {
+                "created": "Tanggal dokumen",
+                "added": "Ditambahkan",
+                "modified": "Diubah",
+                "correspondent": "Koresponden",
+                "document_type": "Jenis dokumen",
+                "tags": "Tag",
+                "archive_serial_number": "Nomor arsip",
+                "filename": "Nama berkas"
             }
         },
         "title": "Dokumen",

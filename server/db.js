@@ -12052,6 +12052,12 @@ const MIGRATIONS = [
       );
     `,
   },
+  {
+    version: 285,
+    description: 'Documents: configurable Live-folder overview fields',
+    up: `ALTER TABLE paperless_live_settings ADD COLUMN display_fields TEXT NOT NULL DEFAULT '[]'
+      CHECK(json_valid(display_fields) AND json_type(display_fields) = 'array');`,
+  },
 ];
 
 /**

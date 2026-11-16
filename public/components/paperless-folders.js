@@ -2,7 +2,7 @@
 import { paperlessControl, paperlessApiError } from '/components/paperless-dom.js';
 import { api } from '/api.js';
 import { openPaperlessTags } from '/components/paperless-tags.js';
-import { t } from '/i18n.js';
+import { t, formatDate } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
@@ -13,6 +13,17 @@ import { openModal, closeModal, confirmOverModal, captureModalContext, isModalCo
 /** @type {(message: string, options: {closeOnConfirm: boolean, confirmLabel: string}) => Promise<boolean>} */
 const confirmFolderRemoval = /** @type {(message: string, options: {closeOnConfirm: boolean, confirmLabel: string}) => Promise<boolean>} */ (/** @type {unknown} */ (confirmOverModal));
 const ROOT = '/documents/dms/paperless';
+const DISPLAY_FIELDS = ['created', 'added', 'modified', 'correspondent', 'document_type', 'tags', 'archive_serial_number', 'filename'];
+/** @param {import("../../types/paperless.d.ts").Document} doc @param {string[]} fields */
+function overviewFields(doc, fields) {
+  return fields.filter((field) => DISPLAY_FIELDS.includes(field)).map((field) => {
+    let value = doc.display?.[field];
+    if (typeof value === 'string' && ['created', 'added', 'modified'].includes(field)) {
+      value = formatDate(field === 'created' ? value.slice(0, 10) : value) || null;
+    }
+    return `<div class="paperless-folder__field" data-pl-field="${field}"><dt>${esc(t(`documents.paperless.fields.${field}`))}</dt><dd>${esc(value === null || value === undefined || value === '' ? '-' : String(value))}</dd></div>`;
+  }).join('');
+}
 /** @param {string} name */
 const key = (name) => `documents.paperless.${name}`;
 /** @param {Element} el */
@@ -127,7 +138,9 @@ export async function mountPaperlessFolders({ sidebar, content, accounts = [], c
             const external = /^https?:\/\//i.test(doc.url || '') ? doc.url : null;
             return `<article class="list-row paperless-folder__document">
               <i data-lucide="file-text" aria-hidden="true"></i>
-              <span class="list-row__name">${esc(doc.title)}</span>
+              <div class="paperless-folder__details"><span class="list-row__name">${esc(doc.title)}</span>
+                ${result.meta.display_fields?.length ? `<dl class="paperless-folder__metadata">${overviewFields(doc, result.meta.display_fields)}</dl>` : ''}
+              </div>
               <div class="paperless-folder__actions">
                 <a class="btn btn--secondary btn--sm" target="_blank" rel="noopener noreferrer" href="${esc(paperlessMediaPath(folder.id, doc.id, 'preview'))}">${esc(t(key('preview')))}</a>
                 ${popoverMenuHtml({ ...{ id: `pl-actions-${folder.id}-${doc.id}`, label: t('common.moreActions'), items: [

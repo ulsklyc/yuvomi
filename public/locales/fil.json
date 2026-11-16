@@ -1993,7 +1993,9 @@
             "tokenRequired": "I-save ang personal mong Paperless token sa Mga Setting > Mga Module > Mga Dokumento > Mga setting ng dinamikong folder.",
             "tagsRestricted": "Tanging mga tag na pinayagan nang sentral ang maaaring baguhin sa mga dinamikong folder. Panatilihin ang lahat ng iba pang umiiral na pagkakatalaga.",
             "dmsForbidden": "Hindi ma-access ng iyong Paperless token ang view o dokumentong ito. Suriin ang mga pahintulot nito sa Paperless.",
-            "error": "Hindi ma-load o ma-save ang mga setting ng dinamikong folder. I-refresh at subukan muli."
+            "error": "Hindi ma-load o ma-save ang mga setting ng dinamikong folder. I-refresh at subukan muli.",
+            "displayFields": "Mga field sa pangkalahatang-ideya",
+            "displayFieldsHint": "Pumili ng karagdagang detalye para sa lahat ng live folder ng koneksyong ito. Palaging makikita ang pangalan."
         },
         "healthCycleEnableLabel": "Ialok ang cycle sa sambahayan",
         "healthCycleHint": "Ipinapakita o itinatago ang bahaging cycle sa Health module para sa lahat ng miyembro ng pamilya.",
@@ -4106,6 +4108,16 @@
                 "changed": "Nagbago ang mga tag sa Paperless. I-refresh bago i-save.",
                 "forbidden": "Wala kang pahintulot na baguhin ang mga tag na ito.",
                 "invalid": "Hindi na-save ang mga tag. I-refresh at subukan muli."
+            },
+            "fields": {
+                "created": "Petsa ng dokumento",
+                "added": "Idinagdag",
+                "modified": "Binago",
+                "correspondent": "Korespondente",
+                "document_type": "Uri ng dokumento",
+                "tags": "Mga tag",
+                "archive_serial_number": "Numero ng archive",
+                "filename": "Pangalan ng file"
             }
         },
         "title": "Mga Dokumento",

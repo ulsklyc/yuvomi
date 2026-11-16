@@ -96,7 +96,7 @@ test('new connections default to the shared token and unrestricted tags without 
   const result = await call('GET', '/live-settings');
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.data[0], { id: accountId, name: 'Live', token_mode: 'shared',
-    has_personal_token: false, allowed_tag_ids: null, revision: 0 });
+    has_personal_token: false, allowed_tag_ids: null, display_fields: [], revision: 0 });
   assert.equal(result.headers.get('cache-control'), 'no-store');
   assert.ok(!JSON.stringify(result.body).includes('SECRET'));
   identity = { id: reader, role: 'member' };
@@ -136,6 +136,39 @@ test('personal mode never falls back to the central token, including for adminis
     }
   }
   assert.equal(credentials.length, 0);
+});
+
+test('overview fields persist per connection, reach readers and survive legacy policy saves', async () => {
+  const selected = ['created', 'correspondent', 'tags', 'filename'];
+  const save = await call('PUT', `/live-settings/${accountId}`, {
+    token_mode: 'shared', allowed_tag_ids: null, expected_revision: 0, display_fields: [...selected, 'tags'],
+  });
+  assert.equal(save.status, 200);
+  assert.deepEqual(save.body.data.display_fields, selected);
+  assert.equal((await policy('shared', null, 0)).status, 409);
+  assert.equal((await policy('shared', null, 1)).status, 200);
+  identity = { id: reader, role: 'member' };
+  assert.deepEqual((await call('GET', '/live-settings')).body.data[0].display_fields, selected);
+  adapter.listViewDocuments = async (_view, options) => {
+    assert.deepEqual(options.displayFields, selected);
+    return { results: [], count: 0, has_more: false };
+  };
+  assert.deepEqual((await call('GET', `/folders/${folderId}/documents`)).body.meta.display_fields, selected);
+  identity = { id: owner, role: 'admin' };
+  assert.equal((await call('PUT', `/live-settings/${accountId}`, {
+    token_mode: 'shared', allowed_tag_ids: null, expected_revision: 2, display_fields: [],
+  })).status, 200);
+  assert.deepEqual((await call('GET', '/live-settings')).body.data[0].display_fields, []);
+});
+
+test('overview field selection rejects malformed or unsupported fields without saving', async () => {
+  for (const fields of [null, 'tags', ['title'], ['content'], [1], ['created', {}], Array(9).fill('tags')]) {
+    const result = await call('PUT', `/live-settings/${accountId}`, {
+      token_mode: 'shared', allowed_tag_ids: null, expected_revision: 0, display_fields: fields,
+    });
+    assert.equal(result.status, 400);
+  }
+  assert.equal((await call('GET', '/live-settings')).body.data[0].revision, 0);
 });
 
 test('users manage only their own token, and Documents readers can save personal credentials', async () => {

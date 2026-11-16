@@ -1975,7 +1975,9 @@
             "tokenRequired": "Lưu mã thông báo Paperless cá nhân trong Cài đặt > Mô-đun > Tài liệu > Cài đặt thư mục động.",
             "tagsRestricted": "Chỉ các thẻ được cho phép tập trung mới có thể được thay đổi trong thư mục động. Giữ nguyên mọi liên kết thẻ khác hiện có.",
             "dmsForbidden": "Mã thông báo Paperless của bạn không có quyền truy cập chế độ xem hoặc tài liệu này. Hãy kiểm tra quyền trong Paperless.",
-            "error": "Không thể tải hoặc lưu cài đặt thư mục động. Hãy làm mới trang và thử lại."
+            "error": "Không thể tải hoặc lưu cài đặt thư mục động. Hãy làm mới trang và thử lại.",
+            "displayFields": "Trường hiển thị",
+            "displayFieldsHint": "Chọn thông tin bổ sung cho tất cả thư mục trực tiếp của kết nối này. Tên luôn hiển thị."
         },
         "healthCycleEnableLabel": "Cung cấp chu kỳ cho gia đình",
         "healthCycleHint": "Hiện hoặc ẩn phần chu kỳ trong mô-đun Sức khỏe cho mọi thành viên trong gia đình.",
@@ -4106,6 +4108,16 @@
                 "changed": "Các thẻ đã thay đổi trong Paperless. Hãy làm mới trước khi lưu.",
                 "forbidden": "Bạn không có quyền thay đổi các thẻ này.",
                 "invalid": "Không thể lưu các thẻ. Hãy làm mới và thử lại."
+            },
+            "fields": {
+                "created": "Ngày tài liệu",
+                "added": "Ngày thêm",
+                "modified": "Ngày sửa",
+                "correspondent": "Đối tác",
+                "document_type": "Loại tài liệu",
+                "tags": "Nhãn",
+                "archive_serial_number": "Số lưu trữ",
+                "filename": "Tên tệp"
             }
         },
         "title": "Tài liệu",

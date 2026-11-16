@@ -1975,7 +1975,9 @@
             "tokenRequired": "Lagre ditt personlige Paperless-token under Innstillinger > Moduler > Dokumenter > Innstillinger for dynamiske mapper.",
             "tagsRestricted": "Bare sentralt tillatte etiketter kan endres i dynamiske mapper. Behold alle andre eksisterende tilordninger.",
             "dmsForbidden": "Ditt Paperless-token har ikke tilgang til denne visningen eller dette dokumentet. Kontroller rettighetene i Paperless.",
-            "error": "Innstillingene for dynamiske mapper kunne ikke lastes eller lagres. Oppdater siden og prøv igjen."
+            "error": "Innstillingene for dynamiske mapper kunne ikke lastes eller lagres. Oppdater siden og prøv igjen.",
+            "displayFields": "Oversiktsfelt",
+            "displayFieldsHint": "Velg tilleggsopplysninger for alle sanntidsmapper på denne tilkoblingen. Navnet er alltid synlig."
         },
         "healthCycleEnableLabel": "Tilby syklusen i husstanden",
         "healthCycleHint": "Viser eller skjuler syklusdelen i helsemodulen for alle familiemedlemmer.",
@@ -4106,6 +4108,16 @@
                 "changed": "Etikettene er endret i Paperless. Oppdater før du lagrer.",
                 "forbidden": "Du har ikke tillatelse til å endre disse etikettene.",
                 "invalid": "Etikettene kunne ikke lagres. Oppdater og prøv igjen."
+            },
+            "fields": {
+                "created": "Dokumentdato",
+                "added": "Lagt til",
+                "modified": "Endret",
+                "correspondent": "Korrespondent",
+                "document_type": "Dokumenttype",
+                "tags": "Etiketter",
+                "archive_serial_number": "Arkivnummer",
+                "filename": "Filnavn"
             }
         },
         "title": "Dokumenter",

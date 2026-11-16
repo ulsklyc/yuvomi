@@ -1975,7 +1975,9 @@
             "tokenRequired": "Sla je persoonlijke Paperless-token op onder Instellingen > Modules > Documenten > Instellingen voor live-mappen.",
             "tagsRestricted": "In live-mappen mogen alleen centraal toegestane tags worden gewijzigd. Behoud alle andere bestaande toewijzingen.",
             "dmsForbidden": "Je Paperless-token heeft geen toegang tot deze weergave of dit document. Controleer de rechten in Paperless.",
-            "error": "De instellingen voor live-mappen konden niet worden geladen of opgeslagen. Vernieuw de pagina en probeer opnieuw."
+            "error": "De instellingen voor live-mappen konden niet worden geladen of opgeslagen. Vernieuw de pagina en probeer opnieuw.",
+            "displayFields": "Overzichtsvelden",
+            "displayFieldsHint": "Kies extra gegevens voor alle live mappen van deze verbinding. De naam blijft altijd zichtbaar."
         },
         "healthCycleEnableLabel": "Cyclus aanbieden in het huishouden",
         "healthCycleHint": "Toont of verbergt het onderdeel cyclus in de gezondheidsmodule voor alle gezinsleden.",
@@ -4106,6 +4108,16 @@
                 "changed": "De tags zijn gewijzigd in Paperless. Vernieuw voordat je opslaat.",
                 "forbidden": "Je mag deze tags niet wijzigen.",
                 "invalid": "De tags konden niet worden opgeslagen. Vernieuw en probeer opnieuw."
+            },
+            "fields": {
+                "created": "Documentdatum",
+                "added": "Toegevoegd",
+                "modified": "Gewijzigd",
+                "correspondent": "Correspondentiepartner",
+                "document_type": "Documenttype",
+                "tags": "Labels",
+                "archive_serial_number": "Archiefnummer",
+                "filename": "Bestandsnaam"
             }
         },
         "title": "Documenten",

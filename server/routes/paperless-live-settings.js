@@ -10,7 +10,7 @@ import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { mayWriteModule } from '../authorize/index.ts';
 import { getAdapter } from '../services/dms/index.js';
 import { positiveId } from '../services/dms/paperless-views.js';
-import { liveSettings, paperlessAccount } from '../services/paperless-live-settings.js';
+import { liveSettings, paperlessAccount, LIVE_DISPLAY_FIELDS } from '../services/paperless-live-settings.js';
 
 const router = express.Router();
 const log = createLogger('PaperlessSettings');
@@ -50,7 +50,7 @@ router.get('/live-settings', (req, res) => {
     const canManage = isAdminRequest(req) && mayWriteModule(req, 'documents');
     res.json({ data: rows.map((/** @type {{id: number, name: string}} */ row) => {
       const settings = liveSettings(row.id);
-      return { ...row, token_mode: settings.token_mode, has_personal_token: hasToken(row.id, actor(req)),
+      return { ...row, token_mode: settings.token_mode, display_fields: settings.display_fields, has_personal_token: hasToken(row.id, actor(req)),
         ...(canManage ? { allowed_tag_ids: settings.allowed_tag_ids, revision: settings.revision } : {}) };
     }), meta: { can_manage: canManage } });
   
@@ -61,7 +61,10 @@ router.put('/live-settings/:id', requireAdmin, (req, res) => {
     if (!mayWriteModule(req, 'documents')) throw problem(403, 'Permission denied.');
     const source = account(req);
     const { token_mode, allowed_tag_ids, expected_revision } = req.body || {};
+    const displayFields = req.body?.display_fields === undefined ? liveSettings(source.id).display_fields : req.body.display_fields;
     if (!['shared', 'personal'].includes(token_mode) || !Number.isSafeInteger(expected_revision)
+      || !Array.isArray(displayFields) || displayFields.length > LIVE_DISPLAY_FIELDS.length
+      || displayFields.some((field) => !LIVE_DISPLAY_FIELDS.includes(field))
       || (allowed_tag_ids !== null && (!Array.isArray(allowed_tag_ids) || allowed_tag_ids.length > 1000
         || allowed_tag_ids.some((id) => !Number.isSafeInteger(id) || id < 1)))) {
       throw problem(400, 'paperless_live_settings_invalid');
@@ -69,11 +72,11 @@ router.put('/live-settings/:id', requireAdmin, (req, res) => {
     const tags = allowed_tag_ids === null ? null : [...new Set(allowed_tag_ids)].sort((a, b) => a - b);
     db.get().transaction(() => {
       if (liveSettings(source.id).revision !== expected_revision) throw problem(409, 'paperless_folder_changed');
-      db.get().prepare(`INSERT INTO paperless_live_settings (account_id, token_mode, allowed_tag_ids, revision)
-        VALUES (?, ?, ?, 1) ON CONFLICT(account_id) DO UPDATE SET token_mode = excluded.token_mode,
-        allowed_tag_ids = excluded.allowed_tag_ids, revision = paperless_live_settings.revision + 1,
+      db.get().prepare(`INSERT INTO paperless_live_settings (account_id, token_mode, allowed_tag_ids, display_fields, revision)
+        VALUES (?, ?, ?, ?, 1) ON CONFLICT(account_id) DO UPDATE SET token_mode = excluded.token_mode,
+        allowed_tag_ids = excluded.allowed_tag_ids, display_fields = excluded.display_fields, revision = paperless_live_settings.revision + 1,
         updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')`)
-        .run(source.id, token_mode, tags === null ? null : JSON.stringify(tags));
+        .run(source.id, token_mode, tags === null ? null : JSON.stringify(tags), JSON.stringify([...new Set(displayFields)]));
     })();
     res.json({ data: liveSettings(source.id) });
   

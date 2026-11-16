@@ -2691,11 +2691,37 @@
 
 .paperless-folder__document {
   flex-wrap: wrap;
+  align-items: flex-start;
 }
 
-.paperless-folder__document > .list-row__name {
+.paperless-folder__details {
   flex: 1;
+  min-width: 0;
   overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+}
+
+.paperless-folder__metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+.paperless-folder__field { min-width: 0; max-width: 100%; }
+.paperless-folder__field dt { color: var(--color-text-secondary); }
+.paperless-folder__field dd { margin: 0; }
+
+@media (max-width: 639px) {
+  .paperless-folder__document .paperless-folder__actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+  .paperless-folder__metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .paperless-folder__actions {

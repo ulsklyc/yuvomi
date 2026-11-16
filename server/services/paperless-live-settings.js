@@ -5,11 +5,14 @@ import { PaperlessHttpError } from './dms/paperless-errors.js';
 /** @param {number} status @param {string} reason */
 const problem = (status, reason) => new PaperlessHttpError(status, { reason });
 
+export const LIVE_DISPLAY_FIELDS = ['created', 'added', 'modified', 'correspondent', 'document_type', 'tags', 'archive_serial_number', 'filename'];
+
 /** @param {number} accountId @returns {import("../../types/paperless.d.ts").LiveSettings} */
 export function liveSettings(accountId) {
   const row = db.get().prepare('SELECT * FROM paperless_live_settings WHERE account_id = ?').get(accountId);
   return { token_mode: row?.token_mode ?? 'shared',
     allowed_tag_ids: row?.allowed_tag_ids == null ? null : JSON.parse(row.allowed_tag_ids),
+    display_fields: row?.display_fields == null ? [] : JSON.parse(row.display_fields),
     revision: row?.revision ?? 0 };
 }
 

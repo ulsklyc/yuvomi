@@ -2066,7 +2066,9 @@
             "tokenRequired": "Uložte osobní token Paperless v Nastavení > Moduly > Dokumenty > Nastavení dynamických složek.",
             "tagsRestricted": "V dynamických složkách lze měnit pouze centrálně povolené štítky. Zachovejte všechna ostatní stávající přiřazení.",
             "dmsForbidden": "Váš token Paperless nemá přístup k tomuto pohledu nebo dokumentu. Zkontrolujte jeho oprávnění v Paperless.",
-            "error": "Nastavení dynamických složek nelze načíst nebo uložit. Obnovte stránku a zkuste to znovu."
+            "error": "Nastavení dynamických složek nelze načíst nebo uložit. Obnovte stránku a zkuste to znovu.",
+            "displayFields": "Zobrazená pole",
+            "displayFieldsHint": "Vyberte další údaje pro všechny živé složky tohoto připojení. Název je vždy viditelný."
         },
         "healthCycleEnableLabel": "Nabídnout cyklus v domácnosti",
         "healthCycleHint": "Zobrazí nebo skryje oblast cyklu v modulu Zdraví pro všechny členy rodiny.",
@@ -4372,6 +4374,16 @@
                 "changed": "Štítky se v Paperless změnily. Před uložením je obnovte.",
                 "forbidden": "Nemáte oprávnění měnit tyto štítky.",
                 "invalid": "Štítky nelze uložit. Obnovte je a zkuste to znovu."
+            },
+            "fields": {
+                "created": "Datum dokumentu",
+                "added": "Přidáno",
+                "modified": "Změněno",
+                "correspondent": "Korespondent",
+                "document_type": "Typ dokumentu",
+                "tags": "Štítky",
+                "archive_serial_number": "Archivní číslo",
+                "filename": "Název souboru"
             }
         },
         "title": "Dokumenty",

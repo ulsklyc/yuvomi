@@ -22,12 +22,17 @@ const requests = [];
   source.get('/api/documents/', (req, res) => {
     const id = req.query.id;
     const page = Number(req.query.page || 1);
-    const all = hasMatches ? Array.from({ length: 51 }, (_, i) => ({ id: i + 1, title: `Hausbeleg ${i + 1}`, original_file_name: `${i + 1}.pdf` })) : [];
+    const all = hasMatches ? Array.from({ length: 51 }, (_, i) => ({ id: i + 1, title: `Hausbeleg ${i + 1}`, original_file_name: `${i + 1}.pdf`,
+      created: '2026-11-01', added: '2026-11-02T10:00:00Z', modified: '2026-11-03T12:00:00Z',
+      correspondent: 3, document_type: 4, tags: [7], archive_serial_number: i === 0 ? 0 : null })) : [];
     assert.equal(req.query.tags__id__all, String(filterTag));
     const docs = id ? all.filter((doc) => String(doc.id) === id) : all.slice((page - 1) * 50, page * 50);
     res.json({ results: docs, count: id ? docs.length : all.length, next: !id && page === 1 && all.length ? 'https://invalid.example/never-follow' : null });
   });
   source.get('/api/documents/:id/download/', (_req, res) => res.type('application/pdf').send('%PDF-test'));
+  source.get('/api/tags/', (_req, res) => res.json({ count: 1, next: null, results: [{ id: 7, name: '<Haus & Beleg>' }] }));
+  source.get('/api/correspondents/', (_req, res) => res.json({ count: 1, next: null, results: [{ id: 3, name: '<Bank & Partner>' }] }));
+  source.get('/api/document_types/', (_req, res) => res.json({ count: 1, next: null, results: [{ id: 4, name: 'Rechnung' }] }));
   const sourceServer = source.listen(0, '127.0.0.1');
   await new Promise((resolve) => sourceServer.once('listening', resolve));
   /** @type {Awaited<ReturnType<typeof startHarness>> | undefined} */
@@ -58,9 +63,28 @@ const errors = [];
     assert.equal(await page.$$eval('.paperless-folder__document', (/** @type {HTMLInputElement[]} */ els) => els.length), 50);
     assert.equal(await page.$eval('.paperless-folder__title', (/** @type {HTMLInputElement} */ el) => el.textContent), 'Hausakte');
     assert.equal(await page.$eval('#fab-new-document', (/** @type {HTMLInputElement} */ el) => el.hidden), true);
+    assert.equal(await page.$('.paperless-folder__metadata'), null, 'default stays title only');
+    await gotoRoute(page, '/settings/modules/documents');
+    await page.waitForSelector('[data-display-fields] input[value="created"]');
+    for (const field of ['created', 'added', 'modified', 'correspondent', 'document_type', 'tags', 'archive_serial_number', 'filename']) {
+      await page.click(`[data-display-fields] input[value="${field}"]`);
+    }
+    const saved = page.waitForResponse((/** @type {import('puppeteer').HTTPResponse} */ response) => response.request().method() === 'PUT' && /\/live-settings\/\d+$/.test(response.url()));
+    await page.click('form:has([data-display-fields]) [type="submit"]');
+    assert.equal((await saved).status(), 200);
+    await gotoRoute(page, '/documents');
+    await page.waitForSelector('[data-pl-folder]');
+    await page.click('[data-pl-folder]');
+    await page.waitForSelector('[data-pl-field="tags"]');
+    assert.equal(await page.$eval('[data-pl-field="tags"] dd', (/** @type {HTMLElement} */ el) => el.textContent), '<Haus & Beleg>');
+    assert.equal(await page.$eval('[data-pl-field="correspondent"] dd', (/** @type {HTMLElement} */ el) => el.textContent), '<Bank & Partner>');
+    assert.equal(await page.$eval('[data-pl-field="archive_serial_number"] dd', (/** @type {HTMLElement} */ el) => el.textContent), '0');
+    assert.equal(await page.$eval('[data-pl-field="filename"] dd', (/** @type {HTMLElement} */ el) => el.textContent), '1.pdf');
+    assert.equal(await page.$eval('[data-pl-field="created"] dd', (/** @type {HTMLElement} */ el) => el.textContent), '01.11.2026');
     await page.click('[data-pl-next]');
     await page.waitForFunction(() => document.querySelector('.paperless-folder__document')?.textContent.includes('Hausbeleg 51'));
     assert.equal(await page.$$eval('.paperless-folder__document', (/** @type {HTMLInputElement[]} */ els) => els.length), 1);
+    assert.equal(await page.$eval('[data-pl-field="archive_serial_number"] dd', (/** @type {HTMLElement} */ el) => el.textContent), '-');
     const media = await page.$eval('.paperless-folder__document [data-pl-download]', (/** @type {HTMLInputElement} */ el) => el.dataset.plDownload);
     assert.equal(await page.evaluate(async (/** @type {string} */ url) => (await fetch(url)).status, media), 200);
     hasMatches = false;

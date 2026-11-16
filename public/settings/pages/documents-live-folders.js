@@ -2,10 +2,11 @@ import { paperlessControl, paperlessApiError } from '/components/paperless-dom.j
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { settingRowHtml, createInlineError, createRetryState } from '/settings/components.js';
+import { settingRowHtml, toggleRowHtml, createInlineError, createRetryState } from '/settings/components.js';
 import { reportFieldErrors, constraintErrors } from '/components/modal.js';
 
 const ROOT = '/documents/dms/paperless';
+const DISPLAY_FIELDS = ['created', 'added', 'modified', 'correspondent', 'document_type', 'tags', 'archive_serial_number', 'filename'];
 /** @param {string} name */
 const key = (name) => `settings.liveFolders.${name}`;
 /** @param {string} name */
@@ -21,7 +22,7 @@ function message(error) {
   return text('error');
 }
 
-/** @param {{id: number, name: string, token_mode: string, has_personal_token: boolean, allowed_tag_ids: number[] | null, revision: number}} account
+/** @param {{id: number, name: string, token_mode: string, has_personal_token: boolean, allowed_tag_ids: number[] | null, display_fields?: string[], revision: number}} account
  * @param {{canManage: boolean, signal?: AbortSignal}} options */
 function buildAccount(account, { canManage, signal }) {
   const section = Object.assign(document.createElement('section'), { loadInitialTags: /** @type {(() => Promise<void>) | undefined} */ (undefined) });
@@ -96,6 +97,11 @@ function buildAccount(account, { canManage, signal }) {
         ${settingRowHtml({ label: t('settings.liveFolders.tags'), labelFor: tagsId, description: text('tagsHint'),
           control: `<select class="form-input" id="${tagsId}"><option value="all">${esc(text('allTags'))}</option><option value="selected">${esc(text('selectedTags'))}</option></select>` })}
       </div>
+      <fieldset class="settings-group" data-display-fields><legend>${esc(text('displayFields'))}</legend>
+        <p class="form-hint">${esc(text('displayFieldsHint'))}</p>
+        <div>${DISPLAY_FIELDS.map((field) => toggleRowHtml({ label: t(`documents.paperless.fields.${field}`),
+          control: 'switch', checked: account.display_fields?.includes(field), attrs: { value: field } })).join('')}</div>
+      </fieldset>
       <fieldset class="settings-group" data-tags-picker><legend>${esc(text('tags'))}</legend>
         <div class="live-folder-settings__tags" data-tags-list></div>
         <button type="button" class="btn btn--secondary btn--sm" data-more-tags>${esc(t('documents.paperless.tags.more'))}</button>
@@ -153,6 +159,7 @@ function buildAccount(account, { canManage, signal }) {
       submit.disabled = true; error.replaceChildren();
       try {
         const result = await api.put(`${ROOT}/live-settings/${account.id}`, { token_mode: mode.value,
+          display_fields: [...form.querySelectorAll('[data-display-fields] input:checked')].map((input) => /** @type {HTMLInputElement} */ (input).value),
           allowed_tag_ids: tagsMode.value === 'all' ? null : [...selected], expected_revision: account.revision });
         if (!current()) return;
         Object.assign(account, result.data);

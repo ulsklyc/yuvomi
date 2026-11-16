@@ -131,8 +131,8 @@ export class PaperlessAdapter {
     return { results: /** @type {Array<Record<string, any>>} */ (body.results), count: body.count, has_more: Boolean(body.next) };
   }
 
-  /** @param {unknown} viewId @param {{page?: number, pageSize?: number, documentId?: unknown}} [options] */
-  async listViewDocuments(viewId, { page = 1, pageSize = 50, documentId = null } = {}) {
+  /** @param {unknown} viewId @param {{page?: number, pageSize?: number, documentId?: unknown, displayFields?: string[]}} [options] */
+  async listViewDocuments(viewId, { page = 1, pageSize = 50, documentId = null, displayFields = [] } = {}) {
     const cacheKey = JSON.stringify([this.base, this.token, positiveId(viewId)]);
     let cached = viewCache.get(cacheKey);
     if (!cached || cached.expires <= Date.now()) {
@@ -151,6 +151,20 @@ export class PaperlessAdapter {
       params.set('id', String(documentId));
     }
     const result = await this.#viewPage(`/api/documents/?${params}`);
+    const names = new Map();
+    // Resolve only references on this page with the current reader's token.
+    // A missing catalogue permission must not prevent reading the documents.
+    await Promise.all(['correspondent', 'document_type', 'tags'].filter((field) => displayFields.includes(field)).map(async (field) => {
+      const ids = [...new Set(result.results.flatMap((row) => field === 'tags' && Array.isArray(row.tags) ? row.tags : [row[field]])
+        .map(positiveId).filter((id) => id !== null))];
+      if (!ids.length) return;
+      try {
+        const found = field === 'tags' ? await this.getTags(ids) : await this.#referenceNames(field, ids);
+        names.set(field, new Map(found.map((row) => [row.id, row.name])));
+      } catch (err) {
+        if (![400, 403, 404].includes(paperlessStatus(err) || 0)) throw err;
+      }
+    }));
     return {
       ...result,
       results: result.results.map((r) => ({
@@ -158,8 +172,32 @@ export class PaperlessAdapter {
         created: r.created || null,
         filename: r.archived_file_name || r.original_file_name || `${r.id}.pdf`,
         url: this.docUrl(r.id),
+        ...(displayFields.length ? { display: Object.fromEntries(displayFields.map((field) => {
+          const value = r[field];
+          if (field === 'filename') return [field, r.original_file_name || r.archived_file_name || null];
+          if (field === 'tags') return [field, Array.isArray(value) ? value.map(positiveId).filter(Boolean)
+            .map((id) => names.get(field)?.get(id) || `#${id}`).join(', ') : null];
+          if (['correspondent', 'document_type'].includes(field)) return [field, positiveId(value) ? names.get(field)?.get(Number(value)) || `#${value}` : null];
+          return [field, ['created', 'added', 'modified', 'archive_serial_number'].includes(field)
+            && ['string', 'number'].includes(typeof value) ? value : null];
+        })) } : {}),
       })),
     };
+  }
+
+  /** @param {string} field @param {number[]} ids */
+  async #referenceNames(field, ids) {
+    const resource = field === 'correspondent' ? 'correspondents' : 'document_types';
+    const wanted = new Set(ids), found = new Map();
+    for (let page = 1; page <= 10; page++) {
+      const result = await this.#viewPage(`/api/${resource}/?id__in=${ids.join(',')}&page_size=100&page=${page}`);
+      for (const row of result.results) {
+        const id = positiveId(row.id);
+        if (id && wanted.has(id) && typeof row.name === 'string') found.set(id, { id, name: row.name });
+      }
+      if (!result.has_more || found.size === wanted.size) break;
+    }
+    return [...found.values()];
   }
 
   // Eine Ergebnisseite holen. `extra` setzt entweder den Volltext- oder den

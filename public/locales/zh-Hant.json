@@ -1975,7 +1975,9 @@
             "tokenRequired": "請在設定 > 模組 > 文件 > 動態資料夾設定中儲存您的個人 Paperless 權杖。",
             "tagsRestricted": "動態資料夾中只能變更中央允許的標籤。請保留其他所有現有標籤指派。",
             "dmsForbidden": "您的 Paperless 權杖無法存取此檢視或文件。請在 Paperless 中檢查其權限。",
-            "error": "無法載入或儲存動態資料夾設定。請重新整理後再試。"
+            "error": "無法載入或儲存動態資料夾設定。請重新整理後再試。",
+            "displayFields": "概覽欄位",
+            "displayFieldsHint": "選擇此連線下所有即時資料夾中顯示的附加資訊。名稱一律顯示。"
         },
         "healthCycleEnableLabel": "在家庭中提供週期",
         "healthCycleHint": "為所有家庭成員顯示或隱藏健康模組中的週期部分。",
@@ -4044,6 +4046,16 @@
                 "changed": "Paperless 中的標籤已變更。請重新整理後再儲存。",
                 "forbidden": "你沒有變更這些標籤的權限。",
                 "invalid": "無法儲存標籤。請重新整理後再試。"
+            },
+            "fields": {
+                "created": "文件日期",
+                "added": "新增時間",
+                "modified": "修改時間",
+                "correspondent": "往來單位",
+                "document_type": "文件類型",
+                "tags": "標籤",
+                "archive_serial_number": "封存編號",
+                "filename": "檔案名稱"
             }
         },
         "title": "文件",

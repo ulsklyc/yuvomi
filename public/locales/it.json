@@ -1975,7 +1975,9 @@
             "tokenRequired": "Salva il tuo token personale Paperless in Impostazioni > Moduli > Documenti > Impostazioni delle cartelle dinamiche.",
             "tagsRestricted": "Nelle cartelle dinamiche possono essere modificati solo i tag abilitati centralmente. Mantieni tutte le altre assegnazioni esistenti.",
             "dmsForbidden": "Il tuo token Paperless non può accedere a questa vista o documento. Verifica i suoi permessi in Paperless.",
-            "error": "Impossibile caricare o salvare le impostazioni delle cartelle dinamiche. Aggiorna e riprova."
+            "error": "Impossibile caricare o salvare le impostazioni delle cartelle dinamiche. Aggiorna e riprova.",
+            "displayFields": "Campi della panoramica",
+            "displayFieldsHint": "Scegli i dettagli aggiuntivi per tutte le cartelle dinamiche di questa connessione. Il nome resta sempre visibile."
         },
         "healthCycleEnableLabel": "Offri il ciclo alla famiglia",
         "healthCycleHint": "Mostra o nasconde la sezione ciclo del modulo Salute per tutti i membri della famiglia.",
@@ -4044,6 +4046,16 @@
                 "changed": "I tag sono cambiati in Paperless. Aggiorna prima di salvare.",
                 "forbidden": "Non hai il permesso di modificare questi tag.",
                 "invalid": "Impossibile salvare i tag. Aggiorna e riprova."
+            },
+            "fields": {
+                "created": "Data del documento",
+                "added": "Aggiunto",
+                "modified": "Modificato",
+                "correspondent": "Corrispondente",
+                "document_type": "Tipo di documento",
+                "tags": "Etichette",
+                "archive_serial_number": "Numero di archivio",
+                "filename": "Nome del file"
             }
         },
         "title": "Documenti",

@@ -1650,6 +1650,8 @@ const MIGRATIONS_SQL = {
         PRIMARY KEY (account_id, user_id)
       );
   `,
+  285: `ALTER TABLE paperless_live_settings ADD COLUMN display_fields TEXT NOT NULL DEFAULT '[]'
+      CHECK(json_valid(display_fields) AND json_type(display_fields) = 'array');`,
 };
 
 export { MIGRATIONS_SQL };

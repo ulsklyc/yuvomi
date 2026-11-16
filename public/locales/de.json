@@ -1993,7 +1993,9 @@
             "tokenRequired": "Hinterlege deinen persönlichen Paperless-Token unter Einstellungen > Module > Dokumente > Live-Ordner Einstellungen.",
             "tagsRestricted": "In Live-Ordnern dürfen nur zentral freigegebene Tags geändert werden. Behalte alle anderen vorhandenen Zuweisungen bei.",
             "dmsForbidden": "Dein Paperless-Token darf diese Ansicht oder dieses Dokument nicht öffnen. Prüfe seine Berechtigungen in Paperless.",
-            "error": "Die Live-Ordner Einstellungen konnten nicht gespeichert oder geladen werden. Aktualisiere die Seite und versuche es erneut."
+            "error": "Die Live-Ordner Einstellungen konnten nicht gespeichert oder geladen werden. Aktualisiere die Seite und versuche es erneut.",
+            "displayFields": "Anzeigefelder",
+            "displayFieldsHint": "Wähle die zusätzlichen Angaben für alle Live-Ordner dieser Verbindung. Der Name bleibt immer sichtbar."
         },
         "healthCycleEnableLabel": "Zyklus im Haushalt anbieten",
         "healthCycleHint": "Blendet den Bereich Zyklus im Gesundheitsmodul für alle Familienmitglieder ein oder aus.",
@@ -4106,6 +4108,16 @@
                 "changed": "Die Tags wurden zwischenzeitlich in Paperless geändert. Bitte vor dem Speichern aktualisieren.",
                 "forbidden": "Du hast keine Berechtigung, diese Paperless-Tags zu ändern.",
                 "invalid": "Die ausgewählten Tags konnten nicht gespeichert werden. Bitte aktualisieren und erneut versuchen."
+            },
+            "fields": {
+                "created": "Dokumentdatum",
+                "added": "Hinzugefügt",
+                "modified": "Geändert",
+                "correspondent": "Korrespondent",
+                "document_type": "Dokumenttyp",
+                "tags": "Tags",
+                "archive_serial_number": "Archivnummer",
+                "filename": "Dateiname"
             }
         },
         "title": "Dokumente",

@@ -1993,7 +1993,9 @@
             "tokenRequired": "설정 > 모듈 > 문서 > 동적 폴더 설정에서 개인 Paperless 토큰을 저장하세요.",
             "tagsRestricted": "동적 폴더에서는 중앙에서 허용한 태그만 변경할 수 있습니다. 다른 모든 기존 할당을 유지하세요.",
             "dmsForbidden": "Paperless 토큰으로 이 보기 또는 문서에 접근할 수 없습니다. Paperless에서 권한을 확인하세요.",
-            "error": "동적 폴더 설정을 불러오거나 저장하지 못했습니다. 새로고침한 후 다시 시도하세요."
+            "error": "동적 폴더 설정을 불러오거나 저장하지 못했습니다. 새로고침한 후 다시 시도하세요.",
+            "displayFields": "목록 표시 항목",
+            "displayFieldsHint": "이 연결의 모든 라이브 폴더에 표시할 추가 정보를 선택하세요. 이름은 항상 표시됩니다."
         },
         "healthCycleEnableLabel": "가구에 주기 제공",
         "healthCycleHint": "건강 모듈의 주기 영역을 모든 가족 구성원에게 표시하거나 숨깁니다.",
@@ -4106,6 +4108,16 @@
                 "changed": "Paperless에서 태그가 변경되었습니다. 새로 고친 후 저장하세요.",
                 "forbidden": "이 태그를 변경할 권한이 없습니다.",
                 "invalid": "태그를 저장하지 못했습니다. 새로 고친 후 다시 시도하세요."
+            },
+            "fields": {
+                "created": "문서 날짜",
+                "added": "추가 날짜",
+                "modified": "수정 날짜",
+                "correspondent": "거래처",
+                "document_type": "문서 유형",
+                "tags": "태그",
+                "archive_serial_number": "보관 번호",
+                "filename": "파일 이름"
             }
         },
         "title": "문서",

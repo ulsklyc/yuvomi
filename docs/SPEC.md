@@ -3525,6 +3525,20 @@ views. This is a core extension, not a scheduled import.
 
 #### Live-folder settings
 
+Administrators can select additional **Overview fields** per Paperless connection:
+document date, added date, modified date, correspondent, document type, tags,
+archive serial number and original filename. The title always remains visible.
+The default is an empty selection, preserving the title-only overview. Selected
+fields appear as labelled details below each title and wrap on narrow screens.
+Missing values show a dash; unavailable reference names fall back to their IDs.
+Only references on the current page are resolved, using the reader's credentials.
+The settings API accepts `display_fields` as an array of `created`, `added`,
+`modified`, `correspondent`, `document_type`, `tags`, `archive_serial_number` and
+`filename`. Omitting it preserves the current selection; `[]` clears it. GET
+settings and document-list metadata include `display_fields`. Document entries
+include only selected metadata in `display`. Migration 285 adds the selection
+without altering earlier migrations or authentication policy.
+
 Settings -> Modules -> Documents ends with **Live-folder settings**. Administrators
 choose authentication and available tags per Paperless connection. The central
 catalogue is visible in all-tags mode too, with names and IDs; selecting an

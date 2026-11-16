@@ -190,9 +190,10 @@ router.get('/folders/:id/documents', refuseWhileRestoring, async (req, res) => {
     const page = positiveId(req.query.page ?? 1);
     if (!page || page > 100000) throw problem(400, 'paperless_folder_invalid');
     const source = liveAccount(folder.account_id, actor(req));
-    const result = await remote(adapterFactory(source).listViewDocuments(folder.view_id, { page, pageSize: 50 }));
+    const displayFields = source.live_settings.display_fields;
+    const result = await remote(adapterFactory(source).listViewDocuments(folder.view_id, { page, pageSize: 50, displayFields }));
     unchangedFolder(req, folder, source);
-    res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more } });
+    res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more, display_fields: displayFields } });
   
 });
 
