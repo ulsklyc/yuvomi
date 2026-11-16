@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   could break between the number and its abbreviated unit, leaving the unit alone at the start
   of the next line. All 27 languages now join them with a non-breaking space, and a test keeps
   new texts to the same rule.
+- **The housekeeping payments chart shows all six months on a phone.** On screens narrower
+  than about 390px the chart scrolled sideways and started at the oldest month, so the current
+  month on the right was cut off or hidden. The six columns now fit the card from a 320px wide
+  screen, and amounts up to four digits stay readable above their column.
 
 ## [2.91.0] - 2026-11-15
 
