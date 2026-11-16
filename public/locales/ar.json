@@ -1054,7 +1054,13 @@
             "waited": "لم يُنقل «{{item}}» إلى «{{target}}»: مزامنة «{{back}}» متوقفة منذ أكثر من أسبوع. سيظهر العنصر في «{{back}}» مجددًا بمجرد تشغيل القائمة."
         },
         "moreDetailsHint": "السعر، المتجر، الرابط، ملاحظة",
-        "toPantryAllToPlaceholder": "اختر مكانًا …"
+        "toPantryAllToPlaceholder": "اختر مكانًا …",
+        "summaryRemaining": "للشراء",
+        "summaryPurchased": "في السلة",
+        "summaryTotal": "الإجمالي التقديري",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "حوالي {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "randomizeSuccess_few": "تم تخطيط {{count}} وجبات.",

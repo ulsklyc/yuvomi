@@ -862,7 +862,13 @@
             "waited": "\"{{item}}\" tidak dipindahkan ke \"{{target}}\": sinkronisasi \"{{back}}\" sudah lebih dari seminggu nonaktif. Item akan muncul lagi di \"{{back}}\" setelah daftar itu diaktifkan."
         },
         "moreDetailsHint": "Harga, toko, tautan, catatan",
-        "toPantryAllToPlaceholder": "Pilih tempat …"
+        "toPantryAllToPlaceholder": "Pilih tempat …",
+        "summaryRemaining": "Perlu dibeli",
+        "summaryPurchased": "Di keranjang",
+        "summaryTotal": "Perkiraan total",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "sekitar {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} bahan",

@@ -862,7 +862,13 @@
             "waited": "«{{item}}» به «{{target}}» منتقل نشد: همگام‌سازی «{{back}}» بیش از یک هفته است که خاموش است. مورد به محض روشن شدن این فهرست دوباره در «{{back}}» نمایش داده می‌شود."
         },
         "moreDetailsHint": "قیمت، فروشگاه، پیوند، یادداشت",
-        "toPantryAllToPlaceholder": "یک مکان انتخاب کنید …"
+        "toPantryAllToPlaceholder": "یک مکان انتخاب کنید …",
+        "summaryRemaining": "برای خرید",
+        "summaryPurchased": "در سبد",
+        "summaryTotal": "مجموع تخمینی",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "حدود {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} مادهٔ لازم",

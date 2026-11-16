@@ -917,7 +917,13 @@
             "waited": "Položka „{{item}}“ nebyla přesunuta do seznamu „{{target}}“: synchronizace seznamu „{{back}}“ je přes týden vypnutá. Položka se v seznamu „{{back}}“ znovu objeví, jakmile ho zapnete."
         },
         "moreDetailsHint": "Cena, obchod, odkaz, poznámka",
-        "toPantryAllToPlaceholder": "Vyberte místo …"
+        "toPantryAllToPlaceholder": "Vyberte místo …",
+        "summaryRemaining": "K nákupu",
+        "summaryPurchased": "V košíku",
+        "summaryTotal": "Odhadovaný součet",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "přibližně {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",

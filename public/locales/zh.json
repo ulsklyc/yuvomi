@@ -844,7 +844,13 @@
             "waited": "“{{item}}”未移到“{{target}}”：“{{back}}”的同步已关闭超过一周。开启该清单后，项目会重新出现在“{{back}}”。"
         },
         "moreDetailsHint": "价格、商店、链接、备注",
-        "toPantryAllToPlaceholder": "选择位置 …"
+        "toPantryAllToPlaceholder": "选择位置 …",
+        "summaryRemaining": "待买",
+        "summaryPurchased": "在购物车",
+        "summaryTotal": "预估总计",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "约 {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} 种食材",

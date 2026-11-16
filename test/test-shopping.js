@@ -762,6 +762,25 @@ test('Der Listen-Scroller traegt einen duennen, getoenten Scrollbalken (#1039)',
 });
 
 // --------------------------------------------------------
+// Preisschätzung und Summenzeile (#1003)
+// --------------------------------------------------------
+test('Preisschätzung und Summenzeile im Markup und Styling (#1003)', () => {
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  assert(/function itemPriceCents\(item\)/.test(source), 'itemPriceCents muss als Preisfunktion existieren');
+  assert(/item\.price_cents \?\? item\.estimated_price_cents/.test(source), 'getippter Preis sticht Schätzpreis');
+  assert(!/parseItemQuantity/.test(source), 'keine automatische Mengenmultiplikation');
+  assert(/renderShoppingSummary\(container\)/.test(source), 'renderShoppingSummary muss existieren');
+  assert(/t\('shopping\.estimatedPrice'/.test(source), 'Schätzpreis muss lokalisiertes Format nutzen');
+  assert(/t\('shopping\.estimatedPriceAria'/.test(source), 'Schätzpreis muss barrierefreies Aria-Label nutzen');
+  assert(/t\('shopping\.metaSeparator'/.test(source), 'Trennzeichen muss lokalisiert sein');
+
+  const css = readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8');
+  assert(/\.shopping-price-summary\s*\{[^}]*display:\s*flex;/s.test(css), 'Summenzeile ist als ruhige Flex-Zeile gestaltet');
+  assert(/\.shopping-item__price--estimated\s*\{[^}]*color:\s*var\(--color-text-tertiary\);/s.test(css),
+    'Schätzpreis nutzt var(--color-text-tertiary) für barrierefreien Kontrast (WCAG AA)');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 console.log(`\n[Shopping-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

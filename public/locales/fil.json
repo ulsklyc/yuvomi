@@ -862,7 +862,13 @@
             "waited": "Hindi nailipat ang \"{{item}}\" sa \"{{target}}\": mahigit isang linggo nang naka-off ang pag-sync ng \"{{back}}\". Lalabas ulit ang item sa \"{{back}}\" kapag binuksan ang listahang iyon."
         },
         "moreDetailsHint": "Presyo, tindahan, link, tala",
-        "toPantryAllToPlaceholder": "Pumili ng lugar …"
+        "toPantryAllToPlaceholder": "Pumili ng lugar …",
+        "summaryRemaining": "Bibilhin",
+        "summaryPurchased": "Nasa cart",
+        "summaryTotal": "Tinatayang kabuuan",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "humigit-kumulang {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} sangkap",
