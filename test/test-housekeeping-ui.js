@@ -681,7 +681,13 @@ test('Uebersicht: das Zahlungsdiagramm zeigt Saeulen mit Legende, leere Monate o
   assert.equal(values.length, 4, 'eine Wertzeile je Monat');
   assert.equal(values[0], '', 'ein leerer Monat traegt keinen Betrag ("0,00 €")');
   assert.doesNotMatch(values[2], /[.,]00/, `ganze Betraege ohne Nachkommastellen (${values[2]})`);
-  assert.match(values[3], /57[.,]5/, 'ein krummer Betrag behaelt seine Stellen');
+  // Die Beschriftung ueber der Saeule ist immer ganz (#2772-Folge): "57,50 €"
+  // stand bei 320px ueber der Nachbarin. Kaufmaennisch gerundet wird 57,5 zu 58.
+  assert.match(values[3], /^58\s?€$/u, `ein krummer Betrag steht im Diagramm gerundet und ganz (${values[3]})`);
+  // Der genaue Betrag bleibt im zugaenglichen Namen der Spalte und im Titel der Spur.
+  const names = [...html.matchAll(/role="listitem" aria-label="([^"]*)"/g)].map((m) => m[1]);
+  assert.match(names[3] ?? '', /57[.,]50/, `der Name der Spalte nennt den genauen Betrag (${names[3]})`);
+  assert.match(html, /title="[^"]*57[.,]50/, 'der Titel der Spur nennt den genauen Betrag');
   const bars = [...html.matchAll(/housekeeping-chart__bar" style="([^"]*)"/g)].map((m) => m[1]);
   assert.equal(bars.length, 3, 'ein leerer Monat hat keine Saeule, nur die Grundlinie');
   assert.match(bars[0], /--paid-share:100\.0%/, 'ganz bezahlt');
@@ -698,10 +704,11 @@ test('Uebersicht: das Zahlungsdiagramm zeigt Saeulen mit Legende, leere Monate o
 // Breiten unten sind Messwerte und stehen hier als Eingabe: die Innenbreite
 // der Karte (Browser, 320px Fenster) und "9.999 €" in der Systemschrift bei
 // 11px mit tabellarischen Ziffern (AppKit, 41.5px). Ob der Browser die Regeln
-// so anwendet, misst dieser Test nicht. Gerechnet ist fuer GANZE Betraege:
-// chartMoney() behaelt bei krummen Summen die Nachkommastellen, "999,50 €"
-// misst 48.4px, "1.234,50 €" 58.8px - breiter als die 44px zwischen zwei
-// Spaltenmitten bei 254px. Den Fall haelt dieser Test nicht.
+// so anwendet, misst dieser Test nicht. Seit der Folge zu #2772 rundet
+// chartMoney() auch krumme Summen auf ganze Betraege (vorher "999,50 €" 48.5px,
+// "1.234,50 €" 58.8px - breiter als die 44px zwischen zwei Spaltenmitten bei
+// 254px); damit gilt die Rechnung fuer jede Monatssumme bis vier Stellen.
+// Fuenfstellige Monatssummen ("10.000 €") liegen ausserhalb der Rechnung.
 test('Uebersicht: sechs Monatsspalten passen ab 320px Fenster ohne Scrollen in die Karte', () => {
   const CARD_INNER = 254;
   const VALUE_4_DIGITS = 41.5;
