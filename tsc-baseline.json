@@ -1,7 +1,7 @@
 {
  ".github/scripts/review-verdict.mjs\tTS2339": 6,
  ".github/scripts/review-verdict.mjs\tTS2345": 2,
- ".github/scripts/review-verdict.mjs\tTS7006": 24,
+ ".github/scripts/review-verdict.mjs\tTS7006": 22,
  ".github/scripts/review-verdict.mjs\tTS7053": 1,
  "public/api.js\tTS2339": 5,
  "public/api.js\tTS2345": 5,

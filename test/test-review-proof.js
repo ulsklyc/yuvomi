@@ -29,7 +29,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import {
-  adressenImStrom, beurteile, bejaht, bejahtIrgendwo, zaehleBelege, zaehleSeit
+  adressenImStrom, beurteile, bejahtIrgendwo, zaehleBelege, zaehleSeit
 } from '../.github/scripts/review-verdict.mjs';
 import { tempDir } from './tmp-dir.js';
 
@@ -134,18 +134,19 @@ test('fremde Stimmen zaehlen nicht, auch wenn sie fleissig sind', () => {
   assert.equal(zaehleSeit(waehrendDesLaufs, seit(ABBRUCH_LAUF), kopf(ABBRUCH_LAUF)).gesamt, 0);
 });
 
-test('der triviale Abbruch bleibt gruen, sagt aber, dass er nichts geprueft hat', () => {
-  // #1029: zwei Zeilen `{ timeout: 5000 }`. Das Plugin steigt zugesichert aus,
-  // und rot waere hier ein Fehlalarm. Der Unterschied zum Fall oben steht nur
-  // im result-Text, sonst ist alles gleich: 4 Turns, keine Verweigerungen.
+test('der triviale Abbruch aus #1029 wird rot und heisst so', () => {
+  // #1029: zwei Zeilen `{ timeout: 5000 }`, 4 Turns, keine Verweigerungen,
+  // nichts hinterlassen. Bis zum 16.11.2026 war das die einzige stumme
+  // Gruen-Kategorie. Seit #2768 verlangt der Prompt fuer "trivial" einen Satz
+  // als Kommentar (an #2772 live belegt); wer schweigt, ist rot.
   const urteil = beurteile({
     seit: seit(ABBRUCH_LAUF),
     ergebnis: fixture.ergebnisse['abbruch-trivial'],
     aeusserungen: wieGesehen(ABBRUCH_LAUF)
   });
-  assert.equal(urteil.ausgang, 'ausgesetzt');
-  assert.equal(urteil.grund, 'trivial');
-  assert.match(urteil.meldung, /nicht "geprueft"/);
+  assert.equal(urteil.ausgang, 'stumm');
+  assert.equal(urteil.grund, 'trivial-stumm');
+  assert.match(urteil.meldung, /ALS TRIVIAL EINGESTUFT/);
 });
 
 test('nennt ein Text beides, gilt die gefaehrlichere Lesart', () => {
@@ -179,14 +180,13 @@ test('"has not previously commented" ist kein Abbruch aus diesem Grund', () => {
       ergebnis: fixture.ergebnisse['abbruch-trivial'],
       aeusserungen: wieGesehen(ABBRUCH_LAUF)
     }).grund,
-    'trivial'
+    'trivial-stumm'
   );
 });
 
 test('ein stiller Trivial-Abbruch bleibt rot und heisst so (#2765)', () => {
   // Lauf 43758461498 (PR #2765, 15.11.2026): nur `tsc-baseline.json`, 2 Turns,
-  // keine Verweigerungen, kein Kommentar, deutscher result-Text. Die Tor-Formel
-  // aus #1029 ist englisch und greift nicht - richtig so, denn gruen darf das
+  // keine Verweigerungen, kein Kommentar, deutscher result-Text. Gruen darf das
   // nicht werden: der Prompt verlangt fuer "trivial" einen Satz als Kommentar.
   // Bis hierher meldete das Urteil "ohne eines der bekannten Muster"; der Fall
   // hat aber einen Namen, und der schickt den Leser zum Prompt.
@@ -316,9 +316,10 @@ test('eine FREMDE claude-Aeusserung faerbt einen Abbruch nicht gruen', () => {
   assert.equal(urteil.grund, 'schon-kommentiert');
 });
 
-test('eine VERNEINTE Tor-Bedingung ist keine Ausnahme', () => {
+test('eine VERNEINTE Tor-Bedingung ist kein Trivial-Abbruch', () => {
   // "the stop condition does not apply because this is not trivial" trug beide
-  // Woerter und haette die einzige stille Gruen-Ausnahme ausgeloest.
+  // Woerter und loeste bis zum 16.11.2026 beinahe die damalige stille
+  // Gruen-Ausnahme aus. Heute geht es nur noch um den Namen der Diagnose.
   const urteil = beurteile({
     seit: seit(ABBRUCH_LAUF),
     kopf: kopf(ABBRUCH_LAUF),
@@ -337,10 +338,10 @@ test('eine VERNEINTE Tor-Bedingung ist keine Ausnahme', () => {
   assert.equal(urteil.grund, 'unbekannt');
 });
 
-test('eine Werkzeugsperre schlaegt die Tor-Ausnahme', () => {
+test('eine Werkzeugsperre schlaegt den Trivial-Abbruch', () => {
   // Die Reihenfolge war umgekehrt: ein Lauf, der an einer Sperre gescheitert
   // war, wurde gruen, wenn sein Text zufaellig nach dem trivialen Tor klang.
-  // Die einzige stille Gruen-Ausnahme darf nicht vor der Fehlerpruefung liegen.
+  // Die Sperre ist die genauere Diagnose und bleibt davor.
   const urteil = beurteile({
     seit: seit(ABBRUCH_LAUF),
     kopf: kopf(ABBRUCH_LAUF),
@@ -357,19 +358,40 @@ test('eine Werkzeugsperre schlaegt die Tor-Ausnahme', () => {
   assert.equal(urteil.grund, 'werkzeugsperre');
 });
 
-test('der echte #1029-Wortlaut bleibt die Ausnahme', () => {
-  // Das geschaerfte Muster darf den Fall, fuer den es gebaut ist, nicht
-  // verlieren. Der Wortlaut steht als Beleg im Fixture.
+test('der echte #1029-Wortlaut endet rot mit trivial-stumm', () => {
+  // Bis zum 16.11.2026 die Gruen-Ausnahme. Der Wortlaut bleibt als Beleg im
+  // Fixture und muss jetzt die sprechende Diagnose tragen, nicht `unbekannt`.
   assert.match(fixture.ergebnisse['abbruch-trivial'].result, /matches the step 1 stop condition/);
-  assert.equal(
-    beurteile({
+  const urteil = beurteile({
+    seit: seit(ABBRUCH_LAUF),
+    kopf: kopf(ABBRUCH_LAUF),
+    ergebnis: fixture.ergebnisse['abbruch-trivial'],
+    aeusserungen: wieGesehen(ABBRUCH_LAUF)
+  });
+  assert.equal(urteil.ausgang, 'stumm');
+  assert.equal(urteil.grund, 'trivial-stumm');
+});
+
+test('es gibt keine stumme Gruen-Kategorie mehr', () => {
+  // Ohne Beleg fuer eine Lieferung endet jeder Lauf rot, wie immer er sein
+  // Aufhoeren begruendet - auch in der Formel der alten Tor-Ausnahme
+  // (`matches ... stop condition` plus "trivial"), in jeder Sprache.
+  const texte = [
+    ...Object.values(fixture.ergebnisse).map((e) => e.result),
+    'This meets the stop condition from step 1 of the review process: a trivial change.',
+    'This satisfies the stop condition, since the diff is a trivial change that is obviously correct.',
+    'Der Diff ist trivial und offensichtlich korrekt, ich hoere hier auf.'
+  ];
+  for (const result of texte) {
+    const urteil = beurteile({
       seit: seit(ABBRUCH_LAUF),
       kopf: kopf(ABBRUCH_LAUF),
-      ergebnis: fixture.ergebnisse['abbruch-trivial'],
-      aeusserungen: wieGesehen(ABBRUCH_LAUF)
-    }).ausgang,
-    'ausgesetzt'
-  );
+      ergebnis: { num_turns: 3, subtype: 'success', is_error: false, permission_denials: [], result },
+      aeusserungen: [],
+      gepostet: NICHTS
+    });
+    assert.equal(urteil.ausgang, 'stumm', `ohne Beleg gruen: ${result.slice(0, 80)}`);
+  }
 });
 
 test('eine Zusammenfassung ohne SHA zaehlt ueber ihre Adresse im Strom', () => {
@@ -841,9 +863,9 @@ test('eine VERNEINTE Abbruchbehauptung faerbt eine gueltige Review nicht rot', (
 test('der echte Abbruchtext bleibt trotz Verneinungspruefung erkannt', () => {
   // Die Gegenrichtung: das geschaerfte Muster darf den Fall nicht verlieren,
   // fuer den es gebaut ist.
-  assert.equal(bejaht(ABBRUCH.result, /already\s+(?:left\s+a\s+comment|commented|posted|reviewed)/i), true);
+  assert.equal(bejahtIrgendwo(ABBRUCH.result, /already\s+(?:left\s+a\s+comment|commented|posted|reviewed)/i), true);
   assert.equal(
-    bejaht('Claude has not already commented on this PR.', /already\s+commented/i),
+    bejahtIrgendwo('Claude has not already commented on this PR.', /already\s+commented/i),
     false
   );
 });
@@ -1053,7 +1075,8 @@ test('SCHON KOMMENTIERT SCHLAEGT TRIVIAL AUCH OHNE AUFHOER-SATZ (#1096)', () => 
   // dieser Text nennt beides, aber keine der Aufhoer-Formeln - "stop CONDITION"
   // ist keine. Er rutschte an `schon-kommentiert` vorbei und wurde im trivialen
   // Zweig gruen, fuer einen Lauf, der woertlich sagt, er habe den PR schon
-  // geprueft.
+  // geprueft. Den gruenen Zweig gibt es seit dem 16.11.2026 nicht mehr; die
+  // Probe haelt weiter, dass nicht `trivial-stumm` die Lesart bestimmt.
   const urteil = beurteile({
     seit: seit(ABBRUCH_LAUF),
     kopf: kopf(ABBRUCH_LAUF),
@@ -1067,9 +1090,8 @@ test('SCHON KOMMENTIERT SCHLAEGT TRIVIAL AUCH OHNE AUFHOER-SATZ (#1096)', () => 
     aeusserungen: [],
     gepostet: NICHTS
   });
-  assert.notEqual(urteil.ausgang, 'ausgesetzt',
+  assert.equal(urteil.ausgang, 'stumm',
     'die gefaehrlichere Lesart gewinnt, egal wie das Aufhoeren formuliert ist');
-  assert.equal(urteil.ausgang, 'stumm');
   // Bewusst `unbekannt` und nicht `schon-kommentiert`: ohne Aufhoer-Satz weiss
   // dieses Modul nicht, ob abgebrochen wurde, und behauptet es nicht.
   assert.equal(urteil.grund, 'unbekannt');
@@ -1222,11 +1244,10 @@ test('ein Aufhoeren, das SELBST verneint, bleibt ein Abbruch (#1096, Codex nach 
   assert.equal(weiter.grund, 'werkzeugsperre');
 });
 
-test('eine VERNEINTE erste Erwaehnung oeffnet die Gruen-Ausnahme nicht (#1096, Codex P1 nach 8dc12582)', () => {
-  // `bejaht` sieht nur den ersten Treffer. Verneint im ersten Satz, bejaht im
-  // zweiten, dazu "trivial" und die Tor-Formel: das wurde GRUEN, fuer einen
-  // Lauf, der sagt, dass er den PR schon kommentiert hat. Fuer den einzigen
-  // stillen Gruen-Pfad gilt deshalb: jede Erwaehnung sperrt ihn.
+test('eine VERNEINTE erste Erwaehnung macht nicht gruen (#1096, Codex P1 nach 8dc12582)', () => {
+  // Verneint im ersten Satz, bejaht im zweiten, dazu "trivial" und die
+  // Tor-Formel: das wurde bis zur Streichung der Tor-Ausnahme beinahe GRUEN,
+  // fuer einen Lauf, der sagt, dass er den PR schon kommentiert hat.
   const urteil = beurteile({
     seit: seit(ABBRUCH_LAUF),
     kopf: kopf(ABBRUCH_LAUF),
@@ -1240,9 +1261,8 @@ test('eine VERNEINTE erste Erwaehnung oeffnet die Gruen-Ausnahme nicht (#1096, C
     aeusserungen: [],
     gepostet: NICHTS
   });
-  assert.notEqual(urteil.ausgang, 'ausgesetzt',
-    'eine Erwaehnung von "schon kommentiert" oeffnet den stillen Gruen-Pfad nie');
-  assert.equal(urteil.ausgang, 'stumm');
+  assert.equal(urteil.ausgang, 'stumm',
+    'eine Erwaehnung von "schon kommentiert" macht nie gruen');
 });
 
 test('ein spaeteres bejahtes Aufhoeren zaehlt auch nach einem verneinten (#1096, Codex P2 nach 8dc12582)', () => {
@@ -1282,13 +1302,10 @@ test('eine spaetere bejahte Erwaehnung zaehlt auch nach einer verneinten (#1101)
   assert.equal(urteil.grund, 'schon-kommentiert');
 });
 
-test('bejahtIrgendwo liest jede Erwaehnung, bejaht weiter nur die erste (#1101)', () => {
+test('bejahtIrgendwo liest jede Erwaehnung (#1101)', () => {
   const muster = /already\s+(?:left\s+a\s+comment|commented|posted|reviewed)/i;
   const gemischt = 'Claude has not already reviewed this HEAD. Claude has already reviewed this PR.';
   assert.equal(bejahtIrgendwo(gemischt, muster), true);
-  // Die Tor-Ausnahme, die GRUEN machen kann, prueft weiter ueber `bejaht`: dort
-  // bleibt die engere Lesart die sichere Richtung.
-  assert.equal(bejaht(gemischt, muster), false);
   assert.equal(bejahtIrgendwo('Claude has not already commented. It has never already posted.', muster), false);
   assert.equal(bejahtIrgendwo('', muster), false);
   assert.equal(bejahtIrgendwo(undefined, muster), false);
