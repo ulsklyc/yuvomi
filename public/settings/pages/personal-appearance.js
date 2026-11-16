@@ -582,6 +582,17 @@ function renderPage(container, preferences, isAdmin) {
         })}
       </div>` : `
       <div class="row-carrier settings-group">
+        <!-- C4 (E9): die Waehrung aendern nur Admins, sehen sollen sie alle -
+             sie steht an jedem Betrag im Budget. Dasselbe Muster wie die
+             Zeitzone darunter und dieselbe Aufteilung wie die Auswahl der
+             Admins: der Wert ist das Kurzlabel ("CHF", "GBP £"), der volle
+             Name steht in der Sekundaerzeile (#2166). Keinen eigenen
+             Hinweissatz: wer aendert, sagt der Fuss der Gruppe. -->
+        ${settingRowHtml({
+          label: t('settings.currencyLabel'),
+          description: currencyName(preferences.currency) ?? '',
+          control: `<span class="settings-setting-row__value">${esc(currencyShortLabel(preferences.currency))}</span>`,
+        })}
         <!-- Dieselbe Aufteilung wie in der Auswahl der Admins: der Wert kurz,
              die gerade geltende Zone vorn im Hinweis. Eine gesetzte Zone steht
              selbst da - bis R21 hiess sie hier immer "Automatisch (...)", auch

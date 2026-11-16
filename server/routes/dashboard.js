@@ -22,6 +22,8 @@ import {
   householdAudienceShows,
   householdVisibleWhere,
   resolveBudgetMode,
+  rowReader,
+  taskVisibleWhere,
   visibleWhere,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
@@ -422,9 +424,12 @@ router.get('/', (req, res) => {
    * Die normale Uebersicht derselben Sitzung fragt ohne ihn und bleibt
    * persoenlich. */
   const householdAudience = asksHouseholdAudience(req.query);
-  const taskVisibleSql = householdAudience
-    ? householdVisibleWhere('t')
-    : visibleWhere('tasks', 't', '@me');
+  // A paired display reads the task and event parts under the wall rule with or
+  // without the parameter (rowReader): the personal answer of a display is the wall
+  // too, and audience=household is the wall for every account. Only the task and
+  // event parts follow it here; the other blocks keep their own rules.
+  const rowsReader = rowReader(req, { household: householdAudience });
+  const taskVisibleSql = taskVisibleWhere(rowsReader, 't');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
   // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
   // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
@@ -577,7 +582,7 @@ router.get('/', (req, res) => {
     // Browser an der Uhr: ein Termin endet auch zwischen zwei Abrufen.
     result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
       userId, limit: eventsLimit, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
-      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, calendars: eventCalendars,
+      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, calendars: eventCalendars, reader: rowsReader,
     }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
   } catch (err) {
     log.error('upcomingEvents error:', err.message);
@@ -602,7 +607,7 @@ router.get('/', (req, res) => {
   if (allows('calendar')) try {
     result.weekEvents = serializeEvents(getEventsOverlappingDays(d, {
       userId, fromKey: shiftDateKey(todayLocalKey, -1), days: 9,
-      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience, calendars: eventCalendars,
+      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience, calendars: eventCalendars, reader: rowsReader,
     }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) })
       .map(weekEventFields);
   } catch (err) {
@@ -927,7 +932,7 @@ router.get('/', (req, res) => {
     for (const member of result.users) {
       for (const event of getUpcomingEvents(d, {
         userId, limit: FAMILY_AHEAD_PER_MEMBER, fromToday: true, assignedTo: member.id, includeBirthdays,
-        keepEndedToday: ENDED_TODAY_POOL, household: householdAudience,
+        keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, reader: rowsReader,
       })) {
         const key = `${event.id}@${event.start_datetime}`;
         if (seen.has(key)) continue;
@@ -1016,6 +1021,8 @@ router.get('/', (req, res) => {
       userId,
       todayKey: todayLocalKey,
       hiddenModules: denied,
+      // The event and task countdowns of a paired display follow the wall rule (rowReader).
+      reader: rowsReader,
     });
     result.countdowns = countdowns.items;
     // Wie `birthdayCount` neben `birthdays`: die Liste ist der Vorrat für die

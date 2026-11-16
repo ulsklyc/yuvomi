@@ -63,9 +63,19 @@ export {
   householdVisible,
   householdVisibleWhere,
 } from './rows/household.ts';
-// Task reads: a paired display reads under the wall rule, people under the task row rule.
-export { taskReader, taskRowVisible, taskVisibleWhere } from './rows/task-reader.ts';
-export type { TaskReader } from './rows/task-reader.ts';
+// Task and event reads: a paired display reads under the wall rule, people under the
+// row rule of the type (rows/reader.ts).
+export {
+  personReader,
+  readerBinds,
+  readerRowVisible,
+  readerVisibleWhere,
+  rowReader,
+  taskReader,
+  taskRowVisible,
+  taskVisibleWhere,
+} from './rows/reader.ts';
+export type { RowReader, TaskReader } from './rows/reader.ts';
 export {
   applyDocumentAccess,
   ATTACHMENT_NARROW_ONLY,

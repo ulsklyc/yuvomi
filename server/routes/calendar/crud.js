@@ -34,6 +34,9 @@ import {
   ATTACHMENT_NARROW_ONLY,
   documentClonePredicate,
   documentWidenPredicate,
+  readerBinds,
+  readerVisibleWhere,
+  rowReader,
   visibleWhere,
 } from '../../authorize/index.ts';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
@@ -486,6 +489,8 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
 router.get('/:id', (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
+    // A paired display reads under the wall rule (rowReader), people under the row rule.
+    const reader = rowReader(req);
     const event = db.get().prepare(`
       SELECT e.*,
              u_assigned.display_name AS assigned_name,
@@ -520,9 +525,9 @@ router.get('/:id', (req, res) => {
       LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
       LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
       WHERE e.id = ?
-        AND ${visibleWhere('ics_subscriptions', 'e', '?')}
-        AND ${visibleWhere('events', 'e', '?')}
-    `).get(id, getUserId(req), getUserId(req), getUserId(req));
+        AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '?')}
+        AND ${readerVisibleWhere(reader, 'events', 'e', '?')}
+    `).get(id, ...readerBinds(reader, 'ics_subscriptions'), ...readerBinds(reader, 'events'));
 
     if (!event) return sendEventGone(res);
     const database = db.get();
