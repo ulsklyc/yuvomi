@@ -38,6 +38,7 @@ import {
   clickPastDeadTime,
 } from './document-guards-harness.js';
 import { eachRule } from './css-rules.js';
+import { evaluateSample } from './text-contrast.js';
 
 const ROUTE_NAMES = Object.keys(ROUTES);
 const SETTINGS_NAMES = Object.keys(SETTINGS_ROUTES);
@@ -1034,7 +1035,7 @@ describe('Sonde 1 - kein Modulkopf laeuft bei 375px ueber die Viewport-Kante', (
  * zaehlen dabei mit - `color-mix()` rendert als `color(srgb …)` und nicht als
  * `rgba()`, ein naiver Parser meldet hier Fehltreffer.
  *
- * Verlaeufe zaehlen als Kandidaten (siehe evaluateSample); bliebe die Sonde an
+ * Verlaeufe zaehlen als Kandidaten (evaluateSample in text-contrast.js); bliebe die Sonde an
  * ihnen stehen, hoerte sie bei `.app-shell` auf zu messen - dreissig Elemente
  * je Route. Deaktivierte Bedienelemente sind ausgenommen, die nimmt WCAG 1.4.3
  * aus. Nur ein echtes Bild bleibt unrechenbar, und die Zahl steht im
@@ -1101,66 +1102,9 @@ async function collectTextSamples(page) {
   });
 }
 
-/**
- * Zerlegt einen `background-image`-Wert in seine Farbstops.
- * @returns {null|string[]} null, wenn ein echtes Bild im Spiel ist (dann ist
- *          der Untergrund nicht rechenbar), sonst die Stops eines Verlaufs.
- */
-function gradientStops(image) {
-  if (!image || image === 'none') return [];
-  if (/url\(/i.test(image)) return null;
-  return [...image.matchAll(/color\(srgb[^)]*\)|rgba?\([^)]*\)|#[0-9a-f]{3,8}/gi)].map((m) => m[0]);
-}
-
-/**
- * Komponiert den effektiven Untergrund eines Textelements und liefert den
- * SCHLECHTESTEN Kontrast, den er dort haben kann.
- *
- * WARUM EIN SCHLECHTESTER FALL UND KEIN EINZELWERT: `.app-shell` trägt
- * radiale Verläufe über dem Seitengrund. Eine Sonde, die bei einem Verlauf
- * aufgibt, hört genau dort auf zu messen, wo die meisten Texte stehen - rund
- * dreissig Elemente je Route, also die Hälfte des Dokuments. Deshalb werden
- * die Farbstops als Kandidaten behandelt: jeder wird auf den bisherigen
- * Untergrund komponiert, und es zählt der ungünstigste. Das ist eine
- * NÄHERUNG (die Stops werden auf das Endergebnis statt auf ihre eigene Ebene
- * gerechnet), aber eine konservative - sie kann strenger urteilen als die
- * Wirklichkeit, nie milder.
- *
- * @returns {null|{ratio: number, min: number, bg: number[], fg: number[]}}
- *          null nur noch bei einem echten Bild (`url(...)`).
- */
-function evaluateSample(sample, pageBase) {
-  // Erste deckende Ebene suchen; alles darunter ist wirkungslos.
-  let opaqueAt = sample.layers.length - 1;
-  for (let i = 0; i < sample.layers.length; i += 1) {
-    if (parseColor(sample.layers[i].bg)[3] >= 1) {
-      opaqueAt = i;
-      break;
-    }
-  }
-  let bg = pageBase;
-  const candidates = [];
-  for (let i = opaqueAt; i >= 0; i -= 1) {
-    const layer = parseColor(sample.layers[i].bg);
-    if (layer[3] > 0) bg = composite(layer, bg);
-    const stops = gradientStops(sample.layers[i].image);
-    if (stops === null) return null;
-    candidates.push(...stops);
-  }
-
-  const fgRaw = parseColor(sample.color);
-  const large = sample.size >= 24 || (sample.size >= 18.66 && sample.weight >= 700);
-  const min = large ? 3 : 4.5;
-
-  let worst = { ratio: Infinity, bg, fg: composite(fgRaw, bg) };
-  for (const variant of [null, ...candidates]) {
-    const under = variant === null ? bg : composite(parseColor(variant), bg);
-    const fg = composite(fgRaw, under);
-    const ratio = contrastRatio(fg, under);
-    if (ratio < worst.ratio) worst = { ratio, bg: under, fg };
-  }
-  return { ...worst, min };
-}
+// Die Rechnung selbst (`evaluateSample`, ebenengerecht samt Verlaufsstops)
+// steht browserfrei in text-contrast.js und wird in `npm test` geprueft
+// (test-text-contrast.js).
 
 describe('Sonde 2 - jeder sichtbare Text haelt WCAG AA auf seinem KOMPONIERTEN Untergrund', () => {
   for (const theme of ['light', 'dark']) {

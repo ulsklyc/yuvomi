@@ -1,7 +1,10 @@
 /** Focused rendered AA/overflow measurements; same color arithmetic as document guards. */
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { parseColor, composite, contrastRatio } from './document-guards-harness.js';
+import { evaluateSample } from './text-contrast.js';
+
+/** Opaque page base under every sample; the layered composition lives in text-contrast.js. */
+const PAGE_BASE = [255, 255, 255, 1];
 
 export async function measureFasting(page, selector, name, { viewport = false } = {}) {
   await page.$eval(selector, async (root) => {
@@ -25,21 +28,9 @@ export async function measureFasting(page, selector, name, { viewport = false } 
     return { text: el.textContent.trim().slice(0, 60), color: css.color, size: parseFloat(css.fontSize), weight: Number(css.fontWeight), layers };
   }));
   const measured = samples.map((sample) => {
-    let bg = [255, 255, 255, 1];
-    let opaque = sample.layers.findIndex((layer) => parseColor(layer.bg)[3] >= 1);
-    if (opaque < 0) opaque = sample.layers.length - 1;
-    const stops = [];
-    for (let i = opaque; i >= 0; i--) {
-      const layer = sample.layers[i]; bg = composite(parseColor(layer.bg), bg);
-      assert.doesNotMatch(layer.image, /url\(/, 'Text background image needs pixel-based inspection');
-      stops.push(...[...layer.image.matchAll(/color\(srgb[^)]*\)|rgba?\([^)]*\)|#[0-9a-f]{3,8}/gi)].map((m) => m[0]));
-    }
-    const ratio = Math.min(...[null, ...stops].map((stop) => {
-      const under = stop ? composite(parseColor(stop), bg) : bg;
-      return contrastRatio(composite(parseColor(sample.color), under), under);
-    }));
-    const minimum = sample.size >= 24 || sample.size >= 18.66 && sample.weight >= 700 ? 3 : 4.5;
-    return { text: sample.text, size: sample.size, ratio, minimum };
+    const result = evaluateSample(sample, PAGE_BASE);
+    assert.ok(result, 'Text background image needs pixel-based inspection');
+    return { text: sample.text, size: sample.size, ratio: result.ratio, minimum: result.min };
   });
   const geometry = await page.$eval(selector, (root) => ({ width: root.clientWidth, scrollWidth: root.scrollWidth, viewport: innerWidth, documentWidth: document.documentElement.scrollWidth }));
   if (process.env.FASTING_SCREENSHOT_DIR) {
