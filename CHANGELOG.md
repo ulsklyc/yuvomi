@@ -1177,6 +1177,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `examples`, and two "one of these fields" rules are spelled so that a strict JSON Schema validator
   accepts them. The API itself did not change.
 
+### Added
+- **Deleting a calendar asks whether its events go with it or move** (#2570). The confirmation
+  now names the number of events and offers a choice: delete them too, or move them to another
+  calendar (the default calendar preselected). With no events, it stays the plain confirmation
+  it was before. Moving never pushes a synced event anywhere - a local calendar move isn't a
+  change to what the event looks like at Google, CalDAV or iCloud - and only deleting the events,
+  or moving them to a calendar other than the default, stops the "also uploads to iCloud" note
+  from applying. Existing API callers that send no body keep today's behavior unchanged.
+
 ## [2.91.1] - 2026-11-17
 
 ### Fixed
@@ -1300,13 +1309,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   try again. And "Active" is green only while nothing on the card asks for attention: after a
   failed run or with an overdue backup the word stays, since the schedule is still running, but
   without the green that would say all is well next to a red line.
-- **Deleting a calendar asks whether its events go with it or move** (#2570). The confirmation
-  now names the number of events and offers a choice: delete them too, or move them to another
-  calendar (the default calendar preselected). With no events, it stays the plain confirmation
-  it was before. Moving never pushes a synced event anywhere - a local calendar move isn't a
-  change to what the event looks like at Google, CalDAV or iCloud - and only deleting the events,
-  or moving them to a calendar other than the default, stops the "also uploads to iCloud" note
-  from applying. Existing API callers that send no body keep today's behavior unchanged.
 
 ### Fixed
 - **A wall display or a split-expense guest account no longer receives medication reminders or
