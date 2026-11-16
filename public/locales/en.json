@@ -4060,6 +4060,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Folder source",
+            "savedViewSource": "Saved Paperless view",
+            "tagSource": "Tag filter",
+            "tagMatch": "Match tags",
+            "matchAll": "All selected tags (AND)",
+            "matchAny": "At least one selected tag (OR)",
+            "tagFilterHint": "Select at least one tag. Matching documents appear automatically. To change the filter later, create a new folder.",
             "title": "Paperless views",
             "add": "Connect Paperless view",
             "edit": "Edit Paperless folder",
@@ -4072,7 +4079,7 @@
             "shared": "Family",
             "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Changes to this saved view in Paperless also change this folder. Files remain in Paperless. An empty filter includes every document the connection can read.",
-            "readOnly": "Documents and filters stay in Paperless. Authorized administrators can change tags here.",
+            "readOnly": "Files stay in Paperless. Authorized administrators can edit tags here.",
             "refresh": "Refresh",
             "preview": "Preview",
             "download": "Download",

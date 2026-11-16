@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Klasör kaynağı",
+            "savedViewSource": "Kayıtlı Paperless görünümü",
+            "tagSource": "Etiket filtresi",
+            "tagMatch": "Etiketleri birleştir",
+            "matchAll": "Seçilen tüm etiketler (VE)",
+            "matchAny": "Seçilen etiketlerden en az biri (VEYA)",
+            "tagFilterHint": "En az bir etiket seçin. Eşleşen belgeler otomatik görünür. Filtreyi değiştirmek için yeni bir klasör oluşturun.",
             "title": "Paperless görünümleri",
             "add": "Paperless görünümü bağla",
             "edit": "Paperless klasörünü düzenle",
@@ -4010,7 +4017,7 @@
             "shared": "Aile",
             "shareConsent": "Seçilen kişilere bu görünümdeki mevcut ve gelecekteki tüm belgeleri okuma ve indirme izni veriyorum.",
             "viewHint": "Paperless görünümündeki değişiklikler bu klasörü de değiştirir. Dosyalar Paperless’ta kalır. Filtre yoksa bağlantının okuyabildiği tüm belgeler dahil edilir.",
-            "readOnly": "Belgeler ve filtreler Paperless içinde kalır. Yetkili yöneticiler etiketleri burada değiştirebilir.",
+            "readOnly": "Dosyalar Paperless içinde kalır. Yetkili yöneticiler etiketleri burada değiştirebilir.",
             "refresh": "Yenile",
             "preview": "Önizleme",
             "download": "İndir",

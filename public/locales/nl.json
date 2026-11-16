@@ -4060,6 +4060,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Mapbron",
+            "savedViewSource": "Opgeslagen Paperless-weergave",
+            "tagSource": "Tagfilter",
+            "tagMatch": "Tags combineren",
+            "matchAll": "Alle gekozen tags (EN)",
+            "matchAny": "Minstens één gekozen tag (OF)",
+            "tagFilterHint": "Kies minstens één tag. Passende documenten verschijnen automatisch. Maak een nieuwe map om het filter later te wijzigen.",
             "title": "Paperless-weergaven",
             "add": "Paperless-weergave koppelen",
             "edit": "Paperless-map bewerken",
@@ -4072,7 +4079,7 @@
             "shared": "Gezin",
             "shareConsent": "Ik geef de geselecteerde personen toestemming om alle huidige en toekomstige documenten in deze weergave te lezen en te downloaden.",
             "viewHint": "Wijzigingen aan de Paperless-weergave wijzigen ook deze map. Bestanden blijven in Paperless. Zonder filters worden alle voor de verbinding leesbare documenten opgenomen.",
-            "readOnly": "Documenten en filters blijven in Paperless. Bevoegde beheerders kunnen hier tags wijzigen.",
+            "readOnly": "Bestanden blijven in Paperless. Bevoegde beheerders kunnen hier tags wijzigen.",
             "refresh": "Vernieuwen",
             "preview": "Voorbeeld",
             "download": "Downloaden",

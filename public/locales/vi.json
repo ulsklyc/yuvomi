@@ -4060,6 +4060,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Nguồn thư mục",
+            "savedViewSource": "Chế độ xem Paperless đã lưu",
+            "tagSource": "Bộ lọc thẻ",
+            "tagMatch": "Kết hợp thẻ",
+            "matchAll": "Tất cả thẻ đã chọn (VÀ)",
+            "matchAny": "Ít nhất một thẻ đã chọn (HOẶC)",
+            "tagFilterHint": "Chọn ít nhất một thẻ. Tài liệu phù hợp tự động xuất hiện. Để đổi bộ lọc, hãy tạo thư mục mới.",
             "title": "Chế độ xem Paperless",
             "add": "Kết nối chế độ xem Paperless",
             "edit": "Sửa thư mục Paperless",
@@ -4072,7 +4079,7 @@
             "shared": "Gia đình",
             "shareConsent": "Tôi cho phép những người đã chọn đọc và tải xuống tất cả tài liệu hiện tại và tương lai trong chế độ xem này.",
             "viewHint": "Thay đổi chế độ xem trong Paperless cũng thay đổi thư mục này. Tệp vẫn ở Paperless. Không có bộ lọc sẽ bao gồm mọi tài liệu mà kết nối có thể đọc.",
-            "readOnly": "Tài liệu và bộ lọc vẫn ở Paperless. Quản trị viên được cấp quyền có thể thay đổi thẻ tại đây.",
+            "readOnly": "Tệp vẫn ở Paperless. Quản trị viên có quyền có thể sửa thẻ tại đây.",
             "refresh": "Làm mới",
             "preview": "Xem trước",
             "download": "Tải xuống",

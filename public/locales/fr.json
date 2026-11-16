@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Source du dossier",
+            "savedViewSource": "Vue Paperless enregistrée",
+            "tagSource": "Filtre par étiquettes",
+            "tagMatch": "Associer les étiquettes",
+            "matchAll": "Toutes les étiquettes choisies (ET)",
+            "matchAny": "Au moins une étiquette choisie (OU)",
+            "tagFilterHint": "Choisissez au moins une étiquette. Les documents correspondants apparaissent automatiquement. Pour modifier le filtre, créez un nouveau dossier.",
             "title": "Vues Paperless",
             "add": "Associer une vue Paperless",
             "edit": "Modifier le dossier Paperless",
@@ -4010,7 +4017,7 @@
             "shared": "Famille",
             "shareConsent": "J’autorise les personnes sélectionnées à lire et télécharger tous les documents actuels et futurs de cette vue.",
             "viewHint": "Les changements de la vue Paperless modifient aussi ce dossier. Les fichiers restent dans Paperless. Sans filtre, tous les documents lisibles par la connexion sont inclus.",
-            "readOnly": "Les documents et filtres restent dans Paperless. Les administrateurs autorisés peuvent modifier les étiquettes ici.",
+            "readOnly": "Les fichiers restent dans Paperless. Les administrateurs autorisés peuvent modifier les étiquettes ici.",
             "refresh": "Actualiser",
             "preview": "Aperçu",
             "download": "Télécharger",

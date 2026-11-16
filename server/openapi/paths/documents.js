@@ -657,23 +657,36 @@ function paperlessFolderPaths() {
   const operation = (summary, extra = {}) => op({ summary, tag: 'Documents', description: note, responses: { ...responses }, ...extra });
   /** @param {boolean} create */
   const body = (create) => ({ required: true, content: { 'application/json': { schema: {
-    type: 'object', required: create ? ['name', 'account_id', 'view_id'] : ['name', 'visibility'],
+    type: 'object', required: create ? ['name', 'account_id'] : ['name', 'visibility'],
+    ...(create ? { oneOf: [
+      { required: ['view_id'], not: { required: ['tag_filter'] } },
+      { required: ['tag_filter'], not: { required: ['view_id'] } },
+    ] } : {}),
     properties: {
       name: { type: 'string', minLength: 1, maxLength: 200 },
       visibility: { type: 'string', enum: ['private', 'restricted', 'family'], default: 'private' },
       allowed_member_ids: { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 }, description: 'Required for restricted visibility; selected household member IDs.' },
       confirm_share: { type: 'boolean', description: 'Must be true when widening the audience, including adding selected members.' },
-      ...(create ? { account_id: { type: 'integer', minimum: 1 }, view_id: { type: 'integer', minimum: 1 } } : {}),
+      ...(create ? { account_id: { type: 'integer', minimum: 1 }, view_id: { type: 'integer', minimum: 1 },
+        tag_filter: { type: 'object', required: ['match', 'tag_ids'], properties: {
+          match: { type: 'string', enum: ['all', 'any'] },
+          tag_ids: { type: 'array', minItems: 1, maxItems: 1000, items: { type: 'integer', minimum: 1 } },
+        }, description: 'Local Live-folder filter. All IDs must be readable with the creator Live-folder token. Source and filters are immutable after creation.' },
+      } : {}),
     },
   } } } });
   return {
+    [`${root}/filter-tags`]: { get: operation('List tags for a local Live-folder filter', {
+      admin: true, params: [page, { name: 'account_id', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } }],
+      description: `${note} Uses the configured Live-folder credentials, including personal mode. Tag-edit allowlists do not restrict filtering. Returns only tag IDs and names.`,
+    }) },
     [`${root}/saved-views`]: { get: operation('List available saved Paperless views', {
       admin: true, params: [page, { name: 'account_id', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } }],
       description: `${note} Admin-only picker; data items contain only {id, name}.`,
     }) },
     [`${root}/folders`]: {
-      get: operation('List visible Paperless view folders', { description: `${note} Returns {data: [{id, name, account_id, view_id, visibility,allowed_member_ids, created_by, created_at, updated_at, can_manage}]}.` }),
-      post: operation('Connect a saved Paperless view as a folder', { admin: true, stateChanging: true, requestBody: body(true),
+      get: operation('List visible Paperless view folders', { description: `${note} Returns {data: [{id, name, account_id, view_id, tag_filter, visibility, allowed_member_ids, created_by, created_at, updated_at, can_manage}]}.` }),
+      post: operation('Create a Live folder from a saved Paperless view or a tag filter', { admin: true, stateChanging: true, requestBody: body(true),
         responses: { ...Object.fromEntries(Object.entries(responses).filter(([code]) => code !== '200')), 201: { description: 'The new folder in data. Filters are validated before creation.' } } }),
     },
     [`${root}/folders/{id}`]: {

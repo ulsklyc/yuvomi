@@ -4060,6 +4060,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Ordnerquelle",
+            "savedViewSource": "Gespeicherte Paperless-Ansicht",
+            "tagSource": "Tag-Filter",
+            "tagMatch": "Tags verknüpfen",
+            "matchAll": "Alle gewählten Tags (UND)",
+            "matchAny": "Mindestens eines der gewählten Tags (ODER)",
+            "tagFilterHint": "Wähle mindestens ein Tag. Passende Dokumente erscheinen automatisch. Lege zum späteren Ändern des Filters einen neuen Ordner an.",
             "title": "Paperless-Ansichten",
             "add": "Paperless-Ansicht einbinden",
             "edit": "Paperless-Ordner bearbeiten",
@@ -4072,7 +4079,7 @@
             "shared": "Familie",
             "shareConsent": "Ich erlaube dem gewählten Personenkreis, alle aktuellen und zukünftigen Dokumente dieser Ansicht zu lesen und herunterzuladen.",
             "viewHint": "Änderungen an der gespeicherten Ansicht in Paperless ändern auch diesen Ordner. Die Dateien bleiben in Paperless. Ein leerer Filter umfasst alle für die Verbindung lesbaren Dokumente.",
-            "readOnly": "Dokumente und Filter bleiben in Paperless. Berechtigte Administratoren können hier Tags ändern.",
+            "readOnly": "Die Dateien bleiben in Paperless. Berechtigte Administratoren können hier Tags ändern.",
             "refresh": "Aktualisieren",
             "preview": "Vorschau",
             "download": "Herunterladen",

@@ -10,7 +10,7 @@
  */
 import { assertDmsTargetAllowed, DmsTargetError } from './guard.js';
 import { paperlessStatus } from './paperless-errors.js';
-import { savedViewParams, positiveId, PaperlessViewError } from './paperless-views.js';
+import { savedViewParams, positiveId, PaperlessViewError, tagFilter } from './paperless-views.js';
 import { remoteFailure } from '../../utils/http.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -143,7 +143,19 @@ export class PaperlessAdapter {
       viewCache.set(cacheKey, cached);
     }
     const view = cached.view;
-    const params = savedViewParams(view);
+    return this.#listDocuments(savedViewParams(view), { page, pageSize, documentId, displayFields });
+  }
+
+  /** @param {unknown} filter @param {{page?: number, pageSize?: number, documentId?: unknown, displayFields?: string[]}} [options] */
+  async listTagDocuments(filter, options = {}) {
+    const valid = tagFilter(filter);
+    const params = new URLSearchParams({ ordering: '-created',
+      [valid.match === 'all' ? 'tags__id__all' : 'tags__id__in']: valid.tag_ids.join(',') });
+    return this.#listDocuments(params, options);
+  }
+
+  /** @param {URLSearchParams} params @param {{page?: number, pageSize?: number, documentId?: unknown, displayFields?: string[]}} options */
+  async #listDocuments(params, { page = 1, pageSize = 50, documentId = null, displayFields = [] }) {
     params.set('page', String(positiveId(page) || 1));
     params.set('page_size', String(Math.min(100, positiveId(pageSize) || 50)));
     if (documentId !== null) {

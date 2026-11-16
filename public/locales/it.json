@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Origine della cartella",
+            "savedViewSource": "Vista Paperless salvata",
+            "tagSource": "Filtro per tag",
+            "tagMatch": "Combina tag",
+            "matchAll": "Tutti i tag selezionati (E)",
+            "matchAny": "Almeno un tag selezionato (O)",
+            "tagFilterHint": "Seleziona almeno un tag. I documenti corrispondenti appaiono automaticamente. Per modificare il filtro, crea una nuova cartella.",
             "title": "Viste Paperless",
             "add": "Collega vista Paperless",
             "edit": "Modifica cartella Paperless",
@@ -4010,7 +4017,7 @@
             "shared": "Famiglia",
             "shareConsent": "Autorizzo le persone selezionate a leggere e scaricare tutti i documenti attuali e futuri di questa vista.",
             "viewHint": "Le modifiche alla vista Paperless cambiano anche questa cartella. I file restano in Paperless. Senza filtri sono inclusi tutti i documenti leggibili dalla connessione.",
-            "readOnly": "Documenti e filtri restano in Paperless. Gli amministratori autorizzati possono modificare i tag qui.",
+            "readOnly": "I file rimangono in Paperless. Gli amministratori autorizzati possono modificare i tag qui.",
             "refresh": "Aggiorna",
             "preview": "Anteprima",
             "download": "Scarica",

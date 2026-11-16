@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "文件夹来源",
+            "savedViewSource": "已保存的 Paperless 视图",
+            "tagSource": "标签筛选",
+            "tagMatch": "组合标签",
+            "matchAll": "所有已选标签（与）",
+            "matchAny": "至少一个已选标签（或）",
+            "tagFilterHint": "请至少选择一个标签。符合条件的文档会自动显示。要更改筛选条件，请新建文件夹。",
             "title": "Paperless 视图",
             "add": "关联 Paperless 视图",
             "edit": "编辑 Paperless 文件夹",
@@ -4010,7 +4017,7 @@
             "shared": "家庭",
             "shareConsent": "我允许选定的人员读取和下载此视图中当前及今后的所有文档。",
             "viewHint": "在 Paperless 中修改此视图也会更改此文件夹。文件保留在 Paperless 中。没有筛选条件时，将包含此连接可读取的所有文档。",
-            "readOnly": "文档和筛选条件保留在 Paperless。获授权的管理员可以在此更改标签。",
+            "readOnly": "文件保留在 Paperless 中。获授权的管理员可在此修改标签。",
             "refresh": "刷新",
             "preview": "预览",
             "download": "下载",

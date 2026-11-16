@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Origem da pasta",
+            "savedViewSource": "Vista guardada do Paperless",
+            "tagSource": "Filtro de etiquetas",
+            "tagMatch": "Combinar etiquetas",
+            "matchAll": "Todas as etiquetas selecionadas (E)",
+            "matchAny": "Pelo menos uma etiqueta selecionada (OU)",
+            "tagFilterHint": "Selecione pelo menos uma etiqueta. Os documentos correspondentes aparecem automaticamente. Para alterar o filtro, crie uma nova pasta.",
             "title": "Vistas do Paperless",
             "add": "Ligar vista do Paperless",
             "edit": "Editar pasta do Paperless",
@@ -4010,7 +4017,7 @@
             "shared": "Família",
             "shareConsent": "Autorizo as pessoas selecionadas a ler e transferir todos os documentos atuais e futuros desta vista.",
             "viewHint": "As alterações à vista no Paperless também alteram esta pasta. Os ficheiros permanecem no Paperless. Sem filtros, são incluídos todos os documentos acessíveis pela ligação.",
-            "readOnly": "Os documentos e filtros permanecem no Paperless. Os administradores autorizados podem alterar etiquetas aqui.",
+            "readOnly": "Os ficheiros permanecem no Paperless. Os administradores autorizados podem editar etiquetas aqui.",
             "refresh": "Atualizar",
             "preview": "Pré-visualizar",
             "download": "Transferir",

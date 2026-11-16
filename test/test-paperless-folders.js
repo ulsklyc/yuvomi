@@ -477,3 +477,97 @@ test('central Paperless row visibility and filterVisible agree with private, sel
   member();
   assert.deepEqual((await call('GET', '/folders')).body.data.map((/** @type {{id: number}} */ row) => row.id).sort((/** @type {number} */ a, /** @type {number} */ b) => a - b), direct);
 });
+
+test('tag folders are independent live sources, preserve filter semantics and scope media', async () => {
+  /** @type {any[]} */
+  const calls = [];
+  adapter.getTags = async (ids) => ids.map((/** @type {number} */ id) => ({ id, name: `Tag ${id}` }));
+  adapter.getSavedView = async () => { throw new Error('local tag folders must not read saved views'); };
+  adapter.listTagDocuments = async (filter, options) => {
+    calls.push({ filter, options });
+    return { results: options.documentId && String(options.documentId) !== '99' ? [] : [doc(99)], count: 1, has_more: false };
+  };
+  const created = await call('POST', '/folders', { name: 'Invoices', account_id: accountId,
+    tag_filter: { match: 'all', tag_ids: [12, 7, 7] }, visibility: 'family', confirm_share: true });
+  assert.equal(created.status, 201);
+  const folder = created.body.data;
+  assert.equal(folder.view_id, null);
+  assert.deepEqual(folder.tag_filter, { match: 'all', tag_ids: [7, 12] });
+  member();
+  assert.equal((await call('GET', `/folders/${folder.id}/documents?page=2`)).status, 200);
+  assert.deepEqual(calls[0].filter, folder.tag_filter);
+  assert.equal(calls[0].options.page, 2);
+  assert.equal((await call('GET', `/folders/${folder.id}/documents/99/download`)).status, 200);
+  assert.equal((await call('GET', `/folders/${folder.id}/documents/88/preview`)).status, 404);
+  assert.equal(mediaCalls, 1);
+  admin();
+  assert.equal((await call('PUT', `/folders/${folder.id}`, { name: 'Changed', visibility: 'family',
+    tag_filter: { match: 'any', tag_ids: [7] } })).status, 400, 'source changes require a new delegation');
+  assert.equal((await call('DELETE', `/folders/${folder.id}`)).status, 204);
+});
+
+test('empty, ambiguous, malformed and inaccessible tag filters cannot create folders', async () => {
+  adapter.getTags = async () => [{ id: 7, name: 'Visible' }];
+  for (const tag_filter of [null, {}, { match: 'all', tag_ids: [] }, { match: 'all', tag_ids: ['7'] },
+    { match: 'none', tag_ids: [7] }, { match: 'any', tag_ids: [0] }, { match: 'any', tag_ids: [8] }]) {
+    assert.equal((await call('POST', '/folders', { name: 'Invalid', account_id: accountId, tag_filter })).status, 400);
+  }
+  assert.equal((await call('POST', '/folders', { name: 'Ambiguous', account_id: accountId, view_id: 5,
+    tag_filter: { match: 'all', tag_ids: [7] } })).status, 400);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folders').get().n, 0);
+});
+
+test('filter catalogue and creation use personal credentials without a shared fallback', async () => {
+  database.prepare("INSERT INTO paperless_live_settings(account_id,token_mode) VALUES (?, 'personal')").run(accountId);
+  adapter.listTags = async () => ({ results: [{ id: 7, name: 'Personal' }], count: 101, has_more: true });
+  adapter.getTags = async () => [{ id: 7, name: 'Personal' }];
+  _setAdapterFactory((source) => { assert.equal(source.api_token, 'personal-only'); return adapter; });
+  assert.equal((await call('GET', `/filter-tags?account_id=${accountId}`)).status, 403);
+  database.prepare('INSERT INTO paperless_user_tokens(account_id,user_id,api_token) VALUES (?,?,?)').run(accountId,adminId,'personal-only');
+  const catalogue = await call('GET', `/filter-tags?account_id=${accountId}&page=2`);
+  assert.equal(catalogue.status, 200);
+  assert.equal(catalogue.body.meta.has_more, true);
+  assert.deepEqual(catalogue.body.data, [{ id: 7, name: 'Personal' }]);
+  const created = await call('POST', '/folders', { name: 'Personal tags', account_id: accountId,
+    tag_filter: { match: 'any', tag_ids: [7] } });
+  assert.equal(created.status, 201);
+  member();
+  assert.equal((await call('GET', `/filter-tags?account_id=${accountId}`)).status, 403);
+  assert.equal((await call('GET', `/folders/${created.body.data.id}/documents`)).status, 404);
+});
+
+test('tag source revocation during media loading prevents the response', async () => {
+  adapter.getTags = async () => [{ id: 7, name: 'Tag' }];
+  adapter.listTagDocuments = async () => ({ results: [doc(99)], count: 1, has_more: false });
+  const created = await call('POST', '/folders', { name: 'Shared tags', account_id: accountId,
+    tag_filter: { match: 'all', tag_ids: [7] }, visibility: 'family', confirm_share: true });
+  const id = created.body.data.id;
+  member();
+  adapter.fetchContent = async () => {
+    database.prepare("UPDATE paperless_view_folders SET visibility = 'private' WHERE id = ?").run(id);
+    return { buffer: Buffer.from('private bytes'), mime: 'application/pdf' };
+  };
+  const result = await call('GET', `/folders/${id}/documents/99/download`);
+  assert.equal(result.status, 404);
+  assert.ok(!JSON.stringify(result.body).includes('private bytes'));
+});
+
+test('tag adapter intersects both match modes and document ID without querying saved views', async () => {
+  /** @type {any[]} */
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    const u = new URL(String(url)); calls.push(u);
+    assert.equal(u.pathname, '/api/documents/');
+    return Response.json({ results: [{ id: 99 }], count: 1, next: null });
+  };
+  const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1237', api_token: 'tag-reader' });
+  await source.listTagDocuments({ match: 'all', tag_ids: [12, 7] }, { page: 2 });
+  await source.listTagDocuments({ match: 'any', tag_ids: [12, 7] }, { documentId: 99, pageSize: 1 });
+  assert.equal(calls[0].searchParams.get('tags__id__all'), '7,12');
+  assert.equal(calls[0].searchParams.get('page'), '2');
+  assert.equal(calls[1].searchParams.get('tags__id__in'), '7,12');
+  assert.equal(calls[1].searchParams.get('id'), '99');
+  assert.equal(calls[1].searchParams.get('page_size'), '1');
+  await assert.rejects(source.listTagDocuments({ match: 'all', tag_ids: [] }), PaperlessViewError);
+  assert.equal(calls.length, 2);
+});

@@ -170,6 +170,7 @@ export const ROWS = [
   // Paperless delegates live source access explicitly through administrator gates.
   ...middlewareRows('server/routes/paperless-folders.js', '/api/v1/documents/dms/paperless', ADMIN_REQUIRED, [
     ['GET', '/saved-views'],
+    ['GET', '/filter-tags'],
     ['POST', '/folders', '/folders', {}],
     ['PUT', '/folders/:id', `/folders/${NO_ID}`, {}],
     ['DELETE', '/folders/:id', `/folders/${NO_ID}`],

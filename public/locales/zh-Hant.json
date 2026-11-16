@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "資料夾來源",
+            "savedViewSource": "已儲存的 Paperless 檢視",
+            "tagSource": "標籤篩選",
+            "tagMatch": "組合標籤",
+            "matchAll": "所有已選標籤（且）",
+            "matchAny": "至少一個已選標籤（或）",
+            "tagFilterHint": "請至少選擇一個標籤。符合條件的文件會自動顯示。若要變更篩選條件，請建立新資料夾。",
             "title": "Paperless 檢視",
             "add": "連結 Paperless 檢視",
             "edit": "編輯 Paperless 資料夾",
@@ -4010,7 +4017,7 @@
             "shared": "家庭",
             "shareConsent": "我允許選取的人員讀取與下載此檢視中目前及未來的所有文件。",
             "viewHint": "在 Paperless 中修改此檢視也會變更此資料夾。檔案保留在 Paperless 中。沒有篩選條件時，將包含此連線可讀取的所有文件。",
-            "readOnly": "文件和篩選條件保留在 Paperless。獲授權的管理員可以在此變更標籤。",
+            "readOnly": "檔案保留在 Paperless 中。獲授權的管理員可在此修改標籤。",
             "refresh": "重新整理",
             "preview": "預覽",
             "download": "下載",

@@ -215,11 +215,19 @@ function createFolderEditor({ canManage, alive, accounts, members, userId, signa
       content: `<form class="document-form" id="paperless-folder-form" novalidate>
         <div class="form-group"><label class="form-label" for="pl-name">${esc(t(key('name')))}${REQUIRED_MARK}</label><input class="form-input" id="pl-name" required maxlength="200" value="${esc(folder?.name || '')}"></div>
         ${!folder ? `<div class="form-group"><label class="form-label" for="pl-account">${esc(t(key('account')))}</label><select class="form-input" id="pl-account">${accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></div>
-          <div class="form-group"><label class="form-label" for="pl-view">${esc(t(key('view')))}${REQUIRED_MARK}</label><select class="form-input" id="pl-view" required disabled></select><button class="btn btn--ghost btn--sm" type="button" data-pl-more-views hidden>${esc(t(key('moreViews')))}</button></div>` : ''}
+          <div class="form-group"><label class="form-label" for="pl-source">${esc(t(key('source')))}</label><select class="form-input" id="pl-source"><option value="view">${esc(t(key('savedViewSource')))}</option><option value="tags">${esc(t(key('tagSource')))}</option></select></div>
+          <div data-pl-view-source class="form-group"><label class="form-label" for="pl-view">${esc(t(key('view')))}${REQUIRED_MARK}</label><select class="form-input" id="pl-view" required disabled></select><button class="btn btn--ghost btn--sm" type="button" data-pl-more-views hidden>${esc(t(key('moreViews')))}</button></div>
+          <div data-pl-tag-source hidden>
+            <div class="form-group"><label class="form-label" for="pl-tag-match">${esc(t(key('tagMatch')))}</label><select class="form-input" id="pl-tag-match"><option value="all">${esc(t(key('matchAll')))}</option><option value="any">${esc(t(key('matchAny')))}</option></select></div>
+            <p class="form-hint">${esc(t(key('tagFilterHint')))}</p>
+            <div class="paperless-tags__filter-list" data-pl-filter-tags role="group" aria-label="${esc(t(key('tags.action')))}"></div>
+            <button class="btn btn--secondary btn--sm" type="button" data-pl-more-tags hidden>${esc(t(key('tags.more')))}</button>
+            <button class="btn btn--secondary btn--sm" type="button" data-pl-retry-tags hidden>${esc(t('common.retry'))}</button>
+          </div>` : ''}
         <div class="form-group"><label class="form-label" for="pl-visibility">${esc(t(key('visibility')))}</label><select class="form-input" id="pl-visibility">${['private', 'restricted', 'family'].map((visibility) => `<option value="${visibility}" ${(folder?.visibility || 'private') === visibility ? 'selected' : ''}>${esc(t(`documents.visibility.${visibility}`))}</option>`).join('')}</select></div>
         <div id="pl-members" hidden>${renderUserMultiSelect(members, folder?.allowed_member_ids || [], 'pl-members', 'documents.allowedMembersLabel')}</div>
         <label class="form-hint" id="pl-consent" hidden><input type="checkbox" id="pl-confirm"> ${esc(t(key('shareConsent')))}</label>
-        <p class="form-hint">${esc(t(key('viewHint')))}</p>
+        <p class="form-hint" data-pl-source-hint>${esc(t(key(folder?.tag_filter ? 'tagFilterHint' : 'viewHint')))}</p>
         <p class="form-error" id="pl-error" role="alert" hidden></p>
         <div class="modal-panel__footer">
           ${folder ? `<button type="button" class="btn btn--danger-outline" data-pl-remove>${esc(t(key('remove')))}</button>` : ''}
@@ -251,55 +259,8 @@ function createFolderEditor({ canManage, alive, accounts, members, userId, signa
         updateAudience();
         /** @param {unknown} err */
         const showError = (err) => { error.textContent = sentence(err); error.hidden = false; };
-        let viewsPage = 0;
-        let viewsSerial = 0;
-        /** @type {string | null} */
-        let viewsAccount = null;
-        const loadViews = async (append = false) => {
-          const accountSelect = /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-account'));
-          const viewSelect = /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-view'));
-          const more = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[data-pl-more-views]'));
-          const mine = ++viewsSerial;
-          const accountId = accountSelect.value;
-          submit.disabled = true;
-          more.disabled = true;
-          error.hidden = true;
-          if (!append || viewsAccount !== accountId) {
-            viewsAccount = accountId;
-            viewsPage = 0;
-            viewSelect.replaceChildren();
-            viewSelect.disabled = true;
-          }
-          try {
-            const result = await api.get(`${ROOT}/saved-views?account_id=${accountId}&page=${viewsPage + 1}`, { signal });
-            if (!current() || mine !== viewsSerial) return;
-            viewsPage++;
-            for (const view of result.data) {
-              const option = document.createElement('option');
-              option.value = String(view.id);
-              option.textContent = view.name;
-              viewSelect.append(option);
-            }
-            viewSelect.disabled = false;
-            submit.disabled = false;
-            more.hidden = !result.meta.has_more;
-            if (!viewSelect.options.length) error.textContent = t(key('noViews'));
-            error.hidden = viewSelect.options.length > 0;
-          } catch (err) { if (current() && mine === viewsSerial) showError(err); }
-          finally {
-            if (current() && mine === viewsSerial) {
-              more.disabled = false;
-              viewSelect.disabled = false;
-              submit.disabled = false;
-            }
-          }
-        };
-        panel.querySelector('#pl-account')?.addEventListener('change', () => loadViews(), options);
-        panel.querySelector('[data-pl-more-views]')?.addEventListener('click', () => loadViews(true), options);
-        panel.querySelector('#pl-view')?.addEventListener('change', (e) => {
-          if (!/** @type {HTMLInputElement} */ (paperlessControl(panel, '#pl-name')).value.trim()) /** @type {HTMLInputElement} */ (paperlessControl(panel, '#pl-name')).value = (/** @type {HTMLSelectElement} */ (e.target)).selectedOptions[0]?.textContent || '';
-        }, options);
-        if (!folder) loadViews();
+        const { selectedTags, tagSource } = folder ? { selectedTags: new Set(), tagSource: () => false }
+          : bindFolderSourcePicker({ panel, current, signal, options, submit, showError, error });
         panel.querySelector('[data-pl-remove]')?.addEventListener('click', async () => {
           if (!current()) return;
           if (!folder) return;
@@ -318,7 +279,7 @@ function createFolderEditor({ canManage, alive, accounts, members, userId, signa
           event.preventDefault();
           if (!current() || submit.disabled) return;
           if (reportFieldErrors(constraintErrors(/** @type {HTMLFormElement} */ (event.currentTarget)))) return;
-          /** @type {{name: string, visibility: string, confirm_share: boolean, allowed_member_ids: number[], account_id?: number, view_id?: number}} */
+          /** @type {{name: string, visibility: string, confirm_share: boolean, allowed_member_ids: number[], account_id?: number, view_id?: number, tag_filter?: {tag_ids: number[], match: string}}} */
           const body = {
             name: /** @type {HTMLInputElement} */ (paperlessControl(panel, '#pl-name')).value.trim(),
             visibility: /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-visibility')).value,
@@ -327,7 +288,9 @@ function createFolderEditor({ canManage, alive, accounts, members, userId, signa
           };
           if (!folder) {
             body.account_id = Number(/** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-account')).value);
-            body.view_id = Number(/** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-view')).value);
+            if (tagSource()) body.tag_filter = { tag_ids: [...selectedTags],
+              match: /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-tag-match')).value };
+            else body.view_id = Number(/** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-view')).value);
           }
           submit.disabled = true;
           error.hidden = true;
@@ -347,4 +310,109 @@ function createFolderEditor({ canManage, alive, accounts, members, userId, signa
     } });
   }
 
+}
+
+/** @param {{panel: HTMLElement, current: () => boolean, signal?: AbortSignal, options: AddEventListenerOptions,
+ * submit: HTMLButtonElement, showError: (error: unknown) => void, error: HTMLElement}} context */
+function bindFolderSourcePicker({ panel, current, signal, options, submit, showError, error }) {
+  const sourceSelect = /** @type {HTMLSelectElement | null} */ (panel.querySelector('#pl-source'));
+  const tagSource = () => sourceSelect?.value === 'tags';
+  /** @type {Set<number>} */
+  const selectedTags = new Set();
+  let tagsPage = 0, tagsSerial = 0, tagsLoading = false;
+  const loadFilterTags = async (append = false) => {
+    const mine = ++tagsSerial;
+    const accountId = /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-account')).value;
+    const list = /** @type {HTMLElement} */ (paperlessControl(panel, '[data-pl-filter-tags]'));
+    const more = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[data-pl-more-tags]'));
+    const retry = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[data-pl-retry-tags]'));
+    if (!append) { tagsPage = 0; selectedTags.clear(); list.replaceChildren(); }
+    tagsLoading = true; submit.disabled = true; more.disabled = true; retry.hidden = true; error.hidden = true;
+    try {
+      const result = await api.get(`${ROOT}/filter-tags?account_id=${accountId}&page=${tagsPage + 1}`, { signal });
+      if (!current() || mine !== tagsSerial || !tagSource()) return;
+      tagsPage++;
+      for (const tag of result.data) {
+        const label = document.createElement('label');
+        label.className = 'paperless-tags__choice';
+        const input = document.createElement('input');
+        input.type = 'checkbox'; input.value = String(tag.id);
+        input.checked = selectedTags.has(tag.id);
+        input.addEventListener('change', () => {
+          if (input.checked) selectedTags.add(tag.id); else selectedTags.delete(tag.id);
+          submit.disabled = tagsLoading || !selectedTags.size;
+        }, options);
+        label.append(input, document.createTextNode(` ${tag.name} (#${tag.id})`));
+        list.append(label);
+      }
+      more.hidden = !result.meta.has_more;
+      if (!list.childElementCount) { error.textContent = t(key('tags.empty')); error.hidden = false; }
+    } catch (err) { if (current() && mine === tagsSerial && tagSource()) { showError(err); retry.hidden = false; } }
+    finally { if (current() && mine === tagsSerial && tagSource()) {
+      tagsLoading = false; more.disabled = false; submit.disabled = !selectedTags.size;
+    } }
+  };
+  let viewsPage = 0;
+  let viewsSerial = 0;
+  /** @type {string | null} */
+  let viewsAccount = null;
+  const loadViews = async (append = false) => {
+    const accountSelect = /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-account'));
+    const viewSelect = /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-view'));
+    const more = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[data-pl-more-views]'));
+    const mine = ++viewsSerial;
+    const accountId = accountSelect.value;
+    submit.disabled = true;
+    more.disabled = true;
+    error.hidden = true;
+    if (!append || viewsAccount !== accountId) {
+      viewsAccount = accountId;
+      viewsPage = 0;
+      viewSelect.replaceChildren();
+      viewSelect.disabled = true;
+    }
+    try {
+      const result = await api.get(`${ROOT}/saved-views?account_id=${accountId}&page=${viewsPage + 1}`, { signal });
+      if (!current() || mine !== viewsSerial || tagSource()) return;
+      viewsPage++;
+      for (const view of result.data) {
+        const option = document.createElement('option');
+        option.value = String(view.id);
+        option.textContent = view.name;
+        viewSelect.append(option);
+      }
+      viewSelect.disabled = false;
+      submit.disabled = false;
+      more.hidden = !result.meta.has_more;
+      if (!viewSelect.options.length) error.textContent = t(key('noViews'));
+      error.hidden = viewSelect.options.length > 0;
+    } catch (err) { if (current() && mine === viewsSerial && !tagSource()) showError(err); }
+    finally {
+      if (current() && mine === viewsSerial && !tagSource()) {
+        more.disabled = false;
+        viewSelect.disabled = false;
+        submit.disabled = false;
+      }
+    }
+  };
+  const updateSource = () => {
+    viewsSerial++; tagsSerial++;
+    const byTags = tagSource();
+    /** @type {HTMLElement} */ (paperlessControl(panel, '[data-pl-source-hint]')).hidden = byTags;
+    /** @type {HTMLElement} */ (paperlessControl(panel, '[data-pl-view-source]')).hidden = byTags;
+    /** @type {HTMLElement} */ (paperlessControl(panel, '[data-pl-tag-source]')).hidden = !byTags;
+    const viewInput = /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-view'));
+    viewInput.required = !byTags; viewInput.disabled = byTags;
+    if (byTags) loadFilterTags(); else loadViews();
+  };
+  sourceSelect?.addEventListener('change', updateSource, options);
+  panel.querySelector('#pl-account')?.addEventListener('change', updateSource, options);
+  panel.querySelector('[data-pl-more-tags]')?.addEventListener('click', () => loadFilterTags(true), options);
+  panel.querySelector('[data-pl-retry-tags]')?.addEventListener('click', () => loadFilterTags(tagsPage > 0), options);
+  panel.querySelector('[data-pl-more-views]')?.addEventListener('click', () => loadViews(true), options);
+  panel.querySelector('#pl-view')?.addEventListener('change', (e) => {
+    if (!/** @type {HTMLInputElement} */ (paperlessControl(panel, '#pl-name')).value.trim()) /** @type {HTMLInputElement} */ (paperlessControl(panel, '#pl-name')).value = (/** @type {HTMLSelectElement} */ (e.target)).selectedOptions[0]?.textContent || '';
+  }, options);
+  loadViews();
+  return { selectedTags, tagSource };
 }

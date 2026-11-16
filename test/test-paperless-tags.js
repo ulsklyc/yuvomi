@@ -279,3 +279,22 @@ test('tag catalogues accept unpaginated responses and include nested named tags 
   assert.deepEqual(result.results, [{ id: 7, name: 'House' }, { id: 150, name: 'Insurance' }]);
   assert.equal(result.has_more, false);
 });
+
+test('local tag-folder membership gates tag reads and writes, including documents leaving the filter', async () => {
+  const filter = { match: 'all', tag_ids: [7] };
+  database.prepare('UPDATE paperless_view_folders SET view_id = NULL, tag_filter = ? WHERE id = ?').run(JSON.stringify(filter), folderId);
+  let checks = 0;
+  adapter.listTagDocuments = async (actual, options) => {
+    assert.deepEqual(actual, filter);
+    assert.equal(options.documentId, 99);
+    checks++;
+    return { results: assigned.includes(7) ? [{ id: '99' }] : [] };
+  };
+  adapter.listViewDocuments = async () => { throw new Error('wrong source'); };
+  assert.equal((await call('GET', folderPath())).status, 200);
+  assert.equal((await call('PUT', folderPath(), { tags: [150], expected_tags: [7, 150] })).status, 200);
+  assert.equal(checks, 3);
+  assert.equal((await call('GET', folderPath())).status, 404);
+  assert.equal((await call('PUT', folderPath(), { tags: [7, 150], expected_tags: [150] })).status, 404);
+  assert.equal(writes.length, 1);
+});

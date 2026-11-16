@@ -4292,6 +4292,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Źródło folderu",
+            "savedViewSource": "Zapisany widok Paperless",
+            "tagSource": "Filtr tagów",
+            "tagMatch": "Łączenie tagów",
+            "matchAll": "Wszystkie wybrane tagi (I)",
+            "matchAny": "Co najmniej jeden wybrany tag (LUB)",
+            "tagFilterHint": "Wybierz co najmniej jeden tag. Pasujące dokumenty pojawią się automatycznie. Aby zmienić filtr, utwórz nowy folder.",
             "title": "Widoki Paperless",
             "add": "Połącz widok Paperless",
             "edit": "Edytuj folder Paperless",
@@ -4304,7 +4311,7 @@
             "shared": "Rodzina",
             "shareConsent": "Zezwalam wybranym osobom na odczytywanie i pobieranie wszystkich obecnych i przyszłych dokumentów w tym widoku.",
             "viewHint": "Zmiany widoku w Paperless zmieniają też ten folder. Pliki pozostają w Paperless. Bez filtrów uwzględniane są wszystkie dokumenty dostępne dla połączenia.",
-            "readOnly": "Dokumenty i filtry pozostają w Paperless. Uprawnieni administratorzy mogą tutaj zmieniać tagi.",
+            "readOnly": "Pliki pozostają w Paperless. Uprawnieni administratorzy mogą tutaj zmieniać tagi.",
             "refresh": "Odśwież",
             "preview": "Podgląd",
             "download": "Pobierz",

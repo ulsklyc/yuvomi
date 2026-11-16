@@ -4060,6 +4060,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Sumber folder",
+            "savedViewSource": "Tampilan Paperless tersimpan",
+            "tagSource": "Filter tag",
+            "tagMatch": "Gabungkan tag",
+            "matchAll": "Semua tag terpilih (DAN)",
+            "matchAny": "Setidaknya satu tag terpilih (ATAU)",
+            "tagFilterHint": "Pilih setidaknya satu tag. Dokumen yang cocok muncul otomatis. Buat folder baru untuk mengubah filter.",
             "title": "Tampilan Paperless",
             "add": "Hubungkan tampilan Paperless",
             "edit": "Edit folder Paperless",
@@ -4072,7 +4079,7 @@
             "shared": "Keluarga",
             "shareConsent": "Saya mengizinkan orang yang dipilih untuk membaca dan mengunduh semua dokumen saat ini dan mendatang dalam tampilan ini.",
             "viewHint": "Perubahan tampilan di Paperless juga mengubah folder ini. Berkas tetap di Paperless. Tanpa filter, semua dokumen yang dapat dibaca koneksi akan disertakan.",
-            "readOnly": "Dokumen dan filter tetap berada di Paperless. Administrator berwenang dapat mengubah tag di sini.",
+            "readOnly": "Berkas tetap di Paperless. Administrator yang berwenang dapat mengubah tag di sini.",
             "refresh": "Perbarui",
             "preview": "Pratinjau",
             "download": "Unduh",

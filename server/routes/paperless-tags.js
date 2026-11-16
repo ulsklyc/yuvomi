@@ -10,7 +10,7 @@ import { mayWriteModule } from '../authorize/index.ts';
 import { actorFromRequest, visibleWhere } from '../authorize/index.ts';
 import { getAdapter } from '../services/dms/index.js';
 import { liveAccount, liveIdentity, checkLiveTagChanges } from '../services/paperless-live-settings.js';
-import { positiveId } from '../services/dms/paperless-views.js';
+import { positiveId, listFolderDocuments } from '../services/dms/paperless-views.js';
 
 const router = express.Router();
 const log = createLogger('PaperlessTags');
@@ -63,7 +63,7 @@ function resolve(req) {
       AND ${visibleWhere('paperless_folders', 'f', '@userId')}`).get({ id: req.params.id, userId: actor(req) });
     if (!row) throw problem(404, 'paperless_folder_not_found');
     canEdit = writable(req) && row.created_by === actor(req);
-    identity = [row.account_id, row.view_id, row.created_by, row.visibility];
+    identity = [row.account_id, row.view_id, row.tag_filter, row.created_by, row.visibility];
   } else {
     row = db.get().prepare(`SELECT d.* FROM family_documents d WHERE d.id = @id
       AND d.storage_backend = 'dms' AND ${visibleWhere('documents', 'd', '@userId')}`).get({ id: req.params.id, userId: actor(req) });
@@ -86,7 +86,7 @@ function recheck(req, before, write = false) {
 /** @param {import("../services/dms/paperless.js").PaperlessAdapter} adapter @param {ReturnType<typeof resolve>} context */
 async function inView(adapter, context) {
   if (context.row.view_id === undefined) return;
-  const result = await remote(adapter.listViewDocuments(context.row.view_id, { documentId: context.documentId, pageSize: 1 }));
+  const result = await remote(listFolderDocuments(adapter, context.row, { documentId: context.documentId, pageSize: 1 }));
   if (!result.results.some((/** @type {{id: string | number}} */ doc) => String(doc.id) === String(context.documentId))) {
     throw problem(404, 'paperless_document_not_found');
   }

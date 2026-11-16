@@ -4060,6 +4060,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Mappekilde",
+            "savedViewSource": "Lagret Paperless-visning",
+            "tagSource": "Taggfilter",
+            "tagMatch": "Kombiner tagger",
+            "matchAll": "Alle valgte tagger (OG)",
+            "matchAny": "Minst én valgt tagg (ELLER)",
+            "tagFilterHint": "Velg minst én tagg. Samsvarende dokumenter vises automatisk. Opprett en ny mappe for å endre filteret.",
             "title": "Paperless-visninger",
             "add": "Koble til Paperless-visning",
             "edit": "Rediger Paperless-mappe",
@@ -4072,7 +4079,7 @@
             "shared": "Familie",
             "shareConsent": "Jeg gir de valgte personene tillatelse til å lese og laste ned alle nåværende og fremtidige dokumenter i denne visningen.",
             "viewHint": "Endringer i Paperless-visningen endrer også denne mappen. Filene forblir i Paperless. Uten filtre tas alle dokumenter tilkoblingen kan lese med.",
-            "readOnly": "Dokumenter og filtre blir i Paperless. Autoriserte administratorer kan endre etiketter her.",
+            "readOnly": "Filene blir i Paperless. Autoriserte administratorer kan endre tagger her.",
             "refresh": "Oppdater",
             "preview": "Forhåndsvisning",
             "download": "Last ned",

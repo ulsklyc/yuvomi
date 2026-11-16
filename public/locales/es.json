@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Origen de la carpeta",
+            "savedViewSource": "Vista guardada de Paperless",
+            "tagSource": "Filtro de etiquetas",
+            "tagMatch": "Combinar etiquetas",
+            "matchAll": "Todas las etiquetas elegidas (Y)",
+            "matchAny": "Al menos una etiqueta elegida (O)",
+            "tagFilterHint": "Selecciona al menos una etiqueta. Los documentos coincidentes aparecen automáticamente. Para cambiar el filtro, crea otra carpeta.",
             "title": "Vistas de Paperless",
             "add": "Conectar una vista de Paperless",
             "edit": "Editar carpeta de Paperless",
@@ -4010,7 +4017,7 @@
             "shared": "Familia",
             "shareConsent": "Autorizo a las personas seleccionadas a leer y descargar todos los documentos actuales y futuros de esta vista.",
             "viewHint": "Los cambios de la vista en Paperless también cambian esta carpeta. Los archivos permanecen en Paperless. Sin filtros, se incluyen todos los documentos accesibles para la conexión.",
-            "readOnly": "Los documentos y filtros permanecen en Paperless. Los administradores autorizados pueden cambiar etiquetas aquí.",
+            "readOnly": "Los archivos permanecen en Paperless. Los administradores autorizados pueden editar etiquetas aquí.",
             "refresh": "Actualizar",
             "preview": "Vista previa",
             "download": "Descargar",

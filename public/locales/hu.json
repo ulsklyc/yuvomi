@@ -4060,6 +4060,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Mappa forrása",
+            "savedViewSource": "Mentett Paperless-nézet",
+            "tagSource": "Címkeszűrő",
+            "tagMatch": "Címkék összekapcsolása",
+            "matchAll": "Minden kiválasztott címke (ÉS)",
+            "matchAny": "Legalább egy kiválasztott címke (VAGY)",
+            "tagFilterHint": "Válassz legalább egy címkét. A megfelelő dokumentumok automatikusan megjelennek. A szűrő módosításához hozz létre új mappát.",
             "title": "Paperless-nézetek",
             "add": "Paperless-nézet csatlakoztatása",
             "edit": "Paperless-mappa szerkesztése",
@@ -4072,7 +4079,7 @@
             "shared": "Család",
             "shareConsent": "Engedélyezem a kijelölt személyeknek a nézet összes jelenlegi és jövőbeli dokumentumának olvasását és letöltését.",
             "viewHint": "A Paperless-nézet módosítása ezt a mappát is módosítja. A fájlok a Paperlessben maradnak. Szűrők nélkül a kapcsolat számára olvasható összes dokumentum megjelenik.",
-            "readOnly": "A dokumentumok és szűrők a Paperless rendszerben maradnak. A jogosult rendszergazdák itt módosíthatják a címkéket.",
+            "readOnly": "A fájlok a Paperless rendszerben maradnak. A jogosult rendszergazdák itt módosíthatják a címkéket.",
             "refresh": "Frissítés",
             "preview": "Előnézet",
             "download": "Letöltés",

@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Mappkälla",
+            "savedViewSource": "Sparad Paperless-vy",
+            "tagSource": "Taggfilter",
+            "tagMatch": "Kombinera taggar",
+            "matchAll": "Alla valda taggar (OCH)",
+            "matchAny": "Minst en vald tagg (ELLER)",
+            "tagFilterHint": "Välj minst en tagg. Matchande dokument visas automatiskt. Skapa en ny mapp för att ändra filtret.",
             "title": "Paperless-vyer",
             "add": "Anslut Paperless-vy",
             "edit": "Redigera Paperless-mapp",
@@ -4010,7 +4017,7 @@
             "shared": "Familj",
             "shareConsent": "Jag ger de valda personerna rätt att läsa och ladda ner alla nuvarande och framtida dokument i denna vy.",
             "viewHint": "Ändringar i Paperless-vyn ändrar även den här mappen. Filerna stannar i Paperless. Utan filter ingår alla dokument som anslutningen kan läsa.",
-            "readOnly": "Dokument och filter finns kvar i Paperless. Behöriga administratörer kan ändra taggar här.",
+            "readOnly": "Filerna stannar i Paperless. Behöriga administratörer kan ändra taggar här.",
             "refresh": "Uppdatera",
             "preview": "Förhandsgranska",
             "download": "Ladda ner",

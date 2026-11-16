@@ -3998,6 +3998,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "フォルダーの参照元",
+            "savedViewSource": "保存済みのPaperlessビュー",
+            "tagSource": "タグフィルター",
+            "tagMatch": "タグの組み合わせ",
+            "matchAll": "選択したすべてのタグ（AND）",
+            "matchAny": "選択したタグのいずれか（OR）",
+            "tagFilterHint": "タグを1つ以上選択してください。一致する文書は自動的に表示されます。フィルターを変更するには、新しいフォルダーを作成してください。",
             "title": "Paperlessの保存済みビュー",
             "add": "Paperlessのビューを接続",
             "edit": "Paperlessフォルダーを編集",
@@ -4010,7 +4017,7 @@
             "shared": "家族",
             "shareConsent": "選択したメンバーが、このビューの現在および今後のすべての文書を閲覧・ダウンロードすることを許可します。",
             "viewHint": "Paperlessのビューを変更すると、このフォルダーも変わります。ファイルはPaperlessに残ります。フィルターが空の場合、接続先のアカウントで閲覧できる全書類が含まれます。",
-            "readOnly": "文書とフィルターはPaperlessで管理されます。権限のある管理者はここでタグを変更できます。",
+            "readOnly": "ファイルはPaperlessに保存されます。権限のある管理者はここでタグを変更できます。",
             "refresh": "更新",
             "preview": "プレビュー",
             "download": "ダウンロード",

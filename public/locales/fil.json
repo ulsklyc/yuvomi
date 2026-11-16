@@ -4060,6 +4060,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Pinagmulan ng folder",
+            "savedViewSource": "Naka-save na Paperless view",
+            "tagSource": "Filter ng tag",
+            "tagMatch": "Pagsamahin ang mga tag",
+            "matchAll": "Lahat ng napiling tag (AT)",
+            "matchAny": "Kahit isang napiling tag (O)",
+            "tagFilterHint": "Pumili ng kahit isang tag. Awtomatikong lilitaw ang mga katugmang dokumento. Gumawa ng bagong folder upang baguhin ang filter.",
             "title": "Mga view sa Paperless",
             "add": "Ikonekta ang view sa Paperless",
             "edit": "I-edit ang folder sa Paperless",
@@ -4072,7 +4079,7 @@
             "shared": "Pamilya",
             "shareConsent": "Pinapayagan ko ang mga napiling tao na basahin at i-download ang lahat ng kasalukuyan at darating na dokumento sa view na ito.",
             "viewHint": "Ang pagbabago ng view sa Paperless ay magbabago rin sa folder na ito. Mananatili sa Paperless ang mga file. Kapag walang filter, kasama ang lahat ng dokumentong mababasa ng koneksyon.",
-            "readOnly": "Nananatili sa Paperless ang mga dokumento at filter. Maaaring baguhin dito ng awtorisadong administrator ang mga tag.",
+            "readOnly": "Nananatili ang mga file sa Paperless. Maaaring baguhin ng mga awtorisadong administrator ang mga tag dito.",
             "refresh": "I-refresh",
             "preview": "I-preview",
             "download": "I-download",

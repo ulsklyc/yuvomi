@@ -4326,6 +4326,13 @@
     },
     "documents": {
         "paperless": {
+            "source": "Zdroj složky",
+            "savedViewSource": "Uložený pohled Paperless",
+            "tagSource": "Filtr štítků",
+            "tagMatch": "Propojení štítků",
+            "matchAll": "Všechny vybrané štítky (A)",
+            "matchAny": "Alespoň jeden vybraný štítek (NEBO)",
+            "tagFilterHint": "Vyberte alespoň jeden štítek. Odpovídající dokumenty se zobrazí automaticky. Pro změnu filtru vytvořte novou složku.",
             "title": "Pohledy Paperless",
             "add": "Připojit pohled Paperless",
             "edit": "Upravit složku Paperless",
@@ -4338,7 +4345,7 @@
             "shared": "Rodina",
             "shareConsent": "Uděluji vybraným osobám oprávnění číst a stahovat všechny současné i budoucí dokumenty v tomto pohledu.",
             "viewHint": "Změny pohledu v Paperless změní i tuto složku. Soubory zůstávají v Paperless. Bez filtrů jsou zahrnuty všechny dokumenty čitelné tímto připojením.",
-            "readOnly": "Dokumenty a filtry zůstávají v Paperless. Oprávnění správci zde mohou měnit štítky.",
+            "readOnly": "Soubory zůstávají v Paperless. Oprávnění správci zde mohou měnit štítky.",
             "refresh": "Aktualizovat",
             "preview": "Náhled",
             "download": "Stáhnout",

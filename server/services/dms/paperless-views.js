@@ -92,3 +92,29 @@ export function positiveId(value) {
   const text = String(value ?? '');
   return /^[1-9]\d*$/.test(text) && Number.isSafeInteger(Number(text)) ? Number(text) : null;
 }
+
+/** A local filter must always constrain the archive to at least one tag. */
+/** @param {unknown} value @returns {import('../../../types/paperless.d.ts').TagFilter} */
+export function tagFilter(value) {
+  const filter = /** @type {import('../../../types/paperless.d.ts').TagFilter | null} */ (value);
+  if (!filter || !['all', 'any'].includes(filter.match) || !Array.isArray(filter.tag_ids)
+    || !filter.tag_ids.length || filter.tag_ids.length > 1000
+    || filter.tag_ids.some((id) => !Number.isSafeInteger(id) || id < 1)) {
+    throw new PaperlessViewError('Invalid tag filter.');
+  }
+  return { match: filter.match, tag_ids: [...new Set(filter.tag_ids)].sort((a, b) => a - b) };
+}
+
+/** Dispatch both folder sources through the same membership boundary. */
+/** @param {import('./paperless.js').PaperlessAdapter} adapter
+ * @param {{view_id: number | null, tag_filter?: unknown}} folder
+ * @param {{page?: number, pageSize?: number, documentId?: unknown, displayFields?: string[]}} [options] */
+export function listFolderDocuments(adapter, folder, options = {}) {
+  if (folder.tag_filter != null) {
+    if (folder.view_id != null) throw new PaperlessViewError('Ambiguous folder source.');
+    const filter = tagFilter(typeof folder.tag_filter === 'string' ? JSON.parse(folder.tag_filter) : folder.tag_filter);
+    return adapter.listTagDocuments(filter, options);
+  }
+  if (!positiveId(folder.view_id)) throw new PaperlessViewError('Missing folder source.');
+  return adapter.listViewDocuments(folder.view_id, options);
+}

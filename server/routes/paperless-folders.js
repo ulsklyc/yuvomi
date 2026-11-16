@@ -11,13 +11,13 @@ import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { actorFromRequest, visibleWhere, paperlessFolderMembers, paperlessFolderAudienceWidens, paperlessFolderVisibilityValid } from '../authorize/index.ts';
 import { getAdapter } from '../services/dms/index.js';
-import { PaperlessViewError, positiveId } from '../services/dms/paperless-views.js';
+import { PaperlessViewError, positiveId, tagFilter, listFolderDocuments } from '../services/dms/paperless-views.js';
 
 const router = express.Router();
 router.use(liveSettingsRouter);
 router.use(paperlessTagsRouter);
 const log = createLogger('PaperlessFolders');
-const COLUMNS = 'id, name, account_id, view_id, visibility, created_by, created_at, updated_at';
+const COLUMNS = 'id, name, account_id, view_id, tag_filter, visibility, created_by, created_at, updated_at';
 const PREVIEW_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'text/plain']);
 const THUMB_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 /** @type {(account: object) => import('../services/dms/paperless.js').PaperlessAdapter} */
@@ -54,7 +54,7 @@ function visibleFolder(req, id) {
 
 /** @param {import("../../types/paperless.d.ts").Folder} row */
 function withAccess(row) {
-  return { ...row, allowed_member_ids: db.get().prepare(
+  return { ...row, tag_filter: row.tag_filter == null ? null : tagFilter(typeof row.tag_filter === 'string' ? JSON.parse(row.tag_filter) : row.tag_filter), allowed_member_ids: db.get().prepare(
     'SELECT user_id FROM paperless_view_folder_access WHERE folder_id = ? ORDER BY user_id'
   ).all(row.id).map((/** @type {{user_id: number}} */ entry) => entry.user_id) };
 }
@@ -72,6 +72,7 @@ function unchangedFolder(req, before, source) {
   if (source) recheckLiveAccount(source, actor(req));
   const now = visibleFolder(req, before.id);
   if (now.account_id !== before.account_id || now.view_id !== before.view_id
+    || JSON.stringify(now.tag_filter) !== JSON.stringify(before.tag_filter)
     || now.visibility !== before.visibility || now.created_by !== before.created_by
     || JSON.stringify(now.allowed_member_ids) !== JSON.stringify(before.allowed_member_ids)) {
     throw problem(409, 'paperless_folder_changed');
@@ -125,6 +126,16 @@ router.get('/saved-views', requireAdmin, refuseWhileRestoring, async (req, res) 
   
 });
 
+// Filter creation always uses the same credentials as Live-folder reads.
+router.get('/filter-tags', requireAdmin, refuseWhileRestoring, async (req, res) => {
+  const accountId = positiveId(req.query.account_id), page = positiveId(req.query.page ?? 1);
+  if (!accountId || !page || page > 100000) throw problem(400, 'paperless_folder_invalid');
+  const source = liveAccount(accountId, actor(req));
+  const result = await remote(adapterFactory(source).listTags({ page }));
+  recheckLiveAccount(source, actor(req));
+  res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more } });
+});
+
 router.get('/folders', (req, res) => {
   
     const rows = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders f
@@ -140,14 +151,23 @@ router.post('/folders', requireAdmin, async (req, res) => {
     shareConsent({ ...body, ...values }, { visibility: 'private', created_by: actor(req), allowed_member_ids: [] });
     const accountId = positiveId(body.account_id);
     const viewId = positiveId(body.view_id);
-    if (!accountId || !viewId) throw problem(400, 'paperless_folder_invalid');
+    let filter = null;
+    if (body.tag_filter !== undefined) {
+      try { filter = tagFilter(body.tag_filter); }
+      catch { throw problem(400, 'paperless_folder_invalid'); }
+    }
+    if (!accountId || (filter ? body.view_id !== undefined : !viewId)) throw problem(400, 'paperless_folder_invalid');
     const source = liveAccount(accountId, actor(req));
-    await remote(adapterFactory(source).getSavedView(viewId));
+    if (filter) {
+      // Verify every selected tag with the creator's configured Live-folder token.
+      const tags = await remote(adapterFactory(source).getTags(filter.tag_ids));
+      if (filter.tag_ids.some((id) => !tags.some((tag) => tag.id === id))) throw problem(400, 'paperless_folder_invalid');
+    } else await remote(adapterFactory(source).getSavedView(viewId));
     recheckLiveAccount(source, actor(req));
     const result = db.get().transaction(() => {
       const result = db.get().prepare(`INSERT INTO paperless_view_folders
-      (name, account_id, view_id, visibility, created_by) VALUES (?, ?, ?, ?, ?)`)
-      .run(values.name, accountId, viewId, values.visibility, actor(req));
+      (name, account_id, view_id, tag_filter, visibility, created_by) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(values.name, accountId, viewId, filter ? JSON.stringify(filter) : null, values.visibility, actor(req));
       replaceAccess(result.lastInsertRowid, values.allowed_member_ids);
       return result;
     })();
@@ -162,7 +182,7 @@ router.put('/folders/:id', requireAdmin, (req, res) => {
     const values = fields(req.body || {});
     shareConsent({ ...req.body, ...values }, before);
     // Account and view are immutable. A different view is a new delegation.
-    if (req.body.account_id !== undefined || req.body.view_id !== undefined) {
+    if (req.body.account_id !== undefined || req.body.view_id !== undefined || req.body.tag_filter !== undefined) {
       throw problem(400, 'paperless_folder_invalid');
     }
     db.get().transaction(() => {
@@ -191,7 +211,7 @@ router.get('/folders/:id/documents', refuseWhileRestoring, async (req, res) => {
     if (!page || page > 100000) throw problem(400, 'paperless_folder_invalid');
     const source = liveAccount(folder.account_id, actor(req));
     const displayFields = source.live_settings.display_fields;
-    const result = await remote(adapterFactory(source).listViewDocuments(folder.view_id, { page, pageSize: 50, displayFields }));
+    const result = await remote(listFolderDocuments(adapterFactory(source), folder, { page, pageSize: 50, displayFields }));
     unchangedFolder(req, folder, source);
     res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more, display_fields: displayFields } });
   
@@ -208,7 +228,7 @@ router.get('/folders/:id/documents/:documentId/:action', refuseWhileRestoring, a
     const adapter = adapterFactory(source);
     // Intersect the current view with the requested ID at Paperless. A
     // valid ID alone never authorizes media, even if an old page contained it.
-    const result = await remote(adapter.listViewDocuments(folder.view_id, { documentId, pageSize: 1 }));
+    const result = await remote(listFolderDocuments(adapter, folder, { documentId, pageSize: 1 }));
     const doc = result.results.find((/** @type {import("../../types/paperless.d.ts").Document} */ row) => String(row.id) === documentId);
     if (!doc) throw problem(404, 'paperless_document_not_found');
     unchangedFolder(req, folder, source);

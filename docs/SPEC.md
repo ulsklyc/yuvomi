@@ -3633,6 +3633,22 @@ recalled. Removing the DMS connection also removes its view-folder bindings.
 
 #### Design
 
+- Migration 286 supports local tag-filter sources in the same folder table. Choose
+  a saved Paperless view or a local filter when adding a Live folder. Local filters
+  require at least one tag, combined with AND (`all`) or OR (`any`); no saved view
+  is created or modified in Paperless. Tag names and IDs are paginated using the
+  configured Live-folder token. Filter tags need read access; the tag-edit allowlist
+  governs changes to document tags, not filtering.
+- A folder has exactly one source: positive `view_id` or `tag_filter` containing
+  `{match, tag_ids}`. Source/filter changes require a new folder and a new sharing
+  delegation. Preview, download and tag operations intersect the current local
+  filter with the document ID using the current reader's credentials. Removing
+  a matching document tag can make a document disappear immediately.
+- Live-folder settings use the shared settings-card, grouped-row and switch
+  components. Overview switches save immediately with optimistic policy revisions;
+  failed saves restore the switch. Credential and allowed-tag changes retain the
+  explicit Save action. Existing folders, audience grants and tokens survive the
+  append-only migration.
 - Migration 283 adds `paperless_view_folders` and `paperless_view_folder_access`; shipped migrations stay intact.
 - `server/services/dms/paperless-views.js` translates persisted Paperless rule
   IDs. Unknown or malformed rules fail closed with 422.

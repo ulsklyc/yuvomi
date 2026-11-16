@@ -2,7 +2,7 @@ import { paperlessControl, paperlessApiError } from '/components/paperless-dom.j
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { settingRowHtml, toggleRowHtml, createInlineError, createRetryState } from '/settings/components.js';
+import { settingRowHtml, settingSwitchRowHtml, bindInstantSwitch, createInlineError, createRetryState } from '/settings/components.js';
 import { reportFieldErrors, constraintErrors } from '/components/modal.js';
 
 const ROOT = '/documents/dms/paperless';
@@ -26,7 +26,7 @@ function message(error) {
  * @param {{canManage: boolean, signal?: AbortSignal}} options */
 function buildAccount(account, { canManage, signal }) {
   const section = Object.assign(document.createElement('section'), { loadInitialTags: /** @type {(() => Promise<void>) | undefined} */ (undefined) });
-  section.className = 'settings-section';
+  section.className = 'settings-card';
   section.insertAdjacentHTML('beforeend', `<h3 class="settings-section__title">${esc(account.name)}</h3>`);
   const current = () => !signal?.aborted && section.isConnected;
   const options = signal ? { signal } : {};
@@ -97,15 +97,17 @@ function buildAccount(account, { canManage, signal }) {
         ${settingRowHtml({ label: t('settings.liveFolders.tags'), labelFor: tagsId, description: text('tagsHint'),
           control: `<select class="form-input" id="${tagsId}"><option value="all">${esc(text('allTags'))}</option><option value="selected">${esc(text('selectedTags'))}</option></select>` })}
       </div>
-      <fieldset class="settings-group" data-display-fields><legend>${esc(text('displayFields'))}</legend>
-        <p class="form-hint">${esc(text('displayFieldsHint'))}</p>
-        <div>${DISPLAY_FIELDS.map((field) => toggleRowHtml({ label: t(`documents.paperless.fields.${field}`),
-          control: 'switch', checked: account.display_fields?.includes(field), attrs: { value: field } })).join('')}</div>
-      </fieldset>
-      <fieldset class="settings-group" data-tags-picker><legend>${esc(text('tags'))}</legend>
-        <div class="live-folder-settings__tags" data-tags-list></div>
+      <h4 class="settings-group__title" id="live-fields-${account.id}">${esc(text('displayFields'))}</h4>
+      <div class="row-carrier settings-group" data-display-fields role="group" aria-labelledby="live-fields-${account.id}">
+        ${DISPLAY_FIELDS.map((field) => settingSwitchRowHtml({ label: t(`documents.paperless.fields.${field}`),
+          checked: account.display_fields?.includes(field), attrs: { value: field, 'data-instant-save': '' } })).join('')}
+      </div>
+      <p class="settings-group__footer form-hint">${esc(text('displayFieldsHint'))}</p>
+      <div data-tags-picker>
+        <h4 class="settings-group__title" id="live-tags-${account.id}">${esc(text('tags'))}</h4>
+        <div class="row-carrier settings-group live-folder-settings__tags" data-tags-list role="group" aria-labelledby="live-tags-${account.id}"></div>
         <button type="button" class="btn btn--secondary btn--sm" data-more-tags>${esc(t('documents.paperless.tags.more'))}</button>
-      </fieldset>
+      </div>
       <div data-policy-error role="alert"></div>
       <div class="settings-form-actions"><button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button></div>`);
     const mode = /** @type {HTMLSelectElement} */ (paperlessControl(form, `#${modeId}`));
@@ -122,15 +124,20 @@ function buildAccount(account, { canManage, signal }) {
     function drawTags() {
       list.replaceChildren();
       for (const id of new Set([...selected, ...tags.keys()])) {
+        const row = document.createElement('div');
+        row.className = 'settings-setting-row';
         const label = document.createElement('label');
-        label.className = 'live-folder-settings__tag';
+        label.className = 'toggle-row';
         const input = document.createElement('input');
         input.type = 'checkbox'; input.value = String(id);
         input.checked = tagsMode.value === 'all' || selected.has(id);
         input.disabled = tagsMode.value === 'all';
+        const name = document.createElement('span');
+        name.textContent = tags.has(id) ? `${tags.get(id)} (#${id})` : `#${id}`;
+        label.append(input, name);
+        row.append(label);
         input.addEventListener('change', () => input.checked ? selected.add(id) : selected.delete(id), options);
-        label.append(input, document.createTextNode(` ${tags.has(id) ? `${tags.get(id)} (#${id})` : `#${id}`}`));
-        list.append(label);
+        list.append(row);
       }
     }
     async function loadTags() {
@@ -146,6 +153,25 @@ function buildAccount(account, { canManage, signal }) {
       } catch (err) { if (current()) error.replaceChildren(createInlineError(message(err))); }
       finally { loading = false; if (current()) more.disabled = false; }
     }
+    const displayInputs = /** @type {HTMLInputElement[]} */ ([...form.querySelectorAll('[data-display-fields] input')]);
+    for (const input of displayInputs) bindInstantSwitch(input, {
+      savedMessage: text('saved'),
+      save: async () => {
+        displayInputs.forEach((field) => { field.disabled = true; });
+        error.replaceChildren();
+        try {
+          const result = await api.put(`${ROOT}/live-settings/${account.id}`, {
+            token_mode: account.token_mode, allowed_tag_ids: account.allowed_tag_ids,
+            display_fields: displayInputs.filter((field) => field.checked).map((field) => field.value),
+            expected_revision: account.revision,
+          });
+          if (current()) Object.assign(account, result.data);
+        } catch (err) {
+          if (current()) error.replaceChildren(createInlineError(message(err)));
+          throw err;
+        } finally { if (current()) displayInputs.forEach((field) => { field.disabled = false; }); }
+      },
+    });
     tagsMode.addEventListener('change', () => {
       drawTags();
       if (!page) loadTags();
@@ -153,10 +179,10 @@ function buildAccount(account, { canManage, signal }) {
     more.addEventListener('click', () => loadTags(), options);
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (!current()) return;
+      if (!current() || displayInputs.some((input) => input.disabled)) return;
       const submit = /** @type {HTMLButtonElement} */ (paperlessControl(form, '[type="submit"]'));
       if (submit.disabled) return;
-      submit.disabled = true; error.replaceChildren();
+      submit.disabled = true; displayInputs.forEach((input) => { input.disabled = true; }); error.replaceChildren();
       try {
         const result = await api.put(`${ROOT}/live-settings/${account.id}`, { token_mode: mode.value,
           display_fields: [...form.querySelectorAll('[data-display-fields] input:checked')].map((input) => /** @type {HTMLInputElement} */ (input).value),
@@ -166,7 +192,7 @@ function buildAccount(account, { canManage, signal }) {
         updateOwn();
         window.yuvomi?.showToast(text('saved'), 'success');
       } catch (err) { if (current()) error.replaceChildren(createInlineError(message(err))); }
-      finally { if (current()) submit.disabled = false; }
+      finally { if (current()) { submit.disabled = false; displayInputs.forEach((input) => { input.disabled = false; }); } }
     }, options);
     section.append(form);
     drawTags();
