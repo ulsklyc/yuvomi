@@ -504,6 +504,82 @@ test('task reader: the wall rule for a paired display, the task row rule for eve
   db.prepare('DELETE FROM tasks WHERE id = ?').run(named);
 });
 
+test('row reader: the task names are the reader for tasks; events read the wall rule on both axes', () => {
+  const rowReader = rowApi('rowReader');
+  const readerVisibleWhere = rowApi('readerVisibleWhere');
+  const readerBinds = rowApi('readerBinds');
+  const readerRowVisible = rowApi('readerRowVisible');
+  const taskReader = rowApi('taskReader');
+  const taskVisibleWhere = rowApi('taskVisibleWhere');
+  const taskRowVisible = rowApi('taskRowVisible');
+  const personReader = rowApi('personReader');
+
+  // rowReader: the display flag, or the wall audience of a request; the task reader is the same.
+  for (const req of [
+    { authMethod: 'display', authUserId: display },
+    { authMethod: 'session', session: { userId: owner } },
+    { authMethod: 'api_token', authUserId: owner },
+  ]) assert.deepEqual({ ...rowReader(req) }, { ...taskReader(req) });
+  assert.deepEqual({ ...rowReader({ authMethod: 'session', session: { userId: owner } }, { household: true }) }, { userId: owner, wall: true });
+  assert.deepEqual({ ...rowReader({ authMethod: 'session', session: { userId: owner } }, { household: false }) }, { userId: owner, wall: false });
+  assert.deepEqual({ ...personReader(owner) }, { userId: owner, wall: false });
+
+  // The task wrappers answer exactly as readerVisibleWhere / readerRowVisible for 'tasks'.
+  const taskRows = rowsById('tasks', eqTasks);
+  for (const viewer of VIEWERS) {
+    for (const wall of [false, true]) {
+      const reader = { userId: viewer, wall };
+      assert.equal(taskVisibleWhere(reader, 'x'), readerVisibleWhere(reader, 'tasks', 'x', '@me'));
+      assert.equal(taskVisibleWhere(reader, 'x', '@v'), readerVisibleWhere(reader, 'tasks', 'x', '@v'));
+      for (const row of taskRows) assert.equal(taskRowVisible(db, reader, row), readerRowVisible(db, reader, 'tasks', row));
+    }
+  }
+
+  // Events: two subscriptions of the owner, one shared, each with one 'all' event.
+  const sub = (/** @type {number} */ shared) => Number(db.prepare(
+    "INSERT INTO ics_subscriptions (name, url, created_by, shared) VALUES ('reader', 'https://reader.example/a.ics', ?, ?) RETURNING id",
+  ).get(owner, shared).id);
+  const subs = [sub(0), sub(1)];
+  const icsEvents = subs.map((id) => Number(db.prepare(
+    "INSERT INTO calendar_events (title, start_datetime, created_by, visibility, external_source, subscription_id) VALUES ('ics', '2026-01-01T10:00', ?, 'all', 'ics', ?) RETURNING id",
+  ).get(owner, id).id));
+  const named = Number(db.prepare(
+    "INSERT INTO calendar_events (title, start_datetime, created_by, visibility) VALUES ('reader.assignees', '2026-01-01T10:00', ?, 'assignees') RETURNING id",
+  ).get(owner).id);
+  db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(named, display);
+  const ids = [...eqEvents, ...icsEvents, named];
+  const eventRows = rowsById('calendar_events', ids);
+  const shared = (/** @type {any} */ row) => row.external_source !== 'ics' || row.subscription_id === subs[1];
+  try {
+    for (const viewer of VIEWERS) {
+      for (const wall of [false, true]) {
+        const reader = { userId: viewer, wall };
+        const where = `${readerVisibleWhere(reader, 'ics_subscriptions', 'x', '?')} AND ${readerVisibleWhere(reader, 'events', 'x', '?')}`;
+        const binds = [...readerBinds(reader, 'ics_subscriptions'), ...readerBinds(reader, 'events')];
+        assert.equal(binds.length, wall ? 0 : 3, `viewer ${viewer}, wall ${wall}: the positional binds`);
+        const sql = db.prepare(`SELECT x.id FROM calendar_events x WHERE x.id IN (${ids.join(',')}) AND ${where} ORDER BY x.id`)
+          .all(...binds).map((/** @type {any} */ r) => r.id);
+        const person = sqlIds('calendar_events', `${authorizeApi.visibleWhere('ics_subscriptions', 'x', '@v')} AND ${authorizeApi.visibleWhere('events', 'x', '@v')}`, ids, viewer);
+        const household = eventRows.filter((row) => row.visibility === 'all' && shared(row)).map((row) => row.id);
+        assert.deepEqual(sql, wall ? household : person, `viewer ${viewer}, wall ${wall}`);
+        const js = eventRows.filter((row) => readerRowVisible(db, reader, 'events', row)).map((row) => row.id);
+        const rowsAxis = sqlIds('calendar_events', readerVisibleWhere(reader, 'events', 'x', '@v'), ids, viewer);
+        assert.deepEqual(js, rowsAxis, `viewer ${viewer}, wall ${wall}: the row form equals the fragment`);
+      }
+    }
+    assert.ok(sqlIds('calendar_events', readerVisibleWhere({ userId: display, wall: false }, 'events', 'x', '@v'), [named], display).length === 1,
+      'the row rule shows the event to its assignee');
+    assert.equal(readerRowVisible(db, { userId: display, wall: true }, 'events', rowsById('calendar_events', [named])[0]), false, 'the wall rule does not');
+    assert.throws(() => readerVisibleWhere({ userId: owner, wall: true }, 'notes', 'x', '?'), /unknown reader type/);
+    assert.throws(() => readerBinds({ userId: owner, wall: true }, 'toString'), /unknown reader type/);
+    assert.throws(() => readerRowVisible(db, { userId: owner, wall: false }, 'ics_subscriptions', {}), /no row check/);
+  } finally {
+    db.prepare(`DELETE FROM event_assignments WHERE event_id = ${named}`).run();
+    db.prepare(`DELETE FROM calendar_events WHERE id IN (${[...icsEvents, named].join(',')})`).run();
+    db.prepare(`DELETE FROM ics_subscriptions WHERE id IN (${subs.join(',')})`).run();
+  }
+});
+
 test('canEditQuickLink: own tiles, and shared tiles for an admin; never a foreign private one', () => {
   const canEditQuickLink = rowApi('canEditQuickLink');
   const own = { created_by: owner, visibility: 'private' };

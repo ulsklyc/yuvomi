@@ -22,7 +22,7 @@
 
 import { SOURCE_CALENDAR_JOIN } from './calendar-events.js';
 import { localCalendarIdSql } from './local-calendars.js';
-import { visibleWhere } from '../authorize/index.ts';
+import { personReader, readerVisibleWhere } from '../authorize/index.ts';
 
 const KEY_RE = /^(local|cal|sub):([1-9]\d{0,14})$/;
 const MAX_SELECTION = 50;
@@ -49,11 +49,18 @@ export function normalizeCalendarSelection(raw) {
  * eigenes - dieselbe Regel wie `GET /calendar/subscriptions`). Eigene zuerst
  * in der Reihenfolge der Verwaltung, danach die uebrigen nach Namen.
  *
+ * A paired display names only the synced calendars with an event the whole household
+ * sees (`reader`, rowReader in server/authorize); without it the person rule for
+ * `viewerId` applies. The dashboard selection (resolveCalendarSelection) asks
+ * without it on purpose: a selection is a filter, not a disclosure, and a key the
+ * wall rule dropped would turn the tile back to "all calendars".
+ *
  * @param {object} d better-sqlite3-Connection
  * @param {number|null} viewerId
+ * @param {{ reader?: import('../authorize/index.ts').RowReader | null }} [options]
  * @returns {{ key: string, name: string, color: string|null }[]}
  */
-export function calendarSources(d, viewerId) {
+export function calendarSources(d, viewerId, { reader = null } = {}) {
   const local = d.prepare(`
     SELECT id, name, color FROM local_calendars
     ORDER BY sort_order ASC, name COLLATE NOCASE ASC, id ASC
@@ -68,7 +75,7 @@ export function calendarSources(d, viewerId) {
     FROM calendar_events e
     ${SOURCE_CALENDAR_JOIN}
     WHERE src.id IS NOT NULL AND e.subscription_id IS NULL
-      AND ${visibleWhere('events', 'e', '@viewer')}
+      AND ${readerVisibleWhere(reader ?? personReader(viewerId), 'events', 'e', '@viewer')}
   `).all({ viewer: viewerId }).map((row) => ({ key: `cal:${row.id}`, name: row.name, color: row.color ?? null }));
   const subscriptions = d.prepare(`
     SELECT id, name, color FROM ics_subscriptions WHERE shared = 1 OR created_by = ?

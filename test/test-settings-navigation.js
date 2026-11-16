@@ -54,6 +54,8 @@ import {
   shouldApplySubdivisionResponse,
 } from '../public/settings/pages/modules-calendar.js';
 import {
+  currencyName,
+  currencyShortLabel,
   persistCurrencySelection,
 } from '../public/settings/currency.js';
 import { CURRENCY_CODES } from '../public/utils/currency-codes.js';
@@ -5318,6 +5320,28 @@ test('R21 S9c: Darstellung - der Auswahlwert ist kurz, das Detail steht vorn in 
   const memberSet = await renderAppearance({ ...APPEARANCE_PREFS, timezone: 'America/New_York' }, 'member');
   assert.match(memberSet, /<span class="settings-setting-row__value">America\/New York<\/span>/);
   assert.match(memberSet, /<p class="settings-setting-row__description form-row__description">settings\.timezoneAdminOnly<\/p>/);
+});
+
+// C4 (E9): die Waehrung aendern nur Admins - der Server antwortet einem
+// Mitglied mit 403. Das Mitglied sieht sie trotzdem: als Wert, im Muster der
+// Zeitzonen-Zeile daneben, Waehrung vor Zeitzone wie bei Admins. Der Wert ist
+// das Kurzlabel der Auswahl ("EUR €"), der volle Name steht in der
+// Sekundaerzeile (#2166) - ohne eigenen Hinweissatz, den sagt der Fuss
+// `settings.regionAdminOnly`. Kein Select, auch kein gesperrtes.
+test('C4: ein Mitglied sieht die Waehrung nur lesend, ein Admin die Auswahl', async () => {
+  const member = await renderAppearance({ ...APPEARANCE_PREFS, currency: 'CHF' }, 'member');
+  assert.doesNotMatch(member, /id="currency-select"/, 'kein Bedienelement fuer ein Mitglied');
+  const row = member.match(/<div class="settings-setting-row form-row"><div class="settings-setting-row__copy form-row__copy"><span class="settings-setting-row__label form-row__label">settings\.currencyLabel<\/span>([\s\S]*?)<\/div><div class="settings-setting-row__control form-row__control">([\s\S]*?)<\/div><\/div>/);
+  assert.ok(row, 'eine Zeile "Waehrung" mit Label ohne for');
+  assert.equal(row[1], `<p class="settings-setting-row__description form-row__description">${currencyName('CHF')}</p>`,
+    'die Sekundaerzeile nennt nur den vollen Namen, keinen zweiten Hinweissatz');
+  assert.equal(unescapeHtml(row[2]), `<span class="settings-setting-row__value">${currencyShortLabel('CHF')}</span>`);
+  assert.ok(member.indexOf('settings.currencyLabel') < member.indexOf('settings.timezoneTitle'), 'Waehrung vor Zeitzone');
+  assert.match(member, /<p class="form-hint settings-group__footer">settings\.regionAdminOnly<\/p>/, 'der Fuss sagt, wer aendert');
+
+  const admin = await renderAppearance({ ...APPEARANCE_PREFS, currency: 'CHF' }, 'admin');
+  assert.equal(selectedOptionText(admin, 'currency-select'), currencyShortLabel('CHF'), 'der Admin waehlt wie bisher');
+  assert.doesNotMatch(admin, /settings-setting-row__value">[^<]*CHF/, 'und hat keine zweite, nur lesende Zeile');
 });
 
 test('R21 S9c: die Hinweiszeile folgt der Auswahl und der Automatik', async () => {

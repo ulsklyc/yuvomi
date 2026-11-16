@@ -49,7 +49,7 @@ const KNIP = join(REPO, 'node_modules', 'knip', 'bin', 'knip.js');
 const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
 const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'CHANNEL-SEND', 'PUSH-SEND',
   'push-service-importers', 'web-push-only-in-push-service', 'channel-delivery-importers', 'providers-only-in-channel-delivery',
-  'RIGHTS-MODULE', 'rights-only-through-authorize', 'authorize-not-to-db',
+  'RIGHTS-MODULE', 'rights-only-through-authorize', 'authorize-not-to-db', 'settings-is-a-leaf',
   'blanket-disable', 'disable-no-restricted-syntax'];
 
 /** The real rule set for a directory outside the repo: no fixture ignore, plugin by absolute URL. */
@@ -371,6 +371,36 @@ test('server/authorize/ reaching server/db.js, also through another module, is a
     assert.equal(r.code, 1, r.out);
     // Hard since phase 2, B5: named on its own, never a baseline key.
     assert.match(r.out, /Hard rules[\s\S]*server\/authorize\/actor\.ts\s+depcruise\/authorize-not-to-db\s+1/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('server/settings/ importing a service, a route or server/db.js is a hard finding (phase 2, C3)', () => {
+  // The settings registry is a leaf under the services: every service may ask it,
+  // so it must never import one back. module-capabilities.js is the one pure
+  // grammar under services/ it may read.
+  const dir = project(NONE);
+  try {
+    copyFileSync(DEPCRUISE_CONFIG, join(dir, '.dependency-cruiser.mjs'));
+    for (const d of ['server/settings', 'server/services', 'server/routes', 'server/utils']) mkdirSync(join(dir, d), { recursive: true });
+    writeFileSync(join(dir, 'server', 'db.js'), 'export const get = () => null;\n');
+    writeFileSync(join(dir, 'server', 'utils', 'zone.js'), 'export const z = 1;\n');
+    writeFileSync(join(dir, 'server', 'services', 'module-capabilities.js'), 'export const isWidgetId = () => true;\n');
+    writeFileSync(join(dir, 'server', 'services', 'sync.js'), 'export const s = 1;\n');
+    writeFileSync(join(dir, 'server', 'routes', 'prefs.js'), 'export const p = 1;\n');
+    writeFileSync(join(dir, 'server', 'settings', 'registry.ts'),
+      "import { z } from '../utils/zone.js';\nimport { isWidgetId } from '../services/module-capabilities.js';\nexport const r = [z, isWidgetId];\n");
+    assert.equal(run(dir, '--init').code, 0);
+    assert.deepEqual(baselineOf(dir), {}, 'utils and the widget-id grammar are allowed');
+    for (const [file, source] of [
+      ['service.ts', "import { s } from '../services/sync.js';\nexport const a = s;\n"],
+      ['route.ts', "import { p } from '../routes/prefs.js';\nexport const a = p;\n"],
+      ['db.ts', "import { get } from '../db.js';\nexport const a = get;\n"],
+    ]) writeFileSync(join(dir, 'server', 'settings', file), source);
+    const r = run(dir);
+    assert.equal(r.code, 1, r.out);
+    for (const file of ['service.ts', 'route.ts', 'db.ts']) {
+      assert.match(r.out, new RegExp(`Hard rules[\\s\\S]*server/settings/${file.replace('.', '\\.')}\\s+depcruise/settings-is-a-leaf\\s+1`), r.out);
+    }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

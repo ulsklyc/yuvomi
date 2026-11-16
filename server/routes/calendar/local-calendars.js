@@ -1,7 +1,7 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { isAdminRequest, requireAdmin } from '../../middleware/require-admin.js';
-import { mayWriteModule, visibleWhere } from '../../authorize/index.ts';
+import { mayWriteModule, readerVisibleWhere, rowReader } from '../../authorize/index.ts';
 import {
   clearCalendarFeedToken,
   ensureDefaultCalendar,
@@ -40,19 +40,22 @@ function sendValidationErrors(res, results) {
   });
 }
 
-function loadCalendars(database, viewerId) {
+/** @param {import('../../authorize/index.ts').RowReader} reader */
+function loadCalendars(database, reader) {
   ensureDefaultCalendar(database);
   return database.prepare(`
     SELECT lc.*,
-           (SELECT COUNT(*) FROM calendar_events e WHERE ${localCalendarIdSql()} = lc.id AND ${visibleWhere('events', 'e', '@viewerId')}) AS event_count
+           (SELECT COUNT(*) FROM calendar_events e WHERE ${localCalendarIdSql()} = lc.id AND ${readerVisibleWhere(reader, 'events', 'e', '@viewerId')}) AS event_count
     FROM local_calendars lc
     ORDER BY lc.sort_order ASC, lc.name COLLATE NOCASE ASC, lc.id ASC
-  `).all({ viewerId });
+  `).all({ viewerId: reader.userId });
 }
 
 router.get('/calendars', (req, res) => {
   try {
-    const rows = loadCalendars(db.get(), getUserId(req));
+    // A paired display counts and names only what the whole household sees (rowReader).
+    const reader = rowReader(req);
+    const rows = loadCalendars(db.get(), reader);
     // Nur der Standardkalender geht mit der alten Apple-Verbindung zu iCloud
     // hinauf. Die Rückfrage vor dem Löschen eines anderen Kalenders nennt das,
     // weil dessen Termine dorthin fallen. Ein Ja oder Nein, keine Zugangsdaten.
@@ -68,7 +71,7 @@ router.get('/calendars', (req, res) => {
         event_count: row.event_count ?? 0,
         uploads_to_icloud: icloudUpload && !!row.is_default,
       })),
-      sources: calendarSources(db.get(), getUserId(req)),
+      sources: calendarSources(db.get(), getUserId(req), { reader }),
     });
   } catch (err) {
     log.error('GET /calendars', err);
