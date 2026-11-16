@@ -331,8 +331,10 @@
  *
  * Die Wertbeschriftung ist breiter als eine schmale Spalte ("9.999 €" misst
  * bei 11px rund 42px, die Spalte bei 254px 34px). Spaltenabstand plus Luecke
- * (44px) halten sie von der Nachbarin frei; an den beiden Raendern steht sie
- * bis zu 4px ueber. Dafuer reicht der Scrollport per Bleed --space-1h in das
+ * (44px) halten sie von der Nachbarin frei, weil chartMoney() sie immer ganz
+ * zeigt (bis vier Stellen; "1.234,50 €" mass 59px und stiess an die
+ * Nachbarin, fuenfstellige Monatssummen sind nicht gerechnet); an den beiden
+ * Raendern steht sie bis zu 4px ueber. Dafuer reicht der Scrollport per Bleed --space-1h in das
  * Polster der Karte - der Inhaltsrand bleibt, wo er war, und nichts wird
  * beschnitten. */
 .housekeeping-chart {

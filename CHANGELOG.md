@@ -25,7 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The housekeeping payments chart shows all six months on a phone.** On screens narrower
   than about 390px the chart scrolled sideways and started at the oldest month, so the current
   month on the right was cut off or hidden. The six columns now fit the card from a 320px wide
-  screen, and amounts up to four digits stay readable above their column.
+  screen, and amounts up to four digits stay readable above their column. The number above
+  a column is now always a whole amount, so a month total like €1,234.50 no longer runs into
+  its neighbour; the exact amount is still shown in the visits and the report.
 
 ## [2.91.0] - 2026-11-15
 
