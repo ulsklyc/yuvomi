@@ -8,15 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **Every "administrators only" refusal of the API has the same answer.** Routes that only an
-  administrator may use refused everyone else with one of four texts ("Permission denied.",
-  "Admin access required.", "Not authorized.", and one of its own for the member order), most
-  of them without a `reason`. They now all answer `403` with
-  `{ "error": "Admin access required.", "code": 403, "reason": "admin_required" }`. A signed-in
-  device gets `reason: "device_credential"` at every one of these routes, where some of them
-  used to send the plain text. API clients that compared the text should read the `reason`
-  instead. Who may use a route has not changed, and the web app shows the same sentence as
-  before.
 - **Picking a time takes two taps: hour and minute stand side by side.** The clock button of a
   time field used to open one list of every time in 15-minute steps (96 rows, and 18:05 was not
   in it). It now opens an hour column and a minute column in 5-minute steps, with an AM/PM column
@@ -29,6 +20,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `24122026` turns the calendar to that day (#2671).
 
 ### Fixed
+- **The "session cannot be checked" screen is readable on the light field.** When the server
+  did not answer the sign-in check at startup (offline, a server error, too many requests), the
+  title, the sentence and "Technical details" stood directly on the violet light field behind
+  them, and in the light theme the sentence and the details link fell below the WCAG AA
+  contrast of 4.5:1. The screen now sits on the same glass panel as the sign-in page.
+- **The retry countdown keeps number and unit together in Traditional Chinese.** On the same
+  screen, the hint "Trying again in 2 s" could break between the number and 秒 on a narrow
+  panel. Every other language already joined them with a non-breaking space; zh-Hant now does
+  too.
+- **Numbers stay on one line with their unit in every language.** Texts such as "up to 25 MB",
+  "1 h 30 min", "45 %", the wind speed on the weather card or the Russian and Ukrainian "5 дн."
+  could break between the number and its abbreviated unit, leaving the unit alone at the start
+  of the next line. All 27 languages now join them with a non-breaking space, and a test keeps
+  new texts to the same rule.
+- **The housekeeping payments chart shows all six months on a phone.** On screens narrower
+  than about 390px the chart scrolled sideways and started at the oldest month, so the current
+  month on the right was cut off or hidden. The six columns now fit the card from a 320px wide
+  screen, and amounts up to four digits stay readable above their column. The number above
+  a column is now always a whole amount, so a month total like €1,234.50 no longer runs into
+  its neighbour; the exact amount is still shown in the visits and the report.
+- **Escape in a date or time picker returns the focus to where it came from.** It stayed on a row
+  of the closed picker, so the next Tab started from nowhere.
+
+## [2.91.0] - 2026-11-15
+
+### Changed
+- **Every "administrators only" refusal of the API has the same answer.** Routes that only an
+  administrator may use refused everyone else with one of four texts ("Permission denied.",
+  "Admin access required.", "Not authorized.", and one of its own for the member order), most
+  of them without a `reason`. They now all answer `403` with
+  `{ "error": "Admin access required.", "code": 403, "reason": "admin_required" }`. A signed-in
+  device gets `reason: "device_credential"` at every one of these routes, where some of them
+  used to send the plain text. API clients that compared the text should read the `reason`
+  instead. Who may use a route has not changed, and the web app shows the same sentence as
+  before.
+- **Four household settings are for administrators only.** The currency, the app name, the
+  housekeeping payment tasks and the default length of new events count for the whole
+  household, but every member could change them through the API. A member who sends
+  `currency`, `app_name`, `housekeeping_payment_tasks` or `calendar_default_duration` to
+  `PUT /api/v1/preferences` now gets `403` with `reason: "admin_required"`, also for an invalid
+  value, which used to answer `400`, and nothing of that request is saved. Every member still
+  reads all four. In the web app members never saw these controls; on the Appearance page they
+  now see the household currency as a read-only row.
+
+### Fixed
 - **The backup schedule shows the same time as the next backup.** On a server running in
   another time zone than the household, the backup card said "Daily at 02:00" above "Next
   backup 03:00" for the same run. The server now names the zone its schedule runs in, and the
@@ -37,17 +73,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zones changes to summer time, it shows the configured value (`BACKUP_SCHEDULE=0 2 * * *`)
   instead.
 - **A wall display reads only the tasks the whole household sees.** The task list, a single
-  task with its subtasks, its comments, its history and the household's completion feed
-  (`GET /api/v1/tasks`, `/tasks/:id`, `/tasks/:id/comments`, `/tasks/:id/completions`,
-  `/tasks/completions`) asked a paired display the same question as a person, so a task or
-  subtask shared only with its assignees would show on the wall if the display itself was
-  assigned, while ticking it off there answered "not found". Every one of these reads now
-  follows the same wall rule: such a task answers "not found" like an unknown one, and the
-  list, its subtask counts and the feeds leave it out, also for every earlier instance of a
-  repeating task. Nothing changes for people. In the app this state could not be reached: a
-  display is never offered as an assignee, and the server refuses it as one.
-- **Escape in a date or time picker returns the focus to where it came from.** It stayed on a row
-  of the closed picker, so the next Tab started from nowhere.
+  task with its subtasks, its comments, its linked documents, its history, the household's
+  completion feed, the tag lists, the task parts of the overview and the task named by a
+  points entry (`GET /api/v1/tasks`, `/tasks/:id`, `/tasks/:id/comments`,
+  `/tasks/:id/documents`, `/tasks/:id/completions`, `/tasks/completions`, `/tasks/tags`,
+  `/tasks/meta/options`, `/dashboard` without `audience=household`, `/rewards/ledger`) asked a
+  paired display the same question as a person, so a task or subtask shared only with its
+  assignees would show on the wall if the display itself was assigned, while ticking it off
+  there answered "not found". Every one of these reads now follows the same wall rule: such a
+  task answers "not found" like an unknown one, also where a household task answers "no
+  access to documents", and the list, its subtask counts, the feeds, the tags, the overview
+  with its counts and countdowns leave it out, also for every earlier instance of a repeating
+  task; a points entry keeps its row and its points, only without the task's name. Nothing
+  changes for people. In the app this state could not be reached: a display is never offered
+  as an assignee, and the server refuses it as one.
+- **A wall display reads only the events the whole household sees.** The calendar, the next
+  events, the event search, a single event, the event count and the synced calendars of the
+  calendar list, and the event parts of the overview without `audience=household` showed a
+  display an event shared only with its assignees if the display itself was assigned. They
+  now follow the same wall rule as the tasks: such an event answers "not found" like an
+  unknown one and stays off every list, count and countdown. Nothing changes for people, and
+  as with the tasks the state could not be reached in the app.
 
 ## [2.90.0] - 2026-11-14
 

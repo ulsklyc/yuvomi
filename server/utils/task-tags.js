@@ -19,7 +19,7 @@
  * die eine Liste an eine Person ausliefert).
  */
 
-import { visibleWhere } from '../authorize/index.ts';
+import { taskVisibleWhere, visibleWhere } from '../authorize/index.ts';
 
 // Identisch zu den Grenzen im Parser (server/services/ics-parser.js): was von
 // dort hereinkommt, ist bereits gedeckelt, was aus der Oberfläche kommt, wird es
@@ -206,17 +206,24 @@ export function setItemTags(database, itemId, tags) {
  * Fehlt `me`, bleibt nur übrig, was ohnehin für alle sichtbar ist - ein
  * vergessener Parameter zeigt also zu wenig statt zu viel.
  *
+ * A paired display lists under the wall rule: the routes hand in the reader of the
+ * request (taskReader in server/authorize), and a tag that hangs only on tasks the
+ * whole household does not see stays off the wall. Without `reader` the person rule
+ * for `me` applies, so existing callers keep their answer.
+ *
  * @param {number|null} me betrachtende User-ID
+ * @param {{ reader?: import('../authorize/index.ts').TaskReader }} [opts]
  */
-export function allTags(database, me = null) {
+export function allTags(database, me = null, opts = {}) {
+  const r = opts.reader ?? { userId: me, wall: false };
   return database.prepare(`
     SELECT MIN(tt.tag) AS tag, COUNT(*) AS count
     FROM task_tags tt
     JOIN tasks t ON t.id = tt.task_id
-    WHERE ${visibleWhere('tasks', 't', '@me')}
+    WHERE ${taskVisibleWhere(r, 't')}
     GROUP BY tt.tag_key
     ORDER BY count DESC, tag COLLATE NOCASE ASC
-  `).all({ me });
+  `).all({ me: r.userId });
 }
 
 // --------------------------------------------------------

@@ -1,12 +1,12 @@
-<!-- version: 2.90.0 -->
-This update makes the global search show what your pages show. It now finds tasks and notes that someone shared with everyone, tasks you are assigned to together with others, and the medications and activities of a person you care for. An archived task is marked as archived in the results. The search also no longer finds a task that someone else set to "only me".
+<!-- version: 2.91.0 -->
+This update makes the backup card tell one time. On a server that runs in another time zone than your household, the card in Settings > Household > Backup and restore said "Daily at 02:00" above "Next backup 03:00" for the same run. The schedule now reads in your household's time zone, like the next backup below it.
 
-The backup card in Settings > Household > Backup and restore tells you more. It shows why the last scheduled run failed, keeps the date of the last backup that succeeded, names the next scheduled run, and warns when at least two scheduled backups have been missed. "Create backup now" no longer reports success when the backup failed.
+Four household settings are now for administrators only: the currency, the app name, the housekeeping payment tasks and the default length of new events. In the app, members never saw these controls; they could only be changed through the API. On the Appearance page members now see the household currency as a read-only row.
 
-Admins find a new diagnostics section in the "System" sheet. One button copies version, database and backup state as plain text for a bug report; it contains no password, key or path and nothing about members.
+A wall display now reads only the tasks and events the whole household sees, on every page and in every list, count and countdown. In the app a display could not be assigned to a task or an event, so nothing changes on a wall you have set up.
 
-If you connect an AI assistant over MCP, it now creates tasks, shopping items and events exactly as the app does. Writing over MCP now needs an API token; a client that signs in with a browser session cookie alone is refused.
+If you use the API with your own scripts: every "administrators only" refusal now has the same answer, `403` with `reason: "admin_required"`. Scripts that compared the error text should read the `reason` instead.
 
-Behind the scenes, all access rules now live in one place and are checked by a test for every kind of account. This update does not change the database. No action is needed from you.
+This update does not change the database. No action is needed from you.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.90.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.91.0

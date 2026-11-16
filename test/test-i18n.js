@@ -778,6 +778,189 @@ test('timeSuffix: kein Stunden-Zaehlwort hinter einer Uhrzeit mit Doppelpunkt', 
   }
 });
 
+/* ZAHL UND EINHEIT BLEIBEN AUF EINER ZEILE.
+ *
+ * Regel: Stoesst ein Zahl-Platzhalter an eine Einheit, die als Abkuerzung oder
+ * Zeichen geschrieben ist ("{{size}} MB", "{{minutes}} Min.", "{{pct}} %",
+ * "{{count}} дн."), steht dazwischen ein geschuetztes Leerzeichen (U+00A0,
+ * literal in der JSON-Datei) oder gar keins (ko, ja, zh schreiben die Einheit
+ * oft direkt an). U+202F ist ebenfalls recht. Ein normales Leerzeichen laesst
+ * den Browser "2" ans Zeilenende und "s." an den naechsten Zeilenanfang setzen -
+ * auf der schmalen Tafel "Sitzung nicht erreichbar" (#2764) war das sichtbar,
+ * seit #2049 steht dort U+00A0, #2766 zog zh-Hant nach.
+ *
+ * Nicht gemeint sind ausgeschriebene Woerter ("{{count}} Tage", "{{taken}} von
+ * {{total}} Dosen") und Platzhalter ohne Zahl ("{{title}} als erledigt").
+ *
+ * Geltungsbereich je Schluessel (Pluralvarianten _one, _few ... inbegriffen):
+ *  - ohne `locales`: de schreibt die Einheit abgekuerzt oder als Zeichen, dann
+ *    gilt der Schluessel in JEDER Locale, auch wo eine Sprache das Wort
+ *    ausschreibt ("{{count}} phút") - wie sessionRetryHint seit #2049.
+ *  - mit `locales`: de schreibt das Wort aus ("{{count}} Tage"), nur diese
+ *    Locales kuerzen ab ("{{count}} дн.", "{{interval}} mies."); dort gilt die
+ *    Regel fuer alle Varianten des Schluessels, sonst nirgends.
+ * `numbers` nennt die Zahl-Platzhalter, HINTER denen die Einheit steht; steht
+ * ein Prozentzeichen davor (tr "%{{pct}}"), wird die Luecke davor geprueft.
+ */
+const NUMBER_UNIT_KEYS = new Map([
+  // Groessen
+  ['calendar.attachmentTooLarge', { numbers: ['size'] }],
+  ['documentAttach.hint', { numbers: ['size'] }],
+  ['documents.fileHint', { numbers: ['size'] }],
+  ['documents.fileTooLarge', { numbers: ['size'] }],
+  ['documents.folderUpload.adminLimitHint', { numbers: ['size'] }],
+  ['documents.folderUpload.limitHint', { numbers: ['size'] }],
+  ['health.errorCycleImportTooLarge', { numbers: ['limit_kb'] }],
+  ['settings.icsErrorTooLarge', { numbers: ['limit_mb'] }],
+  ['settings.installModuleFileTooLarge', { numbers: ['max'] }],
+  ['settings.installModuleZipHint', { numbers: ['max'] }],
+  ['waste.errorImportTooLarge', { numbers: ['limit_mb'] }],
+  ['waste.errorSourceFetchTooLarge', { numbers: ['limit_mb'] }],
+  // Prozent, Grad, Wind
+  ['budget.chartSummary', { numbers: ['pct'] }],
+  ['budget.statsDonutSummary', { numbers: ['pct'] }],
+  ['dashboard.weatherFeelsLike', { numbers: ['temp', 'humidity', 'wind'] }],
+  ['dashboard.weatherHighLow', { numbers: ['max', 'min'] }],
+  // Zeit
+  ['common.sessionRetryHint', { numbers: ['seconds'] }],
+  ['budget.loanTermYearsMonths', { numbers: ['years', 'months'] }],
+  ['dashboard.wallTimerMinutes', { numbers: ['count'] }],
+  ['health.activity.unit.min', { numbers: ['value'] }],
+  ['health.duration.h', { numbers: ['hours'] }],
+  ['health.duration.hm', { numbers: ['hours', 'minutes'] }],
+  ['health.duration.m', { numbers: ['minutes'] }],
+  ['health.meds.prn.remainingHm', { numbers: ['hours', 'minutes'] }],
+  ['health.meds.prn.remainingM', { numbers: ['minutes'] }],
+  ['schedule.hoursValue', { numbers: ['value'] }],
+  ['schedule.overtimeNote', { numbers: ['hours'] }],
+  ['schedule.reminderMinutesBefore', { numbers: ['minutes'] }],
+  ['settings.calendarDurationMinutes', { numbers: ['count'] }],
+  ['tasks.overdueDay', { numbers: ['count'] }],
+  // Strecke, Energie, Einheit als eigener Platzhalter ({{unit}}: kcal, g, km, mi)
+  ['health.activity.unit.km', { numbers: ['value'] }],
+  ['health.activity.unit.kcal', { numbers: ['value'] }],
+  ['health.nutrition.ofTarget', { numbers: ['target'] }],
+  ['health.nutrition.noTargetValue', { numbers: ['value'] }],
+  ['inventory.historyOdometerValue', { numbers: ['value'] }],
+  ['inventory.trackedDateDistanceHint', { numbers: ['value'] }],
+  // de schreibt das Wort aus, einzelne Locales kuerzen ab
+  ['settings.backupSchedulerCronHourly', { numbers: ['count'], locales: ['pl', 'ru', 'uk'] }],
+  ['waste.summaryWeeklyInterval', { numbers: ['interval'], locales: ['pl', 'ru', 'uk'] }],
+  ['waste.summaryMonthlyInterval', { numbers: ['interval'], locales: ['pl', 'ru', 'uk'] }],
+  ['waste.summaryOrdinalWeekdayInterval', { numbers: ['interval'], locales: ['ru', 'uk'] }],
+  ['inventory.warrantyMonthsValue', { numbers: ['count'], locales: ['pl', 'ru', 'uk'] }],
+  ['settings.healthPreventionIntervalMonths', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['settings.healthPreventionIntervalYears', { numbers: ['count'], locales: ['uk'] }],
+  ['dashboard.daysLeft', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['dashboard.pantryExpiringEmpty', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['health.cycle.history.cycleLength', { numbers: ['value'], locales: ['ru', 'uk'] }],
+  ['health.cycle.pregnancy.countdown', { numbers: ['days'], locales: ['ru', 'uk'] }],
+  ['health.cycle.pregnancy.overdue', { numbers: ['days'], locales: ['ru', 'uk'] }],
+  ['health.cycle.status.inDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['health.cycle.status.overdue', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['health.cycle.trends.cyclePatternDaysBefore', { numbers: ['days'], locales: ['ru', 'uk'] }],
+  ['health.cycle.trends.typicalRangeLabel', { numbers: ['max'], locales: ['ru', 'uk'] }],
+  ['health.cycle.unit.days', { numbers: ['value'], locales: ['ru', 'uk'] }],
+  ['health.fasting.extraDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['health.prevention.dueInDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['health.prevention.overdueDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['housekeeping.everyDays', { numbers: ['days'], locales: ['ru'] }],
+  ['inventory.deadlineChipInDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['inventory.trackedDateInDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['inventory.trackedDateOverdueDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['inventory.warrantyStatusExpiringSoon', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['schedule.cycleDaysHint', { numbers: ['count'], locales: ['ru'] }],
+  ['schedule.deletePatternDetail', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['subscriptions.dueInDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['subscriptions.overdueDays', { numbers: ['count'], locales: ['ru', 'uk'] }],
+  ['subscriptions.reminderMeta', { numbers: ['count'], locales: ['ru', 'uk'] }],
+]);
+
+const PLURAL_VARIANT = /^_(zero|one|two|few|many|other)$/;
+const escapeRe = (/** @type {string} */ s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Leerraum, an dem der Browser umbrechen darf: alles ausser U+00A0 und U+202F. */
+const hasBreakableSpace = (/** @type {string} */ gap) => /[^\S\u00a0\u202f]/u.test(gap);
+/** Schluessel ohne Pluralsuffix - eine Regel gilt fuer alle Varianten. */
+/** @param {string} key */
+function pluralBase(key) {
+  const i = key.lastIndexOf('_');
+  return i > 0 && PLURAL_VARIANT.test(key.slice(i)) ? key.slice(0, i) : key;
+}
+/** @param {string} key @param {string} locale */
+function unitKeyCovers(key, locale) {
+  const spec = NUMBER_UNIT_KEYS.get(pluralBase(key));
+  return spec !== undefined && (!spec.locales || spec.locales.includes(locale));
+}
+
+test('Zahl und Einheit: die Liste nennt nur Schluessel und Platzhalter, die es gibt', () => {
+  const stale = [];
+  for (const [key, spec] of NUMBER_UNIT_KEYS) {
+    if (!reference.has(key)) { stale.push(`${key} fehlt in de.json`); continue; }
+    for (const locale of spec.locales ?? []) {
+      if (!LOCALES.includes(locale)) stale.push(`${key}: Locale ${locale} unbekannt`);
+    }
+    for (const name of spec.numbers) {
+      if (!placeholders(reference.get(key)).has(name)) stale.push(`${key}: {{${name}}} fehlt in de.json`);
+    }
+  }
+  assert.deepEqual(stale, []);
+});
+
+test('Zahl und Einheit: zwischen den geregelten Platzhaltern und ihrer Einheit bricht keine Zeile um', () => {
+  const breakable = [];
+  for (const locale of LOCALES) {
+    for (const [key, value] of flatten(JSON.parse(readLocale(locale)))) {
+      const spec = NUMBER_UNIT_KEYS.get(pluralBase(key));
+      if (typeof value !== 'string' || !spec || !unitKeyCovers(key, locale)) continue;
+      for (const name of spec.numbers) {
+        const ph = escapeRe(`{{${name}}}`);
+        const gaps = [
+          ...value.matchAll(new RegExp(`${ph}(\\s+)(?=\\S)`, 'gu')),
+          ...value.matchAll(new RegExp(`[%\\u066a](\\s+)${ph}`, 'gu')),
+        ];
+        if (gaps.some((m) => hasBreakableSpace(m[1]))) breakable.push(`${locale}:${key}:{{${name}}}`);
+      }
+    }
+  }
+  assert.deepEqual(breakable, []);
+});
+
+/* FAENGER FUER NEUE STELLEN: Platzhalter, umbrechbares Leerzeichen, dann eine
+ * Einheit aus dieser Liste - in einem Schluessel oder einer Locale, die
+ * NUMBER_UNIT_KEYS nicht regelt -, wird rot. Die Liste ist bewusst eng: nur
+ * Abkuerzungen und Zeichen, die in keiner der Locales ein eigenes Wort sind.
+ * Einzelbuchstaben ausser "h" fehlen absichtlich ("s", "a", "y", "с", "v" sind
+ * in cs/es/pt/ru Praepositionen), ebenso "год" (ru: "Jahr" ausgeschrieben) und
+ * Punkte ("pkt", "pts": sie zaehlen, sie messen nicht). Abgekuerzte Monate,
+ * Wochen und Tage (mies., tyg., мес., дн. ...) stehen drin, weil pl/ru/uk dort
+ * abkuerzen, wo de das Wort ausschreibt. Ein {{...unit}}-Platzhalter zaehlt als
+ * Einheit. Ausserhalb der Liste trifft der Faenger am 15.11.2026 nichts. */
+const CATCHER_UNITS = [
+  '%', '\u066a', '°',
+  'MB', 'KB', 'GB', 'TB', 'Mo', 'Ko', 'Go', 'МБ', 'Мб', 'КБ',
+  'km', 'км', 'kg', 'кг', 'kcal', 'kkal', 'ккал',
+  'h', 'Std.', 'min', 'Min', 'Min.', 'мин', 'хв', 'ч', 'dk', 'mnt', 'sek', 'godz.',
+  'tyg.', 'mies.', 'дн.', 'нед.', 'тиж.', 'мес.', 'міс.',
+];
+const CATCHER = new RegExp(
+  `\\{\\{\\w+\\}\\}(\\s+)(?:${CATCHER_UNITS.map(escapeRe).join('|')}|\\{\\{\\w*[uU]nit\\}\\})(?![\\p{L}\\p{N}])`
+  + `|[%\\u066a](\\s+)\\{\\{\\w+\\}\\}`,
+  'gu',
+);
+
+test('Zahl und Einheit: keine neue Stelle mit umbrechbarem Leerzeichen ausserhalb der Liste', () => {
+  const unregulated = [];
+  for (const locale of LOCALES) {
+    for (const [key, value] of flatten(JSON.parse(readLocale(locale)))) {
+      if (typeof value !== 'string') continue;
+      for (const m of value.matchAll(CATCHER)) {
+        if (hasBreakableSpace(m[1] ?? m[2] ?? '') &&!unitKeyCovers(key, locale)) unregulated.push(`${locale}:${key}: ${m[0]}`);
+      }
+    }
+  }
+  assert.deepEqual(unregulated, [], 'Einheit an einer Zahl: U+00A0 setzen und den Schluessel in NUMBER_UNIT_KEYS aufnehmen');
+});
+
 // D15 (Critique R21): die deutsche Oberflaeche spricht durchgehend "du". Zwei
 // Saetze im Fasten (Datumsfeld, Sicherheitsdialog) siezten, mitten zwischen
 // lauter du-Saetzen. "Sie" am Satzanfang kann "sie" (Dritte) sein - geprueft

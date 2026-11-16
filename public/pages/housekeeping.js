@@ -225,18 +225,19 @@ function money(value) {
 }
 
 /**
- * Der Betrag ueber einer Diagrammsaeule: ganze Betraege ohne Nachkommastellen
- * (R20, Re-Critique 2026-10-17 a5 P2-5). "380,00 €" lief bei 390px in seiner
- * Spalte ueber die Kante; "380 €" traegt dieselbe Auskunft. Krumme Betraege
- * behalten ihre Stellen - gerundet wuerde aus 57,50 € eine Zahl, die nie
- * gezahlt wurde.
+ * Der Betrag ueber einer Diagrammsaeule: immer ganz, kaufmaennisch gerundet
+ * (R20, Re-Critique 2026-10-17 a5 P2-5; seit der Folge zu #2772 auch fuer
+ * krumme Summen). "380,00 €" lief bei 390px in seiner Spalte ueber die Kante;
+ * nach #2772 misst eine Spalte bei 320px Fenster nur 34px, und "1.234,50 €"
+ * (59px) stand selbst bei 390px ueber der Nachbarin. Die Beschriftung ist
+ * eine Ablesehilfe fuer die Saeule, nicht die Buchung: der genaue Betrag
+ * steht im Namen der Spalte und im Titel der Spur (beide aus money()), in
+ * "Offene Zahlungen", in den Besuchen und im Bericht.
  */
 function chartMoney(value) {
-  const amount = Number(value || 0);
-  const whole = Number.isInteger(amount);
   return getNumberFormat({
-    style: 'currency', currency: state.currency, ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
-  }).format(amount);
+    style: 'currency', currency: state.currency, minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 }
 
 function urgencyLabel(status) {

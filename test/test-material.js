@@ -535,3 +535,86 @@ test('R18: auf der Zugangstafel halten Text und Feldkante ihre Schwelle, direkt 
     assert.match(read(`../public/pages/${page}.js`), /<p class="auth-version"[^>]*><\/p>\s*<\/main>/, `${page}.js: Versionszeile in der Tafel`);
   }
 });
+
+/**
+ * KEIN TEXT DIREKT AUF DEM FELD, auch im Zustand "Sitzung nicht pruefbar"
+ * (utils/session-unreachable.js). Er ersetzt die Shell VOR der App und traegt
+ * das Feld wie Ladebild und Zugangsseiten; bis v2.91.0 standen Titel, Satz und
+ * "Technische Details" ohne Tafel darauf (gemessen hell 4,36:1 und 4,01:1).
+ *
+ * Gerechnet wie auf der Zugangstafel: der schlechteste Grund (drei Kerne
+ * uebereinander), darauf die Flaeche, die der Zustand selbst traegt - der
+ * opake Rueckfall UND das Glas in @supports, beide muessen halten. Traegt er
+ * keine Flaeche, steht der Text auf dem nackten Feld und die Rechnung faellt.
+ * Elemente mit eigener Flaeche (Hinweis, Details-Kasten) stehen auf dieser.
+ * Die Tinten liest der Test aus den Regeln des Leerzustands, nicht aus einer
+ * Liste: dreht jemand eine Tinte, rechnet der Guard die neue.
+ */
+test('R19: der Zustand "Sitzung nicht pruefbar" stellt seinen Text auf die Tafel der Zugangsseiten', () => {
+  const PANEL = '.app-shell > .session-unreachable';
+  /** @param {string|undefined} decl */
+  const tokenOf = (decl) => decl?.trim().match(/^var\((--[\w-]+)\)$/)?.[1];
+  /** @param {{ body: string }|undefined} rule @param {string} prop */
+  const declOf = (rule, prop) => rule?.body.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`))?.[1].trim();
+  /** @param {string} css @param {string} selector @param {string} prop */
+  const baseDecl = (css, selector, prop) => rulesFor(css, selector).filter((r) => !r.at.length)
+    .map((r) => declOf(r, prop)).filter(Boolean).at(-1);
+
+  // Die Shell malt das Feld, der Knoten darin traegt die Tafel.
+  const fallback = tokenOf(baseDecl(LAYOUT, PANEL, 'background-color'));
+  const glassRule = rulesFor(LAYOUT, PANEL).find((r) => r.at.some((a) => /@supports[^{]*backdrop-filter/.test(a)));
+  const glassToken = tokenOf(declOf(glassRule, 'background-color'));
+  const surfaces = [fallback, glassToken].filter(Boolean);
+
+  const from = tone('--brand-mark-from', 'light').rgb;
+  const to = tone('--brand-mark-to', 'light').rgb;
+  const peaks = [...LIGHT.get('--brand-field').matchAll(/var\(--brand-mark-(from|to)\) calc\(var\(--brand-field-opacity\) \* (\d+)%\), transparent\) 0%/g)]
+    .map((m) => ({ ink: m[1] === 'from' ? from : to, share: Number(m[2]) / 100 }));
+  assert.equal(peaks.length, 3, 'drei Kerne gelesen');
+
+  // Die Textknoten des Zustands (emptyStateEl mit hint und details).
+  const nodes = [
+    '.empty-state__title',
+    '.empty-state__description',
+    '.empty-state__hint',
+    '.empty-state__details > summary',
+    '.empty-state__details > pre',
+  ];
+  const failures = [];
+  const report = [];
+  for (const theme of ['light', 'dark']) {
+    const strength = Number(resolve('--_brand-field-opacity', theme));
+    const stage = tone('--_neutral-100', theme).rgb;
+    const worst = peaks.reduce((ground, peak) => over(peak.ink, strength * peak.share, ground), stage);
+    // Ohne eigene Flaeche ist das Feld selbst der Grund.
+    const grounds = surfaces.length
+      ? surfaces.map((name) => { const s = tone(name, theme); return [name, over(s.rgb, s.a, worst)]; })
+      : [['nacktes Feld', worst]];
+    for (const [groundName, panel] of grounds) {
+      for (const node of nodes) {
+        const ink = tokenOf(baseDecl(LAYOUT, node, 'color'));
+        assert.ok(ink, `${node}: Tinte nicht als Token gelesen`);
+        const own = tokenOf(baseDecl(LAYOUT, node, 'background-color'));
+        let ground = panel;
+        if (own) { const s = tone(own, theme); ground = over(s.rgb, s.a, panel); }
+        const ratio = contrast(tone(ink, theme).rgb, ground);
+        report.push(`${theme} ${groundName} ${node} ${ratio.toFixed(2)}`);
+        if (ratio < 4.5) failures.push(`${theme} auf ${groundName}: ${node} ${ratio.toFixed(2)}:1 < 4.5`);
+      }
+    }
+  }
+  if (process.env.MATERIAL_REPORT) console.log(report.join('\n'));
+  assert.deepEqual(failures, [], 'Text des Zustands auf dem schlechtesten Grund');
+
+  // DIESELBE Tafel wie die Zugangsseiten, keine zweite Flaechenart: opaker
+  // Rueckfall ausserhalb, Glas und Blur in @supports, Kante, Radius, Schatten.
+  assert.equal(fallback, tokenOf(baseDecl(AUTH, '.auth-page', 'background-color')), 'opaker Rueckfall wie .auth-page');
+  assert.ok(glassRule, 'die Glas-Regel in @supports fehlt');
+  const authGlass = rulesFor(AUTH, '.auth-page').find((r) => r.at.some((a) => /@supports[^{]*backdrop-filter/.test(a)));
+  for (const prop of ['background-color', 'backdrop-filter', '-webkit-backdrop-filter']) {
+    assert.equal(declOf(glassRule, prop), declOf(authGlass, prop), `Glas: ${prop} wie .auth-page`);
+  }
+  for (const prop of ['border', 'border-radius', 'box-shadow']) {
+    assert.equal(baseDecl(LAYOUT, PANEL, prop), baseDecl(AUTH, '.auth-page', prop), `${prop} wie .auth-page`);
+  }
+});

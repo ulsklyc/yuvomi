@@ -268,10 +268,10 @@ jobs:
             Zu pruefen ist der Stand ${{ github.event.pull_request.head.sha }}.
             Dieses Repo prueft je Push: dass du zu einem FRUEHEREN Stand
             desselben PR schon etwas gesagt hast, ist kein Grund aufzuhoeren.
-            Bringt dieser Stand nichts Neues, sag genau das in einem Satz als
-            Kommentar und nenne darin, WOMIT du verglichen hast. Die uebrigen
-            Bedingungen aus Schritt 1 (geschlossen, Entwurf, automatisiert,
-            trivial) gelten unveraendert.
+            Bringt dieser Stand nichts Neues oder haeltst du ihn fuer trivial,
+            sag genau das in einem Satz als Kommentar und nenne darin,
+            WOMIT du verglichen hast. Die uebrigen Bedingungen aus Schritt 1
+            (geschlossen, Entwurf, automatisiert) gelten unveraendert.
 
             Ein CLAUDE.md liegt im Checkout nicht (gitignored); die Regeln
             dieses Repos stehen in CONTRIBUTING.md auf
@@ -293,6 +293,13 @@ jobs:
           # Anlass war Lauf 35322774327 an #1259 (18.09.2026), 3m26s, rot: er
           # zitierte `run_in_background: false` und den Doku-Verweis und pruefte
           # deshalb nichts. Seitdem gilt die Laengengrenze.
+          #
+          # "TRIVIAL" STEHT BEIM KOMMENTAR, NICHT BEI DEN STILLEN ABBRUECHEN
+          # (#2765, 15.11.2026). Lauf 43758461498 stufte eine reine
+          # `tsc-baseline.json`-Aenderung als trivial ein, brach nach 2 Turns
+          # ab und hinterliess nichts - der Nachweis wurde zu Recht rot.
+          # Entwurf und Bot-PR weiss der Workflow sicher, "trivial" nicht; also
+          # sagt die Review es in einem Satz, wie bei "nichts Neues".
           allowed_bots: 'dependabot[bot]'
           # DIESE LISTE ERSETZT, SIE ERGÄNZT NICHT. Das war die Annahme, die den
           # zweiten Anlauf gekostet hat: `--allowed-tools` verdrängt die acht
@@ -410,6 +417,8 @@ jobs:
         # zugesichert abbricht - das ist "nichts zu pruefen" und kein Schweigen.
         # Sie stehen hier und nicht im Urteil, weil der Workflow sie sicher weiss,
         # waehrend das Urteil sie nur aus dem result-Text raten koennte.
+        # "Trivial" steht bewusst NICHT hier: das entscheidet erst das Plugin,
+        # und der Prompt verlangt dafuer einen Satz als Kommentar (#2765).
         if: >-
           env.CLAUDE_CODE_OAUTH_TOKEN != ''
           && steps.claude-review.outcome == 'success'

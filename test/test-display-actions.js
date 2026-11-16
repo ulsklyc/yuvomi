@@ -520,6 +520,220 @@ test('the wall rule holds at every task read: list, detail, comments and the hou
   assert.ok(personFeed.includes(forDisplay) && personFeed.includes(hiddenSub), 'an assigned person still reads both entries');
 });
 
+test('the wall rule holds at the remaining task reads: tags, documents, dashboard, points ledger', async () => {
+  // Four reads outside the task routes above asked the task row rule with the display
+  // account as the viewer: the tag lists, the linked documents of a task, the task
+  // parts of the personal dashboard (no audience=household) and the task reference of
+  // a points ledger row. A task with visibility `assignees` that names the display
+  // showed through all four. The app never offers a display as an assignee, so the
+  // rows are seeded directly.
+  const created = await admin('POST', '/auth/users', {
+    username: 'wilma', display_name: 'Wilma', password: 'wilmapass12345', role: 'member',
+  });
+  assert.equal(created.status, 201, `create member: ${JSON.stringify(created.body)}`);
+  const WILMA = created.body.user.id;
+  const asWilma = as(await login('wilma', 'wilmapass12345'));
+  const { todayKey } = await import('../server/utils/timezone.js');
+  const today = todayKey(db);
+
+  /**
+   * A task due today, flagged as a countdown, in its own category, with one tag and
+   * one points row for Lea.
+   * @param {string} title @param {string} visibility @param {number[]} assignees
+   */
+  const seeded = (title, visibility, assignees) => {
+    const id = addTask(title, visibility);
+    db.prepare("UPDATE tasks SET due_date = ?, countdown = 1, category = 'wallrest' WHERE id = ?").run(today, id);
+    for (const userId of assignees) {
+      db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(id, userId);
+    }
+    db.prepare('INSERT INTO task_tags (task_id, tag, tag_key) VALUES (?, ?, ?)').run(id, `tag-${id}`, `tag-${id}`);
+    db.prepare(`
+      INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, unit, created_by)
+      VALUES (?, 4, 'earn', ?, ?, 'points', 1)
+    `).run(LEA, title, id);
+    return id;
+  };
+  const forDisplay = seeded('Dachboden', 'assignees', [displayId, WILMA]);
+  const forAll = seeded('Hecke schneiden', 'all', []);
+
+  // GET /tasks/tags and the tags of GET /tasks/meta/options
+  /** @param {(m: string, p: string) => Promise<{ status: number, body: any }>} who */
+  const tagLists = async (who) => {
+    const tags = await who('GET', '/tasks/tags');
+    const options = await who('GET', '/tasks/meta/options');
+    assert.equal(tags.status, 200);
+    assert.equal(options.status, 200);
+    return [tags.body.data, options.body.tags].map((list) => list.map((/** @type {any} */ t) => t.tag));
+  };
+  for (const list of await tagLists(display)) {
+    assert.ok(!list.includes(`tag-${forDisplay}`), 'the tag of an assignees task stays off the wall');
+    assert.ok(list.includes(`tag-${forAll}`), 'the tag of a household task stays on the wall');
+  }
+  for (const list of await tagLists(asWilma)) {
+    assert.ok(list.includes(`tag-${forDisplay}`) && list.includes(`tag-${forAll}`), 'an assigned person still lists both tags');
+  }
+  // A tag that also hangs on a household task stays.
+  db.prepare('INSERT INTO task_tags (task_id, tag, tag_key) VALUES (?, ?, ?)').run(forAll, `tag-${forDisplay}`, `tag-${forDisplay}`);
+  const [shared] = await tagLists(display);
+  assert.ok(shared.includes(`tag-${forDisplay}`), 'a tag shared with a household task stays on the wall');
+  db.prepare('DELETE FROM task_tags WHERE task_id = ? AND tag_key = ?').run(forAll, `tag-${forDisplay}`);
+
+  // GET /tasks/:id/documents
+  const unknownDocs = await display('GET', '/tasks/999999/documents');
+  const hiddenDocs = await display('GET', `/tasks/${forDisplay}/documents`);
+  assert.equal(hiddenDocs.status, 404, 'the documents of an assignees task answer 404 on the wall');
+  assert.deepEqual(hiddenDocs.body, unknownDocs.body, 'the refusal must equal the one for an unknown id');
+  const sharedDocs = await display('GET', `/tasks/${forAll}/documents`);
+  assert.equal(sharedDocs.status, 403, 'a household task keeps the refusal of a reader without documents');
+  assert.equal(sharedDocs.body.reason, 'cross_module_access');
+  assert.equal((await asWilma('GET', `/tasks/${forDisplay}/documents`)).status, 200, 'an assigned person still reads the documents');
+
+  // GET /dashboard without audience=household
+  /** @param {(m: string, p: string) => Promise<{ status: number, body: any }>} who @param {string} [query] */
+  const overview = async (who, query = '') => {
+    const res = await who('GET', `/dashboard?tasks_category=wallrest${query}`);
+    assert.equal(res.status, 200);
+    const b = res.body;
+    return {
+      urgent: b.urgentTasks.map((/** @type {any} */ t) => t.id),
+      open: b.openTaskCount,
+      members: b.memberTodayTasks.map((/** @type {any} */ m) => m.user_id),
+      countdowns: b.countdowns.filter((/** @type {any} */ c) => c.source === 'task').map((/** @type {any} */ c) => c.id),
+    };
+  };
+  const wallOverview = await overview(display);
+  assert.ok(!wallOverview.urgent.includes(forDisplay), 'urgentTasks leaves an assignees task off the wall');
+  assert.ok(wallOverview.urgent.includes(forAll), 'a household task stays in urgentTasks');
+  assert.equal(wallOverview.open, 1, 'openTaskCount counts only the household task');
+  assert.ok(!wallOverview.members.includes(displayId) && !wallOverview.members.includes(WILMA),
+    'memberTodayTasks counts no assignee of the hidden task');
+  assert.ok(!wallOverview.countdowns.includes(forDisplay), 'the task countdowns leave an assignees task off the wall');
+  assert.ok(wallOverview.countdowns.includes(forAll), 'a household task stays among the countdowns');
+  assert.deepEqual((await overview(display, '&audience=household')).urgent, [forAll], 'the household audience answers as before');
+  const personOverview = await overview(asWilma);
+  assert.deepEqual(personOverview.urgent.sort(), [forDisplay, forAll].sort(), 'an assigned person still sees both');
+  assert.equal(personOverview.open, 2);
+  assert.ok(personOverview.members.includes(WILMA), 'an assigned person still counts the task');
+  assert.ok(personOverview.countdowns.includes(forDisplay) && personOverview.countdowns.includes(forAll));
+
+  // GET /rewards/ledger: the row and its points stay, only the task reference goes.
+  /** @param {(m: string, p: string) => Promise<{ status: number, body: any }>} who @param {string} reason */
+  const ledgerRow = async (who, reason) => {
+    const res = await who('GET', '/rewards/ledger?limit=500');
+    assert.equal(res.status, 200);
+    const ids = db.prepare('SELECT id FROM reward_ledger WHERE reason = ?').all(reason).map((/** @type {any} */ r) => r.id);
+    return res.body.data.find((/** @type {any} */ e) => ids.includes(e.id));
+  };
+  const wallHidden = await ledgerRow(display, 'Dachboden');
+  assert.ok(wallHidden, 'the ledger row itself stays on the wall');
+  assert.equal(wallHidden.delta, 4, 'with its points');
+  assert.equal(wallHidden.task_id, null, 'the wall does not learn the task of an assignees row');
+  assert.equal(wallHidden.reason, null, 'nor its title');
+  const wallShared = await ledgerRow(display, 'Hecke schneiden');
+  assert.equal(wallShared.task_id, forAll, 'a household task keeps its reference on the wall');
+  assert.equal(wallShared.reason, 'Hecke schneiden');
+  const personHidden = await ledgerRow(asWilma, 'Dachboden');
+  assert.equal(personHidden.task_id, forDisplay, 'an assigned person still reads the reference');
+  assert.equal(personHidden.reason, 'Dachboden');
+});
+
+test('the wall rule holds at every event read: calendar, search, detail, calendars, dashboard', async () => {
+  // The event reads asked the event row rule with the display account as the viewer,
+  // so an event with visibility `assignees` that names the display showed on the wall
+  // without audience=household. The app never offers a display as an assignee
+  // (newNonMembers, #1207), so the rows are seeded directly.
+  const created = await admin('POST', '/auth/users', {
+    username: 'erna', display_name: 'Erna', password: 'ernapass12345', role: 'member',
+  });
+  assert.equal(created.status, 201, `create member: ${JSON.stringify(created.body)}`);
+  const ERNA = created.body.user.id;
+  const asErna = as(await login('erna', 'ernapass12345'));
+  const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
+  const day = shiftDateKey(todayKey(db), 1);
+  const calendarId = Number(db.prepare(
+    "INSERT INTO local_calendars (name, color, is_default, sort_order, created_by) VALUES ('Wandprobe', '#123456', 0, 9, 1) RETURNING id",
+  ).get().id);
+  const source = Number(db.prepare(
+    "INSERT INTO external_calendars (source, external_id, name, color) VALUES ('google', 'wall-probe', 'Wandquelle', NULL) RETURNING id",
+  ).get().id);
+
+  /**
+   * An all-day event tomorrow, flagged as a countdown, in the probe calendar (or, with
+   * `synced`, in the synced calendar Wandquelle).
+   * @param {string} title @param {string} visibility @param {number[]} assignees @param {boolean} [synced]
+   */
+  const addEvent = (title, visibility, assignees, synced = false) => {
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, all_day, visibility, created_by, external_source,
+                                   local_calendar_id, calendar_ref_id, countdown)
+      VALUES (?, ?, 1, ?, 1, ?, ?, ?, 1) RETURNING id
+    `).get(title, day, visibility, synced ? 'google' : 'local', synced ? null : calendarId, synced ? source : null).id);
+    for (const userId of assignees) db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(id, userId);
+    return id;
+  };
+  const forDisplay = addEvent('Wandprobe Zahnarzt', 'assignees', [displayId, ERNA]);
+  const forAll = addEvent('Wandprobe Elternabend', 'all', [ERNA]);
+  const syncedForDisplay = addEvent('Wandprobe Training', 'assignees', [displayId], true);
+
+  /** @typedef {(m: string, p: string) => Promise<{ status: number, body: any }>} Caller */
+  /** @param {any[]} list */
+  const ids = (list) => list.map((e) => e.id).filter((id) => [forDisplay, forAll, syncedForDisplay].includes(id)).sort();
+  /** @param {Caller} who @param {string} path @param {(body: any) => any[]} pick */
+  const read = async (who, path, pick = (b) => b.data) => {
+    const res = await who('GET', path);
+    assert.equal(res.status, 200, `${path}: ${JSON.stringify(res.body)}`);
+    return ids(pick(res.body));
+  };
+  /** @param {Caller} who */
+  const reads = async (who) => ({
+    list: await read(who, `/calendar?from=${day}&to=${day}`),
+    upcoming: await read(who, '/calendar/upcoming?limit=20'),
+    search: await read(who, '/calendar/search?q=Wandprobe'),
+    upcomingEvents: await read(who, `/dashboard?events_calendar=local:${calendarId}`, (b) => b.upcomingEvents),
+    weekEvents: await read(who, `/dashboard?events_calendar=local:${calendarId}`, (b) => b.weekEvents),
+    familyEvents: await read(who, '/dashboard', (b) => b.familyEvents),
+    countdowns: await read(who, '/dashboard', (b) => b.countdowns.filter((/** @type {any} */ c) => c.source === 'event')),
+  });
+  /** @param {Caller} who */
+  const calendars = async (who) => {
+    const res = await who('GET', '/calendar/calendars');
+    assert.equal(res.status, 200);
+    return {
+      count: res.body.data.find((/** @type {any} */ c) => c.id === calendarId)?.event_count,
+      sources: res.body.sources.map((/** @type {any} */ s) => s.key).includes(`cal:${source}`),
+    };
+  };
+
+  const both = [forDisplay, forAll].sort();
+  const wall = await reads(display);
+  for (const [key, list] of Object.entries(wall)) {
+    assert.deepEqual(list, [forAll], `${key}: the wall reads only the household event`);
+  }
+  for (const [key, list] of Object.entries(await reads(asErna))) {
+    assert.deepEqual(list, both, `${key}: an assigned person still reads both`);
+  }
+  assert.deepEqual(await calendars(display), { count: 1, sources: false }, 'GET /calendar/calendars counts and names only household events on the wall');
+  assert.deepEqual(await calendars(asErna), { count: 2, sources: false }, 'a person keeps the count of what she sees');
+
+  const unknown = await display('GET', '/calendar/999999');
+  const hidden = await display('GET', `/calendar/${forDisplay}`);
+  assert.equal(hidden.status, 404, 'the detail of an assignees event answers 404 on the wall');
+  assert.deepEqual(hidden.body, unknown.body, 'the refusal must equal the one for an unknown id');
+  assert.equal((await display('GET', `/calendar/${forAll}`)).status, 200, 'a household event stays readable');
+  assert.equal((await asErna('GET', `/calendar/${forDisplay}`)).status, 200, 'an assigned person still reads the detail');
+
+  // The household audience answers as before, for the display and for a person.
+  const household = await display('GET', `/dashboard?audience=household&events_calendar=local:${calendarId}`);
+  assert.deepEqual(ids(household.body.upcomingEvents), [forAll], 'audience=household on the wall as before');
+  const personHousehold = await asErna('GET', `/dashboard?audience=household&events_calendar=local:${calendarId}`);
+  assert.deepEqual(ids(personHousehold.body.upcomingEvents), [forAll], 'audience=household for a person as before');
+  // The admin created both and sees both: the creator branch stays for people.
+  assert.deepEqual(await read(admin, `/calendar?from=${day}&to=${day}`), [...both, syncedForDisplay].sort(), 'the creator still reads every row');
+  assert.equal((await calendars(admin)).sources, true, 'the creator still finds the synced calendar');
+  db.prepare('DELETE FROM calendar_events WHERE id IN (?, ?, ?)').run(forDisplay, forAll, syncedForDisplay);
+});
+
 test('jede andere Schreibroute der beiden Module bleibt zu', async () => {
   // DIE EIGENTLICHE ZUSAGE DES TICKETS: „no creating, editing or deleting, and
   // no settings". Sie haengt daran, dass die Erlaubnis eine Liste von zwei

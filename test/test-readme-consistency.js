@@ -38,6 +38,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { dictBlock, dictKeysMatching, dictValue, stripTags, unescapeJs } from './docs-dict.js';
+import { TOGGLEABLE_MODULES } from '../server/settings/values.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const READMES = { en: 'README.md', de: 'README.de.md' };
@@ -621,7 +622,7 @@ const README_FACTS = [
     what: 'Uebernahme-Dialog Einkauf -> Vorrat mit Menge und Einheit (public/pages/shopping.js openPantryTransfer)' },
   { says: { en: /Inventory,\s+Waste collection and Schedule start switched off/, de: /Inventar,\s+Entsorgung und Schichtplan sind anfangs aus/ },
     holds: (s) => ['inventory', 'waste', 'schedule'].every((m) => new RegExp(`disabled\\.push\\('${m}'\\)`).test(s.db) && s.toggleable.includes(m)),
-    what: 'Migrationen in server/db.js schalten die drei ab, TOGGLEABLE_MODULES (server/routes/preferences.js) kennt sie' },
+    what: 'Migrationen in server/db.js schalten die drei ab, TOGGLEABLE_MODULES (server/settings/values.ts, seit Phase 2 C3 importiert) kennt sie' },
   { says: { en: /amd64 and arm64 \(Raspberry Pi 4\/5\)/, de: /amd64 und arm64 \(Raspberry Pi 4\/5\)/ },
     holds: (s) => /platforms:\s*linux\/amd64,\s*linux\/arm64/.test(s.dockerPublish),
     what: 'Multi-Arch-Build (.github/workflows/docker-publish.yml platforms)' },
@@ -712,8 +713,6 @@ const LAN_OPEN = {
 
 function factSources() {
   const src = (p) => read(p);
-  const prefs = src('server/routes/preferences.js');
-  const toggleable = (prefs.match(/TOGGLEABLE_MODULES = \[([\s\S]*?)\]/) || [, ''])[1];
   return {
     readmes: { en: readme('en'), de: readme('de') },
     shoppingPage: src('public/pages/shopping.js'),
@@ -721,7 +720,8 @@ function factSources() {
     // Seit R23 (D2) liest der Import den Essensplan ueber die geteilte Quelle.
     kitchenHandover: src('server/services/kitchen-handover.js'),
     db: src('server/db.js'),
-    toggleable: [...toggleable.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]),
+    // Die Liste steht seit Phase 2, C3 im Einstellungs-Register: importiert, nicht geschnitten.
+    toggleable: [...TOGGLEABLE_MODULES],
     dockerPublish: src('.github/workflows/docker-publish.yml'),
     auth: src('server/auth.js'),
     installer: src('tools/installer/install-server.js'),
