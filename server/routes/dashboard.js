@@ -15,11 +15,17 @@ import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryF
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
-  asksHouseholdAudience, householdAudienceAnswer, householdAudienceShows, householdVisibleWhere, noteVisibleWhere,
-  visibilityWhere,
-} from '../services/visibility.js';
-import { resolveBudgetMode } from '../services/budget-visibility.js';
-import { hiddenModulesFor, requestHasCapability } from '../permissions.js';
+  hiddenModulesFor,
+  requestHasCapability,
+  asksHouseholdAudience,
+  householdAudienceAnswer,
+  householdAudienceShows,
+  householdVisibleWhere,
+  resolveBudgetMode,
+  rowReader,
+  taskVisibleWhere,
+  visibleWhere,
+} from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
@@ -29,7 +35,7 @@ import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
 import { finishedVisitsInMonth, latestVisit } from '../services/housekeeping-month.js';
 import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/timezone.js';
-import { isAdminUser, serializeEvents } from './calendar/helpers.js';
+import { serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
 import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
@@ -268,7 +274,7 @@ function wallTasksByMember(d, { today, zone, now, categoryAnd = '', categoryBind
     JOIN task_assignments ta ON ta.task_id = t.id
     LEFT JOIN task_completions tc ON tc.task_id = t.id
     WHERE t.archived_at IS NULL
-      AND t.visibility = 'all'
+      AND ${householdVisibleWhere('t')}
       AND t.due_date IS NOT NULL AND t.due_date <= @today
       AND ${taskScopeWhere('t', { bind: '@today' })}${categoryAnd}
       AND (t.status != 'done' OR t.due_date = @today OR tc.completed_at >= @since)
@@ -389,7 +395,7 @@ router.get('/', (req, res) => {
       JOIN note_categories nc ON nc.id = nca.category_id
       WHERE nca.note_id = n.id
         AND nc.id = @note_category_${index}
-        AND (nc.scope = 'household' OR nc.owner_user_id = @me)
+        AND ${visibleWhere('note_categories', 'nc', '@me')}
     )
   `).join('');
   /* FUER WEN DIE ANTWORT IST (#1817). `audience=household` fragt die Fassung
@@ -406,7 +412,7 @@ router.get('/', (req, res) => {
    *
    * UND SIE TRAEGT NUR, WAS DIE WAND ZEICHNET. Welche Schluessel das sind,
    * steht als Allowlist an einer Stelle (`HOUSEHOLD_AUDIENCE_SHOWS` in
-   * services/visibility.js); alles andere kommt in der leeren Fassung einer
+   * authorize/rows/household.ts); alles andere kommt in der leeren Fassung einer
    * Modulsperre - Notizen, Budget, geteilte Ausgaben, Schnellzugriffe,
    * Countdowns, der offene Lohn der Haushaltshilfe, und was nur dem Betrachter
    * gilt (Dosen, die eigene Schicht, wartende Freigaben: „2 zu bestaetigen"
@@ -418,9 +424,12 @@ router.get('/', (req, res) => {
    * Die normale Uebersicht derselben Sitzung fragt ohne ihn und bleibt
    * persoenlich. */
   const householdAudience = asksHouseholdAudience(req.query);
-  const taskVisibleSql = householdAudience
-    ? householdVisibleWhere('t')
-    : visibilityWhere('t', 'task_assignments', 'task_id', '@me');
+  // A paired display reads the task and event parts under the wall rule with or
+  // without the parameter (rowReader): the personal answer of a display is the wall
+  // too, and audience=household is the wall for every account. Only the task and
+  // event parts follow it here; the other blocks keep their own rules.
+  const rowsReader = rowReader(req, { household: householdAudience });
+  const taskVisibleSql = taskVisibleWhere(rowsReader, 't');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
   // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
   // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
@@ -573,8 +582,8 @@ router.get('/', (req, res) => {
     // Browser an der Uhr: ein Termin endet auch zwischen zwei Abrufen.
     result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
       userId, limit: eventsLimit, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
-      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, calendars: eventCalendars,
-    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
+      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, calendars: eventCalendars, reader: rowsReader,
+    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
   } catch (err) {
     log.error('upcomingEvents error:', err.message);
     result.upcomingEvents = [];
@@ -598,8 +607,8 @@ router.get('/', (req, res) => {
   if (allows('calendar')) try {
     result.weekEvents = serializeEvents(getEventsOverlappingDays(d, {
       userId, fromKey: shiftDateKey(todayLocalKey, -1), days: 9,
-      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience, calendars: eventCalendars,
-    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) })
+      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience, calendars: eventCalendars, reader: rowsReader,
+    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) })
       .map(weekEventFields);
   } catch (err) {
     log.error('weekEvents error:', err.message);
@@ -796,7 +805,7 @@ router.get('/', (req, res) => {
       SELECT n.*, u.display_name AS author_name, u.avatar_color AS author_color
       FROM notes n
       LEFT JOIN users u ON n.created_by = u.id
-      WHERE ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
+      WHERE ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
       ORDER BY n.pinned DESC, n.updated_at DESC
       -- FUENF, WEIL DIE KACHEL ZWEI HOCH SEIN DARF - dieselbe Korrektur, die
       -- die Geburtstage oben schon bekommen haben und bei der die Notizen
@@ -817,7 +826,7 @@ router.get('/', (req, res) => {
      * braucht deshalb eine eigene, echte Zahl. */
     result.pinnedNotesCount = d.prepare(`
       SELECT COUNT(*) AS n FROM notes n
-      WHERE n.pinned = 1 AND ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
+      WHERE n.pinned = 1 AND ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
     `).get({ me: userId, ...noteCategoryBinds }).n;
     /* UND DIE MENGE, AUS DER DIE VORSCHAU SCHOEPFT - fuer die Badge und das
      * „+N weitere" der Kachel. `pinnedNotesCount` ist dafuer die falsche Zahl:
@@ -827,7 +836,7 @@ router.get('/', (req, res) => {
      * (#814: Filter vor Schnitt UND Zahl). */
     result.notesTotal = d.prepare(`
       SELECT COUNT(*) AS n FROM notes n
-      WHERE ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
+      WHERE ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
     `).get({ me: userId, ...noteCategoryBinds }).n;
   } catch (err) {
     log.error('pinnedNotes error:', err.message);
@@ -923,7 +932,7 @@ router.get('/', (req, res) => {
     for (const member of result.users) {
       for (const event of getUpcomingEvents(d, {
         userId, limit: FAMILY_AHEAD_PER_MEMBER, fromToday: true, assignedTo: member.id, includeBirthdays,
-        keepEndedToday: ENDED_TODAY_POOL, household: householdAudience,
+        keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, reader: rowsReader,
       })) {
         const key = `${event.id}@${event.start_datetime}`;
         if (seen.has(key)) continue;
@@ -932,7 +941,7 @@ router.get('/', (req, res) => {
       }
     }
     merged.sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
-    result.familyEvents = serializeEvents(merged, { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminUser(req) });
+    result.familyEvents = serializeEvents(merged, { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
   } catch (err) {
     log.error('familyEvents error:', err.message);
     result.familyEvents = [];
@@ -1012,6 +1021,8 @@ router.get('/', (req, res) => {
       userId,
       todayKey: todayLocalKey,
       hiddenModules: denied,
+      // The event and task countdowns of a paired display follow the wall rule (rowReader).
+      reader: rowsReader,
     });
     result.countdowns = countdowns.items;
     // Wie `birthdayCount` neben `birthdays`: die Liste ist der Vorrat für die
@@ -1033,7 +1044,7 @@ router.get('/', (req, res) => {
   // Person durch - eine fremde private Kachel liegt also auch dann nicht auf der
   // Leitung, wenn der Browser sie nie zeichnen wuerde.
   if (wants('quicklinks')) try {
-    result.quicklinks = listQuickLinksFor(userId, req.authRole === 'admin');
+    result.quicklinks = listQuickLinksFor(userId, isAdminRequest(req));
   } catch (err) {
     log.error('quick links error:', err.message);
     result.quicklinks = [];

@@ -6,38 +6,46 @@ import { openPaperlessTags } from '../public/components/paperless-tags.js';
 
 class Node {
   constructor(tag = 'div') {
-    this.tagName = tag; this.children = []; this.controls = new Map(); this.events = new Map();
-    this.isConnected = true; this.hidden = false; this.disabled = false; this.value = ''; this.markup = '';
+    this.textContent = ''; this.tagName = tag; this.children = /** @type {Node[]} */ ([]); this.controls = /** @type {Map<string, Node>} */ (new Map()); this.events = /** @type {Map<string, (event: unknown) => unknown>} */ (new Map());
+    this.checked = false; this.isConnected = true; this.hidden = false; this.disabled = false; this.value = ''; this.markup = '';
   }
-  insertAdjacentHTML(_position, markup) {
+  insertAdjacentHTML(/** @type {string} */ _position, /** @type {string} */ markup) {
     this.markup += markup;
     if (markup.includes('data-tags-picker hidden')) this.querySelector('[data-tags-picker]').hidden = true;
   }
-  querySelector(selector) {
+  /** @returns {Node} */
+  querySelector(/** @type {string} */ selector) {
     if (!this.controls.has(selector)) this.controls.set(selector, new Node());
-    return this.controls.get(selector);
+    return /** @type {Node} */ (this.controls.get(selector));
   }
   closest() { return null; }
-  replaceChildren(...children) { this.children = [...children]; this.markup = ''; }
-  append(...children) { this.children.push(...children); }
-  addEventListener(type, listener) { this.events.set(type, listener); }
-  async fire(type) { await this.events.get(type)?.({ target: this, currentTarget: this, preventDefault() {} }); }
+  replaceChildren(/** @type {Node[]} */ ...children) { this.children = [...children]; this.markup = ''; }
+  append(/** @type {Node[]} */ ...children) { this.children.push(...children); }
+  addEventListener(/** @type {string} */ type, /** @type {(event: any) => unknown} */ listener) { this.events.set(type, listener); }
+  async fire(/** @type {string} */ type) { await this.events.get(type)?.({ target: this, currentTarget: this, preventDefault() {} }); }
 }
+/** @type {typeof globalThis & {__apiStub?: Record<string, (...args: any[]) => Promise<any>>, __openModal?: (options: {onSave: (panel: Node) => void}) => void}} */
+const fixtureGlobals = globalThis;
 const previous = { document: globalThis.document, window: globalThis.window };
 afterEach(() => {
   globalThis.document = previous.document; globalThis.window = previous.window;
-  delete globalThis.__apiStub; delete globalThis.__openModal;
+  delete fixtureGlobals.__apiStub; delete fixtureGlobals.__openModal;
 });
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 test('central tag catalogue is loaded and visible in all-tags mode; switching to selected tags enables choices', async () => {
-  const forms = [], requests = [], writes = [];
-  globalThis.document = {
-    createElement(tag) { const node = new Node(tag); if (tag === 'form') forms.push(node); return node; },
-    createTextNode(text) { return { textContent: text }; },
-  };
-  globalThis.window = { yuvomi: { showToast() {} } };
-  globalThis.__apiStub = {
+  /** @type {Node[]} */
+const forms = [];
+/** @type {any[]} */
+const requests = [];
+/** @type {any[]} */
+const writes = [];
+  Object.assign(globalThis, { document: {
+    createElement(/** @type {string} */ tag) { const node = new Node(tag); if (tag === 'form') forms.push(node); return node; },
+    createTextNode(/** @type {string} */ text) { return Object.assign(new Node(), { textContent: text }); },
+  } });
+  Object.assign(globalThis, { window: { yuvomi: { showToast() {} } } });
+  fixtureGlobals.__apiStub = {
     get: async (path) => {
       requests.push(path);
       if (path.endsWith('/live-settings')) return { data: [{ id: 1, name: 'Paperless', token_mode: 'shared',
@@ -46,7 +54,7 @@ test('central tag catalogue is loaded and visible in all-tags mode; switching to
     },
     put: async (path, body) => { writes.push({ path, body }); return { data: { ...body, revision: 1 } }; },
   };
-  await render(new Node()); await flush();
+  await render(/** @type {HTMLElement} */ (/** @type {unknown} */ (new Node()))); await flush();
   const form = forms.find((entry) => entry.markup.includes('data-policy-error'));
   assert.ok(form, 'the settings form must actually be built');
   assert.equal(form.querySelector('[data-tags-picker]').hidden, false);
@@ -64,8 +72,8 @@ test('central tag catalogue is loaded and visible in all-tags mode; switching to
 
 test('active-folder tag dialog shows names plus IDs and searches by ID', async () => {
   const panel = new Node();
-  globalThis.__openModal = ({ onSave }) => onSave(panel);
-  globalThis.__apiStub = { get: async () => ({ data: { tags: [{ id: 7, name: 'House' }, { id: 150, name: 'Insurance' }],
+  fixtureGlobals.__openModal = ({ onSave }) => onSave(panel);
+  fixtureGlobals.__apiStub = { get: async () => ({ data: { tags: [{ id: 7, name: 'House' }, { id: 150, name: 'Insurance' }],
     tag_ids: [7, 150], can_edit: false } }) };
   openPaperlessTags({ path: '/documents/dms/paperless/folders/1/documents/99/tags', title: 'Receipt' });
   await flush();
@@ -79,8 +87,8 @@ test('active-folder tag dialog shows names plus IDs and searches by ID', async (
 
 test('unreadable tag names keep the assigned ID and show an actionable explanation', async () => {
   const panel = new Node();
-  globalThis.__openModal = ({ onSave }) => onSave(panel);
-  globalThis.__apiStub = { get: async () => ({ data: { tags: [{ id: 150, name: '#150' }],
+  fixtureGlobals.__openModal = ({ onSave }) => onSave(panel);
+  fixtureGlobals.__apiStub = { get: async () => ({ data: { tags: [{ id: 150, name: '#150' }],
     tag_ids: [150], unresolved_tag_ids: [150], can_edit: false } }) };
   openPaperlessTags({ path: '/documents/dms/paperless/folders/1/documents/99/tags', title: 'Receipt' });
   await flush();
@@ -91,8 +99,8 @@ test('unreadable tag names keep the assigned ID and show an actionable explanati
 test('Save retries an incomplete tag load without writing an unverified selection', async () => {
   const panel = new Node();
   let catalogues = 0, writes = 0;
-  globalThis.__openModal = ({ onSave }) => onSave(panel);
-  globalThis.__apiStub = {
+  fixtureGlobals.__openModal = ({ onSave }) => onSave(panel);
+  fixtureGlobals.__apiStub = {
     get: async (path) => {
       if (path.includes('/tags?account_id=')) {
         if (++catalogues === 1) throw new Error('catalogue unavailable');

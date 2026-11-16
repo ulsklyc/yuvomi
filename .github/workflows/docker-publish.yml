@@ -95,8 +95,17 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             APP_BUILD_REVISION=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max,ignore-error=true
+          # A RELEASE IMAGE IS BUILT WITHOUT THE LAYER CACHE (#2635). The gha cache
+          # is shared within the repository, so a tag build could take over
+          # layers from an earlier build of main, `npm ci` and the Vite build of
+          # the build stage included. A tag therefore imports no cache, exports
+          # none and passes --no-cache: what a household pins was built from the
+          # tag and nothing else. Builds of main keep the cache; they save
+          # minutes there and publish only the moving `main` tag. An empty
+          # cache-from/cache-to is an empty list for the action, no flag at all.
+          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          cache-from: ${{ !startsWith(github.ref, 'refs/tags/v') && 'type=gha' || '' }}
+          cache-to: ${{ !startsWith(github.ref, 'refs/tags/v') && 'type=gha,mode=max,ignore-error=true' || '' }}
           # Both travel inside the image index as attestation manifests, so a
           # `docker pull` gets them for free and `docker buildx imagetools inspect`
           # shows them. Provenance says which workflow built the image from which

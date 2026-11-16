@@ -29,6 +29,9 @@
  *   - Shell und Sprachen trennen sich wie das fetch-Routing, keine Doppel
  *   - jede Sprachdatei ist dem Worker bekannt, vorab nur die Rueckfallsprache
  *   - jedes Settings-Blatt der Registry ist precacht
+ *   - der gebaute Worker beantwortet jede precachte Datei unter /assets/ aus
+ *     dem Cache ohne Netz (#2633) und laesst jede Datei unter /vendor/pdfjs/
+ *     am Worker vorbei, wie die Kopierliste sagt (#2634)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -122,7 +125,8 @@ const IMPORT_EXCEPTIONS = [
       + 'Precacht haette pdf.js nichts zu zeigen, und allein reichte es ohnehin nicht - Worker '
       + '(1.4 MB) und standard_fonts/ gehoerten dazu. Dieselbe Lage fuer die Vorschaubilder '
       + '(utils/document-thumbs.js, im selben Chunk gebuendelt): sie rendern die erste Seite aus '
-      + 'derselben /preview-Datei, die in keinem Cache des Geraets liegen soll.',
+      + 'derselben /preview-Datei, die in keinem Cache des Geraets liegen soll. Der Worker legt '
+      + 'pdf.js auch beim Oeffnen nicht ab: /vendor/pdfjs/ geht an ihm vorbei (#2634).',
     stillValid: () => !API_CACHE_WHITELIST.some((p) => p === '/documents' || p.startsWith('/documents/')),
   },
 ];
@@ -252,4 +256,112 @@ test('jedes Settings-Blatt der Registry ist precacht', () => {
     return !chunk || !precached.has(`/${chunk.file}`);
   });
   assert.deepEqual(missing, [], `Diese Settings-Blätter sind offline nicht erreichbar:\n  ${missing.join('\n  ')}`);
+});
+
+/**
+ * Der gebaute Worker mit einem Cache-Speicher, der ablegt, und einem Netz,
+ * das mitzaehlt. Fuer die Routing-Faelle unten: gemessen wird das Verhalten
+ * von dist/sw.js, nicht sein Text.
+ */
+function runBuiltWorker() {
+  const ORIGIN = 'https://app.test';
+  const key = (/** @type {any} */ req) => {
+    const url = typeof req === 'string' ? req : req.url;
+    return url.startsWith('/') ? ORIGIN + url : url;
+  };
+  /** @type {string[]} */
+  const fetched = [];
+  const okResponse = () => ({ ok: true, status: 200, type: 'basic', headers: { get: () => 'text/javascript' }, clone() { return this; } });
+  const fetchImpl = async (/** @type {any} */ req) => { fetched.push(key(req)); return okResponse(); };
+  /** @type {Map<string, Map<string, any>>} */
+  const stores = new Map();
+  const open = async (/** @type {string} */ name) => {
+    if (!stores.has(name)) stores.set(name, new Map());
+    const store = /** @type {Map<string, any>} */ (stores.get(name));
+    return {
+      match: async (/** @type {any} */ req) => store.get(key(req)),
+      put: async (/** @type {any} */ req, /** @type {any} */ res) => { store.set(key(req), res); },
+      delete: async (/** @type {any} */ req) => store.delete(key(req)),
+      addAll: async (/** @type {any[]} */ reqs) => { for (const req of reqs) store.set(key(req), await fetchImpl(req)); },
+    };
+  };
+  /** @type {Record<string, Function[]>} */
+  const listeners = {};
+  /** @type {Record<string, any>} */
+  const sandbox = {
+    self: {
+      addEventListener: (/** @type {string} */ type, /** @type {Function} */ fn) => { (listeners[type] ||= []).push(fn); },
+      skipWaiting: async () => {}, clients: { claim: async () => {}, matchAll: async () => [] }, location: { origin: ORIGIN },
+    },
+    caches: {
+      open, keys: async () => [...stores.keys()], delete: async (/** @type {string} */ n) => stores.delete(n),
+      has: async (/** @type {string} */ n) => stores.has(n),
+      match: async (/** @type {any} */ req) => { for (const s of stores.values()) if (s.has(key(req))) return s.get(key(req)); },
+    },
+    fetch: fetchImpl,
+    Request: class {
+      /**
+       * @param {any} input
+       * @param {any} [init]
+       */
+      constructor(input, init) { this.url = typeof input === 'string' ? input : input.url; this.mode = init?.mode || 'cors'; this.method = 'GET'; }
+    },
+    Response: class {
+      /**
+       * @param {any} body
+       * @param {any} [init]
+       */
+      constructor(body, init) { this.body = body; this.status = init?.status ?? 200; this.ok = this.status < 300; }
+    },
+    Headers: class { get() { return null; } set() {} },
+    URL, console, Date, Promise, parseInt, setTimeout, clearTimeout,
+  };
+  sandbox.self.self = sandbox.self;
+  runInContext(SW, createContext(sandbox));
+  return {
+    ORIGIN, fetched,
+    async install() {
+      /** @type {Promise<any> | undefined} */
+      let waited;
+      listeners.install[0]({ waitUntil(/** @type {Promise<any>} */ p) { waited = p; } });
+      await waited;
+    },
+    /** @param {string} path */
+    fetchEvent(path) {
+      /** @type {Promise<any> | undefined} */
+      let result;
+      listeners.fetch[0]({
+        request: new sandbox.Request(ORIGIN + path),
+        respondWith(/** @type {Promise<any>} */ p) { result = p; },
+        waitUntil() {},
+      });
+      return result;
+    },
+  };
+}
+
+test('der gebaute Worker liefert jede precachte /assets/-Datei ohne Netz aus (#2633)', async () => {
+  const worker = runBuiltWorker();
+  await worker.install();
+  const assets = APP_SHELL.filter((p) => p.startsWith('/assets/'));
+  assert.ok(assets.length >= 100, `nur ${assets.length} gehashte Dateien im Precache`);
+  worker.fetched.length = 0;
+  const viaNetwork = [];
+  for (const path of assets) {
+    const answer = worker.fetchEvent(path);
+    assert.ok(answer, `${path}: kein respondWith`);
+    await answer;
+    if (worker.fetched.length) { viaNetwork.push(path); worker.fetched.length = 0; }
+  }
+  assert.deepEqual(viaNetwork, [], 'diese gehashten Dateien fragen trotz Precache erst das Netz');
+});
+
+test('der gebaute Worker laesst pdf.js vorbei, wie die Kopierliste sagt (#2634)', async () => {
+  const pdfjs = copiedFiles(PUBLIC_DIR).filter((rel) => rel.startsWith('vendor/pdfjs/'));
+  assert.ok(pdfjs.some((rel) => rel.endsWith('pdf.min.mjs')) && pdfjs.some((rel) => rel.endsWith('pdf.worker.min.mjs')), 'pdf.js fehlt in der Kopie');
+  assert.deepEqual(pdfjs.filter((rel) => copyEntryFor(rel)?.precache), [], 'pdf.js steht mit precache: true auf der Kopierliste');
+  const worker = runBuiltWorker();
+  await new Promise((resolve) => setImmediate(resolve));
+  const answered = pdfjs.filter((rel) => worker.fetchEvent(`/${rel}`) !== undefined);
+  assert.deepEqual(answered, [], 'diese pdf.js-Dateien beantwortet der Worker selbst - dann liegen sie danach in seinem Cache');
 });

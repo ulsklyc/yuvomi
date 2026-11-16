@@ -33,10 +33,11 @@
  * Phase 1a E (09.11.2026) die eine Matrix = `build.target` (Chrome 105,
  * Firefox 115, Safari/iOS 15.4). Mit der Anhebung fielen aus den Listen:
  * `Object.hasOwn`, `.at()`, `findLast`/`findLastIndex`, `structuredClone`,
- * `crypto.randomUUID`, private Klassenglieder und `@layer`. Die Rueckfaelle,
- * die der Code fuer die alte Grenze traegt (pickLocale ohne hasOwn,
- * formatUnit ohne findLastIndex), bleiben samt ihren Programm-Tests stehen;
- * ihr Abbau ist ein eigenes Ticket. Die Suite
+ * `crypto.randomUUID`, private Klassenglieder und `@layer`. Von den
+ * Rueckfaellen fuer die alte Grenze fiel pickLocale ohne Object.hasOwn (#2649:
+ * ohne die API laesst browser-floor.js keinen Browser durch); formatUnit ohne
+ * findLastIndex bleibt samt Programm-Test, weil die Probe Firefox 97 bis 103
+ * durchlaesst und findLastIndex dort fehlt (Teil 2). Die Suite
  * liest sie dort und prueft jeden Eintrag ihrer Verbotslisten dagegen: ein
  * Eintrag, den die Mindestversion schon kann, ist ueberfluessig. Hebt jemand
  * die Mindestversion, meldet die Suite genau die Eintraege, die dann fallen.
@@ -63,9 +64,9 @@
  *   - ohne var()/env(): der vh-Zwilling davor in derselben Regel, gleiche
  *     Eigenschaft, gleicher Wert bis auf die Einheit. Dazwischen darf nur
  *     dieselbe Eigenschaft ohne dvh-Einheit stehen - so steht
- *     `height: -webkit-fill-available` zwischen 100vh und 100dvh, das auf iOS
- *     13.4 bis 15.3 die SICHTBARE Hoehe liefert, wo 100vh die grosse waere
- *     (Review zu #1371). Jede andere Deklaration dazwischen bricht die Kette;
+ *     `height: -webkit-fill-available` zwischen 100vh und 100dvh, das ein
+ *     Chromium ohne dvh (an der Untergrenze Chrome 105 bis 107) den Containing
+ *     Block fuellen laesst, wo 100vh die grosse Hoehe waere (Review zu #1371). Jede andere Deklaration dazwischen bricht die Kette;
  *   - mit var()/env(): gar keine dvh-Einheit, sondern `var(--viewport-height)`
  *     aus tokens.css (dort 100vh, in `@supports (height: 100dvh)` 100dvh);
  *   - innerhalb eines `@supports`, das die Einheit selbst abfragt: nichts, denn
@@ -149,7 +150,7 @@ const guardedBySupports = (at) => at.some(
 /**
  * Steht der vh-Zwilling vor der Deklaration an `index`? Rueckwaerts gelesen
  * darf dazwischen nur dieselbe Eigenschaft OHNE dvh-Einheit stehen - etwa
- * `-webkit-fill-available` fuer Safari 13.4 bis 15.3. Eine andere Eigenschaft
+ * `-webkit-fill-available` fuer Chromium ohne dvh. Eine andere Eigenschaft
  * oder eine weitere dvh-Zeile beendet die Suche.
  */
 function twinBefore(decls, index, property, expected) {
@@ -283,7 +284,7 @@ test('Textleser: sieht, was eachRule() ueberspringt (erfundene Faelle)', () => {
   assert.equal(viewportUnitFindings(keyframes).seen, 0);
 });
 
-test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome 91 wirkt (#1276)', () => {
+test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome 105 wirkt (#1276)', () => {
   const files = appStylesheets();
   const offenders = [];
   const matchedExceptions = new Set();
@@ -319,7 +320,7 @@ test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome
     + 'einer Stelle, die eachRule() nicht liefert (z.B. @keyframes) - dort prueft dieser Guard nichts.');
 
   assert.deepEqual(offenders, [],
-    'Ein Browser ohne dvh (Chrome < 108, Safari < 15.4) verwirft diese Deklarationen, und der '
+    'Ein Browser ohne dvh (an der Untergrenze Chrome 105 bis 107) verwirft diese Deklarationen, und der '
     + 'Rueckfall fehlt oder wirkt nicht:\n' + offenders.join('\n'));
 
   const stale = EXCEPTIONS.filter((ex) => !matchedExceptions.has(ex));
@@ -333,9 +334,9 @@ test('jede dvh-Deklaration in den Stylesheets hat einen Rueckfall, der in Chrome
  * Zwilling und dvh-Zeile nur ZU - er verlangt es nicht, und ohne diesen Test
  * gingen Entfernen und Vertauschen beide gruen durch (gemessen). Jede Zeile
  * gilt fuer andere Browser: 100dvh wo dvh bekannt ist, -webkit-fill-available
- * wo nur das bekannt ist (Safari 13.4 bis 15.3: die SICHTBARE Hoehe), 100vh wo
- * keins von beiden bekannt ist. Vertauscht gewaenne auf alten Browsern die
- * falsche Zeile.
+ * wo nur das bekannt ist (an der Untergrenze Chrome 105 bis 107), 100vh wo
+ * keins von beiden bekannt ist (an der Untergrenze kein Browser mehr - die
+ * Zeile ist der letzte Halt). Vertauscht gewaenne die falsche Zeile.
  */
 const IOS_HEIGHT_CHAIN = ['100vh', '-webkit-fill-available', '100dvh'];
 const IOS_HEIGHT_CHAIN_CARRIERS = [
@@ -357,9 +358,9 @@ test('body und .app-shell tragen die Hoehe als 100vh -> -webkit-fill-available -
   }
   assert.deepEqual(wrong, [],
     `body und .app-shell brauchen genau height: ${IOS_HEIGHT_CHAIN.join('; height: ')} - in dieser `
-    + 'Reihenfolge. iOS Safari 13.4 bis 15.3 kennt -webkit-fill-available, aber kein dvh: fehlt die '
-    + 'Zeile oder steht sie vor 100vh, gilt dort 100vh, die GROSSE Hoehe bei eingefahrener '
-    + 'Adressleiste, und die untere Navigation liegt unter der Adressleiste. An beiden Stellen, weil '
+    + 'Reihenfolge. Chrome 105 bis 107 kennt -webkit-fill-available, aber kein dvh: fehlt die '
+    + 'Zeile oder steht sie vor 100vh, gilt dort 100vh, auf dem Telefon die GROSSE Hoehe bei '
+    + 'eingefahrener Adressleiste, und die untere Navigation liegt unter der Leiste. An beiden Stellen, weil '
     + 'fill-available sich am Containing Block misst - body mit 100vh gaebe der Shell wieder die '
     + 'grosse Hoehe:\n' + wrong.join('\n'));
 });
@@ -748,31 +749,13 @@ test('die Ausnahmen des Startpfads haben ihren Anlass noch', () => {
     + 'und die Ausnahme streichen');
 });
 
-test('pickLocale() laeuft ohne Object.hasOwn - als Programm, nicht nur als Text', () => {
-  // Der Textguard oben sieht nur, was dasteht. Dieser Test nimmt dem Prozess
-  // die API weg, wie Chrome 91 sie nie hatte, und ruft die Aufloesung mit den
-  // Tags, die den Zweig mit der Region erreichen - `de-DE` genuegte dafuer.
-  const saved = Object.getOwnPropertyDescriptor(Object, 'hasOwn');
-  delete Object.hasOwn;
-  let results;
-  try {
-    results = [
-      pickLocale(['de-DE'], ['de', 'en']),
-      pickLocale(['zh-TW'], ['en', 'zh', 'zh-Hant']),
-      pickLocale(['zh-Hans-HK'], ['en', 'zh', 'zh-Hant']),
-      pickLocale(['xx-YY'], ['de', 'en']),
-    ];
-  } finally {
-    if (saved) Object.defineProperty(Object, 'hasOwn', saved);
-  }
-  assert.deepEqual(results, ['de', 'zh-Hant', 'zh', 'en']);
-});
-
 test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text', () => {
-  // Nicht im Startpfad, aber an der Mindestversion (Chrome 87) auf dem Schirm:
-  // die Leseansicht eines Geburtstags mit eigener Erinnerungsfrist und die
-  // Fastendauern. findLastIndex kennt Chrome erst ab 97; dort warf der Aufruf,
-  // und die Angabe fehlte. Erwartet wird dasselbe Ergebnis wie mit der API.
+  // Nicht im Startpfad, aber auf dem Schirm: die Leseansicht eines Geburtstags
+  // mit eigener Erinnerungsfrist, die Fastendauern, Groessen und Fristen in den
+  // Einstellungen. findLastIndex kennt Firefox erst ab 104, und browser-floor.js
+  // laesst Firefox 97 bis 103 bewusst durch (docs/installation.md: "single
+  // screens can stay empty"); dort wuerfe der Aufruf die ganze Ansicht um.
+  // Erwartet wird dasselbe Ergebnis wie mit der API.
   const cases = [[2, 'day'], [1, 'week'], [1.5, 'hour'], [-3, 'minute'], [1234.5, 'hour']];
   const format = () => cases.flatMap(([value, unit]) => ['short', 'long']
     .map((unitDisplay) => formatUnit(value, unit, { unitDisplay })));
@@ -800,8 +783,8 @@ test('formatUnit() laeuft ohne findLastIndex - als Programm, nicht nur als Text'
  *
  * Erhoben wurde die Syntax aller Module mit einem echten Parser (acorn,
  * ecmaVersion-Leiter, #1369): das Neueste in der App ist `||=`/`??=`
- * (Firefox 79) und ein statisches Klassenfeld (Safari 14.1), beides genau an
- * der Mindestversion. Private Klassenglieder, statische Initialisierungsbloecke
+ * und ein statisches Klassenfeld, beides seit der Untergrenze 105/115/15.4
+ * weit unter ihr. Private Klassenglieder, statische Initialisierungsbloecke
  * und Lookbehind stehen nur im vendorten PDF.js. Die Muster hier sind Text und
  * damit eine Naeherung: sie treffen die Schreibweise, mit der die Konstrukte
  * tatsaechlich benutzt werden (`this.#x`, `static {`, `(?<=`).
@@ -846,7 +829,7 @@ test('Leser: erkennt neuere Syntax, nicht ihre Doppelgaenger in Strings (erfunde
   assert.deepEqual(kinds('const re = /(?<=\\$)\\d+/;'), ['Lookbehind']);
   assert.deepEqual(kinds("const re = new RegExp('(?<!a)b');"), ['Lookbehind']);
   // Erlaubt: Hex-Farben, Anker, IDs, statische Felder und Methoden, benannte
-  // Gruppen und private Klassenglieder (Safari 14.1, unter der Grenze seit Phase 1a E).
+  // Gruppen und private Klassenglieder (die Untergrenze kann sie seit Phase 1a E).
   assert.deepEqual(kinds([
     'class A { #n = 0; get n() { return this.#n; } }',
     "el.style.color = '#fff'; const sel = '#main-content'; location.hash = '#top';",
@@ -940,8 +923,8 @@ test('Leser: erkennt die Block-Konstrukte, nicht ihre harmlosen Nachbarn (erfund
   assert.deepEqual(kinds('@media (width >= 768px) { .a { display: flex } .b { gap: 0 } }'), ['Bereichssyntax in @media']);
   assert.deepEqual(kinds('@media (400px < width < 800px) { .a { display: flex } }'), ['Bereichssyntax in @media']);
   // Erlaubt: klassische Media-Merkmale, @supports und @container, @starting-style,
-  // @keyframes, und `@layer` (Chrome 99, Firefox 97, Safari 15.4 - unter der
-  // Grenze seit Phase 1a E; ob ein Blatt es nutzt, entscheidet DECISIONS 14).
+  // @keyframes, und `@layer` (die Untergrenze kann es seit Phase 1a E; ob ein
+  // Blatt es nutzt, entscheidet DECISIONS 14).
   assert.deepEqual(kinds([
     '@layer base { .a { color: red } }',
     '@layer base, theme;',
@@ -977,11 +960,13 @@ test('kein Stylesheet nutzt ein Konstrukt, das an der Mindestversion einen ganze
 });
 
 // DIE PILLE DER MOBILEN KAPSEL (R20, Review): sie verschiebt das aktive Ziel
-// mit `translate` (Chromium 104) und schneidet mit `overflow: clip` (90). Unter
-// der Mindestversion (Chrome 87, der Chromebook aus #1276 bei 91) schrumpfte
-// die Kapsel ohne den Versatz, und die Pille stuende leer. Jede Regel, die die
-// Pille baut, steht deshalb in `@supports (translate: 0)`; ohne die Eigenschaft
-// minimiert die Kapsel wie in R19.
+// mit `translate` und schneidet mit `overflow: clip`. Ohne `translate`
+// schrumpfte die Kapsel ohne den Versatz, und die Pille stuende leer. Jede
+// Regel, die die Pille baut, steht deshalb in `@supports (translate: 0)`; ohne
+// die Eigenschaft minimiert die Kapsel wie in R19. An der Untergrenze
+// (Chrome 105, Firefox 115, Safari 15.4) kennt jeder Browser `translate`, die
+// Weiche greift dort also immer; sie bleibt, weil sie die Pille an ihre
+// Voraussetzung bindet statt an eine Versionsannahme.
 test('die Pille der Kapsel steht nur dort, wo translate gilt', () => {
   const pillRules = [...eachRule(read('public/styles/layout.css'))].filter(({ selector, body }) => (
     /nav-item--pill/.test(selector)
@@ -1169,13 +1154,24 @@ test('keine Regel setzt display an einem Popover ausserhalb von :popover-open (#
  *      statisch, sonst laedt ihn jeder Browser (und Vite legte ihn in den
  *      Start-Chunk).
  *   2. Er kennt `:popover-open` in CSS nicht, sondern setzt die Klasse
- *      `.\:popover-open`. Jede Regel, die ein offenes Popover erst zeigt
- *      (`display`, `opacity`, `transform`, `pointer-events`), hat ihren
- *      Zwilling an dieser Klasse im Rueckfall-Block von reset.css - sonst
- *      stuende das Menue offen, aber unsichtbar.
+ *      `.\:popover-open`. Jede Regel, die vom offenen Zustand abhaengt, hat
+ *      ihren Zwilling an dieser Klasse im Rueckfall-Block von reset.css -
+ *      sonst stuende das Menue offen, aber unsichtbar. "Jede" heisst (#2650):
+ *      auch in `@media` (der Zwilling steht im selben `@media` im
+ *      Rueckfall-Block, oder der Zwilling der Basisebene setzt denselben Wert),
+ *      auch zusammengesetzt (`.a.b:popover-open`, `.a:popover-open .c`) und
+ *      auch als Bedingung (`:has(:popover-open)`). Ein unbekannter Selektor
+ *      macht die ganze Liste ungueltig - der Zwilling ist deshalb eine eigene
+ *      Regel, nie ein Glied derselben Liste.
+ *      Nicht verlangt: `:not(:popover-open)` allein (der geschlossene Zustand,
+ *      den `[popover] { display: none }` traegt), `transition*` (ohne
+ *      `@starting-style` blendet unter dem Polyfill nichts) und alles in
+ *      `@starting-style` (Chrome 117, also nie zusammen mit dem Polyfill).
  * ────────────────────────────────────────────────────────────────────────── */
 const POLYFILL = '@oddbird/popover-polyfill';
-const OPEN_STATE_PROPS = ['display', 'opacity', 'transform', 'pointer-events'];
+const NOT_OPEN_STATE = /^transition/;
+// `:popover-open`, das nicht direkt in `:not(` steht.
+const OPEN_PSEUDO = /(?<!:not\()(?<!\\):popover-open\b/g;
 
 /**
  * Statische und dynamische Importe des Polyfills in einer Quelle.
@@ -1188,51 +1184,74 @@ function polyfillImports(source) {
 }
 
 /**
- * Klasse -> Eigenschaften, die eine Grundebenen-Regel `.x:popover-open` setzt.
+ * Schluessel aus At-Kette und Selektor: `@media (...) > .a.\:popover-open`.
+ * @param {string[]} at
+ * @param {string} selector
+ */
+const twinKey = (at, selector) => [...at.map(norm), norm(selector)].join(' > ');
+
+/**
+ * Was der Polyfill verliert: Zwilling-Schluessel -> Eigenschaft -> Wert, je
+ * Regel, die vom offenen Zustand abhaengt. Der Schluessel nennt den Zwilling,
+ * der verlangt ist (`:popover-open` -> `.\:popover-open`), samt `@media`-Kette.
  * @param {string} css
  */
 function openStateRules(css) {
-  /** @type {Map<string, Set<string>>} */
+  /** @type {Map<string, Map<string, string>>} */
   const map = new Map();
   for (const { selector, body, at } of eachRule(css)) {
-    if (at.length) continue;
+    if (at.some((a) => /^@starting-style\b/i.test(a) || /^@supports\s+(?:not\s+)?selector\(\s*:popover-open\s*\)$/i.test(a))) continue;
+    const props = declarations(body).filter((d) => !NOT_OPEN_STATE.test(d.property));
+    if (!props.length) continue;
     for (const part of selectorParts(selector)) {
-      const cls = part.match(/^\.([\w-]+):popover-open$/)?.[1];
-      if (!cls) continue;
-      const props = declarations(body).map((d) => d.property).filter((p) => OPEN_STATE_PROPS.includes(p));
-      if (props.length) map.set(cls, new Set([...(map.get(cls) ?? []), ...props]));
+      if (!OPEN_PSEUDO.test(part)) continue;
+      OPEN_PSEUDO.lastIndex = 0;
+      const key = twinKey(at, part.replace(OPEN_PSEUDO, '.\\:popover-open'));
+      const entry = map.get(key) ?? new Map();
+      for (const d of props) entry.set(d.property, norm(d.value));
+      map.set(key, entry);
     }
   }
   return map;
 }
 
 /**
- * Klasse -> Eigenschaften ihrer Zwillinge `.x.\:popover-open` im Rueckfall-Block.
+ * Die Zwillinge im Rueckfall-Block, gleich verschluesselt (ohne die
+ * `@supports`-Stufe selbst).
  * @param {string} css
  */
 function polyfillTwins(css) {
-  /** @type {Map<string, Set<string>>} */
+  /** @type {Map<string, Map<string, string>>} */
   const map = new Map();
   for (const { selector, body, at } of eachRule(css)) {
-    if (at.length !== 1 || !POPOVER_FALLBACK_AT.test(at[0])) continue;
+    if (!at.length || !POPOVER_FALLBACK_AT.test(at[0])) continue;
     for (const part of selectorParts(selector)) {
-      const cls = part.match(/^\.([\w-]+)\.\\:popover-open$/)?.[1];
-      if (!cls) continue;
-      map.set(cls, new Set([...(map.get(cls) ?? []), ...declarations(body).map((d) => d.property)]));
+      if (!part.includes('.\\:popover-open')) continue;
+      const key = twinKey(at.slice(1), part);
+      const entry = map.get(key) ?? new Map();
+      for (const d of declarations(body)) entry.set(d.property, norm(d.value));
+      map.set(key, entry);
     }
   }
   return map;
 }
 
 /**
- * Was an den Zwillingen fehlt: `.x { prop }` je fehlender Eigenschaft.
- * @param {Map<string, Set<string>>} open
- * @param {Map<string, Set<string>>} twins
+ * Was an den Zwillingen fehlt: `<Schluessel> { prop }` je fehlender Eigenschaft.
+ * Eine Regel in `@media` ist gedeckt, wenn ihr Zwilling im selben `@media`
+ * steht oder der Zwilling der Basisebene denselben Wert setzt.
+ * @param {Map<string, Map<string, string>>} open
+ * @param {Map<string, Map<string, string>>} twins
  */
 function missingTwins(open, twins) {
   const missing = [];
-  for (const [cls, props] of open) {
-    for (const prop of props) if (!twins.get(cls)?.has(prop)) missing.push(`.${cls}.\\:popover-open { ${prop} }`);
+  for (const [key, props] of open) {
+    const baseKey = key.split(' > ').filter((step) => !step.startsWith('@')).join(' > ');
+    for (const [prop, value] of props) {
+      if (twins.get(key)?.has(prop)) continue;
+      if (baseKey !== key && twins.get(baseKey)?.get(prop) === value) continue;
+      missing.push(`${key} { ${prop} }`);
+    }
   }
   return missing.sort();
 }
@@ -1245,12 +1264,35 @@ test('Leser: Polyfill-Importe und Zwillinge des offenen Zustands (erfundene Fael
     '.a:popover-open { display: flex; transition: none }',
     '.b:popover-open, .c:popover-open { opacity: 1 }',
     '.d:not(:popover-open) { opacity: 0 }',
-    '@media (max-width: 1px) { .e:popover-open { opacity: 1 } }',
+    '@media (max-width: 1px) { .a:popover-open { display: grid } .b:popover-open { opacity: 1 } }',
     '.f:popover-open { color: red }',
+    '.g.h:popover-open { display: grid }',
+    '.i:popover-open .j { opacity: 1 }',
+    '.k:not(:has(:popover-open)) { translate: 0 -1px }',
+    '@starting-style { .a:popover-open { opacity: 0 } }',
+    '@supports selector(:popover-open) { .l:popover-open { opacity: 1 } }',
   ].join('\n'));
-  assert.deepEqual([...open.keys()].sort(), ['a', 'b', 'c']);
-  const twins = polyfillTwins('@supports not selector(:popover-open) { .a.\\:popover-open, .b.\\:popover-open { display: flex; opacity: 1 } } .c.\\:popover-open { opacity: 1 }');
-  assert.deepEqual(missingTwins(open, twins), ['.c.\\:popover-open { opacity }'], 'ein Zwilling ausserhalb des Rueckfall-Blocks zaehlt nicht');
+  assert.deepEqual([...open.keys()].sort(), [
+    '.a.\\:popover-open', '.b.\\:popover-open', '.c.\\:popover-open', '.f.\\:popover-open',
+    '.g.h.\\:popover-open', '.i.\\:popover-open .j', '.k:not(:has(.\\:popover-open))',
+    '@media (max-width: 1px) > .a.\\:popover-open', '@media (max-width: 1px) > .b.\\:popover-open',
+  ]);
+  assert.deepEqual([...(open.get('.a.\\:popover-open')?.keys() ?? [])], ['display'], 'transition zaehlt nicht');
+  const twins = polyfillTwins([
+    '@supports not selector(:popover-open) {',
+    '  .a.\\:popover-open, .b.\\:popover-open { display: flex; opacity: 1 }',
+    '  .f.\\:popover-open { color: red } .g.h.\\:popover-open { display: grid }',
+    '  .i.\\:popover-open .j { opacity: 1 }',
+    '  @media (max-width: 1px) { .k:not(:has(.\\:popover-open)) { translate: 0 -1px } }',
+    '}',
+    '.c.\\:popover-open { opacity: 1 }',
+  ].join('\n'));
+  assert.deepEqual(missingTwins(open, twins), [
+    '.c.\\:popover-open { opacity }',
+    '.k:not(:has(.\\:popover-open)) { translate }',
+    '@media (max-width: 1px) > .a.\\:popover-open { display }',
+  ], 'ausserhalb des Rueckfall-Blocks zaehlt nichts; in @media deckt die Basis nur denselben Wert; '
+    + 'ein Zwilling in einem anderen @media deckt nicht');
 });
 
 test('der Popover-Polyfill laedt nur dynamisch und nur hinter der Probe', () => {
@@ -1305,13 +1347,17 @@ test('ensurePopoverApi() als Programm: laedt nur ohne die API, und ein Ladefehle
 });
 
 test('jede Regel des offenen Popovers hat ihren Zwilling fuer den Polyfill in reset.css', () => {
+  /** @type {Map<string, Map<string, string>>} */
   const open = new Map();
   for (const file of appStylesheets()) {
-    for (const [cls, props] of openStateRules(read(file))) open.set(cls, new Set([...(open.get(cls) ?? []), ...props]));
+    for (const [key, props] of openStateRules(read(file))) open.set(key, new Map([...(open.get(key) ?? []), ...props]));
   }
   for (const known of ['popover-menu', 'filter-popover', 'ydp-popover', 'documents-context-menu']) {
-    assert.ok(open.has(known), `Reichweite: keine Regel .${known}:popover-open gefunden`);
+    assert.ok(open.has(`.${known}.\\:popover-open`), `Reichweite: keine Regel .${known}:popover-open gefunden`);
   }
+  // Reichweite in @media und an einer Bedingung (#2650).
+  assert.ok([...open.keys()].some((key) => key.startsWith('@media')), 'Reichweite: keine Regel in @media gelesen');
+  assert.ok([...open.keys()].some((key) => key.includes(':has(.\\:popover-open)')), 'Reichweite: keine :has(:popover-open)-Regel gelesen');
   const twins = polyfillTwins(read('public/styles/reset.css'));
   assert.deepEqual(missingTwins(open, twins), [],
     'Mit dem Popover-Polyfill traegt ein offenes Popover die Klasse `.\\:popover-open`, `:popover-open` gilt dort nicht. '
@@ -1319,7 +1365,8 @@ test('jede Regel des offenen Popovers hat ihren Zwilling fuer den Polyfill in re
   const base = [...eachRule(read('public/styles/reset.css'))]
     .find((r) => r.selector === '[popover].\\:popover-open' && r.at.length === 1 && POPOVER_FALLBACK_AT.test(r.at[0]));
   assert.ok(base, 'reset.css: `[popover].\\:popover-open` im Rueckfall-Block fehlt');
-  assert.match(base.body, /z-index:\s*2147483647/, 'ohne Top-Layer hebt der z-index das offene Popover ueber Dialoge und Meldungen');
+  assert.match(base.body, /z-index:\s*var\(--z-top-layer\)/, 'ohne Top-Layer hebt der z-index das offene Popover ueber Dialoge und Meldungen');
+  assert.match(read('public/styles/tokens.css'), /--z-top-layer:\s*2147483647;/, 'tokens.css: --z-top-layer steht fuer die Top Layer, der groesste z-index');
 });
 
 /* ──────────────────────────────────────────────────────────────────────────

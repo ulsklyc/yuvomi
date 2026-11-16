@@ -16,9 +16,352 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the binding. Migration 283 adds the folder and member-access tables.
 - **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
 
+
 ### Fixed
 - **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
 - **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+- **The "session cannot be checked" screen is readable on the light field.** When the server
+  did not answer the sign-in check at startup (offline, a server error, too many requests), the
+  title, the sentence and "Technical details" stood directly on the violet light field behind
+  them, and in the light theme the sentence and the details link fell below the WCAG AA
+  contrast of 4.5:1. The screen now sits on the same glass panel as the sign-in page.
+- **The retry countdown keeps number and unit together in Traditional Chinese.** On the same
+  screen, the hint "Trying again in 2 s" could break between the number and 秒 on a narrow
+  panel. Every other language already joined them with a non-breaking space; zh-Hant now does
+  too.
+
+## [2.91.0] - 2026-11-15
+
+### Changed
+- **Every "administrators only" refusal of the API has the same answer.** Routes that only an
+  administrator may use refused everyone else with one of four texts ("Permission denied.",
+  "Admin access required.", "Not authorized.", and one of its own for the member order), most
+  of them without a `reason`. They now all answer `403` with
+  `{ "error": "Admin access required.", "code": 403, "reason": "admin_required" }`. A signed-in
+  device gets `reason: "device_credential"` at every one of these routes, where some of them
+  used to send the plain text. API clients that compared the text should read the `reason`
+  instead. Who may use a route has not changed, and the web app shows the same sentence as
+  before.
+- **Four household settings are for administrators only.** The currency, the app name, the
+  housekeeping payment tasks and the default length of new events count for the whole
+  household, but every member could change them through the API. A member who sends
+  `currency`, `app_name`, `housekeeping_payment_tasks` or `calendar_default_duration` to
+  `PUT /api/v1/preferences` now gets `403` with `reason: "admin_required"`, also for an invalid
+  value, which used to answer `400`, and nothing of that request is saved. Every member still
+  reads all four. In the web app members never saw these controls; on the Appearance page they
+  now see the household currency as a read-only row.
+
+### Fixed
+- **The backup schedule shows the same time as the next backup.** On a server running in
+  another time zone than the household, the backup card said "Daily at 02:00" above "Next
+  backup 03:00" for the same run. The server now names the zone its schedule runs in, and the
+  schedule reads its time, weekday and day from the next run in the household's time zone;
+  where that would not hold for every run, for example shortly before only one of the two
+  zones changes to summer time, it shows the configured value (`BACKUP_SCHEDULE=0 2 * * *`)
+  instead.
+- **A wall display reads only the tasks the whole household sees.** The task list, a single
+  task with its subtasks, its comments, its linked documents, its history, the household's
+  completion feed, the tag lists, the task parts of the overview and the task named by a
+  points entry (`GET /api/v1/tasks`, `/tasks/:id`, `/tasks/:id/comments`,
+  `/tasks/:id/documents`, `/tasks/:id/completions`, `/tasks/completions`, `/tasks/tags`,
+  `/tasks/meta/options`, `/dashboard` without `audience=household`, `/rewards/ledger`) asked a
+  paired display the same question as a person, so a task or subtask shared only with its
+  assignees would show on the wall if the display itself was assigned, while ticking it off
+  there answered "not found". Every one of these reads now follows the same wall rule: such a
+  task answers "not found" like an unknown one, also where a household task answers "no
+  access to documents", and the list, its subtask counts, the feeds, the tags, the overview
+  with its counts and countdowns leave it out, also for every earlier instance of a repeating
+  task; a points entry keeps its row and its points, only without the task's name. Nothing
+  changes for people. In the app this state could not be reached: a display is never offered
+  as an assignee, and the server refuses it as one.
+- **A wall display reads only the events the whole household sees.** The calendar, the next
+  events, the event search, a single event, the event count and the synced calendars of the
+  calendar list, and the event parts of the overview without `audience=household` showed a
+  display an event shared only with its assignees if the display itself was assigned. They
+  now follow the same wall rule as the tasks: such an event answers "not found" like an
+  unknown one and stays off every list, count and countdown. Nothing changes for people, and
+  as with the tasks the state could not be reached in the app.
+
+## [2.90.0] - 2026-11-14
+
+### Foundation
+- **Every access rule is answered in one place.** Who may see a row, who may use an area and
+  who cares for whom was decided in many files: as SQL in the routes, as comparisons on loaded
+  rows, in the scheduler, the feeds, the push sender and the MCP tools. All of it now lives in
+  `server/authorize/` and is asked through one function, and lint rules refuse a new rule
+  written anywhere else. Nothing changes for a household: the rules are the same, apart from
+  the corrections listed under "Fixed" and "Security" below, which this move brought to light.
+- **A matrix test holds what each role sees on every read path.** For every kind of account
+  (admin, member, child, caregiver, wall display, split-expense guest) and every path that
+  reads data (lists, detail views, search, overview, feeds, reminders, MCP) the expected answer
+  is written down and checked on every change, so a rule that drifts on one path turns a test
+  red before it reaches a release.
+- **No change to the database, and the way back is open.** This release brings no migration.
+  Before the tag the previous image and this build ran in turn on the same database, and a
+  backup made on this build restored on the previous one; pinning the previous version works
+  as described in the installation guide ("Pinning a version").
+
+### Added
+- **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
+  system information there is a section with what the installation runs on: version and build,
+  whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema
+  version and the last migration, the size of the database and the free disk space, whether the
+  database is encrypted and where its key comes from, and the state of the last backup. One
+  button copies all of it as plain text with the field names of the API and the raw values, the
+  same in every language, so that whoever reads the report does not have to know yours. The
+  text contains no password, key or path and nothing about members. Copying also works over
+  plain http in the home network; where a browser refuses it, the text stands selected in a
+  field instead of claiming a copy that did not happen.
+- **The backup page now shows why the last scheduled run failed** (#2525). Settings > Household >
+  Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
+  in your language - a full disk, an unwritable backup folder, a failed integrity check, or an
+  unrecognised cause - from `scheduler.lastError.reason`. A successful run clears the row.
+- **The backup card keeps telling you when a backup last succeeded, and warns when that is too
+  long ago.** After a failed run, "Last backup" showed only the date of the failure, and the date
+  of the last backup you can actually restore from was gone. "Last backup" is now always the
+  last one that succeeded; a failed run adds its own "Last attempt" row above the reason and
+  leaves again with the next success. If the last success is older than two intervals of the
+  schedule (daily, weekly, monthly or every N hours), or no run has succeeded yet although one
+  was tried, the row turns amber and says that at least two scheduled backups have been missed -
+  also when nothing failed and the schedule simply stood still. A schedule the page cannot read
+  as one of those patterns never warns about age. The card also names the next scheduled run
+  ("Next backup") below those rows, because after a failure the next question is when it will
+  try again. And "Active" is green only while nothing on the card asks for attention: after a
+  failed run or with an overdue backup the word stays, since the schedule is still running, but
+  without the green that would say all is well next to a red line.
+
+### Fixed
+- **A wall display or a split-expense guest account no longer receives medication reminders or
+  calendar feeds.** Reminders, pushes and the subscription feeds are sent without a request, and
+  there the account was looked up like an ordinary member: a display or a guest whose medication
+  schedule or feed token had been set directly in the database heard about its own doses, and its
+  calendar feed carried every household event, while the app itself refuses both accounts these
+  areas. Now a guest receives nothing from any area, a display receives only from the areas its
+  wall shows (tasks, calendar, rewards), and every feed of a display or a guest - calendar,
+  birthdays, inventory deadlines, cycle, shift plan and waste - answers with an empty calendar,
+  as for a member without the area. The app offers neither account a way to get there, so only
+  an installation edited by hand was affected. Members and admins are not affected.
+- **An AI assistant now creates tasks, shopping items and events exactly as the app does**
+  (#2616). The MCP tools `create_task`, `add_shopping_item` and `create_event` wrote with their
+  own queries beside the app's own path, and the result differed: a new task got no points,
+  although the household had set a default value for them; your own task category was refused
+  while a default category you had deleted was still accepted; a shopping item took any
+  category name, even one that no longer exists, and without one it fell back on "Sonstiges"
+  even after you had renamed that category; and with an iCloud calendar connected, which uploads
+  every local event, a new calendar event waited for the next sync run instead of going up right
+  away. All three now take the same route as the app, so there is nothing left to keep in step.
+  They also accept an optional `idempotency_key`: repeat a call with the same key after a lost
+  answer and you get the first result back instead of a duplicate. Writing over MCP now needs an
+  API token or a sent-along CSRF token - a client that authenticates with a browser session
+  cookie alone is refused. When the API refuses a call with a machine-readable reason, the error
+  text of these tools and of `call_api_operation` now ends in it, for example
+  `[reason: csrf_invalid]`.
+- **Creating or editing a task with an empty category or priority no longer breaks it.** An
+  API client that sent `category: ""` got a task with an empty category that none of your
+  categories matches, and `priority: ""` failed with "Internal server error.". An empty value
+  now counts as not given, exactly as leaving the field out: a new task gets "Miscellaneous"
+  and no priority, an edited one keeps what it had. The app itself sent an empty category when
+  its category list had not loaded. The description is now stored without leading and trailing spaces, and one
+  that is empty or only spaces is stored as no description - also when you clear it on edit.
+  When an AI assistant cannot reach the API from the server itself, the server log now says so
+  with the cause and the address it tried, not only the assistant.
+- **"Create backup now" no longer reports success when the backup failed.** The server answers
+  a failed manual run with `200` and `success: false`, and the page showed "Backup created
+  successfully." without reading the answer. It now shows the reason in your language, the
+  same sentence as the "Last error" row, and the card reloads either way.
+- **A backup schedule over several weekdays is no longer shown as "Every Monday".** With
+  `BACKUP_SCHEDULE` set to a range or a list of weekday names, such as `0 2 * * mon-fri` or
+  `0 2 * * mon,wed,fri`, the backup card read only the first name: it said "Every Monday at
+  02:00" for a schedule that runs on five days. The backups themselves always ran as
+  configured - only the description was wrong. Such a schedule now stands there as the
+  expression itself, like every other list or range; a single weekday is still spelled out,
+  as a number or as a short or full name (`mon`, `Monday`).
+- **The global search finds the tasks your task list shows.** It only found tasks you had
+  created yourself or that named you in the old single-assignee field. A task someone else
+  shared with everyone, or one you were assigned to together with others, stood in your list
+  and was missing from the search. The search now applies the rule of the list.
+- **The global search finds the notes your notes page shows.** It only found notes you had
+  written yourself. A note someone else shared with everyone stood on your notes page and was
+  missing from the search. The search now applies the rule of the page: notes visible to
+  everyone, and your own. A note set to "only me" is still found by nobody but its author.
+- **The global search finds the medications and activities of a person you care for.** If an
+  admin has entered you as someone's caregiver, the Health pages show you that person's
+  entries, including the ones marked private. The search left those out: it only knew your
+  own entries and the ones shared with the family. It now applies the rule of the Health
+  pages. Nothing else changes - without a care grant nobody finds another person's private
+  entry, an admin included.
+- **An archived task says so in the search results.** The global search finds archived tasks,
+  so that a task you put away can be found again - but the hit looked like any open task. It
+  now reads "Archived" before the due date and stands at the end of the task hits, after the
+  done ones. With many hits an archived task can drop off the end of the list; a more exact
+  search term brings it back. `GET /api/v1/search` returns `archived_at` on a task hit.
+- **Changing or deleting a quick link that your list does not show answers "not found".**
+  `PUT` and `DELETE /api/v1/quick-links/:id` now apply the same visibility rule as the list. A
+  quick link with a visibility other than "all" or "private", which only a restored backup or
+  direct database access can produce, was hidden from everyone but its creator in the list,
+  yet changing or deleting it answered `403` and so gave away that it exists. It now answers
+  `404` with `quick_links_link_not_found`, like a private quick link of someone else. Nothing
+  changes for the two levels the app writes.
+- **Recurring events decide "is this series mine" the way the calendar list does.** If the
+  creator stored with a series is not an account number - possible only after restoring a
+  backup or editing the database directly, for example `0x2` - the calendar never counted the
+  series as anyone's own, but a single occurrence of it that is shared with everyone could
+  still offer "change this occurrence" to the account that text resembles. It no longer does.
+  Events the app wrote itself are not affected.
+
+### Security
+- **The global search no longer finds a private task of someone else.** A task set to "only
+  me" was found by a second person if the old single-assignee field still named them - a
+  field the task list ignores for a private task. Title, status, priority and due date of that
+  task appeared in the search results, with a matching word from its description or tags as an
+  excerpt. The task list, the detail view and the overview never showed it. The search now
+  asks the same rule as the list: visible to everyone, created by you, or shared with the
+  assigned people and you are one of them.
+
+## [2.89.1] - 2026-11-12
+
+### Security
+- **A signed-in device can no longer change the email addresses of a household member.**
+  SECURITY.md says that a device credential changes neither password, email nor second factor.
+  The addresses of the contact that belongs to an account were outside that rule, and they are
+  where a password reset is sent. A device is now refused there like a module-scoped token
+  (`403`, `contact_email_protected`), for the person's own contact too. The other fields of the
+  contact stay editable from a device, and a browser session or a full-access token changes
+  the addresses as before.
+- **The Umbrel catalog workflow no longer runs foreign code next to its token.** On every
+  release it ran the catalog repository's linter and installed its npm dependencies in the step
+  that held the token for the catalog fork. It now has three jobs: one edits the catalog files
+  as text, one runs the linter with no secret and no rights and installs with
+  `npm ci --ignore-scripts`, and only the last one holds the token and pushes. Nothing changes
+  for an installation.
+
+## [2.89.0] - 2026-11-12
+
+### Foundation
+- **A readiness endpoint `/readyz` next to `/health`.** `/health` only says that the process
+  answers, and it stays `200` during a restore so that Docker does not restart the container in
+  the middle of one. `/readyz` says whether the instance can serve right now: `200` with
+  `{"status":"ready"}`, or `503` with `{"status":"not_ready","reason":"..."}` while a restore is
+  running, the database connection is closed, the database is older than this version expects or
+  the data folder refuses writes. It needs no login, tells nothing else about the instance and
+  does not write to the database. `/health` and every shipped healthcheck stay as they are; the
+  new path is for a load balancer or an uptime monitor.
+- **Unexpected errors are answered and logged in one place.** The central error handler now
+  keeps the status of a client error that is marked as safe to show; until now every error
+  that reached it was a 500. Its sentence and `reason` reach the client only from a
+  `HttpError` (`server/utils/http-error.js`), whose text we write ourselves; a 4xx of the HTTP
+  libraries gets a fixed sentence such as "The request was refused (Bad Request).", because
+  body-parser wraps foreign text (zlib) that way. Requests the HTTP layer refuses now get their
+  4xx instead of a 500: a corrupt compressed body, an aborted upload or a body shorter than its
+  `Content-Length` 400, a form nested too deep 400, too many form fields 413, an unsupported
+  `Content-Encoding` or charset 415. A path parameter that does not decode (`%ZZ`) is a 400.
+  Everything else stays a 500 with the fixed sentence, and the raw text stays in the log. The
+  log line names the method, the route pattern and the status instead of the path, and the
+  raw segment of an undecodable parameter is no longer written, so a calendar feed token in the
+  URL no longer lands in the log. The cause of an error is logged with it.
+- **The status of the last backup survives a restart.** After a restart the backup page said
+  "never" until the next scheduled run, because the last attempt lived in memory only. The time of
+  the last attempt, the time of the last success and the reason of a failed attempt are now kept
+  in the database, without a schema change, and a restore keeps the values of the installation it
+  runs on rather than those inside the restored file. `GET /api/v1/backup/status` gains
+  `scheduler.lastSuccess`.
+- **A restore drill checks that a release database restores and migrates on this version.**
+  `scripts/restore-drill.mjs` restores a database through the same restore command an operator
+  uses, migrates it to the current schema and checks its integrity, foreign keys, schema and row
+  counts before it starts the server on it and reads every module. The rollback probe that
+  tries the way back before a foundation release moved into the repository as
+  `scripts/rollback-probe/`. Nothing changes for an installation.
+- **Releases that change the database schema carry a frozen demo database.** A new workflow
+  attaches `yuvomi-<version>-corpus.db` and its `.sha256` to every release whose schema differs
+  from the last one with such a file, and to every foundation release. It is the demo seed of
+  that release, encrypted with a public test key, and the restore drill migrates each of them
+  to the current version. Nothing changes for an installation.
+- **Every day and in every pull request, all of those databases are restored and migrated.**
+  A new workflow downloads each release's frozen database, restores it the way an operator
+  would, migrates it to the code under test and starts the server on it. A migration that
+  breaks an older database now fails in CI, and the run is also red when the newest release
+  changed the schema but has no frozen database. Nothing changes for an installation.
+- **Lint, layer and dead-code checks run on every pull request.** A new `lint` job runs
+  oxlint, dependency-cruiser, knip and zizmor and compares their findings with
+  `lint-baseline.json`, one count per file and rule that only sinks: a new finding or a rising
+  count fails, as with the type baseline. An assignment to `innerHTML` and an `await` inside a
+  database transaction have no baseline and fail at the first finding. Contributors run
+  `npm run lint` before a push; CONTRIBUTING.md lists the rules. Nothing changes for an
+  installation.
+- **Tests that read source code as text are listed and counted.**
+  `test/text-reader-inventory.json` names every suite that reads a file under `public/` or
+  `server/` as text, with the files it reads and what becomes of it. A new suite of that kind
+  without an entry fails `npm run test:text-reader-inventory`, and the number of checks that
+  hold a spelling instead of a behaviour only sinks. docs/test-suites.md has the rules. Nothing
+  changes for an installation.
+- **CI runs the test suites side by side and takes about ten minutes instead of thirty.**
+  The `Tests` job now runs `npm run test-parallel` with four jobs instead of `npm test`. A red
+  suite no longer hides the ones after it: the job log ends with every red suite and its log,
+  and when one is red, the logs are attached to the run. Contributors run `npm run test-parallel` before a push.
+  A new push to a pull request cancels the run it replaces.
+- **The way back to 2.88.1 was tried before the tag.** Image 2.88.1 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.88.1 to 2.89.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.89.0 restored on
+  2.88.1 through the admin restore, and 2.88.1 started on a database that carries the new
+  backup status without a word about it. To go back, pin the image tag `2.88.1`.
+
+### Added
+- **Admins can ask the server what it runs on.** `GET /api/v1/system/diagnostics` answers with
+  the version and build revision, the Node.js and SQLite versions, platform, schema version and
+  the time of the last migration, the size of the database and its write-ahead log, free space on
+  the data volume, uptime, the status of the last backup with the next scheduled run, where the
+  database key comes from, readiness and the number of installed modules. It never carries a key,
+  a path, a hostname, the value of an environment variable or anything about a member, and it is
+  refused for members and for signed-in devices. `GET /api/v1/backup/status` gains
+  `scheduler.nextRun`. The settings page does not show any of this yet.
+
+### Changed
+- **The container image of a release is now built from its tag alone.** Until now a release
+  build reused layers from the build cache that builds of `main` fill, the dependency install
+  and the app build included. A tagged build now ignores that cache and writes none; only the
+  rolling `main` image keeps it. Nothing changes for an installation.
+- **A failed backup says why, with a reason instead of the text of the error** (from #2525,
+  the `reason` on the last error proposed by @nomi25home in #2540). `scheduler.lastError` in
+  `GET /api/v1/backup/status` now always carries `reason`, one of `backup_dir_not_writable`,
+  `disk_full`, `backup_verify_failed` and `unknown`, and its `message` is the fixed sentence of
+  that reason. Until now `message` was the raw text of the error, with the absolute path of the
+  backup folder in it; that text is in the server log only now, where it still names the folder
+  and what to check. `POST /api/v1/backup/trigger` answers a failed run as before with `200` and
+  `success: false`, and carries the same `reason`. The backup page does not show the reason yet.
+
+### Fixed
+- **The demo seed finds the database key the server stored itself.** `scripts/seed-demo.js
+  --db <path>` now reads `DB_ENCRYPTION_KEY_FILE` and the key a first start keeps under
+  `.secrets/` next to the database, in the same order as the server. Until now it stopped on an
+  encrypted database unless the key was in the environment or in `.env`.
+
+## [2.88.1] - 2026-11-11
+
+### Security
+- **Medication reminders to a person's own notification channel now go through the same SSRF
+  guard as every other channel delivery.** Until now they were sent with an unguarded request.
+  The deployment switch `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` applies to them as it does to
+  the other channels: a person whose own Gotify, ntfy or webhook channel lives in the local
+  network needs that switch for medication reminders too, as it was already needed for every
+  other reminder.
+
+### Upcoming: foundation release 2.89.0 (quality and operations)
+- **The next release changes how Yuvomi is tested and operated, not what it does.** It is
+  planned for Friday, 13 November 2026, at the earliest, and carries no new feature; pages,
+  data and the database stay as they are. This note is the advance notice for it.
+- **A readiness endpoint `/readyz` next to `/health`.** It answers `503` with a reason while
+  the instance cannot serve, for a load balancer or an uptime monitor. The existing `/health`
+  does not change, and neither does any shipped healthcheck.
+- **The status of the last backup survives a restart.** Today the backup page says "never"
+  after a restart until the next scheduled run.
+- **The way back stays open.** The release does not change the database, so pinning the image
+  tag `2.88.1` returns to this version with your data untouched (installation guide, "Pinning a
+  version"). That way is tried once before the release is tagged.
+
+## [2.88.0] - 2026-11-10
+
 ### Foundation
 - **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
   service worker takes its offline list from the build instead of a hand-kept one; pages,
@@ -52,6 +395,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reproducible build with two attested release artifacts), describes the build and the type
   check, and docs/DECISIONS.md records the build step, the Node floor and the position on
   hosting as entries 20 to 22.
+- **The way back to 2.87.0 was tried before the tag.** Image 2.87.0 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.87.0 to 2.88.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.88.0 restored on
+  2.87.0 through the admin restore. To go back, pin the image tag `2.87.0`.
 
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
@@ -70,6 +419,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every visit to the birthday list. It wrote each entry again even when nothing had changed,
   which also rebuilt the entry in the search index: constant small writes to the database, on
   a NAS or a Raspberry Pi to its disk or SD card. It now writes only what differs.
+- **Pages open from the app's cache without a round trip to the server.** The service worker
+  asked the network first for every page and module before handing out the copy it already
+  held, although the built files under `/assets/` carry a hash of their content in the name and
+  never change under it; it now serves them straight from its cache and fetches only a file
+  that is missing. Files without a hash, such as `index.html` and `/api.js`, still come from the
+  network first. The PDF viewer (pdf.js) also no longer lands in the worker's cache after the
+  first opened document: documents are not available offline, so it is left to the browser.
+- **On a phone, the tool row of Recipes, Pantry, Meals and Shopping folds away on scroll in
+  browsers that need the menu polyfill too.** The rule that folds it keeps the row while one
+  of its menus is open, and it asked for that with a selector those browsers do not know, so
+  they dropped the whole rule and the row kept its space above the list. It now has a second
+  rule that asks the way the polyfill marks an open menu.
+- **An up-to-date browser that lands on the "browser too old" page now returns to the app on
+  its own.** Opened from a bookmark, or reloaded after a browser update, the page kept saying
+  the browser was too old until you pressed "Try again"; it now runs the same check as the app
+  and sends a browser that passes it back to the start page. A browser that is too old stays
+  on the page. The page and the offline page also no longer request a language file they
+  never use.
 
 ## [2.87.0] - 2026-11-08
 

@@ -37,7 +37,7 @@ const { callTool } = await import('../server/mcp/tools.js');
 const {
   resolvePermissions, buildSessionModuleAccess, moduleAccessVerdict,
   applyChildStartPermissions, permissionCatalog, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED,
-} = await import('../server/permissions.js');
+} = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 function addUser(username, role, familyRole) {
@@ -146,9 +146,13 @@ test('Admin legt ein Kind an: Budget aus, Haushaltshilfe nur lesen ohne Betraege
 
 // R21 (Critique 2026-10-21, D6): ein neues Kind startet auch ohne Zyklus-Tab.
 // Kein Recht, sondern die persoenliche Abwahl aus #760 - gelesen ueber
-// DIESELBE Funktion, die /preferences ausliefert.
+// DASSELBE Register, aus dem /preferences ausliefert (server/settings/registry.ts).
 test('R21 D6: ein neues Kind startet ohne Zyklus - Erwachsene und das bestehende Kind behalten ihn', async () => {
-  const { healthCycleViews } = await import('../server/routes/preferences.js');
+  const { readSetting } = await import('../server/settings/registry.ts');
+  const healthCycleViews = (/** @type {number} */ userId) => ({
+    health_cycle_effective: readSetting(db, 'health_cycle_effective', userId),
+    health_cycle_enabled: readSetting(db, 'health_cycle_enabled', userId),
+  });
   const id = await createMember({ username: 'zyklus-kind', family_role: 'child' });
   assert.equal(healthCycleViews(id).health_cycle_effective, false, 'der Zyklus-Tab ist ausgeblendet');
   assert.equal(healthCycleViews(id).health_cycle_enabled, true, 'der Haushalt bleibt unberuehrt');
@@ -356,7 +360,7 @@ async function taskSurfaces(userId, token, taskId) {
   const wall = await call('GET', '/api/v1/dashboard?audience=household', token);
   const search = await call('GET', `/api/v1/search?q=${encodeURIComponent('maria')}`, token);
   const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  const mcp = await callTool({ db, actor: { ...user } }, 'list_tasks', {});
+  const mcp = await callTool({ db, actor: { kind: 'session', userId: user.id, role: user.role, familyRole: user.family_role } }, 'list_tasks', {});
   return {
     list: (list.body.data ?? []).some((t) => t.id === taskId),
     listDone: (done.body.data ?? []).some((t) => t.id === taskId),

@@ -4015,7 +4015,8 @@
  * hat, nennen der Name der Zelle, die Tagesliste und der Tag.
  * Den Bezugsrahmen gibt eine Klasse des Renderers (calendar.js renderMonthDay),
  * kein `:has()`: ohne `:has()` verloere die Zelle ihn, und alle Striche
- * stuenden an derselben Ecke (Mindestversion Chrome 87, R22 S10). */
+ * stuenden an derselben Ecke (Firefox 115 an der Untergrenze kennt `:has()`
+ * nicht, erst ab 121; R22 S10). */
 .month-day--shifts {
   position: relative;
 }

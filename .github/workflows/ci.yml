@@ -18,16 +18,26 @@ on:
 permissions:
   contents: read
 
+# Ein neuer Push auf einen PR bricht dessen ueberholten Lauf ab: niemand liest
+# das Ergebnis eines Stands, der schon ersetzt ist, und er belegt Runner. Pushes
+# auf main und Laeufe von Hand bekommen je Lauf eine eigene Gruppe (run_id) und
+# werden nie abgebrochen oder in eine Warteschlange gestellt - jeder main-Stand
+# braucht sein eigenes Ergebnis (#1814).
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     name: Tests (Node.js ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    # Die Kette brauchte am 8.10.2026 auf main 19:40 bis 19:53 Minuten. Bei 20
-    # brach das Limit jeden PR ab, der eine Suite hinzufuegte - ein abgebrochener
-    # Lauf sieht aus wie ein roter, sagt aber nichts ueber die Tests.
-    # Am 3.11.2026 lag 22.x bei 27 bis 30 Minuten und brach zweimal am Limit 30
-    # ab (PR #2482, main). 45 gibt Luft, bis #1814 die Kette aufteilt.
-    timeout-minutes: 45
+    # The chain runs in parallel since #1814. Ten measured jobs on 2026-11-10
+    # (PR #2668, four jobs, nproc 4) took 478 to 798 seconds, medians about ten
+    # minutes; the serial chain took a median of about 30. 25 leaves room for the
+    # slow runner mode (the slowest job above) without letting a hung run sit
+    # for 45 minutes. A cancelled run looks red but says nothing about the tests,
+    # so the limit moves only on new measurements, not to make a red job green.
+    timeout-minutes: 25
 
     strategy:
       matrix:
@@ -122,8 +132,28 @@ jobs:
       - name: Check that the build is deterministic
         run: node scripts/check-build-determinism.mjs
 
+      # Die Kette laeuft ueber den Parallel-Runner (#1814): jeder Schritt von
+      # `npm test` als eigener Prozess, vier gleichzeitig, und ein roter Schritt
+      # haelt den Lauf nicht an. Am Ende stehen alle roten Schritte mit ihrem Log,
+      # der Exit-Code ist der der ganzen Kette. Die Jobzahl steht fest statt
+      # "Kerne minus eins", damit eine Messung von gestern auch morgen dieselbe
+      # Laufart misst; der naechste Schritt zeigt, wie viele Kerne der Runner hat.
+      - name: Show the runner's core count
+        run: nproc
+
       - name: Run tests
-        run: npm test
+        run: npm run test-parallel -- --jobs 4 --logs "$RUNNER_TEMP/test-logs"
+
+      # Die Logs der Schritte liegen nur auf dem Runner; bei Rot gehen sie als
+      # Artefakt mit, sonst bliebe vom roten Schritt nur sein Pfad im Job-Log.
+      - name: Upload the test logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-logs-node-${{ matrix.node-version }}
+          path: ${{ runner.temp }}/test-logs
+          if-no-files-found: ignore
+          retention-days: 7
 
   # DIE EINZIGE BROWSER-SUITE IN DER CI (Entscheidung vom 23.9.2026). Die uebrigen
   # Browser-Suiten haengen an `test:document-guards` und laufen nur von Hand (rund
@@ -160,6 +190,18 @@ jobs:
       - name: Run the fasting browser suite
         run: npm run test:fasting-browser
 
+  # Restore-Drill (Phase 1b, Abschnitt B): jede Korpus-DB der Releases ueber den
+  # echten Restore-Weg einspielen und auf den Kopf DIESES Stands migrieren - eine
+  # Migration, die eine alte Datenbank bricht, faellt im PR auf statt beim Nutzer.
+  # Derselbe Job laeuft nachts aus restore-drill.yml. Kein Pflicht-Check.
+  # `timeout-minutes` darf hier nicht stehen (GitHub lehnt es an einem Job ab,
+  # der einen wiederverwendbaren Workflow ruft); der gerufene Job traegt 20.
+  restore-drill:
+    name: Restore drill
+    permissions:
+      contents: read
+    uses: ./.github/workflows/restore-drill.yml
+
   # Typpruefung (Phase 1a, Abschnitt C): `tsc --build` ueber server/, public/ und
   # test/ mit checkJs und strict, verglichen mit tsc-baseline.json, die nur sinken
   # darf. Eigener Job, parallel zu den Tests; eine Node-Version reicht, 24.x ist
@@ -183,3 +225,45 @@ jobs:
 
       - name: Type check against the baseline
         run: npm run typecheck
+
+  # Lint (phase 1b, section D): oxlint with the rule set in .oxlintrc.json,
+  # dependency-cruiser with the layer rules in .dependency-cruiser.mjs and knip
+  # (dead files, exports and dependencies, knip.json), compared with
+  # lint-baseline.json, which only sinks (scripts/check-lint-baseline.ts). Hard
+  # rules (innerHTML/outerHTML writes, async or await in a db.transaction() body)
+  # have no baseline at all. zizmor audits the workflows (.github/zizmor.yml).
+  # Own job, parallel to the tests; one Node version is enough, the rules read
+  # source text, not the runtime.
+  lint:
+    name: Lint (Node.js 24.x)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24.x
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint against the baseline
+        run: npm run lint
+
+      # The action fetches exactly this zizmor version, checked against the hashes it
+      # ships; offline audits only (no API calls), findings as
+      # annotations, accepted findings with their reason in .github/zizmor.yml. Runs
+      # even when the step above failed, so both reports come in one run.
+      - name: Audit the workflows (zizmor)
+        if: ${{ !cancelled() }}
+        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        with:
+          version: 1.32.0
+          online-audits: false
+          advanced-security: false
+          annotations: true
+          config: .github/zizmor.yml

@@ -29,6 +29,9 @@ function makeDb({ withNotificationTables = true } = {}) {
       -- Vorsorge-Erinnerung kommt aus users.display_name.
       display_name TEXT NOT NULL DEFAULT ''
     );
+    -- actorForUser fragt je Empfaenger Gast und Display; fehlt eine Tabelle, schliesst es.
+    CREATE TABLE split_expense_guest_users (user_id INTEGER PRIMARY KEY, group_id INTEGER);
+    CREATE TABLE display_accounts (user_id INTEGER PRIMARY KEY);
     -- Der Vorrats-Voll-Sync fragt beide Rechte-Achsen (#467): sync_config fuer
     -- die haushaltweite Abschaltung, access_permissions je Empfaenger. Fehlt
     -- eine der Tabellen, scheitert er still im try/catch von
@@ -56,7 +59,7 @@ function makeDb({ withNotificationTables = true } = {}) {
       goal_minutes INTEGER
     );
     -- Die Sichtbarkeitsspalten und Zuweisungstabellen, an denen die Zustellung
-    -- seit services/reminder-targets.js haengt - mit den Vorgaben des echten
+    -- seit authorize/rows/reminders.ts haengt - mit den Vorgaben des echten
     -- Schemas, damit eine Zeile ohne Angabe wie in Produktion fuer alle da ist.
     CREATE TABLE tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,7 +109,7 @@ function makeDb({ withNotificationTables = true } = {}) {
     );
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
     -- Sichtbarkeit und Freigaben wie im echten Schema: die Zustellung fragt
-    -- seit services/reminder-targets.js, ob ein Dokument fuer alle da ist.
+    -- seit authorize/rows/reminders.ts, ob ein Dokument fuer alle da ist.
     CREATE TABLE family_documents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -461,7 +464,7 @@ test('ein Platzhalter mit Sonderzeichen wird gemeldet, nicht durchgewinkt (#692)
   // Die Pruefung sagt zu, Unbekanntes abzulehnen. Mit einem gemeinsamen \w+ galt
   // diese Zusage nur fuer Wortzeichen: {{task-title}} war fuer Erkennung UND
   // Ersetzung unsichtbar und ging woertlich an den Empfaenger.
-  const { unknownTemplatePlaceholders } = await import('../server/services/notification-providers/webhook.js');
+  const { unknownTemplatePlaceholders } = await import('../server/services/notification-providers/webhook-template.js');
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{task-title}}"}'), ['task-title']);
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{ title }}"}'), [' title ']);
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{item.name}}"}'), ['item.name']);
@@ -663,6 +666,59 @@ test('ohne fetchImpl senden alle drei Provider ueber guardedFetch (die Voreinste
   }
 });
 
+// Die regulaere Erinnerungsschleife ohne `fetchImpl` und ohne `providers`: echte
+// Provider, echte Voreinstellung aus channel-delivery.js. Kaeme in
+// processDueNotifications() ein eigener fetch-Default zurueck, faellt es hier auf.
+test('ohne fetchImpl geht die faellige Erinnerung ueber den SSRF-Schutz - ein privates Ziel bleibt unerreicht', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  /** @type {string[]} */
+  const hits = [];
+  /** @type {import('node:http').RequestListener} */
+  const record = (req, res) => {
+    req.resume();
+    req.on('end', () => {
+      hits.push(String(req.url));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  };
+  const { base, close } = await startLocalServer(record);
+  // Ein frischer Haushalt je Lauf: eine Erinnerung geht nur einmal raus.
+  const runOnce = async () => {
+    const db = makeDb();
+    const store = createNotificationChannelStore({ db });
+    // Der Store nimmt das private Ziel nur mit dem Schalter an; der Versand prueft danach selbst.
+    await withPrivateNetworkAllowed(() => {
+      store.createChannel({ provider: 'webhook', name: 'Hook', enabled: true, config: { baseUrl: `${base}/hook` }, secrets: {} });
+    });
+    db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Müll rausbringen', 1)").run();
+    db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1)")
+      .run('2026-06-19T09:59:00.000Z');
+    // Push erreicht niemanden, die Zaehler gelten dem Kanal allein.
+    const pushService = /** @type {any} */ ({ sendPushToUser: async () => 0 });
+    return processDueNotifications({ database: db, channelStore: store, pushService, now: new Date() });
+  };
+  const before = process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+  try {
+    delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    const guarded = await runOnce();
+    assert.deepEqual(hits, [], 'der lokale Server darf nichts empfangen haben');
+    assert.equal(guarded.sent, 0);
+    assert.equal(guarded.failed, 1, 'die abgelehnte Zustellung zaehlt als fehlgeschlagen');
+
+    // Gegenprobe: der Schalter oeffnet das private Netz auch fuer diesen Pfad.
+    const opened = await withPrivateNetworkAllowed(() => runOnce());
+    assert.deepEqual(hits, ['/hook'], 'mit dem Schalter kommt genau eine Anfrage an');
+    assert.equal(opened.sent, 1);
+    assert.equal(opened.failed, 0);
+  } finally {
+    if (before === undefined) delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    else process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = before;
+    await close();
+  }
+});
+
 test('providers throw sanitized HTTP errors', async () => {
   const { gotifyProvider } = await import('../server/services/notification-providers/gotify.js');
   await assert.rejects(() => gotifyProvider.send({
@@ -769,7 +825,7 @@ test('next-fast channel notification uses household-localized actionable copy', 
   const db = makeDb();
   const store = createNotificationChannelStore({ db });
   // Fasten ist Gesundheit und geht nur an die Person selbst: an ihren eigenen
-  // Kanal, nie an den des Haushalts (services/reminder-targets.js). Beide
+  // Kanal, nie an den des Haushalts (authorize/rows/reminders.ts). Beide
   // stehen hier, damit der Test auch sieht, wohin die Meldung NICHT geht.
   store.createChannel({ provider: 'ntfy', name: 'household', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
   store.createChannel({ provider: 'ntfy', name: 'mine', enabled: true, scope: 'user', userId: 1, config: { baseUrl: 'https://ntfy.test', topic: 'me' }, secrets: {} });
@@ -1449,7 +1505,7 @@ test('der Mail-Transport gibt vor dem Aufrufer auf (#944)', async () => {
   });
   await service.sendMail({ to: 'a@b.de', subject: 's', text: 't', html: '<p>t</p>' });
 
-  const { PROVIDER_TIMEOUT_MS } = await import('../server/services/notifications.js');
+  const { PROVIDER_TIMEOUT_MS } = await import('../server/services/channel-delivery.js');
   for (const key of ['connectionTimeout', 'greetingTimeout', 'socketTimeout']) {
     assert.ok(Number.isFinite(opts[key]), `${key} muss gesetzt sein - sonst wartet nodemailer unbegrenzt`);
     assert.ok(opts[key] < PROVIDER_TIMEOUT_MS,

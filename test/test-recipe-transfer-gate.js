@@ -226,6 +226,7 @@ test('Token mit meals:read + shopping:read bleibt draussen', async () => {
 
 test('READ_LEVEL_WRITES: jeder Eintrag mit Methodenliste nennt genau die Methoden des Routers', async () => {
   const { READ_LEVEL_WRITES } = await import('../server/scopes.js');
+  /** @type {Record<string, {router: {stack: {route?: {path: unknown, methods: Record<string, boolean>}}[]}, prefix: string}>} */
   const routers = {
     recipes: { router: (await import('../server/routes/recipes.js')).default, prefix: '/recipes' },
     documents: { router: (await import('../server/routes/paperless-live-settings.js')).default, prefix: '/documents/dms/paperless' },
@@ -235,6 +236,7 @@ test('READ_LEVEL_WRITES: jeder Eintrag mit Methodenliste nennt genau die Methode
   for (const entry of mitMethoden) {
     const re = new RegExp(entry.pattern, entry.flags);
     const praefix = entry.pattern.match(/^\^\\\/([a-z-]+)\\\//)?.[1];
+    assert.ok(praefix);
     assert.ok(routers[praefix], `${entry.id}: den Router fuer /${praefix} hier eintragen`);
     const methoden = new Set();
     for (const layer of routers[praefix].router.stack) {

@@ -42,7 +42,7 @@ export function householdDisabledModules(database) {
  * Was eine MISCHSTELLE auslassen muss - eine Antwort, die mehrere Module in
  * einem Koerper liefert (Uebersicht, Countdowns). Beide Achsen in einem Set:
  * was der Haushalt abgeschaltet hat, und was diesem Betrachter entzogen ist
- * (`hiddenModulesFor()` in server/permissions.js: Rechte und Token-Scopes).
+ * (`hiddenModulesFor()` in server/authorize/modules.ts: Rechte und Token-Scopes).
  *
  * DIE REGEL (#1660, docs/DECISIONS.md 11): abschalten heisst "der Haushalt nutzt
  * dieses Modul nicht", es ist keine Sperre. Was der Server von sich aus tut

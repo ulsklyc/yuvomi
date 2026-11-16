@@ -22,6 +22,7 @@ process.env.SESSION_SECRET = 'tasks-routes-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { pushService } = await import('../server/services/push.js');
 const { pendingCreations, processPendingCreations, todoUidFor } =
   await import('../server/services/caldav-todo-outbound.js');
 
@@ -163,6 +164,85 @@ test('POST/PUT: falsche Formen sind 400, leere Tagesfelder werden null', async (
     [blank.body.data.start_date, blank.body.data.due_date, blank.body.data.due_time],
     [null, null, null],
   );
+});
+
+// Vorher: '' in Kategorie lief am eigenen Validator vorbei in die Zeile (der
+// Waisen-Key, den Migration v114 geputzt hat), '' in Prioritaet in den CHECK
+// (500), und die Beschreibung stand ungetrimmt in der Zeile, '   ' als '   '.
+test('POST: leere Kategorie/Prioritaet heissen "nicht angegeben", Beschreibung getrimmt', async () => {
+  const as = { id: ALICE, role: 'admin' };
+  /** @param {number} id */
+  const rowOf = (id) => ({ .../** @type {any} */ (db.prepare('SELECT category, priority, description FROM tasks WHERE id = ?').get(id)) });
+
+  const cat = await call('POST', '/', { as, body: { title: 'Leere Kategorie', category: '' } });
+  assert.equal(cat.status, 201);
+  assert.equal(rowOf(cat.body.data.id).category, 'misc');
+
+  const prio = await call('POST', '/', { as, body: { title: 'Leere Prioritaet', priority: '' } });
+  assert.equal(prio.status, 201, JSON.stringify(prio.body));
+  assert.equal(rowOf(prio.body.data.id).priority, 'none');
+
+  const blankDesc = await call('POST', '/', { as, body: { title: 'Leere Beschreibung', description: '   ' } });
+  assert.equal(blankDesc.status, 201);
+  assert.equal(rowOf(blankDesc.body.data.id).description, null);
+
+  const padded = await call('POST', '/', { as, body: { title: 'Gepolstert', description: '  x  ' } });
+  assert.equal(padded.status, 201);
+  assert.equal(rowOf(padded.body.data.id).description, 'x');
+});
+
+// Beim PUT heisst "weggelassen" "unveraendert": '' in Kategorie oder Prioritaet
+// laesst den Bestand stehen, statt einen Waisen-Key oder einen 500 zu erzeugen.
+// '' in der Beschreibung ist ein gewolltes Leeren und wird NULL.
+test('PUT /:id: leere Kategorie/Prioritaet lassen den Bestand, leere Beschreibung wird NULL', async () => {
+  const as = { id: ALICE, role: 'admin' };
+  /** @param {number} id */
+  const rowOf = (id) => ({ .../** @type {any} */ (db.prepare('SELECT category, priority, description FROM tasks WHERE id = ?').get(id)) });
+  const id = (await call('POST', '/', {
+    as, body: { title: 'Bestand', category: 'school', priority: 'high', description: 'Text' },
+  })).body.data.id;
+
+  assert.equal((await call('PUT', `/${id}`, { as, body: { category: '' } })).status, 200);
+  assert.equal(rowOf(id).category, 'school');
+
+  const prio = await call('PUT', `/${id}`, { as, body: { priority: '' } });
+  assert.equal(prio.status, 200, JSON.stringify(prio.body));
+  assert.equal(rowOf(id).priority, 'high');
+
+  assert.equal((await call('PUT', `/${id}`, { as, body: { description: '  y  ' } })).status, 200);
+  assert.equal(rowOf(id).description, 'y');
+
+  assert.equal((await call('PUT', `/${id}`, { as, body: { description: '   ' } })).status, 200);
+  assert.equal(rowOf(id).description, null);
+
+  await call('PUT', `/${id}`, { as, body: { description: 'wieder' } });
+  assert.equal((await call('PUT', `/${id}`, { as, body: { description: '' } })).status, 200);
+  assert.equal(rowOf(id).description, null);
+});
+
+// Ein alter Schreibweg liess die Beschreibung ungetrimmt in der Zeile. Wer sie
+// an einer gesperrten Aufgabe unveraendert zurueckschickt, aendert nichts an der
+// Definition: 200 wie vor dem Trimmen, nicht 403. Leere Kategorie/Prioritaet
+// fallen weg und lassen den Bestand - ebenfalls keine Aenderung.
+test('PUT /:id: gesperrte Aufgabe mit ungetrimmt gespeicherter Beschreibung bleibt bedienbar', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  const bob = { id: BOB, role: 'member' };
+  const id = (await call('POST', '/', {
+    as: admin, body: { title: 'Gesperrt', category: 'school', priority: 'high', locked: 1 },
+  })).body.data.id;
+  db.prepare('UPDATE tasks SET description = ? WHERE id = ?').run('  alt  ', id);
+
+  const same = await call('PUT', `/${id}`, {
+    as: bob, body: { title: 'Gesperrt', description: '  alt  ', status: 'in_progress' },
+  });
+  assert.equal(same.status, 200, JSON.stringify(same.body));
+
+  const blanks = await call('PUT', `/${id}`, { as: bob, body: { category: '', priority: '', status: 'open' } });
+  assert.equal(blanks.status, 200, JSON.stringify(blanks.body));
+
+  const changed = await call('PUT', `/${id}`, { as: bob, body: { description: 'neu' } });
+  assert.equal(changed.status, 403);
+  assert.equal(changed.body.reason, 'task_locked');
 });
 
 // --------------------------------------------------------
@@ -308,6 +388,33 @@ test('DELETE /:id: Erfolg (204/ok) und unbekannte ID → 404', async () => {
   assert.equal(del.body.ok, true);
   const missing = await call('DELETE', '/999999', { as: { id: ALICE, role: 'admin' } });
   assert.equal(missing.status, 404);
+});
+
+// tasks.created_by is INTEGER without CHECK: with foreign keys off (a restore,
+// direct database access) it can hold TEXT. '0x<id>' stays TEXT in SQLite, the
+// list (`created_by = @me`) never matches it, and Number('0x<id>') would. The
+// write paths compare the creator like the list: such a task is nobody's own.
+test('DELETE/PATCH /:id: a private task whose creator is TEXT reading as my id is not mine (404)', async () => {
+  db.pragma('foreign_keys = OFF');
+  let id;
+  try {
+    id = Number(db.prepare("INSERT INTO tasks (title, created_by, visibility) VALUES ('Hex', ?, 'private')")
+      .run(`0x${Number(BOB).toString(16)}`).lastInsertRowid);
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  assert.equal(db.prepare('SELECT typeof(created_by) AS t FROM tasks WHERE id = ?').get(id).t, 'text');
+  const bob = { id: BOB, role: 'member' };
+  for (const res of [
+    await call('PATCH', `/${id}/status`, { as: bob, body: { status: 'done' } }),
+    await call('DELETE', `/${id}`, { as: bob }),
+  ]) {
+    assert.equal(res.status, 404, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'tasks_task_not_found');
+  }
+  const row = db.prepare('SELECT status FROM tasks WHERE id = ?').get(id);
+  assert.equal(row?.status, 'open', 'the task is still there, unchanged');
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
 });
 
 // --------------------------------------------------------
@@ -851,7 +958,8 @@ test('auch eine gewoehnliche fremde Aufgabe ist nicht loeschbar (#748-Review)', 
 // PATCH /:id/status fragt die Sichtbarkeit wie jeder andere Schreibweg
 // --------------------------------------------------------
 //
-// PUT, DELETE, /archive und /check pruefen `mayAccessTask` seit #748/#769. Der
+// PUT, DELETE, /archive und /check pruefen die Sichtbarkeit seit #748/#769
+// (bis B8b `mayAccessTask`, seit B8b `rowVisible(db, 'tasks', ...)`). Der
 // Statusweg lud die Zeile per id und schrieb darauf - nur der Display-Zweig
 // fragte nach der Sichtbarkeit. Gemessen wird deshalb nicht nur der
 // Antwortcode, sondern alles, was der Uebergang schreibt: Status, Ablage,
@@ -1143,32 +1251,81 @@ test('Kommentare: eine beim Bearbeiten dazugekommene Erwähnung wird gemeldet', 
   assert.deepEqual(nachher.filter((id) => !nachher.includes(id)), []);
 });
 
+/**
+ * Wem notifyMentions() während `fn` einen Push übergibt. Der Versand läuft
+ * synchron nach res.json() im selben Handler an (runExternalJob ruft sofort
+ * auf), die Aufrufe sind also gezählt, wenn die Antwort da ist.
+ *
+ * @param {() => Promise<void>} fn
+ * @returns {Promise<number[]>}
+ */
+async function mentionPushes(fn) {
+  /** @type {number[]} */
+  const pushed = [];
+  const original = pushService.sendPushToUser;
+  pushService.sendPushToUser = async (userId) => { pushed.push(Number(userId)); return 1; };
+  try { await fn(); } finally { pushService.sendPushToUser = original; }
+  return pushed;
+}
+
 test('Kommentare: wem das Modul entzogen ist, bekommt keine Erwähnungs-Meldung', async () => {
   // Sichtbarkeit der Zeile ist nicht die einzige Hürde: wem das Aufgaben-Modul
   // auf `none` steht, der kommt an die Aufgabe gar nicht heran - und bekäme mit
   // dem Push trotzdem ihren Titel und den Anfang des Kommentars zugestellt.
-  const { resolvePermissions } = await import('../server/permissions.js');
+  const { resolvePermissions } = await import('../server/authorize/index.ts');
+  const bob = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(BOB);
+  // Die Aufgabe selbst bleibt für ihn sichtbar (visibility `all`) - genau
+  // deshalb reicht `findVisibleTask` als Prüfung nicht aus.
+  const task = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Ohne Modulzugriff', visibility: 'all' } });
   // subject_id wird als TEXT gehalten und auch so abgefragt (`loadSubjectRows`)
   db.prepare(`
     INSERT OR REPLACE INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
     VALUES ('user', ?, 'module', 'tasks', 'none')
   `).run(String(BOB));
-
-  const bob = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(BOB);
-  const perms = resolvePermissions(db, bob);
-  assert.equal(perms.modules.tasks, 'none', 'Vorbedingung: Bob darf die Aufgaben nicht sehen');
-
-  // Die Aufgabe selbst bleibt für ihn sichtbar (visibility `all`) - genau
-  // deshalb reicht `findVisibleTask` als Prüfung nicht aus.
-  const task = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Ohne Modulzugriff' } });
-  const posted = await call('POST', `/${task.body.data.id}/comments`, {
-    as: { id: ALICE, role: 'admin' }, body: { comment: '@bob liest das nicht' },
-  });
-  assert.equal(posted.status, 201);
-
-  db.prepare("DELETE FROM access_permissions WHERE subject_id = ? AND resource_key = 'tasks'").run(String(BOB));
+  try {
+    const perms = resolvePermissions(db, bob);
+    assert.equal(perms.modules.tasks, 'none', 'Vorbedingung: Bob darf die Aufgaben nicht sehen');
+    const gesperrt = await mentionPushes(async () => {
+      const posted = await call('POST', `/${task.body.data.id}/comments`, {
+        as: { id: ALICE, role: 'admin' }, body: { comment: '@bob liest das nicht' },
+      });
+      assert.equal(posted.status, 201);
+    });
+    assert.deepEqual(gesperrt, [], 'Bob ist das Aufgaben-Modul entzogen: kein Push');
+  } finally {
+    // Auch nach einem roten Befund: sonst erben die folgenden Tests Bobs Sperre.
+    db.prepare("DELETE FROM access_permissions WHERE subject_id = ? AND resource_key = 'tasks'").run(String(BOB));
+  }
   const wieder = resolvePermissions(db, bob);
   assert.notEqual(wieder.modules.tasks, 'none', 'Aufräumen: Bobs Zugriff ist wiederhergestellt');
+  // Gegenprobe in derselben Aufgabe: mit Zugriff kommt die Meldung an, die
+  // Stille oben lag also an der Modulprüfung und nicht am Aufbau des Tests.
+  const offen = await mentionPushes(async () => {
+    const posted = await call('POST', `/${task.body.data.id}/comments`, {
+      as: { id: ALICE, role: 'admin' }, body: { comment: '@bob jetzt schon' },
+    });
+    assert.equal(posted.status, 201);
+  });
+  assert.deepEqual(offen, [BOB]);
+});
+
+test('Kommentare: eine Erwähnung erreicht niemanden, der die Aufgabe nicht sieht', async () => {
+  // Eine Erwähnung ist kein Weg, jemandem den Titel einer privaten Aufgabe
+  // zuzustellen (findVisibleTask in notifyMentions). Bob hat Zugriff auf das
+  // Modul, sieht aber Alices private Aufgabe nicht.
+  const privat = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Geheimer Umzug', visibility: 'private' } });
+  const offen = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Offener Umzug', visibility: 'all' } });
+  /** @type {[typeof privat, number[], string][]} */
+  const faelle = [[privat, [], 'private Aufgabe'], [offen, [BOB], 'Gegenprobe: sichtbare Aufgabe']];
+  for (const [task, erwartet, label] of faelle) {
+    const pushed = await mentionPushes(async () => {
+      const posted = await call('POST', `/${task.body.data.id}/comments`, {
+        as: { id: ALICE, role: 'admin' }, body: { comment: '@bob kannst du?' },
+      });
+      assert.equal(posted.status, 201);
+    });
+    assert.deepEqual(pushed, erwartet, label);
+  }
 });
 
 // --------------------------------------------------------

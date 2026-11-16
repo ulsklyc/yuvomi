@@ -7,7 +7,7 @@
 
 import { WasteValidationError, WasteConflictError, WasteNotFoundError } from '../../services/waste-store.js';
 import { tokenAllows } from '../../scopes.js';
-import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../../permissions.js';
+import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../../authorize/index.ts';
 
 /**
  * Maps a caught error onto a response if it's one of the typed Waste errors.

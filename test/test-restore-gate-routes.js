@@ -46,6 +46,16 @@ const ROUTE_ALLOWLIST = new Map([
 ]);
 
 /**
+ * Routen, die waehrend eines Restores selbst mit 503 antworten, ohne die
+ * Datenbank zu brauchen und ohne das Gate: ihr 503 IST die Auskunft. Gemessen
+ * wird unten der eigene Rumpf, damit hier keine Route landet, die nur zufaellig
+ * mit 503 scheitert.
+ */
+const SELF_REFUSING = new Map([
+  ['/readyz', { reason: 'Readiness (Phase 1b, E11): meldet den laufenden Restore selbst', body: { status: 'not_ready', reason: 'restore_in_progress' } }],
+]);
+
+/**
  * Globale Middleware (Mount-Pfad `/`), nach Funktionsname. Sie laeuft fuer
  * JEDE Anfrage, also auch vor dem Gate oder an ihm vorbei.
  */
@@ -120,7 +130,7 @@ test('#1531 jede Top-Level-Route ist von needsDatabase() gedeckt oder begruendet
         uncovered.push(`${entry.kind} ${String(path)} (kein String-Pfad, nicht pruefbar)`);
         continue;
       }
-      if (needsDatabase(path) || ROUTE_ALLOWLIST.has(path)) continue;
+      if (needsDatabase(path) || ROUTE_ALLOWLIST.has(path) || SELF_REFUSING.has(path)) continue;
       uncovered.push(`${entry.kind} ${path}`);
     }
   }
@@ -142,7 +152,7 @@ test('#1531 jeder Allowlist-Eintrag gibt es in der App noch', () => {
   const routePaths = new Set(layers.filter((l) => !isGlobal(l)).flatMap((l) => l.paths));
   const globalNames = new Set(layers.filter(isGlobal).map((l) => l.name));
   const stale = [
-    ...[...ROUTE_ALLOWLIST.keys()].filter((p) => !routePaths.has(p)),
+    ...[...ROUTE_ALLOWLIST.keys(), ...SELF_REFUSING.keys()].filter((p) => !routePaths.has(p)),
     ...[...GLOBAL_MIDDLEWARE_ALLOWLIST.keys()].filter((n) => !globalNames.has(n)),
   ];
   assert.deepEqual(stale, [], 'veraltete Allowlist-Eintraege');
@@ -206,7 +216,16 @@ test('#1531 bei geschlossener Verbindung: gedeckte Routen 503, freigestellte ohn
         headers: { Authorization: 'Bearer restore-gate-probe', Accept: 'application/json' },
         redirect: 'manual',
       });
-      await res.arrayBuffer();
+      const text = await res.text();
+      const own = SELF_REFUSING.get(probe.path);
+      if (own) {
+        let body = null;
+        try { body = JSON.parse(text); } catch { /* kein JSON: unten ein Befund */ }
+        if (res.status !== 503 || JSON.stringify(body) !== JSON.stringify(own.body)) {
+          wrong.push(`GET ${probe.url} (${probe.path}): ${res.status} ${text.slice(0, 120)}`);
+        }
+        continue;
+      }
       if (probe.covered ? res.status !== 503 : res.status >= 500) {
         wrong.push(`GET ${probe.url} (${probe.path}): ${res.status}`);
       }
@@ -215,6 +234,6 @@ test('#1531 bei geschlossener Verbindung: gedeckte Routen 503, freigestellte ohn
     restore.release();
     await restore.done;
   }
-  assert.deepEqual(wrong, [], 'gedeckt heisst 503, freigestellt heisst ohne 5xx');
+  assert.deepEqual(wrong, [], 'gedeckt heisst 503, freigestellt heisst ohne 5xx, selbst meldend heisst 503 mit eigenem Rumpf');
 });
 

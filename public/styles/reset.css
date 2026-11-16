@@ -76,8 +76,8 @@ html:lang(ko) {
 body {
   /* Dieselbe Kette wie an .app-shell in layout.css, mit der Begruendung dort
    * (#1276): 100dvh, wo der Browser dvh kennt; sonst -webkit-fill-available,
-   * das sich an html (height: 100%) misst und auf iOS 13.4 bis 15.3 die
-   * sichtbare Hoehe ergibt; sonst 100vh. Ohne jede Hoehe waechst der Body mit
+   * das sich an html (height: 100%) misst (an der Untergrenze fuer Chrome 105
+   * bis 107, die dvh noch nicht kennen); sonst 100vh. Ohne jede Hoehe waechst der Body mit
    * seinem Inhalt, overflow: hidden schneidet nichts mehr ab, und der
    * Hauptbereich hat keine Grenze, an der er scrollen koennte. */
   height: 100vh;
@@ -138,8 +138,13 @@ img, svg, video {
  * noch einmal als Zwilling an dieser Klasse - sonst stuende das Menue offen,
  * aber unsichtbar. Die Zwillinge haben zwei Klassen Spezifitaet und schlagen
  * damit die Grundregeln der Seitenblaetter, die spaeter laden. Der Polyfill
- * hat keinen Top-Layer: der z-index hebt das offene Popover ueber Dialoge und
- * Meldungen. test:old-browser-fallbacks verlangt fuer jede `:popover-open`-
+ * hat keinen Top-Layer: `--z-top-layer` (tokens.css) hebt das offene Popover
+ * ueber Dialoge und Meldungen. Ohne Top-Layer gilt auch der Containing Block
+ * der Seite: in der Desktop-Seitenleiste (`position: fixed` mit
+ * `backdrop-filter`) misst sich das Kontomenue an der Leiste statt am Fenster
+ * und steht 9px neben seinem Platz mit der API - vollstaendig sichtbar und
+ * bedienbar (gemessen in test:built-app-browser), bewusst so gelassen
+ * (#2650). test:old-browser-fallbacks verlangt fuer jede `:popover-open`-
  * Regel ihren Zwilling hier. Laedt der Polyfill nicht, traegt kein Element die
  * Klasse, und die Menues bleiben zu wie vorher.
  *
@@ -155,7 +160,7 @@ img, svg, video {
 
   [popover].\:popover-open {
     display: block;
-    z-index: 2147483647;
+    z-index: var(--z-top-layer);
   }
 
   .popover-menu.\:popover-open,
@@ -169,6 +174,29 @@ img, svg, video {
     opacity: 1;
     transform: none;
     pointer-events: auto;
+  }
+
+  /* Die Faltzeile (layout.css, "DIE FALTZEILE") bleibt mit offenem
+   * Werkzeugmenue stehen: `:not(:has(:popover-open))`. Unter dem Polyfill gilt
+   * die Pseudoklasse nicht, und ein unbekannter Selektor in `:has()` verwirft
+   * die ganze Regel (gemessen in aktuellem Chromium mit einer unbekannten
+   * Pseudoklasse) - die Zeile faltete nie. Der Zwilling fragt die Klasse ab,
+   * als eigene Regel (nie in derselben Liste wie `:popover-open`). Parste ein
+   * Browser `:has()` noch nachsichtig, gilt dort zusaetzlich die Grundregel
+   * ohne die Menue-Ausnahme; ein offenes Menue haelt die Zeile dann ueber den
+   * Fokus darin (`:not(:focus-within)`).
+   * Wo `:has()` fehlt (Firefox 115), fallen beide weg, und die Zeile bleibt
+   * stehen wie die anderen `:has()`-Details (docs/installation.md). */
+  @media (max-width: 1023px) {
+    .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(.\:popover-open)) {
+      margin-block-end: calc(-1 * var(--fold-row-h, 0px));
+      translate: 0 calc(-1 * var(--fold-row-h, 0px));
+      pointer-events: none;
+    }
+
+    .page-toolbar--fold-row.is-collapsed:not(:focus-within):not(:has(input:not(:placeholder-shown))):not(:has(.\:popover-open)) > :is(.page-toolbar__center, .page-toolbar__actions, .page-toolbar__tools) {
+      opacity: 0;
+    }
   }
 }
 

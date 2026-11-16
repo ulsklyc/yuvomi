@@ -1,11 +1,14 @@
 /** Real SQLite and loopback HTTP: central policy, personal credentials and revocation. */
 import assert from 'node:assert/strict';
 import test, { beforeEach, after } from 'node:test';
-import express from 'express';
-import Database from 'better-sqlite3-multiple-ciphers';
+import express from '../server/utils/http-router.ts';
+import { resolveRequestModuleAccess } from '../server/authorize/index.ts';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
+import { createRequire } from 'node:module';
+const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
 import { buildMigratedDatabase } from './helpers/migrated-database.js';
 import { sessionModuleAccessRequirement } from '../server/scopes.js';
-import { moduleAccessVerdict } from '../server/permissions.js';
+import { moduleAccessVerdict } from '../server/authorize/index.ts';
 
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS, _setTestDatabase, _resetTestDatabase } = await import('../server/db.js');
@@ -16,35 +19,51 @@ const database = buildMigratedDatabase(Database, MIGRATIONS);
 database.exec('CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired_at INTEGER NOT NULL)');
 const { removeUser } = await import('../server/services/user-removal.js');
 _setTestDatabase(database);
-const user = (name, role) => database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'test', ?)")
+const user = (/** @type {string} */ name, /** @type {string} */ role) => database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'test', ?)")
   .run(name, name, role).lastInsertRowid;
 const owner = user('live-admin', 'admin'), reader = user('live-reader', 'member'), other = user('live-other', 'member');
 const root = '/documents/dms/paperless';
-let identity, accountId, folderId, assigned, adapter, credentials, writes;
+/** @type {{id: number, role: string, cookieSession?: {userId?: number, role?: string}, access?: Record<string, 'none' | 'read'> | null, method?: string}} */
+let identity;
+/** @type {number} */
+let accountId;
+/** @type {number} */
+let folderId;
+/** @type {number[]} */
+let assigned;
+/** @type {Record<string, (...args: any[]) => Promise<any>>} */
+let adapter;
+/** @type {string[]} */
+let credentials;
+/** @type {any[]} */
+let writes;
 const app = express();
 app.use(express.json());
 app.use((req, res, next) => {
   req.authUserId = identity.id; req.authRole = identity.role; req.authMethod = identity.method || 'session';
-  req.session = { userId: identity.id, role: identity.role }; req.sessionModuleAccess = identity.access;
+  req.session = { userId: identity.id, role: identity.role };
   const requirement = sessionModuleAccessRequirement(req.path, req.method);
   if (moduleAccessVerdict(identity.access, requirement.moduleKey, requirement.access) !== 'allow') return res.sendStatus(403);
+  resolveRequestModuleAccess(database, req);
+  req.sessionModuleAccess = identity.access;
   next();
 });
 app.use(root, folders.default);
+app.use(createErrorHandler({ warn() {}, error() {} }));
 const server = app.listen(0, '127.0.0.1');
 await new Promise((resolve) => server.once('listening', resolve));
-const call = async (method, path, body) => {
-  const res = await fetch(`http://127.0.0.1:${server.address().port}${root}${path}`, {
+const call = async (/** @type {string} */ method, /** @type {string} */ path, /** @type {unknown} */ body = undefined) => {
+  const res = await fetch(`http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}${root}${path}`, {
     method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
   });
   const content = await res.text();
   return { status: res.status, body: res.headers.get('content-type')?.includes('json') && content ? JSON.parse(content) : content,
     headers: res.headers };
 };
-const policy = (mode = 'shared', allowed = null, revision = 0) => call('PUT', `/live-settings/${accountId}`, {
+const policy = (mode = 'shared', /** @type {unknown} */ allowed = null, revision = 0) => call('PUT', `/live-settings/${accountId}`, {
   token_mode: mode, allowed_tag_ids: allowed, expected_revision: revision,
 });
-const token = (value) => call('PUT', `/live-settings/${accountId}/token`, { api_token: value });
+const token = (/** @type {unknown} */ value) => call('PUT', `/live-settings/${accountId}/token`, { api_token: value });
 const media = () => `/folders/${folderId}/documents/99/download`;
 const tagPath = () => `/folders/${folderId}/documents/99/tags`;
 beforeEach(() => {
@@ -61,11 +80,11 @@ beforeEach(() => {
     async getSavedView() { return { id: 5, filter_rules: [] }; },
     async listSavedViews() { return { results: [{ id: 5, name: 'Saved' }], count: 1, has_more: false }; },
     async getDocument() { return { tags: assigned }; },
-    async getTags(ids) { return ids.map((id) => ({ id, name: `Tag ${id}` })); },
+    async getTags(ids) { return ids.map((/** @type {number} */ id) => ({ id, name: `Tag ${id}` })); },
     async listTags() { return { results: [7, 8, 150].map((id) => ({ id, name: `Tag ${id}` })), count: 3, has_more: false }; },
     async setDocumentTags(id, values) { writes.push(values); assigned = values; return { tags: values }; },
   };
-  const factory = (source) => { credentials.push(source.api_token); return adapter; };
+  const factory = (/** @type {{api_token: string}} */ source) => { credentials.push(source.api_token); return adapter; };
   folders._setAdapterFactory(factory); tags._setAdapterFactory(factory); settings._setAdapterFactory(factory);
 });
 after(async () => {
@@ -167,7 +186,7 @@ test('the central catalogue uses the administrative connection even when persona
 test('Live-folder catalogue is restricted and hidden assignments cannot be added or removed', async () => {
   await policy('shared', [7, 8]);
   const catalogue = await call('GET', `/tags?account_id=${accountId}&folder_id=${folderId}`);
-  assert.deepEqual(catalogue.body.data.map((tag) => tag.id), [7, 8]);
+  assert.deepEqual(catalogue.body.data.map((/** @type {{id: number}} */ tag) => tag.id), [7, 8]);
   const read = await call('GET', tagPath());
   assert.deepEqual(read.body.data.editable_tag_ids, [7, 8]);
   assert.equal(read.body.data.catalogue_folder_id, folderId);

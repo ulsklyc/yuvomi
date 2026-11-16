@@ -379,7 +379,8 @@ function serverFiles(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) out.push(...serverFiles(p));
-    else if (name.endsWith('.js')) out.push(p);
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(js|ts)$/.test(name)) out.push(p);
   }
   return out;
 }

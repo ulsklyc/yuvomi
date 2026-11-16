@@ -4,7 +4,7 @@
  *        Absage des Ziels, Zielliste auf dem Server fort, Frist aus #1911),
  *        erfährt es die Person, die verschoben hat - an der Glocke, als
  *        sofort fällige Erinnerung `shopping_move_returned`.
- * Abhängigkeiten: server/permissions.js, server/services/account-state.js
+ * Abhängigkeiten: server/authorize/, server/services/account-state.js
  *
  * EINE MOMENTAUFNAHME, KEIN VERWEIS: nach der Frist steht der Artikel auf einer
  * abgeschalteten Liste, und der nächste Abruf nimmt ihn dort lokal fort. Die
@@ -13,7 +13,7 @@
  * auf die Liste.
  */
 
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { activeAccountSql } from './account-state.js';
 
 /**
@@ -22,17 +22,18 @@ import { activeAccountSql } from './account-state.js';
  * deaktiviert) oder ohne Einkaufsrecht bleibt es beim Log des Aufrufers.
  * Synchron, in der Transaktion des Rückwegs.
  *
- * @param {object} database
+ * @param {import('../authorize/index.ts').Database} database
  * @param {{movedBy: number|null, itemId: number, itemName: string,
  *          backListId: number, targetListId: number, reason: 'refused'|'waited'}} notice
  * @returns {number|null} die Kennung der Meldung
  */
 export function noteMoveTakenBack(database, { movedBy, itemId, itemName, backListId, targetListId, reason }) {
   if (!movedBy) return null;
-  const user = database.prepare(
-    `SELECT id, role, family_role FROM users WHERE id = ? AND ${activeAccountSql('users')}`
+  // Active first, as its own question: actorForUser() does not filter by it.
+  const active = database.prepare(
+    `SELECT 1 FROM users WHERE id = ? AND ${activeAccountSql('users')}`
   ).get(movedBy);
-  if (!user || resolvePermissions(database, user).modules.shopping === 'none') return null;
+  if (!active || !authorize(actorForUser(database, movedBy), 'receive', { module: 'shopping' }).allowed) return null;
   const listName = (id) => database.prepare('SELECT name FROM shopping_lists WHERE id = ?').get(id)?.name ?? '';
   const noticeId = Number(database.prepare(`
     INSERT INTO shopping_move_notices (user_id, item_id, item_name, back_list_id, back_list_name, target_list_name, reason)

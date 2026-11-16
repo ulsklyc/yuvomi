@@ -94,7 +94,9 @@ function jsFiles(dir) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) out.push(...jsFiles(full));
-    else if (name.endsWith('.js')) out.push(full);
+    // .ts too: server/authorize/ is TypeScript, and applyDocumentAccess() (rows/documents.ts)
+    // writes - a caller after an await must still count as a late writer (B3).
+    else if (/\.(js|ts)$/.test(name)) out.push(full);
   }
   return out;
 }
@@ -442,7 +444,9 @@ const SPAET_OHNE_RIEGEL = new Map([
 
 /** GET-Routen mit `await`, ohne Riegel, die nach dem Warten nichts in die Datenbank schreiben. */
 const LESEN_NACH_AWAIT = new Map([
+  ['server/index.js|/readyz', 'Readiness (Phase 1b, E11): wartet nur auf `fs.access` am Datenverzeichnis, liest davor synchron und schreibt nichts in die Datenbank'],
   ['server/routes/backup.js|/webdav/files', 'listet die Dateien auf dem WebDAV-Server, schreibt nichts'],
+  ['server/routes/system.js|/diagnostics', 'Diagnose (Phase 1b F): liest die Datenbank synchron vor dem ersten await, wartet dann auf Readiness, `statfs` und die Modulliste (`listModules` liest nach seinem `mkdir` noch `sync_config`, wie fuer `modules.js|/`), schreibt nichts in die Datenbank'],
   ['server/routes/cardav.js|/accounts', 'liest die Konten, der Aufruf ist synchron'],
   ['server/routes/changelog.js|/', 'GitHub-Releases, Cache im Speicher'],
   ['server/routes/dms.js|/search', 'DMS-Adapter (Paperless, Papra) ohne Datenbank'],

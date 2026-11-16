@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-no-locale-preload data-browser-floor-notice>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,8 +16,11 @@
        WAS HIER NICHT LAEUFT, UND WARUM: kein Modul, kein App-Stylesheet, kein
        t(). Genau der Browser, fuer den die Seite da ist, versteht die App-Kette
        nicht. Die Seite laedt deshalb nur klassische ES5-Skripte, die auch
-       offline.html und index.html laden (Theme und Sprache), und keine Probe -
-       sie schickte sich sonst auf sich selbst.
+       offline.html und index.html laden (Probe, Theme und Sprache). Die Probe
+       laeuft hier andersherum (`data-browser-floor-notice`, #2651): ein
+       faehiger Browser geht zurueck auf `/`, ein zu alter bleibt. Den
+       Sprach-Preload schaltet `data-no-locale-preload` ab - die Seite laedt
+       keine Sprachdatei.
 
        ZWEI SPRACHEN FEST IN DER SEITE (Ticket 14): Deutsch und Englisch je in
        einem Block, sichtbar ist der zu `<html lang>` (gesetzt von lang-init.js:
@@ -28,6 +31,7 @@
        test:browser-floor-page haelt beides.
 
        KEIN INLINE-SKRIPT: die CSP dieses Servers erlaubt nur `script-src 'self'`. -->
+  <script src="/browser-floor.js"></script>
   <script src="/night-hours.js"></script>
   <script src="/theme-init.js"></script>
   <script src="/lang-init.js"></script>

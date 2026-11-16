@@ -291,6 +291,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     options: [
       'settings.appNameLabel',
       'settings.systemVersionLabel',
+      'settings.diagnosticsTitle',
     ],
     adminOnly: true,
     loader: () => import('/settings/pages/admin-system.js'),
@@ -896,7 +897,7 @@ function sectionVisible(section, user) {
 }
 
 /** Die Abschnitte eines Blatts in Anzeigereihenfolge: erst "Fuer mich", dann der Haushalt. */
-export function settingsSheetSections(sheet, user = null, { all = false } = {}) {
+export function settingsSheetSections(sheet, user = /** @type {{role?: string} | null} */ (null), { all = false } = {}) {
   const sections = allSettingsSections().filter((section) => section.sheetId === sheet?.id
     && (all || sectionVisible(section, user)));
   return SETTINGS_SCOPES.flatMap((scope) => sections.filter((section) => section.scope === scope));

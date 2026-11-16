@@ -7,9 +7,9 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, MAX_TITLE } from '../middleware/validate.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
 import { getAdapter as defaultGetAdapter, SUPPORTED_PROVIDERS } from '../services/dms/index.js';
-import { documentVisibleSql } from '../services/document-access.js';
+import { visibleWhere } from '../authorize/index.ts';
 import { StorageError, readDocumentContent } from '../services/document-storage.js';
 import paperlessFoldersRouter from './paperless-folders.js';
 
@@ -58,7 +58,7 @@ function getAccount(id) {
 
 router.get('/accounts', (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const rows = db.get().prepare('SELECT * FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
     res.json({ data: rows.map(publicAccount) });
   } catch (err) {
@@ -69,7 +69,7 @@ router.get('/accounts', (req, res) => {
 
 router.post('/accounts', (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const provider = SUPPORTED_PROVIDERS.includes(req.body.provider) ? req.body.provider : 'paperless';
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl = str(req.body.base_url, 'Base URL', { max: 500 });
@@ -103,7 +103,7 @@ router.post('/accounts', (req, res) => {
 
 router.delete('/accounts/:id', (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const id = Number(req.params.id);
     const existing = getAccount(id);
     if (!existing) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
@@ -117,7 +117,7 @@ router.delete('/accounts/:id', (req, res) => {
 
 router.post('/accounts/:id/test', async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.params.id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const result = await adapterFactory(account).testConnection();
@@ -133,7 +133,7 @@ router.get('/search', async (req, res) => {
   try {
     // Admin-only: DMS search proxies the entire Paperless instance ungescoped, which would
     // bypass the per-document restricted/private visibility boundaries of the documents module.
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.query.account_id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     // Leerer Query ist erlaubt: er listet alle Dokumente des DMS, damit der Nutzer
@@ -151,7 +151,7 @@ router.get('/thumbnail', async (req, res) => {
   try {
     // Admin-only wie /search: der Picker durchsucht das gesamte DMS ungescoped,
     // bevor ein Dokument in die sichtbarkeitsgebundene Dokumentenliste übernommen wird.
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.query.account_id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const dmsId = String(req.query.dms_document_id || '').trim();
@@ -182,7 +182,7 @@ router.get('/thumbnail', async (req, res) => {
 
 router.post('/link', async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.body.account_id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const dmsId = String(req.body.dms_document_id || '').trim();
@@ -236,13 +236,13 @@ router.post('/link', async (req, res) => {
 
 router.post('/push', async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.body.account_id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const docId = Number(req.body.document_id);
     const doc = db.get().prepare(`
       SELECT d.* FROM family_documents d
-      WHERE d.id = @id AND ${documentVisibleSql('d')}
+      WHERE d.id = @id AND ${visibleWhere('documents', 'd', '@userId')}
     `).get({ id: docId, userId: userId(req) });
     if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
     if (doc.storage_backend === 'dms') {

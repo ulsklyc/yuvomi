@@ -30,8 +30,7 @@
  */
 
 import * as db from '../../db.js';
-import { resolveBudgetMode, budgetDetailsVisibleWhere } from '../../services/budget-visibility.js';
-import { mayReadModule } from '../../permissions.js';
+import { mayReadModule, resolveBudgetMode, budgetDetailsVisibleWhere } from '../../authorize/index.ts';
 
 export const ROLES = ['purchase', 'refund', 'instalment', 'maintenance', 'accessory'];
 

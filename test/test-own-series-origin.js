@@ -836,8 +836,9 @@ test(`[${ZONE}] Migration 246 markiert lokale Zeilen und lässt gespiegelte unbe
 test('jedes INSERT in calendar_events nennt series_authored oder ist ein Abruf', async () => {
   const { readFileSync, readdirSync } = await import('node:fs');
   const root = new URL('../server/', import.meta.url);
-  const files = readdirSync(root, { recursive: true })
-    .filter((name) => name.endsWith('.js') && !/^db(-schema-test)?\.js$/.test(name));
+  const files = readdirSync(root, { recursive: true }).map(String)
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    .filter((name) => /\.(js|ts)$/.test(name) && !/^db(-schema-test)?\.js$/.test(name));
   const sites = [];
   for (const name of files) {
     const source = readFileSync(new URL(name, root), 'utf8');
@@ -845,7 +846,11 @@ test('jedes INSERT in calendar_events nennt series_authored oder ist ein Abruf',
       sites.push({ name, sql: match[0] });
     }
   }
-  assert.ok(sites.length >= 11, `nur ${sites.length} Anlegestellen gefunden - stimmt die Suche noch?`);
+  // 10 seit #2616: das MCP-Werkzeug `create_event` legte einen Termin mit
+  // eigenem INSERT an (und nannte die Marke dort selbst); es geht jetzt per
+  // Loopback durch POST /api/v1/calendar, dessen INSERT hier mitgezaehlt wird.
+  // Eine Anlegestelle weniger, nicht eine ohne Marke.
+  assert.ok(sites.length >= 10, `nur ${sites.length} Anlegestellen gefunden - stimmt die Suche noch?`);
 
   const inbound = sites.filter((s) => /'(google|caldav|apple|ics)'/.test(s.sql));
   const authored = sites.filter((s) => /\bseries_authored\b/.test(s.sql));

@@ -1,14 +1,15 @@
 /** Full app + real adapter against loopback Paperless; desktop and mobile. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import express from 'express';
+import express from '../server/utils/http-router.ts';
 import { startHarness, openPage, gotoRoute, clickPastDeadTime } from './document-guards-harness.js';
 
 test('a saved view becomes a live folder; pagination, sharing, mobile and removal work', { timeout: 180000 }, async () => {
   const source = express();
   const filterTag = 7;
   let hasMatches = true;
-  const requests = [];
+  /** @type {any[]} */
+const requests = [];
   source.use((req, res, next) => {
     requests.push({ path: req.path, query: req.query, authorization: req.get('Authorization') });
     if (req.get('Authorization') !== 'Token browser-test-token') return res.sendStatus(401);
@@ -29,47 +30,50 @@ test('a saved view becomes a live folder; pagination, sharing, mobile and remova
   source.get('/api/documents/:id/download/', (_req, res) => res.type('application/pdf').send('%PDF-test'));
   const sourceServer = source.listen(0, '127.0.0.1');
   await new Promise((resolve) => sourceServer.once('listening', resolve));
-  let harness;
+  /** @type {Awaited<ReturnType<typeof startHarness>> | undefined} */
+let harness;
   try {
     harness = await startHarness();
     const page = await openPage(harness, { device: 'desktop' });
-    const errors = [];
-    page.on('pageerror', (err) => errors.push(err.message));
-    await page.evaluate(async (baseUrl) => {
-      const { api } = await import('/api.js');
+    /** @type {string[]} */
+const errors = [];
+    page.on('pageerror', (/** @type {Error} */ err) => errors.push(err.message));
+    await page.evaluate(async (/** @type {string} */ baseUrl) => {
+      const apiPath = '/api.js';
+      const { api } = await import(apiPath);
       await api.post('/documents/dms/accounts', { provider: 'paperless', name: 'Paperless test',
         base_url: baseUrl, api_token: 'browser-test-token' });
-    }, `http://127.0.0.1:${sourceServer.address().port}`);
+    }, `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (sourceServer.address()).port}`);
     await gotoRoute(page, '/documents');
     await page.waitForSelector('[data-pl-add]');
     await page.click('[data-pl-add]');
-    await page.waitForFunction(() => document.querySelector('#pl-view')?.disabled === false);
+    await page.waitForFunction(() => document.querySelector('select#pl-view:not([disabled])') !== null);
     await page.type('#pl-name', 'Hausakte');
-    assert.equal(await page.$eval('#pl-consent', (el) => el.hidden), true);
+    assert.equal(await page.$eval('#pl-consent', (/** @type {HTMLInputElement} */ el) => el.hidden), true);
     await page.select('#pl-visibility', 'family');
-    assert.equal(await page.$eval('#pl-consent', (el) => el.hidden), false);
+    assert.equal(await page.$eval('#pl-consent', (/** @type {HTMLInputElement} */ el) => el.hidden), false);
     await page.click('#pl-confirm');
     await clickPastDeadTime(page, '.modal-panel [type="submit"]');
     await page.waitForSelector('.paperless-folder__document');
-    assert.equal(await page.$$eval('.paperless-folder__document', (els) => els.length), 50);
-    assert.equal(await page.$eval('.paperless-folder__title', (el) => el.textContent), 'Hausakte');
-    assert.equal(await page.$eval('#fab-new-document', (el) => el.hidden), true);
+    assert.equal(await page.$$eval('.paperless-folder__document', (/** @type {HTMLInputElement[]} */ els) => els.length), 50);
+    assert.equal(await page.$eval('.paperless-folder__title', (/** @type {HTMLInputElement} */ el) => el.textContent), 'Hausakte');
+    assert.equal(await page.$eval('#fab-new-document', (/** @type {HTMLInputElement} */ el) => el.hidden), true);
     await page.click('[data-pl-next]');
     await page.waitForFunction(() => document.querySelector('.paperless-folder__document')?.textContent.includes('Hausbeleg 51'));
-    assert.equal(await page.$$eval('.paperless-folder__document', (els) => els.length), 1);
-    const media = await page.$eval('.paperless-folder__document [data-pl-download]', (el) => el.dataset.plDownload);
-    assert.equal(await page.evaluate(async (url) => (await fetch(url)).status, media), 200);
+    assert.equal(await page.$$eval('.paperless-folder__document', (/** @type {HTMLInputElement[]} */ els) => els.length), 1);
+    const media = await page.$eval('.paperless-folder__document [data-pl-download]', (/** @type {HTMLInputElement} */ el) => el.dataset.plDownload);
+    assert.equal(await page.evaluate(async (/** @type {string} */ url) => (await fetch(url)).status, media), 200);
     hasMatches = false;
     await page.click('[data-pl-refresh]');
     // Source changes can make page two invalid on a real Paperless instance;
     // choose the folder again to request the first current page.
     await page.click('[data-pl-folder]');
     await page.waitForFunction(() => document.querySelector('#paperless-folder-content')?.textContent.includes('keine Dokumente'));
-    assert.equal(await page.evaluate(async (url) => (await fetch(url)).status, media), 404);
+    assert.equal(await page.evaluate(async (/** @type {string} */ url) => (await fetch(url)).status, media), 404);
     hasMatches = true;
     await page.click('#documents-folder-browser [data-folder-select=""]');
-    assert.equal(await page.$eval('#paperless-folder-content', (el) => el.hidden), true);
-    assert.equal(await page.$eval('#fab-new-document', (el) => el.hidden), false);
+    assert.equal(await page.$eval('#paperless-folder-content', (/** @type {HTMLInputElement} */ el) => el.hidden), true);
+    assert.equal(await page.$eval('#fab-new-document', (/** @type {HTMLInputElement} */ el) => el.hidden), false);
 
     await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
     await gotoRoute(page, '/documents');
@@ -83,15 +87,15 @@ test('a saved view becomes a live folder; pagination, sharing, mobile and remova
     await page.click('#documents-folder-toggle');
     await page.click('[data-pl-edit]');
     await page.waitForSelector('[data-pl-remove]');
-    assert.equal(await page.$eval('#pl-consent', (el) => el.hidden), true, 'existing family sharing does not ask again');
+    assert.equal(await page.$eval('#pl-consent', (/** @type {HTMLInputElement} */ el) => el.hidden), true, 'existing family sharing does not ask again');
     await page.select('#pl-visibility', 'restricted');
-    assert.equal(await page.$eval('#pl-members', (el) => el.hidden), false);
-    assert.equal(await page.$eval('#pl-consent', (el) => el.hidden), true, 'narrowing the audience needs no new consent');
+    assert.equal(await page.$eval('#pl-members', (/** @type {HTMLInputElement} */ el) => el.hidden), false);
+    assert.equal(await page.$eval('#pl-consent', (/** @type {HTMLInputElement} */ el) => el.hidden), true, 'narrowing the audience needs no new consent');
     await clickPastDeadTime(page, '[data-pl-remove]');
     await page.waitForSelector('#confirm-modal-ok');
     await clickPastDeadTime(page, '#confirm-modal-ok');
     await page.waitForFunction(() => !document.querySelector('[data-pl-folder]'));
-    assert.equal(await page.$eval('#paperless-folder-content', (el) => el.hidden), true);
+    assert.equal(await page.$eval('#paperless-folder-content', (/** @type {HTMLInputElement} */ el) => el.hidden), true);
     assert.ok(requests.some((r) => r.query.page === '2'));
     assert.ok(requests.some((r) => r.query.id === '51'));
     assert.ok(requests.every((r) => r.authorization === 'Token browser-test-token'));

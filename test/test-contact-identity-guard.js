@@ -210,6 +210,55 @@ test('unscoped tokens keep working: the admin\'s on a member, the member\'s on t
   assert.equal(emailsOf(kidContactId).email, 'kid.b@home.test');
 });
 
+// Ein angemeldetes Geraet traegt keine Scopes und las sich deshalb wie ein
+// ungescoptes Token. SECURITY.md sagt fuer das Credential zu, dass es die
+// E-Mail-Adresse nicht aendert; die Adresse des verknuepften Kontakts ist
+// die, an die der Passwort-Reset geht.
+let deviceCounter = 0;
+/** @param {{ cookie?: string, csrfToken?: string }} session */
+async function deviceFor(session) {
+  deviceCounter += 1;
+  const created = await call(session, 'POST', '/auth/devices', {
+    name: `Phone ${deviceCounter}`, platform: 'ios', device_id: `guard-device-${deviceCounter}`,
+  });
+  assert.equal(created.status, 201);
+  return { token: created.body.credential };
+}
+
+test('a signed-in device cannot change the addresses of its own member, primary or secondary', async () => {
+  const phone = await deviceFor(kid);
+  const primary = await call(phone, 'PUT', `/contacts/${kidContactId}`, { email: ATTACKER });
+  assert.equal(primary.status, 403);
+  assert.equal(primary.body.reason, 'contact_email_protected');
+  const secondary = await call(phone, 'PUT', `/contacts/${kidContactId}`, { emails: [{ label: 'work', value: ATTACKER }] });
+  assert.equal(secondary.status, 403);
+  assert.deepEqual(emailsOf(kidContactId), { email: 'kid@home.test', emails: [] });
+});
+
+test('an admin\'s signed-in device cannot change the admin\'s own addresses either', async () => {
+  const phone = await deviceFor(admin);
+  const r = await call(phone, 'PUT', `/contacts/${adminContactId}`, { email: ATTACKER });
+  assert.equal(r.status, 403);
+  assert.deepEqual(emailsOf(adminContactId), ADMIN_UNTOUCHED);
+});
+
+test('a signed-in device can still change the other fields of its own contact', async () => {
+  const phone = await deviceFor(kid);
+  const r = await call(phone, 'PUT', `/contacts/${kidContactId}`, { notes: 'From the phone', email: 'kid@home.test' });
+  assert.equal(r.status, 200);
+  assert.equal(db.prepare('SELECT notes FROM contacts WHERE id = ?').get(kidContactId).notes, 'From the phone');
+  assert.deepEqual(emailsOf(kidContactId), { email: 'kid@home.test', emails: [] });
+});
+
+test('after a refused attempt from a device, forgot-password sends the link to the member\'s own address only', async () => {
+  const phone = await deviceFor(kid);
+  assert.equal((await call(phone, 'PUT', `/contacts/${kidContactId}`, { email: ATTACKER })).status, 403);
+  await withResetRoutes(async (/** @type {{ post: Function, sent: Array<{ to: string }> }} */ { post, sent }) => {
+    assert.equal((await post('/forgot-password', { identifier: 'kid' })).status, 200);
+    assert.deepEqual(sent.map((m) => m.to), ['kid@home.test']);
+  });
+});
+
 test('a member can still edit the other fields of a linked contact, with the unchanged form around them', async () => {
   const r = await call(kid, 'PUT', `/contacts/${adminContactId}`, {
     notes: 'Allergic to cats', address: 'Main St 1',

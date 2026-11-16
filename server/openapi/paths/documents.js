@@ -602,6 +602,7 @@ function paperlessTagPaths() {
     503: { ...error, description: 'restore_in_progress' },
     500: { $ref: '#/components/responses/InternalServerError' },
   };
+  /** @type {Record<string, object>} */
   const result = {
     [`${root}/tags`]: { get: op({ summary: 'Browse existing Paperless tags', tag: 'Documents', admin: true,
       description: 'Requires documents:write. Returns data [{id,name}], meta {page,count,has_more}; 100 source tags per page. Optional folder_id restricts the catalogue to a folder owned by the caller, its token mode and centrally enabled tag IDs. Without folder_id, uses the central connection. Never follows absolute pagination URLs.',
@@ -652,7 +653,9 @@ function paperlessFolderPaths() {
     + 'The configured shared or personal token must also be authorized by Paperless; personal mode never falls back to the central token. '
     + 'Only the creating administrator may edit or disconnect a binding. No files or local document references are created or deleted. '
     + 'Responses use Cache-Control: no-store.';
+  /** @param {string} summary @param {object} [extra] */
   const operation = (summary, extra = {}) => op({ summary, tag: 'Documents', description: note, responses: { ...responses }, ...extra });
+  /** @param {boolean} create */
   const body = (create) => ({ required: true, content: { 'application/json': { schema: {
     type: 'object', required: create ? ['name', 'account_id', 'view_id'] : ['name', 'visibility'],
     properties: {
@@ -708,6 +711,7 @@ function paperlessLiveSettingsPaths() {
     409: { ...error, description: 'paperless_folder_changed; reload policy before retrying' },
     500: { $ref: '#/components/responses/InternalServerError' },
   };
+  /** @param {string[]} required @param {Record<string, object>} properties */
   const body = (required, properties) => ({ required: true, content: { 'application/json': {
     schema: { type: 'object', required, properties },
   } } });

@@ -2850,7 +2850,7 @@ Bremse, Serverfehler, offline, keine Verbindung) - die Beschreibung des Aufrufer
 Rueckfall. Der Statuscode steht zugeklappt unter "Technische Details", nie als sichtbarer Chip.
 Zeigt die Flaeche den Fehler, gibt es keinen Toast daneben. Die Sitzungspruefung beim Start
 hat denselben Zustand als Shell-Fassung (`utils/session-unreachable.js`, im Lichtfeld des
-Ladebilds): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
+Ladebilds auf der Glastafel der Zugangsseiten - kein Text direkt auf dem Feld): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
 und nach `Retry-After` selbst erneut. Ihr Titel folgt der Ursache wie der Satz darunter
 (`unreachableTitleKey`: Verbindung, Server nicht bereit, zu viele Anfragen; R20). Scheitert ein
 SEITENWECHSEL am Netz, zeichnet `showPageUnreachable()` denselben Ton in den Inhaltsbereich
@@ -3267,7 +3267,7 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
 
 ### Kinderkonten: Startrechte und eigene Sicht (R20, entschieden 2026-10-17)
 Ein NEUES Konto mit Familienrolle Kind startet mit Mitglied-Zeilen
-(`CHILD_START_PERMISSIONS`, server/permissions.js): Budget `none`, Haushaltshilfe `read`,
+(`CHILD_START_PERMISSIONS`, server/authorize/catalog.ts): Budget `none`, Haushaltshilfe `read`,
 Fasten aus, `housekeeping_view_amounts` aus. Nur verschaerfend, nur beim Anlegen (Admin,
 Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt.
 Seit R21 (D6) startet es ausserdem ohne Zyklus-Tab (`CHILD_START_PREFERENCES`): keine Rechte-Zeile,

@@ -7,7 +7,6 @@ import { createLogger } from '../../logger.js';
 import express from 'express';
 import * as db from '../../db.js';
 import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
-import { icsSubscriptionVisibleWhere, normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';
@@ -28,9 +27,18 @@ import {
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
-  ATTACHMENT_NARROW_ONLY, documentClonePredicate, documentWidenPredicate,
-} from '../../services/document-access.js';
-import { mayChangeRecord, mayWriteModule, sendNotOwner } from '../../permissions.js';
+  mayChangeRecord,
+  mayWriteModule,
+  sendNotOwner,
+  normalizeVisibility,
+  ATTACHMENT_NARROW_ONLY,
+  documentClonePredicate,
+  documentWidenPredicate,
+  readerBinds,
+  readerVisibleWhere,
+  rowReader,
+  visibleWhere,
+} from '../../authorize/index.ts';
 import { recordLocalColorChoice } from '../../services/legacy-color-snapshot.js';
 import { localCalendarColorSql, localCalendarIdSql, localCalendarProjection, resolveLocalCalendarId, validateCalendarId } from '../../services/local-calendars.js';
 import {
@@ -50,10 +58,10 @@ import {
   updateSeriesWithOverrides,
   followInboundStartChange,
 } from '../../services/calendar-occurrence-overrides.js';
+import { isAdminRequest } from '../../middleware/require-admin.js';
 import {
   ASSIGNED_USERS_SQL,
   getUserId,
-  isAdminUser,
   eventIcon,
   parseAttachment,
   attachmentUploadRefused, storedAttachmentLocked,
@@ -124,7 +132,7 @@ function sendSeriesWithoutOccurrence(res) {
 function attachmentRights(req) {
   const actor = {
     actorId: getUserId(req),
-    isAdmin: isAdminUser(req),
+    isAdmin: isAdminRequest(req),
     documentsWritable: mayWriteModule(req, 'documents'),
   };
   const mayManage = documentWidenPredicate(db.get(), actor);
@@ -481,6 +489,8 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
 router.get('/:id', (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
+    // A paired display reads under the wall rule (rowReader), people under the row rule.
+    const reader = rowReader(req);
     const event = db.get().prepare(`
       SELECT e.*,
              u_assigned.display_name AS assigned_name,
@@ -515,9 +525,9 @@ router.get('/:id', (req, res) => {
       LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
       LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
       WHERE e.id = ?
-        AND ${icsSubscriptionVisibleWhere('e')}
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
-    `).get(id, getUserId(req), getUserId(req), getUserId(req));
+        AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '?')}
+        AND ${readerVisibleWhere(reader, 'events', 'e', '?')}
+    `).get(id, ...readerBinds(reader, 'ics_subscriptions'), ...readerBinds(reader, 'events'));
 
     if (!event) return sendEventGone(res);
     const database = db.get();
@@ -526,7 +536,7 @@ router.get('/:id', (req, res) => {
       viewer: documentViewer(req),
       database,
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
     }) });
   } catch (err) {
     log.error('', err);
@@ -722,7 +732,7 @@ router.post('/', async (req, res) => {
       viewer: documentViewer(req),
       database: db.get(),
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
       master: event,
     }) });
 
@@ -770,8 +780,8 @@ function loadVisibleEvent(id, req) {
   return db.get().prepare(`
     SELECT e.* FROM calendar_events e
     WHERE e.id = ?
-      AND ${icsSubscriptionVisibleWhere('e')}
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
+      AND ${visibleWhere('ics_subscriptions', 'e', '?')}
+      AND ${visibleWhere('events', 'e', '?')}
   `).get(id, me, me, me);
 }
 
@@ -1333,7 +1343,7 @@ router.put('/:id', async (req, res) => {
           mayWidenAttachment: rights.mayWidenAttachment,
           seriesId: id,
           actorId: getUserId(req),
-          isAdmin: isAdminUser(req),
+          isAdmin: isAdminRequest(req),
           changes: seriesChanges,
           assignments: assignedTouched ? userIds : undefined,
           confirmedOrphanCount: req.body.confirmed_orphan_count,
@@ -1399,7 +1409,7 @@ router.put('/:id', async (req, res) => {
       viewer: documentViewer(req),
       database: db.get(),
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
       master: updated,
     }) });
 
@@ -1453,7 +1463,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
   try {
     const seriesId = parseInt(req.params.seriesId, 10);
     const actorId = getUserId(req);
-    const isAdmin = isAdminUser(req);
+    const isAdmin = isAdminRequest(req);
     if (attachmentUploadRefused(req)) {
       return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
     }
@@ -1615,7 +1625,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
   try {
     const seriesId = parseInt(req.params.seriesId, 10);
     const actorId = getUserId(req);
-    const isAdmin = isAdminUser(req);
+    const isAdmin = isAdminRequest(req);
     if (attachmentUploadRefused(req)) {
       return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
     }
@@ -1845,7 +1855,7 @@ router.delete('/:seriesId/occurrences/:recurrenceId', (req, res) => {
       seriesId,
       recurrenceId: req.params.recurrenceId,
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
     });
     res.status(204).end();
   } catch (err) {
@@ -1870,7 +1880,7 @@ router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
       seriesId,
       recurrenceId: req.params.recurrenceId,
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
     });
     res.status(204).end();
   } catch (err) {
@@ -1905,7 +1915,7 @@ router.post('/:id/reset', (req, res) => {
       return res.status(400).json({ error: 'Only events from an ICS subscription can be reset.', code: 400 });
 
     const userId  = getUserId(req);
-    const isAdmin = isAdminUser(req);
+    const isAdmin = isAdminRequest(req);
     if (!isAdmin && event.created_by !== userId && event.sub_created_by !== userId)
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
 

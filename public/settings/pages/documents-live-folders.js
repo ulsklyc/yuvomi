@@ -1,3 +1,4 @@
+import { paperlessControl, paperlessApiError } from '/components/paperless-dom.js';
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -5,9 +6,13 @@ import { settingRowHtml, createInlineError, createRetryState } from '/settings/c
 import { reportFieldErrors, constraintErrors } from '/components/modal.js';
 
 const ROOT = '/documents/dms/paperless';
+/** @param {string} name */
 const key = (name) => `settings.liveFolders.${name}`;
+/** @param {string} name */
 const text = (name) => t(key(name));
-function message(err) {
+/** @param {unknown} error */
+function message(error) {
+  const err = paperlessApiError(error);
   const reason = err?.data?.reason;
   if (reason === 'paperless_folder_changed') return t('documents.paperless.errors.changed');
   if (reason === 'paperless_tag_names_unavailable') return text('tagNamesUnavailable');
@@ -16,8 +21,10 @@ function message(err) {
   return text('error');
 }
 
+/** @param {{id: number, name: string, token_mode: string, has_personal_token: boolean, allowed_tag_ids: number[] | null, revision: number}} account
+ * @param {{canManage: boolean, signal?: AbortSignal}} options */
 function buildAccount(account, { canManage, signal }) {
-  const section = document.createElement('section');
+  const section = Object.assign(document.createElement('section'), { loadInitialTags: /** @type {(() => Promise<void>) | undefined} */ (undefined) });
   section.className = 'settings-section';
   section.insertAdjacentHTML('beforeend', `<h3 class="settings-section__title">${esc(account.name)}</h3>`);
   const current = () => !signal?.aborted && section.isConnected;
@@ -39,10 +46,10 @@ function buildAccount(account, { canManage, signal }) {
       <button type="button" class="btn btn--secondary" data-delete-token>${esc(text('deleteToken'))}</button>
       <button type="submit" class="btn btn--primary">${esc(text('saveToken'))}</button>
     </div>`);
-  const status = own.querySelector('[data-token-status]');
-  const remove = own.querySelector('[data-delete-token]');
-  const tokenInput = own.querySelector('input');
-  const tokenError = own.querySelector('[data-token-error]');
+  const status = /** @type {HTMLElement} */ (paperlessControl(own, '[data-token-status]'));
+  const remove = /** @type {HTMLButtonElement} */ (paperlessControl(own, '[data-delete-token]'));
+  const tokenInput = /** @type {HTMLInputElement} */ (paperlessControl(own, 'input'));
+  const tokenError = /** @type {HTMLElement} */ (paperlessControl(own, '[data-token-error]'));
   const updateOwn = () => {
     own.hidden = account.token_mode !== 'personal';
     status.textContent = text(account.has_personal_token ? 'tokenSet' : 'tokenMissing');
@@ -51,7 +58,7 @@ function buildAccount(account, { canManage, signal }) {
   own.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!current() || reportFieldErrors(constraintErrors(own))) return;
-    const submit = own.querySelector('[type="submit"]');
+    const submit = /** @type {HTMLButtonElement} */ (paperlessControl(own, '[type="submit"]'));
     submit.disabled = true;
     tokenError.replaceChildren();
     try {
@@ -95,10 +102,14 @@ function buildAccount(account, { canManage, signal }) {
       </fieldset>
       <div data-policy-error role="alert"></div>
       <div class="settings-form-actions"><button type="submit" class="btn btn--primary">${esc(t('common.save'))}</button></div>`);
-    const mode = form.querySelector(`#${modeId}`), tagsMode = form.querySelector(`#${tagsId}`);
-    const list = form.querySelector('[data-tags-list]');
-    const more = form.querySelector('[data-more-tags]'), error = form.querySelector('[data-policy-error]');
-    const selected = new Set(account.allowed_tag_ids || []), tags = new Map();
+    const mode = /** @type {HTMLSelectElement} */ (paperlessControl(form, `#${modeId}`));
+    const tagsMode = /** @type {HTMLSelectElement} */ (paperlessControl(form, `#${tagsId}`));
+    const list = /** @type {HTMLElement} */ (paperlessControl(form, '[data-tags-list]'));
+    const more = /** @type {HTMLButtonElement} */ (paperlessControl(form, '[data-more-tags]'));
+    const error = /** @type {HTMLElement} */ (paperlessControl(form, '[data-policy-error]'));
+    const selected = new Set(account.allowed_tag_ids || []);
+    /** @type {Map<number, string>} */
+    const tags = new Map();
     let page = 0, loading = false;
     mode.value = account.token_mode;
     tagsMode.value = account.allowed_tag_ids === null ? 'all' : 'selected';
@@ -137,7 +148,7 @@ function buildAccount(account, { canManage, signal }) {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!current()) return;
-      const submit = form.querySelector('[type="submit"]');
+      const submit = /** @type {HTMLButtonElement} */ (paperlessControl(form, '[type="submit"]'));
       if (submit.disabled) return;
       submit.disabled = true; error.replaceChildren();
       try {
@@ -165,13 +176,14 @@ function buildAccount(account, { canManage, signal }) {
   return section;
 }
 
+/** @param {HTMLElement} container @param {{signal?: AbortSignal}} [options] */
 export async function render(container, { signal } = {}) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `<section class="settings-section">
     <h2 class="settings-section__title">${esc(text('title'))}</h2>
     <p class="settings-card-description">${esc(text('description'))}</p>
     <div data-live-accounts></div></section>`);
-  const host = container.querySelector('[data-live-accounts]');
+  const host = /** @type {HTMLElement} */ (paperlessControl(container, '[data-live-accounts]'));
   try {
     const result = await api.get(`${ROOT}/live-settings`, { signal });
     if (signal?.aborted || !container.isConnected) return;

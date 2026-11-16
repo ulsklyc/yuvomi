@@ -85,9 +85,11 @@ itself has to set it as well.
 ### Running tests
 
 ```bash
-npm test              # All suites
-npm run test-parallel # The same suites side by side, keeps going after a failure
+npm run test-parallel # All suites side by side, keeps going after a failure
+npm test              # The same suites one after the other, stops at the first failure
 ```
+
+CI runs `npm run test-parallel`, so that is the command to run before you push.
 
 Individual suites (faster during development):
 
@@ -145,8 +147,9 @@ signal is ignored). The steps come
 from the `test` script itself, so a new suite is still registered there
 and nowhere else. Because suites run side by side, a suite takes a free port
 (`listen(0, '127.0.0.1')`) and a temp path of its own (`freshTestDbPath()`, `mkdtemp`), never a
-fixed one. CI runs `npm test`, one suite after the other, and next to it one browser suite,
-`test:fasting-browser`, as a job of its own.
+fixed one. CI runs the same runner with `--jobs 4` in the `Tests` job and uploads the step logs
+as an artifact when a step is red; next to it runs one browser suite, `test:fasting-browser`, as a
+job of its own.
 
 On Windows, check the repository out with LF line endings: Git for Windows turns them
 into CRLF by default, and the guards that read docs and locale files byte for byte then
@@ -171,6 +174,62 @@ rises or a new key fails the check, in CI as a required job. A change that fixes
 `--init` exists for an empty baseline only. The baseline is a debt register, not a licence:
 new code is expected to type-check clean. TypeScript files run natively on Node 24.12 and 26
 through type stripping, which is why only erasable syntax is allowed.
+
+### Linting
+
+`npm run lint` runs oxlint with the rule set in `.oxlintrc.json` and compares the findings with
+`lint-baseline.json`, one count per file and rule, in CI as the `lint` job. The rules: files up to
+1,500 lines and functions up to 200, no `innerHTML`/`outerHTML` assignment, no
+`toISOString().slice(0, 10)` as a day key (the helpers in `server/utils/timezone.js` know the
+household's zone), no catch block that answers 500 itself, no `async` function or `await` in a
+`db.transaction()` body, no manual `BEGIN`/`COMMIT`, and oxlint's `correctness` category. The
+`innerHTML` and transaction rules are hard: they have no baseline and fail at the first finding.
+The same script runs dependency-cruiser with the layer rules in `.dependency-cruiser.mjs`: no
+import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
+named files import `server/services/push.js`, and only that file imports `web-push`; the server
+reads nothing from `public/` but `utils/` and `locales/`; `public/` never imports `server/`.
+The rights rules keep the visibility rules and the module verdict in `server/authorize/`:
+outside it no module imports anything but `server/authorize/index.ts`
+(`rights-only-through-authorize`, tests apart), the permission module never reaches
+`server/db.js` (`authorize-not-to-db`), and no file under `server/` outside `server/authorize/`,
+the schema (`server/db.js`, `server/db-schema-test.js`) and the API docs (`server/openapi/`)
+compares a module level in dot notation (`x.modules.y`) with `'none'` (`RIGHTS-MODULE`), all
+three hard; a visibility literal in SQL there (`RIGHTS-SQL`) and a visibility level compared
+with a string literal in JavaScript (`RIGHTS-ROW`: `row.visibility === 'all'`, also reversed,
+loose, behind `?.` or `['visibility']`, on a variable named `visibility`, a `case` of a switch on
+it, `['all', ...].includes(it)`, one side of a `||` or `??`) stand only as listed exceptions with their reason, like
+`ERROR-TEXT` below. None of them sees a level under another name, passed through a call first, compared with a
+constant or through a named list, a computed module key, a module level read into a variable first, or SQL
+assembled from pieces; review those.
+knip (`knip.json`) adds dead code: files no entry point reaches, exports nobody imports, an export
+under two names, packages imported but not listed and listed but not used. Its entry points are the
+server, the router and pages, the three facades, the classic scripts the HTML pages load, the two
+CLI files, scripts, tools and tests; a new file that is loaded some other way is an entry there, not
+a baseline key. An entry naming a file that no longer exists stops the run. knip skips an export
+whose JSDoc tags it `public`, `beta` or `alias`; such a tag counts like a disable comment
+(`directive/knip-tag`). In the same job zizmor
+audits `.github/`; a finding that stays is listed in `.github/zizmor.yml` with its reason, per file
+and audit.
+Everything else works like the type baseline: a count that rises or a new key fails, a change that
+fixes findings runs `node scripts/check-lint-baseline.ts --update`, which only lowers counts. The
+rules themselves are tested on the fixture `test/fixtures/lint/` (`npm run test:lint-baseline`).
+An `eslint-disable` or `oxlint-disable` comment counts as a finding of its own (`directive/disable`),
+so a suppression needs the same review as the finding it hides; one without a rule list or one that
+names `no-restricted-syntax` is a hard finding. A file that is renamed or split takes its keys
+along by hand: move them to the new path in `lint-baseline.json` with the same or lower counts.
+
+The `ERROR-TEXT` rule (no text of an exception in a response, see [Backend](#backend)), the
+`RIGHTS-SQL` rule (a write, never a read) and the `RIGHTS-ROW` rule (a write filter or data
+upkeep, never a read rule) keep a list
+of exceptions rather than a debt list: each of its baseline keys needs a reason of at least twenty
+characters under the same key in `lint-baseline-reasons.json` - why the text is our own and behind
+which gate. A reason without a baseline key fails as well, and `--update` drops the reason of a key
+it removes. The spellings the rule sees, and the ones it cannot, are the fixture
+`test/fixtures/lint/error-text/`. Two limits: a key is a file, not a function, so a new place in a
+file that already has a key stays green as long as the count does not rise, and nothing checks the
+reason against the places it names - read both in review. And through a variable the rule does not
+follow the name: it reports where the text is read into one in a function that sends a body, also
+when the variable only goes to the log.
 
 ### Build
 
@@ -233,7 +292,7 @@ docs/                  # Product spec, screenshots
 
 **Key patterns:**
 
-- Every API route lives in `server/routes/` and follows the same `try/catch` → JSON response pattern
+- Every API route lives in `server/routes/` and answers JSON; an error it does not expect is not caught there but reaches the central error handler (see [Backend](#backend))
 - Every frontend page is an ES module in `public/pages/` that exports `render()`
 - All design values come from `tokens.css` - never hardcode colors, radii, or shadows
 - Database migrations are appended to the `MIGRATIONS` array in `server/db.js` - never modify existing entries
@@ -429,8 +488,8 @@ without this repository's private tooling.
 
 - ES modules everywhere (`import`/`export`, never `require`)
 - Semicolons: **yes**
-- `try/catch` in every route handler - no unhandled promise rejections
-- No dynamic code execution. Never write user data directly into an HTML string - use `esc()` from `public/utils/html.js` in template literals, or DOM API (`createElement`, `textContent`). Use `insertAdjacentHTML` to append HTML fragments, `replaceChildren()` to replace content. Direct `innerHTML` assignments are rejected by the frontend audit (`npm run test:frontend-audit`), which runs as part of `npm test`.
+- No `try/catch` around a whole route handler: Express 5 passes a rejected promise on to the central error handler. Catch only to translate an error you know into a 4xx, or to clean up
+- No dynamic code execution. Never write user data directly into an HTML string - use `esc()` from `public/utils/html.js` in template literals, or DOM API (`createElement`, `textContent`). Use `insertAdjacentHTML` to append HTML fragments, `replaceChildren()` to replace content. Direct `innerHTML` and `outerHTML` assignments are rejected by `npm run lint` (see [Linting](#linting)); `npm test` checks the same hard rules through `test:lint-baseline`.
 - Hyphens, not dashes: write `-`, never `—` or `–`. This holds for text people read rather than execute: the READMEs, the CHANGELOG, commit messages, UI strings and locale values. `npm run test:readme-consistency` enforces it for `README.md` and `README.de.md`; everywhere else it is on you. Existing code comments on `main` are inconsistent about this and are deliberately left alone, so `git grep` is not a reliable guide here.
 
 ### Frontend
@@ -492,6 +551,7 @@ stops being one.
 - Database migrations: append to the `MIGRATIONS` array in `server/db.js` - **never modify existing entries**
 - New entity tables: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO 8601). Key/value and join tables (`sync_config`, `task_tags`, …) deviate deliberately
 - Any server-side fetch of a URL stored from user/admin input (WebDAV targets, ICS feed URLs, subscription logos, recipe provider `base_url`s, ...) goes through `server/utils/ssrf.js` (`isBlockedAddress`/`createGuardedLookup`), not a bare `fetch()`. This is one classifier so DNS-rebinding and private-network edge cases aren't reimplemented per subsystem; `npm run test:ssrf` pins both the classification logic and which known modules actually call it, and runs as part of `npm test`.
+- Errors: a route does not answer an unexpected error itself - it lets the error reach the central error handler (`server/middleware/error-handler.js`), or throws an `HttpError` (`server/utils/http-error.js`) for a 4xx the client may read. The client only ever gets a sentence of our own, in English, plus `reason`, never the `err.message` of a foreign error; the lint rules `ERROR-TEXT` and `LOG-PLUS-500` hold this.
 
 ### Testing
 
@@ -598,7 +658,7 @@ That is worth stating plainly rather than leaving to inference. An automated rev
 Beyond that decision, three things are mechanical and hold for every change regardless of who or what wrote it:
 
 - The full test suite runs on every pull request, and a red build is not merged.
-- The [Hard Constraints](#hard-constraints) above are enforced by tests, not by good intentions - an `innerHTML` call, an unpinned or unlisted dependency, an import past the three facades, a type count above the baseline or a build that differs between two runs fails the pull request (`test:frontend-audit`, `test:vendor-policy`, `test:module-facades`, `test:tsc-baseline` and the determinism check in CI).
+- The [Hard Constraints](#hard-constraints) above are enforced by tests, not by good intentions - an `innerHTML` or `outerHTML` write, an unpinned or unlisted dependency, an import past the three facades, a type count or a lint count above its baseline or a build that differs between two runs fails the pull request (the `lint` job with oxlint and `scripts/check-lint-baseline.ts`, `test:vendor-policy`, `test:module-facades`, the `typecheck` job and the determinism check in CI).
 - Behaviour that is claimed to be fixed carries a test that fails against the state before the fix. A guard that was never seen red is not evidence.
 
 **On "a human has read and understood every merged line":** for a one-person project shipping several releases a week, that sentence would be a promise nobody could keep, and a promise that cannot be kept is worse than none - it invites exactly the trust it does not earn. What is true instead: the maintainer decides what gets built and whether it goes in, and is answerable for it either way. Where a change touches something sensitive - authentication, permissions, storage, anything reaching the network - the maintainer reads it line by line and merges it by hand.

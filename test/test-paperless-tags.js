@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test, { beforeEach, after } from 'node:test';
-import express from 'express';
-import Database from 'better-sqlite3-multiple-ciphers';
+import express from '../server/utils/http-router.ts';
+import { resolveRequestModuleAccess } from '../server/authorize/index.ts';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
+import { createRequire } from 'node:module';
+const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
 import { buildMigratedDatabase } from './helpers/migrated-database.js';
 import { PaperlessAdapter } from '../server/services/dms/paperless.js';
 
@@ -10,25 +13,43 @@ const { MIGRATIONS, _setTestDatabase, _resetTestDatabase } = await import('../se
 const { default: router, _setAdapterFactory } = await import('../server/routes/paperless-tags.js');
 const database = buildMigratedDatabase(Database, MIGRATIONS);
 _setTestDatabase(database);
-const user = (name, role) => database.prepare("INSERT INTO users (username,display_name,password_hash,role) VALUES (?,?,'x',?)").run(name,name,role).lastInsertRowid;
+const user = (/** @type {string} */ name, /** @type {string} */ role) => database.prepare("INSERT INTO users (username,display_name,password_hash,role) VALUES (?,?,'x',?)").run(name,name,role).lastInsertRowid;
 const owner = user('tag-owner', 'admin');
 const member = user('tag-reader', 'member');
 const other = user('tag-admin', 'admin');
-let identity, accountId, folderId, linkId, adapter, assigned, writes, inView;
+/** @type {{id: number, role: string, cookieSession?: {userId?: number, role?: string}, access?: Record<string, 'none' | 'read'> | null, method?: string}} */
+let identity;
+/** @type {number} */
+let accountId;
+/** @type {number} */
+let folderId;
+/** @type {number} */
+let linkId;
+/** @type {Record<string, (...args: any[]) => Promise<any>>} */
+let adapter;
+/** @type {number[]} */
+let assigned;
+/** @type {any[]} */
+let writes;
+/** @type {boolean} */
+let inView;
 const realFetch = globalThis.fetch;
 const app = express();
 app.use(express.json());
 app.use((req, _res, next) => {
   req.authUserId = identity.id; req.authRole = identity.role;
   req.session = { userId: identity.id, role: identity.role };
+ 
+  resolveRequestModuleAccess(database, req);
   req.sessionModuleAccess = identity.access;
   next();
 });
 app.use(router);
+app.use(createErrorHandler({ warn: (/** @type {unknown[]} */ ...args) => console.warn(...args), error: (/** @type {unknown[]} */ ...args) => console.warn(...args) }));
 const server = app.listen(0, '127.0.0.1');
 await new Promise((resolve) => server.once('listening', resolve));
-async function call(method, path, body) {
-  const res = await realFetch(`http://127.0.0.1:${server.address().port}${path}`, {
+async function call(/** @type {string} */ method, /** @type {string} */ path, /** @type {unknown} */ body = undefined) {
+  const res = await realFetch(`http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}${path}`, {
     method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: res.status, body: await res.json(), headers: res.headers };
@@ -49,7 +70,7 @@ beforeEach(() => {
   assigned = [7, 150]; writes = []; inView = true;
   adapter = {
     async getDocument() { return { tags: [...assigned] }; },
-    async getTags(ids) { return ids.map((id) => ({ id, name: id === 7 ? 'House' : 'Off-page tag' })); },
+    async getTags(ids) { return ids.map((/** @type {number} */ id) => ({ id, name: id === 7 ? 'House' : 'Off-page tag' })); },
     async listTags({ page }) { return { results: [{ id: page === 1 ? 7 : 150, name: 'Tag' }], count: 101, has_more: page === 1 }; },
     async listViewDocuments() { return { results: inView ? [{ id: '99' }] : [] }; },
     async setDocumentTags(id, tags) { writes.push({ id, tags }); assigned = tags; return { tags }; },
@@ -141,11 +162,12 @@ test('upstream permission and availability failures are sanitized; hidden tag ID
   assert.equal((await call('GET', linkPath())).status, 502);
 });
 test('adapter uses guarded paginated tag paths and PATCH changes tags alone', async () => {
-  const calls = [];
+  /** @type {any[]} */
+const calls = [];
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
-    const body = url.includes('/api/tags/?') ? { results: [{ id: 7, name: 'House', owner: 99 }], count: 101, next: 'https://evil.example' }
-      : url.includes('/api/tags/7/') ? { id: 7, name: 'House', owner: 99 } : { tags: [7] };
+    const body = String(url).includes('/api/tags/?') ? { results: [{ id: 7, name: 'House', owner: 99 }], count: 101, next: 'https://evil.example' }
+      : String(url).includes('/api/tags/7/') ? { id: 7, name: 'House', owner: 99 } : { tags: [7] };
     return new Response(JSON.stringify(body));
   };
   const adapter = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/paperless', api_token: 'test' });
@@ -153,7 +175,7 @@ test('adapter uses guarded paginated tag paths and PATCH changes tags alone', as
   assert.deepEqual(await adapter.getTags([7]), [{ id: 7, name: 'House' }]);
   await adapter.setDocumentTags(99, [7]);
   assert.equal(calls.length, 3);
-  assert.ok(calls[0].url.includes('page=2'));
+  assert.ok(String(calls[0].url).includes('page=2'));
   assert.equal(calls[2].options.method, 'PATCH');
   assert.deepEqual(JSON.parse(calls[2].options.body), { tags: [7] });
   for (const call of calls) assert.ok(call.url.startsWith('http://127.0.0.1:1234/paperless/api/'));
@@ -191,8 +213,8 @@ test('batched tag lookup ignores unassigned names and skips empty assignments', 
   let calls = 0;
   globalThis.fetch = async (url) => {
     calls++;
-    if (url.includes('/api/tags/150/')) return new Response('{}', { status: 403 });
-    assert.equal(new URL(url).searchParams.get('id__in'), '7,150');
+    if (String(url).includes('/api/tags/150/')) return new Response('{}', { status: 403 });
+    assert.equal(new URL(String(url)).searchParams.get('id__in'), '7,150');
     return new Response(JSON.stringify({ results: [{ id: 7, name: 'House' }, { id: 900, name: 'Secret' }], count: 2, next: null }));
   };
   const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/batch', api_token: 'test' });
@@ -203,8 +225,9 @@ test('batched tag lookup ignores unassigned names and skips empty assignments', 
 });
 
 test('operator logs contain response and upstream status codes without upstream messages or URLs', async (t) => {
-  const logs = [];
-  t.mock.method(console, 'warn', (...args) => logs.push(args.join(' ')));
+  /** @type {string[]} */
+const logs = [];
+  t.mock.method(console, 'warn', (/** @type {unknown[]} */ ...args) => logs.push(args.join(' ')));
   adapter.getDocument = async () => { throw Object.assign(new Error('SECRET http://private.invalid'), { status: 503 }); };
   assert.equal((await call('GET', linkPath())).status, 502);
   adapter.getDocument = async () => ({ tags: assigned });
@@ -217,9 +240,10 @@ test('operator logs contain response and upstream status codes without upstream 
 });
 
 test('assigned tag names are resolved beyond the first Paperless page without following next URLs', async () => {
-  const calls = [];
+  /** @type {any[]} */
+const calls = [];
   globalThis.fetch = async (url) => {
-    const parsed = new URL(url); calls.push(parsed);
+    const parsed = new URL(String(url)); calls.push(parsed);
     return new Response(JSON.stringify(parsed.searchParams.get('page') === '2'
       ? { count: 2, next: null, results: [{ id: 150, name: 'Off-page name' }] }
       : { count: 2, next: 'https://invalid.example/token', results: [{ id: 7, name: 'Unassigned' }] }));
@@ -232,10 +256,11 @@ test('assigned tag names are resolved beyond the first Paperless page without fo
 });
 
 test('missing batch names fall back to the assigned tag detail using the same token', async () => {
-  const calls = [];
+  /** @type {any[]} */
+const calls = [];
   globalThis.fetch = async (url, options) => {
-    calls.push({ url, token: options.headers.Authorization });
-    if (url.includes('/api/tags/150/')) return new Response(JSON.stringify({ id: 150, name: 'Insurance' }));
+    calls.push({ url, token: new Headers(options?.headers).get('Authorization') });
+    if (String(url).includes('/api/tags/150/')) return new Response(JSON.stringify({ id: 150, name: 'Insurance' }));
     return new Response(JSON.stringify({ count: 0, next: null, results: [] }));
   };
   const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/detail-tags', api_token: 'personal' });

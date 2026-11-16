@@ -1,7 +1,8 @@
 /** Stock schema upgrades append folders without touching shipped migrations. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import Database from 'better-sqlite3-multiple-ciphers';
+import { createRequire } from 'node:module';
+const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
 import { buildMigratedDatabase } from './helpers/migrated-database.js';
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS, migrate } = await import('../server/db.js');
@@ -12,9 +13,9 @@ test('stock v282 gains folder/member tables while existing migration history and
   const before = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
   migrate(db);
   assert.deepEqual(db.prepare('SELECT * FROM schema_migrations WHERE version <= 282 ORDER BY version').all(), before);
-  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, MIGRATIONS.at(-1).version);
-  assert.ok(db.prepare('PRAGMA table_info(reward_ledger)').all().some((c) => c.name === 'decay_days'));
-  assert.ok(db.prepare('PRAGMA table_info(reward_ledger)').all().some((c) => c.name === 'base_points'));
+  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, MIGRATIONS.at(-1)?.version);
+  assert.ok(db.prepare('PRAGMA table_info(reward_ledger)').all().some((/** @type {{name: string}} */ c) => c.name === 'decay_days'));
+  assert.ok(db.prepare('PRAGMA table_info(reward_ledger)').all().some((/** @type {{name: string}} */ c) => c.name === 'base_points'));
   db.exec(`INSERT INTO users (id,username,display_name,password_hash,role) VALUES (1,'owner','Owner','x','admin'),(2,'reader','Reader','x','member');
     INSERT INTO dms_accounts (id,provider,name,base_url,api_token) VALUES (1,'paperless','Archive','http://127.0.0.1','x');
     INSERT INTO paperless_view_folders (id,name,account_id,view_id,visibility,created_by) VALUES (1,'Selected',1,5,'restricted',1);

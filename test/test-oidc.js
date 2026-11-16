@@ -591,7 +591,8 @@ function sourceFiles() {
       if (entry.isDirectory()) {
         if (/node_modules|vendor/.test(entry.name)) continue;
         walk(`${next}/`);
-      } else if (/\.(js|html)$/.test(entry.name)) {
+      // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+      } else if (/\.(js|ts|html)$/.test(entry.name)) {
         found.push(next);
       }
     }

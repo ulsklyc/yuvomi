@@ -1,8 +1,11 @@
 /** Paperless view filters, live pagination, sharing and media authorization. */
 import assert from 'node:assert/strict';
 import test, { beforeEach, after } from 'node:test';
-import express from 'express';
-import Database from 'better-sqlite3-multiple-ciphers';
+import express from '../server/utils/http-router.ts';
+import { filterVisible, visibleWhere, resolveRequestModuleAccess } from '../server/authorize/index.ts';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
+import { createRequire } from 'node:module';
+const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
 import { buildMigratedDatabase } from './helpers/migrated-database.js';
 import { savedViewParams, PaperlessViewError } from '../server/services/dms/paperless-views.js';
 import { PaperlessAdapter } from '../server/services/dms/paperless.js';
@@ -16,9 +19,13 @@ const insertUser = database.prepare("INSERT INTO users (username, display_name, 
 const adminId = insertUser.run('paperless-admin', 'Admin', 'admin').lastInsertRowid;
 const memberId = insertUser.run('paperless-member', 'Member', 'member').lastInsertRowid;
 const otherId = insertUser.run('paperless-other', 'Other', 'admin').lastInsertRowid;
+/** @type {{id: number, role: string, cookieSession?: {userId?: number, role?: string}, access?: Record<string, 'none' | 'read'> | null, method?: string}} */
 let identity;
+/** @type {Record<string, (...args: any[]) => Promise<any>>} */
 let adapter;
+/** @type {number} */
 let accountId;
+/** @type {number} */
 let mediaCalls;
 const realFetch = globalThis.fetch;
 const app = express();
@@ -27,16 +34,18 @@ app.use((req, _res, next) => {
   req.authUserId = identity.id;
   req.authRole = identity.role;
   req.session = identity.cookieSession || { userId: identity.id, role: identity.role };
+  resolveRequestModuleAccess(database, req);
   next();
 });
 app.use('/api/v1/documents/dms/paperless', router);
+app.use(createErrorHandler({ warn() {}, error() {} }));
 const server = app.listen(0, '127.0.0.1');
 await new Promise((resolve) => server.once('listening', resolve));
-const base = `http://127.0.0.1:${server.address().port}/api/v1/documents/dms/paperless`;
-const doc = (id) => ({ id: String(id), title: `Document ${id}`, filename: `${id}.pdf`, url: `https://paperless.example/documents/${id}` });
+const base = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}/api/v1/documents/dms/paperless`;
+const doc = (/** @type {number} */ id) => ({ id: String(id), title: `Document ${id}`, filename: `${id}.pdf`, url: `https://paperless.example/documents/${id}` });
 const member = () => { identity = { id: memberId, role: 'member' }; };
 const admin = () => { identity = { id: adminId, role: 'admin' }; };
-async function call(method, path, body) {
+async function call(/** @type {string} */ method, /** @type {string} */ path, /** @type {unknown} */ body = undefined) {
   const res = await realFetch(base + path, {
     method, headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -108,10 +117,11 @@ test('unknown, malformed and conflicting rules fail closed', () => {
 test('adapter refreshes expired definitions, preserves sorting and never follows absolute next links', async (t) => {
   let clock = 10000;
   t.mock.method(Date, 'now', () => clock);
-  const calls = [];
+  /** @type {any[]} */
+const calls = [];
   let tag = '7';
   globalThis.fetch = async (url, options) => {
-    const u = new URL(url);
+    const u = new URL(String(url));
     calls.push({ u, options });
     return new Response(JSON.stringify(u.pathname.includes('saved_views')
       ? { id: 5, filter_rules: [{ rule_type: 6, value: tag }], sort_field: 'title', sort_reverse: false }
@@ -134,7 +144,7 @@ test('adapter refreshes expired definitions, preserves sorting and never follows
   assert.equal(calls[4].u.searchParams.get('ordering'), 'title');
   for (const call of calls) {
     assert.equal(call.u.origin, 'http://127.0.0.1:1234');
-    assert.equal(call.options.headers.Authorization, 'Token token');
+    assert.equal(new Headers(call.options?.headers).get('Authorization'), 'Token token');
     assert.equal(call.options.headers.Accept, 'application/json; version=9');
   }
 });
@@ -189,7 +199,9 @@ test('sharing requires explicit consent; members can read the current and subseq
 test('members cannot create, edit or disconnect a shared folder', async () => {
   const folder = await create('family');
   member();
-  for (const [method, path, body] of [['POST', '/folders', {}], ['PUT', `/folders/${folder.id}`, {}], ['DELETE', `/folders/${folder.id}`]]) {
+  /** @type {Array<[string, string, unknown?]>} */
+  const forbidden = [['POST', '/folders', {}], ['PUT', `/folders/${folder.id}`, {}], ['DELETE', `/folders/${folder.id}`]];
+  for (const [method, path, body] of forbidden) {
     assert.equal((await call(method, path, body)).status, 403);
   }
 });
@@ -212,7 +224,7 @@ test('downloads outside the current view are denied even with a real document ID
   const result = await call('GET', `/folders/${folder.id}/documents/99/download`);
   assert.equal(result.status, 200);
   assert.equal(mediaCalls, 1);
-  assert.match(result.headers.get('content-disposition'), /^attachment/);
+  assert.match(result.headers.get('content-disposition') || '', /^attachment/);
   assert.equal(result.headers.get('cache-control'), 'no-store');
   assert.equal(result.headers.get('x-content-type-options'), 'nosniff');
 });
@@ -392,10 +404,11 @@ test('family-to-restricted narrowing needs no consent and rejects nonexistent re
 });
 
 test('definition cache survives adapter recreation but isolates changed credentials and base URLs', async () => {
-  const calls = [];
+  /** @type {any[]} */
+const calls = [];
   globalThis.fetch = async (url, options) => {
-    calls.push({ url, token: options.headers.Authorization });
-    return new Response(JSON.stringify(url.includes('saved_views')
+    calls.push({ url, token: new Headers(options?.headers).get('Authorization') });
+    return new Response(JSON.stringify(String(url).includes('saved_views')
       ? { id: 5, filter_rules: [] } : { count: 0, results: [], next: null }));
   };
   const account = { base_url: 'http://127.0.0.1:1234/cache-isolation', api_token: 'first' };
@@ -403,6 +416,24 @@ test('definition cache survives adapter recreation but isolates changed credenti
   await new PaperlessAdapter(account).listViewDocuments(5);
   await new PaperlessAdapter({ ...account, api_token: 'second' }).listViewDocuments(5);
   await new PaperlessAdapter({ ...account, base_url: `${account.base_url}/other` }).listViewDocuments(5);
-  assert.equal(calls.filter((call) => call.url.includes('saved_views')).length, 3);
-  assert.equal(calls.filter((call) => call.url.includes('/api/documents/')).length, 4);
+  assert.equal(calls.filter((call) => String(call.url).includes('saved_views')).length, 3);
+  assert.equal(calls.filter((call) => String(call.url).includes('/api/documents/')).length, 4);
+});
+
+
+test('central Paperless row visibility and filterVisible agree with private, selected-member and family audiences', async () => {
+  const own = await create();
+  const family = await create('family');
+  const selected = await create();
+  assert.equal((await call('PUT', `/folders/${selected.id}`, { name: 'Selected', visibility: 'restricted',
+    allowed_member_ids: [Number(memberId)], confirm_share: true })).status, 200);
+  const ids = [own.id, family.id, selected.id];
+  const sql = visibleWhere('paperless_folders', 'f', '@viewer');
+  const direct = database.prepare(`SELECT f.id FROM paperless_view_folders f WHERE ${sql} ORDER BY f.id`).all({viewer: memberId})
+    .map((/** @type {{id: number}} */ row) => row.id);
+  assert.deepEqual(direct, [family.id, selected.id]);
+  assert.deepEqual(filterVisible(database, 'paperless_folders', ids, memberId), direct);
+  assert.deepEqual(filterVisible(database, 'paperless_folders', ids, adminId), ids);
+  member();
+  assert.deepEqual((await call('GET', '/folders')).body.data.map((/** @type {{id: number}} */ row) => row.id).sort((/** @type {number} */ a, /** @type {number} */ b) => a - b), direct);
 });

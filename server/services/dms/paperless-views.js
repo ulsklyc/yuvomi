@@ -5,6 +5,7 @@
  * Reference: paperless-ngx src-ui/src/app/data/filter-rule-type.ts (MIT).
  */
 export class PaperlessViewError extends Error {
+  /** @param {string} message */
   constructor(message) {
     super(message);
     this.name = 'PaperlessViewError';
@@ -12,6 +13,7 @@ export class PaperlessViewError extends Error {
 }
 
 // [query parameter, multiple values, null parameter, boolean value]
+/** @type {Map<number, [string, boolean?, (string | null)?, boolean?]>} */
 const RULES = new Map([
   [0, ['title__icontains']], [1, ['content__icontains']],
   [2, ['archive_serial_number']],
@@ -43,7 +45,9 @@ const RULES = new Map([
   [50, ['has_duplicates', false, null, true]],
 ]);
 
-export function savedViewParams(view) {
+/** @param {unknown} value */
+export function savedViewParams(value) {
+  const view = /** @type {{filter_rules?: unknown, sort_field?: unknown, sort_reverse?: unknown} | null} */ (value);
   if (!view || !Array.isArray(view.filter_rules) || view.filter_rules.length > 200) {
     throw new PaperlessViewError('Invalid saved-view filter definition.');
   }
@@ -83,6 +87,7 @@ export function savedViewParams(view) {
   return params;
 }
 
+/** @param {unknown} value */
 export function positiveId(value) {
   const text = String(value ?? '');
   return /^[1-9]\d*$/.test(text) && Number.isSafeInteger(Number(text)) ? Number(text) : null;

@@ -1,12 +1,12 @@
-<!-- version: 2.87.0 -->
-This update closes several gaps in who may see and receive what, and it makes error messages speak your language.
+<!-- version: 2.91.0 -->
+This update makes the backup card tell one time. On a server that runs in another time zone than your household, the card in Settings > Household > Backup and restore said "Daily at 02:00" above "Next backup 03:00" for the same run. The schedule now reads in your household's time zone, like the next backup below it.
 
-A member whose access to a module was taken away no longer keeps receiving it through the back door. Calendar subscription links, including birthdays, inventory deadlines, cycle, schedule and waste collection, stay empty for somebody set to "no access"; the link itself remains valid and fills again once access is given back. Medication reminders reach only people who may see Health, and they go out by push and to the recipient's own notification channels, never to a channel the whole household shares. A demoted administrator loses the admin role on every device at once, and two administrators demoting each other at the same moment can no longer leave the household without one.
+Four household settings are now for administrators only: the currency, the app name, the housekeeping payment tasks and the default length of new events. In the app, members never saw these controls; they could only be changed through the API. On the Appearance page members now see the household currency as a read-only row.
 
-Settings no longer show raw text from calendar, contact, storage, mail or backup servers. When a connection test or a sync fails, the message names the kind of failure in your language, and technical details stay with the administrator.
+A wall display now reads only the tasks and events the whole household sees, on every page and in every list, count and countdown. In the app a display could not be assigned to a task or an event, so nothing changes on a wall you have set up.
 
-Every release now also carries a signed copy of the app as a file next to the container image. For an Umbrel installation nothing changes; the image updates as before.
+If you use the API with your own scripts: every "administrators only" refusal now has the same answer, `403` with `reason: "admin_required"`. Scripts that compared the error text should read the `reason` instead.
 
 This update does not change the database. No action is needed from you.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.87.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.91.0

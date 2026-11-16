@@ -14,10 +14,11 @@ import {
 } from '../../services/calendar-event-reader.js';
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
 import { buildMatchQuery, eventSearchWindow, resolveEventSearchRows } from '../../services/search.js';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from '../../services/visibility.js';
+import { readerBinds, readerVisibleWhere, rowReader } from '../../authorize/index.ts';
+import { isAdminRequest } from '../../middleware/require-admin.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
-  VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, isAdminUser, serializeEvents,
+  VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, serializeEvents,
 } from './helpers.js';
 import { todayKey } from '../../utils/timezone.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from '../../services/household-modules.js';
@@ -39,6 +40,7 @@ router.get('/', (req, res) => {
     const year  = today.slice(0, 4);
     const month = today.slice(5, 7);
 
+    const reader = rowReader(req);
     const from = req.query.from || `${year}-${month}-01`;
     const to   = req.query.to   || `${year}-${month}-31`;
 
@@ -87,13 +89,14 @@ router.get('/', (req, res) => {
         OR
         (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
       )
-      AND ${icsSubscriptionVisibleWhere('e')}
+      AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '?')}
     `;
-    const params = [to, from, to, getUserId(req)];
+    const params = [to, from, to, ...readerBinds(reader, 'ics_subscriptions')];
 
     // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare.
-    sql += ` AND ${visibilityWhere('e', 'event_assignments', 'event_id')}`;
-    params.push(getUserId(req), getUserId(req));
+    // A paired display reads under the wall rule (rowReader).
+    sql += ` AND ${readerVisibleWhere(reader, 'events', 'e', '?')}`;
+    params.push(...readerBinds(reader, 'events'));
 
     // GEBURTSTAGE HAUSHALTSWEIT ABGESCHALTET (#1660): ihre Termine sind eine
     // Einblendung aus einem anderen Modul und laufen dann nicht mehr mit. Der
@@ -121,7 +124,7 @@ router.get('/', (req, res) => {
       database,
       viewer: documentViewer(req),
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
     };
     const events = serializeEvents(
       expandAndResolveEventRows(database, rawEvents, from, to),
@@ -147,12 +150,13 @@ router.get('/upcoming', (req, res) => {
     const expanded = serializeEvents(hydrateEventAttachmentBodies(
       database,
       // Geburtstage abgeschaltet: der geteilte Leser laesst sie aus (#1660).
-      getUpcomingEvents(database, { userId: getUserId(req), limit }),
+      // A paired display reads under the wall rule (rowReader).
+      getUpcomingEvents(database, { userId: getUserId(req), limit, reader: rowReader(req) }),
     ), {
       database,
       viewer: documentViewer(req),
       actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
+      isAdmin: isAdminRequest(req),
     });
 
     res.json({ data: expanded });
@@ -180,13 +184,14 @@ router.get('/search', (req, res) => {
     if (!match) return res.json({ data: [], total: 0 });
 
     const userId = getUserId(req);
+    const reader = rowReader(req);
     const LIMIT  = 100;
     // Sichtbarkeit deckt sich mit GET / (alle Familientermine; ICS nur aus
     // geteilten/eigenen Abos). Als Fragment wiederverwendet für Count + Liste.
     const whereSql = `
       s.entity = 'event' AND s.search_index MATCH @match
-      AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}${
+      AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '@userId')}
+      AND ${readerVisibleWhere(reader, 'events', 'e', '@userId')}${
         // Wie GET /: ohne Geburtstage, wenn der Haushalt sie abgeschaltet hat (#1660).
         birthdaysSwitchedOff(db.get()) ? ` AND ${notBirthdayEventSql('e')}` : ''}`;
 
@@ -251,7 +256,7 @@ router.get('/search', (req, res) => {
         viewer: documentViewer(req),
         database,
         actorId: userId,
-        isAdmin: isAdminUser(req),
+        isAdmin: isAdminRequest(req),
       }),
       total,
     });

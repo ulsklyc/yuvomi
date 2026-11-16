@@ -1,26 +1,27 @@
 /** Real browser, full application and loopback Paperless tag API. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import express from 'express';
+import express from '../server/utils/http-router.ts';
 import { startHarness, openPage, gotoRoute, clickPastDeadTime } from './document-guards-harness.js';
 
 test('tags can be viewed and edited in folders and linked documents on desktop and mobile', { timeout: 180000 }, async () => {
   let assigned = [7, 150];
-  const writes = [];
+  /** @type {any[]} */
+const writes = [];
   const source = express();
   source.use(express.json());
   source.use((req, res, next) => req.get('Authorization') === 'Token tag-test' ? next() : res.sendStatus(401));
   const view = { id: 5, name: 'House', filter_rules: [{ rule_type: 6, value: '7' }] };
-  const document = () => ({ id: 99, title: 'Tag test receipt', tags: [...assigned], original_file_name: 'receipt.txt' });
+  const paperlessDocument = () => ({ id: 99, title: 'Tag test receipt', tags: [...assigned], original_file_name: 'receipt.txt' });
   source.get('/api/saved_views/5/', (_req, res) => res.json(view));
-  source.get('/api/documents/', (_req, res) => res.json({ results: assigned.includes(7) ? [document()] : [], count: assigned.includes(7) ? 1 : 0, next: null }));
-  source.get('/api/documents/99/', (_req, res) => res.json(document()));
+  source.get('/api/documents/', (_req, res) => res.json({ results: assigned.includes(7) ? [paperlessDocument()] : [], count: assigned.includes(7) ? 1 : 0, next: null }));
+  source.get('/api/documents/99/', (_req, res) => res.json(paperlessDocument()));
   source.patch('/api/documents/99/', (req, res) => {
-    writes.push(req.body); assigned = req.body.tags; res.json(document());
+    writes.push(req.body); assigned = req.body.tags; res.json(paperlessDocument());
   });
   source.get('/api/documents/99/download/', (_req, res) => res.type('text/plain').send('Receipt'));
   source.get('/api/tags/', (req, res) => {
-    if (req.query.id__in) return res.json({ results: req.query.id__in.split(',').map(Number).map((id) => ({ id, name: id === 7 ? 'House' : 'Second page tag' })), count: 2, next: null });
+    if (req.query.id__in) return res.json({ results: String(req.query.id__in).split(',').map(Number).map((id) => ({ id, name: id === 7 ? 'House' : 'Second page tag' })), count: 2, next: null });
     return res.json({ results: Number(req.query.page) === 2
     ? [{ id: 150, name: 'Second page tag' }, { id: 151, name: 'Another tag' }]
     : [{ id: 7, name: 'House' }, { id: 8, name: '<img src=x onerror=alert(1)>' }],
@@ -29,7 +30,8 @@ test('tags can be viewed and edited in folders and linked documents on desktop a
   source.get('/api/tags/:id/', (req, res) => res.json({ id: Number(req.params.id), name: req.params.id === '7' ? 'House' : 'Second page tag' }));
   const sourceServer = source.listen(0, '127.0.0.1');
   await new Promise((resolve) => sourceServer.once('listening', resolve));
-  let harness;
+  /** @type {Awaited<ReturnType<typeof startHarness>> | undefined} */
+let harness;
   const previousNodeOptions = process.env.NODE_OPTIONS;
   try {
     const preload = new URL('./helpers/loopback-fetch-only.js', import.meta.url).href;
@@ -48,23 +50,25 @@ test('tags can be viewed and edited in folders and linked documents on desktop a
       return false;
     } });
     page.setDefaultTimeout(10000);
-    const errors = [];
-    page.on('pageerror', (err) => errors.push(err.message));
-    const linkId = await page.evaluate(async (base_url) => {
-      const { api } = await import('/api.js');
+    /** @type {string[]} */
+const errors = [];
+    page.on('pageerror', (/** @type {Error} */ err) => errors.push(err.message));
+    const linkId = await page.evaluate(async (/** @type {string} */ base_url) => {
+      const apiPath = '/api.js';
+      const { api } = await import(apiPath);
       const account = (await api.post('/documents/dms/accounts', { provider: 'paperless', name: 'Tag test', base_url, api_token: 'tag-test' })).data;
       await api.post('/documents/dms/paperless/folders', { name: 'Tag folder', account_id: account.id, view_id: 5 });
       return (await api.post('/documents/dms/link', { account_id: account.id, dms_document_id: '99' })).data.id;
-    }, `http://127.0.0.1:${sourceServer.address().port}`);
+    }, `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (sourceServer.address()).port}`);
     await gotoRoute(page, '/documents');
     await page.waitForSelector('[data-pl-folder]');
     await page.click('[data-pl-folder]');
     await page.waitForSelector('.paperless-folder__actions [popovertarget]');
     await page.click('.paperless-folder__actions [popovertarget]');
     await page.click('[data-pl-tags]');
-    await page.waitForFunction(() => document.querySelector('.modal-panel [type="submit"]')?.disabled === false).catch(async (err) => { console.error('tag-test modal:', await page.$eval('.modal-panel', (el) => el.textContent).catch(() => 'missing')); throw err; });
-    assert.equal(await page.$eval('[data-pl-tag-list] input[value="150"]', (el) => el.checked), true);
-    assert.equal(await page.$$eval('[data-pl-tag-list] img', (els) => els.length), 0, 'tag labels must be escaped');
+    await page.waitForFunction(() => document.querySelector('.modal-panel [type="submit"]:not([disabled])') !== null).catch(async (/** @type {Error} */ err) => { console.error('tag-test modal:', await page.$eval('.modal-panel', (/** @type {HTMLInputElement} */ el) => el.textContent).catch(() => 'missing')); throw err; });
+    assert.equal(await page.$eval('[data-pl-tag-list] input[value="150"]', (/** @type {HTMLInputElement} */ el) => el.checked), true);
+    assert.equal(await page.$$eval('[data-pl-tag-list] img', (/** @type {HTMLInputElement[]} */ els) => els.length), 0, 'tag labels must be escaped');
     await page.click('[data-pl-tag-list] input[value="7"]');
     await page.click('[data-pl-tag-list] input[value="8"]');
     await clickPastDeadTime(page, '.modal-panel [type="submit"]');
@@ -78,7 +82,7 @@ test('tags can be viewed and edited in folders and linked documents on desktop a
     await linkedTitle.click();
     await page.waitForSelector('[data-action="paperless-tags"]');
     await clickPastDeadTime(page, '[data-action="paperless-tags"]');
-    await page.waitForFunction(() => document.querySelector('.modal-panel [type="submit"]')?.disabled === false).catch(async (err) => { console.error('tag-test modal:', await page.$eval('.modal-panel', (el) => el.textContent).catch(() => 'missing')); throw err; });
+    await page.waitForFunction(() => document.querySelector('.modal-panel [type="submit"]:not([disabled])') !== null).catch(async (/** @type {Error} */ err) => { console.error('tag-test modal:', await page.$eval('.modal-panel', (/** @type {HTMLInputElement} */ el) => el.textContent).catch(() => 'missing')); throw err; });
     await page.click('[data-pl-tag-more]');
     await page.waitForSelector('[data-pl-tag-list] input[value="151"]');
     await page.click('[data-pl-tag-list] input[value="151"]');
@@ -88,14 +92,14 @@ test('tags can be viewed and edited in folders and linked documents on desktop a
     await page.waitForSelector('[data-pl-tag-error]:not([hidden])');
     assert.equal(writes.length, 1);
     await page.click('[data-pl-tag-reload]');
-    await page.waitForFunction(() => document.querySelector('.modal-panel [type="submit"]')?.disabled === false).catch(async (err) => { console.error('tag-test modal:', await page.$eval('.modal-panel', (el) => el.textContent).catch(() => 'missing')); throw err; });
-    assert.equal(await page.$eval('[data-pl-tag-list] input[value="7"]', (el) => el.checked), true);
+    await page.waitForFunction(() => document.querySelector('.modal-panel [type="submit"]:not([disabled])') !== null).catch(async (/** @type {Error} */ err) => { console.error('tag-test modal:', await page.$eval('.modal-panel', (/** @type {HTMLInputElement} */ el) => el.textContent).catch(() => 'missing')); throw err; });
+    assert.equal(await page.$eval('[data-pl-tag-list] input[value="7"]', (/** @type {HTMLInputElement} */ el) => el.checked), true);
 
     await page.setViewport({ width: 390, height: 844 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
     if (process.env.PAPERLESS_TAGS_SCREENSHOT) await page.screenshot({ path: process.env.PAPERLESS_TAGS_SCREENSHOT });
     // Clearing is deliberate, including tags that originated on another catalogue page.
-    await page.$$eval('[data-pl-tag-list] input:checked', (els) => els.forEach((el) => el.click()));
+    await page.$$eval('[data-pl-tag-list] input:checked', (/** @type {HTMLInputElement[]} */ els) => els.forEach((/** @type {HTMLInputElement} */ el) => el.click()));
     await clickPastDeadTime(page, '.modal-panel [type="submit"]');
     await page.waitForFunction(() => !document.querySelector('#paperless-tags-form'));
     assert.deepEqual(assigned, []);

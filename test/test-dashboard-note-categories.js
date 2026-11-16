@@ -19,6 +19,7 @@ test('OpenAPI documents the repeatable AND note-category filter', () => {
 
 const dbmod = await import('../server/db.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { listVisibleCategories } = await import('../server/services/note-categories.js');
 const db = dbmod.get();
 
 const userId = Number(db.prepare(`
@@ -82,6 +83,22 @@ test('notesTotal counts the set the preview draws from, behind the same filter',
   assert.equal(all.notesTotal, 9);
   const homeOnly = await (await fetch(`${baseUrl}/?notes_category=${home}`)).json();
   assert.equal(homeOnly.notesTotal, 2);
+});
+
+// #2601: die Sichtbarkeitsregel steht jetzt an einer Stelle
+// (categoryVisibleWhere() in note-categories.js); dieser Test haelt fest,
+// dass das Dashboard-Filter kein eigenes, abweichendes Set akzeptiert -
+// genau die beiden Haushalts-/eigene Kategorien, nicht die fremde.
+test('die Kategorien, die der Dashboard-Filter annimmt, sind genau die, die listVisibleCategories() nennt', async () => {
+  const visible = new Set(listVisibleCategories(db, userId).map((category) => category.id));
+  assert.deepEqual(visible, new Set([home, school]), 'Vorbedingung: home und school sichtbar, hidden nicht');
+
+  for (const id of [home, school]) {
+    const body = await (await fetch(`${baseUrl}/?notes_category=${id}`)).json();
+    assert.notEqual(body.notesTotal, 0, `${id} ist sichtbar und muss etwas finden`);
+  }
+  const hiddenBody = await (await fetch(`${baseUrl}/?notes_category=${hidden}`)).json();
+  assert.equal(hiddenBody.notesTotal, 0, 'hidden ist nicht sichtbar und darf nichts finden');
 });
 
 test.after(() => server.close());

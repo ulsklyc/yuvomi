@@ -72,6 +72,12 @@ name: Release Assets
 # its checkout, and the notes for this version are committed before the tag -
 # on main they may already belong to the next release, or (patch release from
 # a branch) never have been there.
+#
+# THE MIGRATION CORPUS (phase 1b, section B). After the Umbrel handover the
+# job starts corpus.yml for the tag, from main (tags older than corpus.yml do
+# not contain it). corpus.yml decides itself whether the release changes the
+# schema and attaches `yuvomi-<version>-corpus.db`; that step may fail without
+# failing this run, because the release is out by then.
 
 on:
   workflow_dispatch:
@@ -322,3 +328,16 @@ jobs:
             exit 0
           fi
           gh workflow run umbrel-publish.yml --ref "$TAG" -f version="$VERSION"
+
+      # The migration corpus (phase 1b, section B): corpus.yml decides itself
+      # whether this release changes the schema and gets a corpus database. It
+      # runs from main, because tags older than corpus.yml do not contain it,
+      # and checks out the tag itself. A failure here never fails this run: the
+      # release is already out, and the restore drill reports a missing database.
+      - name: Start the migration corpus
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run corpus.yml --ref main -f tag="$TAG"

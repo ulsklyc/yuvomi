@@ -9,6 +9,7 @@
  * Dependencies: global fetch (Node >=22), ./guard.js
  */
 import { assertDmsTargetAllowed, DmsTargetError } from './guard.js';
+import { paperlessStatus } from './paperless-errors.js';
 import { savedViewParams, positiveId, PaperlessViewError } from './paperless-views.js';
 import { remoteFailure } from '../../utils/http.js';
 
@@ -20,12 +21,13 @@ const viewCache = new Map();
 
 // Tags may be flat or contain nested child objects. Keep the public contract
 // flat, deduplicated and limited to IDs/names, never provider metadata.
+/** @param {unknown[]} rows @returns {import("../../../types/paperless.d.ts").Tag[]} */
 function namedTags(rows) {
   const result = new Map(), pending = [...rows];
   let cursor = 0;
   while (cursor < pending.length) {
     if (cursor >= 10000) throw new PaperlessViewError('Invalid tag catalogue.');
-    const tag = pending[cursor++];
+    const tag = /** @type {{id?: unknown, name?: unknown, children?: unknown}} */ (pending[cursor++]);
     if (!tag || typeof tag !== 'object') continue;
     const id = positiveId(tag.id);
     if (id && typeof tag.name === 'string' && tag.name.trim()) result.set(id, { id, name: tag.name });
@@ -93,11 +95,11 @@ export class PaperlessAdapter {
     return res;
   }
 
+  /** @param {string} path @param {RequestInit} [opts] */
   async #request(path, opts = {}) {
     const res = await this.#fetch(path, opts);
     if (!res.ok) {
-      const err = new Error(`DMS request failed (${res.status})`);
-      err.status = res.status;
+      const err = Object.assign(new Error(`DMS request failed (${res.status})`), { status: res.status });
       throw err;
     }
     return res;
@@ -111,6 +113,7 @@ export class PaperlessAdapter {
     return this.#viewPage(`/api/saved_views/?page=${positiveId(page) || 1}&page_size=${Math.min(100, positiveId(pageSize) || 50)}`);
   }
 
+  /** @param {unknown} id */
   async getSavedView(id) {
     if (!positiveId(id)) throw new PaperlessViewError('Invalid saved-view ID.');
     const view = await (await this.#request(`/api/saved_views/${id}/`)).json();
@@ -118,15 +121,17 @@ export class PaperlessAdapter {
     return view;
   }
 
+  /** @param {string} path */
   async #viewPage(path) {
-    const body = await (await this.#request(path)).json();
+    const body = /** @type {{results: unknown[], count: number, next?: unknown}} */ (await (await this.#request(path)).json());
     if (!Array.isArray(body.results) || !Number.isSafeInteger(body.count) || body.count < 0) {
       throw new PaperlessViewError('Invalid Paperless pagination.');
     }
     // Return a flag, never follow Paperless's absolute next URL with our token.
-    return { results: body.results, count: body.count, has_more: Boolean(body.next) };
+    return { results: /** @type {Array<Record<string, any>>} */ (body.results), count: body.count, has_more: Boolean(body.next) };
   }
 
+  /** @param {unknown} viewId @param {{page?: number, pageSize?: number, documentId?: unknown}} [options] */
   async listViewDocuments(viewId, { page = 1, pageSize = 50, documentId = null } = {}) {
     const cacheKey = JSON.stringify([this.base, this.token, positiveId(viewId)]);
     let cached = viewCache.get(cacheKey);
@@ -207,6 +212,7 @@ export class PaperlessAdapter {
     return this.#searchPage(q ? { query: q } : {}, limit);
   }
 
+  /** @param {string | number} id */
   async getDocument(id) {
     const res = await this.#request(`/api/documents/${encodeURIComponent(id)}/`);
     const r = await res.json();
@@ -234,8 +240,9 @@ export class PaperlessAdapter {
     return this.#tagPage(`/api/tags/?page=${positiveId(page) || 1}&page_size=100&ordering=name`);
   }
 
+  /** @param {string} path */
   async #tagPage(path) {
-    const body = await (await this.#request(path)).json();
+    const body = /** @type {{results: unknown[], count: number, next?: unknown}} */ (await (await this.#request(path)).json());
     if (Array.isArray(body)) return { results: namedTags(body), count: body.length, has_more: false };
     if (!body || !Array.isArray(body.results) || !Number.isSafeInteger(body.count) || body.count < 0) {
       throw new PaperlessViewError('Invalid tag pagination.');
@@ -243,6 +250,7 @@ export class PaperlessAdapter {
     return { results: namedTags(body.results), count: body.count, has_more: Boolean(body.next) };
   }
 
+  /** @param {number[]} ids */
   async getTags(ids) {
     if (!Array.isArray(ids) || ids.length > 1000 || ids.some((id) => !positiveId(id))) {
       throw new PaperlessViewError('Invalid tag IDs.');
@@ -258,7 +266,7 @@ export class PaperlessAdapter {
       try {
         result = await this.#tagPage(`/api/tags/?id__in=${wanted.join(',')}&page_size=100&page=${page}`);
       } catch (err) {
-        if (![400, 403, 404].includes(err.status)) throw err;
+        if (![400, 403, 404].includes(paperlessStatus(err) || 0)) throw err;
         break;
       }
       for (const tag of result.results) if (allowed.has(tag.id)) found.set(tag.id, tag);
@@ -272,24 +280,25 @@ export class PaperlessAdapter {
       while (cursor < missing.length) {
         const id = missing[cursor++];
         try {
-          const tag = await (await this.#request(`/api/tags/${id}/`)).json();
+          const tag = /** @type {{id?: unknown}} */ (await (await this.#request(`/api/tags/${id}/`)).json());
           if (positiveId(tag?.id) !== id) throw new PaperlessViewError('Invalid tag identity.');
           const named = namedTags([tag]).find((entry) => entry.id === id);
           if (named) found.set(id, named);
-        } catch (err) { if (![403, 404].includes(err.status)) throw err; }
+        } catch (err) { if (![403, 404].includes(paperlessStatus(err) || 0)) throw err; }
       }
     }));
     return wanted.flatMap((id) => found.has(id) ? [found.get(id)] : []);
   }
 
+  /** @param {number} id @param {number[]} tags */
   async setDocumentTags(id, tags) {
     if (!positiveId(id) || !Array.isArray(tags) || tags.some((tag) => !Number.isSafeInteger(tag) || tag < 1)) {
       throw new PaperlessViewError('Invalid document tags.');
     }
-    const result = await (await this.#request(`/api/documents/${encodeURIComponent(id)}/`, {
+    const result = /** @type {{tags: number[]}} */ (await (await this.#request(`/api/documents/${encodeURIComponent(id)}/`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tags }),
-    })).json();
+    })).json());
     return { tags: result.tags };
   }
 

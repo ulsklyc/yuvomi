@@ -4367,8 +4367,8 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   const dayWaste = wasteOccurrencesOnDay(date);
   const isToday  = date === state.today;
   // `month-day--shifts` gibt den Strichen am Kopf ihren Bezugsrahmen. Eine
-  // Klasse aus dem Renderer statt `:has()`: ohne `:has()` (Chrome < 105, die
-  // Mindestversion ist 87) fiele die Regel weg, und die Striche jeder Zelle
+  // Klasse aus dem Renderer statt `:has()`: ohne `:has()` (Firefox 115 an der
+  // Untergrenze, erst ab 121) fiele die Regel weg, und die Striche jeder Zelle
   // stuenden an derselben Ecke des Rasters (R22, S10).
   const classes  = monthDayClasses(date, inMonth, state.today, { selected, selWeek })
     + (daySchedule.length ? ' month-day--shifts' : '');

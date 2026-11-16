@@ -99,8 +99,7 @@ export function pickLocale(tags, supported) {
     const teile = canonicalTag(roh).split('-');
     const treffer = matchTag(teile.slice(), supported);
     if (treffer) return treffer;
-    // hasOwnProperty.call statt Object.hasOwn, wie in matchTag (#1276).
-    if (Object.prototype.hasOwnProperty.call(LANGUAGE_ALIAS, teile[0])) {
+    if (Object.hasOwn(LANGUAGE_ALIAS, teile[0])) {
       const alias = matchTag([LANGUAGE_ALIAS[teile[0]]].concat(teile.slice(1)), supported);
       if (alias) return alias;
     }
@@ -123,9 +122,9 @@ function matchTag(teile, supported) {
     if (supported.includes(tag)) return tag;
     if (!traegtSchrift) {
       const letzter = teile[teile.length - 1];
-      // hasOwnProperty.call statt Object.hasOwn: das kennt Chrome erst ab 93, und
-      // diese Zeile laeuft beim Start vor dem ersten Bild (#1276).
-      const schrift = Object.prototype.hasOwnProperty.call(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
+      // Object.hasOwn laeuft hier beim Start vor dem ersten Bild (#1276): ohne die
+      // API kommt kein Browser bis hierher, browser-floor.js fragt genau sie ab.
+      const schrift = Object.hasOwn(REGION_SCRIPT, letzter) ? REGION_SCRIPT[letzter] : null;
       if (schrift && supported.includes(`${teile[0]}-${schrift}`)) return `${teile[0]}-${schrift}`;
     }
     teile.pop();
@@ -573,8 +572,11 @@ export function formatUnit(value, unit, options = {}) {
   const parts = pair.word.formatToParts(value);
   let first = parts.findIndex((part) => NUMBER_PARTS.has(part.type));
   if (first === -1) return parts.map((part) => part.value).join('');
-  // Rueckwaerts gezaehlt statt findLastIndex: das kennt Chrome erst ab 97, die
-  // Mindestversion ist 87 (docs/installation.md, test:old-browser-fallbacks).
+  // Rueckwaerts gezaehlt statt findLastIndex: das kennt Firefox erst ab 104, und
+  // browser-floor.js laesst Firefox ab 97 bewusst durch (docs/installation.md).
+  // Dort wuerfe der Aufruf in jeder Ansicht, die eine Dauer oder Groesse zeigt
+  // (Geburtstage, Fasten, Einstellungen), statt nur eine Angabe zu verlieren -
+  // test:old-browser-fallbacks ruft die Funktion ohne die API.
   let last = parts.length - 1;
   while (!NUMBER_PARTS.has(parts[last].type)) last--;
   while (first > 0 && parts[first - 1].type === 'literal' && BIDI_MARK.test(parts[first - 1].value)) first--;

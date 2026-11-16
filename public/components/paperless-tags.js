@@ -1,5 +1,6 @@
 /** Tag names and assignment stay live in Paperless, never in a local snapshot. */
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { paperlessControl, paperlessApiError } from '/components/paperless-dom.js';
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
@@ -7,8 +8,11 @@ import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { openModal, closeModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 
 const ROOT = '/documents/dms/paperless';
+/** @param {string} name */
 const key = (name) => `documents.paperless.tags.${name}`;
-function message(err) {
+/** @param {unknown} error */
+function message(error) {
+  const err = paperlessApiError(error);
   const reason = err?.data?.reason;
   if (reason === 'paperless_tags_changed') return t(key('changed'));
   if (reason === 'paperless_personal_token_required') return t('settings.liveFolders.tokenRequired');
@@ -19,13 +23,14 @@ function message(err) {
   return t('documents.paperless.errors.unavailable');
 }
 
+/** @param {{path: string, title: string, signal?: AbortSignal, onSaved?: () => unknown}} options */
 export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
-  openModal({
+  openModal({ ...{
     title: t(key('title'), { name: title }), size: 'sm',
     content: `<form class="document-form" id="paperless-tags-form" novalidate>
       <p class="form-hint">${esc(t(key('hint')))}</p>
       <p role="status" data-pl-tag-status>${esc(t('common.loading'))}</p>
-      ${renderPageSearch({ id: 'pl-tag-search', label: t(key('search')), clearLabel: t('common.searchClear') })}
+      ${renderPageSearch({ ...{ id: 'pl-tag-search', label: t(key('search')), clearLabel: t('common.searchClear') } })}
       <fieldset class="paperless-tags__choices" disabled><legend>${esc(t(key('assigned')))}</legend><div data-pl-tag-list></div></fieldset>
       <button type="button" class="btn btn--ghost btn--sm" data-pl-tag-more hidden>${esc(t(key('more')))}</button>
       <p class="form-hint" role="status" data-pl-tag-names-warning hidden>${esc(t('settings.liveFolders.tagNamesUnavailable'))}</p>
@@ -36,31 +41,40 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
         <button type="submit" class="btn btn--primary" disabled hidden>${esc(t('common.save'))}</button>
       </div>
     </form>`,
-    onSave(panel) {
+    onSave(/** @type {HTMLElement} */ panel) {
       const context = captureModalContext();
       const current = () => !signal?.aborted && isModalContextCurrent(context);
-      const form = panel.querySelector('form');
-      const fieldset = panel.querySelector('fieldset');
-      const list = panel.querySelector('[data-pl-tag-list]');
-      const search = panel.querySelector('#pl-tag-search');
-      const status = panel.querySelector('[data-pl-tag-status]');
-      const error = panel.querySelector('[data-pl-tag-error]');
-      const namesWarning = panel.querySelector('[data-pl-tag-names-warning]');
-      const more = panel.querySelector('[data-pl-tag-more]');
-      const reload = panel.querySelector('[data-pl-tag-reload]');
-      const save = panel.querySelector('[type="submit"]');
+      const form = /** @type {HTMLFormElement} */ (paperlessControl(panel, 'form'));
+      const fieldset = /** @type {HTMLFieldSetElement} */ (paperlessControl(panel, 'fieldset'));
+      const list = /** @type {HTMLElement} */ (paperlessControl(panel, '[data-pl-tag-list]'));
+      const search = /** @type {HTMLInputElement} */ (paperlessControl(panel, '#pl-tag-search'));
+      const status = /** @type {HTMLElement} */ (paperlessControl(panel, '[data-pl-tag-status]'));
+      const error = /** @type {HTMLElement} */ (paperlessControl(panel, '[data-pl-tag-error]'));
+      const namesWarning = /** @type {HTMLElement} */ (paperlessControl(panel, '[data-pl-tag-names-warning]'));
+      const more = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[data-pl-tag-more]'));
+      const reload = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[data-pl-tag-reload]'));
+      const save = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[type="submit"]'));
+      /** @type {Map<number, import("../../types/paperless.d.ts").Tag>} */
       let tags = new Map();
+      /** @type {Set<number>} */
       let selected = new Set();
+      /** @type {number[]} */
       let expected = [];
+      /** @type {Set<number>} */
       let unresolved = new Set();
+      /** @type {number | undefined} */
       let accountId;
+      /** @type {number | undefined} */
       let catalogueFolderId;
+      /** @type {number[] | null} */
       let editableTagIds = null;
       let page = 0;
       let canEdit = false;
       let busy = false;
       let ready = false;
+      /** @param {unknown} err */
       const showError = (err) => { error.textContent = message(err); error.hidden = false; };
+      /** @param {boolean} value */
       function lock(value) {
         busy = value;
         // Only an in-flight operation locks Save. Readiness is checked on
@@ -100,13 +114,13 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
           expected = result.data.tag_ids;
           unresolved = new Set(result.data.unresolved_tag_ids || []);
           selected = new Set(expected);
-          tags = new Map(result.data.tags.map((tag) => [tag.id, tag]));
+          tags = new Map(result.data.tags.map((/** @type {import("../../types/paperless.d.ts").Tag} */ tag) => [tag.id, tag]));
           accountId = result.data.account_id;
           catalogueFolderId = result.data.catalogue_folder_id;
           editableTagIds = result.data.editable_tag_ids ?? null;
           canEdit = result.data.can_edit;
           page = 0;
-          searchControl.setValue('');
+          searchControl?.setValue('');
           search.disabled = false;
           save.hidden = !canEdit;
           draw();
@@ -118,9 +132,10 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
       }
       const searchControl = wirePageSearch(panel, { id: 'pl-tag-search', onQuery: draw, delay: 0 });
       list.addEventListener('change', (event) => {
-        if (busy || !canEdit || !event.target.matches('input[type="checkbox"]')) return;
-        const id = Number(event.target.value);
-        if (event.target.checked) selected.add(id); else selected.delete(id);
+        const input = /** @type {HTMLInputElement | null} */ (event.target);
+        if (busy || !canEdit || !input || !input.matches('input[type="checkbox"]')) return;
+        const id = Number(input.value);
+        if (input.checked) selected.add(id); else selected.delete(id);
         status.textContent = t(key(selected.size ? 'selection' : 'empty'), { count: selected.size });
       });
       reload.addEventListener('click', load);
@@ -148,11 +163,11 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
         } catch (err) {
           if (current()) {
             showError(err);
-            if (err?.status === 409 || err?.status === 404) ready = false;
+            if ([409, 404].includes(paperlessApiError(err)?.status || 0)) ready = false;
           }
         } finally { if (current()) lock(false); }
       });
       load();
     },
-  });
+  } });
 }

@@ -41,6 +41,8 @@ const read = (rel) => readFileSync(new URL(rel, REPO), 'utf8');
 const PROBE = 'public/browser-floor.js';
 const NOTICE = 'public/browser-too-old.html';
 const NOTICE_URL = '/browser-too-old.html';
+/** Der Schalter am <html> der Hinweisseite: die Probe laeuft dort andersherum (#2651). */
+const NOTICE_FLAG = 'data-browser-floor-notice';
 /** Die beiden statischen Seiten mit fester de/en-Fassung (Ticket 14). */
 const STATIC_PAGES = ['public/browser-too-old.html', 'public/offline.html'];
 
@@ -140,9 +142,9 @@ test('Leser: erkennt ES2015+-Formen, nicht ihre Doppelgaenger in Kommentaren und
 
 test('alle fuenf klassischen Skripte, die auf der Hinweisseite oder vor ihr laufen, sind ES5', () => {
   const notice = scriptTags(read(NOTICE)).map(srcOf);
-  assert.deepEqual(notice, ['/night-hours.js', '/theme-init.js', '/lang-init.js', '/static-page-title.js'],
+  assert.deepEqual(notice, ['/browser-floor.js', '/night-hours.js', '/theme-init.js', '/lang-init.js', '/static-page-title.js'],
     'die Skripte der Hinweisseite - eine neue Datei hier gehoert in diese Pruefung');
-  for (const src of ['/browser-floor.js', ...notice]) {
+  for (const src of notice) {
     assert.deepEqual(es2015Findings(read(`public${src}`)), [], `${src} traegt Syntax ueber ES5`);
   }
 });
@@ -154,11 +156,19 @@ test('die Probe ist eine klassische ES5-Datei, die node parst', () => {
   assert.deepEqual(es2015Findings(read(PROBE)), [], `${PROBE} traegt Syntax, die ein zu alter Browser nicht parst`);
 });
 
-/** Fuehrt die Probe aus und liefert die Adressen, auf die sie ersetzt hat. */
-function runProbe({ layerRule = true, hasOwn = true } = {}) {
+/**
+ * Fuehrt die Probe aus und liefert die Adressen, auf die sie ersetzt hat.
+ * `notice`: das Dokument ist die Hinweisseite (`data-browser-floor-notice` am
+ * <html>, #2651).
+ */
+function runProbe({ layerRule = true, hasOwn = true, notice = false } = {}) {
   /** @type {string[]} */
   const replaced = [];
-  const context = createContext({ location: { replace: (/** @type {string} */ url) => replaced.push(url) } });
+  const documentElement = { hasAttribute: (/** @type {string} */ name) => notice && name === NOTICE_FLAG };
+  const context = createContext({
+    location: { replace: (/** @type {string} */ url) => replaced.push(url) },
+    document: { documentElement },
+  });
   // Die Eingriffe in den Intrinsics des Kontexts, wie ein alter Browser sie nie hatte.
   if (!hasOwn) runInContext('delete Object.hasOwn;', context);
   if (layerRule) runInContext('this.CSSLayerBlockRule = function CSSLayerBlockRule() {};', context);
@@ -171,6 +181,36 @@ test('die Probe als Programm: ohne CSSLayerBlockRule oder Object.hasOwn geht es 
   assert.deepEqual(runProbe({ layerRule: false }), [NOTICE_URL], 'ohne CSSLayerBlockRule (Chrome < 99, Firefox < 97, Safari < 15.4)');
   assert.deepEqual(runProbe({ hasOwn: false }), [NOTICE_URL], 'ohne Object.hasOwn (Chrome < 93, Firefox < 92, Safari < 15.4)');
   assert.deepEqual(runProbe({ layerRule: false, hasOwn: false }), [NOTICE_URL], 'einmal, nicht zweimal');
+});
+
+test('die Probe auf der Hinweisseite: ein faehiger Browser geht zurueck zur App, ein zu alter bleibt (#2651)', () => {
+  assert.deepEqual(runProbe({ notice: true }), ['/'], 'mit beiden APIs zurueck auf /');
+  assert.deepEqual(runProbe({ notice: true, layerRule: false }), [], 'ohne CSSLayerBlockRule bleibt die Seite stehen');
+  assert.deepEqual(runProbe({ notice: true, hasOwn: false }), [], 'ohne Object.hasOwn bleibt die Seite stehen');
+  assert.deepEqual(runProbe({ notice: true, layerRule: false, hasOwn: false }), [], 'ohne beide ebenso');
+});
+
+test('keine Umleitungsschleife: jeder Browser kommt nach hoechstens einem Sprung zur Ruhe (#2651)', () => {
+  // Dieselbe Datei, dasselbe Praedikat, zwei Richtungen: was auf / zur
+  // Hinweisseite geht, bleibt dort, und was die Hinweisseite zurueckschickt,
+  // bleibt auf /. Gelaufen ab beiden Seiten fuer jeden der vier Zustaende.
+  for (const layerRule of [true, false]) {
+    for (const hasOwn of [true, false]) {
+      const capable = layerRule && hasOwn;
+      for (const start of ['/', NOTICE_URL]) {
+        /** @type {string[]} */
+        const path = [start];
+        for (let hop = 0; hop < 4; hop += 1) {
+          const next = runProbe({ layerRule, hasOwn, notice: path[path.length - 1] === NOTICE_URL });
+          if (!next.length) break;
+          path.push(next[0]);
+        }
+        assert.ok(path.length <= 2, `layerRule=${layerRule} hasOwn=${hasOwn} ab ${start}: ${path.join(' -> ')}`);
+        assert.equal(path[path.length - 1], capable ? '/' : NOTICE_URL,
+          `layerRule=${layerRule} hasOwn=${hasOwn} ab ${start}: endet auf ${path[path.length - 1]}`);
+      }
+    }
+  }
 });
 
 /**
@@ -198,7 +238,7 @@ test('index.html und offline.html laden die Probe vor jedem anderen Skript, klas
  * Die statischen Seiten: Hinweisseite und offline.html
  * ────────────────────────────────────────────────────────────────────────── */
 
-test('die Hinweisseite ist statisch: kein Modul, kein App-Stylesheet, keine Probe, nur ES5-Skripte', () => {
+test('die Hinweisseite ist statisch: kein Modul, kein App-Stylesheet, die Probe nur andersherum, nur ES5-Skripte', () => {
   assert.ok(existsSync(new URL(NOTICE, REPO)), `${NOTICE} fehlt`);
   for (const file of STATIC_PAGES) {
     const html = withoutHtmlComments(read(file));
@@ -213,9 +253,16 @@ test('die Hinweisseite ist statisch: kein Modul, kein App-Stylesheet, keine Prob
       assert.deepEqual(es2015Findings(source), [], `${file} laedt ${src}, und das traegt Syntax ueber ES5`);
     }
   }
+  // Die Hinweisseite laedt die Probe als erstes Skript, aber nur mit dem
+  // Schalter am <html>: ohne ihn schickte sie sich auf sich selbst (#2651).
   const notice = withoutHtmlComments(read(NOTICE));
-  assert.ok(!scriptTags(notice).some((tag) => srcOf(tag) === '/browser-floor.js'),
-    'die Hinweisseite laedt die Probe nicht - sie schickte sich sonst auf sich selbst');
+  assert.equal(scriptTags(notice)[0], '<script src="/browser-floor.js">', 'die Probe ist das erste Skript der Hinweisseite');
+  assert.match(notice.match(/<html\b[^>]*>/i)?.[0] ?? '', new RegExp(`\\s${NOTICE_FLAG}[\\s>]`),
+    `die Hinweisseite traegt ${NOTICE_FLAG} am <html>`);
+  for (const file of ['public/index.html', 'public/offline.html']) {
+    assert.doesNotMatch(read(file).match(/<html\b[^>]*>/i)?.[0] ?? '', new RegExp(NOTICE_FLAG),
+      `${file}: ohne den Schalter der Hinweisseite`);
+  }
 });
 
 /**
@@ -326,7 +373,7 @@ test('beide statischen Seiten sprechen de und en, und jeder Text ist ein Schlues
   const vars = buildTarget();
   for (const file of STATIC_PAGES) {
     const html = read(file);
-    assert.match(html, /<html lang="en">/, `${file}: Englisch ist der Rueckfall, bevor lang-init.js die Sprache setzt`);
+    assert.match(html, /<html lang="en"[\s>]/, `${file}: Englisch ist der Rueckfall, bevor lang-init.js die Sprache setzt`);
     const blocks = copyBlocks(html);
     assert.deepEqual(Object.keys(blocks).sort(), ['de', 'en'], `${file}: genau ein Block je Sprache`);
     for (const lang of ['de', 'en']) {

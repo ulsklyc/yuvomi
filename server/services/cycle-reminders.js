@@ -35,10 +35,10 @@
 
 import { reminderDateBefore } from '../utils/reminder-schedule.js';
 import { todayKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { predictCycle } from '../../public/utils/health-cycle.js';
-import { healthCycleViews } from '../routes/preferences.js';
+import { readSetting } from '../settings/registry.ts';
 import { isHouseholdMember } from './household-members.js';
 import { listHouseholdMembers } from './member-email.js';
 import { householdDisabledModules } from './household-modules.js';
@@ -53,13 +53,13 @@ const log = createLogger('CycleReminders');
 
 /**
  * Zyklus-Tab freigeschaltet? Die Regel (Haushalts-Default, persönliches
- * Opt-out, UND statt Override, #760) lebt in EINER exportierten Funktion,
- * healthCycleViews() in server/routes/preferences.js - dieselbe Fassung, die
- * auch die Präferenzen-Routen beantworten, statt einer zweiten Abschrift
- * derselben Regel hier.
+ * Opt-out, UND statt Override, #760) lebt im Einstellungs-Register
+ * (`health_cycle_effective` in server/settings/registry.ts) - dieselbe
+ * Fassung, die auch die Präferenzen-Route beantwortet, statt einer zweiten
+ * Abschrift derselben Regel hier.
  */
 function cycleTabEnabled(database, userId) {
-  return healthCycleViews(userId).health_cycle_effective;
+  return readSetting(database, 'health_cycle_effective', userId) === true;
 }
 
 /**
@@ -69,9 +69,7 @@ function cycleTabEnabled(database, userId) {
  * eine zweite Wahrheit (DECISIONS #2).
  */
 export function lacksHealth(database, userId) {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return true;
-  return resolvePermissions(database, user).modules.health === 'none';
+  return !authorize(actorForUser(database, userId), 'receive', { module: 'health' }).allowed;
 }
 
 /**

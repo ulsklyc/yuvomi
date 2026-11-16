@@ -35,8 +35,9 @@
  * Die Frist ist kurz (SLICE_MS), weil zu jedem Happen noch Stil und Layout
  * seiner Zeilen kommen, die erst nach dem Task anfallen.
  *
- * Startpfad-Regel (CONTRIBUTING, R22): keine API juenger als Chrome 87 /
- * Firefox 79 / Safari 14.1 ohne Rueckfall - `scheduler.yield` nur geprueft.
+ * Startpfad-Regel (CONTRIBUTING, R22): keine API juenger als die Untergrenze
+ * (Chrome 105 / Firefox 115 / Safari 15.4) ohne Rueckfall - `scheduler.yield`
+ * nur geprueft.
  */
 import { isRestoringScroll } from './scroll-restore.js';
 

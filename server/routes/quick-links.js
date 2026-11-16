@@ -24,6 +24,7 @@ import { str, color, collectErrors, MAX_SHORT } from '../middleware/validate.js'
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { normalizeQuickLinkUrl } from '../../public/utils/quick-link-url.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
+import { canEditQuickLink, rowVisible, visibleWhere } from '../authorize/index.ts';
 
 const log = createLogger('QuickLinks');
 
@@ -122,33 +123,12 @@ function iconName(value) {
   return { value: trimmed, error: null };
 }
 
-/**
- * WHERE-Fragment: was diese Person sehen darf.
- * Geteilte Kacheln sehen alle; private nur ihre Urheberin - auch Admins nicht,
- * wie überall sonst in dieser App (vgl. services/visibility.js).
- */
-const VISIBLE_WHERE = "(q.visibility = 'all' OR q.created_by = @me)";
+// What this person may see: the rule lives in authorize/rows/quick-links.ts.
+const VISIBLE_WHERE = visibleWhere('quick_links', 'q', '@me');
 
 const SELECT_COLUMNS = `
   q.id, q.name, q.url, q.icon_data, q.icon_name, q.color, q.visibility,
   q.created_by, q.position, q.created_at, q.updated_at`;
-
-/**
- * Darf diese Person die Kachel ändern oder löschen?
- *
- * ANLEGEN DARF JEDER, ÄNDERN NICHT JEDER. Eine geteilte Kachel steht auf der
- * Startseite des ganzen Haushalts; sie gehört der Person, die sie gesetzt hat,
- * und dem Admin. Eine private gehört nur ihrer Urheberin - ein Admin, der sie
- * bearbeiten dürfte, könnte sie über den Umweg "auf geteilt stellen" auch lesen.
- *
- * @param {{created_by: number|null, visibility: string}} row
- * @param {number|null} userId
- * @param {boolean} isAdmin
- */
-function mayEdit(row, userId, isAdmin) {
-  if (row.created_by === userId) return true;
-  return row.visibility === 'all' && isAdmin === true;
-}
 
 /**
  * Die sichtbaren Schnellzugriffe einer Person, in ihrer Reihenfolge.
@@ -156,7 +136,7 @@ function mayEdit(row, userId, isAdmin) {
  * diese Datei und die Übersichts-Route.
  *
  * `can_edit` KOMMT MIT UND WIRD NICHT IM BROWSER HERGELEITET. Die Regel dafür
- * ist `mayEdit`, und die ist ohnehin die Grenze - der Client würde sie sonst
+ * ist `canEditQuickLink` (authorize/rows/quick-links.ts), und die ist ohnehin die Grenze - der Client würde sie sonst
  * ein zweites Mal formulieren, aus Angaben, die er nur mittelbar hat (wer bin
  * ich, bin ich Admin). Zwei Formulierungen derselben Regel laufen genau dann
  * auseinander, wenn eine von beiden sich ändert; hier gibt es nur eine, und
@@ -172,7 +152,7 @@ export function listQuickLinksFor(userId, isAdmin = false) {
     FROM quick_links q
     WHERE ${VISIBLE_WHERE}
     ORDER BY q.position, q.id
-  `).all({ me: userId }).map((row) => ({ ...row, can_edit: mayEdit(row, userId, isAdmin) }));
+  `).all({ me: userId }).map((row) => ({ ...row, can_edit: canEditQuickLink(row, userId, isAdmin) }));
 }
 
 /** Die handelnde Person - dieselbe Auflösung wie in den übrigen Routen. */
@@ -300,12 +280,14 @@ router.put('/:id', (req, res) => {
   try {
     const id  = parseInt(req.params.id, 10);
     const row = db.get().prepare('SELECT * FROM quick_links WHERE id = ?').get(id);
-    // Eine fremde private Kachel gibt es für diese Person nicht - 404 und nicht
-    // 403, sonst verrät die Antwort ihre Existenz.
-    if (!row || (row.visibility === 'private' && row.created_by !== actingUser(req))) {
+    // A tile this person's list does not show does not exist for them - 404 and
+    // not 403, or the answer gives its existence away. The same rule as the list
+    // (rowVisible), also for a value outside all|private, which only a restore
+    // can write (no CHECK on quick_links.visibility).
+    if (!rowVisible(db.get(), 'quick_links', row, actingUser(req))) {
       return res.status(404).json({ error: 'Quick link not found.', code: 404, reason: 'quick_links_link_not_found' });
     }
-    if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+    if (!canEditQuickLink(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     const vName  = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_SHORT }) : { value: row.name, error: null };
     const vColor = req.body.color !== undefined ? color(req.body.color || null, 'Color') : { value: row.color, error: null };
@@ -347,10 +329,11 @@ router.delete('/:id', (req, res) => {
   try {
     const id  = parseInt(req.params.id, 10);
     const row = db.get().prepare('SELECT * FROM quick_links WHERE id = ?').get(id);
-    if (!row || (row.visibility === 'private' && row.created_by !== actingUser(req))) {
+    // As in PUT: not visible means 404, never 403.
+    if (!rowVisible(db.get(), 'quick_links', row, actingUser(req))) {
       return res.status(404).json({ error: 'Quick link not found.', code: 404, reason: 'quick_links_link_not_found' });
     }
-    if (!mayEdit(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
+    if (!canEditQuickLink(row, actingUser(req), isAdminRequest(req))) return res.status(403).json({ error: 'You cannot modify this entry.', code: 403 });
 
     db.get().prepare('DELETE FROM quick_links WHERE id = ?').run(id);
     res.status(204).end();

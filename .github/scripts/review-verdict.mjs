@@ -96,6 +96,21 @@ const PROMPT_VERWORFEN =
   /prompt[-\s]injection|(?:injected|embedded)\s+(?:instruction|directive|prompt|text|block|paragraph)|instructions?\s+embedded\s+in/i;
 
 /**
+ * DER STILLE TRIVIAL-ABBRUCH (#2765, 15.11.2026). Der Lauf stuft den Stand als
+ * trivial ein, verweist auf Schritt 1 und hinterlaesst nichts. Wortlaut aus
+ * Lauf 43758461498: 'Der PR bleibt hier ohne Review, weil er die Bedingung
+ * „trivial“ aus Schritt 1 erfuellt.' Seit diesem Anlass verlangt der Prompt
+ * dafuer einen Satz als Kommentar; wer das auslaesst, bleibt ROT.
+ *
+ * Das ist nicht die Tor-Ausnahme `TOR_STOPP` oben: die greift eng auf den
+ * englischen #1029-Wortlaut und ist die einzige stumme Gruen-Kategorie. Dieses
+ * Muster ist lockerer, weil es nie ueber gruen entscheidet - es gibt nur dem
+ * roten Fall seinen Namen, statt "ohne eines der bekannten Muster" zu melden.
+ */
+const TRIVIAL_STILL =
+  /\btrivial\b[^.\n]{0,40}\b(?:Schritt|step)\s*1\b|\b(?:Schritt|step)\s*1\b[^.\n]{0,40}\btrivial\b/i;
+
+/**
  * Der Ausstieg aus #865: die Sitzung endet, waehrend sie auf ihre eigenen
  * asynchronen Subagenten wartet. Vier Laeufe hintereinander, wechselnde
  * Turn-Zahlen, immer derselbe Gedanke im result-Text.
@@ -328,6 +343,8 @@ const ZEITSTEMPEL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
  * @param {Array<{login: string, zeit: string, commit?: string}>} eingabe.aeusserungen
  * @param {string} [eingabe.kopf]  SHA des aktuellen Head, gegen die eine
  *        Aeusserung gebunden wird.
+ * @param {{adressen: number, erfolge: number}} [eingabe.gepostet]  Belege aus
+ *        dem Strom dieses Laufs (`zaehleBelege`).
  * @param {number} [eingabe.kaputt]  Zeilen, die nicht zu lesen waren.
  */
 export function beurteile({
@@ -514,6 +531,13 @@ export function beurteile({
     };
   }
 
+  // Der stille Trivial-Abbruch (#2765): erst NACH der Tor-Ausnahme, damit der
+  // #1029-Wortlaut seine Ausnahme behaelt, und vor `nicht-zuzuordnen`, weil der
+  // Lauf hier selbst sagt, dass er nichts hinterlassen hat.
+  if (bejahtIrgendwo(text, TRIVIAL_STILL)) {
+    return stumm('trivial-stumm', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
+  }
+
   if (zahl.frei > 0) return stumm('nicht-zuzuordnen', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
   return stumm('unbekannt', neu, seit, ergebnis, zahl.gebunden, gepostet.erfolge);
 }
@@ -549,6 +573,13 @@ const DIAGNOSE = {
     'nicht; der Prompt selbst muss kuerzer und sachlicher werden (auf `main`, nicht im ' +
     'roten PR). Bis dahin die Pruefung von Hand nachholen oder `@codex review` anfordern. ' +
     'Gemessen zwischen #1119 und #1259: sechs rote Laeufe dieser Sorte in sieben Tagen.',
+  'trivial-stumm':
+    'DER LAUF HAT DEN STAND ALS TRIVIAL EINGESTUFT UND DAZU NICHTS HINTERLASSEN - der Push ' +
+    'ist ungeprueft, und es ist KEIN Befund am Code. Der Prompt verlangt fuer diesen Fall ' +
+    'einen Satz als Kommentar (was trivial ist und womit verglichen wurde); kommt diese ' +
+    'Diagnose, hat das nicht getragen (#2765). Ein Rerun spielt denselben Prompt ab. Bis ' +
+    'das repariert ist, die Pruefung von Hand nachholen (`/code-review <PR> high`) oder ' +
+    '`@codex review` anfordern.',
   'lauf-fehler':
     'Der Lauf selbst ist gescheitert (`is_error` oder ein anderes `subtype` als ' +
     '"success"). Das ist kein Befund am Code: erst den Lauf reparieren, dann wieder ' +

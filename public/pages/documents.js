@@ -253,9 +253,11 @@ function readStoredSortDirection(sort) {
   return direction === 'asc' || direction === 'desc' ? direction : defaultSortDirection(sort);
 }
 
+/** @type {Awaited<ReturnType<typeof mountPaperlessFolders>> | null} */
 let _paperlessFolders = null;
 
 let state = {
+  isAdmin: false,
   allDocuments: [],
   documents: [],
   // Treffer der leeren Suche in der ANDEREN Ansicht: { status, query, count }
@@ -323,6 +325,7 @@ function persistExpandedFolders() {
     // weiter, er erinnert sich nur bis zum naechsten Laden.
   }
 }
+/** The legacy page controller receives its DOM container from the router. @type {any} */
 let _container = null;
 // Der Container, dessen erster Aufbau fertig ist (applyFolderDeleteResult, #2005).
 let _built = null;
@@ -544,7 +547,7 @@ export async function render(container, context = {}) {
   const paperlessFolders = await mountPaperlessFolders({
     sidebar: container.querySelector('#paperless-folder-nav'),
     content: container.querySelector('#paperless-folder-content'),
-    accounts: state.dmsAccounts.filter((a) => a.provider === 'paperless'),
+    accounts: state.dmsAccounts.filter((/** @type {{provider: string}} */ a) => a.provider === 'paperless'),
     canManage: state.isAdmin && !readOnly(),
     members: state.members,
     userId: state.currentUserId,
@@ -560,7 +563,7 @@ export async function render(container, context = {}) {
         container.querySelectorAll('#documents-folder-browser [aria-current]').forEach((el) => el.setAttribute('aria-current', 'false'));
         container.querySelectorAll('#documents-folder-browser .documents-folder-item--active').forEach((el) => el.classList.remove('documents-folder-item--active'));
         const label = container.querySelector('.documents-folder-browser__toggle-label');
-        if (label) label.textContent = folder.name;
+        if (label) label.textContent = folder?.name || '';
         container.querySelector('.documents-folder-browser')?.classList.remove('documents-folder-browser--open');
         container.querySelector('#documents-folder-toggle')?.setAttribute('aria-expanded', 'false');
       } else {
@@ -1901,7 +1904,7 @@ async function moveFolder(folder) {
 
   const chosen = await selectModal(t('documents.moveFolderTo', { name: folder.name }), options);
   if (chosen === null) return;
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     await api.put(`/documents/folders/${folder.id}`, { parent_id: chosen === '' ? null : Number(chosen) });
     window.yuvomi?.showToast(t('documents.folderMovedToast'), 'success');
@@ -1963,7 +1966,7 @@ async function renameFolder(folder) {
   if (readOnly()) return;
   const newName = await promptModal(t('documents.renameFolder'), folder.name);
   if (!newName || newName === folder.name) return;
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     await api.put(`/documents/folders/${folder.id}`, { name: newName });
     window.yuvomi?.showToast(t('documents.folderRenamedToast'), 'success');
@@ -2282,6 +2285,7 @@ function wireLocalThumbs(root) {
  * Dokumentenseite scrollt nicht im Fenster, sondern in der Shell (am Desktop
  * `.app-content`) - mit dem Fenster als Wurzel schnitte der Scroller den
  * Vorlauf ab, und eine Karte laedt erst, wenn sie schon im Bild steht. */
+/** @param {Element} el */
 function scrollRootOf(el) {
   for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
     if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
@@ -2794,7 +2798,7 @@ async function archiveSelected() {
   // sonst archivieren. Kein gemischter Zustand möglich, da beides nie zugleich sichtbar ist.
   const archived = state.status === 'archived';
   exitSelectMode();
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     await Promise.all(docs.map((doc) => api.patch(`/documents/${doc.id}/archive`, { archived: !archived })));
     window.yuvomi?.showToast(
@@ -2820,7 +2824,7 @@ async function moveSelected() {
   ]);
   if (target === null) return;
   exitSelectMode();
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     await Promise.all(docs.map((doc) => api.put(`/documents/${doc.id}`, {
       name: doc.name,
@@ -2946,7 +2950,7 @@ export const __test = {
   linkDmsDocument, folderUploadFailureText,
 };
 
-function openDocumentModal(doc = null) {
+function openDocumentModal(doc = /** @type {Record<string, any> | null} */ (null)) {
   // DER EINE RIEGEL fuer Hochladen und Bearbeiten: FAB, Leerzustand,
   // Tastenkuerzel „n" (klickt den FAB), Menue und Stift im Betrachter enden
   // hier. Anlegen braucht das Modulrecht, Bearbeiten dazu die Besitzregel.
@@ -4187,6 +4191,7 @@ function renderDmsResults(container, items, accountId) {
 
 // Titel und Screenreader-Label einer Vorschaukachel gemeinsam setzen - beide
 // beschreiben dieselbe Aktion und dürfen nie auseinanderlaufen.
+/** @param {HTMLElement} el @param {string} label */
 function setMediaAffordance(el, label) {
   el.title = label;
   el.setAttribute('aria-label', label);
@@ -4196,7 +4201,7 @@ function setMediaAffordance(el, label) {
 // damit der auslösende Button im Fehlerfall wieder bedienbar wird.
 async function linkDmsDocument(item, accountId) {
   const modalContext = captureModalContext();
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
     // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
@@ -4396,7 +4401,7 @@ function viewerStepKeys() {
 }
 
 /**
- * @param {object} doc
+ * @param {Record<string, any>} doc
  * @param {object} [carry]
  * @param {Element|null} [carry.opener] - beim Blaettern der Ausloeser in der
  *   Liste, den der vorige Betrachter weiterreicht
@@ -4590,7 +4595,8 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
       });
       wireViewerStage(panel, doc);
       panel.querySelector('[data-action="paperless-tags"]')?.addEventListener('click', () => {
-        if (opener?.isConnected && opener !== document.body) opener.focus();
+        const tagOpener = /** @type {HTMLElement | null} */ (opener);
+        if (tagOpener?.isConnected && tagOpener !== document.body) tagOpener.focus();
         openPaperlessTags({ path: `/documents/dms/paperless/documents/${doc.id}/tags`, title: doc.name,
           onSaved: () => openDocumentViewer(doc, { opener }) });
       });

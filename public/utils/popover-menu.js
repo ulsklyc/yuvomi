@@ -74,6 +74,7 @@ function itemAttrs(attrs) {
 // graues Ghost-Icon neben beringten Knoepfen anderer Module - eine dritte
 // Haut fuer denselben Kopfknopf. Zeilen- und Sonderknoepfe geben ihre Klasse
 // ohnehin selbst mit (rowMenuHtml, Erledigt-von-Wahl).
+/** @param {{id: string, label: string, items?: object[], triggerClass?: string, icon?: string, defer?: boolean}} options */
 export function popoverMenuHtml({ id, label, items = [], triggerClass = 'btn btn--secondary btn--icon', icon = 'ellipsis', defer = false }) {
   const entry = (item, index) => {
     if (item.separator) return '\n    <div class="popover-menu__separator" role="separator"></div>';

@@ -80,6 +80,7 @@ function jsonBody(schemaRef, description = 'JSON request body') {
   };
 }
 
+/** @param {{summary: string, operationId?: string, tag: string, description?: string, auth?: boolean, admin?: boolean, params?: object[], requestBody?: object | null, responses?: Record<string, object> | null, stateChanging?: boolean, documentDeleteConflict?: boolean, documentLinkRefusal?: boolean}} options */
 function op({
   summary,
   operationId,

@@ -2451,3 +2451,95 @@ test('R23 S11: GET /medications?include=schedules,logs bringt Plaene und Eintrae
   assert.ok(plain.body.data.every((m) => !('schedules' in m) && !('logs' in m)), 'ohne include bleibt die Liste, wie sie war');
   for (const id of [mine, shared, hidden]) db.prepare('DELETE FROM medications WHERE id = ?').run(id);
 });
+
+// Phase 2 B9: GET /caregivers and PUT /caregivers/:subjectId hold their whole answer
+// and the table behind it before the grant table moves behind server/authorize/.
+// Held elsewhere already: 403 for a non-admin, the person herself dropped and an
+// unknown id refused (tests above, status and list only); a deactivated caregiver
+// or subject (test-user-deactivation.js, status and reason only).
+// With PRAGMA reverse_unordered_selects a list without ORDER BY comes back
+// reversed, so the order is held as a promise, not as a planner accident.
+test('B9: caregivers - whole answers and the table after each write', async () => {
+  const saved = db.prepare('SELECT subject_id, caregiver_id FROM health_care_grants ORDER BY rowid').all();
+  db.prepare('DELETE FROM health_care_grants').run();
+  const add = (/** @type {string} */ name) => Number(db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES (?, ?, '$2b$12$x', 'member')`).run(`b9${name}`, `B9 ${name}`).lastInsertRowid);
+  const [d, e, f, g] = ['d', 'e', 'f', 'g'].map(add);
+  const table = () => db.prepare('SELECT subject_id, caregiver_id FROM health_care_grants ORDER BY rowid').all()
+    .map((/** @type {any} */ r) => [r.subject_id, r.caregiver_id]);
+  const deactivate = (/** @type {number} */ id) => db.prepare("UPDATE users SET deactivated_at = '2026-01-01T00:00:00Z' WHERE id = ?").run(id);
+  db.pragma('reverse_unordered_selects = ON');
+  try {
+    // Entered against the sorted order.
+    const grant = db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)');
+    grant.run(e, g); grant.run(e, f); grant.run(d, g); grant.run(d, f);
+    asAdmin();
+    const list = await call('GET', '/caregivers');
+    assert.equal(list.status, 200);
+    assert.deepEqual(list.body, { data: { [d]: [f, g], [e]: [f, g] } });
+
+    const put = (/** @type {number} */ subject, /** @type {unknown} */ ids) => call('PUT', `/caregivers/${subject}`, { caregiver_ids: ids });
+
+    // Replace: the stored list goes, the new one is written in the given order.
+    let r = await put(d, [g, userA]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: d, caregiver_ids: [g, userA] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f], [d, g], [d, userA]]);
+    // Shorten.
+    r = await put(d, [userA]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: d, caregiver_ids: [userA] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f], [d, userA]]);
+    // Duplicates, a string id and the person herself fall out silently.
+    r = await put(d, [f, String(f), f, d, g]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: d, caregiver_ids: [f, g] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f], [d, f], [d, g]]);
+    // Empty.
+    r = await put(d, []);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: d, caregiver_ids: [] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f]]);
+    // Unknown id: refused, nothing written.
+    r = await put(d, [f, 999999]);
+    assert.deepEqual([r.status, r.body], [400, { error: 'caregiver_ids contains an unknown user.', code: 400 }]);
+    assert.deepEqual(table(), [[e, g], [e, f]]);
+    // Invalid subject, unknown subject, no list.
+    r = await call('PUT', '/caregivers/abc', { caregiver_ids: [f] });
+    assert.deepEqual([r.status, r.body], [400, { error: 'Invalid user_id.', code: 400 }]);
+    r = await put(999999, [f]);
+    assert.deepEqual([r.status, r.body], [404, { error: 'User not found.', code: 404 }]);
+    r = await put(d, 'f');
+    assert.deepEqual([r.status, r.body], [400, { error: 'caregiver_ids must be an array.', code: 400 }]);
+
+    // A deactivated caregiver: stored stays allowed, new is refused.
+    deactivate(g);
+    r = await put(e, [f, g]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: e, caregiver_ids: [f, g] } }]);
+    assert.deepEqual(table(), [[e, f], [e, g]]);
+    r = await put(d, [f, g]);
+    assert.deepEqual([r.status, r.body], [400, {
+      error: `A deactivated account cannot be a caregiver - user ${g}.`, code: 400, reason: 'account_deactivated',
+    }]);
+    assert.deepEqual(table(), [[e, f], [e, g]]);
+    // A deactivated subject: the stored list may stay or shrink, nobody new comes in.
+    deactivate(e);
+    r = await put(e, [g, f]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: e, caregiver_ids: [g, f] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f]]);
+    r = await put(e, [f, userA]);
+    assert.deepEqual([r.status, r.body], [400, {
+      error: 'A deactivated account cannot get new caregivers.', code: 400, reason: 'account_deactivated',
+    }]);
+    assert.deepEqual(table(), [[e, g], [e, f]]);
+    r = await put(e, [f]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: e, caregiver_ids: [f] } }]);
+    assert.deepEqual(table(), [[e, f]]);
+
+    const after = await call('GET', '/caregivers');
+    assert.deepEqual([after.status, after.body], [200, { data: { [e]: [f] } }]);
+    db.prepare('DELETE FROM health_care_grants').run();
+    assert.deepEqual((await call('GET', '/caregivers')).body, { data: {} });
+  } finally {
+    db.pragma('reverse_unordered_selects = OFF');
+    db.prepare('DELETE FROM health_care_grants').run();
+    for (const row of saved) db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)').run(row.subject_id, row.caregiver_id);
+    for (const id of [d, e, f, g]) db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  }
+});

@@ -1,13 +1,15 @@
 /** Virtual folders with scoped media and tags. No local file copies. */
-import express from 'express';
+import express from '../utils/http-router.ts';
+import { createLogger } from '../logger.js';
+import { PaperlessHttpError, paperlessStatus } from '../services/dms/paperless-errors.js';
+import { paperlessErrorHandler } from '../middleware/paperless-errors.js';
 import liveSettingsRouter from './paperless-live-settings.js';
 import { liveAccount, recheckLiveAccount } from '../services/paperless-live-settings.js';
 import paperlessTagsRouter from './paperless-tags.js';
 import * as db from '../db.js';
-import { createLogger } from '../logger.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
-import { paperlessFolderVisibleSql } from '../services/document-access.js';
+import { actorFromRequest, visibleWhere, paperlessFolderMembers, paperlessFolderAudienceWidens, paperlessFolderVisibilityValid } from '../authorize/index.ts';
 import { getAdapter } from '../services/dms/index.js';
 import { PaperlessViewError, positiveId } from '../services/dms/paperless-views.js';
 
@@ -18,53 +20,46 @@ const log = createLogger('PaperlessFolders');
 const COLUMNS = 'id, name, account_id, view_id, visibility, created_by, created_at, updated_at';
 const PREVIEW_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'text/plain']);
 const THUMB_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
-let adapterFactory = getAdapter;
-export function _setAdapterFactory(fn) { adapterFactory = fn || getAdapter; }
-const actor = (req) => req.authUserId || req.session?.userId;
+/** @type {(account: object) => import('../services/dms/paperless.js').PaperlessAdapter} */
+let adapterFactory = (account) => /** @type {import('../services/dms/paperless.js').PaperlessAdapter} */ (getAdapter(account));
+/** @param {((account: import("../../types/paperless.d.ts").Account) => unknown) | null} fn */
+export function _setAdapterFactory(fn) { adapterFactory = /** @type {typeof adapterFactory | null} */ (fn) || ((account) => /** @type {import('../services/dms/paperless.js').PaperlessAdapter} */ (getAdapter(account))); }
+/** @param {import('../utils/http-router.ts').Request} req */
+const actor = (req) => actorFromRequest(req).userId;
 
-function problem(status, reason) {
-  const err = new Error(reason);
-  err.httpStatus = status;
-  err.reason = reason;
-  return err;
-}
+/** @param {number} status @param {string} reason */
+const problem = (status, reason) => new PaperlessHttpError(status, { reason });
 
-function fail(res, err) {
-  log.warn(`Paperless folder operation failed (status ${err.httpStatus || (err instanceof PaperlessViewError ? 422 : 500)}).`);
-  if (err.httpStatus === 403 && !['paperless_personal_token_required', 'paperless_dms_forbidden'].includes(err.reason)) return res.status(403).json({ error: 'Permission denied.', code: 403 });
-  const status = err.httpStatus || (err instanceof PaperlessViewError ? 422 : 500);
-  if (status === 500) {
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
-  const reason = err.reason || (err instanceof PaperlessViewError ? 'paperless_view_unsupported' : 'paperless_unavailable');
-  // Never send upstream response bodies, URLs or credentials to the browser.
-  return res.status(status).json({ error: reason, code: status, reason });
-}
 
+
+/** @template T @param {Promise<T>} promise @returns {Promise<T>} */
 async function remote(promise) {
   try { return await promise; }
   catch (err) {
-    if (Number.isInteger(err.status)) log.warn(`Paperless folders upstream request failed (status ${err.status}).`);
+    if (Number.isInteger(paperlessStatus(err))) log.warn(`Paperless folders upstream request failed (status ${paperlessStatus(err)}).`);
     if (err instanceof PaperlessViewError) throw err;
-    if (err.status === 403 || err.status === 401) throw Object.assign(new Error('DMS permission denied.'), { httpStatus: 403, reason: 'paperless_dms_forbidden' });
+    if (paperlessStatus(err) === 403 || paperlessStatus(err) === 401) throw new PaperlessHttpError(403, { reason: 'paperless_dms_forbidden' });
     throw problem(502, 'paperless_unavailable');
   }
 }
 
+/** @param {import('../utils/http-router.ts').Request} req @param {unknown} id */
 function visibleFolder(req, id) {
   if (!positiveId(id)) throw problem(404, 'paperless_folder_not_found');
   const row = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders f
-    WHERE id = @id AND ${paperlessFolderVisibleSql()}`).get({ id, userId: actor(req) });
+    WHERE id = @id AND ${visibleWhere('paperless_folders', 'f', '@userId')}`).get({ id, userId: actor(req) });
   if (!row) throw problem(404, 'paperless_folder_not_found');
   return withAccess(row);
 }
 
+/** @param {import("../../types/paperless.d.ts").Folder} row */
 function withAccess(row) {
   return { ...row, allowed_member_ids: db.get().prepare(
     'SELECT user_id FROM paperless_view_folder_access WHERE folder_id = ? ORDER BY user_id'
-  ).all(row.id).map((entry) => entry.user_id) };
+  ).all(row.id).map((/** @type {{user_id: number}} */ entry) => entry.user_id) };
 }
 
+/** @param {number | bigint} id @param {number[]} memberIds */
 function replaceAccess(id, memberIds) {
   const database = db.get();
   database.prepare('DELETE FROM paperless_view_folder_access WHERE folder_id = ?').run(id);
@@ -72,6 +67,7 @@ function replaceAccess(id, memberIds) {
   for (const memberId of memberIds) insert.run(id, memberId);
 }
 
+/** @param {import("../utils/http-router.ts").Request} req @param {import("../../types/paperless.d.ts").Folder} before @param {import("../../types/paperless.d.ts").Account} source */
 function unchangedFolder(req, before, source) {
   if (source) recheckLiveAccount(source, actor(req));
   const now = visibleFolder(req, before.id);
@@ -84,16 +80,15 @@ function unchangedFolder(req, before, source) {
 }
 
 
-function admin(req) {
-  if (!isAdminRequest(req)) throw problem(403, 'Permission denied.');
-}
 
+
+/** @param {{ name?: unknown, visibility?: unknown, allowed_member_ids?: unknown }} body */
 function fields(body) {
   if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 200
-    || !['private', 'restricted', 'family'].includes(body.visibility)) {
+    || !paperlessFolderVisibilityValid(body.visibility)) {
     throw problem(400, 'paperless_folder_invalid');
   }
-  const allowed = body.visibility === 'restricted' ? body.allowed_member_ids : [];
+  const allowed = paperlessFolderMembers(String(body.visibility), body.allowed_member_ids);
   if (!Array.isArray(allowed) || allowed.length > 1000 || allowed.some((id) => !positiveId(id))) {
     throw problem(400, 'paperless_folder_invalid');
   }
@@ -101,15 +96,12 @@ function fields(body) {
   for (const id of memberIds) {
     if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(id)) throw problem(400, 'paperless_folder_invalid');
   }
-  return { name: body.name.trim(), visibility: body.visibility, allowed_member_ids: memberIds };
+  return { name: body.name.trim(), visibility: String(body.visibility), allowed_member_ids: memberIds };
 }
 
-function shareConsent(body, before = null) {
-  const wider = before?.visibility !== 'family' && (
-    body.visibility === 'family' || (body.visibility === 'restricted'
-      && body.allowed_member_ids.some((id) => id !== before?.created_by
-        && !before?.allowed_member_ids.includes(id)))
-  );
+/** @param {import("../../types/paperless.d.ts").FolderAudience & {confirm_share?: unknown}} body @param {import("../../types/paperless.d.ts").FolderAudience} before */
+function shareConsent(body, before) {
+  const wider = paperlessFolderAudienceWidens(body, before);
   if (wider && body.confirm_share !== true) throw problem(400, 'paperless_share_confirmation');
 }
 
@@ -120,31 +112,29 @@ router.use((_req, res, next) => {
 
 // Hold the DB identity across remote awaits: a concurrent restore must wait
 // for these responses, just as it waits for the core document media routes.
-router.get('/saved-views', refuseWhileRestoring, async (req, res) => {
-  try {
-    admin(req);
+router.get('/saved-views', requireAdmin, refuseWhileRestoring, async (req, res) => {
+  
     const accountId = positiveId(req.query.account_id);
     const page = positiveId(req.query.page ?? 1);
     if (!accountId || !page || page > 100000) throw problem(400, 'paperless_folder_invalid');
     const source = liveAccount(accountId, actor(req));
     const result = await remote(adapterFactory(source).listSavedViews({ page, pageSize: 50 }));
     recheckLiveAccount(source, actor(req));
-    res.json({ data: result.results.map((view) => ({ id: view.id, name: view.name })),
+    res.json({ data: result.results.map((/** @type {Record<string, any>} */ view) => ({ id: view.id, name: view.name })),
       meta: { page, count: result.count, has_more: result.has_more } });
-  } catch (err) { fail(res, err); }
+  
 });
 
 router.get('/folders', (req, res) => {
-  try {
+  
     const rows = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders f
-      WHERE ${paperlessFolderVisibleSql()} ORDER BY name COLLATE NOCASE, id`).all({ userId: actor(req) });
-    res.json({ data: rows.map((row) => ({ ...withAccess(row), can_manage: isAdminRequest(req) && row.created_by === actor(req) })) });
-  } catch (err) { fail(res, err); }
+      WHERE ${visibleWhere('paperless_folders', 'f', '@userId')} ORDER BY name COLLATE NOCASE, id`).all({ userId: actor(req) });
+    res.json({ data: rows.map((/** @type {import("../../types/paperless.d.ts").Folder} */ row) => ({ ...withAccess(row), can_manage: isAdminRequest(req) && row.created_by === actor(req) })) });
+  
 });
 
-router.post('/folders', async (req, res) => {
-  try {
-    admin(req);
+router.post('/folders', requireAdmin, async (req, res) => {
+  
     const body = req.body || {};
     const values = fields({ visibility: 'private', ...body });
     shareConsent({ ...body, ...values }, { visibility: 'private', created_by: actor(req), allowed_member_ids: [] });
@@ -162,12 +152,11 @@ router.post('/folders', async (req, res) => {
       return result;
     })();
     res.status(201).json({ data: visibleFolder(req, result.lastInsertRowid) });
-  } catch (err) { fail(res, err); }
+  
 });
 
-router.put('/folders/:id', (req, res) => {
-  try {
-    admin(req);
+router.put('/folders/:id', requireAdmin, (req, res) => {
+  
     const before = visibleFolder(req, req.params.id);
     if (before.created_by !== actor(req)) throw problem(403, 'Permission denied.');
     const values = fields(req.body || {});
@@ -183,21 +172,20 @@ router.put('/folders/:id', (req, res) => {
       replaceAccess(before.id, values.allowed_member_ids);
     })();
     res.json({ data: visibleFolder(req, before.id) });
-  } catch (err) { fail(res, err); }
+  
 });
 
-router.delete('/folders/:id', (req, res) => {
-  try {
-    admin(req);
+router.delete('/folders/:id', requireAdmin, (req, res) => {
+  
     const folder = visibleFolder(req, req.params.id);
     if (folder.created_by !== actor(req)) throw problem(403, 'Permission denied.');
     db.get().prepare('DELETE FROM paperless_view_folders WHERE id = ?').run(folder.id);
     res.status(204).end();
-  } catch (err) { fail(res, err); }
+  
 });
 
 router.get('/folders/:id/documents', refuseWhileRestoring, async (req, res) => {
-  try {
+  
     const folder = visibleFolder(req, req.params.id);
     const page = positiveId(req.query.page ?? 1);
     if (!page || page > 100000) throw problem(400, 'paperless_folder_invalid');
@@ -205,11 +193,11 @@ router.get('/folders/:id/documents', refuseWhileRestoring, async (req, res) => {
     const result = await remote(adapterFactory(source).listViewDocuments(folder.view_id, { page, pageSize: 50 }));
     unchangedFolder(req, folder, source);
     res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more } });
-  } catch (err) { fail(res, err); }
+  
 });
 
 router.get('/folders/:id/documents/:documentId/:action', refuseWhileRestoring, async (req, res) => {
-  try {
+  
     const { documentId, action } = req.params;
     if (!positiveId(documentId) || !['preview', 'download', 'thumbnail'].includes(action)) {
       throw problem(404, 'paperless_document_not_found');
@@ -220,7 +208,7 @@ router.get('/folders/:id/documents/:documentId/:action', refuseWhileRestoring, a
     // Intersect the current view with the requested ID at Paperless. A
     // valid ID alone never authorizes media, even if an old page contained it.
     const result = await remote(adapter.listViewDocuments(folder.view_id, { documentId, pageSize: 1 }));
-    const doc = result.results.find((row) => String(row.id) === documentId);
+    const doc = result.results.find((/** @type {import("../../types/paperless.d.ts").Document} */ row) => String(row.id) === documentId);
     if (!doc) throw problem(404, 'paperless_document_not_found');
     unchangedFolder(req, folder, source);
     const file = await remote(action === 'thumbnail'
@@ -232,11 +220,12 @@ router.get('/folders/:id/documents/:documentId/:action', refuseWhileRestoring, a
     res.set('X-Content-Type-Options', 'nosniff');
     res.attachment(doc.filename || `${documentId}.bin`);
     if (action !== 'download') {
-      res.set('Content-Disposition', res.get('Content-Disposition').replace(/^attachment/, 'inline'));
+      res.set('Content-Disposition', (res.get('Content-Disposition') || 'attachment').replace(/^attachment/, 'inline'));
       res.set('Content-Security-Policy', "default-src 'none'; sandbox");
     }
     res.type(mime || 'application/octet-stream').send(file.buffer);
-  } catch (err) { fail(res, err); }
+  
 });
 
+router.use(paperlessErrorHandler);
 export default router;

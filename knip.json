@@ -1,0 +1,33 @@
+{
+  "$schema": "https://unpkg.com/knip@6.45.0/schema.json",
+  "entry": [
+    "server/index.js",
+    "server/check-backup.js",
+    "server/utils/load-secrets-readonly.js",
+    "setup.js",
+    "public/router.js",
+    "public/sw.js",
+    "public/api.js",
+    "public/i18n.js",
+    "public/utils/html.js",
+    "public/browser-floor.js",
+    "public/static-page-title.js",
+    "public/lucide-scope.js",
+    "public/pages/**/*.js",
+    "public/settings/pages/**/*.js",
+    "test/test-*.js",
+    "test/*.mjs",
+    "scripts/**/*.{js,mjs,ts}",
+    "tools/**/*.{js,mjs}",
+    "vite.config.ts"
+  ],
+  "project": [
+    "server/**/*.{js,ts}",
+    "public/**/*.{js,ts}",
+    "scripts/**/*.{js,mjs,ts}",
+    "tools/**/*.{js,mjs}",
+    "test/**/*.{js,mjs}"
+  ],
+  "ignore": ["public/vendor/**", "test/fixtures/lint/**"],
+  "ignoreDependencies": ["oxlint", "dependency-cruiser", "@swc/core", "knip"]
+}
