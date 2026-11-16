@@ -317,20 +317,44 @@
 /* DIE SECHS MONATE FUELLEN DIE KARTE (R19, Critique 2026-10-16): zwei 24px-
  * Balken standen links in 570px, der Rest war leer. Jetzt immer sechs Monate
  * (Server), jeder nimmt seinen Anteil der Breite; der Balken wird mit ihm
- * breiter, bis --space-10. */
+ * breiter, bis --space-10.
+ *
+ * AUCH IN DER SCHMALSTEN KARTE. Mit 44px Mindestbreite und 12px Luecke
+ * brauchten sechs Spalten 324px, die Karte bietet bei 320px Fenster innen
+ * 254px, bei 375px 309px: das Diagramm scrollte seitlich, startete links, und
+ * der laufende Monat ganz rechts war abgeschnitten. Die Spalten sind keine
+ * Tippziele, die 44px hatten keinen Grund. Jetzt traegt die Mindestbreite
+ * --space-8 und die Luecke gibt unter 300px Breite etwas ab (4 % statt 12px,
+ * bei 254px 10px): sechs Spalten brauchen dort 243px. Ab 300px Breite bleibt
+ * es bei 12px, breite Fenster sehen aus wie vorher. `overflow-x` bleibt als
+ * Notnagel fuer noch schmalere Flaechen.
+ *
+ * Die Wertbeschriftung ist breiter als eine schmale Spalte ("9.999 €" misst
+ * bei 11px rund 42px, die Spalte bei 254px 34px). Spaltenabstand plus Luecke
+ * (44px) halten sie von der Nachbarin frei; an den beiden Raendern steht sie
+ * bis zu 4px ueber. Dafuer reicht der Scrollport per Bleed --space-1h in das
+ * Polster der Karte - der Inhaltsrand bleibt, wo er war, und nichts wird
+ * beschnitten. */
 .housekeeping-chart {
   min-height: 126px;
   display: flex;
   align-items: end;
-  gap: var(--space-3);
+  column-gap: min(var(--space-3), 4%);
   overflow-x: auto;
+  margin-inline: calc(-1 * var(--space-1h));
   padding-top: var(--space-3);
+  padding-inline: var(--space-1h);
 }
 
+/* `minmax(0, 1fr)` statt der automatischen Spur: die haette sich auf die
+ * Breite der Wertbeschriftung gestreckt und Beschriftung und Saeule nach
+ * rechts aus der Spalte geschoben. So bleibt beides mittig, und eine breitere
+ * Beschriftung steht gleich weit nach beiden Seiten ueber. */
 .housekeeping-chart__bar-wrap {
   flex: 1 1 0;
-  min-width: 44px;
+  min-width: var(--space-8);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   align-content: end;
   gap: var(--space-2);

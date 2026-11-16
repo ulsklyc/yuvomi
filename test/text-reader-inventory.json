@@ -118,7 +118,7 @@
   "test-household-timezone.js": {"class":"M","sBlocks":5,"targets":["server/","server/services/outlook-calendar.js"],"fate":"falls-with:server/"},
   "test-household-zone-hint.js": {"class":"M","sBlocks":6,"targets":["public/pages/dashboard.js","public/pages/setup.js","public/router.js","public/settings/pages/personal-appearance.js","public/styles/layout.css","public/utils/household-zone-hint.js"],"fate":"falls-with:public/router.js"},
   "test-housekeeping-editvisit.js": {"class":"M","sBlocks":1,"targets":["public/pages/housekeeping.js"],"fate":"falls-with:public/pages/housekeeping.js"},
-  "test-housekeeping-ui.js": {"class":"M","sBlocks":15,"targets":["public/pages/housekeeping.js","public/styles/housekeeping.css","public/styles/panel.css","public/styles/reset.css"],"fate":"falls-with:public/pages/housekeeping.js"},
+  "test-housekeeping-ui.js": {"class":"M","sBlocks":15,"targets":["public/pages/housekeeping.js","public/styles/housekeeping.css","public/styles/panel.css","public/styles/reset.css","public/styles/tokens.css"],"fate":"falls-with:public/pages/housekeeping.js"},
   "test-i18n-ko-particles.js": {"class":"M","sBlocks":1,"targets":["server/"],"fate":"falls-with:server/"},
   "test-i18n-plural.js": {"class":"M","sBlocks":1,"targets":["public/pages/dashboard.js","public/pages/pantry.js"],"fate":"falls-with:public/pages/pantry.js"},
   "test-i18n-switch.js": {"class":"M","sBlocks":1,"targets":["public/settings/pages/personal-appearance.js"],"fate":"falls-with:public/settings/pages/personal-appearance.js"},
