@@ -2695,7 +2695,7 @@
  "test/error-language.js\tTS7005": 1,
  "test/error-language.js\tTS7006": 5,
  "test/error-language.js\tTS7034": 1,
- "test/fasting-visual-harness.js\tTS7006": 13,
+ "test/fasting-visual-harness.js\tTS7006": 12,
  "test/fetch-retry.js\tTS7006": 2,
  "test/helpers/migrated-database.js\tTS7006": 4,
  "test/i18n-env.js\tTS7006": 7,

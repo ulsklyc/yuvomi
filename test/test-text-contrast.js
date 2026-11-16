@@ -9,12 +9,16 @@
  *        jeder 429 waehrend der Sonde machte sie rot. Hier steht beides: der
  *        Fall darf nicht mehr rot sein, und derselbe Verlauf direkt unter dem
  *        Text muss rot bleiben, sonst waere die Sonde blind geworden.
+ *        Dieselbe Rechnung traegt `measureFasting` (test/fasting-visual-harness.js),
+ *        das bis 2026-11 eine eigene Kopie der alten Rechnung fuehrte; die
+ *        Faelle unten fahren es browserfrei mit einer Stub-Seite.
  * Ausfuehren: npm run test:text-contrast
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateSample } from './text-contrast.js';
+import { measureFasting } from './fasting-visual-harness.js';
 
 const PAGE_BASE = [255, 255, 255];
 const FIELD_FROM = 'color(srgb 0.545098 0.360784 0.964706';
@@ -89,4 +93,44 @@ test('die Kandidatenmenge waechst nicht mit gleichen Stops', { timeout: 5000 }, 
     ROOT,
   ];
   assert.ok(evaluateSample(sample('rgb(0, 0, 0)', layers), PAGE_BASE));
+});
+
+/**
+ * Stub fuer die Puppeteer-Seite: `measureFasting` ruft `$eval` dreimal -
+ * Einschwingen, Textproben, Geometrie - und bekommt hier feste Antworten.
+ * @param {Array<{text: string, color: string, size: number, weight: number, layers: Array<{bg: string, image: string}>}>} samples
+ */
+const stubPage = (samples) => {
+  const answers = [undefined, samples, { width: 360, scrollWidth: 360, viewport: 390, documentWidth: 390 }];
+  return { $eval: async () => answers.shift() };
+};
+
+/** @param {Array<{bg: string, image: string}>} layers */
+const fastingSamples = (layers) =>
+  ['Fasten', '16:8', 'Seit 12 Stunden'].map((text) => ({ ...sample('rgb(107, 103, 95)', layers), text }));
+
+test('measureFasting: Text auf der Karte ueber dem Lichtfeld besteht', async () => {
+  const card = { bg: 'rgba(251, 250, 247, 0.86)', image: 'none' };
+  const { measured } = await measureFasting(stubPage(fastingSamples([NONE, card, APP_SHELL, NONE, ROOT])), '.fasting-card', 'card');
+  assert.equal(measured.length, 3);
+  for (const entry of measured) {
+    assert.deepEqual(Object.keys(entry), ['text', 'size', 'ratio', 'minimum']);
+    assert.equal(entry.minimum, 4.5);
+    assert.ok(entry.ratio >= 4.5, `${entry.text}: ${entry.ratio.toFixed(2)}:1`);
+  }
+});
+
+test('measureFasting: derselbe Verlauf direkt unter dem Text scheitert', async () => {
+  await assert.rejects(
+    measureFasting(stubPage(fastingSamples([NONE, NONE, APP_SHELL, NONE, ROOT])), '.fasting-card', 'field'),
+    /Rendered text meets AA/,
+  );
+});
+
+test('measureFasting: ein echtes Bild unter dem Text scheitert', async () => {
+  const image = { bg: 'rgb(255, 255, 255)', image: 'url("x.png")' };
+  await assert.rejects(
+    measureFasting(stubPage(fastingSamples([NONE, image, ROOT])), '.fasting-card', 'image'),
+    /Text background image needs pixel-based inspection/,
+  );
 });
