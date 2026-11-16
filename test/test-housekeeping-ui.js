@@ -698,17 +698,25 @@ test('Uebersicht: das Zahlungsdiagramm zeigt Saeulen mit Legende, leere Monate o
 // Breiten unten sind Messwerte und stehen hier als Eingabe: die Innenbreite
 // der Karte (Browser, 320px Fenster) und "9.999 €" in der Systemschrift bei
 // 11px mit tabellarischen Ziffern (AppKit, 41.5px). Ob der Browser die Regeln
-// so anwendet, misst dieser Test nicht.
+// so anwendet, misst dieser Test nicht. Gerechnet ist fuer GANZE Betraege:
+// chartMoney() behaelt bei krummen Summen die Nachkommastellen, "999,50 €"
+// misst 48.4px, "1.234,50 €" 58.8px - breiter als die 44px zwischen zwei
+// Spaltenmitten bei 254px. Den Fall haelt dieser Test nicht.
 test('Uebersicht: sechs Monatsspalten passen ab 320px Fenster ohne Scrollen in die Karte', () => {
   const CARD_INNER = 254;
   const VALUE_4_DIGITS = 41.5;
   const tokensCss = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
-  const tokenPx = (name) => {
+  const tokenPx = (/** @type {string} */ name) => {
     const value = tokensCss.match(new RegExp(`${name}:\\s*(\\d+(?:\\.\\d+)?)px`))?.[1];
     assert.ok(value, `${name} ist in tokens.css kein Pixelwert`);
     return Number(value);
   };
-  /** Wertet eine Laengenangabe aus; Prozent gelten gegen `basis`. */
+  /**
+   * Wertet eine Laengenangabe aus; Prozent gelten gegen `basis`.
+   * @param {string} decl
+   * @param {number} basis
+   * @returns {number}
+   */
   const px = (decl, basis) => {
     const js = decl
       .replace(/var\((--space-[\w]+)\)/g, (_m, name) => String(tokenPx(name)))
@@ -720,16 +728,17 @@ test('Uebersicht: sechs Monatsspalten passen ab 320px Fenster ohne Scrollen in d
     assert.match(js, /^[\d\s.+\-*/(),Mathminax]+$/, `die Angabe enthaelt etwas, das der Test nicht rechnet: ${decl} -> ${js}`);
     return Function(`"use strict"; return (${js});`)();
   };
-  const base = (selector) => [...eachRule(HK_STYLES)]
-    .filter((r) => !r.at.length && r.selector.split(',').map((s) => s.trim()).includes(selector))
-    .map((r) => r.body).join('\n');
-  const prop = (body, name) => [...body.matchAll(new RegExp(`(?:^|[\\s;{])${name}:\\s*([^;]+);`, 'g'))].at(-1)?.[1].trim() ?? null;
+  /** @typedef {{ selector: string, body: string, at: string[] }} CssRule */
+  const base = (/** @type {string} */ selector) => [...eachRule(HK_STYLES)]
+    .filter((/** @type {CssRule} */ r) => !r.at.length && r.selector.split(',').map((s) => s.trim()).includes(selector))
+    .map((/** @type {CssRule} */ r) => r.body).join('\n');
+  const prop = (/** @type {string} */ body, /** @type {string} */ name) => [...body.matchAll(new RegExp(`(?:^|[\\s;{])${name}:\\s*([^;]+);`, 'g'))].at(-1)?.[1].trim() ?? null;
 
   const chart = base('.housekeeping-chart');
   const column = base('.housekeeping-chart__bar-wrap');
   const gapDecl = prop(chart, 'column-gap') ?? prop(chart, 'gap');
   assert.ok(gapDecl, '.housekeeping-chart setzt eine Luecke');
-  const gap = px(gapDecl.split(/\s+(?![^(]*\))/).at(-1), CARD_INNER);
+  const gap = px(gapDecl.split(/\s+(?![^(]*\))/).at(-1) ?? gapDecl, CARD_INNER);
   const minWidth = px(prop(column, 'min-width') ?? '0', CARD_INNER);
   const needed = 6 * minWidth + 5 * gap;
   const reserve = tokenPx('--space-2');
