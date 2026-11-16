@@ -47,6 +47,7 @@ import {
 } from '../utils/task-tags.js';
 import * as v from '../middleware/validate.js';
 import { personAvatarUrlSql } from '../services/person-avatar.js';
+import { ownReminderIds } from '../services/reminder-flags.js';
 
 const log = createLogger('Tasks');
 
@@ -255,6 +256,28 @@ function attachDocumentCounts(tasks, viewer) {
   `).all({ me: viewer.userId });
   const map = new Map(counts.map((r) => [r.id, r.n]));
   for (const task of tasks) task.document_count = map.get(task.id) ?? 0;
+  return tasks;
+}
+
+/**
+ * Die Glocke in der Liste: `has_reminder`, wenn sich an der Aufgabe eine eigene,
+ * nicht verworfene Erinnerung des Betrachters meldet (services/reminder-flags.js).
+ * Eine Abfrage für die ganze Liste, aus demselben Grund wie attachDocumentCounts.
+ *
+ * NICHT AN ERLEDIGTEN UND ABGELEGTEN AUFGABEN (#2687): sie sollen nicht mehr
+ * erinnern, also verspricht die Liste es auch nicht. Die Zeile bleibt stehen,
+ * und Wiederöffnen bringt die Glocke zurück - dieselbe Bedingung wie
+ * OPEN_TASK_REMINDER_SQL in routes/reminders.js.
+ * @param {any[]} tasks
+ * @param {unknown} userId Wer liest (`taskReader(req).userId`); der Wandmodus hat niemanden.
+ */
+function attachReminderFlags(tasks, userId) {
+  if (!tasks.length) return tasks;
+  const viewer = typeof userId === 'number' ? userId : null;
+  const ids = ownReminderIds(db.get(), 'task', tasks.map((t) => t.id), viewer);
+  for (const task of tasks) {
+    task.has_reminder = task.status !== 'done' && task.archived_at == null && ids.has(Number(task.id));
+  }
   return tasks;
 }
 
@@ -1226,7 +1249,7 @@ router.get('/', (req, res) => {
     `;
 
     const rows = db.get().prepare(sql).all(...params, { me: reader.userId }).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
-    res.json({ data: attachRotation(attachTags(attachDocumentCounts(rows, documentViewer(req)))) });
+    res.json({ data: attachReminderFlags(attachRotation(attachTags(attachDocumentCounts(rows, documentViewer(req)))), reader.userId) });
   } catch (err) {
     log.error('GET / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

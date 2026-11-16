@@ -1316,8 +1316,17 @@
   min-width: 0;
 }
 
-.task-card__meta > .task-card__docs {
+.task-card__meta > .task-card__docs,
+.task-card__meta > .task-card__reminder {
   flex-shrink: 0;
+}
+
+/* Abgehakt traegt die Karte `--done`, bevor die Liste neu geladen ist. Die
+   Glocke heisst „das meldet sich bei dir" (#2687) und geht mit dem Haken, nicht
+   erst mit der Antwort des Servers. */
+.task-card--done .task-card__reminder,
+.kanban-card--done .task-card__reminder {
+  display: none;
 }
 
 .due-date__label {

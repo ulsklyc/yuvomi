@@ -598,6 +598,7 @@
       "response 200.data[].due_date",
       "response 200.data[].due_time",
       "response 200.data[].external_source",
+      "response 200.data[].has_reminder",
       "response 200.data[].id",
       "response 200.data[].is_recurring",
       "response 200.data[].locked",
