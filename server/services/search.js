@@ -3,35 +3,44 @@
  * Zweck: Reine Suchlogik gegen den FTS5-Index `search_index` (Migration 44).
  *        Keine Abhängigkeit auf db.js - die Datenbank wird hereingereicht, damit
  *        die Logik direkt mit node:sqlite getestet werden kann.
- * Abhaengigkeiten: server/authorize/index.ts (rows/: assignees, notes, ics-subscriptions,
- *        health, documents, budget - reine SQL-Bausteine, kein db.js)
+ *
+ * Phase 2, section D: each hit type (bucket) reads in a search slice of its module
+ * (`<module>SearchSlice(db, actor, query, options?)` in services/<module>-slices.ts).
+ * This file keeps what all of them share - the MATCH query, the bucket -> module
+ * and bucket -> nav tables, the empty answer - and the orchestration: runSearch,
+ * runTableSearch and searchEverything call the slices in the old order and write
+ * the old keys in the old order. The text helpers live in services/search-text.ts
+ * and the event helpers in services/search-events.ts (the slices import them, so
+ * they cannot live here without a cycle); this file re-exports every name it used
+ * to export.
+ *
+ * Abhaengigkeiten: services/search-text.ts, services/search-events.ts, the search
+ *        slices in services/*-slices.ts (which take their row rules from
+ *        server/authorize/index.ts). None of them may reach server/db.js:
+ *        suites load this file without DB_PATH (test:db-isolation), which is
+ *        why the birthday hits live in calendar-slices.ts and the recipe hits
+ *        in recipes-slices.ts.
  */
-import {
-  careAwareClause,
-  budgetDetailsVisibleWhere,
-  resolveBudgetMode,
-  visibleWhere,
-} from '../authorize/index.ts';
+/** @typedef {import('../authorize/index.ts').Database} Database */
+/** @typedef {{ hiddenModules?: Set<string> | null, disabledNav?: Set<string> | null }} SearchAxes */
+import { foldLikeIndex, foldSearchText, queryTokens } from './search-text.ts';
+import { tasksSearchSlice } from './tasks-slices.ts';
+import { birthdaysSearchSlice, calendarSearchSlice } from './calendar-slices.ts';
+import { notesSearchSlice } from './notes-slices.ts';
+import { contactsSearchSlice } from './contacts-slices.ts';
+import { shoppingSearchSlice } from './shopping-slices.ts';
+import { healthActivitiesSearchSlice, healthMedsSearchSlice } from './health-slices.ts';
+import { wasteSearchSlice } from './waste-slices.ts';
+import { recipesSearchSlice } from './recipes-slices.ts';
+import { pantrySearchSlice } from './pantry-slices.ts';
+import { inventorySearchSlice } from './inventory-slices.ts';
+import { documentsSearchSlice } from './documents-slices.ts';
+import { budgetSearchSlice } from './budget-slices.ts';
 
-import {
-  expandRecurringEvents, loadEventExceptions, seriesReadingZone,
-} from './calendar-events.js';
-import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
-import { notBirthdayEventSql } from './household-modules.js';
-import { householdTimeZone, shiftDateKey, storedToInstantMs, todayKey } from '../utils/timezone.js';
-
-export const SEARCH_LIMIT = 5;
-// Wie viele Termin-Treffer AUFGELOEST werden, bevor die fuenf fruehesten
-// uebrig bleiben (#1607). Eine Serie steht an ihrem naechsten Termin, ihre
-// Stammzeile aber am Tag ihres Beginns: wer schon in der Abfrage auf fuenf
-// deckelt, waehlt nach einem Datum aus, das er danach gar nicht anzeigt -
-// fuenf alte Jahrestage verdraengten den Termin von morgen. Die Schranke haelt
-// die Expansion klein; die Kalendersuche loest mit derselben Funktion hundert
-// Zeilen auf.
-const EVENT_SEARCH_CANDIDATES = 50;
-// Ein Einzeltermin, dessen Tag vor heute liegt (Kandidatenfolge der globalen
-// Suche; Serien zaehlen nie dazu - ihr naechster Termin kann kommen).
-const PAST_SINGLE_EVENT_SQL = "(e.recurrence_rule IS NULL AND substr(e.start_datetime, 1, 10) < @from)";
+export { SEARCH_LIMIT, foldSearchText, searchExcerpt } from './search-text.ts';
+export {
+  eventSearchWindow, resolveEventSearchRows, upcomingEventsFirst,
+} from './search-events.ts';
 
 /**
  * Erzeugt die ß↔ss-Schreibvarianten eines Tokens. Der FTS-Tokenizer faltet
@@ -46,95 +55,6 @@ function eszettVariants(token) {
     token.replace(/ß/g, 'ss').replace(/ẞ/g, 'ss'),
     token.replace(/ss/gi, 'ß'),
   ]);
-}
-
-/**
- * Die Faltung, die der FTS-Tokenizer (unicode61 remove_diacritics 2) an jedem
- * Wort vornimmt, fuer JS nachgebaut: klein, ohne Akzente. Das Eszett bleibt -
- * der Tokenizer faltet es auch nicht (siehe eszettVariants).
- */
-function foldLikeIndex(text) {
-  return String(text ?? '').normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();
-}
-
-/**
- * Dieselbe Faltung plus ß->ss: der Vergleichsschluessel fuer Trefferarten ohne
- * FTS-Index (runTableSearch). Beide Seiten laufen hindurch, deshalb findet
- * "strasse" die "Straße" und "muller" den "Müller" wie im Index.
- */
-export function foldSearchText(text) {
-  return foldLikeIndex(text).replace(/ß/g, 'ss');
-}
-
-/** Die Woerter der Eingabe, wie buildMatchQuery sie sieht - ohne Satzzeichen. */
-function queryTokens(q) {
-  return String(q || '')
-    .split(/\s+/)
-    .map((t) => t.replace(/[^\p{L}\p{N}_]+/gu, ''))
-    .filter(Boolean);
-}
-
-/* AUSSCHNITT FUER TREFFER AUSSERHALB DES TITELS (Re-Critique 2026-09-28, A1
- * P2-2). "sch" fand "Klavier ueben" ohne jeden Grund im Bild: das Wort stand in
- * der Beschreibung, und die Palette zeigte nur Titel und Datum. Steht die
- * Eingabe nicht vollstaendig im Titel, bekommt der Treffer `excerpt` - ein
- * Stueck des ersten Felds, das ein Suchwort enthaelt, um die Fundstelle herum.
- * Nur Felder, die der Betrachter auf der Zielseite ohnehin sieht; die Zeilen
- * sind zu diesem Zeitpunkt schon durch ihre Sichtbarkeitsfilter gelaufen. */
-export const EXCERPT_RADIUS = 36;
-
-/** Faltung je Zeichen samt Rueckweg: folded[i] stammt aus original[map[i]]. */
-function foldWithMap(text) {
-  const chars = [...String(text ?? '')];
-  let folded = '';
-  const map = [];
-  let offset = 0;
-  for (const ch of chars) {
-    const f = foldSearchText(ch);
-    for (let i = 0; i < f.length; i += 1) map.push(offset);
-    folded += f;
-    offset += ch.length;
-  }
-  map.push(offset);
-  return { folded, map };
-}
-
-/**
- * @param {string} q        die Eingabe
- * @param {string} title    was die Palette als Titel zeigt
- * @param {Array<string|null|undefined>} texts  weitere sichtbare Felder, in Vorrang
- * @returns {string|null}
- */
-export function searchExcerpt(q, title, texts) {
-  const tokens = queryTokens(q).map(foldSearchText).filter(Boolean);
-  if (!tokens.length) return null;
-  const inTitle = foldSearchText(title);
-  const missing = tokens.filter((tok) => !inTitle.includes(tok));
-  if (!missing.length) return null;
-  for (const raw of texts) {
-    if (raw == null || raw === '') continue;
-    const text = String(raw).replace(/\s+/g, ' ').trim();
-    const { folded, map } = foldWithMap(text);
-    const at = missing.map((tok) => ({ i: folded.indexOf(tok), len: tok.length })).filter((m) => m.i >= 0)
-      .sort((a, b) => a.i - b.i)[0];
-    if (!at) continue;
-    const from = map[at.i];
-    const to = map[at.i + at.len];
-    let start = Math.max(0, from - EXCERPT_RADIUS);
-    let end = Math.min(text.length, to + EXCERPT_RADIUS);
-    // An Wortgrenzen schneiden, nicht mitten im Wort.
-    if (start > 0) { const sp = text.indexOf(' ', start); if (sp >= 0 && sp < from) start = sp + 1; }
-    if (end < text.length) { const sp = text.lastIndexOf(' ', end); if (sp > to) end = sp; }
-    return `${start > 0 ? '\u2026' : ''}${text.slice(start, end).trim()}${end < text.length ? '\u2026' : ''}`;
-  }
-  return null;
-}
-
-/** Zeile mit Ausschnitt (falls einer faellt), ohne interne Hilfsfelder (`_body`). */
-function withExcerpt(row, q, texts) {
-  const { _body, ...rest } = row;
-  const excerpt = searchExcerpt(q, rest.title, texts);
-  return excerpt ? { ...rest, excerpt } : rest;
 }
 
 /* WORTTEILE (Re-Critique 2026-09-27, A1 P2-6): "Milch" fand die "Vollmilch"
@@ -207,6 +127,9 @@ function infixTerms(database, token) {
  * Mit `database` kommen die Index-Woerter dazu, die das Token ENTHALTEN
  * (infixTerms) - erst damit findet "milch" die "Vollmilch". Ohne bleibt es
  * beim reinen Praefix (reine Syntax-Tests, Aufrufer ohne Verbindung).
+ *
+ * @param {string} q
+ * @param {{ database?: Database | null }} [options]
  */
 export function buildMatchQuery(q, { database = null } = {}) {
   const tokens = queryTokens(q);
@@ -286,7 +209,10 @@ const BUCKET_NAV = Object.freeze({
 /** Die Module, aus denen die Suche liest - die Menge, gegen die Token-Scopes geprüft werden. */
 export const SEARCH_MODULES = Object.freeze([...new Set(Object.values(BUCKET_MODULE))]);
 
-/** Welche Trefferart bleibt - Rechte-Achse UND Haushalts-Schalter. */
+/**
+ * Welche Trefferart bleibt - Rechte-Achse UND Haushalts-Schalter.
+ * @param {SearchAxes} [axes]
+ */
 function bucketFilter({ hiddenModules = null, disabledNav = null } = {}) {
   return (bucket) => !hiddenModules?.has(BUCKET_MODULE[bucket])
     && !disabledNav?.has(BUCKET_NAV[bucket]);
@@ -296,120 +222,10 @@ function bucketFilter({ hiddenModules = null, disabledNav = null } = {}) {
  * Die leere Antwort - eine Trefferart je Schlüssel, Form bleibt stabil.
  * Exportiert, damit die Route für „Suchbegriff zu kurz" dieselbe Form schreibt
  * und nicht eine zweite, von Hand gepflegte Liste derselben sieben Schlüssel.
+ * @returns {Record<string, any[]>}
  */
 export function emptySearchResults() {
   return Object.fromEntries(Object.keys(BUCKET_MODULE).map((k) => [k, []]));
-}
-
-/**
- * Das Fenster, in dem ein Serientreffer seinen naechsten Termin sucht: ab heute
- * (Haushaltszone), zwei Jahre weit.
- *
- * EINE Rechnung fuer beide Suchen (#1607). Die Kalendersuche hatte sie in ihrer
- * Route, die globale Suche hatte gar keine und lieferte den Start der
- * Stammzeile - ein Geburtstag von 1990 stand in der Palette mit dem Datum von
- * 1990 und oeffnete den Kalender in jenem Jahr, waehrend dieselbe Serie in der
- * Kalendersuche an ihrem naechsten Termin stand.
- *
- * Zwei Jahre, damit auch eine Serie mit mehrjaehrigem Abstand ihren naechsten
- * Termin findet. Findet sich keiner, bleibt der Treffer die Stammzeile
- * (`resolveEventSearchRows`).
- *
- * @param {object} database
- * @returns {{ from: string, to: string }} zwei Tagesschluessel
- */
-export function eventSearchWindow(database) {
-  const from = todayKey(database);
-  return { from, to: shiftDateKey(from, 730) };
-}
-
-/**
- * Resolves event search hits through the same linked-occurrence contract as
- * calendar reads. When a display window is supplied, recurring master hits are
- * represented by their first occurrence in that window, preserving the
- * calendar-search behavior without expanding one FTS hit into many results.
- */
-export function resolveEventSearchRows(database, rows, from = null, to = null, options = {}) {
-  const recurringIds = rows.filter((row) => row.recurrence_rule).map((row) => row.id);
-  const exceptions = loadEventExceptions(database, recurringIds);
-  // Einmal je Aufruf, nicht je Treffer - und nur, wenn ein Treffer sie braucht
-  // (zonenlose Ziffern neben einer `tzid`, #1993).
-  const householdZone = rows.reduce((zone, row) => zone ?? seriesReadingZone(database, row), null);
-  // Das Fenster ist ein Haushaltsfenster (`eventSearchWindow`, ab `todayKey()`):
-  // eine Serie mit eigener Zone wird an ihrem Haushaltstag gemessen (#1999).
-  const windowZone = from && to ? householdTimeZone(database) : null;
-  const displayRows = rows.map((row) => {
-    if (!row.recurrence_rule || !from || !to) return row;
-    return expandRecurringEvents(
-      [row],
-      from,
-      to,
-      exceptions,
-      { includeRecurrenceIdentity: true, householdZone, windowZone },
-    )[0] || row;
-  });
-  return resolveProjectedEventRows(database, displayRows, options)
-    .sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
-}
-
-/**
- * KOMMENDES ZUERST, VERGANGENES DAHINTER (Critique R21, Palette). Die globale
- * Suche reihte Termine aufsteigend nach Start - wer "Zahnarzt" tippte, sah den
- * Termin vom letzten Jahr vor dem naechste Woche. Jetzt stehen die Termine ab
- * heute (Haushaltstag, `eventSearchWindow`) aufsteigend vorn, die vergangenen
- * danach, der juengste zuerst. Gemessen wird der Zeitpunkt in der
- * Haushaltszone (`storedToInstantMs`), nie der Datumsteil des Texts: ein Wert
- * mit `Z` kurz vor Mitternacht laege sonst am falschen Tag.
- * @param {Array<{start_datetime: string}>} rows  aufsteigend nach Start
- * @param {number} fromMs  Beginn des heutigen Haushaltstags
- * @param {string} zone    Haushaltszone
- */
-export function upcomingEventsFirst(rows, fromMs, zone) {
-  const upcoming = [];
-  const past = [];
-  for (const row of rows) {
-    const ms = storedToInstantMs(row.start_datetime, zone);
-    if (ms !== null && fromMs !== null && ms < fromMs) past.push(row);
-    else upcoming.push(row);
-  }
-  return [...upcoming, ...past.reverse()];
-}
-
-/**
- * DER GEBURTSTAGSTERMIN TRAEGT SEINEN NAMEN (R24, Critique G0 P1-1). Der Termin
- * steht mit dem sprachneutralen Titel "Birthday: <Name>" in calendar_events
- * (#524); Kalender und Uebersicht uebersetzen ihn ueber `birthday_name`
- * (public/utils/birthday-event.js). Die globale Suche lieferte das Feld nicht,
- * und Palette wie mobile Suche zeigten "Birthday: Emma" auf Deutsch. Dieselben
- * Felder wie `serializeEvent()` (routes/calendar/helpers.js), mit derselben
- * Regel fuer das unbekannte Geburtsjahr. Eine Abfrage fuer die (hoechstens
- * SEARCH_LIMIT) Treffer, nicht ein Join in der FTS-Abfrage.
- * @returns {Map<number, object>} Termin-ID -> Geburtstagsfelder
- */
-function birthdayFieldsByEvent(database, events) {
-  const out = new Map();
-  if (!events.length) return out;
-  const ids = events.map((event) => Number(event.id));
-  const marks = ids.map(() => '?').join(', ');
-  const rows = database.prepare(`
-    SELECT calendar_event_id, name_day_calendar_event_id, name,
-           CASE WHEN year_unknown = 1 THEN NULL ELSE birth_date END AS birth_date
-    FROM birthdays
-    WHERE calendar_event_id IN (${marks}) OR name_day_calendar_event_id IN (${marks})
-  `).all(...ids, ...ids);
-  for (const row of rows) {
-    if (row.calendar_event_id != null && ids.includes(Number(row.calendar_event_id))) {
-      out.set(Number(row.calendar_event_id), {
-        birthday_name: row.name, birthday_date: row.birth_date ?? null, birthday_event_kind: 'birthday',
-      });
-    }
-    if (row.name_day_calendar_event_id != null && ids.includes(Number(row.name_day_calendar_event_id))) {
-      out.set(Number(row.name_day_calendar_event_id), {
-        birthday_name: row.name, birthday_date: null, birthday_event_kind: 'name_day',
-      });
-    }
-  }
-  return out;
 }
 
 /**
@@ -420,7 +236,7 @@ function birthdayFieldsByEvent(database, events) {
  * Gesundheitsdaten sind sensibel: nur eigene Zeilen ODER visibility='family'
  * sind sichtbar (spiegelt das Lese-Scoping der Health-List-Routen).
  *
- * @param {object} database
+ * @param {Database} database
  * @param {string} q
  * @param {number} userId
  * @param {object} [opts]
@@ -435,177 +251,32 @@ function birthdayFieldsByEvent(database, events) {
  *
  * Die Trefferarten OHNE FTS-Index (Rezepte, Vorrat, Inventar, Dokumente,
  * Geburtstage, Budget) fuellt runTableSearch; beide zusammen: searchEverything.
+ *
+ * No error isolation, as before: a slice that throws ends the whole search
+ * (the route answers 500). Each slice runs only when its bucket is allowed.
  */
 export function runSearch(database, q, userId, { hiddenModules = null, disabledNav = null } = {}) {
   const match = buildMatchQuery(q, { database });
   if (!match) return emptySearchResults();
-  const limit = SEARCH_LIMIT;
 
   // Leere Fassung als Ausgangspunkt: eine gesperrte Trefferart bleibt damit
   // eine leere Liste und wird nicht zu einem fehlenden Feld, über das ein
   // Client stolpert (`/api/v1` ist zugesagte Oberfläche für Drittmodule).
   const results = emptySearchResults();
   const allows = bucketFilter({ hiddenModules, disabledNav });
+  // The search knows the viewer only by id; the slices bind it as `@userId`
+  // (or positionally for the health clause), as the queries did here.
+  const actor = { userId };
+  const query = { text: q, match };
 
-  // The row rule of the task list (GET /tasks): `all`, the creator, and for
-  // `assignees` a row in task_assignments. The legacy column `assigned_to` is
-  // no access path: a private task that only names someone there stays with
-  // its creator.
-  // The archive is a wish of the viewer at the list, no limit of what the list
-  // may hold (services/task-scope.js): an archived task stays a hit, as does
-  // one that starts later. It says so (`archived_at`, as in the list row) and
-  // stands last - behind the limit, too: with enough open hits an archived
-  // one drops out, and a narrower query brings it back.
-  if (allows('tasks')) results.tasks = database.prepare(`
-    SELECT t.id, t.title, t.status, t.priority, t.due_date,
-           t.archived_at, s.body AS _body
-    FROM search_index s
-    JOIN tasks t ON t.id = s.entity_id
-    WHERE s.entity = 'task' AND s.search_index MATCH @match
-      AND t.parent_task_id IS NULL
-      AND ${visibleWhere('tasks', 't', '@userId')}
-    ORDER BY t.archived_at IS NOT NULL,
-             CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
-             t.due_date ASC NULLS LAST
-    LIMIT @limit
-  `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row._body]));
-
-  // Termine sind Familienbesitz (die Kalenderliste zeigt alle Termine, nicht nur
-  // eigene) - daher KEIN created_by-Filter, konsistent mit GET /calendar und der
-  // Kalender-Suche (#471). Was die beiden aber seit #474 haben und diese Abfrage
-  // bis zum Review von #1055 nicht: die Zeilen-Sichtbarkeit (`all` / Ersteller /
-  // Zugewiesene) und den Abo-Filter (ICS-Termine nur aus geteilten oder eigenen
-  // Abos). Ohne beides fand jedes Mitglied Titel und Datum fremder PRIVATER
-  // Termine ueber ein Stichwort. Es sind dieselben zwei Klauseln wie in
-  // routes/calendar/read.js, damit globale und Kalender-Suche fuers gleiche
-  // Stichwort dieselben Treffer liefern - das war der Sinn von #471. Beide
-  // Filter müssen vor ORDER/LIMIT greifen, damit verborgene Treffer sichtbare
-  // nicht aus dem Ergebnisfenster verdrängen.
-  if (allows('events')) {
-    // Serien stehen an ihrem naechsten Termin, wie in der Kalendersuche (#1607).
-    const window = eventSearchWindow(database);
-    const eventCandidates = resolveEventSearchRows(database, database.prepare(`
-      SELECT ${eventProjectionSql(database)}
-      FROM search_index s
-      JOIN calendar_events e ON e.id = s.entity_id
-      WHERE s.entity = 'event' AND s.search_index MATCH @match
-        AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
-        AND ${visibleWhere('events', 'e', '@userId')}${
-          // Geburtstagstermine stehen in dieser Trefferart, gehoeren aber dem
-          // Schalter `birthdays` - wie in der Kalendersuche (#1660).
-          disabledNav?.has('birthdays') ? ` AND ${notBirthdayEventSql('e')}` : ''}
-      ORDER BY ${PAST_SINGLE_EVENT_SQL} ASC,
-               CASE WHEN ${PAST_SINGLE_EVENT_SQL} THEN NULL ELSE e.start_datetime END ASC,
-               e.start_datetime DESC
-      LIMIT @limit
-    `).all({ match, userId, from: window.from, limit: EVENT_SEARCH_CANDIDATES }), window.from, window.to, { lightweight: true });
-    // resolveEventSearchRows sortiert nach dem AUFGELOESTEN Start; vorn steht,
-    // was ab heute kommt, danach das Vergangene (upcomingEventsFirst). Die
-    // Kandidaten holt die Abfrage schon in dieser Folge, damit fuenfzig alte
-    // Einzeltermine den kommenden nicht aus dem Fenster draengen - dort genuegt
-    // der Datumsteil, die genaue Grenze zieht upcomingEventsFirst.
-    const zone = householdTimeZone(database);
-    const eventRows = upcomingEventsFirst(eventCandidates, storedToInstantMs(window.from, zone), zone)
-      .slice(0, limit);
-    // Preserve the compact global-search payload. The resolver-capable
-    // projection supplies linked inheritance without loading attachment bodies
-    // or unrelated sync metadata into this result bucket.
-    const birthdays = birthdayFieldsByEvent(database, eventRows);
-    results.events = eventRows.map((event) => withExcerpt({
-      id: event.id,
-      title: event.title,
-      start_datetime: event.start_datetime,
-      all_day: event.all_day,
-      ...(birthdays.get(Number(event.id)) || {}),
-      ...(event.is_occurrence_override ? {
-        series_id: event.series_id,
-        recurrence_id: event.recurrence_id,
-        is_occurrence_override: true,
-        assignment_owner_id: event.assignment_owner_id,
-        attachment_owner_id: event.attachment_owner_id,
-        reminder_owner_id: event.reminder_owner_id,
-        reminder_anchor_start: event.reminder_anchor_start,
-      } : {}),
-    }, q, [event.description, event.location]));
-  }
-
-  // The row rule of the note list (GET /notes, #1514): `all` notes of anyone
-  // and the viewer's own. Nothing narrower, nothing wider - a note the list
-  // shows is a note the search finds.
-  if (allows('notes')) results.notes = database.prepare(`
-    SELECT n.id, n.title, n.content
-    FROM search_index s
-    JOIN notes n ON n.id = s.entity_id
-    WHERE s.entity = 'note' AND s.search_index MATCH @match
-      AND ${visibleWhere('notes', 'n', '@userId')}
-    ORDER BY n.pinned DESC, n.updated_at DESC
-    LIMIT @limit
-  `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.content]));
-
-  if (allows('contacts')) results.contacts = database.prepare(`
-    SELECT c.id, c.name AS title, s.body AS _body
-    FROM search_index s
-    JOIN contacts c ON c.id = s.entity_id
-    WHERE s.entity = 'contact' AND s.search_index MATCH @match
-    ORDER BY c.name ASC
-    LIMIT @limit
-  `).all({ match, limit }).map((row) => withExcerpt(row, q, [row._body]));
-
-  if (allows('items')) results.items = database.prepare(`
-    SELECT i.id, i.name AS title, i.list_id, s.body AS _body
-    FROM search_index s
-    JOIN shopping_items i ON i.id = s.entity_id
-    WHERE s.entity = 'item' AND s.search_index MATCH @match
-    ORDER BY i.name ASC
-    LIMIT @limit
-  `).all({ match, limit }).map((row) => withExcerpt(row, q, [row._body]));
-
-  // Health: the row rule of the health lists (GET /health/medications,
-  // GET /health/activities) - the viewer's own rows, `family` rows, and every
-  // row of a person whose care was granted to the viewer (#584). The clause
-  // binds positionally, so these two queries do as a whole: match, the
-  // clause's parameters, limit - in the order of the placeholders.
-  // Medications: hits on name and dosage text.
-  if (allows('meds')) {
-    const visible = careAwareClause('m', userId, null);
-    results.meds = database.prepare(`
-      SELECT m.id, m.name AS title, m.dosage_text, m.active
-      FROM search_index s
-      JOIN medications m ON m.id = s.entity_id
-      WHERE s.entity = 'medication' AND s.search_index MATCH ?
-        AND ${visible.sql}
-      ORDER BY m.active DESC, m.name ASC
-      LIMIT ?
-    `).all(match, ...visible.params, limit);
-  }
-
-  // Activities: hits on type and note, the same row rule.
-  if (allows('activities')) {
-    const visible = careAwareClause('a', userId, null);
-    results.activities = database.prepare(`
-      SELECT a.id, a.type AS title, a.note, a.performed_at
-      FROM search_index s
-      JOIN health_activities a ON a.id = s.entity_id
-      WHERE s.entity = 'activity' AND s.search_index MATCH ?
-        AND ${visible.sql}
-      ORDER BY a.performed_at DESC
-      LIMIT ?
-    `).all(match, ...visible.params, limit).map((row) => withExcerpt(row, q, [row.note]));
-  }
-
-  // Waste: nur der Typ-Katalog ist indiziert (Migration 206) - nie die von
-  // waste-domain.js berechneten, potenziell unbegrenzten Termine (siehe dortige
-  // Migrationsnotiz). Kein Besitzer-Filter (Haushaltseigentum, wie Kontakte),
-  // archivierte Typen bleiben ausgeblendet wie überall sonst in Waste.
-  if (allows('waste')) results.waste = database.prepare(`
-    SELECT wt.id, wt.name AS title, wt.icon, wt.color
-    FROM search_index s
-    JOIN waste_types wt ON wt.id = s.entity_id
-    WHERE s.entity = 'waste_type' AND s.search_index MATCH @match
-      AND wt.archived = 0
-    ORDER BY wt.sort_order ASC, wt.name ASC
-    LIMIT @limit
-  `).all({ match, limit });
+  if (allows('tasks')) results.tasks = tasksSearchSlice(database, actor, query);
+  if (allows('events')) results.events = calendarSearchSlice(database, actor, query, { disabledNav });
+  if (allows('notes')) results.notes = notesSearchSlice(database, actor, query);
+  if (allows('contacts')) results.contacts = contactsSearchSlice(database, actor, query);
+  if (allows('items')) results.items = shoppingSearchSlice(database, actor, query);
+  if (allows('meds')) results.meds = healthMedsSearchSlice(database, actor, query);
+  if (allows('activities')) results.activities = healthActivitiesSearchSlice(database, actor, query);
+  if (allows('waste')) results.waste = wasteSearchSlice(database, actor, query);
 
   return results;
 }
@@ -633,104 +304,39 @@ function tableMatcher(q) {
   };
 }
 
-/** Die ersten `limit` Zeilen, deren Felder passen - Reihenfolge aus dem SQL. */
-function firstMatches(rows, matches, fieldsOf, limit) {
-  const out = [];
-  for (const row of rows) {
-    if (matches(...fieldsOf(row))) out.push(row);
-    if (out.length >= limit) break;
-  }
-  return out;
-}
-
-const pick = (row, keys) => Object.fromEntries(keys.map((k) => [k, row[k]]));
-
 /**
- * @param {object} database
+ * @param {Database} database
  * @param {string} q
  * @param {number} userId
- * @param {{ hiddenModules?: Set<string>|null, disabledNav?: Set<string>|null }} [opts]
+ * @param {SearchAxes} [opts]
+ *
+ * No error isolation, as before: a slice that throws ends the whole search.
  */
 export function runTableSearch(database, q, userId, { hiddenModules = null, disabledNav = null } = {}) {
   const results = emptySearchResults();
   const matches = tableMatcher(q);
   if (!matches) return results;
-  const limit = SEARCH_LIMIT;
   const allows = bucketFilter({ hiddenModules, disabledNav });
+  const actor = { userId };
+  const query = { text: q, matches };
 
-  // Rezepte: Haushaltsbesitz wie die Liste (GET /recipes filtert nicht),
-  // gespiegelte Mealie/Tandoor-Rezepte eingeschlossen.
-  if (allows('recipes')) {
-    results.recipes = firstMatches(database.prepare(`
-      SELECT r.id, r.title, r.notes FROM recipes r
-      ORDER BY r.title COLLATE NOCASE ASC, r.id DESC
-    `).all(), matches, (r) => [r.title, r.notes], limit)
-      .map((r) => withExcerpt(pick(r, ['id', 'title']), q, [r.notes]));
-  }
-
-  if (allows('pantry')) {
-    results.pantry = firstMatches(database.prepare(`
-      SELECT p.id, p.name AS title, p.quantity, p.unit, p.expires_on, p.notes
-      FROM pantry_items p
-      ORDER BY p.name COLLATE NOCASE ASC, p.id ASC
-    `).all(), matches, (p) => [p.title, p.notes], limit)
-      .map((p) => withExcerpt(pick(p, ['id', 'title', 'quantity', 'unit', 'expires_on']), q, [p.notes]));
-  }
-
-  // Inventar: aktive Gegenstaende zuerst, verkaufte/entsorgte bleiben
-  // auffindbar (die Liste zeigt sie ueber den Statusfilter).
-  if (allows('inventory')) {
-    results.inventory = firstMatches(database.prepare(`
-      SELECT i.id, i.name AS title, i.brand, i.model, i.status, i.notes
-      FROM inventory_items i
-      ORDER BY CASE i.status WHEN 'active' THEN 0 ELSE 1 END, i.name COLLATE NOCASE ASC
-    `).all(), matches, (i) => [i.title, i.brand, i.model, i.notes], limit)
-      .map((i) => withExcerpt(pick(i, ['id', 'title', 'brand', 'model', 'status']), q, [i.brand, i.model, i.notes]));
-  }
-
-  // Dokumente: dieselbe Sichtbarkeit wie GET /documents (eigen, Familie oder
-  // ausdruecklich freigegeben) und nur der aktive Bestand, den die Liste zeigt.
-  if (allows('documents')) {
-    results.documents = firstMatches(database.prepare(`
-      SELECT d.id, d.name AS title, d.description, d.category, d.updated_at
-      FROM family_documents d
-      WHERE ${visibleWhere('documents', 'd', '@userId')} AND d.status = 'active'
-      ORDER BY d.updated_at DESC, d.id DESC
-    `).all({ userId }), matches, (d) => [d.title, d.description], limit)
-      .map((d) => withExcerpt(pick(d, ['id', 'title', 'category']), q, [d.description]));
-  }
-
-  // Geburtstage: Haushaltsbesitz, Rechte-Modul `calendar` (siehe BUCKET_MODULE).
-  if (allows('birthdays')) {
-    results.birthdays = firstMatches(database.prepare(`
-      SELECT b.id, b.name AS title, b.birth_date, b.notes, b.year_unknown
-      FROM birthdays b
-      ORDER BY b.name COLLATE NOCASE ASC, b.id ASC
-    `).all(), matches, (b) => [b.title, b.notes], limit)
-      // `year_unknown` (#2095): birth_date traegt dann das Platzhalterjahr.
-      .map((b) => withExcerpt({ ...pick(b, ['id', 'title', 'birth_date']), year_unknown: b.year_unknown === 1 }, q, [b.notes]));
-  }
-
-  // Budget: gesucht wird im TITEL, also nur dort, wo der Betrachter den Titel
-  // sieht - budgetDetailsVisibleWhere, nicht budgetVisibilityWhere. Eine
-  // 'shared_amount'-Zeile eines anderen zeigt ihm Datum und Betrag, aber nicht
-  // den Zweck (#659); fand die Suche sie ueber den Zweck, verriete schon der
-  // Treffer, was die Stufe verschweigt. Neueste zuerst.
-  if (allows('budget')) {
-    const mode = resolveBudgetMode(database);
-    results.budget = firstMatches(database.prepare(`
-      SELECT b.id, b.title, b.amount, b.date
-      FROM budget_entries b
-      WHERE ${budgetDetailsVisibleWhere('b', '@userId', { mode })}
-      ORDER BY b.date DESC, b.id DESC
-    `).all(mode === 'personal' ? { userId } : {}), matches, (b) => [b.title], limit)
-      .map((b) => pick(b, ['id', 'title', 'amount', 'date']));
-  }
+  if (allows('recipes')) results.recipes = recipesSearchSlice(database, actor, query);
+  if (allows('pantry')) results.pantry = pantrySearchSlice(database, actor, query);
+  if (allows('inventory')) results.inventory = inventorySearchSlice(database, actor, query);
+  if (allows('documents')) results.documents = documentsSearchSlice(database, actor, query);
+  if (allows('birthdays')) results.birthdays = birthdaysSearchSlice(database, actor, query);
+  if (allows('budget')) results.budget = budgetSearchSlice(database, actor, query);
 
   return results;
 }
 
-/** Die ganze Suche: Index-Trefferarten und Tabellen-Trefferarten in einer Antwort. */
+/**
+ * Die ganze Suche: Index-Trefferarten und Tabellen-Trefferarten in einer Antwort.
+ * @param {Database} database
+ * @param {string} q
+ * @param {number} userId
+ * @param {SearchAxes} [opts]
+ */
 export function searchEverything(database, q, userId, opts = {}) {
   const indexed = runSearch(database, q, userId, opts);
   const tables = runTableSearch(database, q, userId, opts);

@@ -31,7 +31,9 @@
  */
 
 import type { Database, RowReader } from '../authorize/index.ts';
-import { householdVisibleWhere, taskVisibleWhere } from '../authorize/index.ts';
+import { householdVisibleWhere, taskVisibleWhere, visibleWhere } from '../authorize/index.ts';
+import type { IndexSearchQuery, SearchActor, SearchRow } from './search-text.ts';
+import { SEARCH_LIMIT, withExcerpt } from './search-text.ts';
 import { categoryBindings, taskCategoryWhere, taskScopeWhere } from './task-scope.js';
 import { personAvatarUrlSql } from './person-avatar.js';
 import { utcToWall } from '../utils/timezone.js';
@@ -319,4 +321,38 @@ function wallTasksByMember(
     }
   }
   return [...byMember.values()];
+}
+
+/**
+ * The task hits of the global search (services/search.js runSearch, bucket `tasks`).
+ * The SQL is the search's, word for word; the viewer is `actor.userId`, bound as
+ * `@userId` as before.
+ */
+export function tasksSearchSlice(db: Database, actor: SearchActor, query: IndexSearchQuery): SearchRow[] {
+  const { text: q, match } = query;
+  const userId = actor.userId;
+  const limit = SEARCH_LIMIT;
+
+  // The row rule of the task list (GET /tasks): `all`, the creator, and for
+  // `assignees` a row in task_assignments. The legacy column `assigned_to` is
+  // no access path: a private task that only names someone there stays with
+  // its creator.
+  // The archive is a wish of the viewer at the list, no limit of what the list
+  // may hold (services/task-scope.js): an archived task stays a hit, as does
+  // one that starts later. It says so (`archived_at`, as in the list row) and
+  // stands last - behind the limit, too: with enough open hits an archived
+  // one drops out, and a narrower query brings it back.
+  return (db.prepare(`
+    SELECT t.id, t.title, t.status, t.priority, t.due_date,
+           t.archived_at, s.body AS _body
+    FROM search_index s
+    JOIN tasks t ON t.id = s.entity_id
+    WHERE s.entity = 'task' AND s.search_index MATCH @match
+      AND t.parent_task_id IS NULL
+      AND ${visibleWhere('tasks', 't', '@userId')}
+    ORDER BY t.archived_at IS NOT NULL,
+             CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
+             t.due_date ASC NULLS LAST
+    LIMIT @limit
+  `).all({ match, userId, limit }) as SearchRow[]).map((row) => withExcerpt(row, q, [row._body]));
 }

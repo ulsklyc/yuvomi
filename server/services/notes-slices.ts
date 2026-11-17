@@ -28,6 +28,8 @@ import type { Database, RowReader } from '../authorize/index.ts';
 import { visibleWhere } from '../authorize/index.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
 import { hydrateNotesWithCategories } from './note-categories.js';
+import type { IndexSearchQuery, SearchActor, SearchRow } from './search-text.ts';
+import { SEARCH_LIMIT, withExcerpt } from './search-text.ts';
 
 /** Query options of the overview that act on the note block. */
 export type NotesOverviewOptions = Readonly<{
@@ -146,4 +148,28 @@ export function notesOverviewSlice(
     `).get({ me: userId, ...noteCategoryBinds }) as { n: number }).n;
     return { pinnedNotes, pinnedNotesCount, notesTotal };
   }, { ...NOTES_BLOCK_FAILED, pinnedNotes: [] });
+}
+
+/**
+ * The note hits of the global search (services/search.js runSearch, bucket
+ * `notes`). The SQL is the search's, word for word; the viewer is
+ * `actor.userId`, bound as `@userId` as before.
+ */
+export function notesSearchSlice(db: Database, actor: SearchActor, query: IndexSearchQuery): SearchRow[] {
+  const { text: q, match } = query;
+  const userId = actor.userId;
+  const limit = SEARCH_LIMIT;
+
+  // The row rule of the note list (GET /notes, #1514): `all` notes of anyone
+  // and the viewer's own. Nothing narrower, nothing wider - a note the list
+  // shows is a note the search finds.
+  return (db.prepare(`
+    SELECT n.id, n.title, n.content
+    FROM search_index s
+    JOIN notes n ON n.id = s.entity_id
+    WHERE s.entity = 'note' AND s.search_index MATCH @match
+      AND ${visibleWhere('notes', 'n', '@userId')}
+    ORDER BY n.pinned DESC, n.updated_at DESC
+    LIMIT @limit
+  `).all({ match, userId, limit }) as SearchRow[]).map((row) => withExcerpt(row, q, [row.content]));
 }
