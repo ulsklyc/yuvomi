@@ -25,7 +25,8 @@ export function contactsSearchSlice(db: Database, _actor: SearchActor, query: In
     FROM search_index s
     JOIN contacts c ON c.id = s.entity_id
     WHERE s.entity = 'contact' AND s.search_index MATCH @match
-    ORDER BY c.name ASC
+    -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+    ORDER BY c.name ASC, c.id ASC
     LIMIT @limit
   `).all({ match, limit }) as SearchRow[]).map((row) => withExcerpt(row, q, [row._body]));
 }

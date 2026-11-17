@@ -262,6 +262,62 @@ test('events: with birthdays switched off, a birthday event leaves the event hit
 });
 
 // --------------------------------------------------------------------------
+// 2b. Ties: the id is the last sort key
+// --------------------------------------------------------------------------
+
+// Three rows with the same sort key, inserted as 9002, 9003, 9001: the index
+// scan meets them in that order, so only the id key can put them in id order.
+const TIE_IDS = [9002, 9003, 9001];
+const TIE_ASC = [9001, 9002, 9003];
+const TIE_DESC = [9003, 9002, 9001];
+
+/**
+ * @type {Array<{ name: string, table: string, insert: string, params: (id: number) => unknown[],
+ *   run: () => Array<Record<string, unknown>>, want: number[] }>}
+ */
+const TIES = [
+  { name: 'tasks (same due date)', table: 'tasks', insert: '(id, title, due_date, created_by) VALUES (?, ?, ?, ?)',
+    params: (id) => [id, 'tieword task', '2026-04-01', ALICE],
+    run: () => tasksSearchSlice(db, alice, indexQuery('tieword task')), want: TIE_ASC },
+  { name: 'notes (same pin and update)', table: 'notes', insert: '(id, title, content, created_by, updated_at) VALUES (?, ?, ?, ?, ?)',
+    params: (id) => [id, 'tieword note', 'x', ALICE, '2026-03-01T08:00:00Z'],
+    run: () => notesSearchSlice(db, alice, indexQuery('tieword note')), want: TIE_DESC },
+  { name: 'contacts (same name)', table: 'contacts', insert: '(id, name) VALUES (?, ?)',
+    params: (id) => [id, 'tieword contact'],
+    run: () => contactsSearchSlice(db, alice, indexQuery('tieword contact')), want: TIE_ASC },
+  { name: 'items (same name)', table: 'shopping_items', insert: '(id, list_id, name) VALUES (?, ?, ?)',
+    params: (id) => [id, list, 'tieword item'],
+    run: () => shoppingSearchSlice(db, alice, indexQuery('tieword item')), want: TIE_ASC },
+  { name: 'meds (same state and name)', table: 'medications', insert: '(id, user_id, name) VALUES (?, ?, ?)',
+    params: (id) => [id, ALICE, 'tieword med'],
+    run: () => healthMedsSearchSlice(db, alice, indexQuery('tieword med')), want: TIE_ASC },
+  { name: 'activities (same time)', table: 'health_activities', insert: '(id, user_id, type, performed_at) VALUES (?, ?, ?, ?)',
+    params: (id) => [id, ALICE, 'tieword activity', '2026-03-01T08:00'],
+    run: () => healthActivitiesSearchSlice(db, alice, indexQuery('tieword activity')), want: TIE_DESC },
+  { name: 'waste (same position and name)', table: 'waste_types', insert: "(id, name, color) VALUES (?, ?, '#000000')",
+    params: (id) => [id, 'tieword waste'],
+    run: () => wasteSearchSlice(db, alice, indexQuery('tieword waste')), want: TIE_ASC },
+  // Upcoming ties stand by id ascending; past ties, newest first, by id descending.
+  { name: 'events (same upcoming start)', table: 'calendar_events', insert: '(id, title, start_datetime, created_by) VALUES (?, ?, ?, ?)',
+    params: (id) => [id, 'tieword upcoming', '2026-04-01T10:00', ALICE],
+    run: () => calendarSearchSlice(db, alice, indexQuery('tieword upcoming')), want: TIE_ASC },
+  { name: 'events (same past start)', table: 'calendar_events', insert: '(id, title, start_datetime, created_by) VALUES (?, ?, ?, ?)',
+    params: (id) => [id, 'tieword past', '2026-01-05T10:00', ALICE],
+    run: () => calendarSearchSlice(db, alice, indexQuery('tieword past')), want: TIE_DESC },
+];
+
+for (const { name, table, insert: values, params, run, want } of TIES) {
+  test(`ties: ${name} stand in id order`, () => {
+    for (const id of TIE_IDS) db.prepare(`INSERT INTO ${table} ${values}`).run(...params(id));
+    try {
+      assert.deepEqual(ids(run()), want);
+    } finally {
+      db.prepare(`DELETE FROM ${table} WHERE id IN (${TIE_IDS.join(', ')})`).run();
+    }
+  });
+}
+
+// --------------------------------------------------------------------------
 // 3. The orchestration
 // --------------------------------------------------------------------------
 

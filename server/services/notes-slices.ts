@@ -116,7 +116,8 @@ export function notesOverviewSlice(
       FROM notes n
       LEFT JOIN users u ON n.created_by = u.id
       WHERE ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
-      ORDER BY n.pinned DESC, n.updated_at DESC
+      -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+      ORDER BY n.pinned DESC, n.updated_at DESC, n.id DESC
       -- FUENF, WEIL DIE KACHEL ZWEI HOCH SEIN DARF - dieselbe Korrektur, die
       -- die Geburtstage oben schon bekommen haben und bei der die Notizen
       -- uebersehen wurden. Der Schnitt stand auf drei und war damit die
@@ -169,7 +170,8 @@ export function notesSearchSlice(db: Database, actor: SearchActor, query: IndexS
     JOIN notes n ON n.id = s.entity_id
     WHERE s.entity = 'note' AND s.search_index MATCH @match
       AND ${visibleWhere('notes', 'n', '@userId')}
-    ORDER BY n.pinned DESC, n.updated_at DESC
+    -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+    ORDER BY n.pinned DESC, n.updated_at DESC, n.id DESC
     LIMIT @limit
   `).all({ match, userId, limit }) as SearchRow[]).map((row) => withExcerpt(row, q, [row.content]));
 }

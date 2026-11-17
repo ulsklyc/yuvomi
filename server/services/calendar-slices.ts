@@ -302,7 +302,10 @@ export function calendarSearchSlice(
           disabledNav?.has('birthdays') ? ` AND ${notBirthdayEventSql('e')}` : ''}
       ORDER BY ${PAST_SINGLE_EVENT_SQL} ASC,
                CASE WHEN ${PAST_SINGLE_EVENT_SQL} THEN NULL ELSE e.start_datetime END ASC,
-               e.start_datetime DESC
+               e.start_datetime DESC,
+               -- A unique last key; the stable sort below keeps it, so upcoming ties
+               -- show id ascending and past ties, reversed there, the newest id first.
+               e.id ASC
       LIMIT @limit
     `).all({ match, userId, from: window.from, limit: EVENT_SEARCH_CANDIDATES }) as SearchRow[], window.from, window.to, { lightweight: true });
   // resolveEventSearchRows sortiert nach dem AUFGELOESTEN Start; vorn steht,

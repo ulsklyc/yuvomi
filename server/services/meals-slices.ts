@@ -96,7 +96,9 @@ export function mealsOverviewSlice(
           WHEN 'lunch'     THEN 1
           WHEN 'dinner'    THEN 2
           WHEN 'snack'     THEN 3
-        END
+        END,
+        -- A unique last key: a day may hold several meals of one type.
+        m.id ASC
     `).all(today, ...visibleTypes) as MealRow[];
   }, MEALS_BLOCK_FAILED.todayMeals);
 

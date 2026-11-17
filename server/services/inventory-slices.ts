@@ -25,7 +25,8 @@ export function inventorySearchSlice(db: Database, _actor: SearchActor, query: T
   return firstMatches(db.prepare(`
       SELECT i.id, i.name AS title, i.brand, i.model, i.status, i.notes
       FROM inventory_items i
-      ORDER BY CASE i.status WHEN 'active' THEN 0 ELSE 1 END, i.name COLLATE NOCASE ASC
+      -- A unique last key: firstMatches keeps the first SEARCH_LIMIT matches in this order.
+      ORDER BY CASE i.status WHEN 'active' THEN 0 ELSE 1 END, i.name COLLATE NOCASE ASC, i.id ASC
     `).all() as SearchRow[], matches, (i) => [i.title, i.brand, i.model, i.notes], limit)
     .map((i) => withExcerpt(pick(i, ['id', 'title', 'brand', 'model', 'status']), q, [i.brand, i.model, i.notes]));
 }
