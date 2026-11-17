@@ -138,7 +138,8 @@ export function shoppingOverviewSlice(
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
       FROM shopping_lists sl
       WHERE (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) > 0
-      ORDER BY sl.updated_at DESC
+      -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+      ORDER BY sl.updated_at DESC, sl.id DESC
       LIMIT 3
     `).all() as ShoppingList[];
     for (const list of lists) list.items = shoppingItemsOf(list.id);
@@ -157,7 +158,8 @@ export function shoppingOverviewSlice(
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
       FROM shopping_lists sl
       WHERE sl.id IN (${shoppingMarks})
-      ORDER BY (open_count > 0) DESC, sl.updated_at DESC
+      -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+      ORDER BY (open_count > 0) DESC, sl.updated_at DESC, sl.id DESC
       LIMIT 3
     `).all(...shoppingBinds) as ShoppingList[];
       for (const list of lists) list.items = shoppingItemsOf(list.id);
@@ -189,7 +191,8 @@ export function shoppingSearchSlice(db: Database, _actor: SearchActor, query: In
     FROM search_index s
     JOIN shopping_items i ON i.id = s.entity_id
     WHERE s.entity = 'item' AND s.search_index MATCH @match
-    ORDER BY i.name ASC
+    -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+    ORDER BY i.name ASC, i.id ASC
     LIMIT @limit
   `).all({ match, limit }) as SearchRow[]).map((row) => withExcerpt(row, q, [row._body]));
 }

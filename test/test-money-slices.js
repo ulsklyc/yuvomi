@@ -182,6 +182,18 @@ test('budget: personal mode reads only the reader\'s own entries', () => {
   }
 });
 
+test('budget: two categories with the same sum stand by name', () => {
+  // Inserted in reverse name order, in a month of their own.
+  addEntry(-9, 'zeta', '2026-04-02', ANNA);
+  addEntry(-9, 'alpha', '2026-04-03', ANNA);
+  try {
+    const { budget } = budgetOverviewSlice(db, anna, CTX, { month: '2026-04' });
+    assert.deepEqual(budget.topExpenses.map((row) => row.category), ['alpha', 'zeta']);
+  } finally {
+    db.prepare("DELETE FROM budget_entries WHERE date LIKE '2026-04-%'").run();
+  }
+});
+
 test('rewards: approver, self and family views', () => {
   const approver = rewardsOverviewSlice(db, anna, CTX, { approver: true, moneyReader: money(ANNA, true) }).rewards;
   assert.equal(approver.view, 'approver');

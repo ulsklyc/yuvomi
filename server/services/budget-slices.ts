@@ -164,7 +164,8 @@ export function budgetOverviewSlice(
       FROM budget_entries
       WHERE amount < 0 AND date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
       GROUP BY category
-      ORDER BY ABS(SUM(amount)) DESC
+      -- Two categories with the same sum: the name decides, not the scan order.
+      ORDER BY ABS(SUM(amount)) DESC, category ASC
       LIMIT 5
     `).all(from, to, ...ownerParams) as TopExpenseRow[];
     const topExpense = topExpenses[0];

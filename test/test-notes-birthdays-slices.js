@@ -203,3 +203,26 @@ test('a count that fails after the list empties the whole note block, as the one
     { pinnedNotes: [], pinnedNotesCount: 0, notesTotal: 0 });
   assert.deepEqual(log.lines, [['pinnedNotes error:', 'count boom']]);
 });
+
+test('notes: pins with the same update time stand newest id first, with and without a category', () => {
+  // Inserted as 9002, 9003, 9001: only the id as last key decides their order.
+  // Without it the plain list and the category list sorted the ties differently.
+  const insertNote = db.prepare(`
+    INSERT INTO notes (id, title, content, pinned, visibility, created_by, updated_at)
+    VALUES (?, ?, '', 1, 'all', ?, '2026-03-20T08:00:00Z')
+  `);
+  const assign = db.prepare('INSERT INTO note_category_assignments (note_id, category_id) VALUES (?, ?)');
+  for (const id of [9002, 9003, 9001]) {
+    insertNote.run(id, `tie ${id}`, ANNA);
+    assign.run(id, HOUSEHOLD_CATEGORY);
+  }
+  try {
+    /** @param {{ pinnedNotes: { id?: unknown }[] }} answer */
+    const firstThree = (answer) => answer.pinnedNotes.slice(0, 3).map((note) => note.id);
+    assert.deepEqual(firstThree(notesOverviewSlice(db, anna, WEDNESDAY)), [9003, 9002, 9001]);
+    assert.deepEqual(firstThree(notesOverviewSlice(db, anna, WEDNESDAY, { categories: [HOUSEHOLD_CATEGORY] })),
+      [9003, 9002, 9001]);
+  } finally {
+    db.prepare('DELETE FROM notes WHERE id IN (9001, 9002, 9003)').run();
+  }
+});

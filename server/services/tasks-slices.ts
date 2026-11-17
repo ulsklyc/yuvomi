@@ -184,7 +184,9 @@ export function tasksOverviewSlice(
         CASE t.priority
           WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
           WHEN 'low' THEN 3 ELSE 4
-        END ASC
+        END ASC,
+        -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+        t.id ASC
       LIMIT 5
     `).all({ now: nowIso, me: userId, today, ...taskCategoryBinds }) as TaskRow[])
       .map(({ __due_sort, ...task }) => addAssignedUsers(task));
@@ -352,7 +354,9 @@ export function tasksSearchSlice(db: Database, actor: SearchActor, query: IndexS
       AND ${visibleWhere('tasks', 't', '@userId')}
     ORDER BY t.archived_at IS NOT NULL,
              CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
-             t.due_date ASC NULLS LAST
+             t.due_date ASC NULLS LAST,
+             -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+             t.id ASC
     LIMIT @limit
   `).all({ match, userId, limit }) as SearchRow[]).map((row) => withExcerpt(row, q, [row._body]));
 }

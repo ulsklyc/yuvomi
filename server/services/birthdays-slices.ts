@@ -94,7 +94,8 @@ export function birthdaysOverviewSlice(
       SELECT b.*, u.avatar_color AS family_user_color
         FROM birthdays b
         LEFT JOIN users u ON u.id = b.family_user_id
-       ORDER BY b.name COLLATE NOCASE ASC
+       -- A unique last key: the stable sort below inherits it for equal names.
+       ORDER BY b.name COLLATE NOCASE ASC, b.id ASC
     `).all() as BirthdayRow[];
     const hydrated = rows
       .flatMap((row) => hydrateBirthdayOccurrences(db, row, now) as Occurrence[])

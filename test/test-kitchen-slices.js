@@ -192,3 +192,23 @@ test('a failing tile read leaves the field out and logs `shoppingTile error:`, t
   assert.equal(answer.shoppingLists.length, 2);
   assert.deepEqual(log.lines, [['shoppingTile error:', 'tile boom']]);
 });
+
+test('shopping: lists with the same update time stand newest id first, in both list reads', () => {
+  // Inserted as 9002, 9003, 9001: only the id as last key decides their order,
+  // and with the LIMIT which of them appear.
+  const ties = [9002, 9003, 9001];
+  const insertList = db.prepare(`
+    INSERT INTO shopping_lists (id, name, created_by, updated_at) VALUES (?, ?, ?, '2026-03-20T08:00:00Z')
+  `);
+  for (const id of ties) {
+    insertList.run(id, `tie ${id}`, ANNA);
+    addItem(id, `open ${id}`);
+  }
+  try {
+    const answer = shoppingOverviewSlice(db, reader, WEDNESDAY, { listSelection: ties });
+    assert.deepEqual(answer.shoppingLists.map((list) => list.id), [9003, 9002, 9001]);
+    assert.deepEqual(answer.shoppingTile?.lists.map((list) => list.id), [9003, 9002, 9001]);
+  } finally {
+    db.prepare(`DELETE FROM shopping_lists WHERE id IN (${ties.join(', ')})`).run();
+  }
+});

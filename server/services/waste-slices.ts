@@ -106,7 +106,8 @@ export function wasteSearchSlice(db: Database, _actor: SearchActor, query: Index
     JOIN waste_types wt ON wt.id = s.entity_id
     WHERE s.entity = 'waste_type' AND s.search_index MATCH @match
       AND wt.archived = 0
-    ORDER BY wt.sort_order ASC, wt.name ASC
+    -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+    ORDER BY wt.sort_order ASC, wt.name ASC, wt.id ASC
     LIMIT @limit
   `).all({ match, limit }) as SearchRow[];
 }
