@@ -8,13 +8,13 @@
  *
  * THE CONTRACT. calendarOverviewSlice(db, actor, ctx, options, guard) and
  * familyEventsOverviewSlice(db, actor, ctx, options, guard) are synchronous and
- * see no request. The week window starts the day before `ctx.today`.
+ * see no request; they read no clock. The week window starts the day before
+ * `ctx.today`.
  *
- * ONE CLOCK READ STAYS, WORD FOR WORD: getUpcomingEvents() is called with the
- * options the route always passed, without `now`, so it takes its own
- * `new Date()` and reads the household day from it (todayKey(d, now)). Handing
- * it `ctx.now` would be a clock alignment, and this cut keeps the calls as they
- * were.
+ * NO CLOCK READ: getUpcomingEvents() gets `ctx.now`, the one reading the route
+ * takes for every slice, and reads the household day from it (todayKey(d, now)).
+ * Until the follow-up of the cuts it took its own `new Date()`, milliseconds
+ * after the route's `now`.
  *
  * TWO SLICES, BECAUSE THE ANSWER HAS TWO PLACES. `upcomingEvents` and
  * `weekEvents` stand before the task keys; `familyEvents` stands after the
@@ -177,7 +177,7 @@ export function calendarOverviewSlice(
   // browser decides at the clock: an event also ends between two fetches.
   const upcomingEvents = guard('upcomingEvents', (): SerializedEvent[] => serialize(getUpcomingEvents(db, {
     userId, limit, fromToday: true, assignedTo, includeBirthdays,
-    keepEndedToday: ENDED_TODAY_POOL, household, calendars, reader: actor,
+    keepEndedToday: ENDED_TODAY_POOL, household, calendars, reader: actor, now: ctx.now,
   })), []);
 
   /* THE WEEK FOR THE STRIP of the calendar widget (2x1). A question of its own
@@ -219,14 +219,14 @@ export function calendarOverviewSlice(
  *
  * @param db      the connection of the request
  * @param actor   the row reader of the request
- * @param _ctx    today, zone and now of the request (getUpcomingEvents reads its own clock)
+ * @param ctx     today, zone and now of the request (getUpcomingEvents reads `ctx.now`)
  * @param options what the request decides, and the members the route read
  * @param guard   the route's runSlice(); without it a failing read throws
  */
 export function familyEventsOverviewSlice(
   db: Database,
   actor: RowReader,
-  _ctx: OverviewContext,
+  ctx: OverviewContext,
   options: FamilyEventsOverviewOptions,
   guard: SliceGuard = passThrough,
 ): FamilyEventsOverview {
@@ -237,7 +237,7 @@ export function familyEventsOverviewSlice(
     for (const member of members) {
       for (const event of getUpcomingEvents(db, {
         userId, limit: FAMILY_AHEAD_PER_MEMBER, fromToday: true, assignedTo: member.id, includeBirthdays,
-        keepEndedToday: ENDED_TODAY_POOL, household, reader: actor,
+        keepEndedToday: ENDED_TODAY_POOL, household, reader: actor, now: ctx.now,
       })) {
         const key = `${event.id}@${event.start_datetime}`;
         if (seen.has(key)) continue;

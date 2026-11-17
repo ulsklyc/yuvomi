@@ -220,7 +220,6 @@
  "server/routes/contacts.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 12,
  "server/routes/dashboard.js\toxlint/max-lines-per-function": 1,
  "server/routes/dashboard.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 1,
- "server/routes/dashboard.js\toxlint/no-unused-vars": 2,
  "server/routes/displays.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 9,
  "server/routes/dms.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 6,
  "server/routes/document-storage-google-drive.js\toxlint/no-restricted-syntax/ERROR-TEXT": 2,

@@ -24,6 +24,7 @@ import { calendarOverviewSlice, emptyCalendarOverview, familyEventsOverviewSlice
 import { countdownsOverviewSlice, emptyCountdownsOverview } from '../services/countdowns-slices.ts';
 import { emptyScheduleOverview, scheduleOverviewSlice } from '../services/schedule-slices.ts';
 import { emptyWasteOverview, wasteOverviewSlice } from '../services/waste-slices.ts';
+import { emptyMembersOverview, membersOverviewSlice } from '../services/members-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -37,7 +38,6 @@ import {
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
-import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { serializeEvents } from './calendar/helpers.js';
@@ -119,7 +119,7 @@ const DENIED_PAYLOAD = Object.freeze({
  * nur bei einer Listen-Auswahl, und ein Konto ohne den Einkauf bekommt es nie.
  */
 function emptyAnswer(context) {
-  const empty = { users: [], ...emptyCountdownsOverview(), quicklinks: [] };
+  const empty = { ...emptyMembersOverview(), ...emptyCountdownsOverview(), quicklinks: [] };
   for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
   return empty;
 }
@@ -303,7 +303,6 @@ router.get('/', (req, res) => {
   const todayLocalKey = householdWall?.date
     ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const currentMonth = todayLocalKey.slice(0, 7);
-  const deadline48h = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
 
   // Modulrechte des Betrachters (#467, siehe DENIED_PAYLOAD oben). Gelesen aus
   // dem, was die Auth-Schicht schon aufgelöst hat: null für Admins und für
@@ -366,10 +365,10 @@ router.get('/', (req, res) => {
   const overviewCtx = { today: todayLocalKey, zone: householdTimeZone(d), now };
 
   // serializeEvents() (routes/calendar/helpers.js) an diese Anfrage gebunden:
-  // Dokumentrechte des Betrachters, Admin-Flag. Bleibt in der Route - ein Dienst,
+  // Dokumentrechte des Betrachters. Bleibt in der Route - ein Dienst,
   // der eine Route importiert, ist der Schichtbruch, den die Lint-Baseline zaehlt.
   const serializeForViewer = (events) => serializeEvents(events, {
-    database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req),
+    database: d, viewer: documentViewer(req), actorId: userId,
   });
 
   // Die naechsten Termine der Kachel und die Woche des Streifens
@@ -475,16 +474,10 @@ router.get('/', (req, res) => {
     if (shopping.shoppingTile) result.shoppingTile = shopping.shoppingTile;
   }
 
-  // Alle User (für Avatar-Farben in Widgets)
-  try {
-    result.users = d.prepare(
-      `SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, ${memberPositionSql('u')} AS sort_order FROM users u
-       WHERE ${householdMemberSql('u')}
-       ORDER BY ${memberOrderSql('u')}`
-    ).all();
-  } catch (err) {
-    result.users = [];
-  }
+  // Die Haushaltsmitglieder (services/members-slices.ts) fuer die Avatar-Farben
+  // der Widgets und die Familienkarte darunter. Ein Fehler setzt `[]` und loggt
+  // `users error:` wie jeder andere Block.
+  Object.assign(result, membersOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
 
   // Die Familienkarte (services/calendar-slices.ts, #1449): je Mitglied die
   // beendeten von heute und die naechsten kommenden, ohne „nur meine" und ohne
