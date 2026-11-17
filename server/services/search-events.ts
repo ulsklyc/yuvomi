@@ -99,11 +99,16 @@ export function resolveEventSearchRows(
  * danach, der juengste zuerst. Gemessen wird der Zeitpunkt in der
  * Haushaltszone (`storedToInstantMs`), nie der Datumsteil des Texts: ein Wert
  * mit `Z` kurz vor Mitternacht laege sonst am falschen Tag.
- * @param rows    aufsteigend nach Start
+ *
+ * Both groups are ordered here, not taken from the input: upcoming by start
+ * ascending, then id ascending; past by start descending, then id descending.
+ * The start compares as text, like the sort in `resolveEventSearchRows`. The
+ * candidate query of the event slice cuts in this same order.
+ * @param rows    in any order; each row carries its `id`
  * @param fromMs  Beginn des heutigen Haushaltstags
  * @param zone    Haushaltszone
  */
-export function upcomingEventsFirst<T extends { start_datetime?: unknown }>(rows: readonly T[], fromMs: number | null, zone: string): T[] {
+export function upcomingEventsFirst<T extends { start_datetime?: unknown; id?: unknown }>(rows: readonly T[], fromMs: number | null, zone: string): T[] {
   const upcoming: T[] = [];
   const past: T[] = [];
   for (const row of rows) {
@@ -111,7 +116,11 @@ export function upcomingEventsFirst<T extends { start_datetime?: unknown }>(rows
     if (ms !== null && fromMs !== null && ms < fromMs) past.push(row);
     else upcoming.push(row);
   }
-  return [...upcoming, ...past.reverse()];
+  const ascending = (a: T, b: T): number =>
+    String(a.start_datetime).localeCompare(String(b.start_datetime)) || Number(a.id) - Number(b.id);
+  upcoming.sort(ascending);
+  past.sort((a, b) => ascending(b, a));
+  return [...upcoming, ...past];
 }
 
 /**

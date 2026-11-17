@@ -36,7 +36,8 @@ process.env.DB_PATH = ':memory:';
 
 const { get } = await import('../server/db.js');
 const search = await import('../server/services/search.js');
-const { EVENT_SEARCH_CANDIDATES } = await import('../server/services/search-events.ts');
+const { EVENT_SEARCH_CANDIDATES, upcomingEventsFirst } = await import('../server/services/search-events.ts');
+const { storedToInstantMs } = await import('../server/utils/timezone.js');
 const { tasksSearchSlice } = await import('../server/services/tasks-slices.ts');
 const { birthdaysSearchSlice, calendarSearchSlice } = await import('../server/services/calendar-slices.ts');
 const { notesSearchSlice } = await import('../server/services/notes-slices.ts');
@@ -316,6 +317,39 @@ for (const { name, table, insert: values, params, run, want } of TIES) {
     }
   });
 }
+
+// More past ties than candidates: the cut at EVENT_SEARCH_CANDIDATES keeps the
+// rows the answer shows first, the highest ids, not the lowest.
+test('ties at the cut: past events with the same start keep the highest ids', () => {
+  const count = EVENT_SEARCH_CANDIDATES + 5;
+  const all = range(count).map((i) => 9101 + i);
+  for (const id of all) {
+    db.prepare(`INSERT INTO calendar_events (id, title, start_datetime, created_by)
+      VALUES (?, 'cutword past', '2026-01-05T10:00', ?)`).run(id, ALICE);
+  }
+  try {
+    const want = all.slice().reverse().slice(0, SEARCH_LIMIT);
+    assert.deepEqual(ids(calendarSearchSlice(db, alice, indexQuery('cutword past'))), want);
+  } finally {
+    db.prepare("DELETE FROM calendar_events WHERE title = 'cutword past'").run();
+  }
+});
+
+test('upcomingEventsFirst: orders an unordered input by start, then id', () => {
+  const zone = 'Europe/Berlin';
+  const rows = [
+    { id: 5, start_datetime: '2026-01-05T10:00' },
+    { id: 2, start_datetime: '2026-04-01T10:00' },
+    { id: 7, start_datetime: '2026-01-05T10:00' },
+    { id: 1, start_datetime: '2026-04-01T10:00' },
+    { id: 3, start_datetime: '2026-02-01T10:00' },
+    { id: 4, start_datetime: '2026-03-20T10:00' },
+    { id: 6, start_datetime: '2025-12-01T10:00' },
+  ];
+  const out = upcomingEventsFirst(rows, storedToInstantMs('2026-03-11', zone), zone);
+  // Upcoming: start ascending, id ascending. Past: start descending, id descending.
+  assert.deepEqual(ids(out), [4, 1, 2, 3, 7, 5, 6]);
+});
 
 // --------------------------------------------------------------------------
 // 3. The orchestration
