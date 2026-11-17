@@ -17,6 +17,9 @@
  *            5. The budget rule against data (owner, stranger, NULL and TEXT owner)
  *               per mode, against a written-out expectation.
  *            6. isOwnRow: a viewer given as a string owns nothing.
+ *            7. The wall rules of the overview (rows/household.ts): the display wall
+ *               modules, the third axis, and the narrowed meals and pantry rows,
+ *               for every combination of display and household audience.
  *
  * Run: npm run test:authorize-rows
  */
@@ -687,4 +690,142 @@ test('isOwnRow: a viewer given as a string (\'2\') is deliberately not the owner
   const rowVisible = rowApi('rowVisible');
   assert.equal(rowVisible(db, 'quick_links', { id: 0, created_by: owner, visibility: 'private' }, String(owner)), false);
   assert.equal(rowVisible(db, 'tasks', { id: 0, created_by: owner, visibility: 'private' }, String(owner)), false);
+});
+
+// ── 7. The wall rules of the overview (#1903, #1817) ───────────────────────────
+// GET /dashboard asks these four with the audience it read from the request; the
+// route-level evidence is test:overview-golden, test:wall-tasks and
+// test:display-account. Held here per audience, so a rule that narrows for everyone
+// or for no one turns red without a running server.
+
+const AUDIENCES = [
+  { display: true, household: true },
+  { display: true, household: false },
+  { display: false, household: true },
+  { display: false, household: false },
+];
+/** @param {{ display: boolean, household: boolean }} audience */
+const isDisplayWall = (audience) => audience.display && audience.household;
+const WALL_FIVE = ['meals', 'shopping', 'housekeeping', 'waste', 'pantry'];
+
+test('DISPLAY_WALL_MODULES: exactly the five sources of the today sheet, frozen', () => {
+  assert.deepEqual([...authorizeApi.DISPLAY_WALL_MODULES], WALL_FIVE);
+  assert.ok(Object.isFrozen(authorizeApi.DISPLAY_WALL_MODULES));
+});
+
+test('openDisplayWallModules: only the display wall opens the five, in place, nothing else', () => {
+  const open = rowApi('openDisplayWallModules');
+  const all = ['calendar', 'tasks', ...WALL_FIVE, 'notes', 'budget', 'rewards', 'health', 'schedule', 'documents'];
+  for (const audience of AUDIENCES) {
+    const denied = new Set(all);
+    const returned = open(denied, audience);
+    assert.equal(returned, denied, `same set (${JSON.stringify(audience)})`);
+    const expected = isDisplayWall(audience) ? all.filter((key) => !WALL_FIVE.includes(key)) : all;
+    assert.deepEqual([...denied], expected, JSON.stringify(audience));
+  }
+  // A key that was not denied stays not denied; nothing is added.
+  const partial = new Set(['budget']);
+  open(partial, { display: true, household: true });
+  assert.deepEqual([...partial], ['budget']);
+});
+
+test('modulesOutsideHouseholdAudience: modules without an allowlisted key, in order, only for the household audience', () => {
+  const outside = rowApi('modulesOutsideHouseholdAudience');
+  const empties = {
+    calendar: { upcomingEvents: [], weekEvents: [], birthdays: [] },
+    notes: { notes: [], pinnedNoteCount: 0 },
+    meals: { todayMeals: [] },
+    budget: { budget: null, splitBalance: null },
+    housekeeping: { housekeeping: { present: false } },
+    schedule: { todayShift: null },
+    empty: {},
+  };
+  let calls = 0;
+  const build = () => { calls += 1; return empties; };
+  for (const audience of AUDIENCES) {
+    calls = 0;
+    const keys = outside(audience, build);
+    if (audience.household) {
+      assert.deepEqual(keys, ['notes', 'budget', 'schedule', 'empty'], JSON.stringify(audience));
+      assert.equal(calls, 1, 'the empty forms are built once');
+    } else {
+      assert.deepEqual(keys, [], JSON.stringify(audience));
+      assert.equal(calls, 0, 'the personal answer builds no empty form');
+    }
+  }
+  // Every allowlisted key keeps its module in, whatever else the module carries.
+  for (const key of Object.keys(authorizeApi.HOUSEHOLD_AUDIENCE_SHOWS)) {
+    assert.deepEqual(outside({ display: false, household: true }, () => ({ m: { other: 1, [key]: null } })), [], key);
+  }
+});
+
+test('wallMeals: the display wall gets the ten fields of the wall line, everyone else the rows unchanged', () => {
+  const wallMeals = rowApi('wallMeals');
+  const full = {
+    id: 1, date: '2026-11-17', meal_type: 'dinner', title: 'Suppe', recipe_id: 4,
+    cook_user_id: 2, cook_name: 'Ada', cook_color: '#123456',
+    recipe_has_image: 1, recipe_has_own_image: 0,
+    notes: 'private note', created_by: 3, recipe_url: 'https://example.invalid/x', extra: true,
+  };
+  const bare = { id: 2, date: '2026-11-17', meal_type: 'lunch', title: 'Brot', notes: 'x', created_by: 3 };
+  const rows = [full, bare];
+  for (const audience of AUDIENCES) {
+    const out = wallMeals(rows, audience);
+    if (!isDisplayWall(audience)) {
+      assert.equal(out, rows, `unchanged (${JSON.stringify(audience)})`);
+      continue;
+    }
+    assert.deepEqual(out, [
+      {
+        id: 1, date: '2026-11-17', meal_type: 'dinner', title: 'Suppe', recipe_id: 4,
+        cook_user_id: 2, cook_name: 'Ada', cook_color: '#123456',
+        recipe_has_image: 1, recipe_has_own_image: 0,
+      },
+      {
+        id: 2, date: '2026-11-17', meal_type: 'lunch', title: 'Brot', recipe_id: undefined,
+        cook_user_id: undefined, cook_name: undefined, cook_color: undefined,
+        recipe_has_image: null, recipe_has_own_image: null,
+      },
+    ]);
+    assert.deepEqual(Object.keys(out[0]), [
+      'id', 'date', 'meal_type', 'title', 'recipe_id', 'cook_user_id', 'cook_name', 'cook_color',
+      'recipe_has_image', 'recipe_has_own_image',
+    ]);
+    // What a JSON answer carries: never the note or the author.
+    const wire = JSON.stringify(out);
+    for (const word of ['notes', 'created_by', 'recipe_url', 'extra', 'private note']) {
+      assert.ok(!wire.includes(word), `${word} stays back`);
+    }
+  }
+  // Not a list (a failed read): unchanged, also on the wall.
+  for (const value of [null, undefined, { error: true }]) {
+    assert.equal(wallMeals(value, { display: true, household: true }), value);
+  }
+});
+
+test('wallPantryExpiring: the display wall gets the name of each item of today, the rest of the slice unchanged', () => {
+  const wallPantry = rowApi('wallPantryExpiring');
+  const slice = {
+    todayItems: [{ name: 'Milch', quantity: 2, unit: 'l', location: 'Kuehlschrank' }, { name: 'Brot', quantity: 1 }],
+    todayCount: 2,
+    items: [{ name: 'Joghurt', quantity: 4 }],
+  };
+  for (const audience of AUDIENCES) {
+    const out = wallPantry(slice, audience);
+    if (!isDisplayWall(audience)) {
+      assert.equal(out, slice, `unchanged (${JSON.stringify(audience)})`);
+      continue;
+    }
+    assert.deepEqual(out, {
+      todayItems: [{ name: 'Milch' }, { name: 'Brot' }],
+      todayCount: 2,
+      items: [{ name: 'Joghurt', quantity: 4 }],
+    });
+    assert.notEqual(out, slice, 'a new object, the slice itself is not changed');
+    assert.equal(slice.todayItems[0].quantity, 2);
+  }
+  // No list of today (left out, a failed read): unchanged, also on the wall.
+  for (const value of [null, undefined, {}, { todayItems: null, todayCount: 0 }]) {
+    assert.equal(wallPantry(value, { display: true, household: true }), value);
+  }
 });

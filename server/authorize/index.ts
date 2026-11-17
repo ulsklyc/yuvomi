@@ -57,12 +57,18 @@ export { categoryVisibleTo } from './rows/notes.ts';
 export { icsSubscriptionSharedWhere } from './rows/ics-subscriptions.ts';
 export {
   asksHouseholdAudience,
+  DISPLAY_WALL_MODULES,
   HOUSEHOLD_AUDIENCE_SHOWS,
   householdAudienceAnswer,
   householdAudienceShows,
   householdVisible,
   householdVisibleWhere,
+  modulesOutsideHouseholdAudience,
+  openDisplayWallModules,
+  wallMeals,
+  wallPantryExpiring,
 } from './rows/household.ts';
+export type { WallAudience } from './rows/household.ts';
 // Task and event reads: a paired display reads under the wall rule, people under the
 // row rule of the type (rows/reader.ts).
 export {
