@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { setEventAssignments } from '../routes/calendar/helpers.js';
+import { setEventAssignments } from './event-assignments.ts';
 import { visibleWhere } from '../authorize/index.ts';
 
 // Die Standard-Zuweisung eines Kalenders laeuft ohne Person dahinter - ueber
@@ -328,7 +328,7 @@ const MOVED_DEFAULT_EVENTS = `
  * eingeschraenkter Anhang bekommt nur die neue Person dazu, #1358); geerbte
  * Erinnerungen, deren Zeit vorbei ist, gelten als verworfen.
  *
- * @param {object} d better-sqlite3 Datenbank-Handle
+ * @param {import('../authorize/index.ts').Database} d better-sqlite3 Datenbank-Handle
  * @param {number} eventId
  * @param {number} toUserId
  * @param {string} nowKey remindAtCompareKey(jetzt)
@@ -622,7 +622,7 @@ export function backfillCandidatesToken(candidates) {
  * kuenftige kommen wie gewohnt. Ein Termin, dessen Anleger nur vergangene
  * Erinnerungen hat, nimmt den teuren Weg gar nicht erst.
  *
- * @param {object} d better-sqlite3 Datenbank-Handle
+ * @param {import('../authorize/index.ts').Database} d better-sqlite3 Datenbank-Handle
  * @param {{ eventId: number, userIds: number[], fromUserIds?: number[] }[]} [candidates]
  *   bestätigte Liste; Standard: die aktuelle des Nachtragens. Ein Eintrag mit
  *   `fromUserIds` ist ein einzeln abgehakter umgezogener Termin (#1307): er wird
@@ -767,7 +767,7 @@ export async function applyDefaultAssigneesToExisting(
  * genau die unangetastete Standard-Person des alten Kalenders ist oder der
  * Termin hinausgepusht wurde (NOT_PUSHED_OUTBOUND).
  *
- * @param {object} d better-sqlite3 Datenbank-Handle
+ * @param {import('../authorize/index.ts').Database} d better-sqlite3 Datenbank-Handle
  * @param {number} eventId ID des umgezogenen Termins
  * @param {object} move
  * @param {number|null} move.fromCalRefId external_calendars.id VOR dem Umzug

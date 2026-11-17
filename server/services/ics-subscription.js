@@ -16,7 +16,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { assignDefaultToEvent, settlePastInheritedReminders } from './sync-assignment.js';
 import { assigneeFields, readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
-import { setEventAssignments } from '../routes/calendar/helpers.js';
+import { setEventAssignments } from './event-assignments.ts';
 import { remindAtCompareKey } from '../utils/reminder-schedule.js';
 import { parseICS, expandRRULE, normalizeRecurrenceOverrides, providerStatusOf } from './ics-parser.js';
 import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup, BlockedAddressError } from '../utils/ssrf.js';
