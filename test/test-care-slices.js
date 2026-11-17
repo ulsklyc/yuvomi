@@ -17,7 +17,12 @@
  *             fasting form without a log line; without a guard a failure throws.
  *          4. OWN DATA ONLY. The medication block reads the viewer's own active
  *             medications, never a family-visible one of someone else (#592); the
- *             unpaid wage follows the capability question (R20).
+ *             nutrition balance carries the viewer's own target and entries only,
+ *             also for a caregiver of someone with a target; the unpaid wage
+ *             follows the capability question (R20).
+ *          5. THE NUTRITION DAY IS ctx.today, whatever `ctx.zone` and `ctx.now`
+ *             say: an invalid zone or a `now` on another day in the zone does not
+ *             move it.
  *
  *          The whole GET /dashboard answer is held byte for byte by
  *          test:overview-golden; this suite holds what that one cannot see.
@@ -203,6 +208,51 @@ test('fasting and nutrition: the own state, a fasting 403 is the empty form with
   assert.deepEqual(ben.fasting, emptyFastingWidget());
   assert.equal(ben.nutrition.target, null, 'no target for someone without one');
   assert.deepEqual(log.lines, []);
+});
+
+test('nutrition and medications: only the viewer\'s own, also as a caregiver of another member', () => {
+  // Today: Anna has a target (2000 kcal) and entries, Ben and Helga have neither.
+  // Ben gets a target of his own and becomes Anna's caregiver; Helga stays without.
+  db.prepare('INSERT INTO health_nutrition_targets (user_id, energy_kcal, protein_g) VALUES (?, 1800, 50)').run(BEN);
+  db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)').run(ANNA, BEN);
+  try {
+    const own = healthOverviewSlice(db, anna, CTX).nutrition;
+    assert.equal(/** @type {any} */ (own.target).energy_kcal, 2000, 'Anna sees her own target, not Ben\'s');
+    assert.equal(own.entryCount, 1);
+    assert.equal(own.totals.energy_kcal, 350);
+
+    const ben = healthOverviewSlice(db, personReader(BEN), CTX).nutrition;
+    assert.equal(/** @type {any} */ (ben.target).energy_kcal, 1800, 'Ben sees his own target, not the one of Anna he cares for');
+    assert.equal(ben.entryCount, 0, 'the care grant does not bring Anna\'s entries onto Ben\'s tile');
+    assert.equal(ben.totals.energy_kcal, 0);
+    // The same grant does not bring Anna's medications onto Ben's tile either.
+    const benHealth = healthOverviewSlice(db, personReader(BEN), CTX).health;
+    assert.equal(benHealth.dosesTotal, 1, 'only Ben\'s own dose');
+    assert.deepEqual(benHealth.nextDose, { name: 'Ben family', time: '07:30' });
+
+    const helga = healthOverviewSlice(db, personReader(HELGA), CTX).nutrition;
+    assert.equal(helga.target, null, 'a member without a target sees none of the others');
+    assert.equal(helga.entryCount, 0);
+  } finally {
+    db.prepare('DELETE FROM health_care_grants WHERE subject_id = ? AND caregiver_id = ?').run(ANNA, BEN);
+    db.prepare('DELETE FROM health_nutrition_targets WHERE user_id = ?').run(BEN);
+  }
+});
+
+test('nutrition: the day is ctx.today, also with an invalid zone or a now on another day', () => {
+  // 23:30 UTC on the 10th: in UTC still the 10th, in Honolulu the 10th, in Berlin the 11th.
+  const lateNow = new Date('2026-03-10T23:30:00.000Z');
+  const [invalidZone, westZone] = withoutClock(() => [
+    healthOverviewSlice(db, anna, { today: '2026-03-11', zone: 'Not/AZone', now: lateNow }),
+    healthOverviewSlice(db, anna, { today: '2026-03-11', zone: 'Pacific/Honolulu', now: lateNow }),
+  ]);
+  for (const out of [invalidZone, westZone]) {
+    assert.equal(out.nutrition.date, '2026-03-11');
+    assert.equal(out.nutrition.entryCount, 1, 'the oats of the 11th, not the eggs of the 10th');
+    assert.equal(out.nutrition.totals.energy_kcal, 350);
+    // The dose day follows the same key: the Wednesday doses of the 11th.
+    assert.equal(out.health.dosesTotal, 3);
+  }
 });
 
 test('housekeeping: presence, worker, month, unpaid amount behind the capability, last visit', () => {
