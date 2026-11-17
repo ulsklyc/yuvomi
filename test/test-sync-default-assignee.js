@@ -9,7 +9,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 
-// sync-assignment.js laedt ueber setEventAssignments() server/db.js, und dessen Modul-
+// sync-assignment.js laedt ueber default-assignees.js server/db.js, und dessen Modul-
 // init() oeffnet sofort die Datenbank unter DB_PATH. Ohne eigenen Pfad legte schon der
 // IMPORT eine echte yuvomi.db im Repo an - auch beim direkten Aufruf aus dem Kopf dieser
 // Datei, den das npm-Script mit seinem Praefix nicht abdeckt.

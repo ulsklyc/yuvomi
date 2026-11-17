@@ -151,7 +151,7 @@ const router = express.Router();
  *   upcomingEvents: CalendarEvent[],   // Nächste 5 Termine (`events_limit`: 8 oder 12)
  *   familyEvents:   CalendarEvent[],   // Termine je Mitglied fuer die Familienkarte (#1449)
  *   weekEvents:     WeekEvent[],       // Termine, die die Woche ab heute berühren (schlank)
- *   urgentTasks:    Task[],            // High/Urgent mit Fälligkeit ≤ 48h
+ *   urgentTasks:    Task[],            // Max. 5 offene, sichtbare, begonnene Aufgaben jeder Prioritaet: Ueberfaellige zuerst, dann nach Faelligkeit (ohne Datum zuletzt), dann Prioritaet (tasksOverviewSlice)
  *   todayMeals:     Meal[],            // Mahlzeiten für heute
  *   pinnedNotes:    Note[],            // Angepinnte Notizen (max. 3)
  *   users:          User[],            // Alle User (für Avatar-Farben)

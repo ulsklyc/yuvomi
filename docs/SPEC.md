@@ -2814,7 +2814,7 @@ fan-out, all of them about what must *not* happen:
   standing that the author just abolished would be a promise without cover.
 
 Both triggers — writing a reminder (`server/routes/reminders.js`) and changing the assignment
-(`setEventAssignments` in `server/routes/calendar/helpers.js`) — go through one service,
+(`setEventAssignments` in `server/services/event-assignments.ts`) — go through one service,
 `server/services/event-reminder-fanout.js`. Two implementations would be unusually expensive here: a
 reminder that does **not** arrive does not announce itself.
 

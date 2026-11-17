@@ -312,7 +312,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -360,7 +360,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -406,7 +406,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -726,7 +726,7 @@
         },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -770,7 +770,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -814,7 +814,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1155,7 +1155,7 @@
         },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -1210,7 +1210,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1256,7 +1256,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1513,7 +1513,7 @@
         },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": []
@@ -1548,7 +1548,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1591,7 +1591,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1931,7 +1931,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -1989,7 +1989,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -2035,7 +2035,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -2305,7 +2305,7 @@
         },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": []
@@ -2326,7 +2326,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [],
           "wallTasks": []
         }
@@ -2356,7 +2356,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [],
           "wallTasks": []
         }
@@ -2939,7 +2939,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -2997,7 +2997,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3043,7 +3043,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -3396,7 +3396,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -3454,7 +3454,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3500,7 +3500,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -3853,7 +3853,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -3911,7 +3911,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3957,7 +3957,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
