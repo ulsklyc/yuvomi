@@ -392,6 +392,18 @@ export const schemas = {
               description: 'Only next to a `reason` whose cause carries a number (waste import and URL sources): the limit or status itself, e.g. `{ "limit_mb": 5 }`, so a client can put it into its own sentence instead of parsing `error`.',
             },
             storage_code: { $ref: '#/components/schemas/DocumentStorageErrorCode' },
+            fields: {
+              type: 'array',
+              description: 'Only next to `reason: "validation"`: what the request got wrong against the schema of its operation, at most ten entries. Never carries a value of the request.',
+              items: {
+                type: 'object',
+                required: ['path', 'rule'],
+                properties: {
+                  path: { type: 'string', description: 'Place and pointer, e.g. `body/title`, `query/limit`, `path/id`; for a missing property its name is appended. Cut to 120 characters.' },
+                  rule: { type: 'string', description: 'The JSON Schema keyword that failed, e.g. `type`, `required`, `maxLength`, `enum`, `format`.' },
+                },
+              },
+            },
           },
         },
         CalendarOverrideOrphanConflict: {

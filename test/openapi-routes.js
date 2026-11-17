@@ -71,7 +71,7 @@ function routerFiles() {
  */
 function directAppRoutes() {
   return [...INDEX.matchAll(/app\.(get|post|put|patch|delete)\(\s*'(\/api\/v1[^']*)'/g)]
-    .map((m) => ({ verb: m[1], path: m[2].replace(/:(\w+)/g, '{$1}'), file: 'server/index.js', body: '' }));
+    .map((m) => ({ verb: m[1], path: m[2].replace(/:(\w+)/g, '{$1}'), file: 'server/index.js', body: '', mount: '', pattern: m[2] }));
 }
 
 /**
@@ -142,6 +142,9 @@ function routesIn(file, mount) {
     return {
       verb: m[1] === 'all' ? 'get' : m[1], path: full, file,
       body: handlerBody(src, m.index, matches[i + 1]?.index ?? src.length),
+      // Mount and pattern as Express sees them, unconverted: for test:validate-request,
+      // which resolves them the way the middleware does at runtime.
+      mount, pattern: m[2],
     };
   });
 }

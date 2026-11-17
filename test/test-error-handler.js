@@ -63,6 +63,17 @@ function appWith(log) {
   router.get('/caused-500', () => {
     throw new Error('wrapper', { cause: new Error('SQLITE_BUSY: database is locked') });
   });
+  router.get('/fields', () => {
+    throw new HttpError(400, 'The request does not match the documented schema.', {
+      reason: 'validation', fields: [{ path: 'body/title', rule: 'type' }, { path: 'query/limit', rule: 'minimum' }],
+    });
+  });
+  router.get('/no-fields', () => {
+    throw new HttpError(400, 'Nothing to name.', { reason: 'validation', fields: [] });
+  });
+  router.get('/foreign-fields', () => {
+    throw Object.assign(new Error('Taken.'), { status: 400, expose: true, fields: [{ path: 'body/x', rule: 'type' }] });
+  });
   router.get('/conflict', async () => {
     throw new HttpError(409, 'This thing changed in the meantime.', { reason: 'thing_changed' });
   });
@@ -158,6 +169,34 @@ test('a corrupt gzip body is a 400 without the text of zlib', async () => {
   assert.equal(status, 400);
   assert.deepEqual(body, { error: 'The request was refused (Bad Request).', code: 400 });
   assert.ok(log.lines.join(' | ').includes('-> 400'), log.lines.join(' | '));
+});
+
+test('an HttpError with fields sends them after the reason, and the log names rule and path', async () => {
+  const { status, body, text, log } = await get('/api/v1/things/fields');
+  assert.equal(status, 400);
+  assert.deepEqual(body, {
+    error: 'The request does not match the documented schema.', code: 400, reason: 'validation',
+    fields: [{ path: 'body/title', rule: 'type' }, { path: 'query/limit', rule: 'minimum' }],
+  });
+  assert.ok(text.indexOf('"reason"') < text.indexOf('"fields"'), text);
+  const line = log.join(' | ');
+  assert.ok(line.includes('type at body/title') && line.includes('minimum at query/limit'), line);
+});
+
+test('fields appear only on an HttpError with a non-empty list', async () => {
+  const empty = await get('/api/v1/things/no-fields');
+  assert.deepEqual(empty.body, { error: 'Nothing to name.', code: 400, reason: 'validation' });
+  assert.ok(!empty.log.join(' | ').includes('(fields:'), empty.log.join(' | '));
+  const foreign = await get('/api/v1/things/foreign-fields');
+  assert.deepEqual(foreign.body, { error: 'The request was refused (Bad Request).', code: 400 });
+  assert.ok(!foreign.log.join(' | ').includes('(fields:'), 'fields of a foreign error are no rule and path of ours');
+  const plain = await get('/api/v1/things/conflict');
+  assert.ok(!Object.hasOwn(plain.body, 'fields'), plain.text);
+});
+
+test('HttpError keeps fields only when given', () => {
+  assert.equal(Object.hasOwn(new HttpError(400, 'x'), 'fields'), false);
+  assert.deepEqual(new HttpError(400, 'x', { fields: [{ path: 'path/id', rule: 'type' }] }).fields, [{ path: 'path/id', rule: 'type' }]);
 });
 
 test('an HttpError without reason carries none', async () => {
