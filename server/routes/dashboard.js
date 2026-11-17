@@ -6,15 +6,15 @@
 
 import { createLogger } from '../logger.js';
 import express from 'express';
-import { hydrateNotesWithCategories } from '../services/note-categories.js';
 import * as db from '../db.js';
-import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
 import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { resolveCalendarSelection } from '../services/calendar-selection.js';
 import { normalizeCategoryFilter } from '../services/task-scope.js';
 import { emptyTasksOverview, tasksOverviewSlice } from '../services/tasks-slices.ts';
 import { emptyShoppingOverview, shoppingOverviewSlice } from '../services/shopping-slices.ts';
 import { emptyMealsOverview, mealsOverviewSlice } from '../services/meals-slices.ts';
+import { emptyNotesOverview, normalizeNoteCategoryFilter, notesOverviewSlice } from '../services/notes-slices.ts';
+import { birthdaysOverviewSlice, emptyBirthdaysOverview } from '../services/birthdays-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -26,7 +26,6 @@ import {
   householdAudienceShows,
   resolveBudgetMode,
   rowReader,
-  visibleWhere,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
@@ -86,10 +85,10 @@ const runSlice = sliceRunner(log);
 const DENIED_PAYLOAD = Object.freeze({
   // Geburtstage gehören zum Kalender-Modul, nicht zu einem eigenen — dieselbe
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
-  calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdays() }),
+  calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdaysOverview() }),
   tasks: () => emptyTasksOverview(),
   meals: () => emptyMealsOverview(),
-  notes: () => ({ pinnedNotes: [], pinnedNotesCount: 0, notesTotal: 0 }),
+  notes: () => emptyNotesOverview(),
   shopping: () => emptyShoppingOverview(),
   // Der Monat bleibt stehen: er ist keine Budgetzahl, sondern der Zeitraum, auf
   // den die Kachel beschriftet ist — und er steht ohnehin im Kalender.
@@ -134,15 +133,6 @@ function emptyAnswer(context) {
   const empty = { users: [], countdowns: [], countdownTotal: 0, quicklinks: [] };
   for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
   return empty;
-}
-
-/**
- * Die leere Fassung der Geburtstags-Kachel. Eigene Funktion, weil sie zwei
- * Wege hat: das entzogene Kalender-RECHT nimmt sie mit (oben), der
- * Haushaltsschalter `birthdays` nimmt sie allein (#1660, siehe die Route).
- */
-function emptyBirthdays() {
-  return { birthdays: [], birthdayCount: 0, birthdayTotal: 0, birthdaySoonCount: 0 };
 }
 
 /** Wie viele beendete Termine von heute ausserhalb des Deckels mitkommen (#1449). */
@@ -282,25 +272,9 @@ router.get('/', (req, res) => {
    * Aufgabe wieder verschwinden lässt, nähme eine Entscheidung zurück, die
    * jemand ausdrücklich getroffen hat. */
   const taskCategories = normalizeCategoryFilter(req.query.tasks_category);
-  const noteCategories = [...new Set(
-    (Array.isArray(req.query.notes_category) ? req.query.notes_category : [req.query.notes_category])
-      .map(Number)
-      .filter((id) => Number.isInteger(id) && id > 0),
-  )].slice(0, 50);
-  const noteCategoryBinds = Object.fromEntries(noteCategories.map((id, index) => [`note_category_${index}`, id]));
-  // Ein EXISTS je Auswahl ist absichtlich AND. Die Sichtbarkeitsbedingung im
-  // Unterselect verhindert, dass erratene IDs fremder persoenlicher Kategorien
-  // verraten, an welchen geteilten Notizen sie haengen.
-  const noteCategoryAnd = noteCategories.map((_id, index) => `
-    AND EXISTS (
-      SELECT 1
-      FROM note_category_assignments nca
-      JOIN note_categories nc ON nc.id = nca.category_id
-      WHERE nca.note_id = n.id
-        AND nc.id = @note_category_${index}
-        AND ${visibleWhere('note_categories', 'nc', '@me')}
-    )
-  `).join('');
+  // Die Notizkategorien-Auswahl (services/notes-slices.ts): hoechstens 50 Ids,
+  // Unsinn faellt weg.
+  const noteCategories = normalizeNoteCategoryFilter(req.query.notes_category);
   /* FUER WEN DIE ANTWORT IST (#1817). `audience=household` fragt die Fassung
    * fuer eine GETEILTE FLAECHE ab - die Wand. Dort gilt nicht „was darf die
    * angemeldete Person sehen", sondern „was darf jeder sehen": Aufgaben und
@@ -472,7 +446,7 @@ router.get('/', (req, res) => {
   // Geburtstagen die Kachel deshalb nicht weg; die leere Fassung, die der
   // Kalender-Eintrag oben eben geschrieben hat, ueberschreibt der Block unten.
   const birthdaysLeftOut = denied.has('calendar') || birthdaysSwitchedOff(d);
-  if (birthdaysLeftOut) Object.assign(result, emptyBirthdays());
+  if (birthdaysLeftOut) Object.assign(result, emptyBirthdaysOverview());
 
   // Anstehende Termine (nächste 5, 8 oder 12, ab jetzt).
   // Geteilte Logik mit /calendar/upcoming: expandiert wiederkehrende Serien,
@@ -598,50 +572,10 @@ router.get('/', (req, res) => {
     }));
   }
 
-  // Neueste Notizen (gepinnte zuerst, dann aktuellste)
-  if (allows('notes')) try {
-    result.pinnedNotes = d.prepare(`
-      SELECT n.*, u.display_name AS author_name, u.avatar_color AS author_color
-      FROM notes n
-      LEFT JOIN users u ON n.created_by = u.id
-      WHERE ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
-      ORDER BY n.pinned DESC, n.updated_at DESC
-      -- FUENF, WEIL DIE KACHEL ZWEI HOCH SEIN DARF - dieselbe Korrektur, die
-      -- die Geburtstage oben schon bekommen haben und bei der die Notizen
-      -- uebersehen wurden. Der Schnitt stand auf drei und war damit die
-      -- Obergrenze fuer JEDE Kachelgroesse; die Notizkachel startet ab Werk auf
-      -- 1x2, hat also Platz fuer fuenf Zeilen und bekam trotzdem nur drei
-      -- geliefert. Wie viele wirklich erscheinen, entscheidet die Kachel
-      -- (listRowCap in public/pages/dashboard.js) - der Server liefert nur
-      -- den Vorrat fuer die groesste Fassung.
-      LIMIT 5
-    `).all({ me: userId, ...noteCategoryBinds });
-    result.pinnedNotes = hydrateNotesWithCategories(d, result.pinnedNotes, userId);
-    /* `pinnedNotes` HEISST SO, IST ES ABER NICHT: die Liste sortiert Gepinntes
-     * nach vorn und schneidet bei drei ab - sie filtert nicht. Fuer die Vorschau
-     * ist das richtig (sie zeigt, was oben liegt), als ZAHL war es zweimal
-     * falsch: ein Haushalt ohne einen einzigen Pin las "3 angepinnt", einer mit
-     * fuenf Pins ebenfalls "3" (Codex-Review zu PR #754). Die Kennzahlkachel
-     * braucht deshalb eine eigene, echte Zahl. */
-    result.pinnedNotesCount = d.prepare(`
-      SELECT COUNT(*) AS n FROM notes n
-      WHERE n.pinned = 1 AND ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
-    `).get({ me: userId, ...noteCategoryBinds }).n;
-    /* UND DIE MENGE, AUS DER DIE VORSCHAU SCHOEPFT - fuer die Badge und das
-     * „+N weitere" der Kachel. `pinnedNotesCount` ist dafuer die falsche Zahl:
-     * die Vorschau fuellt nach den angehefteten mit den neuesten auf, eine Badge
-     * „1" ueber drei Karten waere derselbe Widerspruch wie vorher die „3" bei
-     * fuenf angehefteten. Derselbe Kategoriefilter wie Liste und Pin-Zahl
-     * (#814: Filter vor Schnitt UND Zahl). */
-    result.notesTotal = d.prepare(`
-      SELECT COUNT(*) AS n FROM notes n
-      WHERE ${visibleWhere('notes', 'n', '@me')} ${noteCategoryAnd}
-    `).get({ me: userId, ...noteCategoryBinds }).n;
-  } catch (err) {
-    log.error('pinnedNotes error:', err.message);
-    result.pinnedNotes = [];
-    result.pinnedNotesCount = 0;
-    result.notesTotal = 0;
+  // Neueste Notizen (services/notes-slices.ts): gepinnte zuerst, dann aktuellste,
+  // dazu die echte Pin-Zahl und die Menge, aus der die Vorschau schoepft.
+  if (allows('notes')) {
+    Object.assign(result, notesOverviewSlice(d, rowsReader, overviewCtx, { categories: noteCategories }, runSlice));
   }
 
   // Einkaufslisten mit offenen Artikeln und die Fassung der Kachel (#1818), aus
@@ -695,60 +629,11 @@ router.get('/', (req, res) => {
     result.familyEvents = [];
   }
 
-  if (!birthdaysLeftOut) try {
-    // family_user_color: die Identitaetsfarbe des verknuepften Mitglieds. Das
-    // Widget zeigt Familien-Geburtstage damit in derselben Farbsprache wie die
-    // Familien-Kachel; Kontakte ohne Verknuepfung bleiben NULL und behalten im
-    // Frontend die neutrale Modul-Toenung (Etappe 4, Critique 2026-08-17).
-    const rows = d.prepare(`
-      SELECT b.*, u.avatar_color AS family_user_color
-        FROM birthdays b
-        LEFT JOIN users u ON u.id = b.family_user_id
-       ORDER BY b.name COLLATE NOCASE ASC
-    `).all();
-    const hydrated = rows
-      .flatMap((row) => hydrateBirthdayOccurrences(d, row))
-      .sort((a, b) => a.days_until - b.days_until
-        || a.name.localeCompare(b.name)
-        || a.kind.localeCompare(b.kind));
-
-    /* DIE ZAHL FUERS NAV-BADGE, UNGEDECKELT (#868).
-     *
-     * Sie darf NICHT aus `result.birthdays` abgeleitet werden: die Liste ist
-     * gleich auf fuenf geschnitten, und das ist der Vorrat der KACHEL, keine
-     * Aussage ueber den Bestand. Ein Haushalt mit sieben Geburtstagen in drei
-     * Tagen bekaeme sonst beim Start eine Fuenf am Nav-Ziel und nach dem
-     * ersten Besuch der Seite eine Sieben - dieselbe Frage, zwei Antworten.
-     *
-     * Der Schnitt bei DREI Tagen ist derselbe wie im Browser
-     * (`BIRTHDAY_BADGE_DAYS` in public/utils/nav-badges.js); ein Guard haelt
-     * beide zusammen. */
-    result.birthdaySoonCount = hydrated.filter((b) => (b.days_until ?? 9999) <= 3).length;
-
-    result.birthdays = hydrated
-      // FUENF, WEIL DIE KACHEL ZWEI HOCH SEIN DARF. Der Schnitt stand auf drei
-      // und war damit die Obergrenze fuer JEDE Kachelgroesse: in der
-      // 1x2-Standardgroesse blieb darunter rund ein Drittel der Karte leer, weil
-      // der Server gar nicht mehr hergab. Wie viele Zeilen wirklich erscheinen,
-      // entscheidet die Kachel (`listRowCap` in public/pages/dashboard.js) - der
-      // Server liefert nur den Vorrat fuer die groesste Fassung. ACHT seit U14:
-      // eine hohe Kachel, die die Packung streckt, zeigt im gewonnenen Platz
-      // weitere Zeilen (gemessen 1440px bis 93px, knapp zwei Zeilen). Die Liste
-      // ist schon sortiert im Speicher, drei Eintraege mehr kosten nichts; das
-      // Heute-Blatt liest daraus nur, was heute ist.
-      .slice(0, 8);
-    result.birthdayCount = rows.length;
-    // Die Liste zaehlt ANLAESSE (Geburtstag und Namenstag je eine Zeile),
-    // `birthdayCount` die Personen. Badge und „+N weitere" der Kachel brauchen
-    // die Menge, aus der die Liste geschnitten ist - sonst stimmt der Rest nur,
-    // solange niemand einen Namenstag hat.
-    result.birthdayTotal = hydrated.length;
-  } catch (err) {
-    log.error('birthdays error:', err.message);
-    result.birthdays = [];
-    result.birthdayCount = 0;
-    result.birthdayTotal = 0;
-    result.birthdaySoonCount = 0;
+  // Die Geburtstags-Kachel (services/birthdays-slices.ts). Ob sie gelesen wird,
+  // entscheidet `birthdaysLeftOut` oben, an der Stelle, an der die leere Fassung
+  // in die Antwort kommt.
+  if (!birthdaysLeftOut) {
+    Object.assign(result, birthdaysOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
   }
 
   // Countdowns (#647): markierte Termine und Aufgaben und bald ablaufende
