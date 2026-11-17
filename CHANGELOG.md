@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The API description marks every value that may be null in the OpenAPI 3.1 way.** 36 places - the
+  fasting and nutrition bodies, the household setup, the waste calendar feed - said so with the
+  OpenAPI 3.0 keyword `nullable`, which a 3.1 client generator ignores, so a generated client treated
+  them as never null. They now carry `null` in their type. Four sample values moved from `example` to
+  `examples`, and two "one of these fields" rules are spelled so that a strict JSON Schema validator
+  accepts them. The API itself did not change.
+
 ## [2.91.1] - 2026-11-17
 
 ### Fixed
