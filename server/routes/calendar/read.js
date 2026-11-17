@@ -13,7 +13,9 @@ import {
   expandAndResolveEventRows, getUpcomingEvents, hydrateEventAttachmentBodies,
 } from '../../services/calendar-event-reader.js';
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
-import { buildMatchQuery, eventSearchWindow, resolveEventSearchRows } from '../../services/search.js';
+import {
+  PAST_SINGLE_EVENT_SQL, buildMatchQuery, eventSearchWindow, resolveEventSearchRows,
+} from '../../services/search.js';
 import { readerBinds, readerVisibleWhere, rowReader } from '../../authorize/index.ts';
 import { isAdminRequest } from '../../middleware/require-admin.js';
 import { documentViewer } from '../../services/document-links.js';
@@ -202,7 +204,14 @@ router.get('/search', (req, res) => {
       WHERE ${whereSql}
     `).get({ match, userId }).n;
 
-    const rows = db.get().prepare(`
+    // Wiederkehrende Treffer stehen an ihrer nächsten Instanz ab heute (statt des
+    // Serienstarts, der Jahre zurückliegen kann). Findet die Serie im Fenster
+    // keine kommende Instanz, bleibt der Master-Termin unverändert (#471). Das
+    // Fenster teilt sich diese Route mit der globalen Suche (#1607).
+    const database = db.get();
+    const window = eventSearchWindow(database);
+
+    const rows = database.prepare(`
       SELECT e.*,
              u_assigned.display_name AS assigned_name,
              u_assigned.avatar_color AS assigned_color,
@@ -239,16 +248,19 @@ router.get('/search', (req, res) => {
       LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
       LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
       WHERE ${whereSql}
-      ORDER BY e.start_datetime ASC
+      -- Der Schnitt bei @limit folgt der globalen Suche (calendarSearchSlice):
+      -- Kommendes und Serien zuerst, dann vergangene Einzeltermine ab dem
+      -- juengsten. Nach dem gespeicherten Start aufsteigend verdraengte eine
+      -- alte Serienstammzeile oder ein Jahr Vergangenes die kommenden Termine.
+      ORDER BY ${PAST_SINGLE_EVENT_SQL} ASC,
+               CASE WHEN ${PAST_SINGLE_EVENT_SQL} THEN NULL ELSE e.start_datetime END ASC,
+               e.start_datetime DESC,
+               CASE WHEN ${PAST_SINGLE_EVENT_SQL} THEN e.id END DESC,
+               e.id ASC
       LIMIT @limit
-    `).all({ match, userId, limit: LIMIT });
+    `).all({ match, userId, from: window.from, limit: LIMIT });
 
-    // Wiederkehrende Treffer auf die nächste Instanz ab heute auflösen (statt des
-    // Serienstarts, der Jahre zurückliegen kann). Findet die Serie im Fenster
-    // keine kommende Instanz, bleibt der Master-Termin unverändert (#471). Das
-    // Fenster teilt sich diese Route mit der globalen Suche (#1607).
-    const database = db.get();
-    const window = eventSearchWindow(database);
+    // Angezeigt wird aufsteigend nach dem aufgeloesten Start (resolveEventSearchRows).
     const resolved = resolveEventSearchRows(database, rows, window.from, window.to);
 
     res.json({

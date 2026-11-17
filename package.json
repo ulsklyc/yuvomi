@@ -505,7 +505,7 @@
     "test:split-recurring-past-start": "node --test test/test-split-recurring-past-start.js",
     "test:split-recurring-failed": "node --test test/test-split-recurring-failed.js",
     "test:search": "node test/test-search.js",
-    "test:calendar-search": "node test/test-calendar-search.js",
+    "test:calendar-search": "node test/test-calendar-search.js && node test/test-calendar-search-cut.js",
     "test:calendar-exceptions": "node scripts/with-env.mjs TZ=UTC node --test test/test-calendar-exceptions.js && node scripts/with-env.mjs TZ=America/Chicago node --test test/test-calendar-exceptions.js",
     "test:recurring-scope": "node test/test-recurring-scope.js",
     "test:rrule-ui": "node --loader ./test/test-browser-loader.mjs --test test/test-rrule-ui.js",

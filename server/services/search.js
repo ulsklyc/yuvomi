@@ -39,7 +39,7 @@ import { budgetSearchSlice } from './budget-slices.ts';
 
 export { SEARCH_LIMIT, foldSearchText, searchExcerpt } from './search-text.ts';
 export {
-  eventSearchWindow, resolveEventSearchRows, upcomingEventsFirst,
+  PAST_SINGLE_EVENT_SQL, eventSearchWindow, resolveEventSearchRows, upcomingEventsFirst,
 } from './search-events.ts';
 
 /**
