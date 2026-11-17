@@ -2785,7 +2785,10 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
 - **Saeulendiagramm mit einer Reihe (R20, Haushaltshilfe):** Saeulen auf einer Haarlinie,
   keine volle Bahn (die las sich als Fortschritt); bezahlt im Vollton der Serie, offen als
   `--tint-hint`-Tint derselben Serie, Legende darunter; ein leerer Monat traegt nur die
-  Grundlinie und keinen "0,00 €"-Wert, ganze Betraege ohne Nachkommastellen.
+  Grundlinie und keinen "0,00 €"-Wert. Die Zahl ueber der Saeule ist immer ganz, auch ein
+  krummer Betrag wird kaufmaennisch gerundet (Folge zu #2772: "1.234,50 €" stiess bei 320-390px
+  an die Nachbarspalte); der genaue Betrag steht im Namen der Spalte, im Titel der Spur, in
+  den Besuchen und im Bericht.
 - **Zahlen-Stepper (R20, "Alle N Wochen"):** das native `<input type="number">` bleibt das
   Feld (Label, Tastatur), links und rechts `btn--secondary btn--icon` mit Minus/Plus; an der
   Grenze `disabled`, der Fokus geht dann ins Feld.

@@ -207,8 +207,12 @@ test('local tag folders can be created without saved views, using AND or OR with
         console.error('Tag mode:', match, await page.$eval('#pl-error', (/** @type {HTMLElement} */ el) => el.textContent), errors);
         throw err;
       });
-      assert.equal(await page.$eval('.modal-panel [type="submit"]', (/** @type {HTMLButtonElement} */ el) => el.disabled), true, 'an empty filter cannot save');
+      assert.equal(await page.$eval('.modal-panel [type="submit"]', (/** @type {HTMLButtonElement} */ el) => el.disabled), false, 'the primary action validates on submit');
       await page.type('#pl-name', `Tag ${match}`);
+      const foldersBefore = await page.$$eval('[data-pl-folder]', (/** @type {HTMLElement[]} */ els) => els.length);
+      await clickPastDeadTime(page, '.modal-panel [type="submit"]');
+      await page.waitForSelector('[data-pl-filter-tags][aria-invalid="true"]');
+      assert.equal(await page.$$eval('[data-pl-folder]', (/** @type {HTMLElement[]} */ els) => els.length), foldersBefore, 'an empty tag filter must never create a folder');
       await page.select('#pl-tag-match', match);
       await page.click('[data-pl-filter-tags] input[value="7"]');
       await page.click('[data-pl-more-tags]');

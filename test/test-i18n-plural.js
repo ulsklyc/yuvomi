@@ -644,8 +644,9 @@ test('t() waehlt in cs, pl, ru, uk und ar die Form fuer 2, 5 und 11 (#1473)', as
     ['pl', 'dashboard.metricPoints', 2, '2 punkty'],
     ['pl', 'dashboard.metricPoints', 5, '5 punktów'],
     ['pl', 'dashboard.metricPoints', 22, '22 punkty'],
-    ['ru', 'dashboard.daysLeft', 2, '2 дня'],
-    ['ru', 'dashboard.daysLeft', 11, '11 дн.'],
+    // ru kuerzt "дн." ab: Zahl und Einheit stehen mit U+00A0 (NUMBER_UNIT_KEYS in test-i18n.js)
+    ['ru', 'dashboard.daysLeft', 2, '2 дня'],
+    ['ru', 'dashboard.daysLeft', 11, '11 дн.'],
     ['uk', 'tasks.pointsSummary', 3, '3 бали'],
     ['uk', 'tasks.pointsSummary', 12, '12 балів'],
     ['ar', 'dashboard.daysLeft', 2, 'يومان'],

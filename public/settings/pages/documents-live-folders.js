@@ -97,7 +97,7 @@ function buildAccount(account, { canManage, signal }) {
         ${settingRowHtml({ label: t('settings.liveFolders.tags'), labelFor: tagsId, description: text('tagsHint'),
           control: `<select class="form-input" id="${tagsId}"><option value="all">${esc(text('allTags'))}</option><option value="selected">${esc(text('selectedTags'))}</option></select>` })}
       </div>
-      <h4 class="settings-group__title" id="live-fields-${account.id}">${esc(text('displayFields'))}</h4>
+      <h4 class="settings-group__title" id="live-fields-${account.id}">${esc(t('settings.liveFolders.displayFields'))}</h4>
       <div class="row-carrier settings-group" data-display-fields role="group" aria-labelledby="live-fields-${account.id}">
         ${DISPLAY_FIELDS.map((field) => settingSwitchRowHtml({ label: t(`documents.paperless.fields.${field}`),
           checked: account.display_fields?.includes(field), attrs: { value: field, 'data-instant-save': '' } })).join('')}

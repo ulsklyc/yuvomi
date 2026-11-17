@@ -2,7 +2,8 @@
 import { paperlessControl, paperlessApiError } from '/components/paperless-dom.js';
 import { api } from '/api.js';
 import { openPaperlessTags } from '/components/paperless-tags.js';
-import { t, formatDate } from '/i18n.js';
+import { t } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
@@ -19,7 +20,7 @@ function overviewFields(doc, fields) {
   return fields.filter((field) => DISPLAY_FIELDS.includes(field)).map((field) => {
     let value = doc.display?.[field];
     if (typeof value === 'string' && ['created', 'added', 'modified'].includes(field)) {
-      value = formatDate(field === 'created' ? value.slice(0, 10) : value) || null;
+      value = dateText(field === 'created' ? value.slice(0, 10) : value, { year: true }) || null;
     }
     return `<div class="paperless-folder__field" data-pl-field="${field}"><dt>${esc(t(`documents.paperless.fields.${field}`))}</dt><dd>${esc(value === null || value === undefined || value === '' ? '-' : String(value))}</dd></div>`;
   }).join('');
@@ -220,7 +221,7 @@ function createFolderEditor({ canManage, alive, accounts, members, userId, signa
           <div data-pl-tag-source hidden>
             <div class="form-group"><label class="form-label" for="pl-tag-match">${esc(t(key('tagMatch')))}</label><select class="form-input" id="pl-tag-match"><option value="all">${esc(t(key('matchAll')))}</option><option value="any">${esc(t(key('matchAny')))}</option></select></div>
             <p class="form-hint">${esc(t(key('tagFilterHint')))}</p>
-            <div class="paperless-tags__filter-list" data-pl-filter-tags role="group" aria-label="${esc(t(key('tags.action')))}"></div>
+            <div class="form-field"><div class="paperless-tags__filter-list" data-pl-filter-tags role="group" tabindex="-1" aria-label="${esc(t(key('tags.action')))}"></div></div>
             <button class="btn btn--secondary btn--sm" type="button" data-pl-more-tags hidden>${esc(t(key('tags.more')))}</button>
             <button class="btn btn--secondary btn--sm" type="button" data-pl-retry-tags hidden>${esc(t('common.retry'))}</button>
           </div>` : ''}
@@ -279,6 +280,10 @@ function createFolderEditor({ canManage, alive, accounts, members, userId, signa
           event.preventDefault();
           if (!current() || submit.disabled) return;
           if (reportFieldErrors(constraintErrors(/** @type {HTMLFormElement} */ (event.currentTarget)))) return;
+          if (!folder && tagSource() && !selectedTags.size) {
+            reportFieldErrors([[paperlessControl(panel, '[data-pl-filter-tags]'), t('common.required')]]);
+            return;
+          }
           /** @type {{name: string, visibility: string, confirm_share: boolean, allowed_member_ids: number[], account_id?: number, view_id?: number, tag_filter?: {tag_ids: number[], match: string}}} */
           const body = {
             name: /** @type {HTMLInputElement} */ (paperlessControl(panel, '#pl-name')).value.trim(),
@@ -319,7 +324,7 @@ function bindFolderSourcePicker({ panel, current, signal, options, submit, showE
   const tagSource = () => sourceSelect?.value === 'tags';
   /** @type {Set<number>} */
   const selectedTags = new Set();
-  let tagsPage = 0, tagsSerial = 0, tagsLoading = false;
+  let tagsPage = 0, tagsSerial = 0;
   const loadFilterTags = async (append = false) => {
     const mine = ++tagsSerial;
     const accountId = /** @type {HTMLSelectElement} */ (paperlessControl(panel, '#pl-account')).value;
@@ -327,7 +332,7 @@ function bindFolderSourcePicker({ panel, current, signal, options, submit, showE
     const more = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[data-pl-more-tags]'));
     const retry = /** @type {HTMLButtonElement} */ (paperlessControl(panel, '[data-pl-retry-tags]'));
     if (!append) { tagsPage = 0; selectedTags.clear(); list.replaceChildren(); }
-    tagsLoading = true; submit.disabled = true; more.disabled = true; retry.hidden = true; error.hidden = true;
+    submit.disabled = true; more.disabled = true; retry.hidden = true; error.hidden = true;
     try {
       const result = await api.get(`${ROOT}/filter-tags?account_id=${accountId}&page=${tagsPage + 1}`, { signal });
       if (!current() || mine !== tagsSerial || !tagSource()) return;
@@ -340,7 +345,6 @@ function bindFolderSourcePicker({ panel, current, signal, options, submit, showE
         input.checked = selectedTags.has(tag.id);
         input.addEventListener('change', () => {
           if (input.checked) selectedTags.add(tag.id); else selectedTags.delete(tag.id);
-          submit.disabled = tagsLoading || !selectedTags.size;
         }, options);
         label.append(input, document.createTextNode(` ${tag.name} (#${tag.id})`));
         list.append(label);
@@ -349,7 +353,7 @@ function bindFolderSourcePicker({ panel, current, signal, options, submit, showE
       if (!list.childElementCount) { error.textContent = t(key('tags.empty')); error.hidden = false; }
     } catch (err) { if (current() && mine === tagsSerial && tagSource()) { showError(err); retry.hidden = false; } }
     finally { if (current() && mine === tagsSerial && tagSource()) {
-      tagsLoading = false; more.disabled = false; submit.disabled = !selectedTags.size;
+      more.disabled = false; submit.disabled = false;
     } }
   };
   let viewsPage = 0;

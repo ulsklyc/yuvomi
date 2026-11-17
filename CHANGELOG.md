@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
 - **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+
+## [2.91.1] - 2026-11-17
+
+### Fixed
 - **The "session cannot be checked" screen is readable on the light field.** When the server
   did not answer the sign-in check at startup (offline, a server error, too many requests), the
   title, the sentence and "Technical details" stood directly on the violet light field behind
@@ -29,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen, the hint "Trying again in 2 s" could break between the number and 秒 on a narrow
   panel. Every other language already joined them with a non-breaking space; zh-Hant now does
   too.
+- **Numbers stay on one line with their unit in every language.** Texts such as "up to 25 MB",
+  "1 h 30 min", "45 %", the wind speed on the weather card or the Russian and Ukrainian "5 дн."
+  could break between the number and its abbreviated unit, leaving the unit alone at the start
+  of the next line. All 27 languages now join them with a non-breaking space, and a test keeps
+  new texts to the same rule.
+- **The housekeeping payments chart shows all six months on a phone.** On screens narrower
+  than about 390px the chart scrolled sideways and started at the oldest month, so the current
+  month on the right was cut off or hidden. The six columns now fit the card from a 320px wide
+  screen, and amounts up to four digits stay readable above their column. The number above
+  a column is now always a whole amount, so a month total like €1,234.50 no longer runs into
+  its neighbour; the exact amount is still shown in the visits and the report.
 
 ## [2.91.0] - 2026-11-15
 
