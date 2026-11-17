@@ -69,7 +69,8 @@ const CAL_TOGETHER = 'https://dav.example/together/';
 const CAL_BEN = 'https://dav.example/ben/';
 const UID = 'dentist@example.org';
 
-let OWNER; let ANNA; let BEN; let CHRIS; let STAFF;
+/** @type {number} */ let OWNER; /** @type {number} */ let ANNA; /** @type {number} */ let BEN;
+/** @type {number} */ let CHRIS; /** @type {number} */ let STAFF;
 
 function addUser(username, color = '#123456') {
   return Number(db.prepare(`
@@ -80,6 +81,7 @@ function addUser(username, color = '#123456') {
 
 function resetTables() {
   for (const t of ['reminders', 'event_assignments', 'calendar_event_exceptions', 'calendar_events',
+    'family_document_access', 'family_documents',
     'external_calendar_assignees', 'ics_subscription_assignees', 'caldav_reminder_assignees',
     'external_calendars', 'caldav_calendar_selection', 'caldav_reminder_selection', 'task_assignments',
     'tasks', 'ics_subscriptions', 'caldav_accounts', 'calendar_pending_deletions', 'housekeeping_workers', 'users']) {
@@ -212,6 +214,26 @@ describe('Kalender mit mehreren Standard-Personen (#1897)', () => {
     assert.equal(await sa.applyDefaultAssigneesToExisting(db, candidates), 1);
     assert.deepEqual(assignmentsOf(id), sorted([ANNA, BEN]));
     assert.equal(primaryOf(id), ANNA);
+  });
+
+  it('the backfill adds the set to a restricted attachment of an assignees-only event, nothing else', async () => {
+    const together = calendar(CAL_TOGETHER, 'Zusammen', [ANNA, BEN]);
+    const documentId = Number(db.prepare(`
+      INSERT INTO family_documents (name, original_name, mime_type, file_size, content_data, visibility, created_by)
+      VALUES ('anhang', 'anhang.txt', 'text/plain', 1, 'x', 'restricted', ?) RETURNING id
+    `).get(OWNER).id);
+    db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
+    const id = Number(db.prepare(`INSERT INTO calendar_events (title, start_datetime, created_by, external_source,
+      external_calendar_id, calendar_ref_id, visibility, attachment_document_id)
+      VALUES ('x', '2026-04-01T09:00', ?, 'caldav', 'u-doc', ?, 'assignees', ?) RETURNING id`).get(OWNER, together, documentId).id);
+
+    assert.equal(await sa.applyDefaultAssigneesToExisting(db, sa.listBackfillCandidates(db)), 1);
+    assert.deepEqual(assignmentsOf(id), sorted([ANNA, BEN]));
+    const doc = db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId);
+    const access = db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .pluck().all(documentId);
+    assert.equal(doc.visibility, 'restricted', 'nothing becomes family');
+    assert.deepEqual(access, sorted([ANNA, BEN, CHRIS]), 'the set sees the event and gets the document; Chris keeps the owner\'s grant');
   });
 
   it('the list of earlier moves names both sets, and a ticked move applies the new set', async () => {

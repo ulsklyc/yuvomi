@@ -36,7 +36,9 @@
  */
 
 import type { Database, RowReader } from '../authorize/index.ts';
-import { resolveBudgetMode } from '../authorize/index.ts';
+import { budgetDetailsVisibleWhere, resolveBudgetMode } from '../authorize/index.ts';
+import type { SearchActor, SearchRow, TableSearchQuery } from './search-text.ts';
+import { SEARCH_LIMIT, firstMatches, pick } from './search-text.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
 import * as splitExpenses from './split-expenses.js';
 
@@ -162,7 +164,8 @@ export function budgetOverviewSlice(
       FROM budget_entries
       WHERE amount < 0 AND date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
       GROUP BY category
-      ORDER BY ABS(SUM(amount)) DESC
+      -- Two categories with the same sum: the name decides, not the scan order.
+      ORDER BY ABS(SUM(amount)) DESC, category ASC
       LIMIT 5
     `).all(from, to, ...ownerParams) as TopExpenseRow[];
     const topExpense = topExpenses[0];
@@ -254,4 +257,30 @@ export function splitBalanceOverviewSlice(
     const householdCurrency = (db.prepare("SELECT value FROM sync_config WHERE key = 'currency'").get() as { value?: string } | undefined)?.value || 'EUR';
     return { splitBalance: openBalancesForUser(db, userId, { householdCurrency }) };
   }, emptySplitBalanceOverview());
+}
+
+/**
+ * The budget hits of the global search (services/search.js runTableSearch, bucket
+ * `budget`). No FTS index: the rows come in the SQL order and the first
+ * SEARCH_LIMIT that match stay. The row rule comes from authorize
+ * (budgetDetailsVisibleWhere, bound to `actor.userId` as `@userId` in personal
+ * mode, as before). The SQL is the search's, word for word.
+ */
+export function budgetSearchSlice(db: Database, actor: SearchActor, query: TableSearchQuery): SearchRow[] {
+  const { matches } = query;
+  const userId = actor.userId;
+  const limit = SEARCH_LIMIT;
+  // Budget: gesucht wird im TITEL, also nur dort, wo der Betrachter den Titel
+  // sieht - budgetDetailsVisibleWhere, nicht budgetVisibilityWhere. Eine
+  // 'shared_amount'-Zeile eines anderen zeigt ihm Datum und Betrag, aber nicht
+  // den Zweck (#659); fand die Suche sie ueber den Zweck, verriete schon der
+  // Treffer, was die Stufe verschweigt. Neueste zuerst.
+  const mode = resolveBudgetMode(db);
+  return firstMatches(db.prepare(`
+      SELECT b.id, b.title, b.amount, b.date
+      FROM budget_entries b
+      WHERE ${budgetDetailsVisibleWhere('b', '@userId', { mode })}
+      ORDER BY b.date DESC, b.id DESC
+    `).all(mode === 'personal' ? { userId } : {}) as SearchRow[], matches, (b) => [b.title], limit)
+    .map((b) => pick(b, ['id', 'title', 'amount', 'date']));
 }

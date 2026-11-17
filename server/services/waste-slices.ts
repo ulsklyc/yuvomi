@@ -26,6 +26,8 @@
 import type { Database, RowReader } from '../authorize/index.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
 import * as wasteStore from './waste-store.js';
+import type { IndexSearchQuery, SearchActor, SearchRow } from './search-text.ts';
+import { SEARCH_LIMIT } from './search-text.ts';
 import { shiftDateKey } from '../utils/timezone.js';
 
 type WasteOccurrence = {
@@ -84,4 +86,28 @@ export function wasteOverviewSlice(
       }));
   }, []);
   return { wastePickups };
+}
+
+/**
+ * The waste type hits of the global search (services/search.js runSearch, bucket
+ * `waste`). Household property: no row rule, the actor is unused. The SQL is the
+ * search's, word for word.
+ */
+export function wasteSearchSlice(db: Database, _actor: SearchActor, query: IndexSearchQuery): SearchRow[] {
+  const { match } = query;
+  const limit = SEARCH_LIMIT;
+  // Waste: nur der Typ-Katalog ist indiziert (Migration 206) - nie die von
+  // waste-domain.js berechneten, potenziell unbegrenzten Termine (siehe dortige
+  // Migrationsnotiz). Kein Besitzer-Filter (Haushaltseigentum, wie Kontakte),
+  // archivierte Typen bleiben ausgeblendet wie überall sonst in Waste.
+  return db.prepare(`
+    SELECT wt.id, wt.name AS title, wt.icon, wt.color
+    FROM search_index s
+    JOIN waste_types wt ON wt.id = s.entity_id
+    WHERE s.entity = 'waste_type' AND s.search_index MATCH @match
+      AND wt.archived = 0
+    -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+    ORDER BY wt.sort_order ASC, wt.name ASC, wt.id ASC
+    LIMIT @limit
+  `).all({ match, limit }) as SearchRow[];
 }

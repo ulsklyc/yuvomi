@@ -36,7 +36,10 @@
  */
 
 import type { Database, RowReader } from '../authorize/index.ts';
+import { careAwareClause } from '../authorize/index.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
+import type { IndexSearchQuery, SearchActor, SearchRow } from './search-text.ts';
+import { SEARCH_LIMIT, withExcerpt } from './search-text.ts';
 import { FastingError, getFastingDashboardState } from './fasting.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from './health-nutrition.js';
 
@@ -152,6 +155,8 @@ export function healthOverviewSlice(
       SELECT id, name, stock_qty, refill_threshold
       FROM medications
       WHERE active = 1 AND user_id = ?
+      -- A fixed order: of two doses at the same time, nextDose names the first med.
+      ORDER BY id ASC
       `).all(userId) as MedRow[];
     const scheduleStmt = db.prepare(`
       SELECT time_of_day, days_mask, start_date, end_date
@@ -221,4 +226,54 @@ export function healthOverviewSlice(
   ), emptyNutritionWidget());
 
   return { health, fasting, nutrition };
+}
+
+/*
+ * THE HEALTH HITS OF THE GLOBAL SEARCH (services/search.js runSearch, buckets
+ * `meds` and `activities`). Two functions, not one: the orchestration checks each
+ * bucket on its own (`allows('meds')`, `allows('activities')`) and writes each to
+ * its own key, so one slice per bucket keeps that one to one. The SQL is the
+ * search's, word for word.
+ *
+ * Health: the row rule of the health lists (GET /health/medications,
+ * GET /health/activities) - the viewer's own rows, `family` rows, and every
+ * row of a person whose care was granted to the viewer (#584). The clause
+ * binds positionally, so these two queries do as a whole: match, the
+ * clause's parameters, limit - in the order of the placeholders.
+ */
+
+/** Medications: hits on name and dosage text. */
+export function healthMedsSearchSlice(db: Database, actor: SearchActor, query: IndexSearchQuery): SearchRow[] {
+  const { match } = query;
+  const userId = actor.userId;
+  const limit = SEARCH_LIMIT;
+  const visible = careAwareClause('m', userId, null);
+  return db.prepare(`
+      SELECT m.id, m.name AS title, m.dosage_text, m.active
+      FROM search_index s
+      JOIN medications m ON m.id = s.entity_id
+      WHERE s.entity = 'medication' AND s.search_index MATCH ?
+        AND ${visible.sql}
+      -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+      ORDER BY m.active DESC, m.name ASC, m.id ASC
+      LIMIT ?
+    `).all(match, ...visible.params, limit) as SearchRow[];
+}
+
+/** Activities: hits on type and note, the same row rule. */
+export function healthActivitiesSearchSlice(db: Database, actor: SearchActor, query: IndexSearchQuery): SearchRow[] {
+  const { text: q, match } = query;
+  const userId = actor.userId;
+  const limit = SEARCH_LIMIT;
+  const visible = careAwareClause('a', userId, null);
+  return (db.prepare(`
+      SELECT a.id, a.type AS title, a.note, a.performed_at
+      FROM search_index s
+      JOIN health_activities a ON a.id = s.entity_id
+      WHERE s.entity = 'activity' AND s.search_index MATCH ?
+        AND ${visible.sql}
+      -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+      ORDER BY a.performed_at DESC, a.id DESC
+      LIMIT ?
+    `).all(match, ...visible.params, limit) as SearchRow[]).map((row) => withExcerpt(row, q, [row.note]));
 }

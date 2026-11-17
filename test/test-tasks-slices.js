@@ -114,6 +114,32 @@ test('the wall reader narrows the task blocks to visibility all', () => {
   }
 });
 
+test('an undated task: open, never overdue, never due today, sorted last', () => {
+  // The blocks drop `due_date IS NOT NULL` where a NULL comparison is not true
+  // anyway (WHERE, CASE WHEN); this task holds that NULL stays "no date".
+  const undated = addTask('undated', { due: /** @type {any} */ (null) });
+  const undatedDone = addTask('undated done', { due: /** @type {any} */ (null), status: 'done', completedAt: '2026-03-11T08:00:00.000Z' });
+  try {
+    const wednesday = tasksOverviewSlice(db, reader, WEDNESDAY);
+    // 'due wednesday' (10:00) is overdue at 10:30, 'due thursday' is not; the
+    // undated one is not overdue and stands after every dated one.
+    assert.deepEqual(titles(wednesday.urgentTasks), ['due wednesday', 'due thursday', 'undated']);
+    assert.equal(wednesday.openTaskCount, 3, 'an undated task is open');
+    assert.equal(wednesday.overdueTaskCount, 0, 'an undated task is not overdue');
+    assert.deepEqual(wednesday.memberTodayTasks, [{ user_id: ANNA, open_count: 1 }], 'nor due today');
+    assert.deepEqual(wallOf(wednesday), [{ open: ['due wednesday'], done: ['ticked wednesday'] }],
+      'the wall names no undated task, open or done');
+    assert.equal(wednesday.tasksDoneToday, 0);
+
+    const thursday = tasksOverviewSlice(db, reader, THURSDAY);
+    assert.deepEqual(titles(thursday.urgentTasks), ['due wednesday', 'due thursday', 'undated']);
+    assert.equal(thursday.overdueTaskCount, 1);
+    assert.deepEqual(thursday.memberTodayTasks, [{ user_id: ANNA, open_count: 2 }]);
+  } finally {
+    db.prepare('DELETE FROM tasks WHERE id IN (?, ?)').run(undated, undatedDone);
+  }
+});
+
 test('the category filter of the options reaches every block', () => {
   const answer = tasksOverviewSlice(db, reader, WEDNESDAY, { categories: ['no-such-category'] });
   assert.deepEqual(answer.urgentTasks, []);

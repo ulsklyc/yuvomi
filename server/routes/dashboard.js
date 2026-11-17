@@ -8,11 +8,10 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { resolveCalendarSelection } from '../services/calendar-selection.js';
-import { normalizeCategoryFilter } from '../services/task-scope.js';
 import { emptyTasksOverview, tasksOverviewSlice } from '../services/tasks-slices.ts';
 import { emptyShoppingOverview, shoppingOverviewSlice } from '../services/shopping-slices.ts';
 import { emptyMealsOverview, mealsOverviewSlice } from '../services/meals-slices.ts';
-import { emptyNotesOverview, normalizeNoteCategoryFilter, notesOverviewSlice } from '../services/notes-slices.ts';
+import { emptyNotesOverview, notesOverviewSlice } from '../services/notes-slices.ts';
 import { birthdaysOverviewSlice, emptyBirthdaysOverview } from '../services/birthdays-slices.ts';
 import {
   budgetOverviewSlice, emptyBudgetOverview, emptySplitBalanceOverview, splitBalanceOverviewSlice,
@@ -24,26 +23,29 @@ import { calendarOverviewSlice, emptyCalendarOverview, familyEventsOverviewSlice
 import { countdownsOverviewSlice, emptyCountdownsOverview } from '../services/countdowns-slices.ts';
 import { emptyScheduleOverview, scheduleOverviewSlice } from '../services/schedule-slices.ts';
 import { emptyWasteOverview, wasteOverviewSlice } from '../services/waste-slices.ts';
+import { emptyMembersOverview, membersOverviewSlice } from '../services/members-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
   hiddenModulesFor,
   requestHasCapability,
-  asksHouseholdAudience,
   householdAudienceAnswer,
   householdAudienceShows,
+  modulesOutsideHouseholdAudience,
+  openDisplayWallModules,
   rowReader,
+  wallMeals,
+  wallPantryExpiring,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
-import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { serializeEvents } from './calendar/helpers.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { moneyReader } from '../services/reward-money.js';
-import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
+import { overviewQueryOptions } from '../services/overview-query.ts';
 
 const log = createLogger('Dashboard');
 
@@ -119,25 +121,13 @@ const DENIED_PAYLOAD = Object.freeze({
  * nur bei einer Listen-Auswahl, und ein Konto ohne den Einkauf bekommt es nie.
  */
 function emptyAnswer(context) {
-  const empty = { users: [], ...emptyCountdownsOverview(), quicklinks: [] };
+  const empty = { ...emptyMembersOverview(), ...emptyCountdownsOverview(), quicklinks: [] };
   for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
   return empty;
 }
 
-/**
- * `?shopping_list=` als Liste von Listen-Ids (#1818): einzeln oder mehrfach
- * angegeben, nur positive ganze Zahlen, ohne Doppelte, hoechstens 50 - dieselbe
- * Form und Grenze wie `notes_category` und wie die gespeicherten Optionen
- * (preferences.js). Alles andere faellt weg, nie ein Fehler.
- */
-export function normalizeShoppingListFilter(raw) {
-  if (raw === undefined || raw === null) return [];
-  return [...new Set(
-    (Array.isArray(raw) ? raw : [raw])
-      .filter((value) => typeof value === 'string' && /^[1-9]\d{0,14}$/.test(value))
-      .map(Number),
-  )].slice(0, 50);
-}
+// Re-exported for the callers that import it from this route (test:dashboard-shopping-selection).
+export { normalizeShoppingListFilter } from '../services/overview-query.ts';
 
 const router = express.Router();
 
@@ -151,7 +141,7 @@ const router = express.Router();
  *   upcomingEvents: CalendarEvent[],   // Nächste 5 Termine (`events_limit`: 8 oder 12)
  *   familyEvents:   CalendarEvent[],   // Termine je Mitglied fuer die Familienkarte (#1449)
  *   weekEvents:     WeekEvent[],       // Termine, die die Woche ab heute berühren (schlank)
- *   urgentTasks:    Task[],            // High/Urgent mit Fälligkeit ≤ 48h
+ *   urgentTasks:    Task[],            // Max. 5 offene, sichtbare, begonnene Aufgaben jeder Prioritaet: Ueberfaellige zuerst, dann nach Faelligkeit (ohne Datum zuletzt), dann Prioritaet (tasksOverviewSlice)
  *   todayMeals:     Meal[],            // Mahlzeiten für heute
  *   pinnedNotes:    Note[],            // Angepinnte Notizen (max. 3)
  *   users:          User[],            // Alle User (für Avatar-Farben)
@@ -168,92 +158,17 @@ router.get('/', (req, res) => {
   const result = {};
   const userId = req.authUserId || req.session.userId;
 
-  /* WIDGET-OPTIONEN KOMMEN ALS QUERY-PARAMETER, NICHT AUS DEM GESPEICHERTEN
-   * LAYOUT (#814). Der Server kennt die Widget-Ids bewusst nicht - sie gehören
-   * dem Frontend, und ein neues Widget soll keine Backend-Änderung kosten. Er
-   * speichert `options` deshalb nur als Form und versteht hier ausschliesslich
-   * die zwei Achsen, die er ohnehin abfragen kann.
-   *
-   * SIE WIRKEN AUF DIE GANZE ÜBERSICHT, nicht auf eine Kachel. Aufgaben stehen
-   * hier an vier Stellen (Liste, Kennzahl, „heute dran" je Mitglied, das
-   * Kopfband) und Termine an dreien; würde eine Auswahl nur die Liste
-   * einschränken, stünden zwei Zeilen unter einer Kachel, die sieben sagt -
-   * derselbe Fehler wie in #647, eine Ebene höher.
-   *
-   * Und sie wirken VOR der Deckelung, weil jede dieser Abfragen ihr eigenes
-   * LIMIT trägt.
-   *
-   * AUSGENOMMEN SIND DIE COUNTDOWNS (#647), und zwar bewusst: dort steht keine
-   * Aufgabe, weil sie in einer Liste vorkommt, sondern weil jemand sie
-   * ausdrücklich markiert hat. Eine Kategorie-Auswahl, die eine markierte
-   * Aufgabe wieder verschwinden lässt, nähme eine Entscheidung zurück, die
-   * jemand ausdrücklich getroffen hat. */
-  const taskCategories = normalizeCategoryFilter(req.query.tasks_category);
-  // Die Notizkategorien-Auswahl (services/notes-slices.ts): hoechstens 50 Ids,
-  // Unsinn faellt weg.
-  const noteCategories = normalizeNoteCategoryFilter(req.query.notes_category);
-  /* FUER WEN DIE ANTWORT IST (#1817). `audience=household` fragt die Fassung
-   * fuer eine GETEILTE FLAECHE ab - die Wand. Dort gilt nicht „was darf die
-   * angemeldete Person sehen", sondern „was darf jeder sehen": Aufgaben und
-   * Termine nur mit Sichtbarkeit `all`, Termine aus ICS-Abos nur aus geteilten.
-   * Wer die Wand aus seiner eigenen Sitzung oeffnet, stellt damit nicht seine
-   * privaten Zeilen in die Kueche.
-   *
-   * DURCHGESETZT WIRD ES HIER, AM LESER, nicht im Browser: was die Antwort
-   * nicht traegt, liegt auch nicht im Speicher des Tabletts. Der Parameter
-   * VERENGT nur - die Haushaltsfassung ist eine Teilmenge dessen, was dieselbe
-   * Person ohnehin bekaeme -, er braucht deshalb kein eigenes Recht.
-   *
-   * UND SIE TRAEGT NUR, WAS DIE WAND ZEICHNET. Welche Schluessel das sind,
-   * steht als Allowlist an einer Stelle (`HOUSEHOLD_AUDIENCE_SHOWS` in
-   * authorize/rows/household.ts); alles andere kommt in der leeren Fassung einer
-   * Modulsperre - Notizen, Budget, geteilte Ausgaben, Schnellzugriffe,
-   * Countdowns, der offene Lohn der Haushaltshilfe, und was nur dem Betrachter
-   * gilt (Dosen, die eigene Schicht, wartende Freigaben: „2 zu bestaetigen"
-   * und „Eisen 20:00" standen aus der Sitzung eines Mitglieds in der Kueche).
-   * Durchgesetzt wird es am Ende der Route (`householdAudienceAnswer`); ein
-   * Modul, von dem die Wand nichts zeichnet, wird vorher gar nicht gelesen
-   * (`leftOut` unten).
-   *
-   * Die normale Uebersicht derselben Sitzung fragt ohne ihn und bleibt
-   * persoenlich. */
-  const householdAudience = asksHouseholdAudience(req.query);
+  // The widget options of the query (services/overview-query.ts): read once, as a
+  // pure function; the reasons for each one stand there with its code.
+  const options = overviewQueryOptions(req.query, { userId, display: req.authMethod === 'display' });
+  const {
+    taskCategories, noteCategories, householdAudience, eventsAssignedTo, includeBirthdays, eventsLimit,
+  } = options;
   // A paired display reads the task and event parts under the wall rule with or
   // without the parameter (rowReader): the personal answer of a display is the wall
   // too, and audience=household is the wall for every account. Only the task and
   // event parts follow it here; the other blocks keep their own rules.
   const rowsReader = rowReader(req, { household: householdAudience });
-  // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
-  // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
-  // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
-  // einen Termin zu (#1207) - das Tablett stuende leer da. Gelesen wird die
-  // Option deshalb HIER als "alle", statt sie beim Speichern der Vorgabe zu
-  // streichen: dieselbe Vorgabe gilt auch fuer Mitglieder, und dort stimmt sie.
-  // DIESELBE ANTWORT GILT FUER JEDE WAND (#1817): mit `audience=household` gibt
-  // es kein "mich", auch nicht aus der Sitzung eines Mitglieds.
-  const eventsAssignedTo = req.query.events_scope === 'mine' && req.authMethod !== 'display' && !householdAudience
-    ? userId : null;
-  /* GEBURTSTAGE IM TERMIN-WIDGET (#927). Wer sie auf der Uebersicht schon als
-   * eigene Kachel stehen hat, las sie zweimal - einmal bei den Geburtstagen,
-   * einmal zwischen den naechsten Terminen. Abwaehlbar ist deshalb der EINE
-   * Ort, an dem sie mitlaufen, statt dass die Kachel danebensteht.
-   *
-   * NICHT UEBERNOMMEN WIRD DER FILTER DES KALENDERMODULS, obwohl die Anfrage
-   * dorthin zeigte: der Ebenen-Schalter dort liegt im localStorage und gilt
-   * fuer das Geraet, die Widget-Optionen liegen in den Einstellungen und gelten
-   * fuer das Konto. Ein Wert an zwei Orten mit zwei Reichweiten waere die
-   * teurere Antwort - am Wandtablet haette das Abwaehlen am Telefon gewirkt
-   * oder eben nicht, je nachdem, welchen der beiden man liest.
-   *
-   * Der Standard bleibt „mit Geburtstagen": ein Filter wirkt nur, wo jemand ihn
-   * gesetzt hat. Der Parameter reist deshalb nur in seiner einen Richtung. */
-  // Den Haushaltsschalter (#1660) kennt der geteilte Leser selbst: sind die
-  // Geburtstage abgeschaltet, laufen sie nicht mit, was immer hier steht.
-  const includeBirthdays = req.query.events_birthdays !== 'hide';
-  // Wie viele Kommende die Kachel listet (#1680): 5, 8 oder 12 aus einer
-  // Allowlist, die der Browser mit dieser Route teilt. Alles andere - fehlend,
-  // leer, `7`, `500`, `abc`, doppelt angegeben - ist die Vorgabe fuenf.
-  const eventsLimit = clampEventLimit(req.query.events_limit);
   /* WELCHE KALENDER DIE KACHEL ZEIGT (#2062, aus D#2037). `events_calendar`
    * nennt Kalender-Schluessel (`local:N`, `cal:N`, `sub:N`, die des
    * Kalendermoduls); ohne den Parameter bleibt alles, wie es war.
@@ -273,7 +188,7 @@ router.get('/', (req, res) => {
    * keiner der Leser, die Auswahl bleibt also folgenlos. */
   let eventCalendars = null;
   try {
-    eventCalendars = resolveCalendarSelection(d, req.query.events_calendar, userId);
+    eventCalendars = resolveCalendarSelection(d, options.eventsCalendar, userId);
   } catch (err) {
     log.error('calendar selection error:', err.message);
   }
@@ -303,7 +218,6 @@ router.get('/', (req, res) => {
   const todayLocalKey = householdWall?.date
     ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const currentMonth = todayLocalKey.slice(0, 7);
-  const deadline48h = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
 
   // Modulrechte des Betrachters (#467, siehe DENIED_PAYLOAD oben). Gelesen aus
   // dem, was die Auth-Schicht schon aufgelöst hat: null für Admins und für
@@ -316,18 +230,11 @@ router.get('/', (req, res) => {
   // kommt in derselben leeren Fassung wie bei einer Rollensperre. Die Quellen der
   // Countdowns gehoeren dazu: Dokumente haben keine eigene Kachel in dieser Antwort.
   const denied = hiddenModulesFor(req, [...Object.keys(DENIED_PAYLOAD), ...COUNTDOWN_MODULES]);
-  // Wand-Displays zeigen Mahlzeiten, Einkauf, Haushaltshilfe, Abfuhr und Vorrat
-  // (#1903): das Heute-Blatt auf der Wand braucht diese Quellen, aber das
-  // Display-Credential hat keinen Modulzugang. Die fuenf Schluessel werden VOR
-  // `modulesLeftOut` aus `denied` entfernt, NICHT danach aus `leftOut` - so
-  // wirkt der Haushaltsschalter weiter: hat ein Haushalt Mahlzeiten abgeschaltet,
-  // fuegt `modulesLeftOut` sie aus `householdDisabledModules` wieder hinzu.
-  const isDisplay = req.authMethod === 'display';
-  if (isDisplay && householdAudience) {
-    for (const key of ['meals', 'shopping', 'housekeeping', 'waste', 'pantry']) {
-      denied.delete(key);
-    }
-  }
+  // The wall rules of this answer (authorize/rows/household.ts) ask who it is for.
+  const wallAudience = { display: req.authMethod === 'display', household: householdAudience };
+  // The display wall reads its today sheet sources without module access (#1903),
+  // before modulesLeftOut so the household switch still applies.
+  openDisplayWallModules(denied, wallAudience);
   // UND DER HAUSHALTSSCHALTER (#1660, docs/DECISIONS.md 11). Bis dahin fragte
   // diese Stelle nur nach Rechten und Scopes: ein haushaltsweit abgeschaltetes
   // Modul lieferte seine Termine, Aufgaben, Buchungen und Medikamente weiter
@@ -337,17 +244,12 @@ router.get('/', (req, res) => {
   // in EINEM Set, damit jede Abfrage unten dieselbe Frage stellt; die leere
   // Fassung ist dieselbe wie bei einer Sperre, die Form der Antwort bleibt.
   const leftOut = modulesLeftOut(d, denied);
-  // Die dritte Achse (#1817): ein Modul, von dem die Haushaltsfassung keinen
-  // Schluessel traegt, wird gar nicht erst gelesen. Im SELBEN Set, damit jede
-  // Abfrage unten weiter eine einzige Frage stellt. Abgeleitet aus der
-  // Allowlist und nicht als zweite Liste gefuehrt - die Regel selbst setzt das
-  // Ende der Route durch (`householdAudienceAnswer`), das hier spart nur die
-  // Abfragen, deren Ergebnis dort ohnehin leer herauskaeme.
-  if (householdAudience) {
-    for (const [key, build] of Object.entries(DENIED_PAYLOAD)) {
-      if (!Object.keys(build({ month: currentMonth })).some(householdAudienceShows)) leftOut.add(key);
-    }
-  }
+  // The third axis (#1817): a module the household audience carries no key of is
+  // not read at all, in the same set.
+  const emptyModules = () => Object.fromEntries(
+    Object.entries(DENIED_PAYLOAD).map(([key, build]) => [key, build({ month: currentMonth })]),
+  );
+  for (const key of modulesOutsideHouseholdAudience(wallAudience, emptyModules)) leftOut.add(key);
   for (const key of leftOut) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));
   const allows = (moduleKey) => !leftOut.has(moduleKey);
   // Dasselbe fuer die Schluessel, die keinem Modul gehoeren (Countdowns,
@@ -366,10 +268,10 @@ router.get('/', (req, res) => {
   const overviewCtx = { today: todayLocalKey, zone: householdTimeZone(d), now };
 
   // serializeEvents() (routes/calendar/helpers.js) an diese Anfrage gebunden:
-  // Dokumentrechte des Betrachters, Admin-Flag. Bleibt in der Route - ein Dienst,
+  // Dokumentrechte des Betrachters. Bleibt in der Route - ein Dienst,
   // der eine Route importiert, ist der Schichtbruch, den die Lint-Baseline zaehlt.
   const serializeForViewer = (events) => serializeEvents(events, {
-    database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req),
+    database: d, viewer: documentViewer(req), actorId: userId,
   });
 
   // Die naechsten Termine der Kachel und die Woche des Streifens
@@ -435,7 +337,7 @@ router.get('/', (req, res) => {
   // der Antwort: die zwei Zahlen hier, Listen und Kachel weiter unten.
   const shopping = allows('shopping')
     ? shoppingOverviewSlice(d, rowsReader, overviewCtx, {
-      listSelection: normalizeShoppingListFilter(req.query.shopping_list),
+      listSelection: options.shoppingListSelection,
       withTile: wants('shoppingTile'),
     }, runSlice)
     : null;
@@ -449,17 +351,8 @@ router.get('/', (req, res) => {
   if (allows('meals')) {
     result.todayMeals = mealsOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice).todayMeals;
   }
-  // Displays zeigen nur, was die Wand-Zeile braucht: Datum, Typ, Titel und Koch.
-  // `notes` und `created_by` bleiben zurueck (#1903).
-  if (isDisplay && householdAudience && Array.isArray(result.todayMeals)) {
-    result.todayMeals = result.todayMeals.map(({
-      id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
-      recipe_has_image, recipe_has_own_image,
-    }) => ({
-      id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
-      recipe_has_image: recipe_has_image ?? null, recipe_has_own_image: recipe_has_own_image ?? null,
-    }));
-  }
+  // The display wall gets the fields of the wall line only (#1903).
+  Object.assign(result, { todayMeals: wallMeals(result.todayMeals, wallAudience) });
 
   // Neueste Notizen (services/notes-slices.ts): gepinnte zuerst, dann aktuellste,
   // dazu die echte Pin-Zahl und die Menge, aus der die Vorschau schoepft.
@@ -475,16 +368,10 @@ router.get('/', (req, res) => {
     if (shopping.shoppingTile) result.shoppingTile = shopping.shoppingTile;
   }
 
-  // Alle User (für Avatar-Farben in Widgets)
-  try {
-    result.users = d.prepare(
-      `SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, ${memberPositionSql('u')} AS sort_order FROM users u
-       WHERE ${householdMemberSql('u')}
-       ORDER BY ${memberOrderSql('u')}`
-    ).all();
-  } catch (err) {
-    result.users = [];
-  }
+  // Die Haushaltsmitglieder (services/members-slices.ts) fuer die Avatar-Farben
+  // der Widgets und die Familienkarte darunter. Ein Fehler setzt `[]` und loggt
+  // `users error:` wie jeder andere Block.
+  Object.assign(result, membersOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
 
   // Die Familienkarte (services/calendar-slices.ts, #1449): je Mitglied die
   // beendeten von heute und die naechsten kommenden, ohne „nur meine" und ohne
@@ -591,14 +478,8 @@ router.get('/', (req, res) => {
   if (allows('pantry')) {
     result.pantryExpiring = runSlice('pantryExpiring', () => pantryExpiringSlice(d, todayLocalKey), null);
   }
-  // Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
-  // Kennzahlen und gehoeren nicht an die Wand (#1903).
-  if (isDisplay && householdAudience && Array.isArray(result.pantryExpiring?.todayItems)) {
-    result.pantryExpiring = {
-      ...result.pantryExpiring,
-      todayItems: result.pantryExpiring.todayItems.map(({ name }) => ({ name })),
-    };
-  }
+  // The display wall gets the name of an expiring item only (#1903).
+  Object.assign(result, { pantryExpiring: wallPantryExpiring(result.pantryExpiring, wallAudience) });
 
   // Die zweite Haelfte der Aufgaben-Bloecke, an der Stelle, die diese Schluessel
   // in der Antwort immer hatten (die Reihenfolge haelt der Golden Master fest).

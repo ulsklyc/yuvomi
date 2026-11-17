@@ -19,16 +19,21 @@
  * with its old failure value (TASKS_BLOCK_FAILED). Without a guard a failure
  * throws.
  *
- * THE SQL IS THE ROUTE'S, WORD FOR WORD. Several orderings have no unique
- * tiebreak; the golden master (test:overview-golden) holds the answers, not the
- * ties, so an ordering "tidied up" here would change answers silently.
+ * THE SQL IS THE ROUTE'S, minus redundant NULL guards: `due_date IS NOT NULL`
+ * next to a comparison on `due_date` in a WHERE conjunction or a CASE WHEN, where
+ * NULL is not true either way (an undated task in test:tasks-slices holds it).
+ * Several orderings have no unique tiebreak; the golden master
+ * (test:overview-golden) holds the answers, not the ties, so an ordering "tidied
+ * up" here would change answers silently.
  *
  * Dependencies: server/authorize/index.ts (row rule), services/task-scope.js,
  * services/person-avatar.js, utils/timezone.js. Erasable TS syntax only.
  */
 
 import type { Database, RowReader } from '../authorize/index.ts';
-import { householdVisibleWhere, taskVisibleWhere } from '../authorize/index.ts';
+import { householdVisibleWhere, taskVisibleWhere, visibleWhere } from '../authorize/index.ts';
+import type { IndexSearchQuery, SearchActor, SearchRow } from './search-text.ts';
+import { SEARCH_LIMIT, withExcerpt } from './search-text.ts';
 import { categoryBindings, taskCategoryWhere, taskScopeWhere } from './task-scope.js';
 import { personAvatarUrlSql } from './person-avatar.js';
 import { utcToWall } from '../utils/timezone.js';
@@ -149,7 +154,9 @@ export function tasksOverviewSlice(
   //   2. within a group: earlier due date/time first; undated tasks last (NULLS LAST)
   //   3. ties broken by priority rank (urgent=0..none=4)
   // due_sort = due_date + due_time, falling back to 23:59:59 when only a date is set,
-  // and NULL when there is no due_date at all.
+  // and NULL when there is no due_date at all (`||` with NULL is NULL). A NULL
+  // due_sort is not overdue: CASE WHEN takes its branch only when the comparison is
+  // true, and `NULL < @now` is NULL.
   const urgentTasks = guard('urgentTasks', () => {
     // Local, not UTC: the comparison is against `due_date || 'T' || due_time`, and
     // both are stored as local input values. A UTC stamp moved the "overdue"
@@ -160,9 +167,7 @@ export function tasksOverviewSlice(
     return (db.prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
         ${ASSIGNED_USERS_SQL},
-        CASE WHEN t.due_date IS NULL THEN NULL
-             ELSE t.due_date || 'T' || COALESCE(t.due_time, '23:59:59')
-        END AS __due_sort
+        t.due_date || 'T' || COALESCE(t.due_time, '23:59:59') AS __due_sort
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.status != 'done'
@@ -173,13 +178,15 @@ export function tasksOverviewSlice(
         AND ${taskScopeWhere('t', { bind: '@today' })}
         AND ${taskVisibleSql}${taskCategoryAnd}
       ORDER BY
-        CASE WHEN __due_sort IS NOT NULL AND __due_sort < @now THEN 0 ELSE 1 END ASC,
+        CASE WHEN __due_sort < @now THEN 0 ELSE 1 END ASC,
         __due_sort IS NULL ASC,
         __due_sort ASC,
         CASE t.priority
           WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
           WHEN 'low' THEN 3 ELSE 4
-        END ASC
+        END ASC,
+        -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+        t.id ASC
       LIMIT 5
     `).all({ now: nowIso, me: userId, today, ...taskCategoryBinds }) as TaskRow[])
       .map(({ __due_sort, ...task }) => addAssignedUsers(task));
@@ -199,7 +206,7 @@ export function tasksOverviewSlice(
   const overdueTaskCount = guard('overdueTaskCount', () => (db.prepare(`
       SELECT COUNT(*) AS n FROM tasks t
       WHERE t.status != 'done' AND t.archived_at IS NULL
-        AND t.due_date IS NOT NULL AND t.due_date < @today
+        AND t.due_date < @today
         AND ${taskScopeWhere('t', { bind: '@today' })}
         AND ${taskVisibleSql}${taskCategoryAnd}
     `).get({ today, me: userId, ...taskCategoryBinds }) as { n: number }).n, TASKS_BLOCK_FAILED.overdueTaskCount);
@@ -211,7 +218,7 @@ export function tasksOverviewSlice(
       SELECT ta.user_id AS user_id, COUNT(*) AS open_count
       FROM tasks t JOIN task_assignments ta ON ta.task_id = t.id
       WHERE t.status != 'done' AND t.archived_at IS NULL
-        AND t.due_date IS NOT NULL AND t.due_date <= @today
+        AND t.due_date <= @today
         AND ${taskScopeWhere('t', { bind: '@today' })}
         AND ${taskVisibleSql}${taskCategoryAnd}
       GROUP BY ta.user_id
@@ -280,7 +287,7 @@ function wallTasksByMember(
     LEFT JOIN task_completions tc ON tc.task_id = t.id
     WHERE t.archived_at IS NULL
       AND ${householdVisibleWhere('t')}
-      AND t.due_date IS NOT NULL AND t.due_date <= @today
+      AND t.due_date <= @today
       AND ${taskScopeWhere('t', { bind: '@today' })}${categoryAnd}
       AND (t.status != 'done' OR t.due_date = @today OR tc.completed_at >= @since)
     ORDER BY
@@ -316,4 +323,40 @@ function wallTasksByMember(
     }
   }
   return [...byMember.values()];
+}
+
+/**
+ * The task hits of the global search (services/search.js runSearch, bucket `tasks`).
+ * The SQL is the search's, word for word; the viewer is `actor.userId`, bound as
+ * `@userId` as before.
+ */
+export function tasksSearchSlice(db: Database, actor: SearchActor, query: IndexSearchQuery): SearchRow[] {
+  const { text: q, match } = query;
+  const userId = actor.userId;
+  const limit = SEARCH_LIMIT;
+
+  // The row rule of the task list (GET /tasks): `all`, the creator, and for
+  // `assignees` a row in task_assignments. The legacy column `assigned_to` is
+  // no access path: a private task that only names someone there stays with
+  // its creator.
+  // The archive is a wish of the viewer at the list, no limit of what the list
+  // may hold (services/task-scope.js): an archived task stays a hit, as does
+  // one that starts later. It says so (`archived_at`, as in the list row) and
+  // stands last - behind the limit, too: with enough open hits an archived
+  // one drops out, and a narrower query brings it back.
+  return (db.prepare(`
+    SELECT t.id, t.title, t.status, t.priority, t.due_date,
+           t.archived_at, s.body AS _body
+    FROM search_index s
+    JOIN tasks t ON t.id = s.entity_id
+    WHERE s.entity = 'task' AND s.search_index MATCH @match
+      AND t.parent_task_id IS NULL
+      AND ${visibleWhere('tasks', 't', '@userId')}
+    ORDER BY t.archived_at IS NOT NULL,
+             CASE t.status WHEN 'done' THEN 1 ELSE 0 END,
+             t.due_date ASC NULLS LAST,
+             -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
+             t.id ASC
+    LIMIT @limit
+  `).all({ match, userId, limit }) as SearchRow[]).map((row) => withExcerpt(row, q, [row._body]));
 }

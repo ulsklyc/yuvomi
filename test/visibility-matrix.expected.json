@@ -1,7 +1,7 @@
 {
   "_meta": {
     "budget_mode": "personal (sync_config.budget_mode; in shared mode the budget visibility rule is off)",
-    "dashboard_reads": "once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read",
+    "dashboard_reads": "once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read; one more read with every seeded medication at stock_qty 0 (restored to NULL after it) for health.lowStockCount = the number of medications the health tile reads",
     "database": ":memory: on better-sqlite3-multiple-ciphers (DB_PATH override after freshTestDbPath)",
     "detail_documents_route": "GET /documents/:id/thumbnail - same visibility lookup as preview/download, answers 415 for a non-DMS document without reading content; 415 = visible, 404 = not visible, 403 = refused, anything else fails the suite",
     "detail_statuses": "per route exactly three answers: its success status (200; thumbnail 415) = visible, 404 = not visible, 403 = refused; refusals next to visible rows stay in the cell as { visible, refused: { row: status } }",
@@ -312,7 +312,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -347,7 +347,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -359,7 +360,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -397,14 +398,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -724,7 +726,7 @@
         },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -756,7 +758,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 1,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -767,7 +770,7 @@
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -803,14 +806,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1151,7 +1155,7 @@
         },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -1191,7 +1195,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -1205,7 +1210,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1243,14 +1248,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1507,7 +1513,7 @@
         },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": []
@@ -1534,14 +1540,15 @@
         },
         "medications": {
           "health.hasMeds": false,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 0,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1576,14 +1583,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -1923,7 +1931,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -1966,7 +1974,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -1980,7 +1989,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -2018,14 +2027,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -2295,7 +2305,7 @@
         },
         "budget": {
           "budget.entryCount": 0,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": []
@@ -2308,14 +2318,15 @@
         },
         "medications": {
           "health.hasMeds": false,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 0,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [],
           "wallTasks": []
         }
@@ -2337,14 +2348,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [],
           "wallTasks": []
         }
@@ -2927,7 +2939,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -2970,7 +2982,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -2984,7 +2997,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3022,14 +3035,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -3382,7 +3396,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -3425,7 +3439,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3439,7 +3454,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3477,14 +3492,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",
@@ -3837,7 +3853,7 @@
         },
         "budget": {
           "budget.entryCount": 3,
-          "note": "the tile counts own entries only (inline owner_id in the budget block of GET /dashboard, server/routes/dashboard.js), no budgetVisibilityWhere"
+          "note": "the tile counts own entries only (inline owner_id in budgetOverviewSlice of GET /dashboard, server/services/budget-slices.ts), no budgetVisibilityWhere"
         },
         "documents": {
           "countdowns": [
@@ -3880,7 +3896,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3894,7 +3911,7 @@
           "countdowns": [
             "task.member.assignees"
           ],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.admin.assignees",
@@ -3932,14 +3949,15 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
         },
         "tasks": {
           "countdowns": [],
-          "note": "wallTasksByMember (server/routes/dashboard.js) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
+          "note": "wallTasksByMember (server/services/tasks-slices.ts) reads householdVisibleWhere('t'), the visibility = all it spelled inline before; same rows",
           "urgentTasks": [
             "task.admin.all",
             "task.child.all",

@@ -11,10 +11,10 @@
  *             has (`id@start`) and sorts the merge by start.
  *          2. THE DAY. The week strip starts the day before `ctx.today` and spans
  *             nine days; the countdowns count from `ctx.today`; the own shift is
- *             the one of `ctx.today`. Countdowns and shifts read no clock. The event
- *             readers of the tile and the family card take their own `new Date()`
- *             (getUpcomingEvents, called word for word as the route did), so this
- *             suite freezes the clock.
+ *             the one of `ctx.today`. No slice reads a clock: the event readers of
+ *             the tile and the family card get `ctx.now` (getUpcomingEvents), and
+ *             every reading of the system clock throws while they run. The suite
+ *             still freezes the clock for the reference answers.
  *          3. THE OPTIONS. "Only mine", the wall audience, the hidden modules of
  *             the countdowns and the viewer of the shifts reach their readers.
  *          4. ONE FORM. The empty forms carry the keys in the route's order.
@@ -290,6 +290,18 @@ test('the family card: FAMILY_AHEAD_PER_MEMBER per member, each event once, sort
     ...FAMILY, serialize: (events) => events.map((event) => ({ ...event, serialized: true })),
   });
   assert.ok(serialized.familyEvents.every((event) => /** @type {any} */ (event).serialized), 'serialize sees the merge');
+});
+
+test('the tile and the family card read no clock: getUpcomingEvents gets ctx.now', () => {
+  const [tile, family] = withoutClock(() => [
+    calendarOverviewSlice(db, anna, CTX, TILE),
+    familyEventsOverviewSlice(db, anna, CTX, FAMILY),
+  ]);
+  // The same answers as with the frozen clock: ctx.now is that instant.
+  assert.deepEqual(tile, calendarOverviewSlice(db, anna, CTX, TILE));
+  assert.deepEqual(family, familyEventsOverviewSlice(db, anna, CTX, FAMILY));
+  assert.equal(tile.upcomingEvents.filter((event) => !String(event.title).includes('ended')).length, 5);
+  assert.ok(family.familyEvents.length > 0);
 });
 
 test('countdowns: from ctx.today without a clock, hidden modules leave out their source', () => {
