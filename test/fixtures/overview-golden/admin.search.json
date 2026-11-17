@@ -1,0 +1,358 @@
+{
+  "private": {
+    "status": 200,
+    "body": {
+      "tasks": [
+        {
+          "id": 2,
+          "title": "task.admin.private mxtaskadmin",
+          "status": "open",
+          "priority": "high",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        },
+        {
+          "id": 10,
+          "title": "task.admin.private.legacy-assigned-member mxtaskadmin",
+          "status": "open",
+          "priority": "high",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        }
+      ],
+      "events": [
+        {
+          "id": 2,
+          "title": "event.admin.private mxevtadmin",
+          "start_datetime": "2026-03-13",
+          "all_day": 1
+        }
+      ],
+      "notes": [
+        {
+          "id": 2,
+          "title": "note.admin.private mxnoteadmin",
+          "content": "note.admin.private"
+        }
+      ],
+      "contacts": [],
+      "items": [],
+      "meds": [
+        {
+          "id": 1,
+          "title": "medication.admin.private mxmedadmin",
+          "dosage_text": null,
+          "active": 1
+        }
+      ],
+      "activities": [
+        {
+          "id": 1,
+          "title": "matrix",
+          "note": "activity.admin.private mxactadmin",
+          "performed_at": "2026-03-11T08:00",
+          "excerpt": "activity.admin.private mxactadmin"
+        }
+      ],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [
+        {
+          "id": 2,
+          "title": "document.admin.private mxdocadmin",
+          "category": "other"
+        }
+      ],
+      "birthdays": [],
+      "budget": [
+        {
+          "id": 1,
+          "title": "budget.admin.private mxbudgetadmin",
+          "amount": -10,
+          "date": "2026-03-11"
+        }
+      ]
+    }
+  },
+  "mxtaskmember": {
+    "status": 200,
+    "body": {
+      "tasks": [
+        {
+          "id": 4,
+          "title": "task.member.all mxtaskmember",
+          "status": "open",
+          "priority": "high",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        }
+      ],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxevtchild": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [
+        {
+          "id": 7,
+          "title": "event.child.all mxevtchild",
+          "start_datetime": "2026-03-13",
+          "all_day": 1
+        }
+      ],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxnoteadmin": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [
+        {
+          "id": 2,
+          "title": "note.admin.private mxnoteadmin",
+          "content": "note.admin.private"
+        },
+        {
+          "id": 1,
+          "title": "note.admin.all mxnoteadmin",
+          "content": "note.admin.all"
+        }
+      ],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxdocchild": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [
+        {
+          "id": 7,
+          "title": "document.child.family mxdocchild",
+          "category": "other"
+        }
+      ],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxbudgetmember": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": [
+        {
+          "id": 5,
+          "title": "budget.member.shared mxbudgetmember",
+          "amount": -10,
+          "date": "2026-03-11"
+        }
+      ]
+    }
+  },
+  "mxmedmember": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [
+        {
+          "id": 4,
+          "title": "medication.member.family mxmedmember",
+          "dosage_text": null,
+          "active": 1
+        }
+      ],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxactadmin": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [
+        {
+          "id": 1,
+          "title": "matrix",
+          "note": "activity.admin.private mxactadmin",
+          "performed_at": "2026-03-11T08:00",
+          "excerpt": "activity.admin.private mxactadmin"
+        },
+        {
+          "id": 2,
+          "title": "matrix",
+          "note": "activity.admin.family mxactadmin",
+          "performed_at": "2026-03-11T08:00",
+          "excerpt": "activity.admin.family mxactadmin"
+        }
+      ],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "goldkiwi": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [
+        {
+          "id": 9,
+          "title": "goldkiwi plumber"
+        }
+      ],
+      "items": [
+        {
+          "id": 1,
+          "title": "goldkiwi juice",
+          "list_id": 1
+        }
+      ],
+      "meds": [],
+      "activities": [],
+      "waste": [
+        {
+          "id": 1,
+          "title": "goldkiwi bin",
+          "icon": "trash-2",
+          "color": "#6B7280"
+        }
+      ],
+      "recipes": [
+        {
+          "id": 1,
+          "title": "goldkiwi tart"
+        }
+      ],
+      "pantry": [
+        {
+          "id": 1,
+          "title": "goldkiwi jam",
+          "quantity": 1,
+          "unit": "pcs",
+          "expires_on": "2026-03-11"
+        }
+      ],
+      "inventory": [
+        {
+          "id": 1,
+          "title": "goldkiwi blender",
+          "brand": "golden brand",
+          "model": null,
+          "status": "active"
+        }
+      ],
+      "documents": [],
+      "birthdays": [
+        {
+          "id": 1,
+          "title": "goldkiwi grandma",
+          "birth_date": "1950-03-11",
+          "year_unknown": false
+        }
+      ],
+      "budget": []
+    }
+  },
+  "zzqxnohitzz": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "private": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "mxtaskmember": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "mxevtchild": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "mxnoteadmin": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "mxdocchild": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "mxbudgetmember": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "mxmedmember": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "mxactadmin": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "goldkiwi": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  },
+  "zzqxnohitzz": {
+    "status": 403,
+    "body": {
+      "error": "This account can only access Shared expenses.",
+      "code": 403,
+      "reason": "split_guest_scope"
+    }
+  }
+}
