@@ -6,8 +6,8 @@
  * 1x1-Kachel zeigt die Zeilen ihrer Groesse wie jede Liste. Fuenf ist der Auslieferungszustand und wird deshalb weder
  * gespeichert noch mitgeschickt - dieselbe Regel wie `scope: 'all'`.
  *
- * EINE LISTE FUER BEIDE SEITEN. Die Route (`server/routes/dashboard.js`)
- * importiert diese Datei und klemmt mit derselben Funktion, mit der die Kachel
+ * EINE LISTE FUER BEIDE SEITEN. Die Route (`server/routes/dashboard.js`, ueber
+ * `server/services/overview-query.ts`) importiert diese Datei und klemmt mit derselben Funktion, mit der die Kachel
  * schneidet; zwei Listen waeren zwei Gelegenheiten, dass der Server acht
  * liefert und der Browser fuenf zeigt. Deshalb ist die Datei rein: kein
  * Import, kein DOM, kein Node (freigegeben in test/test-layer-boundary.js).
