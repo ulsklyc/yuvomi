@@ -40,8 +40,16 @@
 
 import type { Database, RowReader } from '../authorize/index.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
+import { visibleWhere } from '../authorize/index.ts';
 import * as eventReader from './calendar-event-reader.js';
-import { shiftDateKey } from '../utils/timezone.js';
+import { notBirthdayEventSql } from './household-modules.js';
+import type { IndexSearchQuery, SearchActor, SearchRow, TableSearchQuery } from './search-text.ts';
+import { SEARCH_LIMIT, firstMatches, pick, withExcerpt } from './search-text.ts';
+import {
+  EVENT_SEARCH_CANDIDATES, PAST_SINGLE_EVENT_SQL, birthdayFieldsByEvent, eventSearchWindow,
+  resolveEventSearchRows, upcomingEventsFirst,
+} from './search-events.ts';
+import { householdTimeZone, shiftDateKey, storedToInstantMs } from '../utils/timezone.js';
 
 type EventRow = Record<string, unknown>;
 
@@ -249,4 +257,102 @@ export function familyEventsOverviewSlice(
     return serialize(merged);
   }, []);
   return { familyEvents };
+}
+
+/** Options of the event hits: the household switches (`householdDisabledModules`). */
+export type CalendarSearchOptions = Readonly<{ disabledNav?: ReadonlySet<string> | null }>;
+
+/**
+ * The event hits of the global search (services/search.js runSearch, bucket
+ * `events`). The SQL is the search's, word for word; the viewer is
+ * `actor.userId`, bound as `@userId` as before.
+ */
+export function calendarSearchSlice(
+  db: Database,
+  actor: SearchActor,
+  query: IndexSearchQuery,
+  { disabledNav = null }: CalendarSearchOptions = {},
+): SearchRow[] {
+  const { text: q, match } = query;
+  const userId = actor.userId;
+  const limit = SEARCH_LIMIT;
+
+  // Termine sind Familienbesitz (die Kalenderliste zeigt alle Termine, nicht nur
+  // eigene) - daher KEIN created_by-Filter, konsistent mit GET /calendar und der
+  // Kalender-Suche (#471). Was die beiden aber seit #474 haben und diese Abfrage
+  // bis zum Review von #1055 nicht: die Zeilen-Sichtbarkeit (`all` / Ersteller /
+  // Zugewiesene) und den Abo-Filter (ICS-Termine nur aus geteilten oder eigenen
+  // Abos). Ohne beides fand jedes Mitglied Titel und Datum fremder PRIVATER
+  // Termine ueber ein Stichwort. Es sind dieselben zwei Klauseln wie in
+  // routes/calendar/read.js, damit globale und Kalender-Suche fuers gleiche
+  // Stichwort dieselben Treffer liefern - das war der Sinn von #471. Beide
+  // Filter müssen vor ORDER/LIMIT greifen, damit verborgene Treffer sichtbare
+  // nicht aus dem Ergebnisfenster verdrängen.
+  // Serien stehen an ihrem naechsten Termin, wie in der Kalendersuche (#1607).
+  const window = eventSearchWindow(db);
+  const eventCandidates = resolveEventSearchRows(db, db.prepare(`
+      SELECT ${eventReader.eventProjectionSql(db)}
+      FROM search_index s
+      JOIN calendar_events e ON e.id = s.entity_id
+      WHERE s.entity = 'event' AND s.search_index MATCH @match
+        AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
+        AND ${visibleWhere('events', 'e', '@userId')}${
+          // Geburtstagstermine stehen in dieser Trefferart, gehoeren aber dem
+          // Schalter `birthdays` - wie in der Kalendersuche (#1660).
+          disabledNav?.has('birthdays') ? ` AND ${notBirthdayEventSql('e')}` : ''}
+      ORDER BY ${PAST_SINGLE_EVENT_SQL} ASC,
+               CASE WHEN ${PAST_SINGLE_EVENT_SQL} THEN NULL ELSE e.start_datetime END ASC,
+               e.start_datetime DESC
+      LIMIT @limit
+    `).all({ match, userId, from: window.from, limit: EVENT_SEARCH_CANDIDATES }) as SearchRow[], window.from, window.to, { lightweight: true });
+  // resolveEventSearchRows sortiert nach dem AUFGELOESTEN Start; vorn steht,
+  // was ab heute kommt, danach das Vergangene (upcomingEventsFirst). Die
+  // Kandidaten holt die Abfrage schon in dieser Folge, damit fuenfzig alte
+  // Einzeltermine den kommenden nicht aus dem Fenster draengen - dort genuegt
+  // der Datumsteil, die genaue Grenze zieht upcomingEventsFirst.
+  const zone = householdTimeZone(db);
+  const eventRows = upcomingEventsFirst(eventCandidates, storedToInstantMs(window.from, zone), zone)
+    .slice(0, limit);
+  // Preserve the compact global-search payload. The resolver-capable
+  // projection supplies linked inheritance without loading attachment bodies
+  // or unrelated sync metadata into this result bucket.
+  const birthdays = birthdayFieldsByEvent(db, eventRows);
+  return eventRows.map((event) => withExcerpt({
+    id: event.id,
+    title: event.title,
+    start_datetime: event.start_datetime,
+    all_day: event.all_day,
+    ...(birthdays.get(Number(event.id)) || {}),
+    ...(event.is_occurrence_override ? {
+      series_id: event.series_id,
+      recurrence_id: event.recurrence_id,
+      is_occurrence_override: true,
+      assignment_owner_id: event.assignment_owner_id,
+      attachment_owner_id: event.attachment_owner_id,
+      reminder_owner_id: event.reminder_owner_id,
+      reminder_anchor_start: event.reminder_anchor_start,
+    } : {}),
+  }, q, [event.description, event.location]));
+}
+
+/**
+ * The birthday hits of the global search (services/search.js runTableSearch,
+ * bucket `birthdays`; rights module and table owner `calendar`, nav entry
+ * `birthdays`). Here and not in birthdays-slices.ts: that file reaches server/db.js
+ * through services/birthdays.js, and services/search.js must not (it is loaded by
+ * suites without DB_PATH, test:db-isolation). No FTS index: the rows come in the
+ * SQL order and the first SEARCH_LIMIT that match stay. The SQL is the search's,
+ * word for word; the actor is unused.
+ */
+export function birthdaysSearchSlice(db: Database, _actor: SearchActor, query: TableSearchQuery): SearchRow[] {
+  const { text: q, matches } = query;
+  const limit = SEARCH_LIMIT;
+  // Geburtstage: Haushaltsbesitz, Rechte-Modul `calendar` (siehe BUCKET_MODULE).
+  return firstMatches(db.prepare(`
+      SELECT b.id, b.name AS title, b.birth_date, b.notes, b.year_unknown
+      FROM birthdays b
+      ORDER BY b.name COLLATE NOCASE ASC, b.id ASC
+    `).all() as SearchRow[], matches, (b) => [b.title, b.notes], limit)
+    // `year_unknown` (#2095): birth_date traegt dann das Platzhalterjahr.
+    .map((b) => withExcerpt({ ...pick(b, ['id', 'title', 'birth_date']), year_unknown: b.year_unknown === 1 }, q, [b.notes]));
 }

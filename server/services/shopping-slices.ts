@@ -27,6 +27,8 @@
 
 import type { Database, RowReader } from '../authorize/index.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
+import type { IndexSearchQuery, SearchActor, SearchRow } from './search-text.ts';
+import { SEARCH_LIMIT, withExcerpt } from './search-text.ts';
 
 /** Query options of the overview that act on the shopping blocks. */
 export type ShoppingOverviewOptions = Readonly<{
@@ -172,4 +174,22 @@ export function shoppingOverviewSlice(
     ...openCounts,
     ...(shoppingTile ? { shoppingTile } : {}),
   };
+}
+
+/**
+ * The shopping item hits of the global search (services/search.js runSearch,
+ * bucket `items`). Household property like the lists: no row rule, the actor is
+ * unused. The SQL is the search's, word for word.
+ */
+export function shoppingSearchSlice(db: Database, _actor: SearchActor, query: IndexSearchQuery): SearchRow[] {
+  const { text: q, match } = query;
+  const limit = SEARCH_LIMIT;
+  return (db.prepare(`
+    SELECT i.id, i.name AS title, i.list_id, s.body AS _body
+    FROM search_index s
+    JOIN shopping_items i ON i.id = s.entity_id
+    WHERE s.entity = 'item' AND s.search_index MATCH @match
+    ORDER BY i.name ASC
+    LIMIT @limit
+  `).all({ match, limit }) as SearchRow[]).map((row) => withExcerpt(row, q, [row._body]));
 }
