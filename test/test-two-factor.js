@@ -320,28 +320,15 @@ test('der Wartezustand traegt einen anderen Schluessel als eine echte Sitzung', 
   assert.ok(verify.includes('consumePendingTwoFactor'), 'die Verify-Route prueft den Wartezustand nicht');
 });
 
-test('JEDER Weg in eine Sitzung prueft den zweiten Faktor - auch SSO', () => {
-  // Die teuerste Luecke dieses Features, und sie stand nicht im Login:
-  // `/oidc/callback` rief `setupAuthSession` direkt auf. Wer den zweiten
-  // Faktor eingeschaltet hatte und sich per SSO anmeldete, wurde nie gefragt -
-  // und die haushaltsweite PFLICHT waere ueber diesen Weg auszuhebeln gewesen,
-  // womit sie keine Pflicht mehr ist, sondern eine Bitte an die, die den
-  // Passwort-Weg nehmen.
-  //
-  // Deshalb prueft dieser Test die Regel und nicht die eine Stelle: JEDER
-  // Aufruf von `setupAuthSession` steht hinter einer `isEnabled`-Pruefung.
-  //
-  // Die Liste der Ausnahmen ist bewusst EINE und nicht vier. Naheliegend
-  // waeren auch /setup, die Einladung und der Passwort-Reset - nur meldet
-  // keiner der drei selbst an: /setup legt den ersten Nutzer nur an, die
-  // Einladung ebenso, und der Reset setzt das Passwort und schickt zum Login.
-  // Als Ausnahme eingetragen wuerden sie genau dann zur Luecke, wenn jemand
-  // ihnen spaeter eine Anmeldung beigibt - der Guard schwiege dazu. Deshalb
-  // steht hier nur der Weg, der die Pruefung wirklich IST.
+test('every sign-in path verifies TOTP or a UV-required passkey before creating a session', () => {
+  // Password and OIDC retain their configured TOTP gate. A passkey route is
+  // an alternative MFA proof only after server-side UV-required verification.
   const source = readFileSync(new URL('../server/auth.js', import.meta.url), 'utf8');
   const lines = source.split('\n');
 
+  /** @type {string[]} */
   const callers = [];
+  /** @type {string[]} */
   const unguarded = [];
   lines.forEach((line, index) => {
     // Der Aufruf, nicht die Definition - die traegt dieselbe Zeichenfolge.
@@ -358,6 +345,14 @@ test('JEDER Weg in eine Sitzung prueft den zweiten Faktor - auch SSO', () => {
 
     // Die Verify-Route ist selbst die Pruefung.
     if (header.includes("'/2fa/verify'")) return;
+    if (header.includes("'/passkeys/login/verify'")) {
+      const beforeSession = lines.slice(start, index).join('\n');
+      assert.match(beforeSession, /await passkeys\.finishAuthentication\(/, 'passkey proof must finish before session creation');
+      assert.match(line, /setupAuthSession\(req, res, user, true\)/, 'verified passkey sessions record their MFA proof');
+      const service = readFileSync(new URL('../server/services/passkeys.js', import.meta.url), 'utf8');
+      assert.match(service, /verifyCredential\(verifyAuthenticationResponse,[\s\S]*?requireUserVerification: true/);
+      return;
+    }
     if (lines.slice(start, index).join('\n').includes('twoFactor.isEnabled')) return;
 
     unguarded.push(`auth.js:${index + 1} (Route ab Zeile ${start + 1}: ${header.trim().slice(0, 60)})`);
@@ -373,8 +368,9 @@ test('JEDER Weg in eine Sitzung prueft den zweiten Faktor - auch SSO', () => {
   // Eine leere Liste ist fuer sich keine Zusicherung: sie waere auch leer,
   // wenn der Suchbegriff nicht mehr passte. Deshalb die Gegenprobe, dass
   // ueberhaupt die erwarteten Wege gefunden wurden.
-  assert.equal(callers.length, 3, `erwartet werden drei Anmeldewege, gefunden: ${callers.join(' | ')}`);
+  assert.equal(callers.length, 4, `expected four sign-in paths, found: ${callers.join(' | ')}`);
   assert.ok(callers.some((c) => c.includes("'/login'")), 'der Passwort-Login wurde nicht gefunden');
+  assert.ok(callers.some((c) => c.includes("'/passkeys/login/verify'")), 'passkey sign-in route was not found');
   assert.ok(callers.some((c) => c.includes("'/oidc/callback'")), 'der OIDC-Callback wurde nicht gefunden');
   assert.ok(callers.some((c) => c.includes("'/2fa/verify'")), 'die Verify-Route wurde nicht gefunden');
 

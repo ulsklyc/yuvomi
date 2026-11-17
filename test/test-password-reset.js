@@ -6,17 +6,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
+// Recovery uses the production driver's transaction API.
+const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
 import { createPasswordResetService } from '../server/services/password-reset.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
 function makeDb() {
-  const db = new DatabaseSync(':memory:');
+  const db = new Database(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
     CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL DEFAULT 'x');
+    CREATE TABLE user_passkeys (user_id INTEGER);
+    CREATE TABLE user_passkey_handles (user_id INTEGER);
+    CREATE TABLE passkey_challenges (user_id INTEGER);
     CREATE TABLE password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -467,7 +472,7 @@ test('reset-password beendet jede Sitzung des Kontos, auch eine abgelaufene Zeil
   const token = sent[0].html.match(/token=([a-f0-9]+)/)[1];
   const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
   assert.equal(status, 200);
-  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map((r) => r.sid);
+  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map((/** @type {{sid:string}} */ r) => r.sid);
   assert.deepEqual(left, ['bob-1', 'broken']);
 });
 

@@ -1,4 +1,5 @@
 import { api, auth } from '/api.js';
+import { renderPasskeyCard } from '/settings/passkeys.js';
 import {
   isDateInputValid,
   parseDateInput,
@@ -649,11 +650,12 @@ function passwordCardHtml(user) {
   return `
     <div class="settings-card">
       <h3 class="settings-card__title">${t('settings.changePassword')}</h3>
+      <p class="form-hint" id="password-passkeys-hint">${esc(t('passkeys.passwordChangeWarning'))}</p>
       <form id="password-form" class="settings-form" novalidate>
         <div class="row-carrier settings-group">
           ${settingRowHtml({
             label: t('settings.currentPasswordLabel'), labelFor: 'current-password', labelExtra: REQUIRED_MARK, field: true,
-            control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>',
+            control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error password-passkeys-hint" required>',
           })}
           ${settingRowHtml({
             label: t('settings.newPasswordLabel'), labelFor: 'new-password', labelExtra: REQUIRED_MARK, field: true,
@@ -763,6 +765,8 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
       </div>
 
       ${passwordCardHtml(user)}
+
+      <div id="passkeys-card"></div>
 
       ${twoFactorCardHtml(twoFactorState)}
 
@@ -1014,6 +1018,11 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
       // Wie "Auf anderen Geraeten abmelden": der Server beendet die
       // angemeldeten Geraete und den offenen Kopplungscode mit.
       passwordForm.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
+      const passkeyCard = container.querySelector('#passkeys-card');
+      if (passkeyCard) {
+        passkeyCard.replaceChildren();
+        await renderPasskeyCard(passkeyCard);
+      }
       window.yuvomi?.showToast(t('settings.passwordSavedToast'), 'success');
     } catch (error) {
       // Ein falsches aktuelles Passwort ist ein 400 mit Grund (server/auth.js),
@@ -1129,6 +1138,7 @@ export async function render(container, { user }) {
     container.querySelector('#account-retry')?.addEventListener('click', () => {
       render(container, { user: currentUser });
     });
+    await renderPasskeyCard(container.querySelector('#passkeys-card'));
     window.lucide?.createIcons({ el: container });
   } catch (error) {
     container.replaceChildren();
@@ -1138,4 +1148,4 @@ export async function render(container, { user }) {
 
 // Der Avatar als Programm (test:initials): welche Zeichen ohne Bild auf der
 // Scheibe stehen.
-export const __test = { avatarHtml, passwordCardHtml, avatarEditorHtml, gravatarHintText, gravatarHintHtml, fillGravatarHint, passwordProblems, passwordRefusalKey, isEmailAddress };
+export const __test = { avatarHtml, passwordCardHtml, bindEvents, avatarEditorHtml, gravatarHintText, gravatarHintHtml, fillGravatarHint, passwordProblems, passwordRefusalKey, isEmailAddress };
