@@ -1274,8 +1274,8 @@ test('auth.setup: schickt timezone mit, und laesst das Feld ohne Angabe weg', as
 
 test('OpenAPI beschreibt language und timezone als optionale Setup-Felder', () => {
   const schema = openApi.components.schemas.SetupRequest;
-  assert.equal(schema.properties.language?.type, 'string');
-  assert.equal(schema.properties.timezone?.type, 'string');
+  assert.deepEqual(schema.properties.language?.type, ['string', 'null']);
+  assert.deepEqual(schema.properties.timezone?.type, ['string', 'null']);
   assert.deepEqual(schema.required, ['username', 'display_name', 'password']);
   assert.ok(openApi.paths['/api/v1/auth/setup'].post.responses[400]);
 });

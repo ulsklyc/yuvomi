@@ -2,9 +2,9 @@ import { op, jsonBody, idParam } from '../helpers.js';
 
 export function healthPaths() {
   const instant = { type: 'string', format: 'date-time', pattern: '(Z|[+-][0-9]{2}:[0-9]{2})$', description: 'ISO instant with explicit offset; writes cannot be in the future.' };
-  const goal = { type: 'integer', nullable: true, minimum: 60, maximum: 20160, multipleOf: 60 };
+  const goal = { type: ['integer', 'null'], minimum: 60, maximum: 20160, multipleOf: 60 };
   const revision = { type: 'integer', minimum: 1 };
-  const recordFields = { start_at: instant, end_at: { ...instant, nullable: true }, start_tzid: { type: 'string', description: 'Runtime-supported IANA zone captured on creation and retained by ordinary edits.' }, goal_minutes: goal, rating: { type: 'integer', nullable: true, minimum: 1, maximum: 5 }, note: { type: 'string', nullable: true, maxLength: 2000 }, visibility: { type: 'string', enum: ['private', 'family'] } };
+  const recordFields = { start_at: instant, end_at: { ...instant, type: ['string', 'null'] }, start_tzid: { type: 'string', description: 'Runtime-supported IANA zone captured on creation and retained by ordinary edits.' }, goal_minutes: goal, rating: { type: ['integer', 'null'], minimum: 1, maximum: 5 }, note: { type: ['string', 'null'], maxLength: 2000 }, visibility: { type: 'string', enum: ['private', 'family'] } };
   const fastingBody = (properties, required = [], mandatory = true) => ({ required: mandatory, content: { 'application/json': { schema: { type: 'object', properties, required } } } });
   const userParam = { name: 'user_id', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, description: 'Defaults to the signed-in user. Family visibility and explicit caregiver grants apply.' };
   const dates = ['from', 'to'].map((name) => ({ name, in: 'query', required: false, schema: { type: 'string', format: 'date', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' }, description: 'Inclusive completion date in the household display time zone; from must not exceed to.' }));
@@ -21,11 +21,11 @@ export function healthPaths() {
   // Naehrwerte (#1326). Die acht stehen hier EINMAL und werden in Ziel wie
   // Eintrag gespreadet - acht Spalten, die in zwei Schemata von Hand
   // abgeschrieben werden, sind genau die Bauform, in der eine davon an einer
-  // Stelle anders heisst. `nullable: true` ist die Aussage der Spalte: nicht
+  // Stelle anders heisst. `null` im `type` ist die Aussage der Spalte: nicht
   // angegeben ist etwas anderes als null.
   const NUTRIENT_FIELDS = ['energy_kcal', 'fat_g', 'saturated_fat_g', 'carbs_g', 'sugar_g', 'protein_g', 'salt_g', 'fiber_g'];
   const nutrientSchema = Object.fromEntries(NUTRIENT_FIELDS.map((name) => [name, {
-    type: 'number', nullable: true, minimum: 0, maximum: 100000,
+    type: ['number', 'null'], minimum: 0, maximum: 100000,
     description: 'null means "not stated" and is not the same as 0.',
   }]));
   // Eine VOLLSTAENDIGE requestBody, nicht nur ein Schema - dasselbe Muster wie
@@ -170,7 +170,7 @@ export function healthPaths() {
     },
     '/api/v1/health/fasting/settings': {
       get: op({ summary: 'Get fasting settings', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Settings or null for an ungranted family reader.' }),
-      put: op({ summary: 'Update fasting settings', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Personal settings are owner-only, including safety acknowledgement. clock_mode is stored per user in sync_config. Supplying active_id (null if none) with a default_goal_minutes change also changes that active goal atomically; a matching active row requires expected_revision. Without active_id only the default changes. Completed records remain unchanged. Notification preferences are retained when unavailable; reconciliation is transactional.', stateChanging: true, requestBody: fastingBody({ user_id: revision, default_goal_minutes: goal, zone_mode: { type: 'string', enum: ['timer', 'educational'] }, clock_mode: { type: 'string', enum: ['auto', 'elapsed', 'remaining'] }, acknowledge_safety: { type: 'boolean' }, active_id: { ...revision, nullable: true }, expected_revision: revision, remind_goal: booleanPreference, remind_next_start: booleanPreference }) }),
+      put: op({ summary: 'Update fasting settings', tag: 'Health', params: [userParam], responses: fastingResponses(), description: 'Personal settings are owner-only, including safety acknowledgement. clock_mode is stored per user in sync_config. Supplying active_id (null if none) with a default_goal_minutes change also changes that active goal atomically; a matching active row requires expected_revision. Without active_id only the default changes. Completed records remain unchanged. Notification preferences are retained when unavailable; reconciliation is transactional.', stateChanging: true, requestBody: fastingBody({ user_id: revision, default_goal_minutes: goal, zone_mode: { type: 'string', enum: ['timer', 'educational'] }, clock_mode: { type: 'string', enum: ['auto', 'elapsed', 'remaining'] }, acknowledge_safety: { type: 'boolean' }, active_id: { ...revision, type: ['integer', 'null'] }, expected_revision: revision, remind_goal: booleanPreference, remind_next_start: booleanPreference }) }),
     },
     '/api/v1/health/fasting/acknowledge-safety': {
       post: op({ summary: 'Acknowledge fasting safety information', tag: 'Health', params: [userParam], stateChanging: true, responses: fastingResponses(), description: 'Records first-use acknowledgement for the authenticated owner only. A caregiver cannot acknowledge for another person.', requestBody: fastingBody({ user_id: revision }, [], false) }),
@@ -284,7 +284,7 @@ export function healthPaths() {
     },
     '/api/v1/health/nutrition/entries': {
       get: op({ summary: 'List logged nutrition entries', tag: 'Health', params: [userParam, ...dates, { name: 'meal_type', in: 'query', schema: { type: 'string', enum: MEAL_TYPE_VALUES } }], description: 'Scoped to the viewer; `?user_id=` filters to a family member (their `all`-visible rows, or every row if the viewer is a caregiver for that person). `from`/`to` compare the DATE part of `consumed_at`, which is household wall-clock time rather than an instant.' }),
-      post: op({ summary: 'Log a nutrition entry', tag: 'Health', stateChanging: true, requestBody: nutrientBody({ title: { type: 'string', maxLength: 200 }, consumed_at: wallClock, meal_type: { type: 'string', nullable: true, enum: MEAL_TYPE_VALUES }, note: { type: 'string', nullable: true, maxLength: 5000 }, visibility: nutritionVisibility, user_id: { type: 'integer', minimum: 1, description: 'Caregiver path (#584): the person the entry belongs to.' } }, ['title', 'consumed_at']), description: 'The eight nutrients are stored as VALUES, never as a reference to a recipe: editing a recipe next month must not rewrite what somebody ate last week (docs/DECISIONS.md entry 8). A nutrient left out stays null ("not stated") and is not zero. Without `visibility` the row takes the OWNER\'s default, not the caller\'s.' }),
+      post: op({ summary: 'Log a nutrition entry', tag: 'Health', stateChanging: true, requestBody: nutrientBody({ title: { type: 'string', maxLength: 200 }, consumed_at: wallClock, meal_type: { type: ['string', 'null'], enum: MEAL_TYPE_VALUES }, note: { type: ['string', 'null'], maxLength: 5000 }, visibility: nutritionVisibility, user_id: { type: 'integer', minimum: 1, description: 'Caregiver path (#584): the person the entry belongs to.' } }, ['title', 'consumed_at']), description: 'The eight nutrients are stored as VALUES, never as a reference to a recipe: editing a recipe next month must not rewrite what somebody ate last week (docs/DECISIONS.md entry 8). A nutrient left out stays null ("not stated") and is not zero. Without `visibility` the row takes the OWNER\'s default, not the caller\'s.' }),
     },
     '/api/v1/health/nutrition/entries/{id}': {
       patch: op({ summary: 'Update a nutrition entry', tag: 'Health', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Only the fields present are changed. Sending a nutrient as null clears it back to "not stated"; sending 0 states zero.' + WALL_CLOCK_INPUT }),

@@ -91,7 +91,7 @@ export function displaysPaths() {
               schema: {
                 type: 'object',
                 minProperties: 1,
-                anyOf: [{ required: ['show_screensaver'] }, { required: ['device_settings'] }],
+                anyOf: [{ properties: { show_screensaver: { type: 'boolean' } }, required: ['show_screensaver'] }, { properties: { device_settings: { type: 'object' } }, required: ['device_settings'] }],
                 properties: {
                   device_settings: {
                     type: 'object', additionalProperties: false,

@@ -357,7 +357,7 @@ export const schemas = {
             },
             assignee_user_id: { type: 'integer', minimum: 1, description: 'One person, the short form of `assignee_user_ids`.' },
           },
-          oneOf: [{ required: ['ics'] }, { required: ['url'] }],
+          oneOf: [{ properties: { ics: { type: 'string' } }, required: ['ics'] }, { properties: { url: { type: 'string' } }, required: ['url'] }],
         },
         LocalCalendarCreateInput: {
           type: 'object', required: ['name'],
@@ -1359,7 +1359,7 @@ export const schemas = {
         HealthResponse: {
           type: 'object',
           properties: {
-            status: { type: 'string', example: 'ok' },
+            status: { type: 'string', examples: ['ok'] },
             timestamp: { type: 'string', format: 'date-time' },
           },
           required: ['status', 'timestamp'],
@@ -1391,8 +1391,8 @@ export const schemas = {
             version: { type: 'string', description: 'The application version.' },
             build_revision: { type: ['string', 'null'], description: 'The revision the image was built from (`APP_BUILD_REVISION`), or `null`.' },
             node: { type: 'string', description: 'The Node.js version, as in `process.version`.' },
-            platform: { type: 'string', example: 'linux' },
-            arch: { type: 'string', example: 'x64' },
+            platform: { type: 'string', examples: ['linux'] },
+            arch: { type: 'string', examples: ['x64'] },
             sqlite: {
               type: 'object',
               additionalProperties: false,
@@ -1887,16 +1887,14 @@ export const schemas = {
             display_name: { type: 'string' },
             password: { type: 'string' },
             language: {
-              type: 'string',
-              nullable: true,
+              type: ['string', 'null'],
               description: 'Optional. Language code of a supported app locale (e.g. `de`, `pt`, `fil`). '
                 + 'Sets the household data language (the language of server-generated titles such as birthday events), '
                 + 'unless the automatic choice already yields it. Region, currency and date format are not derived from it. '
                 + 'Unsupported values are rejected with 400; omitted, null or empty keeps the previous behaviour.',
             },
             timezone: {
-              type: 'string',
-              nullable: true,
+              type: ['string', 'null'],
               description: 'Optional. IANA time zone of the household (e.g. `Europe/Berlin`). '
                 + 'Unknown zones are rejected with 400; omitted, null or empty keeps the fallback to TZ, the system zone and UTC.',
             },
@@ -2791,7 +2789,7 @@ export const schemas = {
             server: {
               type: 'string',
               description: 'The http(s) origin of this page, without a path. It goes into the link a client opens, and may take up to 170 characters once percent-encoded, so that the link still fits a QR code.',
-              example: 'https://yuvomi.example.org',
+              examples: ['https://yuvomi.example.org'],
             },
           },
           required: ['server'],
@@ -3612,13 +3610,12 @@ export const schemas = {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteReminderSetting' } },
         },
         WasteFeedStatus: {
-          type: 'object',
-          nullable: true,
+          type: ['object', 'null'],
           properties: {
             token: { type: 'string' },
             url: { type: 'string', description: 'Public, unauthenticated .ics URL. Rotates when regenerated.' },
             type_ids: {
-              type: 'array', items: { type: 'integer' }, nullable: true,
+              type: ['array', 'null'], items: { type: 'integer' },
               description: 'Optional type selection. null (default) means every active type.',
             },
           },
@@ -3631,7 +3628,7 @@ export const schemas = {
           required: ['type_ids'],
           properties: {
             type_ids: {
-              type: 'array', items: { type: 'integer' }, nullable: true,
+              type: ['array', 'null'], items: { type: 'integer' },
               description: 'Waste type ids to include, or null to include every active type again.',
             },
           },
@@ -3665,9 +3662,9 @@ export const schemas = {
           properties: {
             pattern: { type: 'string' },
             type_name: { type: 'string' },
-            mapping_id: { type: 'integer', nullable: true },
-            original_label: { type: 'string', nullable: true },
-            resolved_type_id: { type: 'integer', nullable: true },
+            mapping_id: { type: ['integer', 'null'] },
+            original_label: { type: ['string', 'null'] },
+            resolved_type_id: { type: ['integer', 'null'] },
             status: {
               type: 'string',
               enum: ['applicable', 'unchanged', 'unmatched_pattern', 'unmatched_type', 'ambiguous_type'],
