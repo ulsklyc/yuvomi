@@ -87,8 +87,9 @@ export function resolveEventSearchRows(
       { includeRecurrenceIdentity: true, householdZone, windowZone } as unknown as Parameters<typeof expandRecurringEvents>[4],
     )[0] || row;
   });
+  // Gleicher Start: die niedrigere id zuerst, nicht die Folge der Abfrage.
   return (resolveProjectedEventRows(database, displayRows, options) as EventRow[])
-    .sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
+    .sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)) || Number(a.id) - Number(b.id));
 }
 
 /**
