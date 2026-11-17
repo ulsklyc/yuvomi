@@ -15,6 +15,8 @@ import { emptyShoppingOverview, shoppingOverviewSlice } from '../services/shoppi
 import { emptyMealsOverview, mealsOverviewSlice } from '../services/meals-slices.ts';
 import { emptyNotesOverview, normalizeNoteCategoryFilter, notesOverviewSlice } from '../services/notes-slices.ts';
 import { birthdaysOverviewSlice, emptyBirthdaysOverview } from '../services/birthdays-slices.ts';
+import { budgetOverviewSlice, emptyBudgetOverview } from '../services/budget-slices.ts';
+import { emptyRewardsOverview, rewardsOverviewSlice } from '../services/rewards-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -24,7 +26,6 @@ import {
   asksHouseholdAudience,
   householdAudienceAnswer,
   householdAudienceShows,
-  resolveBudgetMode,
   rowReader,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
@@ -40,8 +41,7 @@ import { serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
 import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { activeCatalog, ledgerBalanceSql } from '../services/rewards.js';
-import { moneyParams, moneyReader, moneyVisibleSql } from '../services/reward-money.js';
+import { moneyReader } from '../services/reward-money.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
 
 const log = createLogger('Dashboard');
@@ -94,8 +94,8 @@ const DENIED_PAYLOAD = Object.freeze({
   // den die Kachel beschriftet ist — und er steht ohnehin im Kalender.
   // Geteilte Ausgaben gehoeren zum Budget-Modul (server/scopes.js fuehrt
   // `split-expenses` als zweiten Praefix von `budget`).
-  budget: ({ month }) => ({ budget: emptyBudget(month), splitBalance: emptySplitBalance() }),
-  rewards: () => ({ rewards: { view: null, standings: [], participantCount: 0, pending: 0, moneyPending: 0, catalog: [], recent: [] } }),
+  budget: ({ month }) => ({ ...emptyBudgetOverview(month), splitBalance: emptySplitBalance() }),
+  rewards: () => emptyRewardsOverview(),
   health: () => ({
     health: {
       hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0,
@@ -166,20 +166,6 @@ function emptyNutritionWidget() {
 
 function emptySplitBalance() {
   return { net: [], positions: [] };
-}
-
-function emptyBudget(month) {
-  return {
-    month,
-    income: 0,
-    expenses: 0,
-    balance: 0,
-    entryCount: 0,
-    topExpenseCategory: null,
-    topExpenseAmount: 0,
-    topExpenses: [],
-    savingsGoal: null,
-  };
 }
 
 /**
@@ -683,74 +669,11 @@ router.get('/', (req, res) => {
     result.quicklinks = [];
   }
 
-  if (allows('budget')) try {
-    const from = `${currentMonth}-01`;
-    const to = `${currentMonth}-31`;
-    // Persönlich/geteilt (#476/#505): im personal-Modus zeigt das Dashboard-Widget
-    // das eigene Budget (owner_id = me), sonst das gesamte Haushaltsbudget.
-    const ownerClause = resolveBudgetMode(d) === 'personal' ? ' AND owner_id = ?' : '';
-    const ownerParams = ownerClause ? [userId] : [];
-
-    const totals = d.prepare(`
-      SELECT
-        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
-        SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS expenses,
-        SUM(amount) AS balance,
-        COUNT(*) AS entry_count
-      FROM budget_entries
-      -- Erwartete, noch unbestaetigte Buchungen zaehlen nicht mit (#637), wie in
-      -- Uebersicht, Statistik, Plan und Kontostand.
-      WHERE date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
-    `).get(from, to, ...ownerParams);
-
-    // Die groessten Ausgabenkategorien, nicht nur die groesste: die hohe
-    // Budget-Kachel (1x2) fuellt damit ihre Hoehe mit Inhalt statt mit einem
-    // leeren Band ueber der Fusszeile (Critique 2026-09-23). Sie zeigt drei;
-    // FUENF, weil eine gestreckte Kachel weitere zeigt (U14, Hoehe wird
-    // Inhalt) - dieselbe Gruppierung, nur zwei Zeilen mehr. Die erste bleibt
-    // zusaetzlich als `topExpenseCategory`/`topExpenseAmount` stehen - die
-    // flache Kachel und aeltere Clients lesen genau diese beiden Felder.
-    const topExpenses = d.prepare(`
-      SELECT category, SUM(amount) AS amount
-      FROM budget_entries
-      WHERE amount < 0 AND date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
-      GROUP BY category
-      ORDER BY ABS(SUM(amount)) DESC
-      LIMIT 5
-    `).all(from, to, ...ownerParams);
-    const topExpense = topExpenses[0];
-
-    // Monats-Sparziel (Budgetplan #468): eigener Guard, damit ältere/Minimal-DBs
-    // ohne budget_plans-Tabelle die Budget-Aggregation nicht scheitern lassen.
-    let savingsGoal = null;
-    try {
-      const goalRow = d.prepare("SELECT amount FROM budget_plans WHERE category = '__savings__'").get();
-      if (goalRow) savingsGoal = Math.round(goalRow.amount * 100) / 100;
-    } catch { /* Tabelle fehlt (Legacy/Test) → kein Sparziel */ }
-
-    result.budget = {
-      month: currentMonth,
-      income: totals?.income || 0,
-      expenses: Math.abs(totals?.expenses || 0),
-      balance: totals?.balance || 0,
-      entryCount: totals?.entry_count || 0,
-      topExpenseCategory: topExpense?.category || null,
-      topExpenseAmount: Math.abs(topExpense?.amount || 0),
-      topExpenses: topExpenses.map((row) => ({ category: row.category, amount: Math.abs(row.amount || 0) })),
-      savingsGoal,
-    };
-  } catch (err) {
-    log.error('budget error:', err.message);
-    result.budget = {
-      month: currentMonth,
-      income: 0,
-      expenses: 0,
-      balance: 0,
-      entryCount: 0,
-      topExpenseCategory: null,
-      topExpenseAmount: 0,
-      topExpenses: [],
-    };
+  // Das Budget des Monats (services/budget-slices.ts): Einnahmen, Ausgaben,
+  // Saldo, groesste Ausgabenkategorien und Sparziel. Persoenlich oder geteilt
+  // entscheidet der Ausschnitt ueber authorize (resolveBudgetMode).
+  if (allows('budget')) {
+    Object.assign(result, budgetOverviewSlice(d, rowsReader, overviewCtx, { month: currentMonth }, runSlice));
   }
 
   // Geteilte Ausgaben: was der Betrachter offen hat (Kennzahl „Ausgleich
@@ -766,90 +689,13 @@ router.get('/', (req, res) => {
     result.splitBalance = emptySplitBalance();
   }
 
-  /* BELOHNUNGEN: FORTSCHRITT STATT RANGLISTE (Critique 2026-09-23, Persona Emma).
-   *
-   * Hier stand eine Top-5-Rangliste nach Punkten, fuer jeden Betrachter gleich.
-   * Ein Kind las darin "1 Leo 60 / 2 Emma 30": Wettbewerb unter Geschwistern
-   * statt des eigenen Wegs zur Praemie. Die Antwort teilt jetzt nach der Frage,
-   * die das Modul selbst stellt - wer darf FREIGEBEN (isAdminRequest, dieselbe
-   * Pruefung wie PATCH /rewards/redemptions) -, nicht nach `family_role`:
-   *
-   *   approver - jedes teilnehmende Mitglied, nach NAMEN (kein Platz), dazu alle
-   *              offenen Anfragen;
-   *   self     - wer nicht freigibt, aber selbst sammelt: NUR die eigene Zeile,
-   *              die eigenen offenen Anfragen und die zuletzt verdienten Punkte.
-   *              Die Geschwister gehen gar nicht erst ueber die Leitung - eine
-   *              Rangliste im Netzwerk-Tab ist dieselbe Rangliste;
-   *   family   - wer weder freigibt noch sammelt (Wandtablett, Grosseltern):
-   *              alle nach Namen, ohne fremde Anfragen.
-   *
-   * `catalog` ist die Zielliste fuer den Balken; welche Praemie das Ziel ist,
-   * entscheidet public/utils/reward-goal.js, dieselbe Regel wie auf der Seite. */
-  if (allows('rewards')) try {
-    const MEMBER_FILTER = householdMemberSql('u');
-    const members = d.prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
-             ${memberPositionSql('u')} AS sort_order,
-             ${ledgerBalanceSql('points', 'u.id')} AS balance
-      FROM users u
-      JOIN reward_participants rp ON rp.user_id = u.id AND rp.enabled = 1
-      WHERE ${MEMBER_FILTER}
-      ORDER BY ${memberOrderSql('u')}
-    `).all();
-    const approver = isAdminRequest(req);
-    const own = members.find((m) => m.id === Number(userId));
-    const view = approver ? 'approver' : own ? 'self' : 'family';
-    const standings = view === 'self' ? [own] : members;
-    // Dieselben Personen wie die Liste darueber (#1207): eine alte
-    // Einschreibung von Personal oder Gast bleibt stehen, zaehlt aber nicht.
-    const participantCount = members.length;
-    // `pending` BLEIBT DIE ZAHL DER PRAEMIEN-ANFRAGEN. Geld-Anfragen (#1734)
-    // stehen daneben in `moneyPending`, damit ein Client, der das alte Feld
-    // liest, nichts anderes darin findet. Wer was zaehlt, sagen die Zweige: wer
-    // freigibt, ist Admin und darf jede lesen; wer selbst sammelt, zaehlt nur
-    // die eigenen; die Sicht `family` (Wandtablett, Grosseltern) bekommt bei den
-    // Praemien 0. Geld selbst zeigt die Kachel nicht - weder Saldo noch Buchung.
-    const countPending = (kindSql) => (view === 'approver'
-      ? d.prepare(`SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND ${kindSql}`).get().n
-      : view === 'self'
-        ? d.prepare(`SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND user_id = ? AND ${kindSql}`).get(userId).n
-        : 0);
-    const pending = countPending("kind = 'reward'");
-    // DER EIGENE GELD-ZAEHLER HAENGT NICHT AN DER PUNKTE-TEILNAHME. Ein Kind mit
-    // Taschengeldkonto, das keine Punkte sammelt, faellt in die Sicht `family`
-    // und bekam hier 0, obwohl seine Einzahlung offen war (Review zu #1745).
-    // Gezaehlt wird ueber dasselbe Praedikat wie an den Geld-Routen: Admins
-    // alle, ein Mitglied die eigenen, ein Display keine.
-    const reader = moneyReader(req);
-    const moneyPending = d.prepare(`
-      SELECT COUNT(*) AS n FROM reward_redemptions r
-      WHERE r.status = 'pending' AND r.kind != 'reward' AND ${moneyVisibleSql(reader, 'r.user_id')}
-    `).get(moneyParams(reader)).n;
-    // Wer selbst sammelt, sieht seine letzten Gutschriften - verdient oder
-    // geschenkt. Einloesungen und Rueckbuchungen sind kein "verdient".
-    //
-    // UND EINE ZURUECKGENOMMENE GUTSCHRIFT AUCH NICHT (#1607). Seit das
-    // Wiederoeffnen gegenbucht statt zu loeschen, bleibt die earn-Zeile im
-    // Ledger stehen. Hier stuende sie sonst weiter als "zuletzt verdient",
-    // obwohl die Aufgabe wieder offen ist - der vollstaendige Verlauf mit
-    // beiden Zeilen gehoert auf die Belohnungsseite, diese Liste zeigt nur,
-    // was gilt. Die Gegenbuchung zeigt auf ihre Gutschrift (`reverses_id`) und
-    // nicht nur auf dieselbe Aufgabe: wird die Aufgabe geloescht, verlieren
-    // beide Zeilen ihre task_id, und ein Vergleich darueber traefe nie mehr.
-    const ownRecent = own && (view === 'self' || members.length === 1)
-      ? d.prepare(`
-          SELECT delta, type, reason, created_at FROM reward_ledger l
-          WHERE user_id = ? AND delta > 0 AND type IN ('earn', 'bonus') AND l.unit = 'points'
-            AND NOT EXISTS (SELECT 1 FROM reward_ledger r WHERE r.reverses_id = l.id)
-          ORDER BY created_at DESC, id DESC
-          LIMIT 3
-        `).all(userId)
-      : [];
-    const catalog = activeCatalog(d).map((c) => ({ id: c.id, name: c.name, cost: c.cost, remaining: c.remaining }));
-    result.rewards = { view, me: userId, standings, participantCount, pending, moneyPending, catalog, recent: ownRecent };
-  } catch (err) {
-    log.error('rewards error:', err.message);
-    result.rewards = { view: null, standings: [], participantCount: 0, pending: 0, moneyPending: 0, catalog: [], recent: [] };
+  // Belohnungen (services/rewards-slices.ts): Fortschritt statt Rangliste - wer
+  // freigibt, sieht alle, wer sammelt, nur sich, alle anderen die Namen. Ob
+  // jemand freigibt und wessen Geld-Anfragen zaehlen, weiss nur die Anfrage.
+  if (allows('rewards')) {
+    Object.assign(result, rewardsOverviewSlice(d, rowsReader, overviewCtx, {
+      approver: isAdminRequest(req), moneyReader: moneyReader(req),
+    }, runSlice));
   }
 
   // Gesundheit: heute fällige Dosen der EIGENEN Medikamente (private wie familiensichtbare)
