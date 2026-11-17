@@ -14,13 +14,16 @@ import { emptyShoppingOverview, shoppingOverviewSlice } from '../services/shoppi
 import { emptyMealsOverview, mealsOverviewSlice } from '../services/meals-slices.ts';
 import { emptyNotesOverview, normalizeNoteCategoryFilter, notesOverviewSlice } from '../services/notes-slices.ts';
 import { birthdaysOverviewSlice, emptyBirthdaysOverview } from '../services/birthdays-slices.ts';
-import { budgetOverviewSlice, emptyBudgetOverview } from '../services/budget-slices.ts';
+import {
+  budgetOverviewSlice, emptyBudgetOverview, emptySplitBalanceOverview, splitBalanceOverviewSlice,
+} from '../services/budget-slices.ts';
 import { emptyRewardsOverview, rewardsOverviewSlice } from '../services/rewards-slices.ts';
 import { emptyHealthOverview, healthOverviewSlice } from '../services/health-slices.ts';
 import { emptyHousekeepingOverview, housekeepingOverviewSlice } from '../services/housekeeping-slices.ts';
 import { calendarOverviewSlice, emptyCalendarOverview, familyEventsOverviewSlice } from '../services/calendar-slices.ts';
 import { countdownsOverviewSlice, emptyCountdownsOverview } from '../services/countdowns-slices.ts';
 import { emptyScheduleOverview, scheduleOverviewSlice } from '../services/schedule-slices.ts';
+import { emptyWasteOverview, wasteOverviewSlice } from '../services/waste-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -35,11 +38,9 @@ import {
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
-import { openBalancesForUser } from '../services/split-expenses.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
-import { householdTimeZone, utcToWall, shiftDateKey } from '../utils/timezone.js';
+import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { serializeEvents } from './calendar/helpers.js';
-import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { moneyReader } from '../services/reward-money.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
@@ -94,7 +95,7 @@ const DENIED_PAYLOAD = Object.freeze({
   // den die Kachel beschriftet ist — und er steht ohnehin im Kalender.
   // Geteilte Ausgaben gehoeren zum Budget-Modul (server/scopes.js fuehrt
   // `split-expenses` als zweiten Praefix von `budget`).
-  budget: ({ month }) => ({ ...emptyBudgetOverview(month), splitBalance: emptySplitBalance() }),
+  budget: ({ month }) => ({ ...emptyBudgetOverview(month), ...emptySplitBalanceOverview() }),
   rewards: () => emptyRewardsOverview(),
   health: () => emptyHealthOverview(),
   housekeeping: () => emptyHousekeepingOverview(),
@@ -102,7 +103,7 @@ const DENIED_PAYLOAD = Object.freeze({
   // statt `waste`/`schedule`: unter diesen Namen legt der Browser die Slices
   // der Kacheln ab (`ensureWasteSlice`, `ensureScheduleSlice`), und ein
   // gleichnamiges Feld hier liesse sie nie mehr laden.
-  waste: () => ({ wastePickups: [] }),
+  waste: () => emptyWasteOverview(),
   schedule: () => emptyScheduleOverview(),
   // Vorrat „läuft bald ab": Chargennamen sind Haushaltsdaten des Moduls pantry.
   pantry: () => ({ pantryExpiring: emptyPantryExpiring() }),
@@ -121,10 +122,6 @@ function emptyAnswer(context) {
   const empty = { users: [], ...emptyCountdownsOverview(), quicklinks: [] };
   for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
   return empty;
-}
-
-function emptySplitBalance() {
-  return { net: [], positions: [] };
 }
 
 /**
@@ -524,11 +521,13 @@ router.get('/', (req, res) => {
   // geteilt gegen privat, und die setzt `listQuickLinksFor` ueber die anfragende
   // Person durch - eine fremde private Kachel liegt also auch dann nicht auf der
   // Leitung, wenn der Browser sie nie zeichnen wuerde.
-  if (wants('quicklinks')) try {
-    result.quicklinks = listQuickLinksFor(userId, isAdminRequest(req));
-  } catch (err) {
-    log.error('quick links error:', err.message);
-    result.quicklinks = [];
+  //
+  // Kein eigener Ausschnitt: listQuickLinksFor() liegt in routes/quick-links.js,
+  // und ein Dienst, der eine Route importiert, ist der Schichtbruch, den die
+  // Lint-Baseline zaehlt. Hineingereicht bliebe vom Ausschnitt nur eine Huelle um
+  // diesen einen Aufruf; die Route ruft ihn deshalb selbst, unter runSlice().
+  if (wants('quicklinks')) {
+    result.quicklinks = runSlice('quick links', () => listQuickLinksFor(userId, isAdminRequest(req)), []);
   }
 
   // Das Budget des Monats (services/budget-slices.ts): Einnahmen, Ausgaben,
@@ -538,17 +537,12 @@ router.get('/', (req, res) => {
     Object.assign(result, budgetOverviewSlice(d, rowsReader, overviewCtx, { month: currentMonth }, runSlice));
   }
 
-  // Geteilte Ausgaben: was der Betrachter offen hat (Kennzahl „Ausgleich
-  // offen"). Keine eigene Abfrage - die Salden kommen aus derselben Funktion wie
-  // die Ausgleichs-Ansicht des Moduls, damit Uebersicht und Modul nie zwei
-  // Zahlen fuer dieselbe Schuld zeigen (und ein Fix wie #1445 beide heilt).
-  // Ein Split-Gast erreicht /dashboard gar nicht (Gate in server/index.js).
-  if (allows('budget')) try {
-    const householdCurrency = d.prepare("SELECT value FROM sync_config WHERE key = 'currency'").get()?.value || 'EUR';
-    result.splitBalance = openBalancesForUser(d, userId, { householdCurrency });
-  } catch (err) {
-    log.error('split balance error:', err.message);
-    result.splitBalance = emptySplitBalance();
+  // Geteilte Ausgaben (services/budget-slices.ts): was der Betrachter offen hat
+  // (Kennzahl „Ausgleich offen"), aus derselben Funktion wie die
+  // Ausgleichs-Ansicht des Moduls. Die Haushaltswaehrung liest der Ausschnitt
+  // unter seinem eigenen Guard.
+  if (allows('budget')) {
+    Object.assign(result, splitBalanceOverviewSlice(d, rowsReader, overviewCtx, { userId }, runSlice));
   }
 
   // Belohnungen (services/rewards-slices.ts): Fortschritt statt Rangliste - wer
@@ -576,25 +570,10 @@ router.get('/', (req, res) => {
       viewsAmounts: () => requestHasCapability(d, req, 'housekeeping_view_amounts'),
     }, runSlice));
   }
-  // Abfuhr fuer das Heute-Blatt: heute (Tonne raus) und morgen (heute Abend
-  // rausstellen). Dieselbe Aufloesung wie Kachel, Modul und Kalender
-  // (`getOccurrences`, invariant #3: nie doppelt), nur das Zwei-Tage-Fenster
-  // und nur die Felder, die eine Zeile braucht. Die Typ-Auswahl der Kachel
-  // gilt hier nicht: die Zeile spricht nur, wenn die Kachel NICHT sichtbar ist.
-  if (allows('waste')) try {
-    const tomorrow = shiftDateKey(todayLocalKey, 1);
-    result.wastePickups = getWasteOccurrences(d, { from: todayLocalKey, to: tomorrow })
-      .map((o) => ({
-        date_key: o.date_key,
-        type_id: o.type_id,
-        type_name: o.type_name,
-        type_icon: o.type_icon,
-        type_color: o.type_color,
-        deep_link: o.deep_link,
-      }));
-  } catch (err) {
-    log.error('wastePickups error:', err.message);
-    result.wastePickups = [];
+  // Abfuhr fuer das Heute-Blatt (services/waste-slices.ts): heute (Tonne raus)
+  // und morgen (heute Abend rausstellen).
+  if (allows('waste')) {
+    Object.assign(result, wasteOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
   }
 
   // Die EIGENE Schicht von heute (services/schedule-slices.ts) - nicht die des
@@ -609,11 +588,8 @@ router.get('/', (req, res) => {
   // derselbe Haushaltstag wie fuer Mahlzeiten und Aufgaben dieser Antwort. Ein
   // Fehler setzt `null` - die Kachel zeigt dann „erneut versuchen" statt einer
   // leeren Liste, die „nichts laeuft ab" behaupten wuerde.
-  if (allows('pantry')) try {
-    result.pantryExpiring = pantryExpiringSlice(d, todayLocalKey);
-  } catch (err) {
-    log.error('pantryExpiring error:', err.message);
-    result.pantryExpiring = null;
+  if (allows('pantry')) {
+    result.pantryExpiring = runSlice('pantryExpiring', () => pantryExpiringSlice(d, todayLocalKey), null);
   }
   // Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
   // Kennzahlen und gehoeren nicht an die Wand (#1903).
