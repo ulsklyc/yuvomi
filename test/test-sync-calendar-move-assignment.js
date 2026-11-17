@@ -40,6 +40,8 @@ const { sync: caldavSync } = await import('../server/services/caldav-sync.js');
 const { sync: appleSync } = await import('../server/services/apple-calendar.js');
 const { __test: google } = await import('../server/services/google-calendar.js');
 const { reassignDefaultOnCalendarMove } = await import('../server/services/sync-assignment.js');
+// Nur fuer die Ausgangslage (Anna hat eine geerbte Erinnerung), nicht als Pruefling.
+const { fanOutEventReminders } = await import('../server/services/event-reminder-fanout.js');
 // Die UID, unter der ein Termin hochgeht, kommt aus EINER Quelle (own-uid.js)
 // und traegt die Kennung der Installation; hier nachgebaut waere sie eine Kopie.
 const { eventUidFor } = await import('../server/services/calendar-outbound.js');
@@ -50,7 +52,8 @@ const GCAL_A = 'a@group.calendar.google.com';
 const GCAL_B = 'b@group.calendar.google.com';
 const UID = 'move-me@example.org';
 
-let OWNER; let ANNA; let BEN; let CHRIS;
+/** @type {number} */ let OWNER; /** @type {number} */ let ANNA;
+/** @type {number} */ let BEN; /** @type {number} */ let CHRIS;
 
 function addUser(username, color) {
   return Number(db.prepare(`
@@ -329,6 +332,44 @@ describe('#1270 - der Umzug nimmt die unangetastete Standard-Zuweisung mit', () 
     const annas = db.prepare(`SELECT COUNT(*) AS n FROM reminders
       WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?`).get(imported.id, ANNA);
     assert.equal(Number(annas.n), 0, 'Anna hat den Termin nicht mehr und keine Erinnerung daran');
+  });
+});
+
+// Die Erinnerung im Fall oben erbt Anna nie (sie kam erst nach dem Import), ihr
+// "keine Erinnerung" haelt also nur das Verteilen fest, nicht das Zurueckziehen.
+describe('#921 - der Umzug zieht geerbte Erinnerungen zurueck', () => {
+  beforeEach(resetTables);
+
+  it('der Umzug zieht der alten Person ihre geerbten Erinnerungen zurueck, eigene bleiben', async () => {
+    externalCalendar('caldav', CAL_A, 'Kalender A', ANNA);
+    externalCalendar('caldav', CAL_B, 'Kalender B', BEN);
+    seedCaldavAccount();
+
+    await caldavSync({ createClient: caldavClient(CAL_A) });
+    const imported = eventRow();
+    assert.deepEqual(assignmentsOf(imported.id), [ANNA]);
+    // Die Erinnerung des Anlegers, an Anna verteilt - so, wie der Termin-Editor
+    // sie nach dem Speichern verteilt (#921). Dazu eine, die Anna sich selbst
+    // gestellt hat (`assigned_from IS NULL`).
+    db.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('event', ?, '2099-01-01T08:00:00Z', ?)`).run(imported.id, OWNER);
+    assert.equal(fanOutEventReminders(db, imported.id, OWNER), 1, 'Anna erbt die Erinnerung');
+    db.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('event', ?, '2099-01-02T08:00:00Z', ?)`).run(imported.id, ANNA);
+    const annasReminders = () => db.prepare(`SELECT remind_at, assigned_from FROM reminders
+      WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
+      ORDER BY remind_at`).all(imported.id, ANNA);
+    assert.deepEqual(annasReminders(), [
+      { remind_at: '2099-01-01T08:00:00Z', assigned_from: OWNER },
+      { remind_at: '2099-01-02T08:00:00Z', assigned_from: null },
+    ], 'vor dem Umzug: eine geerbte, eine eigene');
+
+    // ECHTER Inbound: derselbe Termin liegt jetzt in Kalender B.
+    await caldavSync({ createClient: caldavClient(CAL_B) });
+    assert.deepEqual(assignmentsOf(imported.id), [BEN]);
+    assert.deepEqual(annasReminders(), [
+      { remind_at: '2099-01-02T08:00:00Z', assigned_from: null },
+    ], 'die geerbte ist weg, die selbst gestellte bleibt');
   });
 });
 
