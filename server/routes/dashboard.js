@@ -17,6 +17,8 @@ import { emptyNotesOverview, normalizeNoteCategoryFilter, notesOverviewSlice } f
 import { birthdaysOverviewSlice, emptyBirthdaysOverview } from '../services/birthdays-slices.ts';
 import { budgetOverviewSlice, emptyBudgetOverview } from '../services/budget-slices.ts';
 import { emptyRewardsOverview, rewardsOverviewSlice } from '../services/rewards-slices.ts';
+import { emptyHealthOverview, healthOverviewSlice } from '../services/health-slices.ts';
+import { emptyHousekeepingOverview, housekeepingOverviewSlice } from '../services/housekeeping-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -31,12 +33,9 @@ import {
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
-import { FastingError, getFastingDashboardState } from '../services/fasting.js';
 import { openBalancesForUser } from '../services/split-expenses.js';
-import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
-import { finishedVisitsInMonth, latestVisit } from '../services/housekeeping-month.js';
-import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/timezone.js';
+import { householdTimeZone, utcToWall, shiftDateKey } from '../utils/timezone.js';
 import { serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
 import { scheduleData } from '../services/schedule.js';
@@ -96,20 +95,8 @@ const DENIED_PAYLOAD = Object.freeze({
   // `split-expenses` als zweiten Praefix von `budget`).
   budget: ({ month }) => ({ ...emptyBudgetOverview(month), splitBalance: emptySplitBalance() }),
   rewards: () => emptyRewardsOverview(),
-  health: () => ({
-    health: {
-      hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0,
-      nextDose: null, lowStockCount: 0,
-    },
-    fasting: emptyFastingWidget(),
-    nutrition: emptyNutritionWidget(),
-  }),
-  housekeeping: () => ({
-    housekeeping: {
-      configured: false, present: false, presentSince: null, workerName: null,
-      visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null,
-    },
-  }),
+  health: () => emptyHealthOverview(),
+  housekeeping: () => emptyHousekeepingOverview(),
   // Die zwei Felder des Heute-Blatts (Critique 23.09.2026, P1). Eigene Namen
   // statt `waste`/`schedule`: unter diesen Namen legt der Browser die Slices
   // der Kacheln ab (`ensureWasteSlice`, `ensureScheduleSlice`), und ein
@@ -142,27 +129,6 @@ const ENDED_TODAY_POOL = 20;
  * der naechste eigene heute, einer danach fuer „als Naechstes", und Raum fuer
  * gemeinsame, die die Karte in einer eigenen Zeile zeigt. */
 const FAMILY_AHEAD_PER_MEMBER = 6;
-
-function emptyFastingWidget() {
-  return {
-    settings: { clock_mode: 'auto', zone_mode: 'timer' },
-    active: null,
-    lastCompleted: null,
-  };
-}
-
-/**
- * Die leere Naehrwert-Bilanz: kein Ziel, nichts gegessen.
- *
- * `target: null` ist hier die richtige leere Fassung und nicht ein Ziel aus
- * Nullen - "kein Ziel gesetzt" und "Ziel 0" sind zwei verschiedene Aussagen
- * (#1326), und die Kachel sagt bei der ersten "kein Ziel" statt "0 von 0".
- */
-function emptyNutritionWidget() {
-  const totals = {};
-  for (const key of NUTRIENT_KEYS) totals[key] = 0;
-  return { date: null, target: null, totals, entryCount: 0 };
-}
 
 function emptySplitBalance() {
   return { net: [], positions: [] };
@@ -349,9 +315,9 @@ router.get('/', (req, res) => {
 
   const now = new Date();
 
-  // Lokaler Datums-/Wochentagsschlüssel: die Fälligkeit einer Dosis hängt am lokalen
-  // Kalendertag (nicht UTC), sonst driftet die days_mask westlich von UTC um einen Tag.
-  // Konvention wie public/utils/health-meds.js: Montag = 0 … Sonntag = 6.
+  // Lokaler Datumsschlüssel: die Fälligkeit einer Dosis hängt am lokalen
+  // Kalendertag (nicht UTC), sonst driftet die days_mask westlich von UTC um einen
+  // Tag; den Wochentag leitet der Gesundheits-Ausschnitt aus diesem Schluessel ab.
   //
   // Dieser Schlüssel gilt für ALLES, was der Nutzer als Kalendertag eingegeben hat -
   // Mahlzeitendatum, Fälligkeiten, Budget-Monat. Bis 2026-08-18 zog sich die Route
@@ -371,9 +337,6 @@ router.get('/', (req, res) => {
   const householdWall = utcToWall(now.toISOString(), householdTimeZone(d));
   const todayLocalKey = householdWall?.date
     ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  // Wochentag aus dem Schluessel statt aus `now`: `getDay()` laese die Zone des
-  // Containers und widerspraeche dem Tag darüber, sobald die beiden abweichen.
-  const localWeekdayIdx = (new Date(`${todayLocalKey}T00:00:00Z`).getUTCDay() + 6) % 7;
   const currentMonth = todayLocalKey.slice(0, 7);
   const deadline48h = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
 
@@ -698,129 +661,21 @@ router.get('/', (req, res) => {
     }, runSlice));
   }
 
-  // Gesundheit: heute fällige Dosen der EIGENEN Medikamente (private wie familiensichtbare)
-  // plus Nachbestell-Hinweis. Das Dashboard ist strikt persönlich: fremde Medikamente
-  // erscheinen nie, auch nicht mit visibility='family' (Issue #592); geteilte Medikamente
-  // bleiben der Health-Seite vorbehalten. Fälligkeit inline berechnet (days_mask, Zeitraum,
-  // Log-Status), da public/utils/health-meds.js browser-Pfade importiert und serverseitig
-  // nicht ladbar ist.
+  // Gesundheit (services/health-slices.ts): heute faellige Dosen der EIGENEN
+  // Medikamente mit Nachbestell-Hinweis, der Fastenstand und die Naehrwert-Bilanz
+  // des Tages. Jeder der drei Bloecke faellt ueber runSlice() einzeln auf seinen
+  // alten Fehlerwert zurueck.
   if (allows('health')) {
-    try {
-      const meds = d.prepare(`
-      SELECT id, name, stock_qty, refill_threshold
-      FROM medications
-      WHERE active = 1 AND user_id = ?
-      `).all(userId);
-      const scheduleStmt = d.prepare(`
-      SELECT time_of_day, days_mask, start_date, end_date
-      FROM medication_schedules
-      WHERE medication_id = ? AND active = 1
-      `);
-      const logStmt = d.prepare(`
-      SELECT status FROM medication_logs
-      WHERE medication_id = ? AND substr(scheduled_at, 1, 10) = ? AND substr(scheduled_at, 12, 5) = ?
-      ORDER BY id DESC LIMIT 1
-      `);
-      let dosesTotal = 0;
-      let dosesTaken = 0;
-      let dosesSkipped = 0;
-      let lowStockCount = 0;
-      let nextDose = null;
-      for (const med of meds) {
-        if (med.stock_qty != null && Number.isFinite(Number(med.stock_qty))) {
-          const stock = Number(med.stock_qty);
-          const thr = med.refill_threshold != null && Number.isFinite(Number(med.refill_threshold))
-            ? Number(med.refill_threshold)
-            : null;
-          if (stock <= 0 || (thr != null && stock <= thr)) lowStockCount += 1;
-        }
-        for (const s of scheduleStmt.all(med.id)) {
-          if (s.start_date && todayLocalKey < s.start_date) continue;
-          if (s.end_date && todayLocalKey > s.end_date) continue;
-          const mask = s.days_mask;
-          const matches = mask === null || mask === undefined
-            ? true
-            : (Number(mask) & (1 << localWeekdayIdx)) !== 0;
-          if (!matches) continue;
-          dosesTotal += 1;
-          const time = s.time_of_day || '00:00';
-          const logRow = logStmt.get(med.id, todayLocalKey, time);
-          if (logRow?.status === 'taken') dosesTaken += 1;
-          else if (logRow?.status === 'skipped') dosesSkipped += 1;
-          else if (!nextDose || time < nextDose.time) nextDose = { name: med.name, time };
-        }
-      }
-      result.health = {
-        hasMeds: meds.length > 0,
-        dosesTotal,
-        dosesTaken,
-        dosesSkipped,
-        nextDose,
-        lowStockCount,
-      };
-    } catch (err) {
-      log.error('health error:', err.message);
-      result.health = { hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0, nextDose: null, lowStockCount: 0 };
-    }
-
-    try {
-      result.fasting = getFastingDashboardState(d, { id: userId });
-    } catch (err) {
-      if (err instanceof FastingError && err.status === 403) result.fasting = emptyFastingWidget();
-      else {
-        log.error('fasting error:', err.message);
-        result.fasting = null;
-      }
-    }
-
-    try {
-      // Der Tag kommt aus `todayKey()` und damit aus der HAUSHALTSZONE. Der
-      // Rest dieser Route rechnet ihren lokalen Tag ebenso; ein
-      // `toISOString().slice(0, 10)` stuende hier abends westlich von UTC auf
-      // dem Folgetag und zeigte eine leere Bilanz neben einem vollen Tagebuch.
-      result.nutrition = nutritionSummaryFor(d, userId, userId, todayKey(d));
-    } catch (err) {
-      log.error('nutrition error:', err.message);
-      result.nutrition = emptyNutritionWidget();
-    }
+    Object.assign(result, healthOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
   }
 
-  // Haushaltshilfe: Anwesenheitsstatus (offene Sitzung), Besuche im laufenden Monat,
-  // offener Zahlbetrag und letzter Besuch — ein kompakter Status statt einer Liste.
-  if (allows('housekeeping')) try {
-    // "Die zuletzt begonnene" und "der letzte Besuch" sind der spaeteste
-    // ZEITPUNKT, nicht der groesste Text von `check_in` - dieselbe Regel wie im
-    // Modul (`latestVisit`), sonst nennt die Kachel einen anderen Besuch als
-    // die Modulseite.
-    const hkZone = householdTimeZone(d);
-    const openSession = latestVisit(d, hkZone, 'check_out IS NULL');
-    const openWorker = openSession?.worker_id ? d.prepare(`
-      SELECT u.display_name AS worker_name
-      FROM housekeeping_workers hw
-      LEFT JOIN users u ON u.id = hw.user_id
-      WHERE hw.id = ?
-    `).get(openSession.worker_id) : null;
-    // Der Monat des HAUSHALTS, nicht der UTC-Monat von `check_in` (#1451):
-    // `substr(check_in, 1, 7)` zaehlte einen Besuch am Ersten um 00:30 in
-    // Berlin in den Vormonat - dieselbe Regel wie im Modul (#1387).
-    const month = finishedVisitsInMonth(d, currentMonth, hkZone);
-    const lastRow = latestVisit(d, hkZone, 'check_out IS NOT NULL');
-    const anyRow = d.prepare('SELECT 1 FROM housekeeping_work_sessions LIMIT 1').get()
-      || d.prepare('SELECT 1 FROM housekeeping_workers LIMIT 1').get();
-    result.housekeeping = {
-      configured: Boolean(anyRow),
-      present: Boolean(openSession),
-      presentSince: openSession?.check_in || null,
-      workerName: openWorker?.worker_name || null,
-      visitsThisMonth: month.visits,
-      // Der offene Lohn ist Geld (R20): ohne `housekeeping_view_amounts` -
-      // so starten neue Kinderkonten - kommt er als `null`, wie im Modul.
-      unpaidAmount: requestHasCapability(d, req, 'housekeeping_view_amounts') ? month.unpaid : null,
-      lastVisit: lastRow?.check_in || null,
-    };
-  } catch (err) {
-    log.error('housekeeping error:', err.message);
-    result.housekeeping = { configured: false, present: false, presentSince: null, workerName: null, visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null };
+  // Haushaltshilfe (services/housekeeping-slices.ts): Anwesenheit, Besuche im
+  // laufenden Monat, offener Zahlbetrag und letzter Besuch. Ob der Betrachter
+  // Betraege sehen darf, weiss nur die Anfrage; gefragt wird im Ausschnitt.
+  if (allows('housekeeping')) {
+    Object.assign(result, housekeepingOverviewSlice(d, rowsReader, overviewCtx, {
+      viewsAmounts: () => requestHasCapability(d, req, 'housekeeping_view_amounts'),
+    }, runSlice));
   }
   // Abfuhr fuer das Heute-Blatt: heute (Tonne raus) und morgen (heute Abend
   // rausstellen). Dieselbe Aufloesung wie Kachel, Modul und Kalender
