@@ -30,7 +30,9 @@
     "max-lines-per-function": [
       "error",
       {
-        "max": 200
+        "max": 200,
+        "skipComments": true,
+        "skipBlankLines": true
       }
     ],
     "eslint-js/no-restricted-syntax": [
