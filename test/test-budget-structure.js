@@ -169,7 +169,7 @@ const SUM_SOURCES = [
   'server/routes/budget/stats.js',
   'server/routes/budget/plans.js',
   'server/routes/budget/helpers.js',
-  'server/routes/dashboard.js',
+  'server/services/budget-slices.ts',
 ];
 
 /** Zerlegt eine Datei in ihre SQL-Template-Literale. */

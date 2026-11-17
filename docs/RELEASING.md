@@ -13,16 +13,35 @@ A release is a tag `vX.Y.Z` on this repository. Everything downstream hangs on t
   stay: installations from before the rename pull it and are updated through it).
 - `release-assets.yml` is started by hand right after the GitHub release was created as a
   **draft** (GitHub runs no workflow for a draft's `created` event, so there is no automatic
-  trigger that fires before the release is public). It packs the tag into `yuvomi-X.Y.Z-dist.tar.gz` (top-level folder `yuvomi-X.Y.Z/`, for now the same
-  content as `git archive`), writes `SHA256SUMS`, attests both with a build provenance
-  attestation, uploads them and only then publishes the release. YunoHost and the Proxmox script
-  install from that asset, and neither sees a draft, so no channel ever sees a release without
+  trigger that fires before the release is public). It packs the tag into
+  `yuvomi-X.Y.Z-dist.tar.gz`: the `git archive` tree of the tag plus the built web app `dist/` (with `dist/THIRD-PARTY-NOTICES.txt`), under the one top-level folder
+  `yuvomi-X.Y.Z/`. The source stays in the tarball because the server imports shared code from
+  `public/utils/` and reads `public/locales/`. Before packing, the build runs twice more in fresh
+  directories and the results are compared, and the pack itself is reproducible (sorted entries,
+  owner 0, the tagged commit's mtime, `gzip -n`). The job then writes `SHA256SUMS`, attests both
+  with a build provenance attestation, uploads them and only then publishes the release. YunoHost
+  and the Proxmox script install from that asset: they strip the one folder, run
+  `npm ci --omit=dev` on Node 24 and start `node server/index.js`, with no build step of their
+  own. Neither sees a draft, so no channel ever sees a release without
   its tarball. If the job fails or was never started, the release stays a draft; start it with
   `gh workflow run release-assets.yml --ref vX.Y.Z -f tag=vX.Y.Z`.
 - `umbrel-publish.yml` runs when the GitHub release is published and opens, or renames, the
   store PR against `getumbrel/umbrel-apps`. A release that `release-assets.yml` publishes with
   the workflow token fires no `published` run of its own, so that job starts this one explicitly.
 - TrueNAS picks up the new image tag on its own; the Unraid template points at `latest`.
+- Three packages live in repositories of their own and follow the release without a trigger
+  from here. The Home Assistant app (`ulsklyc/yuvomi-home-assistant`) builds on the image: a
+  Renovate pull request moves its `FROM` tag once the image exists, and after the merge that
+  repository builds its own per-architecture images. The YunoHost package (`ulsklyc/yuvomi_ynh`)
+  opens a daily bump pull request with the asset URL and its checksum, taken only after
+  `gh attestation verify` passed. The iOS app (`ulsklyc/yuvomi-ios`) reads the OpenAPI document
+  of the newest release once a day, from the tag's source tree: it loads `server/openapi.js`
+  with nothing installed, so that file and what it imports must not need `node_modules`.
+
+These packages address a few things here by name: the entry point `node server/index.js`, the
+start-up log line `Server running on port`, `GET /health`, `POST /api/v1/auth/setup`, and the
+asset name `yuvomi-*-dist.tar.gz`. Renaming or moving one of them is a change to those
+repositories too, and nothing in this repository's tests goes red for it.
 
 The in-app changelog reads the GitHub release, not `CHANGELOG.md`, so a release without notes is
 visible to every household on the next start.

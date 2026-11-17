@@ -7,7 +7,6 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { resolveCalendarSelection } from '../services/calendar-selection.js';
 import { normalizeCategoryFilter } from '../services/task-scope.js';
 import { emptyTasksOverview, tasksOverviewSlice } from '../services/tasks-slices.ts';
@@ -15,8 +14,18 @@ import { emptyShoppingOverview, shoppingOverviewSlice } from '../services/shoppi
 import { emptyMealsOverview, mealsOverviewSlice } from '../services/meals-slices.ts';
 import { emptyNotesOverview, normalizeNoteCategoryFilter, notesOverviewSlice } from '../services/notes-slices.ts';
 import { birthdaysOverviewSlice, emptyBirthdaysOverview } from '../services/birthdays-slices.ts';
+import {
+  budgetOverviewSlice, emptyBudgetOverview, emptySplitBalanceOverview, splitBalanceOverviewSlice,
+} from '../services/budget-slices.ts';
+import { emptyRewardsOverview, rewardsOverviewSlice } from '../services/rewards-slices.ts';
+import { emptyHealthOverview, healthOverviewSlice } from '../services/health-slices.ts';
+import { emptyHousekeepingOverview, housekeepingOverviewSlice } from '../services/housekeeping-slices.ts';
+import { calendarOverviewSlice, emptyCalendarOverview, familyEventsOverviewSlice } from '../services/calendar-slices.ts';
+import { countdownsOverviewSlice, emptyCountdownsOverview } from '../services/countdowns-slices.ts';
+import { emptyScheduleOverview, scheduleOverviewSlice } from '../services/schedule-slices.ts';
+import { emptyWasteOverview, wasteOverviewSlice } from '../services/waste-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
-import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
+import { COUNTDOWN_MODULES } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
   hiddenModulesFor,
@@ -24,24 +33,16 @@ import {
   asksHouseholdAudience,
   householdAudienceAnswer,
   householdAudienceShows,
-  resolveBudgetMode,
   rowReader,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
-import { FastingError, getFastingDashboardState } from '../services/fasting.js';
-import { openBalancesForUser } from '../services/split-expenses.js';
-import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
-import { finishedVisitsInMonth, latestVisit } from '../services/housekeeping-month.js';
-import { householdTimeZone, utcToWall, todayKey, shiftDateKey } from '../utils/timezone.js';
+import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { serializeEvents } from './calendar/helpers.js';
-import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
-import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
-import { activeCatalog, ledgerBalanceSql } from '../services/rewards.js';
-import { moneyParams, moneyReader, moneyVisibleSql } from '../services/reward-money.js';
+import { moneyReader } from '../services/reward-money.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
 
 const log = createLogger('Dashboard');
@@ -85,7 +86,7 @@ const runSlice = sliceRunner(log);
 const DENIED_PAYLOAD = Object.freeze({
   // Geburtstage gehören zum Kalender-Modul, nicht zu einem eigenen — dieselbe
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
-  calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdaysOverview() }),
+  calendar: () => ({ ...emptyCalendarOverview(), ...emptyBirthdaysOverview() }),
   tasks: () => emptyTasksOverview(),
   meals: () => emptyMealsOverview(),
   notes: () => emptyNotesOverview(),
@@ -94,28 +95,16 @@ const DENIED_PAYLOAD = Object.freeze({
   // den die Kachel beschriftet ist — und er steht ohnehin im Kalender.
   // Geteilte Ausgaben gehoeren zum Budget-Modul (server/scopes.js fuehrt
   // `split-expenses` als zweiten Praefix von `budget`).
-  budget: ({ month }) => ({ budget: emptyBudget(month), splitBalance: emptySplitBalance() }),
-  rewards: () => ({ rewards: { view: null, standings: [], participantCount: 0, pending: 0, moneyPending: 0, catalog: [], recent: [] } }),
-  health: () => ({
-    health: {
-      hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0,
-      nextDose: null, lowStockCount: 0,
-    },
-    fasting: emptyFastingWidget(),
-    nutrition: emptyNutritionWidget(),
-  }),
-  housekeeping: () => ({
-    housekeeping: {
-      configured: false, present: false, presentSince: null, workerName: null,
-      visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null,
-    },
-  }),
+  budget: ({ month }) => ({ ...emptyBudgetOverview(month), ...emptySplitBalanceOverview() }),
+  rewards: () => emptyRewardsOverview(),
+  health: () => emptyHealthOverview(),
+  housekeeping: () => emptyHousekeepingOverview(),
   // Die zwei Felder des Heute-Blatts (Critique 23.09.2026, P1). Eigene Namen
   // statt `waste`/`schedule`: unter diesen Namen legt der Browser die Slices
   // der Kacheln ab (`ensureWasteSlice`, `ensureScheduleSlice`), und ein
   // gleichnamiges Feld hier liesse sie nie mehr laden.
-  waste: () => ({ wastePickups: [] }),
-  schedule: () => ({ myShiftsToday: [] }),
+  waste: () => emptyWasteOverview(),
+  schedule: () => emptyScheduleOverview(),
   // Vorrat „läuft bald ab": Chargennamen sind Haushaltsdaten des Moduls pantry.
   pantry: () => ({ pantryExpiring: emptyPantryExpiring() }),
 });
@@ -130,81 +119,9 @@ const DENIED_PAYLOAD = Object.freeze({
  * nur bei einer Listen-Auswahl, und ein Konto ohne den Einkauf bekommt es nie.
  */
 function emptyAnswer(context) {
-  const empty = { users: [], countdowns: [], countdownTotal: 0, quicklinks: [] };
+  const empty = { users: [], ...emptyCountdownsOverview(), quicklinks: [] };
   for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
   return empty;
-}
-
-/** Wie viele beendete Termine von heute ausserhalb des Deckels mitkommen (#1449). */
-const ENDED_TODAY_POOL = 20;
-
-/** Wie viele noch kommende Termine die Familienkarte je Mitglied bekommt (#1449):
- * der naechste eigene heute, einer danach fuer „als Naechstes", und Raum fuer
- * gemeinsame, die die Karte in einer eigenen Zeile zeigt. */
-const FAMILY_AHEAD_PER_MEMBER = 6;
-
-function emptyFastingWidget() {
-  return {
-    settings: { clock_mode: 'auto', zone_mode: 'timer' },
-    active: null,
-    lastCompleted: null,
-  };
-}
-
-/**
- * Die leere Naehrwert-Bilanz: kein Ziel, nichts gegessen.
- *
- * `target: null` ist hier die richtige leere Fassung und nicht ein Ziel aus
- * Nullen - "kein Ziel gesetzt" und "Ziel 0" sind zwei verschiedene Aussagen
- * (#1326), und die Kachel sagt bei der ersten "kein Ziel" statt "0 von 0".
- */
-function emptyNutritionWidget() {
-  const totals = {};
-  for (const key of NUTRIENT_KEYS) totals[key] = 0;
-  return { date: null, target: null, totals, entryCount: 0 };
-}
-
-function emptySplitBalance() {
-  return { net: [], positions: [] };
-}
-
-function emptyBudget(month) {
-  return {
-    month,
-    income: 0,
-    expenses: 0,
-    balance: 0,
-    entryCount: 0,
-    topExpenseCategory: null,
-    topExpenseAmount: 0,
-    topExpenses: [],
-    savingsGoal: null,
-  };
-}
-
-/**
- * Die Felder eines Termins, die der Wochenstreifen braucht: Tag(e), Farbe nach
- * der Regel aus public/utils/event-color.js und der Titel fuer den
- * Tagesnamen - der Geburtstag mit den Feldern, aus denen der Browser ihn
- * uebersetzt (#524).
- */
-function weekEventFields(event) {
-  return {
-    id: event.id,
-    title: event.title,
-    start_datetime: event.start_datetime,
-    end_datetime: event.end_datetime ?? null,
-    all_day: event.all_day ? 1 : 0,
-    color: event.color ?? null,
-    cal_color: event.cal_color ?? null,
-    assigned_to: event.assigned_to ?? null,
-    assigned_users: (event.assigned_users ?? []).map((user) => ({
-      id: user.id, display_name: user.display_name, color: user.color,
-    })),
-    birthday_name: event.birthday_name ?? null,
-    birthday_date: event.birthday_date ?? null,
-    birthday_event_kind: event.birthday_event_kind ?? null,
-  };
 }
 
 /**
@@ -363,9 +280,9 @@ router.get('/', (req, res) => {
 
   const now = new Date();
 
-  // Lokaler Datums-/Wochentagsschlüssel: die Fälligkeit einer Dosis hängt am lokalen
-  // Kalendertag (nicht UTC), sonst driftet die days_mask westlich von UTC um einen Tag.
-  // Konvention wie public/utils/health-meds.js: Montag = 0 … Sonntag = 6.
+  // Lokaler Datumsschlüssel: die Fälligkeit einer Dosis hängt am lokalen
+  // Kalendertag (nicht UTC), sonst driftet die days_mask westlich von UTC um einen
+  // Tag; den Wochentag leitet der Gesundheits-Ausschnitt aus diesem Schluessel ab.
   //
   // Dieser Schlüssel gilt für ALLES, was der Nutzer als Kalendertag eingegeben hat -
   // Mahlzeitendatum, Fälligkeiten, Budget-Monat. Bis 2026-08-18 zog sich die Route
@@ -385,9 +302,6 @@ router.get('/', (req, res) => {
   const householdWall = utcToWall(now.toISOString(), householdTimeZone(d));
   const todayLocalKey = householdWall?.date
     ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  // Wochentag aus dem Schluessel statt aus `now`: `getDay()` laese die Zone des
-  // Containers und widerspraeche dem Tag darüber, sobald die beiden abweichen.
-  const localWeekdayIdx = (new Date(`${todayLocalKey}T00:00:00Z`).getUTCDay() + 6) % 7;
   const currentMonth = todayLocalKey.slice(0, 7);
   const deadline48h = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
 
@@ -448,51 +362,26 @@ router.get('/', (req, res) => {
   const birthdaysLeftOut = denied.has('calendar') || birthdaysSwitchedOff(d);
   if (birthdaysLeftOut) Object.assign(result, emptyBirthdaysOverview());
 
-  // Anstehende Termine (nächste 5, 8 oder 12, ab jetzt).
-  // Geteilte Logik mit /calendar/upcoming: expandiert wiederkehrende Serien,
-  // sodass auch Termine erscheinen, deren Master-Start in der Vergangenheit liegt.
-  if (allows('calendar')) try {
-    // Der Deckel (fuenf, auf Wunsch 8 oder 12, #1680) zaehlt nur, was noch kommt (#1449); beendete Termine
-    // von heute kommen ausserhalb mit - die Kachel zeigt sie zurueckgetreten,
-    // das Heute-Blatt laesst sie weg. Welche beendet sind, entscheidet der
-    // Browser an der Uhr: ein Termin endet auch zwischen zwei Abrufen.
-    result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
-      userId, limit: eventsLimit, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
-      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, calendars: eventCalendars, reader: rowsReader,
-    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
-  } catch (err) {
-    log.error('upcomingEvents error:', err.message);
-    result.upcomingEvents = [];
-  }
-
-  /* DIE WOCHE FUER DEN STREIFEN des Kalender-Widgets (2x1). Eigene Frage neben
-   * der Liste darueber: dort „was beginnt als Naechstes", hier „was findet an
-   * den sieben Tagen ab heute statt" - auch was vorgestern begann und noch
-   * laeuft (getEventsOverlappingDays).
-   *
-   * IMMER MITGELIEFERT, nicht nur auf Anfrage: der Anpassen-Modus schaltet die
-   * Groesse als Vorschau um, ohne neu zu laden, und ein Streifen ohne Daten
-   * hiesse dort „leere Woche" - ein plausibles Falsches. Die Kosten haelt die
-   * Form klein: nur, was ein Punkt oder ein Band braucht, ohne Beschreibung,
-   * Ort und Anhaenge.
-   *
-   * Dieselben Filter wie die Liste (Sichtbarkeit, „nur meine", Geburtstage)
-   * und dieselbe Modulsperre ueber DENIED_PAYLOAD. Das Fenster hat einen Tag
-   * Rand je Seite; welcher Tag ein Termin ist, entscheidet der Browser in
-   * seiner Anzeigezone und klammert dort auf die sieben. */
-  if (allows('calendar')) try {
-    result.weekEvents = serializeEvents(getEventsOverlappingDays(d, {
-      userId, fromKey: shiftDateKey(todayLocalKey, -1), days: 9,
-      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience, calendars: eventCalendars, reader: rowsReader,
-    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) })
-      .map(weekEventFields);
-  } catch (err) {
-    log.error('weekEvents error:', err.message);
-    result.weekEvents = [];
-  }
-
   // EIN TAG, EINE ZONE, EIN JETZT fuer jeden Ausschnitt der Uebersicht.
   const overviewCtx = { today: todayLocalKey, zone: householdTimeZone(d), now };
+
+  // serializeEvents() (routes/calendar/helpers.js) an diese Anfrage gebunden:
+  // Dokumentrechte des Betrachters, Admin-Flag. Bleibt in der Route - ein Dienst,
+  // der eine Route importiert, ist der Schichtbruch, den die Lint-Baseline zaehlt.
+  const serializeForViewer = (events) => serializeEvents(events, {
+    database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req),
+  });
+
+  // Die naechsten Termine der Kachel und die Woche des Streifens
+  // (services/calendar-slices.ts). Jeder der beiden Bloecke faellt ueber
+  // runSlice() einzeln auf seine leere Liste zurueck; die Familienkarte steht
+  // weiter unten, hinter den Mitgliedern, die sie liest.
+  if (allows('calendar')) {
+    Object.assign(result, calendarOverviewSlice(d, rowsReader, overviewCtx, {
+      userId, limit: eventsLimit, assignedTo: eventsAssignedTo, includeBirthdays,
+      household: householdAudience, calendars: eventCalendars, serialize: serializeForViewer,
+    }, runSlice));
+  }
 
   // DIE AUFGABEN-BLOECKE (services/tasks-slices.ts): dringende Aufgaben, die zwei
   // Zahlen der Kachel, „heute dran" je Mitglied, die Wandtitel und „heute
@@ -597,36 +486,13 @@ router.get('/', (req, res) => {
     result.users = [];
   }
 
-  /* DIE FAMILIENKARTE HAT EIGENE TERMINE (#1449). Sie lieh sich die Liste der
-   * Termin-Kachel: fuenf Kommende fuer den ganzen Haushalt und deren „nur
-   * meine". An einem vollen Tag fiel so der Abendtermin eines Kindes heraus,
-   * und mit „nur meine" standen alle anderen als „heute frei" da. Hier fragt
-   * deshalb jedes Mitglied fuer sich: was heute war (die beendeten, damit
-   * „fuer heute durch" von „frei" zu unterscheiden ist) und die naechsten
-   * kommenden.
-   *
-   * „NUR MEINE" GILT HIER NICHT - die Karte zeigt jedes Mitglied, das ist ihr
-   * Zweck (Empfehlung in #1449). Sichtbarkeit und abgewaehlte Geburtstage
-   * gelten wie ueberall: der Betrachter sieht nur, was er sehen darf. */
-  if (allows('calendar')) try {
-    const seen = new Set();
-    const merged = [];
-    for (const member of result.users) {
-      for (const event of getUpcomingEvents(d, {
-        userId, limit: FAMILY_AHEAD_PER_MEMBER, fromToday: true, assignedTo: member.id, includeBirthdays,
-        keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, reader: rowsReader,
-      })) {
-        const key = `${event.id}@${event.start_datetime}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        merged.push(event);
-      }
-    }
-    merged.sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
-    result.familyEvents = serializeEvents(merged, { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
-  } catch (err) {
-    log.error('familyEvents error:', err.message);
-    result.familyEvents = [];
+  // Die Familienkarte (services/calendar-slices.ts, #1449): je Mitglied die
+  // beendeten von heute und die naechsten kommenden, ohne „nur meine" und ohne
+  // die Kalender-Auswahl der Kachel.
+  if (allows('calendar')) {
+    Object.assign(result, familyEventsOverviewSlice(d, rowsReader, overviewCtx, {
+      userId, members: result.users, includeBirthdays, household: householdAudience, serialize: serializeForViewer,
+    }, runSlice));
   }
 
   // Die Geburtstags-Kachel (services/birthdays-slices.ts). Ob sie gelesen wird,
@@ -636,35 +502,14 @@ router.get('/', (req, res) => {
     Object.assign(result, birthdaysOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
   }
 
-  // Countdowns (#647): markierte Termine und Aufgaben und bald ablaufende
-  // Dokumente (#1705) in EINER nach Nähe sortierten Liste. `todayLocalKey` und nicht der
-  // UTC-Tag: „noch 1 Tag" gegenüber „heute" entscheidet sich am Kalendertag des
-  // Betrachters, und westlich von UTC ist der ein anderer.
-  //
-  // DER EINZIGE TEIL DER ANTWORT, DER MEHREREN MODULEN GEHÖRT, und deshalb steht
-  // seine Sperre nicht als Zeile in DENIED_PAYLOAD, sondern als Argument: wem
-  // der Kalender entzogen ist, dem fallen die Termin-Countdowns heraus und die
-  // Aufgaben-Countdowns bleiben. Ein Alles-oder-nichts hätte die Kachel schon
-  // beim Sperren EINES der beiden Module verschwinden lassen - dieselbe Falle,
-  // die der haushaltweite Modulschalter im Review zu PR #793 gestellt hat. Die
-  // Gesamtzahl entsteht in `getCountdowns` hinter demselben Filter, damit
-  // Schnitt und Zahl dieselbe Menge meinen.
-  if (wants('countdowns')) try {
-    const countdowns = getCountdowns(d, {
-      userId,
-      todayKey: todayLocalKey,
-      hiddenModules: denied,
-      // The event and task countdowns of a paired display follow the wall rule (rowReader).
-      reader: rowsReader,
-    });
-    result.countdowns = countdowns.items;
-    // Wie `birthdayCount` neben `birthdays`: die Liste ist der Vorrat für die
-    // größte Kachelfassung, die Zahl ist die Wahrheit über den Bestand.
-    result.countdownTotal = countdowns.total;
-  } catch (err) {
-    log.error('countdowns error:', err.message);
-    result.countdowns = [];
-    result.countdownTotal = 0;
+  // Countdowns (services/countdowns-slices.ts, #647, #1705): markierte Termine
+  // und Aufgaben und bald ablaufende Dokumente. Der einzige Teil der Antwort, der
+  // mehreren Modulen gehoert: seine Sperre ist `denied` als Argument, keine Zeile
+  // in DENIED_PAYLOAD.
+  if (wants('countdowns')) {
+    Object.assign(result, countdownsOverviewSlice(d, rowsReader, overviewCtx, {
+      userId, hiddenModules: denied,
+    }, runSlice));
   }
 
   // Schnellzugriffe (#469): die Kachelreihe kommt mit der Uebersichts-Antwort
@@ -676,350 +521,65 @@ router.get('/', (req, res) => {
   // geteilt gegen privat, und die setzt `listQuickLinksFor` ueber die anfragende
   // Person durch - eine fremde private Kachel liegt also auch dann nicht auf der
   // Leitung, wenn der Browser sie nie zeichnen wuerde.
-  if (wants('quicklinks')) try {
-    result.quicklinks = listQuickLinksFor(userId, isAdminRequest(req));
-  } catch (err) {
-    log.error('quick links error:', err.message);
-    result.quicklinks = [];
+  //
+  // Kein eigener Ausschnitt: listQuickLinksFor() liegt in routes/quick-links.js,
+  // und ein Dienst, der eine Route importiert, ist der Schichtbruch, den die
+  // Lint-Baseline zaehlt. Hineingereicht bliebe vom Ausschnitt nur eine Huelle um
+  // diesen einen Aufruf; die Route ruft ihn deshalb selbst, unter runSlice().
+  if (wants('quicklinks')) {
+    result.quicklinks = runSlice('quick links', () => listQuickLinksFor(userId, isAdminRequest(req)), []);
   }
 
-  if (allows('budget')) try {
-    const from = `${currentMonth}-01`;
-    const to = `${currentMonth}-31`;
-    // Persönlich/geteilt (#476/#505): im personal-Modus zeigt das Dashboard-Widget
-    // das eigene Budget (owner_id = me), sonst das gesamte Haushaltsbudget.
-    const ownerClause = resolveBudgetMode(d) === 'personal' ? ' AND owner_id = ?' : '';
-    const ownerParams = ownerClause ? [userId] : [];
-
-    const totals = d.prepare(`
-      SELECT
-        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
-        SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS expenses,
-        SUM(amount) AS balance,
-        COUNT(*) AS entry_count
-      FROM budget_entries
-      -- Erwartete, noch unbestaetigte Buchungen zaehlen nicht mit (#637), wie in
-      -- Uebersicht, Statistik, Plan und Kontostand.
-      WHERE date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
-    `).get(from, to, ...ownerParams);
-
-    // Die groessten Ausgabenkategorien, nicht nur die groesste: die hohe
-    // Budget-Kachel (1x2) fuellt damit ihre Hoehe mit Inhalt statt mit einem
-    // leeren Band ueber der Fusszeile (Critique 2026-09-23). Sie zeigt drei;
-    // FUENF, weil eine gestreckte Kachel weitere zeigt (U14, Hoehe wird
-    // Inhalt) - dieselbe Gruppierung, nur zwei Zeilen mehr. Die erste bleibt
-    // zusaetzlich als `topExpenseCategory`/`topExpenseAmount` stehen - die
-    // flache Kachel und aeltere Clients lesen genau diese beiden Felder.
-    const topExpenses = d.prepare(`
-      SELECT category, SUM(amount) AS amount
-      FROM budget_entries
-      WHERE amount < 0 AND date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
-      GROUP BY category
-      ORDER BY ABS(SUM(amount)) DESC
-      LIMIT 5
-    `).all(from, to, ...ownerParams);
-    const topExpense = topExpenses[0];
-
-    // Monats-Sparziel (Budgetplan #468): eigener Guard, damit ältere/Minimal-DBs
-    // ohne budget_plans-Tabelle die Budget-Aggregation nicht scheitern lassen.
-    let savingsGoal = null;
-    try {
-      const goalRow = d.prepare("SELECT amount FROM budget_plans WHERE category = '__savings__'").get();
-      if (goalRow) savingsGoal = Math.round(goalRow.amount * 100) / 100;
-    } catch { /* Tabelle fehlt (Legacy/Test) → kein Sparziel */ }
-
-    result.budget = {
-      month: currentMonth,
-      income: totals?.income || 0,
-      expenses: Math.abs(totals?.expenses || 0),
-      balance: totals?.balance || 0,
-      entryCount: totals?.entry_count || 0,
-      topExpenseCategory: topExpense?.category || null,
-      topExpenseAmount: Math.abs(topExpense?.amount || 0),
-      topExpenses: topExpenses.map((row) => ({ category: row.category, amount: Math.abs(row.amount || 0) })),
-      savingsGoal,
-    };
-  } catch (err) {
-    log.error('budget error:', err.message);
-    result.budget = {
-      month: currentMonth,
-      income: 0,
-      expenses: 0,
-      balance: 0,
-      entryCount: 0,
-      topExpenseCategory: null,
-      topExpenseAmount: 0,
-      topExpenses: [],
-    };
+  // Das Budget des Monats (services/budget-slices.ts): Einnahmen, Ausgaben,
+  // Saldo, groesste Ausgabenkategorien und Sparziel. Persoenlich oder geteilt
+  // entscheidet der Ausschnitt ueber authorize (resolveBudgetMode).
+  if (allows('budget')) {
+    Object.assign(result, budgetOverviewSlice(d, rowsReader, overviewCtx, { month: currentMonth }, runSlice));
   }
 
-  // Geteilte Ausgaben: was der Betrachter offen hat (Kennzahl „Ausgleich
-  // offen"). Keine eigene Abfrage - die Salden kommen aus derselben Funktion wie
-  // die Ausgleichs-Ansicht des Moduls, damit Uebersicht und Modul nie zwei
-  // Zahlen fuer dieselbe Schuld zeigen (und ein Fix wie #1445 beide heilt).
-  // Ein Split-Gast erreicht /dashboard gar nicht (Gate in server/index.js).
-  if (allows('budget')) try {
-    const householdCurrency = d.prepare("SELECT value FROM sync_config WHERE key = 'currency'").get()?.value || 'EUR';
-    result.splitBalance = openBalancesForUser(d, userId, { householdCurrency });
-  } catch (err) {
-    log.error('split balance error:', err.message);
-    result.splitBalance = emptySplitBalance();
+  // Geteilte Ausgaben (services/budget-slices.ts): was der Betrachter offen hat
+  // (Kennzahl „Ausgleich offen"), aus derselben Funktion wie die
+  // Ausgleichs-Ansicht des Moduls. Die Haushaltswaehrung liest der Ausschnitt
+  // unter seinem eigenen Guard.
+  if (allows('budget')) {
+    Object.assign(result, splitBalanceOverviewSlice(d, rowsReader, overviewCtx, { userId }, runSlice));
   }
 
-  /* BELOHNUNGEN: FORTSCHRITT STATT RANGLISTE (Critique 2026-09-23, Persona Emma).
-   *
-   * Hier stand eine Top-5-Rangliste nach Punkten, fuer jeden Betrachter gleich.
-   * Ein Kind las darin "1 Leo 60 / 2 Emma 30": Wettbewerb unter Geschwistern
-   * statt des eigenen Wegs zur Praemie. Die Antwort teilt jetzt nach der Frage,
-   * die das Modul selbst stellt - wer darf FREIGEBEN (isAdminRequest, dieselbe
-   * Pruefung wie PATCH /rewards/redemptions) -, nicht nach `family_role`:
-   *
-   *   approver - jedes teilnehmende Mitglied, nach NAMEN (kein Platz), dazu alle
-   *              offenen Anfragen;
-   *   self     - wer nicht freigibt, aber selbst sammelt: NUR die eigene Zeile,
-   *              die eigenen offenen Anfragen und die zuletzt verdienten Punkte.
-   *              Die Geschwister gehen gar nicht erst ueber die Leitung - eine
-   *              Rangliste im Netzwerk-Tab ist dieselbe Rangliste;
-   *   family   - wer weder freigibt noch sammelt (Wandtablett, Grosseltern):
-   *              alle nach Namen, ohne fremde Anfragen.
-   *
-   * `catalog` ist die Zielliste fuer den Balken; welche Praemie das Ziel ist,
-   * entscheidet public/utils/reward-goal.js, dieselbe Regel wie auf der Seite. */
-  if (allows('rewards')) try {
-    const MEMBER_FILTER = householdMemberSql('u');
-    const members = d.prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
-             ${memberPositionSql('u')} AS sort_order,
-             ${ledgerBalanceSql('points', 'u.id')} AS balance
-      FROM users u
-      JOIN reward_participants rp ON rp.user_id = u.id AND rp.enabled = 1
-      WHERE ${MEMBER_FILTER}
-      ORDER BY ${memberOrderSql('u')}
-    `).all();
-    const approver = isAdminRequest(req);
-    const own = members.find((m) => m.id === Number(userId));
-    const view = approver ? 'approver' : own ? 'self' : 'family';
-    const standings = view === 'self' ? [own] : members;
-    // Dieselben Personen wie die Liste darueber (#1207): eine alte
-    // Einschreibung von Personal oder Gast bleibt stehen, zaehlt aber nicht.
-    const participantCount = members.length;
-    // `pending` BLEIBT DIE ZAHL DER PRAEMIEN-ANFRAGEN. Geld-Anfragen (#1734)
-    // stehen daneben in `moneyPending`, damit ein Client, der das alte Feld
-    // liest, nichts anderes darin findet. Wer was zaehlt, sagen die Zweige: wer
-    // freigibt, ist Admin und darf jede lesen; wer selbst sammelt, zaehlt nur
-    // die eigenen; die Sicht `family` (Wandtablett, Grosseltern) bekommt bei den
-    // Praemien 0. Geld selbst zeigt die Kachel nicht - weder Saldo noch Buchung.
-    const countPending = (kindSql) => (view === 'approver'
-      ? d.prepare(`SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND ${kindSql}`).get().n
-      : view === 'self'
-        ? d.prepare(`SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND user_id = ? AND ${kindSql}`).get(userId).n
-        : 0);
-    const pending = countPending("kind = 'reward'");
-    // DER EIGENE GELD-ZAEHLER HAENGT NICHT AN DER PUNKTE-TEILNAHME. Ein Kind mit
-    // Taschengeldkonto, das keine Punkte sammelt, faellt in die Sicht `family`
-    // und bekam hier 0, obwohl seine Einzahlung offen war (Review zu #1745).
-    // Gezaehlt wird ueber dasselbe Praedikat wie an den Geld-Routen: Admins
-    // alle, ein Mitglied die eigenen, ein Display keine.
-    const reader = moneyReader(req);
-    const moneyPending = d.prepare(`
-      SELECT COUNT(*) AS n FROM reward_redemptions r
-      WHERE r.status = 'pending' AND r.kind != 'reward' AND ${moneyVisibleSql(reader, 'r.user_id')}
-    `).get(moneyParams(reader)).n;
-    // Wer selbst sammelt, sieht seine letzten Gutschriften - verdient oder
-    // geschenkt. Einloesungen und Rueckbuchungen sind kein "verdient".
-    //
-    // UND EINE ZURUECKGENOMMENE GUTSCHRIFT AUCH NICHT (#1607). Seit das
-    // Wiederoeffnen gegenbucht statt zu loeschen, bleibt die earn-Zeile im
-    // Ledger stehen. Hier stuende sie sonst weiter als "zuletzt verdient",
-    // obwohl die Aufgabe wieder offen ist - der vollstaendige Verlauf mit
-    // beiden Zeilen gehoert auf die Belohnungsseite, diese Liste zeigt nur,
-    // was gilt. Die Gegenbuchung zeigt auf ihre Gutschrift (`reverses_id`) und
-    // nicht nur auf dieselbe Aufgabe: wird die Aufgabe geloescht, verlieren
-    // beide Zeilen ihre task_id, und ein Vergleich darueber traefe nie mehr.
-    const ownRecent = own && (view === 'self' || members.length === 1)
-      ? d.prepare(`
-          SELECT delta, type, reason, created_at FROM reward_ledger l
-          WHERE user_id = ? AND delta > 0 AND type IN ('earn', 'bonus') AND l.unit = 'points'
-            AND NOT EXISTS (SELECT 1 FROM reward_ledger r WHERE r.reverses_id = l.id)
-          ORDER BY created_at DESC, id DESC
-          LIMIT 3
-        `).all(userId)
-      : [];
-    const catalog = activeCatalog(d).map((c) => ({ id: c.id, name: c.name, cost: c.cost, remaining: c.remaining }));
-    result.rewards = { view, me: userId, standings, participantCount, pending, moneyPending, catalog, recent: ownRecent };
-  } catch (err) {
-    log.error('rewards error:', err.message);
-    result.rewards = { view: null, standings: [], participantCount: 0, pending: 0, moneyPending: 0, catalog: [], recent: [] };
+  // Belohnungen (services/rewards-slices.ts): Fortschritt statt Rangliste - wer
+  // freigibt, sieht alle, wer sammelt, nur sich, alle anderen die Namen. Ob
+  // jemand freigibt und wessen Geld-Anfragen zaehlen, weiss nur die Anfrage.
+  if (allows('rewards')) {
+    Object.assign(result, rewardsOverviewSlice(d, rowsReader, overviewCtx, {
+      approver: isAdminRequest(req), moneyReader: moneyReader(req),
+    }, runSlice));
   }
 
-  // Gesundheit: heute fällige Dosen der EIGENEN Medikamente (private wie familiensichtbare)
-  // plus Nachbestell-Hinweis. Das Dashboard ist strikt persönlich: fremde Medikamente
-  // erscheinen nie, auch nicht mit visibility='family' (Issue #592); geteilte Medikamente
-  // bleiben der Health-Seite vorbehalten. Fälligkeit inline berechnet (days_mask, Zeitraum,
-  // Log-Status), da public/utils/health-meds.js browser-Pfade importiert und serverseitig
-  // nicht ladbar ist.
+  // Gesundheit (services/health-slices.ts): heute faellige Dosen der EIGENEN
+  // Medikamente mit Nachbestell-Hinweis, der Fastenstand und die Naehrwert-Bilanz
+  // des Tages. Jeder der drei Bloecke faellt ueber runSlice() einzeln auf seinen
+  // alten Fehlerwert zurueck.
   if (allows('health')) {
-    try {
-      const meds = d.prepare(`
-      SELECT id, name, stock_qty, refill_threshold
-      FROM medications
-      WHERE active = 1 AND user_id = ?
-      `).all(userId);
-      const scheduleStmt = d.prepare(`
-      SELECT time_of_day, days_mask, start_date, end_date
-      FROM medication_schedules
-      WHERE medication_id = ? AND active = 1
-      `);
-      const logStmt = d.prepare(`
-      SELECT status FROM medication_logs
-      WHERE medication_id = ? AND substr(scheduled_at, 1, 10) = ? AND substr(scheduled_at, 12, 5) = ?
-      ORDER BY id DESC LIMIT 1
-      `);
-      let dosesTotal = 0;
-      let dosesTaken = 0;
-      let dosesSkipped = 0;
-      let lowStockCount = 0;
-      let nextDose = null;
-      for (const med of meds) {
-        if (med.stock_qty != null && Number.isFinite(Number(med.stock_qty))) {
-          const stock = Number(med.stock_qty);
-          const thr = med.refill_threshold != null && Number.isFinite(Number(med.refill_threshold))
-            ? Number(med.refill_threshold)
-            : null;
-          if (stock <= 0 || (thr != null && stock <= thr)) lowStockCount += 1;
-        }
-        for (const s of scheduleStmt.all(med.id)) {
-          if (s.start_date && todayLocalKey < s.start_date) continue;
-          if (s.end_date && todayLocalKey > s.end_date) continue;
-          const mask = s.days_mask;
-          const matches = mask === null || mask === undefined
-            ? true
-            : (Number(mask) & (1 << localWeekdayIdx)) !== 0;
-          if (!matches) continue;
-          dosesTotal += 1;
-          const time = s.time_of_day || '00:00';
-          const logRow = logStmt.get(med.id, todayLocalKey, time);
-          if (logRow?.status === 'taken') dosesTaken += 1;
-          else if (logRow?.status === 'skipped') dosesSkipped += 1;
-          else if (!nextDose || time < nextDose.time) nextDose = { name: med.name, time };
-        }
-      }
-      result.health = {
-        hasMeds: meds.length > 0,
-        dosesTotal,
-        dosesTaken,
-        dosesSkipped,
-        nextDose,
-        lowStockCount,
-      };
-    } catch (err) {
-      log.error('health error:', err.message);
-      result.health = { hasMeds: false, dosesTotal: 0, dosesTaken: 0, dosesSkipped: 0, nextDose: null, lowStockCount: 0 };
-    }
-
-    try {
-      result.fasting = getFastingDashboardState(d, { id: userId });
-    } catch (err) {
-      if (err instanceof FastingError && err.status === 403) result.fasting = emptyFastingWidget();
-      else {
-        log.error('fasting error:', err.message);
-        result.fasting = null;
-      }
-    }
-
-    try {
-      // Der Tag kommt aus `todayKey()` und damit aus der HAUSHALTSZONE. Der
-      // Rest dieser Route rechnet ihren lokalen Tag ebenso; ein
-      // `toISOString().slice(0, 10)` stuende hier abends westlich von UTC auf
-      // dem Folgetag und zeigte eine leere Bilanz neben einem vollen Tagebuch.
-      result.nutrition = nutritionSummaryFor(d, userId, userId, todayKey(d));
-    } catch (err) {
-      log.error('nutrition error:', err.message);
-      result.nutrition = emptyNutritionWidget();
-    }
+    Object.assign(result, healthOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
   }
 
-  // Haushaltshilfe: Anwesenheitsstatus (offene Sitzung), Besuche im laufenden Monat,
-  // offener Zahlbetrag und letzter Besuch — ein kompakter Status statt einer Liste.
-  if (allows('housekeeping')) try {
-    // "Die zuletzt begonnene" und "der letzte Besuch" sind der spaeteste
-    // ZEITPUNKT, nicht der groesste Text von `check_in` - dieselbe Regel wie im
-    // Modul (`latestVisit`), sonst nennt die Kachel einen anderen Besuch als
-    // die Modulseite.
-    const hkZone = householdTimeZone(d);
-    const openSession = latestVisit(d, hkZone, 'check_out IS NULL');
-    const openWorker = openSession?.worker_id ? d.prepare(`
-      SELECT u.display_name AS worker_name
-      FROM housekeeping_workers hw
-      LEFT JOIN users u ON u.id = hw.user_id
-      WHERE hw.id = ?
-    `).get(openSession.worker_id) : null;
-    // Der Monat des HAUSHALTS, nicht der UTC-Monat von `check_in` (#1451):
-    // `substr(check_in, 1, 7)` zaehlte einen Besuch am Ersten um 00:30 in
-    // Berlin in den Vormonat - dieselbe Regel wie im Modul (#1387).
-    const month = finishedVisitsInMonth(d, currentMonth, hkZone);
-    const lastRow = latestVisit(d, hkZone, 'check_out IS NOT NULL');
-    const anyRow = d.prepare('SELECT 1 FROM housekeeping_work_sessions LIMIT 1').get()
-      || d.prepare('SELECT 1 FROM housekeeping_workers LIMIT 1').get();
-    result.housekeeping = {
-      configured: Boolean(anyRow),
-      present: Boolean(openSession),
-      presentSince: openSession?.check_in || null,
-      workerName: openWorker?.worker_name || null,
-      visitsThisMonth: month.visits,
-      // Der offene Lohn ist Geld (R20): ohne `housekeeping_view_amounts` -
-      // so starten neue Kinderkonten - kommt er als `null`, wie im Modul.
-      unpaidAmount: requestHasCapability(d, req, 'housekeeping_view_amounts') ? month.unpaid : null,
-      lastVisit: lastRow?.check_in || null,
-    };
-  } catch (err) {
-    log.error('housekeeping error:', err.message);
-    result.housekeeping = { configured: false, present: false, presentSince: null, workerName: null, visitsThisMonth: 0, unpaidAmount: 0, lastVisit: null };
+  // Haushaltshilfe (services/housekeeping-slices.ts): Anwesenheit, Besuche im
+  // laufenden Monat, offener Zahlbetrag und letzter Besuch. Ob der Betrachter
+  // Betraege sehen darf, weiss nur die Anfrage; gefragt wird im Ausschnitt.
+  if (allows('housekeeping')) {
+    Object.assign(result, housekeepingOverviewSlice(d, rowsReader, overviewCtx, {
+      viewsAmounts: () => requestHasCapability(d, req, 'housekeeping_view_amounts'),
+    }, runSlice));
   }
-  // Abfuhr fuer das Heute-Blatt: heute (Tonne raus) und morgen (heute Abend
-  // rausstellen). Dieselbe Aufloesung wie Kachel, Modul und Kalender
-  // (`getOccurrences`, invariant #3: nie doppelt), nur das Zwei-Tage-Fenster
-  // und nur die Felder, die eine Zeile braucht. Die Typ-Auswahl der Kachel
-  // gilt hier nicht: die Zeile spricht nur, wenn die Kachel NICHT sichtbar ist.
-  if (allows('waste')) try {
-    const tomorrow = shiftDateKey(todayLocalKey, 1);
-    result.wastePickups = getWasteOccurrences(d, { from: todayLocalKey, to: tomorrow })
-      .map((o) => ({
-        date_key: o.date_key,
-        type_id: o.type_id,
-        type_name: o.type_name,
-        type_icon: o.type_icon,
-        type_color: o.type_color,
-        deep_link: o.deep_link,
-      }));
-  } catch (err) {
-    log.error('wastePickups error:', err.message);
-    result.wastePickups = [];
+  // Abfuhr fuer das Heute-Blatt (services/waste-slices.ts): heute (Tonne raus)
+  // und morgen (heute Abend rausstellen).
+  if (allows('waste')) {
+    Object.assign(result, wasteOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
   }
 
-  // Die EIGENE Schicht von heute - nicht die des Haushalts, die zeigt die
-  // Schichtplan-Kachel. Freie Tage sind keine Zeile: „frei" ist die Abwesenheit
-  // eines Programmpunkts, kein Programmpunkt.
-  if (allows('schedule')) try {
-    result.myShiftsToday = scheduleData(todayLocalKey, todayLocalKey, userId).entries
-      .filter((entry) => entry.shift_type && !entry.is_free)
-      .map((entry) => ({
-        date_key: entry.date_key,
-        source: entry.source,
-        crosses_midnight: entry.crosses_midnight,
-        shift_type: {
-          id: entry.shift_type.id,
-          name: entry.shift_type.name,
-          short_code: entry.shift_type.short_code ?? null,
-          start_time: entry.shift_type.start_time ?? null,
-          end_time: entry.shift_type.end_time ?? null,
-          color: entry.shift_type.color ?? null,
-          icon: entry.shift_type.icon ?? null,
-        },
-      }));
-  } catch (err) {
-    log.error('myShiftsToday error:', err.message);
-    result.myShiftsToday = [];
+  // Die EIGENE Schicht von heute (services/schedule-slices.ts) - nicht die des
+  // Haushalts, die zeigt die Schichtplan-Kachel.
+  if (allows('schedule')) {
+    Object.assign(result, scheduleOverviewSlice(d, rowsReader, overviewCtx, { userId }, runSlice));
   }
 
   // Vorrat „läuft bald ab" (Critique 2026-09-23): Chargen mit abgelaufenem oder
@@ -1028,11 +588,8 @@ router.get('/', (req, res) => {
   // derselbe Haushaltstag wie fuer Mahlzeiten und Aufgaben dieser Antwort. Ein
   // Fehler setzt `null` - die Kachel zeigt dann „erneut versuchen" statt einer
   // leeren Liste, die „nichts laeuft ab" behaupten wuerde.
-  if (allows('pantry')) try {
-    result.pantryExpiring = pantryExpiringSlice(d, todayLocalKey);
-  } catch (err) {
-    log.error('pantryExpiring error:', err.message);
-    result.pantryExpiring = null;
+  if (allows('pantry')) {
+    result.pantryExpiring = runSlice('pantryExpiring', () => pantryExpiringSlice(d, todayLocalKey), null);
   }
   // Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
   // Kennzahlen und gehoeren nicht an die Wand (#1903).
