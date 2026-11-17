@@ -29,7 +29,8 @@ export function recipesSearchSlice(db: Database, _actor: SearchActor, query: Tab
   // gespiegelte Mealie/Tandoor-Rezepte eingeschlossen.
   return firstMatches(db.prepare(`
       SELECT r.id, r.title, r.notes FROM recipes r
-      ORDER BY r.title COLLATE NOCASE ASC, r.id DESC
+      -- A unique last key in the title's direction: equal titles stand in creation order.
+      ORDER BY r.title COLLATE NOCASE ASC, r.id ASC
     `).all() as SearchRow[], matches, (r) => [r.title, r.notes], limit)
     .map((r) => withExcerpt(pick(r, ['id', 'title']), q, [r.notes]));
 }
