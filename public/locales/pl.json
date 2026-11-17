@@ -6668,7 +6668,8 @@
         "previousMonth": "Poprzedni miesiąc",
         "nextMonth": "Następny miesiąc",
         "today": "Dziś",
-        "clear": "Wyczyść"
+        "clear": "Wyczyść",
+        "typeIn": "Wpisz"
     },
     "pantry": {
         "badgeExpiredDays_one": "Przeterminowane {{count}} dzień temu",

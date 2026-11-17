@@ -6668,7 +6668,8 @@
         "previousMonth": "Попередній місяць",
         "nextMonth": "Наступний місяць",
         "today": "Сьогодні",
-        "clear": "Очистити"
+        "clear": "Очистити",
+        "typeIn": "Ввести"
     },
     "pantry": {
         "badgeExpiredDays_one": "Прострочено {{count}} день тому",

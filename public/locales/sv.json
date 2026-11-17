@@ -6372,7 +6372,8 @@
         "previousMonth": "Föregående månad",
         "nextMonth": "Nästa månad",
         "today": "Idag",
-        "clear": "Rensa"
+        "clear": "Rensa",
+        "typeIn": "Skriv in"
     },
     "pantry": {
         "badgeExpiredDays_one": "Gick ut för {{count}} dag sedan",

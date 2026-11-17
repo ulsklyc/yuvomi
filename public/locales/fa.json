@@ -6372,7 +6372,8 @@
         "previousMonth": "ماه قبل",
         "nextMonth": "ماه بعد",
         "today": "امروز",
-        "clear": "پاک کردن"
+        "clear": "پاک کردن",
+        "typeIn": "تایپ"
     },
     "pantry": {
         "badgeExpiredDays_one": "{{count}} روز پیش منقضی شد",

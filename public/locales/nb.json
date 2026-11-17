@@ -6372,7 +6372,8 @@
         "previousMonth": "Forrige måned",
         "nextMonth": "Neste måned",
         "today": "I dag",
-        "clear": "Tøm"
+        "clear": "Tøm",
+        "typeIn": "Skriv inn"
     },
     "pantry": {
         "badgeExpiredDays_one": "Utløp for {{count}} dager siden",

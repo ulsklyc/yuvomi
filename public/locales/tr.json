@@ -6372,7 +6372,8 @@
         "previousMonth": "Önceki ay",
         "nextMonth": "Sonraki ay",
         "today": "Bugün",
-        "clear": "Temizle"
+        "clear": "Temizle",
+        "typeIn": "Yaz"
     },
     "pantry": {
         "badgeExpiredDays_one": "{{count}} gün önce doldu",
