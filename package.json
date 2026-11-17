@@ -711,17 +711,17 @@
   "devDependencies": {
     "@oddbird/popover-polyfill": "0.7.3",
     "@swc/core": "1.16.22",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.6",
     "axe-core": "^4.14.0",
     "dependency-cruiser": "18.7.2",
     "esbuild": "0.28.2",
-    "knip": "6.45.0",
+    "knip": "6.45.1",
     "oxlint": "1.93.0",
     "oxlint-plugin-eslint": "1.93.0",
-    "puppeteer": "^25.16.0",
+    "puppeteer": "^25.17.0",
     "sharp": "^0.35.5",
     "typescript": "7.0.2",
-    "vite": "8.3.7"
+    "vite": "8.3.8"
   },
   "allowScripts": {
     "better-sqlite3-multiple-ciphers@13.0.3": true,
