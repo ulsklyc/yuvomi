@@ -1,8 +1,9 @@
 /**
  * Module: the last blocks of GET /dashboard as slices (phase 2, section D, contract E10)
  * Purpose: holds the contract of the split balance slice (server/services/budget-slices.ts),
- *          the waste slice (server/services/waste-slices.ts) and the two blocks the
- *          route runs itself under runSlice() (quick links, pantry):
+ *          the waste slice (server/services/waste-slices.ts), the member list
+ *          (server/services/members-slices.ts) and the two blocks the route runs
+ *          itself under runSlice() (quick links, pantry):
  *
  *          1. THE SPLIT BALANCE. The viewer's open balances (`options.userId`), the
  *             household currency first; the currency comes from sync_config, `EUR`
@@ -10,12 +11,15 @@
  *          2. THE PICKUP WINDOW. Today and tomorrow of `ctx.today` - yesterday and the
  *             day after stay outside - and only the six fields a row needs. Neither
  *             slice reads a clock.
- *          3. ONE FORM. The empty forms are fresh objects in the route's key order.
- *          4. ISOLATION. Each block fails alone to its old failure value under its old
- *             name (`split balance`, `wastePickups`, `quick links`, `pantryExpiring`)
- *             and logs `<name> error:`; the pantry block fails to `null`, NOT to its
- *             empty form. Without a guard a slice throws.
- *          5. THE ROUTE. The keys stand at their old places of the answer, in
+ *          3. THE MEMBERS. The household members in the member order, five fields
+ *             each, without a clock; no row visibility.
+ *          4. ONE FORM. The empty forms are fresh objects in the route's key order.
+ *          5. ISOLATION. Each block fails alone to its old failure value under its old
+ *             name (`split balance`, `wastePickups`, `users`, `quick links`,
+ *             `pantryExpiring`) and logs `<name> error:`; the pantry block fails to
+ *             `null`, NOT to its empty form. The member list used to fail silently;
+ *             it logs `users error:` now. Without a guard a slice throws.
+ *          6. THE ROUTE. The keys stand at their old places of the answer, in
  *             success, failure and the denied form; the route hands in the viewer
  *             and the admin flag.
  *
@@ -42,6 +46,7 @@ const { personReader } = await import('../server/authorize/index.ts');
 const { resolveRequestModuleAccess } = await import('../server/authorize/actor.ts');
 const { emptySplitBalanceOverview, splitBalanceOverviewSlice } = await import('../server/services/budget-slices.ts');
 const { emptyWasteOverview, wasteOverviewSlice } = await import('../server/services/waste-slices.ts');
+const { emptyMembersOverview, membersOverviewSlice } = await import('../server/services/members-slices.ts');
 const { emptyPantryExpiring } = await import('../server/services/pantry-expiring.js');
 const { sliceRunner } = await import('../server/services/slice-runner.ts');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
@@ -245,7 +250,38 @@ test('waste: a failing read empties only this block, under its old name', () => 
   assert.throws(() => wasteOverviewSlice(broken, anna, CTX), /no such table/, 'without a guard a failing read throws');
 });
 
-// ---- 3. One form ---------------------------------------------------------------------
+// ---- 3. The members ------------------------------------------------------------------
+
+test('members: the household members in the member order, five fields each, without a clock', () => {
+  // A non-member account (split expense guest) stays outside the list.
+  const guest = addUser('rest-guest', 'Guest', 'member');
+  db.prepare('INSERT INTO split_expense_guest_users (user_id, created_by) VALUES (?, ?)').run(guest, ANNA);
+  db.prepare('UPDATE users SET sort_order = 0 WHERE id = ?').run(CARL);
+  try {
+    const { users } = withoutClock(() => membersOverviewSlice(db, anna, CTX));
+    assert.deepEqual(users.map((u) => u.id), [CARL, ANNA, BEN], 'a set position first, then by name');
+    for (const user of users) {
+      assert.deepEqual(Object.keys(user), ['id', 'display_name', 'avatar_color', 'avatar_data', 'sort_order']);
+    }
+    assert.equal(users[0].sort_order, 0);
+    assert.equal(users[1].display_name, 'Anna');
+    assert.deepEqual(membersOverviewSlice(db, personReader(BEN), CTX), { users }, 'the same list for every viewer');
+  } finally {
+    db.prepare('UPDATE users SET sort_order = NULL WHERE id = ?').run(CARL);
+    db.prepare('DELETE FROM split_expense_guest_users WHERE user_id = ?').run(guest);
+    db.prepare('DELETE FROM users WHERE id = ?').run(guest);
+  }
+});
+
+test('members: a failing read empties only this block under `users` and logs it', () => {
+  const broken = { prepare() { throw new Error('no such table: boom'); }, exec() {} };
+  const log = capturingLog();
+  assert.deepEqual(membersOverviewSlice(broken, anna, CTX, {}, sliceRunner(log)), { users: [] });
+  assert.deepEqual(log.lines, [['users error:', 'no such table: boom']]);
+  assert.throws(() => membersOverviewSlice(broken, anna, CTX), /no such table/, 'without a guard a failing read throws');
+});
+
+// ---- 4. One form ---------------------------------------------------------------------
 
 test('the empty forms are fresh objects in the route\'s key order', () => {
   assert.deepEqual(emptySplitBalanceOverview(), { splitBalance: { net: [], positions: [] } });
@@ -253,9 +289,11 @@ test('the empty forms are fresh objects in the route\'s key order', () => {
   assert.notEqual(emptySplitBalanceOverview().splitBalance, emptySplitBalanceOverview().splitBalance);
   assert.deepEqual(emptyWasteOverview(), { wastePickups: [] });
   assert.notEqual(emptyWasteOverview().wastePickups, emptyWasteOverview().wastePickups);
+  assert.deepEqual(emptyMembersOverview(), { users: [] });
+  assert.notEqual(emptyMembersOverview().users, emptyMembersOverview().users);
 });
 
-// ---- 4./5. The route ---------------------------------------------------------------
+// ---- 5./6. The route ---------------------------------------------------------------
 
 let viewer = ANNA;
 /** @type {string[] | null} */
@@ -368,6 +406,31 @@ test('route: quick links fail to [] under `quick links`, the rest stays', async 
     assert.deepEqual(lines.map((line) => [line[0], line[1]]), [['[Dashboard]', 'quick links error:']]);
   } finally {
     db.exec('ALTER TABLE quick_links_away RENAME TO quick_links');
+  }
+});
+
+test('route: the member list stands before the family card, with the members', async () => {
+  const body = await dashboard();
+  const { at } = neighbourhood(body);
+  assert.equal(at('familyEvents'), at('users') + 1);
+  assert.deepEqual(body.users.map((/** @type {{ id: number }} */ u) => u.id), [ANNA, BEN, CARL]);
+});
+
+test('route: the member list fails to [] under `users` and logs it', async () => {
+  // householdMemberSql() asks this table; the auth stub of this suite does not.
+  db.exec('ALTER TABLE split_expense_guest_users RENAME TO split_expense_guest_users_away');
+  try {
+    /** @type {any} */
+    let body;
+    const lines = await routeLog(async () => { body = await dashboard(); });
+    assert.deepEqual(body.users, []);
+    const { at } = neighbourhood(body);
+    assert.equal(at('familyEvents'), at('users') + 1, 'the key keeps its place');
+    assert.deepEqual(body.familyEvents, [], 'no members, no family card');
+    assert.ok(lines.some((line) => line[0] === '[Dashboard]' && line[1] === 'users error:'
+      && String(line[2]).includes('split_expense_guest_users')), 'the failure is logged as `users error:`');
+  } finally {
+    db.exec('ALTER TABLE split_expense_guest_users_away RENAME TO split_expense_guest_users');
   }
 });
 
