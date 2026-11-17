@@ -7,7 +7,6 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { resolveCalendarSelection } from '../services/calendar-selection.js';
 import { normalizeCategoryFilter } from '../services/task-scope.js';
 import { emptyTasksOverview, tasksOverviewSlice } from '../services/tasks-slices.ts';
@@ -19,8 +18,11 @@ import { budgetOverviewSlice, emptyBudgetOverview } from '../services/budget-sli
 import { emptyRewardsOverview, rewardsOverviewSlice } from '../services/rewards-slices.ts';
 import { emptyHealthOverview, healthOverviewSlice } from '../services/health-slices.ts';
 import { emptyHousekeepingOverview, housekeepingOverviewSlice } from '../services/housekeeping-slices.ts';
+import { calendarOverviewSlice, emptyCalendarOverview, familyEventsOverviewSlice } from '../services/calendar-slices.ts';
+import { countdownsOverviewSlice, emptyCountdownsOverview } from '../services/countdowns-slices.ts';
+import { emptyScheduleOverview, scheduleOverviewSlice } from '../services/schedule-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
-import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
+import { COUNTDOWN_MODULES } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
   hiddenModulesFor,
@@ -38,7 +40,6 @@ import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-exp
 import { householdTimeZone, utcToWall, shiftDateKey } from '../utils/timezone.js';
 import { serializeEvents } from './calendar/helpers.js';
 import { getOccurrences as getWasteOccurrences } from '../services/waste-store.js';
-import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { moneyReader } from '../services/reward-money.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
@@ -84,7 +85,7 @@ const runSlice = sliceRunner(log);
 const DENIED_PAYLOAD = Object.freeze({
   // Geburtstage gehören zum Kalender-Modul, nicht zu einem eigenen — dieselbe
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
-  calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdaysOverview() }),
+  calendar: () => ({ ...emptyCalendarOverview(), ...emptyBirthdaysOverview() }),
   tasks: () => emptyTasksOverview(),
   meals: () => emptyMealsOverview(),
   notes: () => emptyNotesOverview(),
@@ -102,7 +103,7 @@ const DENIED_PAYLOAD = Object.freeze({
   // der Kacheln ab (`ensureWasteSlice`, `ensureScheduleSlice`), und ein
   // gleichnamiges Feld hier liesse sie nie mehr laden.
   waste: () => ({ wastePickups: [] }),
-  schedule: () => ({ myShiftsToday: [] }),
+  schedule: () => emptyScheduleOverview(),
   // Vorrat „läuft bald ab": Chargennamen sind Haushaltsdaten des Moduls pantry.
   pantry: () => ({ pantryExpiring: emptyPantryExpiring() }),
 });
@@ -117,46 +118,13 @@ const DENIED_PAYLOAD = Object.freeze({
  * nur bei einer Listen-Auswahl, und ein Konto ohne den Einkauf bekommt es nie.
  */
 function emptyAnswer(context) {
-  const empty = { users: [], countdowns: [], countdownTotal: 0, quicklinks: [] };
+  const empty = { users: [], ...emptyCountdownsOverview(), quicklinks: [] };
   for (const build of Object.values(DENIED_PAYLOAD)) Object.assign(empty, build(context));
   return empty;
 }
 
-/** Wie viele beendete Termine von heute ausserhalb des Deckels mitkommen (#1449). */
-const ENDED_TODAY_POOL = 20;
-
-/** Wie viele noch kommende Termine die Familienkarte je Mitglied bekommt (#1449):
- * der naechste eigene heute, einer danach fuer „als Naechstes", und Raum fuer
- * gemeinsame, die die Karte in einer eigenen Zeile zeigt. */
-const FAMILY_AHEAD_PER_MEMBER = 6;
-
 function emptySplitBalance() {
   return { net: [], positions: [] };
-}
-
-/**
- * Die Felder eines Termins, die der Wochenstreifen braucht: Tag(e), Farbe nach
- * der Regel aus public/utils/event-color.js und der Titel fuer den
- * Tagesnamen - der Geburtstag mit den Feldern, aus denen der Browser ihn
- * uebersetzt (#524).
- */
-function weekEventFields(event) {
-  return {
-    id: event.id,
-    title: event.title,
-    start_datetime: event.start_datetime,
-    end_datetime: event.end_datetime ?? null,
-    all_day: event.all_day ? 1 : 0,
-    color: event.color ?? null,
-    cal_color: event.cal_color ?? null,
-    assigned_to: event.assigned_to ?? null,
-    assigned_users: (event.assigned_users ?? []).map((user) => ({
-      id: user.id, display_name: user.display_name, color: user.color,
-    })),
-    birthday_name: event.birthday_name ?? null,
-    birthday_date: event.birthday_date ?? null,
-    birthday_event_kind: event.birthday_event_kind ?? null,
-  };
 }
 
 /**
@@ -397,51 +365,26 @@ router.get('/', (req, res) => {
   const birthdaysLeftOut = denied.has('calendar') || birthdaysSwitchedOff(d);
   if (birthdaysLeftOut) Object.assign(result, emptyBirthdaysOverview());
 
-  // Anstehende Termine (nächste 5, 8 oder 12, ab jetzt).
-  // Geteilte Logik mit /calendar/upcoming: expandiert wiederkehrende Serien,
-  // sodass auch Termine erscheinen, deren Master-Start in der Vergangenheit liegt.
-  if (allows('calendar')) try {
-    // Der Deckel (fuenf, auf Wunsch 8 oder 12, #1680) zaehlt nur, was noch kommt (#1449); beendete Termine
-    // von heute kommen ausserhalb mit - die Kachel zeigt sie zurueckgetreten,
-    // das Heute-Blatt laesst sie weg. Welche beendet sind, entscheidet der
-    // Browser an der Uhr: ein Termin endet auch zwischen zwei Abrufen.
-    result.upcomingEvents = serializeEvents(getUpcomingEvents(d, {
-      userId, limit: eventsLimit, fromToday: true, assignedTo: eventsAssignedTo, includeBirthdays,
-      keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, calendars: eventCalendars, reader: rowsReader,
-    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
-  } catch (err) {
-    log.error('upcomingEvents error:', err.message);
-    result.upcomingEvents = [];
-  }
-
-  /* DIE WOCHE FUER DEN STREIFEN des Kalender-Widgets (2x1). Eigene Frage neben
-   * der Liste darueber: dort „was beginnt als Naechstes", hier „was findet an
-   * den sieben Tagen ab heute statt" - auch was vorgestern begann und noch
-   * laeuft (getEventsOverlappingDays).
-   *
-   * IMMER MITGELIEFERT, nicht nur auf Anfrage: der Anpassen-Modus schaltet die
-   * Groesse als Vorschau um, ohne neu zu laden, und ein Streifen ohne Daten
-   * hiesse dort „leere Woche" - ein plausibles Falsches. Die Kosten haelt die
-   * Form klein: nur, was ein Punkt oder ein Band braucht, ohne Beschreibung,
-   * Ort und Anhaenge.
-   *
-   * Dieselben Filter wie die Liste (Sichtbarkeit, „nur meine", Geburtstage)
-   * und dieselbe Modulsperre ueber DENIED_PAYLOAD. Das Fenster hat einen Tag
-   * Rand je Seite; welcher Tag ein Termin ist, entscheidet der Browser in
-   * seiner Anzeigezone und klammert dort auf die sieben. */
-  if (allows('calendar')) try {
-    result.weekEvents = serializeEvents(getEventsOverlappingDays(d, {
-      userId, fromKey: shiftDateKey(todayLocalKey, -1), days: 9,
-      assignedTo: eventsAssignedTo, includeBirthdays, household: householdAudience, calendars: eventCalendars, reader: rowsReader,
-    }), { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) })
-      .map(weekEventFields);
-  } catch (err) {
-    log.error('weekEvents error:', err.message);
-    result.weekEvents = [];
-  }
-
   // EIN TAG, EINE ZONE, EIN JETZT fuer jeden Ausschnitt der Uebersicht.
   const overviewCtx = { today: todayLocalKey, zone: householdTimeZone(d), now };
+
+  // serializeEvents() (routes/calendar/helpers.js) an diese Anfrage gebunden:
+  // Dokumentrechte des Betrachters, Admin-Flag. Bleibt in der Route - ein Dienst,
+  // der eine Route importiert, ist der Schichtbruch, den die Lint-Baseline zaehlt.
+  const serializeForViewer = (events) => serializeEvents(events, {
+    database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req),
+  });
+
+  // Die naechsten Termine der Kachel und die Woche des Streifens
+  // (services/calendar-slices.ts). Jeder der beiden Bloecke faellt ueber
+  // runSlice() einzeln auf seine leere Liste zurueck; die Familienkarte steht
+  // weiter unten, hinter den Mitgliedern, die sie liest.
+  if (allows('calendar')) {
+    Object.assign(result, calendarOverviewSlice(d, rowsReader, overviewCtx, {
+      userId, limit: eventsLimit, assignedTo: eventsAssignedTo, includeBirthdays,
+      household: householdAudience, calendars: eventCalendars, serialize: serializeForViewer,
+    }, runSlice));
+  }
 
   // DIE AUFGABEN-BLOECKE (services/tasks-slices.ts): dringende Aufgaben, die zwei
   // Zahlen der Kachel, „heute dran" je Mitglied, die Wandtitel und „heute
@@ -546,36 +489,13 @@ router.get('/', (req, res) => {
     result.users = [];
   }
 
-  /* DIE FAMILIENKARTE HAT EIGENE TERMINE (#1449). Sie lieh sich die Liste der
-   * Termin-Kachel: fuenf Kommende fuer den ganzen Haushalt und deren „nur
-   * meine". An einem vollen Tag fiel so der Abendtermin eines Kindes heraus,
-   * und mit „nur meine" standen alle anderen als „heute frei" da. Hier fragt
-   * deshalb jedes Mitglied fuer sich: was heute war (die beendeten, damit
-   * „fuer heute durch" von „frei" zu unterscheiden ist) und die naechsten
-   * kommenden.
-   *
-   * „NUR MEINE" GILT HIER NICHT - die Karte zeigt jedes Mitglied, das ist ihr
-   * Zweck (Empfehlung in #1449). Sichtbarkeit und abgewaehlte Geburtstage
-   * gelten wie ueberall: der Betrachter sieht nur, was er sehen darf. */
-  if (allows('calendar')) try {
-    const seen = new Set();
-    const merged = [];
-    for (const member of result.users) {
-      for (const event of getUpcomingEvents(d, {
-        userId, limit: FAMILY_AHEAD_PER_MEMBER, fromToday: true, assignedTo: member.id, includeBirthdays,
-        keepEndedToday: ENDED_TODAY_POOL, household: householdAudience, reader: rowsReader,
-      })) {
-        const key = `${event.id}@${event.start_datetime}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        merged.push(event);
-      }
-    }
-    merged.sort((a, b) => String(a.start_datetime).localeCompare(String(b.start_datetime)));
-    result.familyEvents = serializeEvents(merged, { database: d, viewer: documentViewer(req), actorId: userId, isAdmin: isAdminRequest(req) });
-  } catch (err) {
-    log.error('familyEvents error:', err.message);
-    result.familyEvents = [];
+  // Die Familienkarte (services/calendar-slices.ts, #1449): je Mitglied die
+  // beendeten von heute und die naechsten kommenden, ohne „nur meine" und ohne
+  // die Kalender-Auswahl der Kachel.
+  if (allows('calendar')) {
+    Object.assign(result, familyEventsOverviewSlice(d, rowsReader, overviewCtx, {
+      userId, members: result.users, includeBirthdays, household: householdAudience, serialize: serializeForViewer,
+    }, runSlice));
   }
 
   // Die Geburtstags-Kachel (services/birthdays-slices.ts). Ob sie gelesen wird,
@@ -585,35 +505,14 @@ router.get('/', (req, res) => {
     Object.assign(result, birthdaysOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice));
   }
 
-  // Countdowns (#647): markierte Termine und Aufgaben und bald ablaufende
-  // Dokumente (#1705) in EINER nach Nähe sortierten Liste. `todayLocalKey` und nicht der
-  // UTC-Tag: „noch 1 Tag" gegenüber „heute" entscheidet sich am Kalendertag des
-  // Betrachters, und westlich von UTC ist der ein anderer.
-  //
-  // DER EINZIGE TEIL DER ANTWORT, DER MEHREREN MODULEN GEHÖRT, und deshalb steht
-  // seine Sperre nicht als Zeile in DENIED_PAYLOAD, sondern als Argument: wem
-  // der Kalender entzogen ist, dem fallen die Termin-Countdowns heraus und die
-  // Aufgaben-Countdowns bleiben. Ein Alles-oder-nichts hätte die Kachel schon
-  // beim Sperren EINES der beiden Module verschwinden lassen - dieselbe Falle,
-  // die der haushaltweite Modulschalter im Review zu PR #793 gestellt hat. Die
-  // Gesamtzahl entsteht in `getCountdowns` hinter demselben Filter, damit
-  // Schnitt und Zahl dieselbe Menge meinen.
-  if (wants('countdowns')) try {
-    const countdowns = getCountdowns(d, {
-      userId,
-      todayKey: todayLocalKey,
-      hiddenModules: denied,
-      // The event and task countdowns of a paired display follow the wall rule (rowReader).
-      reader: rowsReader,
-    });
-    result.countdowns = countdowns.items;
-    // Wie `birthdayCount` neben `birthdays`: die Liste ist der Vorrat für die
-    // größte Kachelfassung, die Zahl ist die Wahrheit über den Bestand.
-    result.countdownTotal = countdowns.total;
-  } catch (err) {
-    log.error('countdowns error:', err.message);
-    result.countdowns = [];
-    result.countdownTotal = 0;
+  // Countdowns (services/countdowns-slices.ts, #647, #1705): markierte Termine
+  // und Aufgaben und bald ablaufende Dokumente. Der einzige Teil der Antwort, der
+  // mehreren Modulen gehoert: seine Sperre ist `denied` als Argument, keine Zeile
+  // in DENIED_PAYLOAD.
+  if (wants('countdowns')) {
+    Object.assign(result, countdownsOverviewSlice(d, rowsReader, overviewCtx, {
+      userId, hiddenModules: denied,
+    }, runSlice));
   }
 
   // Schnellzugriffe (#469): die Kachelreihe kommt mit der Uebersichts-Antwort
@@ -698,29 +597,10 @@ router.get('/', (req, res) => {
     result.wastePickups = [];
   }
 
-  // Die EIGENE Schicht von heute - nicht die des Haushalts, die zeigt die
-  // Schichtplan-Kachel. Freie Tage sind keine Zeile: „frei" ist die Abwesenheit
-  // eines Programmpunkts, kein Programmpunkt.
-  if (allows('schedule')) try {
-    result.myShiftsToday = scheduleData(todayLocalKey, todayLocalKey, userId).entries
-      .filter((entry) => entry.shift_type && !entry.is_free)
-      .map((entry) => ({
-        date_key: entry.date_key,
-        source: entry.source,
-        crosses_midnight: entry.crosses_midnight,
-        shift_type: {
-          id: entry.shift_type.id,
-          name: entry.shift_type.name,
-          short_code: entry.shift_type.short_code ?? null,
-          start_time: entry.shift_type.start_time ?? null,
-          end_time: entry.shift_type.end_time ?? null,
-          color: entry.shift_type.color ?? null,
-          icon: entry.shift_type.icon ?? null,
-        },
-      }));
-  } catch (err) {
-    log.error('myShiftsToday error:', err.message);
-    result.myShiftsToday = [];
+  // Die EIGENE Schicht von heute (services/schedule-slices.ts) - nicht die des
+  // Haushalts, die zeigt die Schichtplan-Kachel.
+  if (allows('schedule')) {
+    Object.assign(result, scheduleOverviewSlice(d, rowsReader, overviewCtx, { userId }, runSlice));
   }
 
   // Vorrat „läuft bald ab" (Critique 2026-09-23): Chargen mit abgelaufenem oder
