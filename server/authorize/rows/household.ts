@@ -154,3 +154,102 @@ export function householdAudienceAnswer(
   }
   return shown;
 }
+
+/**
+ * Who the overview answer is for, as far as the wall rules below ask: a paired display
+ * (`req.authMethod === 'display'`, read by the route) and whether the request asked for
+ * the household audience (asksHouseholdAudience()). The route reads both and hands them
+ * in; this file sees no request.
+ */
+export type WallAudience = Readonly<{ display: boolean; household: boolean }>;
+
+/** The display wall: a paired display that asked for the household audience. */
+function displayWall(audience: WallAudience): boolean {
+  return audience.display && audience.household;
+}
+
+/**
+ * The modules a display wall reads without module access (#1903): the sources of the
+ * today sheet on the wall.
+ */
+export const DISPLAY_WALL_MODULES = Object.freeze(['meals', 'shopping', 'housekeeping', 'waste', 'pantry']);
+
+/**
+ * Wand-Displays zeigen Mahlzeiten, Einkauf, Haushaltshilfe, Abfuhr und Vorrat
+ * (#1903): das Heute-Blatt auf der Wand braucht diese Quellen, aber das
+ * Display-Credential hat keinen Modulzugang. Die fuenf Schluessel werden VOR
+ * `modulesLeftOut` aus `denied` entfernt, NICHT danach aus `leftOut` - so
+ * wirkt der Haushaltsschalter weiter: hat ein Haushalt Mahlzeiten abgeschaltet,
+ * fuegt `modulesLeftOut` sie aus `householdDisabledModules` wieder hinzu.
+ *
+ * Changes `denied` in place and returns it: the route reads the same set later (the
+ * birthdays and the countdowns), and both see the exception as before.
+ */
+export function openDisplayWallModules(denied: Set<string>, audience: WallAudience): Set<string> {
+  if (displayWall(audience)) {
+    for (const key of DISPLAY_WALL_MODULES) {
+      denied.delete(key);
+    }
+  }
+  return denied;
+}
+
+/**
+ * Die dritte Achse (#1817): ein Modul, von dem die Haushaltsfassung keinen
+ * Schluessel traegt, wird gar nicht erst gelesen. Im SELBEN Set, damit jede
+ * Abfrage unten weiter eine einzige Frage stellt. Abgeleitet aus der
+ * Allowlist und nicht als zweite Liste gefuehrt - die Regel selbst setzt das
+ * Ende der Route durch (`householdAudienceAnswer`), das hier spart nur die
+ * Abfragen, deren Ergebnis dort ohnehin leer herauskaeme.
+ *
+ * `emptyPayloads` builds the empty form per module (the route's DENIED_PAYLOAD, in its
+ * order); it runs only for the household audience. Returns the module keys in that
+ * order, none for the personal answer.
+ */
+export function modulesOutsideHouseholdAudience(
+  audience: WallAudience,
+  emptyPayloads: () => Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+): string[] {
+  if (!audience.household) return [];
+  return Object.entries(emptyPayloads())
+    .filter(([, empty]) => !Object.keys(empty).some(householdAudienceShows))
+    .map(([key]) => key);
+}
+
+/** The today's meals rows of the overview, as far as wallMeals() reads them. */
+type MealRow = Record<string, unknown>;
+
+/**
+ * Displays zeigen nur, was die Wand-Zeile braucht: Datum, Typ, Titel und Koch.
+ * `notes` und `created_by` bleiben zurueck (#1903).
+ *
+ * Anything that is not a list (a module left out, a failed read) passes unchanged, as
+ * does every answer that is not the display wall.
+ */
+export function wallMeals(rows: unknown, audience: WallAudience): unknown {
+  if (!displayWall(audience) || !Array.isArray(rows)) return rows;
+  return rows.map(({
+    id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
+    recipe_has_image, recipe_has_own_image,
+  }: MealRow) => ({
+    id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
+    recipe_has_image: recipe_has_image ?? null, recipe_has_own_image: recipe_has_own_image ?? null,
+  }));
+}
+
+/**
+ * Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
+ * Kennzahlen und gehoeren nicht an die Wand (#1903).
+ *
+ * `value` is the pantryExpiring slice of the answer; without a `todayItems` list (left
+ * out, `null` after a failed read) it passes unchanged, as does every answer that is
+ * not the display wall.
+ */
+export function wallPantryExpiring(value: unknown, audience: WallAudience): unknown {
+  const todayItems = (value as { todayItems?: unknown } | null | undefined)?.todayItems;
+  if (!displayWall(audience) || !Array.isArray(todayItems)) return value;
+  return {
+    ...value as Record<string, unknown>,
+    todayItems: todayItems.map(({ name }: { name?: unknown }) => ({ name })),
+  };
+}

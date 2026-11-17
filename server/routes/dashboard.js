@@ -34,7 +34,11 @@ import {
   asksHouseholdAudience,
   householdAudienceAnswer,
   householdAudienceShows,
+  modulesOutsideHouseholdAudience,
+  openDisplayWallModules,
   rowReader,
+  wallMeals,
+  wallPantryExpiring,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
 import { documentViewer } from '../services/document-links.js';
@@ -315,18 +319,11 @@ router.get('/', (req, res) => {
   // kommt in derselben leeren Fassung wie bei einer Rollensperre. Die Quellen der
   // Countdowns gehoeren dazu: Dokumente haben keine eigene Kachel in dieser Antwort.
   const denied = hiddenModulesFor(req, [...Object.keys(DENIED_PAYLOAD), ...COUNTDOWN_MODULES]);
-  // Wand-Displays zeigen Mahlzeiten, Einkauf, Haushaltshilfe, Abfuhr und Vorrat
-  // (#1903): das Heute-Blatt auf der Wand braucht diese Quellen, aber das
-  // Display-Credential hat keinen Modulzugang. Die fuenf Schluessel werden VOR
-  // `modulesLeftOut` aus `denied` entfernt, NICHT danach aus `leftOut` - so
-  // wirkt der Haushaltsschalter weiter: hat ein Haushalt Mahlzeiten abgeschaltet,
-  // fuegt `modulesLeftOut` sie aus `householdDisabledModules` wieder hinzu.
-  const isDisplay = req.authMethod === 'display';
-  if (isDisplay && householdAudience) {
-    for (const key of ['meals', 'shopping', 'housekeeping', 'waste', 'pantry']) {
-      denied.delete(key);
-    }
-  }
+  // The wall rules of this answer (authorize/rows/household.ts) ask who it is for.
+  const wallAudience = { display: req.authMethod === 'display', household: householdAudience };
+  // The display wall reads its today sheet sources without module access (#1903),
+  // before modulesLeftOut so the household switch still applies.
+  openDisplayWallModules(denied, wallAudience);
   // UND DER HAUSHALTSSCHALTER (#1660, docs/DECISIONS.md 11). Bis dahin fragte
   // diese Stelle nur nach Rechten und Scopes: ein haushaltsweit abgeschaltetes
   // Modul lieferte seine Termine, Aufgaben, Buchungen und Medikamente weiter
@@ -336,17 +333,12 @@ router.get('/', (req, res) => {
   // in EINEM Set, damit jede Abfrage unten dieselbe Frage stellt; die leere
   // Fassung ist dieselbe wie bei einer Sperre, die Form der Antwort bleibt.
   const leftOut = modulesLeftOut(d, denied);
-  // Die dritte Achse (#1817): ein Modul, von dem die Haushaltsfassung keinen
-  // Schluessel traegt, wird gar nicht erst gelesen. Im SELBEN Set, damit jede
-  // Abfrage unten weiter eine einzige Frage stellt. Abgeleitet aus der
-  // Allowlist und nicht als zweite Liste gefuehrt - die Regel selbst setzt das
-  // Ende der Route durch (`householdAudienceAnswer`), das hier spart nur die
-  // Abfragen, deren Ergebnis dort ohnehin leer herauskaeme.
-  if (householdAudience) {
-    for (const [key, build] of Object.entries(DENIED_PAYLOAD)) {
-      if (!Object.keys(build({ month: currentMonth })).some(householdAudienceShows)) leftOut.add(key);
-    }
-  }
+  // The third axis (#1817): a module the household audience carries no key of is
+  // not read at all, in the same set.
+  const emptyModules = () => Object.fromEntries(
+    Object.entries(DENIED_PAYLOAD).map(([key, build]) => [key, build({ month: currentMonth })]),
+  );
+  for (const key of modulesOutsideHouseholdAudience(wallAudience, emptyModules)) leftOut.add(key);
   for (const key of leftOut) Object.assign(result, DENIED_PAYLOAD[key]?.({ month: currentMonth }));
   const allows = (moduleKey) => !leftOut.has(moduleKey);
   // Dasselbe fuer die Schluessel, die keinem Modul gehoeren (Countdowns,
@@ -448,17 +440,8 @@ router.get('/', (req, res) => {
   if (allows('meals')) {
     result.todayMeals = mealsOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice).todayMeals;
   }
-  // Displays zeigen nur, was die Wand-Zeile braucht: Datum, Typ, Titel und Koch.
-  // `notes` und `created_by` bleiben zurueck (#1903).
-  if (isDisplay && householdAudience && Array.isArray(result.todayMeals)) {
-    result.todayMeals = result.todayMeals.map(({
-      id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
-      recipe_has_image, recipe_has_own_image,
-    }) => ({
-      id, date, meal_type, title, recipe_id, cook_user_id, cook_name, cook_color,
-      recipe_has_image: recipe_has_image ?? null, recipe_has_own_image: recipe_has_own_image ?? null,
-    }));
-  }
+  // The display wall gets the fields of the wall line only (#1903).
+  Object.assign(result, { todayMeals: wallMeals(result.todayMeals, wallAudience) });
 
   // Neueste Notizen (services/notes-slices.ts): gepinnte zuerst, dann aktuellste,
   // dazu die echte Pin-Zahl und die Menge, aus der die Vorschau schoepft.
@@ -584,14 +567,8 @@ router.get('/', (req, res) => {
   if (allows('pantry')) {
     result.pantryExpiring = runSlice('pantryExpiring', () => pantryExpiringSlice(d, todayLocalKey), null);
   }
-  // Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
-  // Kennzahlen und gehoeren nicht an die Wand (#1903).
-  if (isDisplay && householdAudience && Array.isArray(result.pantryExpiring?.todayItems)) {
-    result.pantryExpiring = {
-      ...result.pantryExpiring,
-      todayItems: result.pantryExpiring.todayItems.map(({ name }) => ({ name })),
-    };
-  }
+  // The display wall gets the name of an expiring item only (#1903).
+  Object.assign(result, { pantryExpiring: wallPantryExpiring(result.pantryExpiring, wallAudience) });
 
   // Die zweite Haelfte der Aufgaben-Bloecke, an der Stelle, die diese Schluessel
   // in der Antwort immer hatten (die Reihenfolge haelt der Golden Master fest).
