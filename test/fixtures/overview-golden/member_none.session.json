@@ -1,0 +1,160 @@
+{
+  "status": 200,
+  "body": {
+    "upcomingEvents": [],
+    "familyEvents": [],
+    "weekEvents": [],
+    "birthdays": [],
+    "birthdayCount": 0,
+    "birthdayTotal": 0,
+    "birthdaySoonCount": 0,
+    "urgentTasks": [],
+    "openTaskCount": 0,
+    "overdueTaskCount": 0,
+    "memberTodayTasks": [],
+    "tasksDoneToday": 0,
+    "wallTasks": [],
+    "pinnedNotes": [],
+    "pinnedNotesCount": 0,
+    "notesTotal": 0,
+    "todayMeals": [],
+    "shoppingLists": [],
+    "shoppingOpenCount": 0,
+    "shoppingOpenLists": 0,
+    "pantryExpiring": {
+      "items": [],
+      "todayItems": [],
+      "total": 0,
+      "expiredCount": 0,
+      "todayCount": 0
+    },
+    "budget": {
+      "month": "2026-03",
+      "income": 0,
+      "expenses": 0,
+      "balance": 0,
+      "entryCount": 0,
+      "topExpenseCategory": null,
+      "topExpenseAmount": 0,
+      "topExpenses": [],
+      "savingsGoal": null
+    },
+    "splitBalance": {
+      "net": [],
+      "positions": []
+    },
+    "housekeeping": {
+      "configured": false,
+      "present": false,
+      "presentSince": null,
+      "workerName": null,
+      "visitsThisMonth": 0,
+      "unpaidAmount": 0,
+      "lastVisit": null
+    },
+    "wastePickups": [],
+    "rewards": {
+      "view": null,
+      "standings": [],
+      "participantCount": 0,
+      "pending": 0,
+      "moneyPending": 0,
+      "catalog": [],
+      "recent": []
+    },
+    "health": {
+      "hasMeds": false,
+      "dosesTotal": 0,
+      "dosesTaken": 0,
+      "dosesSkipped": 0,
+      "nextDose": null,
+      "lowStockCount": 0
+    },
+    "fasting": {
+      "settings": {
+        "clock_mode": "auto",
+        "zone_mode": "timer"
+      },
+      "active": null,
+      "lastCompleted": null
+    },
+    "nutrition": {
+      "date": null,
+      "target": null,
+      "totals": {
+        "energy_kcal": 0,
+        "fat_g": 0,
+        "saturated_fat_g": 0,
+        "carbs_g": 0,
+        "sugar_g": 0,
+        "protein_g": 0,
+        "salt_g": 0,
+        "fiber_g": 0
+      },
+      "entryCount": 0
+    },
+    "myShiftsToday": [],
+    "users": [
+      {
+        "id": 1,
+        "display_name": "Admin",
+        "avatar_color": "#DB2777",
+        "avatar_data": null,
+        "sort_order": null
+      },
+      {
+        "id": 4,
+        "display_name": "caregiver",
+        "avatar_color": "#7C3AED",
+        "avatar_data": null,
+        "sort_order": null
+      },
+      {
+        "id": 3,
+        "display_name": "child",
+        "avatar_color": "#D97706",
+        "avatar_data": null,
+        "sort_order": null
+      },
+      {
+        "id": 2,
+        "display_name": "member",
+        "avatar_color": "#059669",
+        "avatar_data": null,
+        "sort_order": null
+      },
+      {
+        "id": 5,
+        "display_name": "member_none",
+        "avatar_color": "#0891B2",
+        "avatar_data": null,
+        "sort_order": null
+      },
+      {
+        "id": 6,
+        "display_name": "member_read",
+        "avatar_color": "#DC2626",
+        "avatar_data": null,
+        "sort_order": null
+      }
+    ],
+    "countdowns": [],
+    "countdownTotal": 0,
+    "quicklinks": [
+      {
+        "id": 1,
+        "name": "golden.link.all",
+        "url": "https://example.invalid/all",
+        "icon_data": null,
+        "icon_name": null,
+        "color": null,
+        "visibility": "all",
+        "created_by": 1,
+        "position": 0,
+        "created_at": "2026-03-09T09:30:01Z",
+        "updated_at": "2026-03-09T09:30:01Z",
+        "can_edit": false
+      }
+    ]
+  }
+}

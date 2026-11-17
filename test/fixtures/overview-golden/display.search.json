@@ -1,0 +1,72 @@
+{
+  "private": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "mxtaskmember": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "mxevtchild": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "mxnoteadmin": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "mxdocchild": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "mxbudgetmember": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "mxmedmember": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "quokka": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "goldkiwi": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  },
+  "zzqxnohitzz": {
+    "status": 403,
+    "body": {
+      "error": "Token scope does not permit this operation.",
+      "code": 403
+    }
+  }
+}
