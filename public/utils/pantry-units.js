@@ -12,6 +12,7 @@
 
 export const PANTRY_UNITS = Object.freeze([
   'pcs', 'g', 'kg', 'ml', 'l', 'pkg', 'can', 'bottle', 'jar', 'bag',
+  'tube', 'roll', 'box', 'portion',
 ]);
 
 export const DEFAULT_PANTRY_UNIT = 'pcs';
@@ -24,6 +25,7 @@ export const DEFAULT_PANTRY_UNIT = 'pcs';
 export const PANTRY_UNIT_STEP = Object.freeze({
   pcs: 1, g: 100, kg: 0.5, ml: 100, l: 0.5,
   pkg: 1, can: 1, bottle: 1, jar: 1, bag: 1,
+  tube: 1, roll: 1, box: 1, portion: 1,
 });
 
 /** Schrittweite einer Einheit; unbekannte Einheiten schreiten um 1. */
@@ -44,8 +46,8 @@ const UNIT_SET = new Set(PANTRY_UNITS);
  * @returns {string}
  */
 export function normalizePantryUnit(value) {
-  const key = String(value ?? '').trim();
-  return UNIT_SET.has(key) ? key : DEFAULT_PANTRY_UNIT;
+  const key = String(value ?? '').trim().slice(0, 40);
+  return key.length > 0 ? key : DEFAULT_PANTRY_UNIT;
 }
 
 /**
