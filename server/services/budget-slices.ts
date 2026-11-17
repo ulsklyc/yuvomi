@@ -12,10 +12,12 @@
  * failing mode read still empties only this block; in personal mode the reader's
  * own id is the owner bind.
  *
- * NOT HERE: the split balance (`splitBalance`). It reads the split tables of the
- * shared expenses (expense_groups, expense_group_members, expense_ledger_entries)
- * through services/split-expenses.js, none of the budget's own tables, and stays
- * in the route for its own cut.
+ * THE SPLIT BALANCE IS A SECOND SLICE OF THIS FILE (splitBalanceOverviewSlice
+ * below): the shared expenses belong to the budget module (server/scopes.js
+ * gates `split-expenses` as the second prefix of `budget`, table-owners.ts gives
+ * expense_groups, expense_group_members and expense_ledger_entries to `budget`),
+ * so one module, one file. Its own slice and not a key of budgetOverviewSlice,
+ * because it fails alone under its own name with its own failure value.
  *
  * ONE FAILURE, AS BEFORE: the three reads used to share one try/catch in the
  * route; `guard` (the route's runSlice()) carries that under the old name `budget`
@@ -29,12 +31,20 @@
  * every Math.abs are the route's. The golden master (test:overview-golden) holds
  * the answers.
  *
- * Dependencies: server/authorize/index.ts (budget mode). Erasable TS syntax only.
+ * Dependencies: server/authorize/index.ts (budget mode), services/split-expenses.js
+ * (open balances). Erasable TS syntax only.
  */
 
 import type { Database, RowReader } from '../authorize/index.ts';
 import { resolveBudgetMode } from '../authorize/index.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
+import * as splitExpenses from './split-expenses.js';
+
+// The JS reader infers its option types from its defaults; this is the shape the
+// overview calls it with. Same function, same call.
+const openBalancesForUser = splitExpenses.openBalancesForUser as unknown as (
+  db: Database, userId: number | null, options: Readonly<{ householdCurrency: string }>,
+) => SplitBalance;
 
 /** Query options of the overview that act on the budget block. */
 export type BudgetOverviewOptions = Readonly<{
@@ -179,4 +189,69 @@ export function budgetOverviewSlice(
       },
     };
   }, budgetBlockFailed(currentMonth));
+}
+
+/** The options of the request that act on the split balance. */
+export type SplitBalanceOverviewOptions = Readonly<{
+  /** The viewer (`req.authUserId || req.session.userId`): their open balances. */
+  userId: number | null;
+}>;
+
+/** The viewer's net per currency (minor units and the decimal string). */
+type SplitNet = { currency: string; netMinor: number; amount: string };
+
+/** One open debt the viewer takes part in, as the settlement view of its group shows it. */
+type SplitPosition = {
+  direction: 'owe' | 'owed';
+  userId: number;
+  name: string;
+  groupId: number;
+  groupName: string;
+  currency: string;
+  amountMinor: number;
+  amount: string;
+};
+
+type SplitBalance = { net: SplitNet[]; positions: SplitPosition[] };
+
+export type SplitBalanceOverview = { splitBalance: SplitBalance };
+
+/**
+ * The empty form of the split balance: a denied or switched-off budget module
+ * (DENIED_PAYLOAD in the route, after emptyBudgetOverview(month)) and the
+ * failure value of the block.
+ */
+export function emptySplitBalanceOverview(): SplitBalanceOverview {
+  return { splitBalance: { net: [], positions: [] } };
+}
+
+/**
+ * Shared expenses: what the viewer has open (the "settlement open" figure). No
+ * query of its own - the balances come from the same function as the settlement
+ * view of the module, so overview and module never show two figures for the same
+ * debt (and a fix like #1445 heals both). A split guest never reaches /dashboard
+ * (gate in server/index.js).
+ *
+ * The household currency is read INSIDE the guard, as the route did: its failure
+ * empties only this block. The guard carries the old name `split balance` and the
+ * old failure value (the empty form). Without a guard a failure throws.
+ *
+ * @param db      the connection of the request
+ * @param _actor  the row reader of the request (balances are read for `options.userId`)
+ * @param _ctx    today, zone and now of the request (the balance has no day)
+ * @param options the viewer
+ * @param guard   the route's runSlice(); without it a failing read throws
+ */
+export function splitBalanceOverviewSlice(
+  db: Database,
+  _actor: RowReader,
+  _ctx: OverviewContext,
+  options: SplitBalanceOverviewOptions,
+  guard: SliceGuard = passThrough,
+): SplitBalanceOverview {
+  const { userId } = options;
+  return guard('split balance', (): SplitBalanceOverview => {
+    const householdCurrency = (db.prepare("SELECT value FROM sync_config WHERE key = 'currency'").get() as { value?: string } | undefined)?.value || 'EUR';
+    return { splitBalance: openBalancesForUser(db, userId, { householdCurrency }) };
+  }, emptySplitBalanceOverview());
 }
