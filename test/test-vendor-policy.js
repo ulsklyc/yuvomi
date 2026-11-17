@@ -40,6 +40,14 @@ const IMPORTED_PACKAGES = ['@oddbird/popover-polyfill'];
 const TOOLCHAIN_HELPERS = ['@oxc-project/runtime', 'rolldown', 'vite'];
 
 /**
+ * Server- und Pruefpakete, die nie im Bundle landen, aber trotzdem exakt
+ * gepinnt sein muessen (Phase 2 E, #2810): Ajv mit Formaten fuer die
+ * Schema-Pruefung, der OpenAPI-3.1-Validator fuer test:openapi-ajv.
+ * Getrennt von IMPORTED_PACKAGES, das allein den Frontend-Bundle beschreibt.
+ */
+const PINNED_SERVER_PACKAGES = ['@seriousme/openapi-schema-validator', 'ajv', 'ajv-formats'];
+
+/**
  * Verstoesse gegen die Pin-Regel: ein gebuendeltes Paket, das package.json
  * nicht exakt pinnt.
  * @param {{ dependencies?: Record<string, string>, devDependencies?: Record<string, string> }} manifest
@@ -62,6 +70,14 @@ test('der Pruefer erkennt ein Caret und ein unbekanntes gebuendeltes Paket (Fixt
 test('.npmrc pinnt neue Abhaengigkeiten exakt', () => {
   const npmrc = readFileSync(new URL('../.npmrc', import.meta.url), 'utf8');
   assert.match(npmrc, /^save-exact=true$/m);
+});
+
+test('die Server- und Pruefpakete stehen in package.json und sind exakt gepinnt', () => {
+  const all = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  assert.deepEqual(PINNED_SERVER_PACKAGES.filter((name) => !(name in all)), [],
+    'diese gepinnten Server-/Pruefpakete fehlen in package.json');
+  assert.deepEqual(pinViolations(pkg, PINNED_SERVER_PACKAGES), [],
+    'ein Server-/Pruefpaket steht mit ^ oder ~ in package.json');
 });
 
 test('was der Build buendelt, ist bekannt und exakt gepinnt', () => {
