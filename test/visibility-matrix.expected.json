@@ -1,7 +1,7 @@
 {
   "_meta": {
     "budget_mode": "personal (sync_config.budget_mode; in shared mode the budget visibility rule is off)",
-    "dashboard_reads": "once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read",
+    "dashboard_reads": "once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read; one more read with every seeded medication at stock_qty 0 (restored to NULL after it) for health.lowStockCount = the number of medications the health tile reads",
     "database": ":memory: on better-sqlite3-multiple-ciphers (DB_PATH override after freshTestDbPath)",
     "detail_documents_route": "GET /documents/:id/thumbnail - same visibility lookup as preview/download, answers 415 for a non-DMS document without reading content; 415 = visible, 404 = not visible, 403 = refused, anything else fails the suite",
     "detail_statuses": "per route exactly three answers: its success status (200; thumbnail 415) = visible, 404 = not visible, 403 = refused; refusals next to visible rows stay in the cell as { visible, refused: { row: status } }",
@@ -347,7 +347,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -397,7 +398,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
@@ -756,7 +758,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 1,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -803,7 +806,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
@@ -1191,7 +1195,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -1243,7 +1248,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
@@ -1534,7 +1540,8 @@
         },
         "medications": {
           "health.hasMeds": false,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 0,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": []
@@ -1576,7 +1583,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
@@ -1966,7 +1974,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -2018,7 +2027,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
@@ -2308,7 +2318,8 @@
         },
         "medications": {
           "health.hasMeds": false,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 0,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": []
@@ -2337,7 +2348,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
@@ -2970,7 +2982,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3022,7 +3035,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
@@ -3425,7 +3439,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3477,7 +3492,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []
@@ -3880,7 +3896,8 @@
         },
         "medications": {
           "health.hasMeds": true,
-          "note": "the tile reads own medications only (inline user_id in the health block of GET /dashboard, server/routes/dashboard.js), by design a viewer-only block (#1900)"
+          "health.lowStockCount": 2,
+          "note": "the tile reads own medications only (user_id bound to the viewer in healthOverviewSlice, server/services/health-slices.ts; health.lowStockCount counts them with every seeded medication at stock 0), by design a viewer-only block (#1900)"
         },
         "notes": {
           "pinnedNotes": [
@@ -3932,7 +3949,8 @@
           "weekEvents": []
         },
         "medications": {
-          "health.hasMeds": false
+          "health.hasMeds": false,
+          "health.lowStockCount": 0
         },
         "notes": {
           "pinnedNotes": []

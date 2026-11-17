@@ -46,6 +46,7 @@ import {
 } from './visibility-matrix-seed.js';
 import { measureWallReads } from './visibility-matrix-wall-reads.js';
 import { measureWallEventReads } from './visibility-matrix-wall-event-reads.js';
+import { overviewMedicationCount } from './visibility-matrix-overview-meds.js';
 
 const DATA_FILE = new URL('./visibility-matrix.expected.json', import.meta.url);
 const UPDATE = process.env.UPDATE_VISIBILITY_MATRIX === '1';
@@ -477,7 +478,7 @@ async function measureOverview(role, path) {
     documents: { countdowns: capped(countdowns, countdownTotal, namesOf('documents', countdownIds(countdowns, 'document'))) },
     // Budget and health carry aggregates, not rows.
     budget: { 'budget.entryCount': d.budget?.entryCount ?? null },
-    medications: { 'health.hasMeds': d.health?.hasMeds ?? null },
+    medications: { 'health.hasMeds': d.health?.hasMeds ?? null, 'health.lowStockCount': await overviewMedicationCount({ db, medications: seed.rows.medications, read: () => apiGet(role, path, `/dashboard?events_limit=${EVENTS_LIMIT}${audience}`), statusValue }) },
     activities: NA('the overview carries no health activities'),
   };
 }
@@ -1279,7 +1280,7 @@ const meta = {
   database: ':memory: on better-sqlite3-multiple-ciphers (DB_PATH override after freshTestDbPath)',
   detail_documents_route: 'GET /documents/:id/thumbnail - same visibility lookup as preview/download, answers 415 for a non-DMS document without reading content; 415 = visible, 404 = not visible, 403 = refused, anything else fails the suite',
   detail_statuses: 'per route exactly three answers: its success status (200; thumbnail 415) = visible, 404 = not visible, 403 = refused; refusals next to visible rows stay in the cell as { visible, refused: { row: status } }',
-  dashboard_reads: 'once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read',
+  dashboard_reads: 'once with events_limit=12, plus once per owner task category (household/school/repair) for urgentTasks and wallTasks; countdowns and events come from the first read; one more read with every seeded medication at stock_qty 0 (restored to NULL after it) for health.lowStockCount = the number of medications the health tile reads',
   due_reminders: 'one due reminder per task, event and document row for each of these accounts (created_by = caller): ' + seed.facts.reminderAccounts.join(', ') + '; document_expiry rows are seeded directly like the others; token roles read the member\'s rows',
   health_delivery: 'due_reminders / medications is measured on the production path: one processDueMedications() run (medication-scheduler.js) after every other measurement, every seeded medication with one active 00:00 schedule, push spy, no channels; hearsOwnDose = the account received a push for a medication it owns, hearsCaredForDose = for one it does not own (n/a without a care grant); notLacksHealth = !lacksHealth(db, id) (cycle-reminders.js ~71). caregiver, member_none, split_guest and display own one private medication each so they can be addressed',
   health_unknown_account: 'unknown_account: the scheduler has no path for an id without a users row (owner and caregiver are foreign keys); recorded is the exported production answer for such an id: notLacksHealth',
