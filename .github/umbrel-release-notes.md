@@ -1,12 +1,10 @@
-<!-- version: 2.91.0 -->
-This update makes the backup card tell one time. On a server that runs in another time zone than your household, the card in Settings > Household > Backup and restore said "Daily at 02:00" above "Next backup 03:00" for the same run. The schedule now reads in your household's time zone, like the next backup below it.
+<!-- version: 2.91.1 -->
+This update fixes the screen you see when Yuvomi cannot check your session at startup, for example while the server is offline or restarting. In the light theme its text stood directly on the violet background and was hard to read. The screen now sits on the same panel as the sign-in page.
 
-Four household settings are now for administrators only: the currency, the app name, the housekeeping payment tasks and the default length of new events. In the app, members never saw these controls; they could only be changed through the API. On the Appearance page members now see the household currency as a read-only row.
+Numbers now stay on one line with their unit in all 27 languages. Texts such as "up to 25 MB", "1 h 30 min" or "45 %" could break between the number and the unit, leaving the unit alone at the start of the next line.
 
-A wall display now reads only the tasks and events the whole household sees, on every page and in every list, count and countdown. In the app a display could not be assigned to a task or an event, so nothing changes on a wall you have set up.
-
-If you use the API with your own scripts: every "administrators only" refusal now has the same answer, `403` with `reason: "admin_required"`. Scripts that compared the error text should read the `reason` instead.
+The payments chart in Housekeeping now shows all six months on a phone. On narrow screens it scrolled sideways and hid the current month. The number above each column is now a whole amount; the exact amount is still shown in the visits and the report.
 
 This update does not change the database. No action is needed from you.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.91.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.91.1

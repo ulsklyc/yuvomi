@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.91.1] - 2026-11-17
+
 ### Fixed
 - **The "session cannot be checked" screen is readable on the light field.** When the server
   did not answer the sign-in check at startup (offline, a server error, too many requests), the
