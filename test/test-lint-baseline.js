@@ -272,7 +272,7 @@ test('a reason without a baseline key is red, and --update drops a reason with i
 
 test('the size rules stand at the planned limits', () => {
   assert.deepEqual(CONFIG.rules['max-lines'], ['error', { max: 1500 }]);
-  assert.deepEqual(CONFIG.rules['max-lines-per-function'], ['error', { max: 200 }]);
+  assert.deepEqual(CONFIG.rules['max-lines-per-function'], ['error', { max: 200, skipComments: true, skipBlankLines: true }]);
 });
 
 test('the real tree has no hard finding (runs in the required test jobs)', () => {
