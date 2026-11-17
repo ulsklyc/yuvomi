@@ -48,7 +48,7 @@
       "code": 403
     }
   },
-  "mxactadmin": {
+  "quokka": {
     "status": 403,
     "body": {
       "error": "Token scope does not permit this operation.",

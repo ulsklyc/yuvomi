@@ -55,7 +55,7 @@
       "reason": "split_guest_scope"
     }
   },
-  "mxactadmin": {
+  "quokka": {
     "status": 403,
     "body": {
       "error": "This account can only access Shared expenses.",

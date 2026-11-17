@@ -10,6 +10,14 @@
  *            <role>.session.json    GET /dashboard
  *            <role>.household.json  GET /dashboard?audience=household (the wall)
  *            <role>.search.json     ten GET /search queries
+ *            admin.options.json     GET /dashboard with 51 `shopping_list` and
+ *                                   51 `notes_category` values (the widget
+ *                                   options; the only answer with `shoppingTile`)
+ *
+ *          The seed puts cap + 2 visible rows behind every capped list of
+ *          both answers, so the caps and the order that decides which rows
+ *          fall out are part of the master (sweep in the PR: every fixed
+ *          `LIMIT n` and `.slice(0, n)` lowered by one turns the suite red).
  *
  *          under test/fixtures/overview-golden/, and compares them byte for
  *          byte: `JSON.stringify(value, null, 2)` plus a final newline, keys
@@ -64,7 +72,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 // server/index.js is imported inside startTestServer(), after the fake below.
 import { startTestServer } from './server-ready.js';
 import { seedMatrix, ROLES } from './visibility-matrix-seed.js';
-import { seedOverviewExtras, GOLDEN_TOKEN } from './overview-golden-seed.js';
+import { seedOverviewExtras, GOLDEN_TOKEN, INFIX_TOKEN } from './overview-golden-seed.js';
 
 /** The one instant this suite lives in: a Wednesday, 10:30 in Berlin. */
 const FROZEN_NOW = Date.parse('2026-03-11T09:30:00.000Z');
@@ -149,12 +157,13 @@ const seed = await seedMatrix({
   displayCookie: DISPLAY_COOKIE,
 });
 let extraIp = 0;
-await seedOverviewExtras({
+const { optionsQuery } = await seedOverviewExtras({
   db,
   call: (method, path, options) => http(`10.31.250.${++extraIp}`, method, path, options),
   adminHeaders: { Cookie: seed.sessions.admin.cookie, 'X-CSRF-Token': seed.sessions.admin.csrf },
   ids: seed.ids,
   rows: seed.rows,
+  shift: shiftDateKey,
   dates: {
     today,
     yesterday: shiftDateKey(today, -1),
@@ -255,10 +264,12 @@ const QUERIES = Object.freeze([
   'mxdocchild',
   'mxbudgetmember',
   'mxmedmember',
-  'mxactadmin',
+  INFIX_TOKEN,
   GOLDEN_TOKEN,
   'zzqxnohitzz',
 ]);
+/** The role whose overview is also read with widget options. */
+const OPTIONS_ROLE = 'admin';
 const NO_HIT_QUERY = QUERIES[QUERIES.length - 1];
 
 /** @type {(role: string, slot: number) => string} */
@@ -292,6 +303,13 @@ for (const role of ROLES) {
     searches[q] = { status: res.status, body: res.body };
   }
   answers.set(`${role}.search.json`, searches);
+}
+// The widget options of the overview (shopping list and note category
+// selection, each one value above its cap of 50), read once by the admin:
+// the only answer that carries `shoppingTile`.
+{
+  const res = await http(xffOf(OPTIONS_ROLE, 4), 'GET', `/api/v1/dashboard?${optionsQuery}`, { headers: authHeaders(OPTIONS_ROLE) });
+  answers.set(`${OPTIONS_ROLE}.options.json`, { status: res.status, body: res.body });
 }
 const measureMs = Math.round(performance.now() - started);
 console.error = originalError;

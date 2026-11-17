@@ -132,7 +132,7 @@
       "budget": []
     }
   },
-  "mxactadmin": {
+  "quokka": {
     "status": 200,
     "body": {
       "tasks": [],

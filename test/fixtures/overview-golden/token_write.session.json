@@ -705,10 +705,10 @@
         "assigned_users": []
       }
     ],
-    "openTaskCount": 7,
+    "openTaskCount": 14,
     "overdueTaskCount": 1,
-    "shoppingOpenCount": 2,
-    "shoppingOpenLists": 1,
+    "shoppingOpenCount": 12,
+    "shoppingOpenLists": 5,
     "todayMeals": [
       {
         "id": 1,
@@ -732,59 +732,74 @@
     ],
     "pinnedNotes": [
       {
-        "id": 5,
-        "title": "note.child.all mxnotechild",
-        "content": "note.child.all",
-        "color": "#FFEB3B",
-        "pinned": 1,
-        "created_by": 3,
-        "created_at": "2026-03-09T09:30:05Z",
-        "updated_at": "2026-03-09T09:30:05Z",
-        "visibility": "all",
-        "locked": 0,
-        "author_name": "child",
-        "author_color": "#D97706",
-        "categories": []
-      },
-      {
-        "id": 4,
-        "title": "note.member.private mxnotemember",
-        "content": "note.member.private",
-        "color": "#FFEB3B",
-        "pinned": 1,
-        "created_by": 2,
-        "created_at": "2026-03-09T09:30:04Z",
-        "updated_at": "2026-03-09T09:30:04Z",
-        "visibility": "private",
-        "locked": 0,
-        "author_name": "member",
-        "author_color": "#059669",
-        "categories": []
-      },
-      {
-        "id": 3,
-        "title": "note.member.all mxnotemember",
-        "content": "note.member.all",
-        "color": "#FFEB3B",
-        "pinned": 1,
-        "created_by": 2,
-        "created_at": "2026-03-09T09:30:03Z",
-        "updated_at": "2026-03-09T09:30:03Z",
-        "visibility": "all",
-        "locked": 0,
-        "author_name": "member",
-        "author_color": "#059669",
-        "categories": []
-      },
-      {
-        "id": 1,
-        "title": "note.admin.all mxnoteadmin",
-        "content": "note.admin.all",
+        "id": 14,
+        "title": "goldkiwi note g",
+        "content": "golden note g",
         "color": "#FFEB3B",
         "pinned": 1,
         "created_by": 1,
-        "created_at": "2026-03-09T09:30:01Z",
-        "updated_at": "2026-03-09T09:30:01Z",
+        "created_at": "2026-03-09T09:30:14Z",
+        "updated_at": "2026-03-09T09:30:14Z",
+        "visibility": "all",
+        "locked": 0,
+        "author_name": "Admin",
+        "author_color": "#DB2777",
+        "categories": []
+      },
+      {
+        "id": 13,
+        "title": "goldkiwi note f",
+        "content": "golden note f",
+        "color": "#FFEB3B",
+        "pinned": 1,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:13Z",
+        "updated_at": "2026-03-09T09:30:13Z",
+        "visibility": "all",
+        "locked": 0,
+        "author_name": "Admin",
+        "author_color": "#DB2777",
+        "categories": []
+      },
+      {
+        "id": 12,
+        "title": "goldkiwi note e",
+        "content": "golden note e",
+        "color": "#FFEB3B",
+        "pinned": 1,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:12Z",
+        "updated_at": "2026-03-09T09:30:12Z",
+        "visibility": "all",
+        "locked": 0,
+        "author_name": "Admin",
+        "author_color": "#DB2777",
+        "categories": []
+      },
+      {
+        "id": 11,
+        "title": "goldkiwi note d",
+        "content": "golden note d",
+        "color": "#FFEB3B",
+        "pinned": 1,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:11Z",
+        "updated_at": "2026-03-09T09:30:11Z",
+        "visibility": "all",
+        "locked": 0,
+        "author_name": "Admin",
+        "author_color": "#DB2777",
+        "categories": []
+      },
+      {
+        "id": 10,
+        "title": "goldkiwi note c",
+        "content": "golden note c",
+        "color": "#FFEB3B",
+        "pinned": 1,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:10Z",
+        "updated_at": "2026-03-09T09:30:10Z",
         "visibility": "all",
         "locked": 0,
         "author_name": "Admin",
@@ -792,24 +807,76 @@
         "categories": []
       }
     ],
-    "pinnedNotesCount": 4,
-    "notesTotal": 4,
+    "pinnedNotesCount": 11,
+    "notesTotal": 12,
     "shoppingLists": [
       {
-        "id": 1,
-        "name": "golden.list",
-        "open_count": 2,
-        "total_count": 3,
+        "id": 5,
+        "name": "golden.list.05",
+        "open_count": 8,
+        "total_count": 9,
         "items": [
           {
             "id": 1,
-            "name": "goldkiwi juice",
-            "quantity": "2",
+            "name": "goldkiwi item a",
+            "quantity": "1",
             "is_checked": 0
           },
           {
             "id": 2,
-            "name": "golden.item.bread",
+            "name": "goldkiwi item b",
+            "quantity": "1",
+            "is_checked": 0
+          },
+          {
+            "id": 3,
+            "name": "goldkiwi item c",
+            "quantity": "1",
+            "is_checked": 0
+          },
+          {
+            "id": 4,
+            "name": "goldkiwi item d",
+            "quantity": "1",
+            "is_checked": 0
+          },
+          {
+            "id": 5,
+            "name": "goldkiwi item e",
+            "quantity": "1",
+            "is_checked": 0
+          },
+          {
+            "id": 6,
+            "name": "goldkiwi item f",
+            "quantity": "1",
+            "is_checked": 0
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "name": "golden.list.04",
+        "open_count": 1,
+        "total_count": 1,
+        "items": [
+          {
+            "id": 13,
+            "name": "golden.item.list-4",
+            "quantity": "1",
+            "is_checked": 0
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "name": "golden.list.03",
+        "open_count": 1,
+        "total_count": 1,
+        "items": [
+          {
+            "id": 12,
+            "name": "golden.item.list-3",
             "quantity": "1",
             "is_checked": 0
           }
@@ -1180,13 +1247,269 @@
         "attachment_preview_url": null,
         "attachment_download_url": null,
         "housekeeping_visit_id": null
+      },
+      {
+        "id": 12,
+        "title": "goldkiwi event a",
+        "description": null,
+        "start_datetime": "2026-04-10",
+        "end_datetime": null,
+        "all_day": 1,
+        "location": null,
+        "color": null,
+        "icon": "calendar",
+        "assigned_to": null,
+        "created_by": 1,
+        "external_source": "local",
+        "recurrence_rule": null,
+        "visibility": "all",
+        "countdown": 0,
+        "attachment_name": null,
+        "attachment_mime": null,
+        "attachment_size": null,
+        "attachment_document_id": null,
+        "tzid": null,
+        "provider_status": null,
+        "external_calendar_id": null,
+        "subscription_id": null,
+        "user_modified": 0,
+        "calendar_ref_id": null,
+        "target_caldav_account_id": null,
+        "target_caldav_calendar_url": null,
+        "created_at": "2026-03-09T09:30:12Z",
+        "updated_at": "2026-03-09T09:30:12Z",
+        "target_google_calendar_id": null,
+        "outbound_dirty": 0,
+        "outbound_attempts": 0,
+        "outbound_move_to": null,
+        "external_object_url": null,
+        "target_outlook_account_id": null,
+        "target_outlook_calendar_id": null,
+        "color_modified": 0,
+        "local_calendar_id": 1,
+        "caldav_account_id": null,
+        "series_authored": 0,
+        "assigned_name": null,
+        "assigned_color": null,
+        "cal_name": null,
+        "cal_color": null,
+        "local_calendar_name": "Yuvomi",
+        "local_calendar_color": null,
+        "source_calendar_ref_id": null,
+        "source_calendar_name": null,
+        "source_calendar_color": null,
+        "assigned_users": [
+          {
+            "id": 3,
+            "display_name": "child",
+            "color": "#D97706",
+            "avatar_data": null
+          }
+        ],
+        "attachment_locked": false,
+        "attachment_data": null,
+        "attachment_preview_url": null,
+        "attachment_download_url": null,
+        "housekeeping_visit_id": null
+      },
+      {
+        "id": 13,
+        "title": "goldkiwi event b",
+        "description": null,
+        "start_datetime": "2026-04-11",
+        "end_datetime": null,
+        "all_day": 1,
+        "location": null,
+        "color": null,
+        "icon": "calendar",
+        "assigned_to": null,
+        "created_by": 1,
+        "external_source": "local",
+        "recurrence_rule": null,
+        "visibility": "all",
+        "countdown": 0,
+        "attachment_name": null,
+        "attachment_mime": null,
+        "attachment_size": null,
+        "attachment_document_id": null,
+        "tzid": null,
+        "provider_status": null,
+        "external_calendar_id": null,
+        "subscription_id": null,
+        "user_modified": 0,
+        "calendar_ref_id": null,
+        "target_caldav_account_id": null,
+        "target_caldav_calendar_url": null,
+        "created_at": "2026-03-09T09:30:13Z",
+        "updated_at": "2026-03-09T09:30:13Z",
+        "target_google_calendar_id": null,
+        "outbound_dirty": 0,
+        "outbound_attempts": 0,
+        "outbound_move_to": null,
+        "external_object_url": null,
+        "target_outlook_account_id": null,
+        "target_outlook_calendar_id": null,
+        "color_modified": 0,
+        "local_calendar_id": 1,
+        "caldav_account_id": null,
+        "series_authored": 0,
+        "assigned_name": null,
+        "assigned_color": null,
+        "cal_name": null,
+        "cal_color": null,
+        "local_calendar_name": "Yuvomi",
+        "local_calendar_color": null,
+        "source_calendar_ref_id": null,
+        "source_calendar_name": null,
+        "source_calendar_color": null,
+        "assigned_users": [
+          {
+            "id": 3,
+            "display_name": "child",
+            "color": "#D97706",
+            "avatar_data": null
+          }
+        ],
+        "attachment_locked": false,
+        "attachment_data": null,
+        "attachment_preview_url": null,
+        "attachment_download_url": null,
+        "housekeeping_visit_id": null
+      },
+      {
+        "id": 14,
+        "title": "goldkiwi event c",
+        "description": null,
+        "start_datetime": "2026-04-12",
+        "end_datetime": null,
+        "all_day": 1,
+        "location": null,
+        "color": null,
+        "icon": "calendar",
+        "assigned_to": null,
+        "created_by": 1,
+        "external_source": "local",
+        "recurrence_rule": null,
+        "visibility": "all",
+        "countdown": 0,
+        "attachment_name": null,
+        "attachment_mime": null,
+        "attachment_size": null,
+        "attachment_document_id": null,
+        "tzid": null,
+        "provider_status": null,
+        "external_calendar_id": null,
+        "subscription_id": null,
+        "user_modified": 0,
+        "calendar_ref_id": null,
+        "target_caldav_account_id": null,
+        "target_caldav_calendar_url": null,
+        "created_at": "2026-03-09T09:30:14Z",
+        "updated_at": "2026-03-09T09:30:14Z",
+        "target_google_calendar_id": null,
+        "outbound_dirty": 0,
+        "outbound_attempts": 0,
+        "outbound_move_to": null,
+        "external_object_url": null,
+        "target_outlook_account_id": null,
+        "target_outlook_calendar_id": null,
+        "color_modified": 0,
+        "local_calendar_id": 1,
+        "caldav_account_id": null,
+        "series_authored": 0,
+        "assigned_name": null,
+        "assigned_color": null,
+        "cal_name": null,
+        "cal_color": null,
+        "local_calendar_name": "Yuvomi",
+        "local_calendar_color": null,
+        "source_calendar_ref_id": null,
+        "source_calendar_name": null,
+        "source_calendar_color": null,
+        "assigned_users": [
+          {
+            "id": 3,
+            "display_name": "child",
+            "color": "#D97706",
+            "avatar_data": null
+          }
+        ],
+        "attachment_locked": false,
+        "attachment_data": null,
+        "attachment_preview_url": null,
+        "attachment_download_url": null,
+        "housekeeping_visit_id": null
+      },
+      {
+        "id": 15,
+        "title": "goldkiwi event d",
+        "description": null,
+        "start_datetime": "2026-04-13",
+        "end_datetime": null,
+        "all_day": 1,
+        "location": null,
+        "color": null,
+        "icon": "calendar",
+        "assigned_to": null,
+        "created_by": 1,
+        "external_source": "local",
+        "recurrence_rule": null,
+        "visibility": "all",
+        "countdown": 0,
+        "attachment_name": null,
+        "attachment_mime": null,
+        "attachment_size": null,
+        "attachment_document_id": null,
+        "tzid": null,
+        "provider_status": null,
+        "external_calendar_id": null,
+        "subscription_id": null,
+        "user_modified": 0,
+        "calendar_ref_id": null,
+        "target_caldav_account_id": null,
+        "target_caldav_calendar_url": null,
+        "created_at": "2026-03-09T09:30:15Z",
+        "updated_at": "2026-03-09T09:30:15Z",
+        "target_google_calendar_id": null,
+        "outbound_dirty": 0,
+        "outbound_attempts": 0,
+        "outbound_move_to": null,
+        "external_object_url": null,
+        "target_outlook_account_id": null,
+        "target_outlook_calendar_id": null,
+        "color_modified": 0,
+        "local_calendar_id": 1,
+        "caldav_account_id": null,
+        "series_authored": 0,
+        "assigned_name": null,
+        "assigned_color": null,
+        "cal_name": null,
+        "cal_color": null,
+        "local_calendar_name": "Yuvomi",
+        "local_calendar_color": null,
+        "source_calendar_ref_id": null,
+        "source_calendar_name": null,
+        "source_calendar_color": null,
+        "assigned_users": [
+          {
+            "id": 3,
+            "display_name": "child",
+            "color": "#D97706",
+            "avatar_data": null
+          }
+        ],
+        "attachment_locked": false,
+        "attachment_data": null,
+        "attachment_preview_url": null,
+        "attachment_download_url": null,
+        "housekeeping_visit_id": null
       }
     ],
     "birthdaySoonCount": 1,
     "birthdays": [
       {
         "id": 1,
-        "name": "goldkiwi grandma",
+        "name": "goldkiwi birthday a",
         "birth_date": "1950-03-11",
         "notes": null,
         "photo_data": null,
@@ -1213,8 +1536,8 @@
       },
       {
         "id": 2,
-        "name": "golden.birthday.later",
-        "birth_date": "1985-12-24",
+        "name": "goldkiwi birthday b",
+        "birth_date": "1950-03-20",
         "notes": null,
         "photo_data": null,
         "calendar_event_id": null,
@@ -1230,17 +1553,179 @@
         "name_day_calendar_event_id": null,
         "year_unknown": 0,
         "family_user_color": null,
-        "next_birthday": "2026-12-24",
-        "next_age": 41,
-        "days_until": 288,
+        "next_birthday": "2026-03-20",
+        "next_age": 76,
+        "days_until": 9,
         "next_name_day": null,
         "name_day_days_until": null,
         "kind": "birthday",
-        "next_date": "2026-12-24"
+        "next_date": "2026-03-20"
+      },
+      {
+        "id": 3,
+        "name": "goldkiwi birthday c",
+        "birth_date": "1950-03-29",
+        "notes": null,
+        "photo_data": null,
+        "calendar_event_id": null,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:03Z",
+        "updated_at": "2026-03-09T09:30:03Z",
+        "family_user_id": null,
+        "reminder_offset": null,
+        "reminder_custom_amount": null,
+        "reminder_custom_unit": null,
+        "contact_id": null,
+        "name_day": null,
+        "name_day_calendar_event_id": null,
+        "year_unknown": 0,
+        "family_user_color": null,
+        "next_birthday": "2026-03-29",
+        "next_age": 76,
+        "days_until": 18,
+        "next_name_day": null,
+        "name_day_days_until": null,
+        "kind": "birthday",
+        "next_date": "2026-03-29"
+      },
+      {
+        "id": 4,
+        "name": "goldkiwi birthday d",
+        "birth_date": "1950-04-07",
+        "notes": null,
+        "photo_data": null,
+        "calendar_event_id": null,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:04Z",
+        "updated_at": "2026-03-09T09:30:04Z",
+        "family_user_id": null,
+        "reminder_offset": null,
+        "reminder_custom_amount": null,
+        "reminder_custom_unit": null,
+        "contact_id": null,
+        "name_day": null,
+        "name_day_calendar_event_id": null,
+        "year_unknown": 0,
+        "family_user_color": null,
+        "next_birthday": "2026-04-07",
+        "next_age": 76,
+        "days_until": 27,
+        "next_name_day": null,
+        "name_day_days_until": null,
+        "kind": "birthday",
+        "next_date": "2026-04-07"
+      },
+      {
+        "id": 5,
+        "name": "goldkiwi birthday e",
+        "birth_date": "1950-04-16",
+        "notes": null,
+        "photo_data": null,
+        "calendar_event_id": null,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:05Z",
+        "updated_at": "2026-03-09T09:30:05Z",
+        "family_user_id": null,
+        "reminder_offset": null,
+        "reminder_custom_amount": null,
+        "reminder_custom_unit": null,
+        "contact_id": null,
+        "name_day": null,
+        "name_day_calendar_event_id": null,
+        "year_unknown": 0,
+        "family_user_color": null,
+        "next_birthday": "2026-04-16",
+        "next_age": 76,
+        "days_until": 36,
+        "next_name_day": null,
+        "name_day_days_until": null,
+        "kind": "birthday",
+        "next_date": "2026-04-16"
+      },
+      {
+        "id": 6,
+        "name": "goldkiwi birthday f",
+        "birth_date": "1950-04-25",
+        "notes": null,
+        "photo_data": null,
+        "calendar_event_id": null,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:06Z",
+        "updated_at": "2026-03-09T09:30:06Z",
+        "family_user_id": null,
+        "reminder_offset": null,
+        "reminder_custom_amount": null,
+        "reminder_custom_unit": null,
+        "contact_id": null,
+        "name_day": null,
+        "name_day_calendar_event_id": null,
+        "year_unknown": 0,
+        "family_user_color": null,
+        "next_birthday": "2026-04-25",
+        "next_age": 76,
+        "days_until": 45,
+        "next_name_day": null,
+        "name_day_days_until": null,
+        "kind": "birthday",
+        "next_date": "2026-04-25"
+      },
+      {
+        "id": 7,
+        "name": "goldkiwi birthday g",
+        "birth_date": "1950-05-04",
+        "notes": null,
+        "photo_data": null,
+        "calendar_event_id": null,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:07Z",
+        "updated_at": "2026-03-09T09:30:07Z",
+        "family_user_id": null,
+        "reminder_offset": null,
+        "reminder_custom_amount": null,
+        "reminder_custom_unit": null,
+        "contact_id": null,
+        "name_day": null,
+        "name_day_calendar_event_id": null,
+        "year_unknown": 0,
+        "family_user_color": null,
+        "next_birthday": "2026-05-04",
+        "next_age": 76,
+        "days_until": 54,
+        "next_name_day": null,
+        "name_day_days_until": null,
+        "kind": "birthday",
+        "next_date": "2026-05-04"
+      },
+      {
+        "id": 10,
+        "name": "golden.birthday.summer",
+        "birth_date": "1992-07-14",
+        "notes": null,
+        "photo_data": null,
+        "calendar_event_id": null,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:10Z",
+        "updated_at": "2026-03-09T09:30:10Z",
+        "family_user_id": null,
+        "reminder_offset": null,
+        "reminder_custom_amount": null,
+        "reminder_custom_unit": null,
+        "contact_id": null,
+        "name_day": null,
+        "name_day_calendar_event_id": null,
+        "year_unknown": 0,
+        "family_user_color": null,
+        "next_birthday": "2026-07-14",
+        "next_age": 34,
+        "days_until": 125,
+        "next_name_day": null,
+        "name_day_days_until": null,
+        "kind": "birthday",
+        "next_date": "2026-07-14"
       }
     ],
-    "birthdayCount": 2,
-    "birthdayTotal": 2,
+    "birthdayCount": 10,
+    "birthdayTotal": 10,
     "countdowns": [
       {
         "source": "task",
@@ -1437,7 +1922,7 @@
       {
         "date_key": "2026-03-11",
         "type_id": 1,
-        "type_name": "goldkiwi bin",
+        "type_name": "goldkiwi bin a",
         "type_icon": "trash-2",
         "type_color": "#6B7280",
         "deep_link": "?type=1&date=2026-03-11"
@@ -1448,7 +1933,7 @@
       "items": [
         {
           "id": 1,
-          "name": "goldkiwi jam",
+          "name": "goldkiwi pantry a",
           "quantity": 1,
           "unit": "pcs",
           "expires_on": "2026-03-11",
@@ -1457,7 +1942,7 @@
           "location_icon": null
         },
         {
-          "id": 2,
+          "id": 8,
           "name": "golden.pantry.soon",
           "quantity": 1,
           "unit": "pcs",
@@ -1470,7 +1955,7 @@
       "todayItems": [
         {
           "id": 1,
-          "name": "goldkiwi jam",
+          "name": "goldkiwi pantry a",
           "quantity": 1,
           "unit": "pcs"
         }
@@ -1486,7 +1971,7 @@
       },
       {
         "user_id": 3,
-        "open_count": 3
+        "open_count": 10
       },
       {
         "user_id": 4,
@@ -1496,7 +1981,7 @@
     "wallTasks": [
       {
         "user_id": 3,
-        "open_count": 2,
+        "open_count": 9,
         "done_count": 0,
         "open": [
           {
@@ -1508,6 +1993,26 @@
             "id": 4,
             "title": "task.member.all mxtaskmember",
             "due_date": "2026-03-11"
+          },
+          {
+            "id": 19,
+            "title": "goldkiwi task a",
+            "due_date": "2026-03-11"
+          },
+          {
+            "id": 20,
+            "title": "goldkiwi task b",
+            "due_date": "2026-03-11"
+          },
+          {
+            "id": 21,
+            "title": "goldkiwi task c",
+            "due_date": "2026-03-11"
+          },
+          {
+            "id": 22,
+            "title": "goldkiwi task d",
+            "due_date": "2026-03-11"
           }
         ],
         "done": []
@@ -1515,7 +2020,7 @@
       {
         "user_id": 2,
         "open_count": 1,
-        "done_count": 1,
+        "done_count": 7,
         "open": [
           {
             "id": 1,
@@ -1526,7 +2031,27 @@
         "done": [
           {
             "id": 12,
-            "title": "golden.task.done-today"
+            "title": "golden.task.done-today-a"
+          },
+          {
+            "id": 13,
+            "title": "golden.task.done-today-b"
+          },
+          {
+            "id": 14,
+            "title": "golden.task.done-today-c"
+          },
+          {
+            "id": 15,
+            "title": "golden.task.done-today-d"
+          },
+          {
+            "id": 16,
+            "title": "golden.task.done-today-e"
+          },
+          {
+            "id": 17,
+            "title": "golden.task.done-today-f"
           }
         ]
       },
@@ -1544,6 +2069,6 @@
         "done": []
       }
     ],
-    "tasksDoneToday": 1
+    "tasksDoneToday": 7
   }
 }
