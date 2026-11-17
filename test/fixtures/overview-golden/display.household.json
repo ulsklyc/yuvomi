@@ -394,6 +394,60 @@
         "next_date": "2026-03-11"
       },
       {
+        "id": 14,
+        "name": "golden.birthday.rené",
+        "birth_date": "1970-03-12",
+        "notes": null,
+        "photo_data": null,
+        "calendar_event_id": null,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:14Z",
+        "updated_at": "2026-03-09T09:30:14Z",
+        "family_user_id": null,
+        "reminder_offset": null,
+        "reminder_custom_amount": null,
+        "reminder_custom_unit": null,
+        "contact_id": null,
+        "name_day": null,
+        "name_day_calendar_event_id": null,
+        "year_unknown": 0,
+        "family_user_color": null,
+        "next_birthday": "2026-03-12",
+        "next_age": 56,
+        "days_until": 1,
+        "next_name_day": null,
+        "name_day_days_until": null,
+        "kind": "birthday",
+        "next_date": "2026-03-12"
+      },
+      {
+        "id": 13,
+        "name": "golden.birthday.rené",
+        "birth_date": "1970-03-12",
+        "notes": null,
+        "photo_data": null,
+        "calendar_event_id": null,
+        "created_by": 1,
+        "created_at": "2026-03-09T09:30:13Z",
+        "updated_at": "2026-03-09T09:30:13Z",
+        "family_user_id": null,
+        "reminder_offset": null,
+        "reminder_custom_amount": null,
+        "reminder_custom_unit": null,
+        "contact_id": null,
+        "name_day": null,
+        "name_day_calendar_event_id": null,
+        "year_unknown": 0,
+        "family_user_color": null,
+        "next_birthday": "2026-03-12",
+        "next_age": 56,
+        "days_until": 1,
+        "next_name_day": null,
+        "name_day_days_until": null,
+        "kind": "birthday",
+        "next_date": "2026-03-12"
+      },
+      {
         "id": 2,
         "name": "goldkiwi birthday b",
         "birth_date": "1950-03-20",
@@ -527,66 +581,74 @@
         "name_day_days_until": null,
         "kind": "birthday",
         "next_date": "2026-04-25"
-      },
-      {
-        "id": 7,
-        "name": "goldkiwi birthday g",
-        "birth_date": "1950-05-04",
-        "notes": null,
-        "photo_data": null,
-        "calendar_event_id": null,
-        "created_by": 1,
-        "created_at": "2026-03-09T09:30:07Z",
-        "updated_at": "2026-03-09T09:30:07Z",
-        "family_user_id": null,
-        "reminder_offset": null,
-        "reminder_custom_amount": null,
-        "reminder_custom_unit": null,
-        "contact_id": null,
-        "name_day": null,
-        "name_day_calendar_event_id": null,
-        "year_unknown": 0,
-        "family_user_color": null,
-        "next_birthday": "2026-05-04",
-        "next_age": 76,
-        "days_until": 54,
-        "next_name_day": null,
-        "name_day_days_until": null,
-        "kind": "birthday",
-        "next_date": "2026-05-04"
-      },
-      {
-        "id": 10,
-        "name": "golden.birthday.summer",
-        "birth_date": "1992-07-14",
-        "notes": null,
-        "photo_data": null,
-        "calendar_event_id": null,
-        "created_by": 1,
-        "created_at": "2026-03-09T09:30:10Z",
-        "updated_at": "2026-03-09T09:30:10Z",
-        "family_user_id": null,
-        "reminder_offset": null,
-        "reminder_custom_amount": null,
-        "reminder_custom_unit": null,
-        "contact_id": null,
-        "name_day": null,
-        "name_day_calendar_event_id": null,
-        "year_unknown": 0,
-        "family_user_color": null,
-        "next_birthday": "2026-07-14",
-        "next_age": 34,
-        "days_until": 125,
-        "next_name_day": null,
-        "name_day_days_until": null,
-        "kind": "birthday",
-        "next_date": "2026-07-14"
       }
     ],
     "birthdayCount": 0,
     "birthdayTotal": 0,
     "birthdaySoonCount": 0,
     "urgentTasks": [
+      {
+        "id": 26,
+        "title": "goldkiwi task assigned three",
+        "description": null,
+        "category": "household",
+        "priority": "low",
+        "status": "open",
+        "due_date": "2026-03-09",
+        "due_time": null,
+        "assigned_to": 3,
+        "created_by": 1,
+        "is_recurring": 0,
+        "recurrence_rule": null,
+        "parent_task_id": null,
+        "created_at": "2026-03-09T09:30:26Z",
+        "updated_at": "2026-03-09T09:30:26Z",
+        "start_date": null,
+        "external_uid": null,
+        "external_source": "local",
+        "external_account_id": null,
+        "points": 0,
+        "visibility": "all",
+        "external_object_url": null,
+        "outbound_dirty": 0,
+        "outbound_attempts": 0,
+        "recurrence_origin_id": null,
+        "recurrence_from_completion": 0,
+        "archived_at": null,
+        "target_caldav_account_id": null,
+        "target_caldav_list_url": null,
+        "countdown": 0,
+        "locked": 0,
+        "recurrence_series_id": null,
+        "sort_order": null,
+        "seen_on_server": 0,
+        "rotation_mode": null,
+        "rotation_last_user": null,
+        "rotation_last_position": null,
+        "external_rrule": null,
+        "assigned_name": "child",
+        "assigned_color": "#D97706",
+        "assigned_users": [
+          {
+            "id": 3,
+            "display_name": "child",
+            "color": "#D97706",
+            "avatar_data": null
+          },
+          {
+            "id": 2,
+            "display_name": "member",
+            "color": "#059669",
+            "avatar_data": null
+          },
+          {
+            "id": 1,
+            "display_name": "Admin",
+            "color": "#DB2777",
+            "avatar_data": null
+          }
+        ]
+      },
       {
         "id": 11,
         "title": "golden.task.overdue",
@@ -638,71 +700,21 @@
         ]
       },
       {
-        "id": 1,
-        "title": "task.admin.all mxtaskadmin",
+        "id": 39,
+        "title": "golden.task.at-nine",
         "description": null,
         "category": "household",
-        "priority": "high",
+        "priority": "low",
         "status": "open",
         "due_date": "2026-03-11",
-        "due_time": null,
+        "due_time": "09:00",
         "assigned_to": null,
         "created_by": 1,
         "is_recurring": 0,
         "recurrence_rule": null,
         "parent_task_id": null,
-        "created_at": "2026-03-09T09:30:01Z",
-        "updated_at": "2026-03-09T09:30:01Z",
-        "start_date": null,
-        "external_uid": null,
-        "external_source": "local",
-        "external_account_id": null,
-        "points": 0,
-        "visibility": "all",
-        "external_object_url": null,
-        "outbound_dirty": 0,
-        "outbound_attempts": 0,
-        "recurrence_origin_id": null,
-        "recurrence_from_completion": 0,
-        "archived_at": null,
-        "target_caldav_account_id": null,
-        "target_caldav_list_url": null,
-        "countdown": 0,
-        "locked": 0,
-        "recurrence_series_id": null,
-        "sort_order": null,
-        "seen_on_server": 0,
-        "rotation_mode": null,
-        "rotation_last_user": null,
-        "rotation_last_position": null,
-        "external_rrule": null,
-        "assigned_name": null,
-        "assigned_color": null,
-        "assigned_users": [
-          {
-            "id": 2,
-            "display_name": "member",
-            "color": "#059669",
-            "avatar_data": null
-          }
-        ]
-      },
-      {
-        "id": 4,
-        "title": "task.member.all mxtaskmember",
-        "description": null,
-        "category": "school",
-        "priority": "high",
-        "status": "open",
-        "due_date": "2026-03-11",
-        "due_time": null,
-        "assigned_to": null,
-        "created_by": 2,
-        "is_recurring": 0,
-        "recurrence_rule": null,
-        "parent_task_id": null,
-        "created_at": "2026-03-09T09:30:04Z",
-        "updated_at": "2026-03-09T09:30:04Z",
+        "created_at": "2026-03-09T09:30:39Z",
+        "updated_at": "2026-03-09T09:30:39Z",
         "start_date": null,
         "external_uid": null,
         "external_source": "local",
@@ -738,21 +750,21 @@
         ]
       },
       {
-        "id": 7,
-        "title": "task.child.all mxtaskchild",
+        "id": 38,
+        "title": "golden.task.at-eleven",
         "description": null,
-        "category": "repair",
-        "priority": "high",
+        "category": "household",
+        "priority": "low",
         "status": "open",
         "due_date": "2026-03-11",
-        "due_time": null,
+        "due_time": "11:00",
         "assigned_to": null,
-        "created_by": 3,
+        "created_by": 1,
         "is_recurring": 0,
         "recurrence_rule": null,
         "parent_task_id": null,
-        "created_at": "2026-03-09T09:30:07Z",
-        "updated_at": "2026-03-09T09:30:07Z",
+        "created_at": "2026-03-09T09:30:38Z",
+        "updated_at": "2026-03-09T09:30:38Z",
         "start_date": null,
         "external_uid": null,
         "external_source": "local",
@@ -780,19 +792,19 @@
         "assigned_color": null,
         "assigned_users": [
           {
-            "id": 4,
-            "display_name": "caregiver",
-            "color": "#7C3AED",
+            "id": 3,
+            "display_name": "child",
+            "color": "#D97706",
             "avatar_data": null
           }
         ]
       },
       {
-        "id": 19,
-        "title": "goldkiwi task a",
+        "id": 40,
+        "title": "golden.task.urgent-today",
         "description": null,
         "category": "household",
-        "priority": "low",
+        "priority": "urgent",
         "status": "open",
         "due_date": "2026-03-11",
         "due_time": null,
@@ -801,8 +813,8 @@
         "is_recurring": 0,
         "recurrence_rule": null,
         "parent_task_id": null,
-        "created_at": "2026-03-09T09:30:19Z",
-        "updated_at": "2026-03-09T09:30:19Z",
+        "created_at": "2026-03-09T09:30:40Z",
+        "updated_at": "2026-03-09T09:30:40Z",
         "start_date": null,
         "external_uid": null,
         "external_source": "local",
@@ -841,51 +853,31 @@
     "openTaskCount": 0,
     "overdueTaskCount": 0,
     "memberTodayTasks": [],
-    "tasksDoneToday": 7,
+    "tasksDoneToday": 8,
     "wallTasks": [
       {
-        "user_id": 3,
-        "open_count": 9,
+        "user_id": 1,
+        "open_count": 1,
         "done_count": 0,
         "open": [
           {
-            "id": 11,
-            "title": "golden.task.overdue",
-            "due_date": "2026-03-10"
-          },
-          {
-            "id": 4,
-            "title": "task.member.all mxtaskmember",
-            "due_date": "2026-03-11"
-          },
-          {
-            "id": 19,
-            "title": "goldkiwi task a",
-            "due_date": "2026-03-11"
-          },
-          {
-            "id": 20,
-            "title": "goldkiwi task b",
-            "due_date": "2026-03-11"
-          },
-          {
-            "id": 21,
-            "title": "goldkiwi task c",
-            "due_date": "2026-03-11"
-          },
-          {
-            "id": 22,
-            "title": "goldkiwi task d",
-            "due_date": "2026-03-11"
+            "id": 26,
+            "title": "goldkiwi task assigned three",
+            "due_date": "2026-03-09"
           }
         ],
         "done": []
       },
       {
         "user_id": 2,
-        "open_count": 1,
-        "done_count": 7,
+        "open_count": 2,
+        "done_count": 9,
         "open": [
+          {
+            "id": 26,
+            "title": "goldkiwi task assigned three",
+            "due_date": "2026-03-09"
+          },
           {
             "id": 1,
             "title": "task.admin.all mxtaskadmin",
@@ -893,6 +885,10 @@
           }
         ],
         "done": [
+          {
+            "id": 30,
+            "title": "goldkiwi task done yesterday"
+          },
           {
             "id": 12,
             "title": "golden.task.done-today-a"
@@ -912,12 +908,46 @@
           {
             "id": 16,
             "title": "golden.task.done-today-e"
-          },
-          {
-            "id": 17,
-            "title": "golden.task.done-today-f"
           }
         ]
+      },
+      {
+        "user_id": 3,
+        "open_count": 13,
+        "done_count": 0,
+        "open": [
+          {
+            "id": 26,
+            "title": "goldkiwi task assigned three",
+            "due_date": "2026-03-09"
+          },
+          {
+            "id": 11,
+            "title": "golden.task.overdue",
+            "due_date": "2026-03-10"
+          },
+          {
+            "id": 39,
+            "title": "golden.task.at-nine",
+            "due_date": "2026-03-11"
+          },
+          {
+            "id": 38,
+            "title": "golden.task.at-eleven",
+            "due_date": "2026-03-11"
+          },
+          {
+            "id": 40,
+            "title": "golden.task.urgent-today",
+            "due_date": "2026-03-11"
+          },
+          {
+            "id": 4,
+            "title": "task.member.all mxtaskmember",
+            "due_date": "2026-03-11"
+          }
+        ],
+        "done": []
       },
       {
         "user_id": 4,
@@ -934,6 +964,18 @@
       }
     ],
     "todayMeals": [
+      {
+        "id": 2,
+        "date": "2026-03-11",
+        "meal_type": "breakfast",
+        "title": "golden.meal.breakfast",
+        "recipe_id": null,
+        "cook_user_id": null,
+        "cook_name": null,
+        "cook_color": null,
+        "recipe_has_image": null,
+        "recipe_has_own_image": 0
+      },
       {
         "id": 1,
         "date": "2026-03-11",

@@ -17943,7 +17943,7 @@ test('das Mehr-Blatt zeichnet erst aus dem Speicher, dann nach (#868)', () => {
  * DIE DREI-TAGE-GRENZE STEHT AN ZWEI ENDEN UND MUSS DIESELBE SEIN (#868).
  *
  * Der Server zaehlt sie fuer den Startwert (`birthdaySoonCount` in
- * routes/dashboard.js), der Browser fuer die laufende Aktualisierung
+ * services/birthdays-slices.ts), der Browser fuer die laufende Aktualisierung
  * (`BIRTHDAY_BADGE_DAYS` in utils/nav-badges.js). Laufen sie auseinander,
  * springt die Zahl beim ersten Besuch der Geburtstagsseite - dieselbe Frage,
  * zwei Antworten, und keine davon sichtbar falsch.
@@ -17952,7 +17952,7 @@ test('das Mehr-Blatt zeichnet erst aus dem Speicher, dann nach (#868)', () => {
  */
 test('Server und Browser ziehen den Geburtstags-Schnitt beim selben Tag (#868)', () => {
   const client = read('../public/utils/nav-badges.js');
-  const server = read('../server/routes/dashboard.js');
+  const server = read('../server/services/birthdays-slices.ts');
 
   const c = /BIRTHDAY_BADGE_DAYS\s*=\s*(\d+)/.exec(client);
   assert.ok(c, 'BIRTHDAY_BADGE_DAYS ist nicht mehr auffindbar');
