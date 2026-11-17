@@ -13,6 +13,8 @@ import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calenda
 import { resolveCalendarSelection } from '../services/calendar-selection.js';
 import { normalizeCategoryFilter } from '../services/task-scope.js';
 import { emptyTasksOverview, tasksOverviewSlice } from '../services/tasks-slices.ts';
+import { emptyShoppingOverview, shoppingOverviewSlice } from '../services/shopping-slices.ts';
+import { emptyMealsOverview, mealsOverviewSlice } from '../services/meals-slices.ts';
 import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
@@ -41,7 +43,6 @@ import { scheduleData } from '../services/schedule.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { activeCatalog, ledgerBalanceSql } from '../services/rewards.js';
 import { moneyParams, moneyReader, moneyVisibleSql } from '../services/reward-money.js';
-import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL } from '../services/meal-cook.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
 
 const log = createLogger('Dashboard');
@@ -87,9 +88,9 @@ const DENIED_PAYLOAD = Object.freeze({
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
   calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdays() }),
   tasks: () => emptyTasksOverview(),
-  meals: () => ({ todayMeals: [] }),
+  meals: () => emptyMealsOverview(),
   notes: () => ({ pinnedNotes: [], pinnedNotesCount: 0, notesTotal: 0 }),
-  shopping: () => ({ shoppingLists: [], shoppingOpenCount: 0, shoppingOpenLists: 0 }),
+  shopping: () => emptyShoppingOverview(),
   // Der Monat bleibt stehen: er ist keine Budgetzahl, sondern der Zeitraum, auf
   // den die Kachel beschriftet ist — und er steht ohnehin im Kalender.
   // Geteilte Ausgaben gehoeren zum Budget-Modul (server/scopes.js fuehrt
@@ -516,17 +517,16 @@ router.get('/', (req, res) => {
     result.weekEvents = [];
   }
 
+  // EIN TAG, EINE ZONE, EIN JETZT fuer jeden Ausschnitt der Uebersicht.
+  const overviewCtx = { today: todayLocalKey, zone: householdTimeZone(d), now };
+
   // DIE AUFGABEN-BLOECKE (services/tasks-slices.ts): dringende Aufgaben, die zwei
   // Zahlen der Kachel, „heute dran" je Mitglied, die Wandtitel und „heute
   // erledigt". Ein Tag, eine Zone, ein Jetzt fuer alle; jeder Block faellt ueber
   // runSlice() einzeln auf seinen alten Fehlerwert zurueck. Die Schluessel stehen
   // an ihren alten Stellen der Antwort: drei hier, drei weiter unten.
   const tasks = allows('tasks')
-    ? tasksOverviewSlice(d, rowsReader, {
-      today: todayLocalKey,
-      zone: householdTimeZone(d),
-      now,
-    }, { categories: taskCategories }, runSlice)
+    ? tasksOverviewSlice(d, rowsReader, overviewCtx, { categories: taskCategories }, runSlice)
     : null;
   if (tasks) {
     result.urgentTasks = tasks.urgentTasks;
@@ -565,69 +565,26 @@ router.get('/', (req, res) => {
    * sichtbar oder gar nicht. Die Auswahl wird deshalb NUR gelesen, wenn das
    * Modul fuer diese Person offen ist - sonst bleibt es bei der leeren Fassung
    * von oben, was immer der Parameter nennt. */
-  let shoppingSelection = null;
-  if (allows('shopping')) try {
-    const wanted = normalizeShoppingListFilter(req.query.shopping_list);
-    if (wanted.length) {
-      const existing = d.prepare(
-        `SELECT id FROM shopping_lists WHERE id IN (${wanted.map(() => '?').join(', ')})`,
-      ).all(...wanted).map((row) => row.id);
-      if (existing.length) shoppingSelection = existing;
-    }
-  } catch (err) {
-    log.error('shopping selection error:', err.message);
-  }
-  const shoppingMarks = shoppingSelection ? shoppingSelection.map(() => '?').join(', ') : '';
-  const shoppingBinds = shoppingSelection ?? [];
-
-  if (allows('shopping')) try {
-    const row = d.prepare(`
-      SELECT COUNT(*) AS items, COUNT(DISTINCT si.list_id) AS lists
-      FROM shopping_items si WHERE si.is_checked = 0
-    `).get();
-    result.shoppingOpenCount = row.items;
-    result.shoppingOpenLists = row.lists;
-  } catch (err) {
-    log.error('shoppingOpenCount error:', err.message);
-    result.shoppingOpenCount = null;
-    result.shoppingOpenLists = 0;
+  //
+  // DIE EINKAUFS-BLOECKE (services/shopping-slices.ts): die Auswahl, die offene
+  // Zahl, die Listen mit Vorschau und die Kachel-Fassung. Gelesen wird alles hier
+  // (nur Lesezugriffe dazwischen); die Schluessel stehen an ihren alten Stellen
+  // der Antwort: die zwei Zahlen hier, Listen und Kachel weiter unten.
+  const shopping = allows('shopping')
+    ? shoppingOverviewSlice(d, rowsReader, overviewCtx, {
+      listSelection: normalizeShoppingListFilter(req.query.shopping_list),
+      withTile: wants('shoppingTile'),
+    }, runSlice)
+    : null;
+  if (shopping) {
+    result.shoppingOpenCount = shopping.shoppingOpenCount;
+    result.shoppingOpenLists = shopping.shoppingOpenLists;
   }
 
-  // Heutiges Essen (gefiltert nach haushaltweiten Mahlzeit-Typ-Einstellungen)
-  if (allows('meals')) try {
-    const ALL_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
-    const prefRow = d.prepare('SELECT value FROM sync_config WHERE key = ?').get('visible_meal_types');
-    const visibleTypes = prefRow
-      ? prefRow.value.split(',').filter((t) => ALL_MEAL_TYPES.includes(t))
-      : ALL_MEAL_TYPES;
-    const placeholders = visibleTypes.map(() => '?').join(', ');
-    result.todayMeals = d.prepare(`
-      SELECT m.*,
-             -- Wie im Planer (#1059): ob das verknuepfte Rezept ein Bild hat,
-             -- entscheidet die Kachel ohne Nachfrage - eigenes zuerst, sonst das
-             -- des Providers.
-             r.provider_has_image AS recipe_has_image,
-             -- Version des Providerbildes fuer ?v= (#2048, routes/recipes.js).
-             r.provider_updated_at AS recipe_image_version,
-             (r.image_data IS NOT NULL) AS recipe_has_own_image,
-             -- Wer kocht (#1679): Name, Farbe und Bild neben der Mahlzeit, aus
-             -- derselben Quelle wie im Planer.${MEAL_COOK_COLUMNS_SQL}
-      FROM meals m
-      LEFT JOIN recipes r ON r.id = m.recipe_id
-      ${MEAL_COOK_JOIN_SQL}
-      WHERE m.date = ?
-        AND m.meal_type IN (${placeholders})
-      ORDER BY
-        CASE m.meal_type
-          WHEN 'breakfast' THEN 0
-          WHEN 'lunch'     THEN 1
-          WHEN 'dinner'    THEN 2
-          WHEN 'snack'     THEN 3
-        END
-    `).all(todayLocalKey, ...visibleTypes);
-  } catch (err) {
-    log.error('todayMeals error:', err.message);
-    result.todayMeals = [];
+  // Heutiges Essen (services/meals-slices.ts), gefiltert nach haushaltweiten
+  // Mahlzeit-Typ-Einstellungen.
+  if (allows('meals')) {
+    result.todayMeals = mealsOverviewSlice(d, rowsReader, overviewCtx, {}, runSlice).todayMeals;
   }
   // Displays zeigen nur, was die Wand-Zeile braucht: Datum, Typ, Titel und Koch.
   // `notes` und `created_by` bleiben zurueck (#1903).
@@ -687,63 +644,12 @@ router.get('/', (req, res) => {
     result.notesTotal = 0;
   }
 
-  // Einkaufslisten mit offenen Artikeln (max. 3 Listen, je bis zu 6 offene Items).
-  // Immer ueber ALLE Listen - was ausserhalb der Kachel vom Einkauf spricht,
-  // liest dieses Feld und die beiden Zaehler oben.
-  const shoppingItemsOf = (listId) => d.prepare(`
-    SELECT id, name, quantity, is_checked
-    FROM shopping_items
-    WHERE list_id = ? AND is_checked = 0
-    ORDER BY id ASC
-    LIMIT 6
-  `).all(listId);
-  if (allows('shopping')) try {
-    const lists = d.prepare(`
-      SELECT sl.id, sl.name,
-        (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
-        (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
-      FROM shopping_lists sl
-      WHERE (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) > 0
-      ORDER BY sl.updated_at DESC
-      LIMIT 3
-    `).all();
-    for (const list of lists) list.items = shoppingItemsOf(list.id);
-    result.shoppingLists = lists;
-  } catch (err) {
-    log.error('shoppingLists error:', err.message);
-    result.shoppingLists = [];
-  }
-
-  // DIE FASSUNG DER KACHEL (#1818), nur bei einer Auswahl. Die gewaehlten
-  // Listen stehen da, AUCH OHNE OFFENES: wer eine Liste auf die Uebersicht
-  // holt, will sie antippen, um den ersten Artikel einzutragen - genau dann
-  // waere sie sonst verschwunden. Listen mit Offenem zuerst, damit der Deckel
-  // von drei keine volle Liste hinter einer leeren versteckt; darin wie bisher
-  // die zuletzt geaenderte.
-  //
-  // `listCount` zaehlt JEDE gewaehlte Liste, die es gibt - auch die ohne
-  // Offenes. Daraus rechnet die Kachel "+n weitere Listen": eine gewaehlte
-  // Liste, die der Deckel abschneidet, ist so als "+1" da und fehlt nie stumm.
-  //
-  // Scheitert die Abfrage, fehlt das Feld, und die Kachel zeigt alle Listen.
-  if (shoppingSelection && wants('shoppingTile')) try {
-    const lists = d.prepare(`
-      SELECT sl.id, sl.name,
-        (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
-        (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
-      FROM shopping_lists sl
-      WHERE sl.id IN (${shoppingMarks})
-      ORDER BY (open_count > 0) DESC, sl.updated_at DESC
-      LIMIT 3
-    `).all(...shoppingBinds);
-    for (const list of lists) list.items = shoppingItemsOf(list.id);
-    const openCount = d.prepare(`
-      SELECT COUNT(*) AS items FROM shopping_items si
-      WHERE si.is_checked = 0 AND si.list_id IN (${shoppingMarks})
-    `).get(...shoppingBinds).items;
-    result.shoppingTile = { lists, openCount, listCount: shoppingSelection.length };
-  } catch (err) {
-    log.error('shoppingTile error:', err.message);
+  // Einkaufslisten mit offenen Artikeln und die Fassung der Kachel (#1818), aus
+  // dem Einkaufs-Ausschnitt oben. Scheitert die Kachel, fehlt das Feld, und die
+  // Kachel zeigt alle Listen.
+  if (shopping) {
+    result.shoppingLists = shopping.shoppingLists;
+    if (shopping.shoppingTile) result.shoppingTile = shopping.shoppingTile;
   }
 
   // Alle User (für Avatar-Farben in Widgets)
