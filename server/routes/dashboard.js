@@ -11,7 +11,9 @@ import * as db from '../db.js';
 import { hydrateBirthdayOccurrences } from '../services/birthdays.js';
 import { getEventsOverlappingDays, getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { resolveCalendarSelection } from '../services/calendar-selection.js';
-import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryFilter } from '../services/task-scope.js';
+import { normalizeCategoryFilter } from '../services/task-scope.js';
+import { emptyTasksOverview, tasksOverviewSlice } from '../services/tasks-slices.ts';
+import { sliceRunner } from '../services/slice-runner.ts';
 import { COUNTDOWN_MODULES, getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
@@ -20,10 +22,8 @@ import {
   asksHouseholdAudience,
   householdAudienceAnswer,
   householdAudienceShows,
-  householdVisibleWhere,
   resolveBudgetMode,
   rowReader,
-  taskVisibleWhere,
   visibleWhere,
 } from '../authorize/index.ts';
 import { birthdaysSwitchedOff, modulesLeftOut } from '../services/household-modules.js';
@@ -43,9 +43,15 @@ import { activeCatalog, ledgerBalanceSql } from '../services/rewards.js';
 import { moneyParams, moneyReader, moneyVisibleSql } from '../services/reward-money.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL } from '../services/meal-cook.js';
 import { clampEventLimit } from '../../public/utils/dashboard-event-limit.js';
-import { personAvatarUrlSql } from '../services/person-avatar.js';
 
 const log = createLogger('Dashboard');
+
+/**
+ * Die eine Fehlerisolation der Ausschnitte (Phase 2, Abschnitt D): ein Block,
+ * der wirft, loggt `<name> error:` und antwortet mit seinem Fehlerwert, der Rest
+ * der Antwort laeuft weiter.
+ */
+const runSlice = sliceRunner(log);
 
 /**
  * WAS EIN GESPERRTES MODUL LIEFERT — und warum das hier steht und nicht in
@@ -80,10 +86,7 @@ const DENIED_PAYLOAD = Object.freeze({
   // Geburtstage gehören zum Kalender-Modul, nicht zu einem eigenen — dieselbe
   // Zuordnung wie in PERMISSION_MODULES (navIds) und im Client (NAV_TO_MODULE).
   calendar: () => ({ upcomingEvents: [], familyEvents: [], weekEvents: [], ...emptyBirthdays() }),
-  tasks: () => ({
-    urgentTasks: [], openTaskCount: 0, overdueTaskCount: 0,
-    memberTodayTasks: [], tasksDoneToday: 0, wallTasks: [],
-  }),
+  tasks: () => emptyTasksOverview(),
   meals: () => ({ todayMeals: [] }),
   notes: () => ({ pinnedNotes: [], pinnedNotesCount: 0, notesTotal: 0 }),
   shopping: () => ({ shoppingLists: [], shoppingOpenCount: 0, shoppingOpenLists: 0 }),
@@ -188,21 +191,6 @@ function emptyBudget(month) {
   };
 }
 
-const ASSIGNED_USERS_SQL = `(
-  SELECT json_group_array(json_object(
-    'id', u.id, 'display_name', u.display_name, 'color', u.avatar_color,
-    'avatar_data', ${personAvatarUrlSql('u')}
-  ) ORDER BY ta.user_id IS NOT t.assigned_to, ta.rowid)
-  FROM task_assignments ta JOIN users u ON u.id = ta.user_id
-  WHERE ta.task_id = t.id
-) AS assigned_users_json`;
-
-function addAssignedUsers(task) {
-  task.assigned_users = task.assigned_users_json ? JSON.parse(task.assigned_users_json) : [];
-  delete task.assigned_users_json;
-  return task;
-}
-
 /**
  * Die Felder eines Termins, die der Wochenstreifen braucht: Tag(e), Farbe nach
  * der Regel aus public/utils/event-color.js und der Titel fuer den
@@ -226,89 +214,6 @@ function weekEventFields(event) {
     birthday_date: event.birthday_date ?? null,
     birthday_event_kind: event.birthday_event_kind ?? null,
   };
-}
-
-/** So viele Titel je Mitglied und Zustand reisen mit; die Zahlen daneben sind ungekappt. */
-const WALL_TASKS_PER_MEMBER = 6;
-
-/**
- * Die Aufgaben von heute je Mitglied, MIT TITEL, fuer die Wand (#1817).
- *
- * WARUM EINE EIGENE LESUNG. `urgentTasks` ist haushaltsweit auf fuenf gekappt -
- * daraus laesst sich nicht lesen, was unter einer einzelnen Person steht.
- * `memberTodayTasks` ist ungekappt, traegt aber nur eine Zahl.
- *
- * NUR `visibility = 'all'`, UND DAS IST NICHT DIE BETRACHTER-REGEL. Jede andere
- * Aufgabenabfrage dieser Route haengt `visibilityWhere(..., '@me')` an: sie
- * zeigt, was die angemeldete Person sehen darf. Ein Wandtablett ist keine
- * Person - es haengt in der Kueche, und der Wandmodus laesst sich aus jeder
- * Sitzung oeffnen. Eine Aufgabe auf "nur Zugewiesene" oder privat steht deshalb
- * auf keiner Wand, auch nicht, wenn die Wand aus der Sitzung der zugewiesenen
- * Person geoeffnet wurde. `'all'` ist eine Teilmenge dessen, was jeder
- * Betrachter ohnehin sieht; die Lesung gibt also nichts frei, was der
- * Betrachter nicht schon hat, und ein gekoppeltes Display erreicht sie nur
- * ueber `dashboard:read` + `tasks:read` wie den Rest der Antwort.
- *
- * "HEUTE" FUER EINE PERSON: offen ist, was heute oder frueher faellig ist -
- * dieselbe Menge, die `memberTodayTasks` zaehlt und die das Programm links als
- * "ueberfaellig" fuehrt. Erledigt ist, was heute faellig war, und dazu, was
- * ueberfaellig war und HEUTE abgehakt wurde: sonst verschwaende eine Aufgabe
- * von gestern beim Abhaken von der Wand, statt ihren Haken zu bekommen. Der Tag
- * einer Erledigung ist der des HAUSHALTS (`completed_at` ist ein UTC-Zeitpunkt).
- * Mit dem Tageswechsel faellt beides von selbst heraus.
- *
- * MEHRERE ZUGEWIESENE: die Aufgabe steht unter jeder von ihnen, wie
- * `memberTodayTasks` sie zaehlt.
- *
- * @returns {{user_id: number, open_count: number, done_count: number,
- *            open: {id: number, title: string, due_date: string}[],
- *            done: {id: number, title: string}[]}[]}
- */
-function wallTasksByMember(d, { today, zone, now, categoryAnd = '', categoryBinds = {} }) {
-  // Grobe Vorauswahl in SQL (48 Stunden decken jede Zone), der Tag selbst wird
-  // unten in der Haushaltszone entschieden.
-  const since = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
-  const rows = d.prepare(`
-    SELECT ta.user_id AS user_id, t.id, t.title, t.status, t.due_date, tc.completed_at
-    FROM tasks t
-    JOIN task_assignments ta ON ta.task_id = t.id
-    LEFT JOIN task_completions tc ON tc.task_id = t.id
-    WHERE t.archived_at IS NULL
-      AND ${householdVisibleWhere('t')}
-      AND t.due_date IS NOT NULL AND t.due_date <= @today
-      AND ${taskScopeWhere('t', { bind: '@today' })}${categoryAnd}
-      AND (t.status != 'done' OR t.due_date = @today OR tc.completed_at >= @since)
-    ORDER BY
-      t.due_date ASC,
-      t.due_time IS NULL ASC, t.due_time ASC,
-      CASE t.priority
-        WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
-        WHEN 'low' THEN 3 ELSE 4
-      END ASC,
-      t.id ASC
-  `).all({ today, since, ...categoryBinds });
-
-  const byMember = new Map();
-  for (const row of rows) {
-    const isDone = row.status === 'done';
-    if (isDone && row.due_date !== today
-      && utcToWall(row.completed_at, zone)?.date !== today) continue;
-    let entry = byMember.get(row.user_id);
-    if (!entry) {
-      entry = { user_id: row.user_id, open_count: 0, done_count: 0, open: [], done: [] };
-      byMember.set(row.user_id, entry);
-    }
-    if (isDone) {
-      entry.done_count += 1;
-      if (entry.done.length < WALL_TASKS_PER_MEMBER) entry.done.push({ id: row.id, title: row.title });
-    } else {
-      entry.open_count += 1;
-      if (entry.open.length < WALL_TASKS_PER_MEMBER) {
-        entry.open.push({ id: row.id, title: row.title, due_date: row.due_date });
-      }
-    }
-  }
-  return [...byMember.values()];
 }
 
 /**
@@ -376,9 +281,6 @@ router.get('/', (req, res) => {
    * Aufgabe wieder verschwinden lässt, nähme eine Entscheidung zurück, die
    * jemand ausdrücklich getroffen hat. */
   const taskCategories = normalizeCategoryFilter(req.query.tasks_category);
-  const taskCategoryFragment = taskCategoryWhere('t', taskCategories, { named: 'cat' });
-  const taskCategoryAnd = taskCategoryFragment ? ` AND ${taskCategoryFragment}` : '';
-  const taskCategoryBinds = categoryBindings(taskCategories, 'cat');
   const noteCategories = [...new Set(
     (Array.isArray(req.query.notes_category) ? req.query.notes_category : [req.query.notes_category])
       .map(Number)
@@ -429,7 +331,6 @@ router.get('/', (req, res) => {
   // too, and audience=household is the wall for every account. Only the task and
   // event parts follow it here; the other blocks keep their own rules.
   const rowsReader = rowReader(req, { household: householdAudience });
-  const taskVisibleSql = taskVisibleWhere(rowsReader, 't');
   // `mine` ist die Auslegung des Kalendermoduls: zugewiesen an mich.
   // EIN DISPLAY HAT KEIN "MIR" (#1808): es folgt der Vorgabe des Haushalts, sein
   // Browser schickt deren Option mit, und dem Display-Konto weist nie jemand
@@ -615,81 +516,22 @@ router.get('/', (req, res) => {
     result.weekEvents = [];
   }
 
-  // Offene Aufgaben: Sortierung in SQL (overdue zuerst, dann Fälligkeit, dann Priorität).
-  // Faithful translation of the previous JS comparator:
-  //   1. overdue (due_sort < now) before not-overdue
-  //   2. within a group: earlier due date/time first; undated tasks last (NULLS LAST)
-  //   3. ties broken by priority rank (urgent=0..none=4)
-  // due_sort = due_date + due_time, falling back to 23:59:59 when only a date is set,
-  // and NULL when there is no due_date at all.
-  if (allows('tasks')) try {
-    // Lokal, nicht UTC: verglichen wird gegen `due_date || 'T' || due_time`, und
-    // beide stehen als lokale Eingabewerte in der DB. Ein UTC-Zeitstempel verschob
-    // die Grenze „überfällig" um den Zonen-Offset.
-    const nowIso = `${todayLocalKey}T${householdWall?.time
-      ?? `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`}`;
-    result.urgentTasks = d.prepare(`
-      SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-        ${ASSIGNED_USERS_SQL},
-        CASE WHEN t.due_date IS NULL THEN NULL
-             ELSE t.due_date || 'T' || COALESCE(t.due_time, '23:59:59')
-        END AS __due_sort
-      FROM tasks t
-      LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.status != 'done'
-        -- Abgelegtes gehört nicht in „Heute auf einen Blick" (#688): eine
-        -- archivierte Aufgabe ist aus dem Lauf genommen, und wer sie von hier aus
-        -- öffnete, fand sie in der Liste nicht wieder.
-        AND t.archived_at IS NULL
-        AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${taskVisibleSql}${taskCategoryAnd}
-      ORDER BY
-        CASE WHEN __due_sort IS NOT NULL AND __due_sort < @now THEN 0 ELSE 1 END ASC,
-        __due_sort IS NULL ASC,
-        __due_sort ASC,
-        CASE t.priority
-          WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
-          WHEN 'low' THEN 3 ELSE 4
-        END ASC
-      LIMIT 5
-    `).all({ now: nowIso, me: userId, today: todayLocalKey, ...taskCategoryBinds }).map(({ __due_sort, ...task }) => addAssignedUsers(task));
-  } catch (err) {
-    log.error('urgentTasks error:', err.message);
-    result.urgentTasks = [];
-  }
-
-  // ZÄHLSTÄNDE FÜR DIE KENNZAHL-KACHELN.
-  //
-  // Sie lassen sich NICHT aus den Listen oben ableiten: `urgentTasks` schneidet
-  // bei 5 ab und `shoppingLists` bei drei Listen mit offenen Posten. Wer daraus
-  // zählte, zeigte auf der Kachel „5 offen", solange zwölf offen sind - eine
-  // Zahl, die genau bis zu ihrer Obergrenze stimmt, ist die gefährlichste Sorte.
-  // Sichtbarkeit wie überall: der Betrachter zählt nur, was er sehen darf.
-  if (allows('tasks')) try {
-    result.openTaskCount = d.prepare(`
-      SELECT COUNT(*) AS n FROM tasks t
-      WHERE t.status != 'done' AND t.archived_at IS NULL
-        AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${taskVisibleSql}${taskCategoryAnd}
-    `).get({ me: userId, today: todayLocalKey, ...taskCategoryBinds }).n;
-  } catch (err) {
-    log.error('openTaskCount error:', err.message);
-    result.openTaskCount = null;
-  }
-
-  // Überfällig ist die Zweitzeile der Aufgaben-Kachel: „7 offen" allein sagt
-  // nicht, ob etwas brennt.
-  if (allows('tasks')) try {
-    result.overdueTaskCount = d.prepare(`
-      SELECT COUNT(*) AS n FROM tasks t
-      WHERE t.status != 'done' AND t.archived_at IS NULL
-        AND t.due_date IS NOT NULL AND t.due_date < @today
-        AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${taskVisibleSql}${taskCategoryAnd}
-    `).get({ today: todayLocalKey, me: userId, ...taskCategoryBinds }).n;
-  } catch (err) {
-    log.error('overdueTaskCount error:', err.message);
-    result.overdueTaskCount = null;
+  // DIE AUFGABEN-BLOECKE (services/tasks-slices.ts): dringende Aufgaben, die zwei
+  // Zahlen der Kachel, „heute dran" je Mitglied, die Wandtitel und „heute
+  // erledigt". Ein Tag, eine Zone, ein Jetzt fuer alle; jeder Block faellt ueber
+  // runSlice() einzeln auf seinen alten Fehlerwert zurueck. Die Schluessel stehen
+  // an ihren alten Stellen der Antwort: drei hier, drei weiter unten.
+  const tasks = allows('tasks')
+    ? tasksOverviewSlice(d, rowsReader, {
+      today: todayLocalKey,
+      zone: householdTimeZone(d),
+      now,
+    }, { categories: taskCategories }, runSlice)
+    : null;
+  if (tasks) {
+    result.urgentTasks = tasks.urgentTasks;
+    result.openTaskCount = tasks.openTaskCount;
+    result.overdueTaskCount = tasks.overdueTaskCount;
   }
 
   /* WELCHE EINKAUFSLISTEN DIE KACHEL ZEIGT (#1818, aus D#1624). `shopping_list`
@@ -1410,53 +1252,12 @@ router.get('/', (req, res) => {
     };
   }
 
-  // „Heute dran"-Karte: pro Mitglied die Zahl der heute fälligen oder über-
-  // fälligen offenen Aufgaben. Eigene Aggregation statt Zählung aus urgentTasks,
-  // dessen 5er-Limit die Zahlen je Mitglied verfälschen würde. Sichtbarkeit wie
-  // überall: der Betrachter zählt nur, was er sehen darf.
-  if (allows('tasks')) try {
-    result.memberTodayTasks = d.prepare(`
-      SELECT ta.user_id AS user_id, COUNT(*) AS open_count
-      FROM tasks t JOIN task_assignments ta ON ta.task_id = t.id
-      WHERE t.status != 'done' AND t.archived_at IS NULL
-        AND t.due_date IS NOT NULL AND t.due_date <= @today
-        AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${taskVisibleSql}${taskCategoryAnd}
-      GROUP BY ta.user_id
-    `).all({ today: todayLocalKey, me: userId, ...taskCategoryBinds });
-  } catch (err) {
-    log.error('memberTodayTasks error:', err.message);
-    result.memberTodayTasks = [];
-  }
-
-  // Die Wand nennt die Aufgaben beim Namen (#1817), siehe `wallTasksByMember`.
-  if (allows('tasks')) try {
-    result.wallTasks = wallTasksByMember(d, {
-      today: todayLocalKey,
-      zone: householdTimeZone(d),
-      now,
-      categoryAnd: taskCategoryAnd,
-      categoryBinds: taskCategoryBinds,
-    });
-  } catch (err) {
-    log.error('wallTasks error:', err.message);
-    result.wallTasks = [];
-  }
-
-  // „Alles erledigt"-Zustand des Tagesprogramms: nur mit der Zahl heute fälliger,
-  // bereits erledigter Aufgaben lässt sich „alles geschafft" von „heute stand nie
-  // etwas an" unterscheiden - die offene Liste allein kann das nicht.
-  if (allows('tasks')) try {
-    result.tasksDoneToday = d.prepare(`
-      SELECT COUNT(*) AS n FROM tasks t
-      WHERE t.status = 'done' AND t.archived_at IS NULL
-        AND t.due_date = @today
-        AND ${taskScopeWhere('t', { bind: '@today' })}
-        AND ${taskVisibleSql}${taskCategoryAnd}
-    `).get({ today: todayLocalKey, me: userId, ...taskCategoryBinds }).n;
-  } catch (err) {
-    log.error('tasksDoneToday error:', err.message);
-    result.tasksDoneToday = 0;
+  // Die zweite Haelfte der Aufgaben-Bloecke, an der Stelle, die diese Schluessel
+  // in der Antwort immer hatten (die Reihenfolge haelt der Golden Master fest).
+  if (tasks) {
+    result.memberTodayTasks = tasks.memberTodayTasks;
+    result.wallTasks = tasks.wallTasks;
+    result.tasksDoneToday = tasks.tasksDoneToday;
   }
 
   // DIE HAUSHALTSFASSUNG (#1817): von der leeren Fassung aus, nur was die Wand
