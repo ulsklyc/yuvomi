@@ -294,6 +294,14 @@
     "body": {
       "tasks": [
         {
+          "id": 26,
+          "title": "goldkiwi task assigned three",
+          "status": "open",
+          "priority": "low",
+          "due_date": "2026-03-09",
+          "archived_at": null
+        },
+        {
           "id": 19,
           "title": "goldkiwi task a",
           "status": "open",
@@ -324,17 +332,15 @@
           "priority": "low",
           "due_date": "2026-03-11",
           "archived_at": null
-        },
-        {
-          "id": 23,
-          "title": "goldkiwi task e",
-          "status": "open",
-          "priority": "low",
-          "due_date": "2026-03-11",
-          "archived_at": null
         }
       ],
       "events": [
+        {
+          "id": 19,
+          "title": "goldkiwi event subscribed",
+          "start_datetime": "2026-03-16",
+          "all_day": 1
+        },
         {
           "id": 12,
           "title": "goldkiwi event a",
@@ -357,12 +363,6 @@
           "id": 15,
           "title": "goldkiwi event d",
           "start_datetime": "2026-04-13",
-          "all_day": 1
-        },
-        {
-          "id": 16,
-          "title": "goldkiwi event e",
-          "start_datetime": "2026-04-14",
           "all_day": 1
         }
       ],
@@ -395,6 +395,10 @@
       ],
       "contacts": [
         {
+          "id": 16,
+          "title": "goldkiwi contact 0"
+        },
+        {
           "id": 9,
           "title": "goldkiwi contact a"
         },
@@ -409,13 +413,14 @@
         {
           "id": 12,
           "title": "goldkiwi contact d"
-        },
-        {
-          "id": 13,
-          "title": "goldkiwi contact e"
         }
       ],
       "items": [
+        {
+          "id": 17,
+          "title": "goldkiwi item 0",
+          "list_id": 51
+        },
         {
           "id": 1,
           "title": "goldkiwi item a",
@@ -435,16 +440,23 @@
           "id": 4,
           "title": "goldkiwi item d",
           "list_id": 5
-        },
-        {
-          "id": 5,
-          "title": "goldkiwi item e",
-          "list_id": 5
         }
       ],
       "meds": [],
       "activities": [],
       "waste": [
+        {
+          "id": 9,
+          "title": "goldkiwi bin z",
+          "icon": "trash-2",
+          "color": "#6B7280"
+        },
+        {
+          "id": 10,
+          "title": "goldkiwi bin 1",
+          "icon": "trash-2",
+          "color": "#6B7280"
+        },
         {
           "id": 1,
           "title": "goldkiwi bin a",
@@ -462,21 +474,17 @@
           "title": "goldkiwi bin c",
           "icon": "trash-2",
           "color": "#6B7280"
-        },
-        {
-          "id": 4,
-          "title": "goldkiwi bin d",
-          "icon": "trash-2",
-          "color": "#6B7280"
-        },
-        {
-          "id": 5,
-          "title": "goldkiwi bin e",
-          "icon": "trash-2",
-          "color": "#6B7280"
         }
       ],
       "recipes": [
+        {
+          "id": 9,
+          "title": "goldkiwi recipe 0"
+        },
+        {
+          "id": 8,
+          "title": "goldkiwi recipe 0"
+        },
         {
           "id": 1,
           "title": "goldkiwi recipe a"
@@ -488,17 +496,23 @@
         {
           "id": 3,
           "title": "goldkiwi recipe c"
-        },
-        {
-          "id": 4,
-          "title": "goldkiwi recipe d"
-        },
-        {
-          "id": 5,
-          "title": "goldkiwi recipe e"
         }
       ],
       "pantry": [
+        {
+          "id": 9,
+          "title": "goldkiwi pantry 0",
+          "quantity": 1,
+          "unit": "pcs",
+          "expires_on": null
+        },
+        {
+          "id": 10,
+          "title": "goldkiwi pantry 0",
+          "quantity": 1,
+          "unit": "pcs",
+          "expires_on": null
+        },
         {
           "id": 1,
           "title": "goldkiwi pantry a",
@@ -519,23 +533,16 @@
           "quantity": 1,
           "unit": "pcs",
           "expires_on": null
-        },
-        {
-          "id": 4,
-          "title": "goldkiwi pantry d",
-          "quantity": 1,
-          "unit": "pcs",
-          "expires_on": null
-        },
-        {
-          "id": 5,
-          "title": "goldkiwi pantry e",
-          "quantity": 1,
-          "unit": "pcs",
-          "expires_on": null
         }
       ],
       "inventory": [
+        {
+          "id": 9,
+          "title": "goldkiwi inventory 1",
+          "brand": "golden brand",
+          "model": null,
+          "status": "active"
+        },
         {
           "id": 1,
           "title": "goldkiwi inventory a",
@@ -563,16 +570,19 @@
           "brand": "golden brand",
           "model": null,
           "status": "active"
-        },
-        {
-          "id": 5,
-          "title": "goldkiwi inventory e",
-          "brand": "golden brand",
-          "model": null,
-          "status": "active"
         }
       ],
       "documents": [
+        {
+          "id": 20,
+          "title": "goldkiwi document tie y",
+          "category": "other"
+        },
+        {
+          "id": 19,
+          "title": "goldkiwi document tie x",
+          "category": "other"
+        },
         {
           "id": 16,
           "title": "goldkiwi document g",
@@ -587,19 +597,21 @@
           "id": 14,
           "title": "goldkiwi document e",
           "category": "other"
-        },
-        {
-          "id": 13,
-          "title": "goldkiwi document d",
-          "category": "other"
-        },
-        {
-          "id": 12,
-          "title": "goldkiwi document c",
-          "category": "other"
         }
       ],
       "birthdays": [
+        {
+          "id": 11,
+          "title": "goldkiwi birthday 0",
+          "birth_date": "1980-02-01",
+          "year_unknown": false
+        },
+        {
+          "id": 12,
+          "title": "goldkiwi birthday 0",
+          "birth_date": "1980-02-01",
+          "year_unknown": false
+        },
         {
           "id": 1,
           "title": "goldkiwi birthday a",
@@ -616,18 +628,6 @@
           "id": 3,
           "title": "goldkiwi birthday c",
           "birth_date": "1950-03-29",
-          "year_unknown": false
-        },
-        {
-          "id": 4,
-          "title": "goldkiwi birthday d",
-          "birth_date": "1950-04-07",
-          "year_unknown": false
-        },
-        {
-          "id": 5,
-          "title": "goldkiwi birthday e",
-          "birth_date": "1950-04-16",
           "year_unknown": false
         }
       ],
