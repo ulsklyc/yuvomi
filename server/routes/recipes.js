@@ -128,7 +128,8 @@ router.get('/', (req, res) => {
       FROM recipes r
       LEFT JOIN users u ON u.id = r.created_by
       LEFT JOIN recipe_provider_accounts p ON p.id = r.provider_account_id
-      ORDER BY r.title COLLATE NOCASE ASC, r.id DESC
+      -- A unique last key in the title's direction: equal titles stand in creation order.
+      ORDER BY r.title COLLATE NOCASE ASC, r.id ASC
     `).all();
 
     const ids = recipes.map((r) => r.id);

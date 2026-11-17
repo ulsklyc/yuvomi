@@ -298,6 +298,9 @@ const TIES = [
   { name: 'waste (same position and name)', table: 'waste_types', insert: "(id, name, color) VALUES (?, ?, '#000000')",
     params: (id) => [id, 'tieword waste'],
     run: () => wasteSearchSlice(db, alice, indexQuery('tieword waste')), want: TIE_ASC },
+  { name: 'recipes (same title)', table: 'recipes', insert: '(id, title, created_by) VALUES (?, ?, ?)',
+    params: (id) => [id, 'tieword recipe', ALICE],
+    run: () => recipesSearchSlice(db, alice, tableQuery('tieword recipe')), want: TIE_ASC },
   // Upcoming ties stand by id ascending; past ties, newest first, by id descending.
   { name: 'events (same upcoming start)', table: 'calendar_events', insert: '(id, title, start_datetime, created_by) VALUES (?, ?, ?, ?)',
     params: (id) => [id, 'tieword upcoming', '2026-04-01T10:00', ALICE],

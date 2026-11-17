@@ -154,6 +154,23 @@ test('GET /: Creator-Join, Zutaten aggregiert, NOCASE-Sortierung, meal_types nor
   assert.ok(Array.isArray(probe.meal_types));
 });
 
+test('GET /: gleich betitelte Rezepte stehen aufsteigend nach id (#2804)', async () => {
+  // Eingefuegt als 9002, 9003, 9001: nur der id-Schluessel bringt sie in id-Reihenfolge.
+  const tieIds = [9002, 9003, 9001];
+  for (const id of tieIds) {
+    db.prepare('INSERT INTO recipes (id, title, created_by) VALUES (?, ?, ?)').run(id, 'Gleichstand', OWNER);
+  }
+  try {
+    const r = await call('GET', '/');
+    assert.equal(r.status, 200);
+    const rows = /** @type {Array<{ id: number, title: string }>} */ (r.body.data);
+    const ids = rows.filter((x) => x.title === 'Gleichstand').map((x) => x.id);
+    assert.deepEqual(ids, [9001, 9002, 9003]);
+  } finally {
+    db.prepare(`DELETE FROM recipes WHERE id IN (${tieIds.join(', ')})`).run();
+  }
+});
+
 // --------------------------------------------------------------------------
 // PUT /:id (Validierung, Auth-Gate, Replace-Set)
 // --------------------------------------------------------------------------
@@ -704,9 +721,14 @@ test('PUT /:id: ein Teil-Update ohne meal_types lässt die Auswahl stehen (#750)
 
 const PNG_1X1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
+// Die gespiegelten Rezepte oben heissen auch "Mit Bild": der Listenfall sucht
+// das eigene ueber seine id, nicht ueber den Titel.
+let mitBildId = 0;
+
 test('POST /recipes: ein eigenes Bild wird gespeichert, aber nie mitgeliefert', async () => {
   const r = await call('POST', '/', { title: 'Mit Bild', image_data: PNG_1X1 });
   assert.equal(r.status, 201);
+  mitBildId = r.body.data.id;
   // DIE DATEN SELBST GEHEN NIE MIT: eine Data-URL von bis zu 5 MB in jeder
   // Listenzeile waere ein Vielfaches der Antwort, fuer eine 32px-Vorschau.
   assert.equal(r.body.data.image_data, undefined, 'image_data darf nicht in der Antwort stehen');
@@ -715,7 +737,7 @@ test('POST /recipes: ein eigenes Bild wird gespeichert, aber nie mitgeliefert', 
 
 test('GET /recipes: die Liste traegt das Flag, nicht das Bild', async () => {
   const r = await call('GET', '/');
-  const mitBild = r.body.data.find((x) => x.title === 'Mit Bild');
+  const mitBild = r.body.data.find((x) => x.id === mitBildId);
   assert.ok(mitBild, 'das Rezept muss in der Liste stehen');
   assert.equal(mitBild.image_data, undefined);
   assert.equal(mitBild.has_own_image, true);
