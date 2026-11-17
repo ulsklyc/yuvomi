@@ -3583,6 +3583,8 @@
         "memberErrorGone": "Este membro já não existe.",
         "memberErrorSsoEmailRequired": "Uma conta só com SSO precisa de um endereço de e-mail para que o primeiro início de sessão por SSO a encontre.",
         "memberErrorSsoEmailAmbiguous": "Outro membro já tem este endereço de e-mail. O SSO não conseguiria distinguir as contas.",
+        "backupSchedulerFailedPushTitle": "A cópia de segurança falhou",
+        "backupSchedulerFailedPushBody": "A cópia de segurança automática não foi executada. Veja o motivo em {{path}}.",
         "twoFactorAlreadyEnabled": "A autenticação de dois fatores já está ativada. Recarrega a página para veres o estado atual.",
         "twoFactorSetupExpired": "A configuração expirou. Cancela e começa de novo.",
         "oidcLinkErrorNotConfigured": "O SSO já não está configurado neste servidor.",

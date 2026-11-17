@@ -3601,6 +3601,8 @@
         "memberErrorGone": "Anggota ini sudah tidak ada.",
         "memberErrorSsoEmailRequired": "Akun khusus SSO memerlukan alamat email agar masuk pertama lewat SSO dapat menemukannya.",
         "memberErrorSsoEmailAmbiguous": "Anggota lain sudah memakai alamat email ini. SSO tidak dapat membedakan akun-akun tersebut.",
+        "backupSchedulerFailedPushTitle": "Pencadangan gagal",
+        "backupSchedulerFailedPushBody": "Pencadangan otomatis tidak berjalan. Buka {{path}} untuk melihat alasannya.",
         "twoFactorAlreadyEnabled": "Autentikasi dua faktor sudah aktif. Muat ulang halaman untuk melihat status terkini.",
         "twoFactorSetupExpired": "Penyiapan sudah kedaluwarsa. Batalkan dan mulai lagi.",
         "oidcLinkErrorNotConfigured": "SSO tidak lagi disiapkan di server ini.",

@@ -141,6 +141,12 @@ export default {
     //   Held by test:tasks-routes.
     // - server/routes/push.js: the test push goes to the requester themself, with the
     //   text they sent. Held by test:push.
+    // - server/services/admin-notices.js: resolves to admins who are household members
+    //   (#1207, householdMemberSql) - an admin account that is a wall tablet, a guest,
+    //   a housekeeping worker or deactivated gets none. Every caller builds its own
+    //   payload (#2519's failed-backup notice is the first; a failed WebDAV upload is
+    //   next) and this module only resolves the audience and sends. Held by
+    //   test:backup-scheduler.
     // A provider or the push service handed to another file as a parameter imports
     // nothing these rules could see; the lint selectors CHANNEL-SEND and PUSH-SEND
     // (.oxlintrc.json, server/ only) catch the call there. Neither rule sees a
@@ -159,6 +165,7 @@ export default {
         pathNot: [
           '^server/routes/tasks\\.[jt]s$',
           '^server/routes/push\\.[jt]s$',
+          '^server/services/admin-notices\\.[jt]s$',
           '^server/services/medication-scheduler\\.[jt]s$',
           '^server/services/notifications\\.[jt]s$',
           '^server/services/push\\.[jt]s$',

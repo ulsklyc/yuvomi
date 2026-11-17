@@ -549,6 +549,11 @@ const DYNAMIC_KEY_SITES = {
   // reminderPayload(): `translate(locale, origin.titleKey)` - die Titel der
   // Herkunftstabelle REMINDER_ORIGINS in derselben Datei.
   'services/notifications.js|origin.titleKey': (code) => [...code.matchAll(/\btitleKey:\s*'([^']+)'/g)].map((m) => m[1]),
+  // notifyAdminsOfBackupFailure(): `translate(locale, reasonKey)` - die vier
+  // Schluessel von BACKUP_FAILURE_LOCALE_KEYS in utils/backup-status.js, nicht
+  // in derselben Datei.
+  'services/backup-scheduler.js|reasonKey': () => [...readFileSync(new URL('utils/backup-status.js', SERVER_DIR), 'utf8')
+    .matchAll(/:\s*'(settings\.[^']+)'/g)].map((m) => m[1]),
 };
 
 function serverSourceFiles(dir = SERVER_DIR, out = []) {
