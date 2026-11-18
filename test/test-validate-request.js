@@ -22,7 +22,6 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import v8 from 'node:v8';
 import vm from 'node:vm';
 // @ts-expect-error express 5 ships no type declarations (TS7016); new code type-checks clean
@@ -113,7 +112,8 @@ function middlewareChain(body) {
  * gates that answer 403 or 429 (a member gets 403, never a 400 that names
  * fields). notifications and permissions gate the whole router with
  * `router.use(requireAdmin)`; their routes carry the check first. Their
- * behaviour against the real routers holds test:validate-small-modules-a.
+ * behaviour against the real routers, the 403 of a member included, holds
+ * test:validate-small-modules-a.
  */
 const GROUP_1A_CHAINS = {
   'server/routes/reminders.js': {
@@ -172,15 +172,6 @@ test('every route of group 1A carries validateRequest(), after its gates', () =>
     (seen[file] ??= {})[`${route.verb.toUpperCase()} ${route.pattern}`] = middlewareChain(route.body);
   }
   assert.deepEqual(seen, GROUP_1A_CHAINS);
-});
-
-test('notifications and permissions gate the whole router with requireAdmin before any route', () => {
-  for (const file of ['server/routes/notifications.js', 'server/routes/permissions.js']) {
-    const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
-    const gate = src.indexOf('router.use(requireAdmin);');
-    const firstRoute = src.search(/\brouter\.(get|post|put|patch|delete)\(/);
-    assert.ok(gate !== -1 && gate < firstRoute, `${file}: router.use(requireAdmin) must stand before the first route`);
-  }
 });
 
 test('the resolution converts the Express pattern and the mount', () => {

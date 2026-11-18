@@ -21,14 +21,13 @@
  * Run: npm run test:validate-small-modules-a
  */
 
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+import { tempDir } from './tmp-dir.js';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 process.env.MODULES_ALLOW_WEB_INSTALL = 'true';
-const MODULES_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'yuvomi-validate-1a-'));
+// Removed at process exit (test/tmp-dir.js).
+const MODULES_DIR = tempDir('yuvomi-validate-1a-');
 process.env.MODULES_DIR = MODULES_DIR;
 
 import test from 'node:test';
@@ -91,10 +90,7 @@ app.use(createErrorHandler(quiet));
 const server = app.listen(0, '127.0.0.1');
 /** @type {string} */
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
-test.after(() => {
-  server.close();
-  fs.rmSync(MODULES_DIR, { recursive: true, force: true });
-});
+test.after(() => server.close());
 
 /**
  * @param {string} method
