@@ -1049,16 +1049,21 @@ function bindModuleColors(container) {
   wireColorPicker(container);
 
   for (const { id, light: defLight, dark: defDark } of BUILTIN_MODULES) {
-    const lightInput = container.querySelector(`#module-color-${id}-light`);
-    const darkInput  = container.querySelector(`#module-color-${id}-dark`);
-    const resetBtn   = container.querySelector(`#module-color-${id}-reset`);
-    const warnEl     = container.querySelector(`#module-color-${id}-warn`);
+    const lightInput = /** @type {HTMLInputElement | null} */ (container.querySelector(`#module-color-${id}-light`));
+    const darkInput  = /** @type {HTMLInputElement | null} */ (container.querySelector(`#module-color-${id}-dark`));
+    const resetBtn   = /** @type {HTMLElement | null} */ (container.querySelector(`#module-color-${id}-reset`));
+    const warnEl     = /** @type {HTMLElement | null} */ (container.querySelector(`#module-color-${id}-warn`));
     if (!lightInput || !darkInput) continue;
+    // Narrowed, non-null bindings for the closures below - a closure captures
+    // the outer `const` itself, so TS cannot carry the `if` check's narrowing
+    // into a nested function declaration (it might run later, from anywhere).
+    const light = lightInput;
+    const dark = darkInput;
 
     function updateWarn() {
       if (!warnEl) return;
-      const lRatio = contrastRatio(lightInput.value, LIGHT_SURFACE);
-      const dRatio = contrastRatio(darkInput.value,  DARK_SURFACE);
+      const lRatio = contrastRatio(light.value, LIGHT_SURFACE);
+      const dRatio = contrastRatio(dark.value,  DARK_SURFACE);
       const parts = [];
       if (lRatio < MIN_CONTRAST) parts.push(t('settings.moduleColorsLowContrastLight'));
       if (dRatio < MIN_CONTRAST) parts.push(t('settings.moduleColorsLowContrastDark'));
@@ -1067,8 +1072,8 @@ function bindModuleColors(container) {
     }
 
     async function saveColors() {
-      const lightVal = lightInput.value;
-      const darkVal  = darkInput.value;
+      const lightVal = light.value;
+      const darkVal  = dark.value;
       try {
         const saved = await savePreferences({ module_colors: { [id]: { light: lightVal, dark: darkVal } } });
         if (resetBtn) resetBtn.hidden = false;
@@ -1081,19 +1086,19 @@ function bindModuleColors(container) {
       }
     }
 
-    lightInput.addEventListener('change', saveColors);
-    darkInput.addEventListener('change', saveColors);
+    light.addEventListener('change', saveColors);
+    dark.addEventListener('change', saveColors);
 
-    lightInput.addEventListener('input', updateWarn);
-    darkInput.addEventListener('input', updateWarn);
+    light.addEventListener('input', updateWarn);
+    dark.addEventListener('input', updateWarn);
 
     resetBtn?.addEventListener('click', async () => {
       try {
         const saved = await savePreferences({ module_colors: { [id]: null } });
         // Restore the pickers to the built-in defaults, without re-emitting
         // change (that would save the default back as a custom choice).
-        setColorPickerValue(lightInput, defLight);
-        setColorPickerValue(darkInput, defDark);
+        setColorPickerValue(light, defLight);
+        setColorPickerValue(dark, defDark);
         resetBtn.hidden = true;
         applyModuleColorOverrides(saved?.data?.module_colors);
         if (warnEl) { warnEl.textContent = ''; warnEl.hidden = true; }
