@@ -26,6 +26,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { buildOpenApiSpec } from '../server/openapi.js';
 import { createErrorHandler } from '../server/middleware/error-handler.js';
+import { defaultEmptyBody } from '../server/middleware/empty-body.js';
 import { createRequestValidator, resolveOperation, validateRequest as boundValidateRequest } from '../server/api/validate-request.ts';
 import { allRoutes } from './openapi-routes.js';
 
@@ -112,7 +113,7 @@ const MINI = {
       get: { parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'integer' } }], responses: {} },
       patch: {
         parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'integer' } }],
-        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { title: { type: 'string' } } } } } },
+        requestBody: { content: { 'application/json': { schema: { type: 'object', minProperties: 1, properties: { title: { type: 'string' } } } } } },
         responses: {},
       },
     },
@@ -133,6 +134,26 @@ const MINI = {
     '/api/v1/things/files/{rest}': {
       get: { parameters: [{ in: 'path', name: 'rest', required: true, schema: { type: 'string', pattern: '^[a-z/]+$' } }], responses: {} },
     },
+    '/api/v1/things/kinds': {
+      get: {
+        parameters: [
+          { in: 'query', name: 'types', style: 'form', explode: false, schema: { type: 'array', minItems: 1, items: { type: 'string', enum: ['task', 'event'] } } },
+          { in: 'query', name: 'tags', style: 'form', explode: true, schema: { type: 'array', maxItems: 1, items: { type: 'string' } } },
+          { in: 'query', name: 'labels', schema: { type: ['array', 'null'], maxItems: 1, items: { type: 'string' } } },
+          { in: 'query', name: 'ids', style: 'form', explode: false, schema: { type: ['array', 'null'], items: { type: 'integer' } } },
+        ],
+        responses: {},
+      },
+    },
+    '/api/v1/things/proto': {
+      get: { parameters: [{ in: 'query', name: 'length', required: true, schema: { type: 'integer' } }], responses: {} },
+    },
+    '/api/v1/things/deep': {
+      get: { parameters: [{ in: 'query', name: 'filter', style: 'deepObject', explode: true, schema: { type: 'object' } }], responses: {} },
+    },
+    '/api/v1/things/shared': {
+      get: { parameters: [{ $ref: '#/components/parameters/Limit' }], responses: {} },
+    },
     '/api/v1/things/many': {
       post: {
         requestBody: {
@@ -148,6 +169,7 @@ const MINI = {
     },
   },
   components: {
+    parameters: { Limit: { in: 'query', name: 'limit', schema: { type: 'integer' } } },
     schemas: {
       ThingInput: {
         type: 'object',
@@ -181,13 +203,19 @@ function recordingLog() {
 function miniApp(log) {
   const validateRequest = createRequestValidator(MINI);
   const app = express();
+  // The order of the app (server/index.js): the parser, then `{}` for a request without a body.
   app.use(express.json());
+  app.use(defaultEmptyBody);
   const router = express.Router();
   /** @param {any} req @param {any} res */
   const echo = (req, res) => res.json({ query: req.query, params: req.params, body: req.body ?? null });
   router.get('/', validateRequest(), echo);
   router.post('/', validateRequest(), echo);
   router.post('/many', validateRequest(), echo);
+  router.get('/kinds', validateRequest(), echo);
+  router.get('/proto', validateRequest(), echo);
+  router.get('/deep', validateRequest(), echo);
+  router.get('/shared', validateRequest(), echo);
   router.get('/files/{*rest}', validateRequest(), echo);
   router.get('/missing', validateRequest(), echo);
   router.get('/:id', validateRequest(), echo);
@@ -285,12 +313,14 @@ test('the body behind a $ref is resolved, and stays unchanged after a passing ch
   assert.equal(typeof res.body.body.title, 'string');
 });
 
-test('a required body that is missing is a 400', async () => {
+test('a required body that is missing is a 400, though the app put {} in its place', async () => {
   assertRefused(await call('POST', '/api/v1/things'), [{ path: 'body', rule: 'required' }]);
+  assertRefused(await call('POST', '/api/v1/things', { json: {} }), [{ path: 'body/title', rule: 'required' }]);
 });
 
-test('an optional body may be missing, a present one is checked', async () => {
+test('an optional body may be missing (the {} of the app is not checked), a present one is checked', async () => {
   assert.equal((await call('PATCH', '/api/v1/things/3')).status, 200);
+  assertRefused(await call('PATCH', '/api/v1/things/3', { json: {} }), [{ path: 'body', rule: 'minProperties' }]);
   assertRefused(await call('PATCH', '/api/v1/things/3', { json: { title: 1 } }), [{ path: 'body/title', rule: 'type' }]);
 });
 
@@ -302,6 +332,39 @@ test('an empty body schema checks nothing, and a body that is not JSON is not ch
 test('a wildcard path parameter is checked as the joined path', async () => {
   assert.equal((await call('GET', '/api/v1/things/files/a/b')).status, 200);
   assertRefused(await call('GET', '/api/v1/things/files/a/B9'), [{ path: 'path/rest', rule: 'pattern' }]);
+});
+
+test('a query array with explode: false is split at the comma on the copy, the handler reads the string', async () => {
+  const ok = await call('GET', '/api/v1/things/kinds?types=task,event');
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.deepEqual(ok.body.query, { types: 'task,event' });
+  assertRefused(await call('GET', '/api/v1/things/kinds?types=task,nope'), [{ path: 'query/types/1', rule: 'enum' }]);
+  assert.equal((await call('GET', '/api/v1/things/kinds?ids=1,2')).status, 200, 'a type list with array counts as an array');
+  assertRefused(await call('GET', '/api/v1/things/kinds?ids=1,x'), [{ path: 'query/ids/1', rule: 'type' }]);
+});
+
+test('a query array with explode: true, or without style, keeps a comma inside one element', async () => {
+  assert.equal((await call('GET', '/api/v1/things/kinds?tags=a,b')).status, 200);
+  assert.equal((await call('GET', '/api/v1/things/kinds?labels=a,b')).status, 200);
+  assertRefused(await call('GET', '/api/v1/things/kinds?tags=a&tags=b'), [{ path: 'query/tags', rule: 'maxItems' }]);
+});
+
+test('a query style other than form is a programming error (500)', async () => {
+  const res = await call('GET', '/api/v1/things/deep?filter[a]=1');
+  assert.equal(res.status, 500);
+  assert.ok(res.log.join(' | ').includes('deepObject'), res.log.join(' | '));
+});
+
+test('a parameter given as $ref is a programming error (500), never skipped', async () => {
+  const res = await call('GET', '/api/v1/things/shared?limit=x');
+  assert.equal(res.status, 500);
+  assert.ok(res.log.join(' | ').includes('$ref'), res.log.join(' | '));
+});
+
+test('a __proto__ key in the query does not set the prototype of the copy', async () => {
+  // Repeated, the key is an array; on a plain object it would become the
+  // prototype, and its inherited `length` would answer the required check.
+  assertRefused(await call('GET', '/api/v1/things/proto?__proto__=a&__proto__=b'), [{ path: 'query/length', rule: 'required' }]);
 });
 
 test('Express matches the mount case-insensitively, so does the validator', async () => {

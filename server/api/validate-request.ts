@@ -28,6 +28,11 @@
  *              the handler keeps reading the strings Express gave it;
  *            - the body without coercion, defaults or removed fields: it stays
  *              byte-equal, a handler may still read the keys that are there.
+ *              A body is missing when Express left it undefined or the app's
+ *              defaultEmptyBody put `{}` in its place (hadNoBody).
+ *          A query array with `style: form, explode: false` is split at the
+ *          comma on the copy; another query style, or a parameter given as
+ *          `$ref`, throws when the operation is compiled.
  *          Headers are not checked. `allErrors` stays off (Ajv's advice for
  *          untrusted input).
  *
@@ -40,6 +45,7 @@ import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv/dist/2020.js';
 import ajvFormats from 'ajv-formats';
 import { buildOpenApiSpec } from '../openapi.js';
+import { hadNoBody } from '../middleware/empty-body.js';
 import { HttpError } from '../utils/http-error.js';
 
 // ajv-formats is CommonJS: the default import is module.exports, whose
@@ -52,7 +58,7 @@ const MAX_PATH_LENGTH = 120;
 const METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 type Schema = Record<string, unknown>;
-type Parameter = { in?: string; name?: string; required?: boolean; schema?: Schema; $ref?: string };
+type Parameter = { in?: string; name?: string; required?: boolean; schema?: Schema; style?: string; explode?: boolean; $ref?: string };
 type MediaType = { schema?: Schema };
 type Operation = {
   parameters?: Parameter[];
@@ -78,6 +84,7 @@ type Middleware = (req: RouteRequest, res: unknown, next: Next) => void;
 type Checks = {
   path: ValidateFunction | null;
   query: ValidateFunction | null;
+  commaLists: string[];
   body: ValidateFunction | null;
   bodyRequired: boolean;
   wildcards: string[];
@@ -161,12 +168,38 @@ function newAjv(options: { coerceTypes?: 'array' }, spec: OpenApiDocument): Ajv2
   return ajv;
 }
 
-/** Path-level parameters, overridden by the operation's own of the same place and name. */
+/**
+ * Path-level parameters, overridden by the operation's own of the same place
+ * and name. A parameter given as `$ref` is not resolved (the document has
+ * none): it throws instead of being skipped, so no check goes missing silently.
+ */
 function parametersOf(resolved: ResolvedOperation): Parameter[] {
+  const all = [...(resolved.pathItem.parameters ?? []), ...(resolved.operation.parameters ?? [])];
+  if (all.some((p) => p.$ref !== undefined)) {
+    throw new Error(`validateRequest(): ${resolved.method.toUpperCase()} ${resolved.path} has a parameter given as $ref, which is not supported`);
+  }
   const own = resolved.operation.parameters ?? [];
   const shared = (resolved.pathItem.parameters ?? [])
     .filter((p) => !own.some((o) => o.in === p.in && o.name === p.name));
   return [...shared, ...own];
+}
+
+/**
+ * The query parameters whose array arrives as one comma-separated value
+ * (`style: form, explode: false`, e.g. `types=task,event`). Form is the only
+ * query style the copy knows; any other would be checked wrongly, so it throws.
+ */
+function commaListsOf(resolved: ResolvedOperation, parameters: Parameter[]): string[] {
+  const query = parameters.filter((p) => p.in === 'query' && typeof p.name === 'string');
+  const foreign = query.find((p) => p.style !== undefined && p.style !== 'form');
+  if (foreign) {
+    throw new Error(`validateRequest(): ${resolved.method.toUpperCase()} ${resolved.path} uses query style ${foreign.style}, only form is supported`);
+  }
+  const isArray = (schema: Schema | undefined) => {
+    const type = schema?.type;
+    return type === 'array' || (Array.isArray(type) && type.includes('array'));
+  };
+  return query.filter((p) => p.explode === false && isArray(p.schema)).map((p) => p.name as string);
 }
 
 function compileParameters(ajv: Ajv2020, parameters: Parameter[], place: 'path' | 'query'): ValidateFunction | null {
@@ -190,11 +223,20 @@ function refusal(fields: Field[]): HttpError {
   return new HttpError(400, SENTENCE, { reason: 'validation', fields: unique.slice(0, MAX_FIELDS) });
 }
 
-/** A plain deep copy of req.params / req.query for coercion; a wildcard parameter as its joined path. */
-function copyOf(source: Record<string, unknown> | undefined, wildcards: string[] = []): Record<string, unknown> {
-  const copy: Record<string, unknown> = {};
+/**
+ * A deep copy of req.params / req.query for coercion, without a prototype (a
+ * key `__proto__` stays a key). A wildcard parameter becomes its joined path,
+ * a comma list (`explode: false`) its items.
+ */
+function copyOf(
+  source: Record<string, unknown> | undefined,
+  { wildcards = [], commaLists = [] }: { wildcards?: string[]; commaLists?: string[] } = {},
+): Record<string, unknown> {
+  const copy: Record<string, unknown> = Object.create(null);
   for (const [key, value] of Object.entries(source ?? {})) {
-    copy[key] = wildcards.includes(key) && Array.isArray(value) ? value.join('/') : structuredClone(value);
+    if (wildcards.includes(key) && Array.isArray(value)) copy[key] = value.join('/');
+    else if (commaLists.includes(key) && typeof value === 'string') copy[key] = value.split(',');
+    else copy[key] = structuredClone(value);
   }
   return copy;
 }
@@ -231,6 +273,7 @@ function validatorFor(loadSpec: () => OpenApiDocument): () => Middleware {
     const checks: Checks = {
       path: compileParameters(state.params, parameters, 'path'),
       query: compileParameters(state.params, parameters, 'query'),
+      commaLists: commaListsOf(resolved, parameters),
       body: hasBodySchema ? state.body.compile(rebase(bodySchema)) : null,
       bodyRequired: hasBodySchema && requestBody?.required === true,
       wildcards: [...String(pattern).matchAll(/\{\*(\w+)\}/g)].map((m) => m[1]),
@@ -244,13 +287,15 @@ function validatorFor(loadSpec: () => OpenApiDocument): () => Middleware {
       const checks = checksFor(req);
       const fields: Field[] = [];
       for (const [place, check, data] of [
-        ['path', checks.path, () => copyOf(req.params, checks.wildcards)],
-        ['query', checks.query, () => copyOf(req.query)],
+        ['path', checks.path, () => copyOf(req.params, { wildcards: checks.wildcards })],
+        ['query', checks.query, () => copyOf(req.query, { commaLists: checks.commaLists })],
       ] as const) {
         if (check && !check(data())) fields.push(...(check.errors ?? []).map((e) => fieldOf(place, e)));
       }
       if (checks.body) {
-        if (req.body === undefined) {
+        // server/index.js puts `{}` in place of a missing body (defaultEmptyBody):
+        // missing is either, and that `{}` is never held against the schema.
+        if (req.body === undefined || hadNoBody(req)) {
           if (checks.bodyRequired) fields.push({ path: 'body', rule: 'required' });
         } else if (!checks.body(req.body)) {
           fields.push(...(checks.body.errors ?? []).map((e) => fieldOf('body', e)));
