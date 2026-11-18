@@ -54,12 +54,12 @@ for (const [name, id] of Object.entries({ admin: ADMIN, parent: PARENT, child: C
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
-app.use('/calendar', requireAuth, calendarRouter);
-app.use('/notes', requireAuth, notesRouter);
-app.use('/inventory', requireAuth, inventoryRouter);
-app.use('/tasks', requireAuth, tasksRouter);
+app.use('/api/v1/calendar', requireAuth, calendarRouter);
+app.use('/api/v1/notes', requireAuth, notesRouter);
+app.use('/api/v1/inventory', requireAuth, inventoryRouter);
+app.use('/api/v1/tasks', requireAuth, tasksRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}/api/v1`)));
 test.after(() => server.close());
 
 async function call(who, method, path, body) {

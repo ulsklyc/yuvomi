@@ -37,9 +37,9 @@ app.use((req, _res, next) => {
   req.session = { userId: actor.id, role: actor.role };
   next();
 });
-app.use('/', quickLinksRouter);
+app.use('/api/v1/quick-links', quickLinksRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/quick-links`)));
 test.after(() => server.close());
 
 const as = (id, role = 'member') => { actor = { id, role }; };

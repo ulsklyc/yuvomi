@@ -127,6 +127,19 @@ function op({
   return operation;
 }
 
+/**
+ * An operation of `op()` that also answers the 400 of validateRequest() (#2810):
+ * a path parameter or body outside its schema, with `reason: 'validation'`.
+ * For operations that keep the default answers of `op()` otherwise.
+ * @template {{ responses: Record<string, unknown> }} T
+ * @param {T} operation
+ * @returns {T}
+ */
+function withValidationRefusal(operation) {
+  operation.responses[400] = { $ref: '#/components/responses/BadRequest' };
+  return operation;
+}
+
 function idParam(name = 'id', description = 'Resource ID') {
   return {
     name,
@@ -187,4 +200,5 @@ function langParam({ fallback = 'default' } = {}) {
 export {
   authSecurity, csrfHeaderParam, idempotencyHeaderParam, jsonBody, op, idParam, stringPathParam, langParam,
   withCaseReasons, DOCUMENT_LINKS_READ_NOTE, DOCUMENT_LINK_REFUSAL, BUDGET_LINKS_READ_NOTE,
+  withValidationRefusal,
 };

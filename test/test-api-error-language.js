@@ -64,6 +64,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { germanIn, outboundLiterals } from './error-language.js';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
 
 const ROUTES = new URL('../server/routes/', import.meta.url);
 // The settings registry (phase 2, C3) holds the refusal texts of
@@ -420,9 +421,10 @@ test('keine Absage der Notizen traegt deutschen Wortlaut', async () => {
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  notesApp.use('/notes', notesRouter);
+  notesApp.use('/api/v1/notes', notesRouter);
+  notesApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const notesServer = notesApp.listen(0, '127.0.0.1');
-  const notesUrl = await new Promise((r) => notesServer.on('listening', () => r(`http://127.0.0.1:${notesServer.address().port}`)));
+  const notesUrl = await new Promise((r) => notesServer.on('listening', () => r(`http://127.0.0.1:${notesServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body) => {
@@ -468,9 +470,10 @@ test('keine Absage der Schnellzugriffe traegt deutschen Wortlaut', async () => {
     req.session = { userId: who.userId, role: who.role };
     next();
   });
-  qlApp.use('/quick-links', quickLinksRouter);
+  qlApp.use('/api/v1/quick-links', quickLinksRouter);
+  qlApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const qlServer = qlApp.listen(0, '127.0.0.1');
-  const qlUrl = await new Promise((r) => qlServer.on('listening', () => r(`http://127.0.0.1:${qlServer.address().port}`)));
+  const qlUrl = await new Promise((r) => qlServer.on('listening', () => r(`http://127.0.0.1:${qlServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body, as = { userId: ADMIN, role: 'admin' }) => {

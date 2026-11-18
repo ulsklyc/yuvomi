@@ -35,9 +35,9 @@ app.use((req, _res, next) => {
   req.session = { userId: USER, role: 'member' };
   next();
 });
-app.use('/', birthdaysRouter);
+app.use('/api/v1/birthdays', birthdaysRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/birthdays`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {

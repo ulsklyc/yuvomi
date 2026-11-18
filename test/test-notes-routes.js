@@ -17,6 +17,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: notesRouter } = await import('../server/routes/notes.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+
 const db = dbmod.get();
 
 const U = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('u','Uli','x','member')`).run().lastInsertRowid;
@@ -33,9 +35,11 @@ app.use((req, _res, next) => {
   req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
-app.use('/', notesRouter);
+app.use('/api/v1/notes', notesRouter);
+// The central error handler of the app: validateRequest() hands its 400 on to it (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/notes`)));
 
 async function call(method, path, body) {
   const res = await fetch(`${baseUrl}${path}`, {
@@ -230,7 +234,9 @@ test('POST /: fehlender Inhalt → 400', async () => {
 test('POST /: ungültige Farbe → 400', async () => {
   const r = await call('POST', '/', { content: 'Hallo', color: 'rot' });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /HEX/);
+  // Seit #2810 weist das Schema der Operation ab, mit dem Feld statt eines Satzes.
+  assert.equal(r.body.reason, 'validation');
+  assert.ok(r.body.fields.some((/** @type {{ path: string }} */ f) => f.path === 'body/color'), JSON.stringify(r.body.fields));
 });
 
 test('POST /: legt Notiz an (Default-Farbe, created_by, creator_name-Join)', async () => {
@@ -281,12 +287,14 @@ test('PUT /:id: aktualisiert Inhalt/Titel/Farbe/pinned', async () => {
   assert.equal(r.body.data.pinned, 1);
 });
 
-test('PUT /:id: Inhalt und Titel als Zahl werden wie beim Anlegen als Text gespeichert, nicht mit 500 abgelehnt', async () => {
+test('PUT /:id: Inhalt und Titel als Zahl sind ein 400 des Schemas, nicht eine 500 (#2810)', async () => {
   const note = (await call('POST', '/', { content: 'C', title: 'T' })).body.data;
   const r = await call('PUT', `/${note.id}`, { content: 5, title: 7 });
-  assert.equal(r.status, 200);
-  assert.equal(r.body.data.content, '5');
-  assert.equal(r.body.data.title, '7');
+  assert.equal(r.status, 400);
+  assert.equal(r.body.reason, 'validation');
+  assert.ok(r.body.fields.some((/** @type {{ path: string }} */ f) => f.path === 'body/content' || f.path === 'body/title'), JSON.stringify(r.body.fields));
+  const stored = db.prepare('SELECT content, title FROM notes WHERE id = ?').get(note.id);
+  assert.deepEqual({ ...stored }, { content: 'C', title: 'T' });
 });
 
 test('PUT /:id: leerer Titel → null', async () => {

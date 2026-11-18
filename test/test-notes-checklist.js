@@ -263,9 +263,9 @@ app.use((req, _res, next) => {
   req.session = { userId: U, role: 'member' };
   next();
 });
-app.use('/', notesRouter);
+app.use('/api/v1/notes', notesRouter);
 const server  = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/notes`)));
 
 async function call(method, path, body) {
   const res = await fetch(`${baseUrl}${path}`, {

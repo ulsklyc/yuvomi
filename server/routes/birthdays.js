@@ -2,6 +2,7 @@ import express from 'express';
 import birthdayFeedRouter from './birthday-feed.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { collectErrors, date as validateDate, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule } from '../authorize/index.ts';
@@ -273,7 +274,7 @@ function withContactLinks(req, birthdays) {
   });
 }
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const userId = req.authUserId || req.session.userId;
     syncAllBirthdayReminders(db.get(), userId);
@@ -297,7 +298,7 @@ router.get('/', (req, res) => {
   }
 });
 
-router.get('/upcoming', (req, res) => {
+router.get('/upcoming', validateRequest(), (req, res) => {
   try {
     const userId = req.authUserId || req.session.userId;
     syncAllBirthdayReminders(db.get(), userId);
@@ -310,7 +311,7 @@ router.get('/upcoming', (req, res) => {
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vYearUnknown = validateYearUnknown(req.body.year_unknown, 'year_unknown');
@@ -374,7 +375,7 @@ function contactsHidden(req) {
   return !mayReadModule(req, 'contacts');
 }
 
-router.get('/import/candidates', (req, res) => {
+router.get('/import/candidates', validateRequest(), (req, res) => {
   try {
     if (contactsHidden(req)) {
       return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
@@ -387,7 +388,7 @@ router.get('/import/candidates', (req, res) => {
   }
 });
 
-router.post('/import', (req, res) => {
+router.post('/import', validateRequest(), (req, res) => {
   try {
     // Schreibt Geburtstage, LIEST aber Kontakte: ohne diesen Riegel waere der
     // Umweg offen, sich die abgewiesene Liste ueber die angelegten
@@ -412,7 +413,7 @@ router.post('/import', (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const userId = req.authUserId || req.session.userId;
     const id = parseInt(req.params.id, 10);
@@ -484,7 +485,7 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const userId = req.authUserId || req.session.userId;
     const id = parseInt(req.params.id, 10);
@@ -503,7 +504,7 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-router.get('/meta/options', (_req, res) => {
+router.get('/meta/options', validateRequest(), (_req, res) => {
   res.json({ data: { photoMaxBytes: MAX_PHOTO_LENGTH, acceptedImageTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] } });
 });
 
