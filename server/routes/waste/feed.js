@@ -13,6 +13,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import { createLogger } from '../../logger.js';
 import * as wasteIcs from '../../services/waste-ics.js';
@@ -35,7 +36,7 @@ function feedStatus(req, userId) {
 }
 
 // GET /api/v1/waste/feed -> own feed status (null if never enabled)
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     res.json({ data: feedStatus(req, currentUserId(req)) });
   } catch (err) {
@@ -45,7 +46,7 @@ router.get('/', (req, res) => {
 });
 
 // POST /api/v1/waste/feed/regenerate -> issue a new token (keeps the type selection)
-router.post('/regenerate', (req, res) => {
+router.post('/regenerate', validateRequest(), (req, res) => {
   try {
     wasteIcs.regenerateFeedToken(db.get(), currentUserId(req));
     res.json({ data: feedStatus(req, currentUserId(req)) });
@@ -56,7 +57,7 @@ router.post('/regenerate', (req, res) => {
 });
 
 // DELETE /api/v1/waste/feed -> revoke own subscription
-router.delete('/', (req, res) => {
+router.delete('/', validateRequest(), (req, res) => {
   try {
     wasteIcs.clearFeedToken(db.get(), currentUserId(req));
     res.json({ data: null });
@@ -70,7 +71,7 @@ router.delete('/', (req, res) => {
 // selection, stored alongside the token (see server/services/waste-ics.js for
 // why this isn't a query parameter on the public feed URL). Requires an
 // existing token - there is nothing to filter before the feed itself exists.
-router.put('/types', (req, res) => {
+router.put('/types', validateRequest(), (req, res) => {
   try {
     const userId = currentUserId(req);
     if (!wasteIcs.getFeedToken(db.get(), userId)) {

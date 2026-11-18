@@ -85,6 +85,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   meets those as before. The admin check of `POST /housekeeping/worker` and of the rewards
   admin routes, and the shopping right of `POST /housekeeping/supply-requests`, come first:
   403 stays 403, also for a bad request. Text lengths count the value as sent.
+- **Waste collection and the shift schedule check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused
+  now. Under `/api/v1/waste` and `/api/v1/schedule`, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `1.5` or `1e3` (they were
+    read as 12, 1 and 1), a number, truth value, list or object in a text field, and a number
+    written as text, a truth value or a list in a number field (`"7"` for a cycle length, `""`
+    or `false` for `reminderOffsetMinutes`, which meant 0 minutes);
+  - `PUT /waste/reminder-settings/{typeId}` without `enabled`, `offset_days` and
+    `delivery_time`: a body without `enabled` SWITCHED THE REMINDER OFF, and a missing lead
+    time or time was reset to 1 day and 08:00. All three are required now;
+  - switches that are not `true` or `false` (`active`, `archived`, `ignored`, `enabled`,
+    `is_active`, `overtimeEnabled`): `active: "false"` kept a waste schedule running;
+  - garbage that was a 500: `type_id: true` or `{}` for a waste schedule or pickup, a `note`
+    that is not text on a moved or skipped pickup, `mappings: [null]` on an import commit, and
+    `color: ""` for a waste type;
+  - lists: a `recurrence_kind` or weekday code outside its values, weekdays as comma text
+    (`"MO,TH"`; send a list), a mapping profile `version`
+    other than 1, `include_archived` and `include_inactive` other than `1`, `true`, `0` or
+    `false`;
+  - ids in a body that are neither whole numbers nor digit text (`user_id`, `shift_type_id`,
+    `custom_field_id`, the type of a schedule or pickup); bounds the routes have on every
+    value (cycle length 1-366, at most 500 cycle days, reminder minutes 0-1440, weekly hours
+    1-168, waste reminder lead time 0-14 days);
+  - queries: `type_id`, `user_id`, `from` and `to` that are not plain digits or `YYYY-MM-DD`
+    (`?type_id=abc` listed every schedule, `?user_id=3abc` read 3), and any filter given twice;
+  - missing fields that were answered later: `profile_digest` of a mapping profile commit and
+    `expected_version` of a re-import commit (a 409 before), and a day in the path of a waste
+    override that is not `YYYY-MM-DD` (a 404 before).
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), weekdays as a list or one code,
+  unknown fields, an empty body where every field is optional (skipping a pickup
+  date), a URL source without `ics`. Rules the description cannot carry stay with the routes
+  and their reasons: an empty name after trimming, a day that does not exist, the anchor day of
+  a schedule, the interval bound per kind, a type, shift type or member that does not exist,
+  the refresh interval of a URL source (with its bounds as `params`). The check runs before the
+  entry is looked up, so a bad request is a 400, not a 404, 403 or 409; a valid one meets those
+  as before. A member who names someone else in `user_id` of a pattern, override, extra shift
+  or their range variants gets 403 first, also for a bad request, now with the plain sentence
+  `Forbidden.`. Text lengths count the value as sent.
 - **A path id beyond the safe integer range is refused with a 400.** This is about your own
   API clients; the app never sends such an id. On the routes that check requests against the
   API description (notes, birthdays, quick links, reminders, notification channels,

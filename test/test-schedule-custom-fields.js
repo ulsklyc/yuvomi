@@ -37,6 +37,8 @@ const BOB = { id: 2, role: 'member' };
 const ADMIN = { id: 3, role: 'admin' };
 const typeId = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Period 3', '09:55', '10:40', '#B45309')").run().lastInsertRowid;
 
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 let actor = ALICE;
 const app = express();
 app.use((req, _res, next) => {
@@ -46,9 +48,13 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', scheduleRouter);
+app.use(defaultEmptyBody);
+// The real prefixes, in the mount order of server/index.js: validateRequest()
+// finds its operation by `req.baseUrl` (#2810).
+app.use('/api/v1/schedule', scheduleRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}/api/v1/schedule`)));
 test.after(() => server.close());
 
 async function call(method, path, { as = ALICE, body } = {}) {

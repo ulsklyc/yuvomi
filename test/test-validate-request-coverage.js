@@ -17,8 +17,9 @@
  *          (reminders, notifications, modules, permissions, email, weather),
  *          1B (family, people, search, kitchen, screensaver, displays), 2A
  *          (recipes, recipe-providers, pantry), 2B (the five route files of
- *          inventory: locations, categories, items, entries, deadlines-feed)
- *          and 3 (housekeeping, rewards).
+ *          inventory: locations, categories, items, entries, deadlines-feed),
+ *          3 (housekeeping, rewards) and 4 (the eight route files of waste,
+ *          schedule, schedule-extras, schedule-feed, schedule-preferences).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -80,23 +81,11 @@ const NOT_MIGRATED = [
   'server/routes/meals.js',
   'server/routes/preferences.js',
   'server/routes/push.js',
-  'server/routes/schedule-extras.js',
-  'server/routes/schedule-feed.js',
-  'server/routes/schedule-preferences.js',
-  'server/routes/schedule.js',
   'server/routes/shopping.js',
   'server/routes/split-expenses.js',
   'server/routes/subscriptions.js',
   'server/routes/system.js',
   'server/routes/tasks.js',
-  'server/routes/waste/feed.js',
-  'server/routes/waste/import.js',
-  'server/routes/waste/occurrences.js',
-  'server/routes/waste/pickups.js',
-  'server/routes/waste/reminder-settings.js',
-  'server/routes/waste/schedules.js',
-  'server/routes/waste/sources.js',
-  'server/routes/waste/types.js',
 ];
 
 /** The files the groups so far migrated: they must be found complete. */
@@ -110,6 +99,11 @@ const MIGRATED = [
   'server/routes/inventory/locations.js', 'server/routes/inventory/categories.js', 'server/routes/inventory/items.js',
   'server/routes/inventory/entries.js', 'server/routes/inventory/deadlines-feed.js',
   'server/routes/housekeeping.js', 'server/routes/rewards.js',
+  'server/routes/waste/types.js', 'server/routes/waste/schedules.js', 'server/routes/waste/pickups.js',
+  'server/routes/waste/occurrences.js', 'server/routes/waste/sources.js', 'server/routes/waste/import.js',
+  'server/routes/waste/reminder-settings.js', 'server/routes/waste/feed.js',
+  'server/routes/schedule.js', 'server/routes/schedule-extras.js', 'server/routes/schedule-feed.js',
+  'server/routes/schedule-preferences.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

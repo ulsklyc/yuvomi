@@ -6,6 +6,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
@@ -15,7 +16,7 @@ import { icsFromBody } from './sources.js';
 const log = createLogger('Waste');
 const router = express.Router();
 
-router.post('/preview', (req, res) => {
+router.post('/preview', validateRequest(), (req, res) => {
   try {
     const ics = icsFromBody(req, res);
     if (ics === null) return;
@@ -28,7 +29,7 @@ router.post('/preview', (req, res) => {
   }
 });
 
-router.post('/commit', (req, res) => {
+router.post('/commit', validateRequest(), (req, res) => {
   try {
     const ics = icsFromBody(req, res);
     if (ics === null) return;

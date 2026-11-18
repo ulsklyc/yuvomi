@@ -7,6 +7,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
@@ -21,7 +22,7 @@ const router = express.Router();
 const DEFAULT_OFFSET_DAYS = 1;
 const DEFAULT_DELIVERY_TIME = '08:00';
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const userId = currentUserId(req);
     const { types, byTypeId } = store.listReminderSettingsForUser(db.get(), userId);
@@ -42,7 +43,7 @@ router.get('/', (req, res) => {
   }
 });
 
-router.put('/:typeId', (req, res) => {
+router.put('/:typeId', validateRequest(), (req, res) => {
   try {
     const vTypeId = validateId(req.params.typeId, 'typeId');
     if (vTypeId.error) return res.status(400).json({ error: vTypeId.error, code: 400 });

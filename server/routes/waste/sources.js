@@ -10,6 +10,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
@@ -21,7 +22,7 @@ import { createUrlSource, refreshUrlSource, fetchIcsText, minutesFromNow, classi
 const log = createLogger('Waste');
 const router = express.Router();
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const sources = store.listSources(db.get()).map((s) => redactSourceForReader(s, req));
     res.json({ data: sources });
@@ -31,7 +32,7 @@ router.get('/', (req, res) => {
   }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -48,7 +49,7 @@ router.get('/:id', (req, res) => {
 // POST /waste/import/commit (./import.js) - a file upload has content to
 // commit immediately, a URL source has only a URL until the first fetch this
 // call performs synchronously.
-router.post('/', async (req, res) => {
+router.post('/', validateRequest(), async (req, res) => {
   try {
     const body = req.body ?? {};
     if (typeof body.name !== 'string' || !body.name.trim()) {
@@ -68,7 +69,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -81,7 +82,7 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -98,7 +99,7 @@ router.delete('/:id', (req, res) => {
 // the exact same fetch/auto-commit/needs-mapping logic the scheduler uses;
 // the response's `outcome` tells the client whether to show a mapping wizard
 // (see .../reimport/preview|commit below, which a URL source also drives).
-router.post('/:id/refresh', async (req, res) => {
+router.post('/:id/refresh', validateRequest(), async (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -117,7 +118,7 @@ router.post('/:id/refresh', async (req, res) => {
 });
 
 // GET /api/v1/waste/sources/:id/mapping-profile/export -> portable {pattern, type_name} snapshot (#1063 Phase 10)
-router.get('/:id/mapping-profile/export', (req, res) => {
+router.get('/:id/mapping-profile/export', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -129,7 +130,7 @@ router.get('/:id/mapping-profile/export', (req, res) => {
   }
 });
 
-router.post('/:id/mapping-profile/import/preview', (req, res) => {
+router.post('/:id/mapping-profile/import/preview', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -142,7 +143,7 @@ router.post('/:id/mapping-profile/import/preview', (req, res) => {
   }
 });
 
-router.post('/:id/mapping-profile/import/commit', (req, res) => {
+router.post('/:id/mapping-profile/import/commit', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -156,7 +157,7 @@ router.post('/:id/mapping-profile/import/commit', (req, res) => {
   }
 });
 
-router.put('/:id/mappings/:mappingId', (req, res) => {
+router.put('/:id/mappings/:mappingId', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -241,7 +242,7 @@ function emptyFeedResponse(res, source, err) {
   return true;
 }
 
-router.post('/:id/reimport/preview', async (req, res) => {
+router.post('/:id/reimport/preview', validateRequest(), async (req, res) => {
   let source = null;
   try {
     const vId = validateId(req.params.id, 'id');
@@ -260,7 +261,7 @@ router.post('/:id/reimport/preview', async (req, res) => {
   }
 });
 
-router.post('/:id/reimport/commit', async (req, res) => {
+router.post('/:id/reimport/commit', validateRequest(), async (req, res) => {
   let source = null;
   try {
     const vId = validateId(req.params.id, 'id');

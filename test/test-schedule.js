@@ -104,6 +104,8 @@ test('calendar day arithmetic remains stable across DST', () => {
   assert.equal(cyclePosition('2026-03-27', 8, '2026-03-30'), 3);
 });
 
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 let actor = ALICE;
 const app = express();
 app.use((req, _res, next) => {
@@ -115,9 +117,13 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', scheduleRouter);
+app.use(defaultEmptyBody);
+// The real prefixes, in the mount order of server/index.js: validateRequest()
+// finds its operation by `req.baseUrl` (#2810).
+app.use('/api/v1/schedule', scheduleRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}/api/v1/schedule`)));
 test.after(() => server.close());
 
 async function call(method, path, { as = ALICE, body } = {}) {
@@ -760,13 +766,14 @@ test('PUT /patterns/:id validates cycle_length bounds, valid_from/until ordering
   const patchPatternId = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Patchable', '2027-10-01', 10)").run().lastInsertRowid;
   database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 7, ?)').run(patchPatternId, typeId);
 
+  // The bounds 1-366 stand in the schema since #2810: the 400 of the check names the field.
   const tooShort = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { cycle_length: 0 } });
   assert.equal(tooShort.status, 400);
-  assert.match(tooShort.body.error, /between 1 and 366/);
+  assert.deepEqual(tooShort.body.fields, [{ path: 'body/cycle_length', rule: 'minimum' }]);
 
   const tooLong = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { cycle_length: 367 } });
   assert.equal(tooLong.status, 400);
-  assert.match(tooLong.body.error, /between 1 and 366/);
+  assert.deepEqual(tooLong.body.fields, [{ path: 'body/cycle_length', rule: 'maximum' }]);
 
   const invertedDates = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { valid_from: '2027-12-01', valid_until: '2027-01-01' } });
   assert.equal(invertedDates.status, 400);
@@ -900,7 +907,8 @@ test('PUT /patterns/:id/days rejects more than MAX_PATTERN_DAY_ROWS (500) rows, 
   const overLimit = { days: Array.from({ length: 501 }, () => ({ position: 0, shift_type_id: typeId })) };
   const rejected = await call('PUT', `/patterns/${bulkPatternId}/days`, { as: ALICE, body: overLimit });
   assert.equal(rejected.status, 400);
-  assert.match(rejected.body.error, /500 rows/);
+  // The cap stands in the schema since #2810 (`maxItems`).
+  assert.deepEqual(rejected.body.fields, [{ path: 'body/days', rule: 'maxItems' }]);
   assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_pattern_days WHERE pattern_id = ?').get(bulkPatternId).c, 0,
     'a rejected over-limit save must not partially apply');
 
@@ -2600,7 +2608,8 @@ test('an "overtime tracking" toggle exists separate from the weekly-hours number
 
 test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separate toggle, not a repurposed sentinel (D-C)', () => {
   const prefsRoute = readFileSync(new URL('../server/routes/schedule-preferences.js', import.meta.url), 'utf8');
-  assert.match(prefsRoute, /n < 1 \|\| n > MAX_WEEKLY_HOURS/, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
+  // The lower bound is MIN_WEEKLY_HOURS (= 1, services/schedule-fields.js) since #2810.
+  assert.match(prefsRoute, /n < MIN_WEEKLY_HOURS \|\| n > MAX_WEEKLY_HOURS/, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
   assert.match(prefsRoute, /typeof raw !== 'boolean'/, 'overtimeEnabled must be validated as a real boolean, not loosely coerced');
 });
 
@@ -3196,7 +3205,8 @@ test('#1777: a reversed range is refused with reason range_reversed, the sentenc
   assert.equal('reason' in foreign.body, false);
   const other = await call('GET', '/entries?from=not-a-date&to=2027-04-01', { as: ALICE });
   assert.equal(other.status, 400);
-  assert.equal('reason' in other.body, false);
+  // Outside the schema since #2810: the reason of the check, never range_reversed.
+  assert.equal(other.body.reason, 'validation');
 
   // Die Oberflaeche liest den reason der ECHTEN Antwort, nicht den Satz.
   const { __test } = await import('../public/pages/schedule.js');

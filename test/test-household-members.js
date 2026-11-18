@@ -146,8 +146,9 @@ app.use((req, _res, next) => {
 });
 app.use('/auth', authRouter);
 app.use('/api/v1/family', requireAuth, familyRouter);
-app.use('/schedule/extras', requireAuth, scheduleExtrasRouter);
-app.use('/schedule', requireAuth, scheduleRouter);
+// At their real prefixes, in the mount order of server/index.js (#2810).
+app.use('/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter);
+app.use('/api/v1/schedule', requireAuth, scheduleRouter);
 app.use('/tasks', requireAuth, tasksRouter);
 app.use('/calendar', requireAuth, calendarRouter);
 app.use('/budget', requireAuth, budgetRouter);
@@ -209,7 +210,7 @@ test('members only: the shopping list recipient picker', () => {
 });
 
 test('members only: GET /schedule/household-members', async () => {
-  const r = await call('GET', '/schedule/household-members');
+  const r = await call('GET', '/api/v1/schedule/household-members');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data), MEMBERS);
 });
@@ -491,22 +492,22 @@ test('budget: a series takes no newly added non-member responsible', async () =>
 
 test('schedule: a new schedule owner must be a household member', async () => {
   const pattern = { name: 'Woche', anchor_date: '2030-01-01', cycle_length: 7 };
-  const ok = await call('POST', '/schedule/patterns', { body: { ...pattern, user_id: BEN } });
+  const ok = await call('POST', '/api/v1/schedule/patterns', { body: { ...pattern, user_id: BEN } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('POST', '/schedule/patterns', { body: { ...pattern, user_id: DORA } }), 'guest pattern');
-  assertRejectsNonMember(await call('PUT', '/schedule/overrides/2030-01-02', { body: { user_id: DORA, shift_type_id: null } }), 'guest override');
-  assertRejectsNonMember(await call('POST', '/schedule/overrides/fill', { body: { user_id: EMIL, from: '2030-01-02', to: '2030-01-03' } }), 'guest override fill');
+  assertRejectsNonMember(await call('POST', '/api/v1/schedule/patterns', { body: { ...pattern, user_id: DORA } }), 'guest pattern');
+  assertRejectsNonMember(await call('PUT', '/api/v1/schedule/overrides/2030-01-02', { body: { user_id: DORA, shift_type_id: null } }), 'guest override');
+  assertRejectsNonMember(await call('POST', '/api/v1/schedule/overrides/fill', { body: { user_id: EMIL, from: '2030-01-02', to: '2030-01-03' } }), 'guest override fill');
 
-  const extra = await call('POST', '/schedule/extras', { body: { user_id: BEN, date_key: '2030-01-04', shift_type_id: SHIFT } });
+  const extra = await call('POST', '/api/v1/schedule/extras', { body: { user_id: BEN, date_key: '2030-01-04', shift_type_id: SHIFT } });
   assert.equal(extra.status, 201, JSON.stringify(extra.body));
-  assertRejectsNonMember(await call('POST', '/schedule/extras', { body: { user_id: DORA, date_key: '2030-01-04', shift_type_id: SHIFT } }), 'guest extra shift');
-  assertRejectsNonMember(await call('POST', '/schedule/extras/fill', { body: { user_id: DORA, from: '2030-01-05', to: '2030-01-06', shift_type_id: SHIFT } }), 'guest extra fill');
+  assertRejectsNonMember(await call('POST', '/api/v1/schedule/extras', { body: { user_id: DORA, date_key: '2030-01-04', shift_type_id: SHIFT } }), 'guest extra shift');
+  assertRejectsNonMember(await call('POST', '/api/v1/schedule/extras/fill', { body: { user_id: DORA, from: '2030-01-05', to: '2030-01-06', shift_type_id: SHIFT } }), 'guest extra fill');
 });
 
 test('schedule: staff who already own a schedule keep it editable', async () => {
-  const override = await call('PUT', '/schedule/overrides/2030-01-08', { body: { user_id: CLARA, shift_type_id: null } });
+  const override = await call('PUT', '/api/v1/schedule/overrides/2030-01-08', { body: { user_id: CLARA, shift_type_id: null } });
   assert.equal(override.status, 200, JSON.stringify(override.body));
-  const extra = await call('POST', '/schedule/extras', { body: { user_id: CLARA, date_key: '2030-01-09', shift_type_id: SHIFT } });
+  const extra = await call('POST', '/api/v1/schedule/extras', { body: { user_id: CLARA, date_key: '2030-01-09', shift_type_id: SHIFT } });
   assert.equal(extra.status, 201, JSON.stringify(extra.body));
 });
 

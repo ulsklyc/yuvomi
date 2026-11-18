@@ -6,7 +6,7 @@
  */
 
 import { isValidTimeZone, utcToWall } from '../utils/timezone.js';
-import { DATE_PATTERN, DATETIME_PATTERN } from '../utils/datetime-pattern.js';
+import { COLOR_PATTERN, DATE_PATTERN, DATETIME_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
 
 // Globale Längengrenzen
 const MAX_TITLE    = 200;
@@ -25,7 +25,10 @@ const DATE_RE     = new RegExp(DATE_PATTERN);
 const TIME_RE     = /^\d{2}:\d{2}$/;
 // One source with the `pattern` of the reminder times in the OpenAPI document (#2810).
 const DATETIME_RE = new RegExp(DATETIME_PATTERN);
-const COLOR_RE    = /^#[0-9A-Fa-f]{6}$/;
+// One source with the `pattern` of the color fields in the OpenAPI document (#2810).
+const COLOR_RE    = new RegExp(COLOR_PATTERN);
+// One source with the `pattern` of the time fields in the OpenAPI document (#2810).
+const TIME_OF_DAY_RE = new RegExp(TIME_PATTERN);
 const MONTH_RE    = /^\d{4}-\d{2}$/;
 // UNTIL und COUNT schließen sich laut RFC 5545 gegenseitig aus (#513).
 // Erlaubt ist AUSSCHLIESSLICH `BYMONTHDAY=-1` ("letzter Tag des Monats", #960),
@@ -144,7 +147,7 @@ function date(val, field, required = false) {
 function time(val, field) {
   if (!val) return { value: null, error: null };
   const raw = String(val);
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw))
+  if (!TIME_OF_DAY_RE.test(raw))
     return { value: null, error: `${field} must be a valid HH:MM time.` };
   return { value: raw, error: null };
 }
@@ -176,7 +179,7 @@ const SERIES_TOKEN_RE = /^var\(--chart-series-[1-9][0-9]?\)$/;
 function color(val, field, { allowTokens = false } = {}) {
   if (!val) return { value: null, error: null };
   const str = String(val);
-  if (/^#[0-9A-Fa-f]{6}$/.test(str)) return { value: str, error: null };
+  if (COLOR_RE.test(str)) return { value: str, error: null };
   if (allowTokens && SERIES_TOKEN_RE.test(str)) return { value: str, error: null };
   return { value: null, error: `${field} must be a valid HEX color (#RRGGBB).` };
 }

@@ -25,6 +25,8 @@ const urlSource = await import('../server/services/waste-url-source.js');
 const { fetchIcsText, refreshUrlSource, createUrlSource, validateSourceUrl, validateRefreshIntervalMinutes, __test } = urlSource;
 const { default: wasteRouter } = await import('../server/routes/waste/index.js');
 const { runDueWasteSourceRefreshes } = await import('../server/services/waste-source-scheduler.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -41,12 +43,15 @@ const ALICE = seedUser('alice', 'admin');
 // of the same source happen back to back.
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = ALICE;
   req.session = { userId: ALICE, role: 'admin' };
   next();
 });
 app.use('/api/v1/waste', wasteRouter);
+// The central error handler of server/index.js: validateRequest() hands its 400 there (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const apiServer = http.createServer(app);
 await new Promise((r) => apiServer.listen(0, '127.0.0.1', r));
 const apiOrigin = `http://127.0.0.1:${apiServer.address().port}/api/v1`;

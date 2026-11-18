@@ -13,6 +13,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import * as scheduleIcs from '../services/schedule-ics.js';
@@ -36,7 +37,7 @@ function feedUrl(req, token) {
 }
 
 // GET /api/v1/schedule/feed → eigener Feed-Status
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const token = scheduleIcs.getFeedToken(db.get(), getUserId(req));
     if (!token) return res.json({ data: null });
@@ -48,7 +49,7 @@ router.get('/', (req, res) => {
 });
 
 // POST /api/v1/schedule/feed/regenerate → eigenen Token neu erzeugen
-router.post('/regenerate', (req, res) => {
+router.post('/regenerate', validateRequest(), (req, res) => {
   try {
     const token = scheduleIcs.regenerateFeedToken(db.get(), getUserId(req));
     res.json({ data: { token, url: feedUrl(req, token) } });
@@ -59,7 +60,7 @@ router.post('/regenerate', (req, res) => {
 });
 
 // DELETE /api/v1/schedule/feed → eigenen Feed deaktivieren
-router.delete('/', (req, res) => {
+router.delete('/', validateRequest(), (req, res) => {
   try {
     scheduleIcs.clearFeedToken(db.get(), getUserId(req));
     res.json({ data: { token: null } });

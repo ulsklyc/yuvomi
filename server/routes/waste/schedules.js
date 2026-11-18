@@ -8,6 +8,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
@@ -17,7 +18,7 @@ import { wasteErrorResponse, currentUserId, queryTypeId } from './helpers.js';
 const log = createLogger('Waste');
 const router = express.Router();
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const includeInactive = req.query.include_inactive !== '0' && req.query.include_inactive !== 'false';
     res.json({ data: store.listSchedules(db.get(), { typeId: queryTypeId(req), includeInactive }) });
@@ -27,7 +28,7 @@ router.get('/', (req, res) => {
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const schedule = store.createSchedule(db.get(), req.body ?? {}, currentUserId(req));
     res.status(201).json({ data: schedule });
@@ -38,7 +39,7 @@ router.post('/', (req, res) => {
   }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -51,7 +52,7 @@ router.get('/:id', (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -64,7 +65,7 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -80,7 +81,7 @@ router.delete('/:id', (req, res) => {
 // Moving, skipping (replacement_date: null), and restoring (DELETE) one
 // calculated occurrence. upsertOverride() refuses an original_date that isn't
 // really one of the schedule's own calculated dates.
-router.put('/:id/overrides/:originalDate', (req, res) => {
+router.put('/:id/overrides/:originalDate', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -97,7 +98,7 @@ router.put('/:id/overrides/:originalDate', (req, res) => {
   }
 });
 
-router.delete('/:id/overrides/:originalDate', (req, res) => {
+router.delete('/:id/overrides/:originalDate', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });

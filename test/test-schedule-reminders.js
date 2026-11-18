@@ -20,6 +20,7 @@ const scheduleReminders = await import('../server/services/schedule-reminders.js
 const { default: schedulePreferencesRouter } = await import('../server/routes/schedule-preferences.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 const db = dbmod.get();
 
 db.prepare("INSERT INTO sync_config (key, value) VALUES ('household_timezone', 'UTC')").run();
@@ -536,8 +537,10 @@ test('syncAllScheduleReminders lässt Nutzer ohne aktivierten Vorlauf unberührt
 let actorId = alice;
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => { req.authUserId = actorId; req.sessionModuleAccess = {}; req.authScopes = null; next(); });
-app.use('/schedule/preferences', schedulePreferencesRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/schedule/preferences', schedulePreferencesRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 app.use('/api/v1/reminders', remindersRouter);
 app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
@@ -559,7 +562,7 @@ async function call(method, path, { as = alice, body } = {}) {
 
 test('GET /schedule/preferences liefert beide Felder als null ohne eigene Einstellung, Ueberstunden-Verfolgung an', async () => {
   clearAll();
-  const r = await call('GET', '/schedule/preferences');
+  const r = await call('GET', '/api/v1/schedule/preferences');
   assert.equal(r.status, 200);
   assert.equal(r.body.data.reminderOffsetMinutes, null);
   assert.equal(r.body.data.weeklyHours, null);
@@ -571,7 +574,7 @@ test('PUT /schedule/preferences setzt den Vorlauf und synchronisiert sofort', as
   const early = insertType();
   insertOverride(alice, REAL_TOMORROW, early);
 
-  const r = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
+  const r = await call('PUT', '/api/v1/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
   assert.equal(r.status, 200);
   assert.equal(r.body.data.reminderOffsetMinutes, 30);
 
@@ -582,11 +585,11 @@ test('PUT /schedule/preferences setzt den Vorlauf und synchronisiert sofort', as
 
 test('PUT /schedule/preferences lehnt ungültige Vorlauf-Werte ab', async () => {
   clearAll();
-  const bad1 = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: -5 } });
+  const bad1 = await call('PUT', '/api/v1/schedule/preferences', { body: { reminderOffsetMinutes: -5 } });
   assert.equal(bad1.status, 400);
-  const bad2 = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 99999 } });
+  const bad2 = await call('PUT', '/api/v1/schedule/preferences', { body: { reminderOffsetMinutes: 99999 } });
   assert.equal(bad2.status, 400);
-  const bad3 = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 'soon' } });
+  const bad3 = await call('PUT', '/api/v1/schedule/preferences', { body: { reminderOffsetMinutes: 'soon' } });
   assert.equal(bad3.status, 400);
 });
 
@@ -594,10 +597,10 @@ test('PUT /schedule/preferences mit reminderOffsetMinutes: null schaltet ab', as
   clearAll();
   const early = insertType();
   insertOverride(alice, REAL_TOMORROW, early);
-  await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
+  await call('PUT', '/api/v1/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
   assert.ok(anchorFor(alice, REAL_TOMORROW));
 
-  const r = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: null } });
+  const r = await call('PUT', '/api/v1/schedule/preferences', { body: { reminderOffsetMinutes: null } });
   assert.equal(r.status, 200);
   assert.equal(r.body.data.reminderOffsetMinutes, null);
   assert.equal(anchorFor(alice, REAL_TOMORROW), undefined);
@@ -605,67 +608,67 @@ test('PUT /schedule/preferences mit reminderOffsetMinutes: null schaltet ab', as
 
 test('PUT /schedule/preferences setzt die Wochenstunden, ohne den Vorlauf anzufassen', async () => {
   clearAll();
-  await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
+  await call('PUT', '/api/v1/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
 
-  const r = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 20 } });
+  const r = await call('PUT', '/api/v1/schedule/preferences', { body: { weeklyHours: 20 } });
   assert.equal(r.status, 200);
   assert.equal(r.body.data.weeklyHours, 20);
   assert.equal(r.body.data.reminderOffsetMinutes, 30, 'ein Feld ohne Erwaehnung im Body bleibt unangetastet');
 
-  const get = await call('GET', '/schedule/preferences');
+  const get = await call('GET', '/api/v1/schedule/preferences');
   assert.equal(get.body.data.weeklyHours, 20);
   assert.equal(get.body.data.reminderOffsetMinutes, 30);
 });
 
 test('PUT /schedule/preferences lehnt ungültige Wochenstunden ab', async () => {
   clearAll();
-  const bad1 = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 0 } });
+  const bad1 = await call('PUT', '/api/v1/schedule/preferences', { body: { weeklyHours: 0 } });
   assert.equal(bad1.status, 400);
-  const bad2 = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 169 } });
+  const bad2 = await call('PUT', '/api/v1/schedule/preferences', { body: { weeklyHours: 169 } });
   assert.equal(bad2.status, 400);
-  const bad3 = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 12.5 } });
+  const bad3 = await call('PUT', '/api/v1/schedule/preferences', { body: { weeklyHours: 12.5 } });
   assert.equal(bad3.status, 400);
 });
 
 test('PUT /schedule/preferences mit weeklyHours: null setzt auf den Rückfallwert zurück', async () => {
   clearAll();
-  await call('PUT', '/schedule/preferences', { body: { weeklyHours: 20 } });
-  const r = await call('PUT', '/schedule/preferences', { body: { weeklyHours: null } });
+  await call('PUT', '/api/v1/schedule/preferences', { body: { weeklyHours: 20 } });
+  const r = await call('PUT', '/api/v1/schedule/preferences', { body: { weeklyHours: null } });
   assert.equal(r.status, 200);
   assert.equal(r.body.data.weeklyHours, null);
 });
 
 test('PUT /schedule/preferences schaltet die Ueberstunden-Verfolgung um, ohne die anderen Felder anzufassen (S-24)', async () => {
   clearAll();
-  await call('PUT', '/schedule/preferences', { body: { weeklyHours: 30, reminderOffsetMinutes: 10 } });
+  await call('PUT', '/api/v1/schedule/preferences', { body: { weeklyHours: 30, reminderOffsetMinutes: 10 } });
 
-  const off = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: false } });
+  const off = await call('PUT', '/api/v1/schedule/preferences', { body: { overtimeEnabled: false } });
   assert.equal(off.status, 200);
   assert.equal(off.body.data.overtimeEnabled, false);
   assert.equal(off.body.data.weeklyHours, 30, 'ein Feld ohne Erwaehnung im Body bleibt unangetastet');
   assert.equal(off.body.data.reminderOffsetMinutes, 10);
 
-  const get = await call('GET', '/schedule/preferences');
+  const get = await call('GET', '/api/v1/schedule/preferences');
   assert.equal(get.body.data.overtimeEnabled, false, 'der Zustand bleibt ueber einen GET-Roundtrip hinweg erhalten');
 
-  const on = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: true } });
+  const on = await call('PUT', '/api/v1/schedule/preferences', { body: { overtimeEnabled: true } });
   assert.equal(on.status, 200);
   assert.equal(on.body.data.overtimeEnabled, true);
 });
 
 test('PUT /schedule/preferences lehnt einen nicht-booleschen overtimeEnabled-Wert ab', async () => {
   clearAll();
-  const bad1 = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: 'yes' } });
+  const bad1 = await call('PUT', '/api/v1/schedule/preferences', { body: { overtimeEnabled: 'yes' } });
   assert.equal(bad1.status, 400);
-  const bad2 = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: 1 } });
+  const bad2 = await call('PUT', '/api/v1/schedule/preferences', { body: { overtimeEnabled: 1 } });
   assert.equal(bad2.status, 400);
-  const bad3 = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: null } });
+  const bad3 = await call('PUT', '/api/v1/schedule/preferences', { body: { overtimeEnabled: null } });
   assert.equal(bad3.status, 400, 'anders als reminderOffsetMinutes/weeklyHours gibt es hier keinen "zurueck auf Vorgabe"-Nullwert - ein Schalter ist immer eindeutig an oder aus');
 });
 
 test('PUT /schedule/preferences: weeklyHours: 0 bleibt abgelehnt - kein Sonderwert fuer "aus" (S-24, Entscheidung D-C)', async () => {
   clearAll();
-  const r = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 0 } });
+  const r = await call('PUT', '/api/v1/schedule/preferences', { body: { weeklyHours: 0 } });
   assert.equal(r.status, 400, 'ein eigener Schalter (overtimeEnabled) ist die Antwort auf S-24, nicht eine umgedeutete 0');
 });
 
@@ -673,7 +676,7 @@ test('POST /reminders lehnt ein handgesetztes schedule_entry mit 400 ab', async 
   clearAll();
   const early = insertType();
   insertOverride(alice, REAL_TOMORROW, early);
-  await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
+  await call('PUT', '/api/v1/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
   const anchor = anchorFor(alice, REAL_TOMORROW);
 
   const r = await call('POST', '/api/v1/reminders', { body: { entity_type: 'schedule_entry', entity_id: anchor.id, remind_at: '2026-09-10T05:00:00' } });
