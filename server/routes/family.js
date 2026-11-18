@@ -7,14 +7,12 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import {
   householdMemberSql, memberOrderProblem, memberOrderSql, memberPositionSql, writeMemberOrder,
 } from '../services/household-members.js';
 
-const log = createLogger('Family');
 const router = express.Router();
 
 /** Die Mitgliederliste, wie `GET /members` sie zeigt - in der Haushaltsreihenfolge. */
@@ -40,13 +38,9 @@ function listMembers() {
   `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 }));
 }
 
+// An unexpected error goes to the central error handler (#2810).
 router.get('/members', validateRequest(), (req, res) => {
-  try {
-    res.json({ data: listMembers() });
-  } catch (err) {
-    log.error('GET /members error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: listMembers() });
 });
 
 // --------------------------------------------------------
@@ -69,16 +63,11 @@ router.get('/members', validateRequest(), (req, res) => {
 // deaktiviert werden und bekaeme trotzdem eine Position.
 // --------------------------------------------------------
 router.patch('/members/reorder', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const order = req.body?.order;
-    const problem = memberOrderProblem(order);
-    if (problem) return res.status(400).json({ error: problem.error, code: 400, reason: problem.reason });
-    writeMemberOrder(order);
-    res.json({ data: listMembers() });
-  } catch (err) {
-    log.error('PATCH /members/reorder error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const order = req.body?.order;
+  const problem = memberOrderProblem(order);
+  if (problem) return res.status(400).json({ error: problem.error, code: 400, reason: problem.reason });
+  writeMemberOrder(order);
+  res.json({ data: listMembers() });
 });
 
 export default router;
