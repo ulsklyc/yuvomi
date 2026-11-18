@@ -1,73 +1,119 @@
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '../../public/utils/note-category-name.js';
+import { MAX_QUICK_LINK_URL_LENGTH } from '../../public/utils/quick-link-url.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+
+// THE REQUEST SCHEMAS OF NOTES, BIRTHDAYS AND QUICK LINKS ARE CHECKED (#2810):
+// validateRequest() runs them before every handler of these three modules, so
+// they describe what the routes really accept - the tolerance the routes lived
+// with is in the schema (null and "" as "no value", the visibility aliases),
+// garbage is not (a number in a text field, an id written as text). Lengths
+// count the raw value, the handlers count after trim; both apply.
+
+/** A hex colour, or null / "" for "no colour" (the handlers read both as unset). */
+const optionalHexColor = { type: ['string', 'null'], pattern: '^(#[0-9A-Fa-f]{6})?$' };
+
+const noteFlag = {
+  oneOf: [
+    { type: 'integer', enum: [0, 1] },
+    { type: 'boolean' },
+  ],
+};
 
 const noteInputProperties = {
-  title: { type: ['string', 'null'] },
-  content: { type: 'string' },
-  color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
-  pinned: {
-    oneOf: [
-      { type: 'integer', enum: [0, 1] },
-      { type: 'boolean' },
-    ],
-  },
-  category_ids: { type: 'array', maxItems: 50, uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+  title: { type: ['string', 'null'], maxLength: MAX_TITLE, description: 'null or "" for no title.' },
+  content: { type: 'string', maxLength: MAX_TEXT },
+  color: { ...optionalHexColor, description: 'A hex colour `#RRGGBB`; null or "" means the default `#FFEB3B` on create and "unchanged" on update.' },
+  pinned: noteFlag,
+  // No uniqueItems: the route drops repeated ids.
+  category_ids: { type: 'array', maxItems: 50, items: { type: 'integer', minimum: 1 } },
   visibility: {
     type: 'string',
-    enum: ['all', 'private'],
-    description: '`private`: only the creator sees the note, administrators included. Only the creator can change it.',
+    enum: ['all', 'private', 'family', 'shared'],
+    description: '`private`: only the creator sees the note, administrators included. Only the creator can change it. `family` and `shared` are the open level of other modules and are stored as `all` (DECISIONS 5).',
   },
   locked: {
-    oneOf: [
-      { type: 'integer', enum: [0, 1] },
-      { type: 'boolean' },
-    ],
+    ...noteFlag,
     description: 'Locked notes can only be changed by their creator and administrators - ticking checklist items included. Only they can set or lift the lock.',
   },
+};
+
+const noteCreateProperties = {
+  ...noteInputProperties,
+  // A missing or null `pinned` is not pinned.
+  pinned: { oneOf: [...noteFlag.oneOf, { type: 'null' }] },
+};
+
+const noteUpdateProperties = {
+  ...noteInputProperties,
+  // null leaves the stored text as it is.
+  content: { type: ['string', 'null'], maxLength: MAX_TEXT },
 };
 
 // Die Erinnerungsfelder spiegeln `validateReminder()` in
 // server/routes/birthdays.js; die Obergrenze ist 999 Wochen in Minuten.
 const BIRTHDAY_REMINDER_MAX_MINUTES = 999 * 10080;
 
+// WEIT mit Absicht (#2810): ein Wert, der genau dem gespeicherten entspricht,
+// geht unveraendert durch, auch ausserhalb der Regeln - das kann nur der
+// Handler pruefen, er kennt den Bestand. Das Frontend schickt Text.
+const reminderValue = { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }] };
+
 const birthdayInputProperties = {
-  name: { type: 'string', maxLength: 200 },
-  birth_date: { type: 'string', format: 'date', description: 'The birth date. With `year_unknown` its year is a placeholder: the server stores 2000 (a leap year, so 29 February stays valid) whatever year is sent.' },
+  name: { type: 'string', minLength: 1, maxLength: MAX_TITLE },
+  // Kein `format: date`: mit `year_unknown` ersetzt der Handler das Jahr, bevor
+  // er den Kalender prueft (ein 29.02. eines Gemeinjahres ist dann gueltig).
+  birth_date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: 'The birth date `YYYY-MM-DD`. With `year_unknown` its year is a placeholder: the server stores 2000 (a leap year, so 29 February stays valid) whatever year is sent.' },
   year_unknown: {
-    description: 'The year of birth is unknown (#2095): only day and month of `birth_date` count, and `next_age` is null. Responses carry it as 0 or 1. Omitted on update, the stored value stays; turning it off needs a `birth_date` with its real year in the same request.',
+    description: 'The year of birth is unknown (#2095): only day and month of `birth_date` count, and `next_age` is null. Responses carry it as 0 or 1; null counts as false. Omitted on update, the stored value stays; turning it off needs a `birth_date` with its real year in the same request.',
     oneOf: [
       { type: 'boolean' },
       { type: 'integer', enum: [0, 1] },
+      { type: 'null' },
     ],
   },
-  name_day: { type: ['string', 'null'], pattern: '^\\d{2}-\\d{2}$', description: 'Month and day (`MM-DD`), or null to clear it.' },
-  notes: { type: ['string', 'null'], maxLength: 5000 },
+  name_day: { type: ['string', 'null'], pattern: '^\\s*(\\d{2}-\\d{2})?\\s*$', description: 'Month and day (`MM-DD`), or null or "" to clear it.' },
+  notes: { type: ['string', 'null'], maxLength: MAX_TEXT },
   photo_data: { type: ['string', 'null'], description: 'A base64 image data URL (png, jpeg, webp, gif), or null to remove it.' },
   reminder_offset: {
-    description: 'Lead time before 12:00 on the birthday in the household time zone. Whole minutes as a number or digit string (`"1440"` = one day before), `"custom"` to use `reminder_custom_amount` and `reminder_custom_unit`, `""` for no reminder and no calendar event, or null for the day itself. On update, a value equal to the one already stored is accepted unchanged even if it lies outside these rules, so older records stay editable.',
-    oneOf: [
-      { type: 'null' },
-      { type: 'string', enum: ['', 'custom'] },
-      { type: 'string', pattern: '^\\d{1,9}$' },
-      { type: 'integer', minimum: 0, maximum: BIRTHDAY_REMINDER_MAX_MINUTES },
-    ],
+    ...reminderValue,
+    description: `Lead time before 12:00 on the birthday in the household time zone. Whole minutes from 0 to ${BIRTHDAY_REMINDER_MAX_MINUTES} as a number or digit string (\`"1440"\` = one day before), \`"custom"\` to use \`reminder_custom_amount\` and \`reminder_custom_unit\`, \`""\` for no reminder and no calendar event, or null for the day itself. On update, a value equal to the one already stored is accepted unchanged even if it lies outside these rules, so older records stay editable; the route checks the rules and answers 400.`,
   },
   reminder_custom_amount: {
-    description: 'Amount for a custom lead time, 1-999. Empty or null means unset (counted as 1).',
-    oneOf: [
-      { type: 'null' },
-      { type: 'integer', minimum: 1, maximum: 999 },
-      { type: 'string', pattern: '^([1-9]\\d{0,2})?$' },
-    ],
+    ...reminderValue,
+    description: 'Amount for a custom lead time, a whole number 1-999 as a number or digit string. Empty or null means unset (counted as 1). The stored value is accepted unchanged on update.',
   },
   reminder_custom_unit: {
-    description: 'Unit for a custom lead time. Empty or null means unset (counted as days).',
     type: ['string', 'null'],
-    enum: ['minutes', 'hours', 'days', 'weeks', '', null],
+    description: 'Unit for a custom lead time: `minutes`, `hours`, `days` or `weeks`. Empty or null means unset (counted as days). The stored value is accepted unchanged on update.',
   },
   contact_id: {
-    type: ['integer', 'null'],
-    minimum: 1,
-    description: 'Links the birthday to a contact of the household (Critique R22, D7), or null to unlink it. Linking needs read access to the `contacts` module as well (for API tokens `contacts:read`), otherwise 403. A contact can carry one birthday: one already linked elsewhere is refused with 409. Birthdays of household members cannot be linked. Linking does not copy or follow the contact\'s date. Omitted on update, the link stays; the value already stored is accepted unchanged.',
+    anyOf: [
+      { type: 'integer', minimum: 1 },
+      { type: 'null' },
+      { type: 'string', maxLength: 0 },
+    ],
+    description: 'Links the birthday to a contact of the household (Critique R22, D7), or null (or "") to unlink it. Linking needs read access to the `contacts` module as well (for API tokens `contacts:read`), otherwise 403. A contact can carry one birthday: one already linked elsewhere is refused with 409. Birthdays of household members cannot be linked. Linking does not copy or follow the contact\'s date. Omitted on update, the link stays; the value already stored is accepted unchanged.',
+  },
+};
+
+const birthdayUpdateProperties = {
+  ...birthdayInputProperties,
+  // null leaves name and date as they are; "" leaves the date as well.
+  name: { type: ['string', 'null'], minLength: 1, maxLength: MAX_TITLE },
+  birth_date: { ...birthdayInputProperties.birth_date, type: ['string', 'null'], pattern: '^(\\d{4}-\\d{2}-\\d{2})?$' },
+};
+
+const quickLinkInputProperties = {
+  name: { type: 'string', minLength: 1, maxLength: MAX_SHORT },
+  // Kein `format: uri`: der Handler ergaenzt `https://` (`192.168.1.5:8096`).
+  url: { type: 'string', minLength: 1, maxLength: MAX_QUICK_LINK_URL_LENGTH, description: 'An http(s) address; without a scheme `https://` is added. Stored normalized.' },
+  icon_data: { type: ['string', 'null'], description: 'An uploaded image as a base64 data URL (png, jpeg, webp), or null / "" for none.' },
+  icon_name: { type: ['string', 'null'], description: 'A built-in Lucide symbol (lowercase letters, digits and hyphens), or null / "" for none.' },
+  color: { ...optionalHexColor, description: 'A hex colour `#RRGGBB` for the letter face, or null / "" for none.' },
+  visibility: {
+    type: ['string', 'null'],
+    enum: ['all', 'private', null],
+    description: '`private`: only the creator sees the tile. null or omitted: `all` on create, unchanged on update.',
   },
 };
 
@@ -457,11 +503,11 @@ export const schemas = {
         NoteCreateInput: {
           type: 'object',
           required: ['content'],
-          properties: noteInputProperties,
+          properties: noteCreateProperties,
         },
         NoteUpdateInput: {
           type: 'object',
-          properties: noteInputProperties,
+          properties: noteUpdateProperties,
         },
         BirthdayCreateInput: {
           type: 'object',
@@ -470,7 +516,30 @@ export const schemas = {
         },
         BirthdayUpdateInput: {
           type: 'object',
-          properties: birthdayInputProperties,
+          properties: birthdayUpdateProperties,
+        },
+        BirthdayImportInput: {
+          type: 'object',
+          required: ['contact_ids'],
+          properties: {
+            contact_ids: { type: 'array', minItems: 1, maxItems: 500, items: { type: 'integer' }, description: 'The contacts to import, at most 500 per request.' },
+          },
+        },
+        QuickLinkCreateInput: {
+          type: 'object',
+          required: ['name', 'url'],
+          properties: quickLinkInputProperties,
+        },
+        QuickLinkUpdateInput: {
+          type: 'object',
+          properties: quickLinkInputProperties,
+        },
+        QuickLinkOrderInput: {
+          type: 'object',
+          required: ['ids'],
+          properties: {
+            ids: { type: 'array', items: { type: 'integer' }, description: 'The complete new order. Ids the caller cannot see are ignored.' },
+          },
         },
         NoteCategoryInput: {
           type: 'object',
@@ -491,7 +560,15 @@ export const schemas = {
           type: 'object',
           required: ['order'],
           properties: {
-            order: { type: 'array', maxItems: 100, uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+            // Ziffern-Text auch: die geteilte Kategorie-Verwaltung
+            // (public/components/category-manager.js) schickt ihre Schluessel als Text.
+            order: {
+              type: 'array',
+              maxItems: 100,
+              uniqueItems: true,
+              items: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' }] },
+              description: 'Category ids as numbers or digit strings.',
+            },
           },
         },
         NoteResponse: {

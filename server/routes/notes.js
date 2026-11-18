@@ -7,6 +7,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { str, color, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
@@ -164,7 +165,7 @@ function editableCategory(req, id) {
 
 // Kategorien stehen vor /:id, damit Express "categories" nicht als Notiz-ID
 // interpretiert. Der Katalog ist leer, bis Nutzer selbst Eintraege anlegen.
-router.get('/categories', (req, res) => {
+router.get('/categories', validateRequest(), (req, res) => {
   try {
     res.json({
       data: listVisibleCategories(db.get(), actorId(req)).map(categoryPayload),
@@ -176,7 +177,7 @@ router.get('/categories', (req, res) => {
   }
 });
 
-router.post('/categories', (req, res) => {
+router.post('/categories', validateRequest(), (req, res) => {
   try {
     const name = validateCategoryName(req.body?.name);
     const requestedScope = req.body?.scope;
@@ -208,7 +209,7 @@ router.post('/categories', (req, res) => {
   }
 });
 
-router.patch('/categories/reorder', (req, res) => {
+router.patch('/categories/reorder', validateRequest(), (req, res) => {
   try {
     const order = req.body?.order;
     if (!Array.isArray(order) || order.length > 100) {
@@ -238,7 +239,7 @@ router.patch('/categories/reorder', (req, res) => {
   }
 });
 
-router.put('/categories/:id', (req, res) => {
+router.put('/categories/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const verdict = editableCategory(req, id);
@@ -260,7 +261,7 @@ router.put('/categories/:id', (req, res) => {
   }
 });
 
-router.delete('/categories/:id', (req, res) => {
+router.delete('/categories/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const verdict = editableCategory(req, id);
@@ -283,7 +284,7 @@ router.delete('/categories/:id', (req, res) => {
  * Alle Notizen, angepinnte zuerst, dann nach updated_at DESC.
  * Response: { data: Note[] }
  */
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const notes = db.get().prepare(`
       SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
@@ -305,7 +306,7 @@ router.get('/', (req, res) => {
  * Body: { content, title?, color?, pinned? }
  * Response: { data: Note }
  */
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const { pinned = 0 } = req.body;
     const vContent = str(req.body.content, 'content', { max: MAX_TEXT });
@@ -357,7 +358,7 @@ router.post('/', (req, res) => {
  * Body: { content?, title?, color?, pinned? }
  * Response: { data: Note }
  */
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const note = findVisibleNote(req, id);
@@ -437,7 +438,7 @@ router.put('/:id', (req, res) => {
  * Pin-Status toggeln.
  * Response: { data: { id, pinned } }
  */
-router.patch('/:id/pin', (req, res) => {
+router.patch('/:id/pin', validateRequest(), (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const note = findVisibleNote(req, id);
@@ -474,7 +475,7 @@ router.patch('/:id/pin', (req, res) => {
  * Body: { line: number, checked: boolean, expect?: string }
  * Response: { data: Note } | 409 { code: 409, reason }
  */
-router.patch('/:id/check', (req, res) => {
+router.patch('/:id/check', validateRequest(), (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const note = findVisibleNote(req, id);
@@ -523,7 +524,7 @@ router.patch('/:id/check', (req, res) => {
  * Notiz löschen.
  * Response: 204 No Content
  */
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id     = parseInt(req.params.id, 10);
     const note   = findVisibleNote(req, id);

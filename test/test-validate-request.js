@@ -64,6 +64,35 @@ test('every route of the routers resolves to exactly one operation of the docume
   assert.deepEqual(staleExceptions, [], 'these exceptions resolve now: remove them from UNRESOLVABLE');
 });
 
+/**
+ * The route files whose every route checks its request (#2810, pilot): the
+ * middleware is the first handler of each route, so no handler of these files
+ * runs on a request the document refuses. Their behaviour against the real
+ * routers holds test:validate-pilot-modules.
+ */
+const VALIDATED_FILES = ['server/routes/notes.js', 'server/routes/birthdays.js', 'server/routes/quick-links.js'];
+
+test('every route of the pilot files carries validateRequest() as its first handler', () => {
+  /** @type {Map<string, number>} */
+  const counted = new Map(VALIDATED_FILES.map((file) => [file, 0]));
+  /** @type {string[]} */
+  const missing = [];
+  for (const route of allRoutes()) {
+    const file = VALIDATED_FILES.find((f) => route.file.endsWith(f));
+    if (!file) continue;
+    counted.set(file, (counted.get(file) ?? 0) + 1);
+    if (!/^\w*[Rr]outer\.\w+\(\s*'[^']*'\s*,\s*validateRequest\(\)\s*,/.test(route.body)) {
+      missing.push(`${route.verb.toUpperCase()} ${route.mount}${route.pattern}`);
+    }
+  }
+  assert.deepEqual(Object.fromEntries(counted), {
+    'server/routes/notes.js': 11,
+    'server/routes/birthdays.js': 8,
+    'server/routes/quick-links.js': 5,
+  }, 'the routes read from the pilot files');
+  assert.deepEqual(missing, [], 'these routes of the pilot files run without validateRequest()');
+});
+
 test('the resolution converts the Express pattern and the mount', () => {
   const spec = {
     paths: {
@@ -275,6 +304,20 @@ test('a valid request goes through to the handler', async () => {
 
 test('a path id that is no integer is a 400 naming path/id and the rule', async () => {
   assertRefused(await call('GET', '/api/v1/things/12abc'), [{ path: 'path/id', rule: 'type' }]);
+});
+
+test('an integer parameter must be written as plain decimal digits: 1e2 and 0x10 are 400, before Ajv coerces them', async () => {
+  // Ajv's coercion reads `1e2` as 100 and `0x10` as 16; the handler's parseInt
+  // reads 1 and 0. Checked and used would be two different numbers.
+  for (const id of ['1e2', '0x10', '1.0', '+5', ' 5', '5 ']) {
+    assertRefused(await call('GET', `/api/v1/things/${encodeURIComponent(id)}`), [{ path: 'path/id', rule: 'type' }]);
+  }
+  assertRefused(await call('GET', '/api/v1/things?limit=1e2'), [{ path: 'query/limit', rule: 'type' }]);
+  assertRefused(await call('GET', '/api/v1/things?limit=0x10'), [{ path: 'query/limit', rule: 'type' }]);
+  const negative = await call('GET', '/api/v1/things/-5');
+  assert.equal(negative.status, 200, 'an optional minus stays plain digits');
+  assert.deepEqual(negative.body.params, { id: '-5' });
+  assert.equal((await call('GET', '/api/v1/things/007')).status, 200, 'leading zeros are digits');
 });
 
 test('a query number written as text goes through, and the handler still reads the string', async () => {

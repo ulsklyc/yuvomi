@@ -25,7 +25,10 @@
  *          ajv-formats:
  *            - path and query with `coerceTypes: 'array'`, on a COPY of
  *              req.params and req.query (Express 5: req.query is a getter);
- *              the handler keeps reading the strings Express gave it;
+ *              the handler keeps reading the strings Express gave it; an
+ *              integer parameter must be plain decimal digits (`^-?\d+$`)
+ *              before that, since coercion reads `1e2` and `0x10` as numbers
+ *              that parseInt in the handler reads differently;
  *            - the body without coercion, defaults or removed fields: it stays
  *              byte-equal, a handler may still read the keys that are there.
  *              A body is missing when Express left it undefined or the app's
@@ -84,6 +87,7 @@ type Middleware = (req: RouteRequest, res: unknown, next: Next) => void;
 type Checks = {
   path: ValidateFunction | null;
   query: ValidateFunction | null;
+  integers: { path: string[]; query: string[] };
   commaLists: string[];
   body: ValidateFunction | null;
   bodyRequired: boolean;
@@ -202,6 +206,35 @@ function commaListsOf(resolved: ResolvedOperation, parameters: Parameter[]): str
   return query.filter((p) => p.explode === false && isArray(p.schema)).map((p) => p.name as string);
 }
 
+/**
+ * The path and query parameters whose schema type is integer. Ajv's coercion
+ * reads `1e2` as 100 and `0x10` as 16 where the handler's parseInt reads 1 and
+ * 0: checked and used would be two different numbers. Such a parameter must
+ * be written as plain decimal digits with an optional minus, or it is refused
+ * with the rule `type` before Ajv sees it.
+ */
+function integersOf(parameters: Parameter[], place: 'path' | 'query'): string[] {
+  return parameters
+    .filter((p) => p.in === place && typeof p.name === 'string')
+    .filter((p) => {
+      const type = p.schema?.type;
+      return type === 'integer' || (Array.isArray(type) && type.includes('integer') && !type.includes('string'));
+    })
+    .map((p) => p.name as string);
+}
+
+const DECIMAL_INTEGER = /^-?\d+$/;
+
+/** The integer parameters of one place that are not written as plain decimal digits. */
+function nonDecimalIntegers(source: Record<string, unknown> | undefined, names: string[], place: string): Field[] {
+  return names
+    .filter((name) => {
+      const value = source?.[name];
+      return typeof value === 'string' && !DECIMAL_INTEGER.test(value);
+    })
+    .map((name) => ({ path: `${place}/${name}`.slice(0, MAX_PATH_LENGTH), rule: 'type' }));
+}
+
 function compileParameters(ajv: Ajv2020, parameters: Parameter[], place: 'path' | 'query'): ValidateFunction | null {
   const mine = parameters.filter((p) => p.in === place && typeof p.name === 'string' && p.schema);
   if (mine.length === 0) return null;
@@ -273,6 +306,7 @@ function validatorFor(loadSpec: () => OpenApiDocument): () => Middleware {
     const checks: Checks = {
       path: compileParameters(state.params, parameters, 'path'),
       query: compileParameters(state.params, parameters, 'query'),
+      integers: { path: integersOf(parameters, 'path'), query: integersOf(parameters, 'query') },
       commaLists: commaListsOf(resolved, parameters),
       body: hasBodySchema ? state.body.compile(rebase(bodySchema)) : null,
       bodyRequired: hasBodySchema && requestBody?.required === true,
@@ -285,7 +319,10 @@ function validatorFor(loadSpec: () => OpenApiDocument): () => Middleware {
   return function validateRequest(): Middleware {
     return function validateRequestMiddleware(req, _res, next) {
       const checks = checksFor(req);
-      const fields: Field[] = [];
+      const fields: Field[] = [
+        ...nonDecimalIntegers(req.params, checks.integers.path, 'path'),
+        ...nonDecimalIntegers(req.query, checks.integers.query, 'query'),
+      ];
       for (const [place, check, data] of [
         ['path', checks.path, () => copyOf(req.params, { wildcards: checks.wildcards })],
         ['query', checks.query, () => copyOf(req.query, { commaLists: checks.commaLists })],

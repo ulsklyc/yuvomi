@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Notes, birthdays and quick links check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that changes. Under
+  `/api/v1/notes`, `/api/v1/birthdays` and `/api/v1/quick-links`, input that used to be
+  quietly accepted or reinterpreted is now refused with a 400:
+  - a path id that is not plain digits, such as `12abc` (it was read as 12);
+  - `pinned` as `"false"`, `5` or `"x"`, and `pinned: null` on a note update;
+  - a number in a text field, such as `"title": 5` (it was stored as text);
+  - an id written as text in `category_ids` and `contact_id`, and anything but whole numbers
+    in `contact_ids` (birthday import) and `ids` (quick link order). Note category reordering
+    still takes digit strings, because the app sends them;
+  - a list instead of an object as the body;
+  - a quick link `visibility` other than `all`, `private` or null (it became `all` or was
+    ignored);
+  - an empty `name` when updating a birthday or a quick link.
+
+  Such a refusal reads `{ "error": "The request does not match the documented schema.",
+  "code": 400, "reason": "validation", "fields": [{ "path": "body/title", "rule": "type" }] }`.
+  `fields` names the place and the JSON Schema rule, never the value you sent. Input that was
+  already refused before can now get this form instead of the old sentence. The check runs
+  before the entry is looked up, so a bad request for a missing or locked entry is now a 400,
+  not a 404 or 403, and a missing body where one is required is a 400. Text lengths count the
+  value as sent, before surrounding spaces are trimmed. Unknown fields are still ignored, and
+  what stays allowed is in the description too: null or `""` for "no value", the note
+  visibilities `family` and `shared`, `year_unknown: null`, a pin toggle without a body, and
+  reminder fields as text or number.
+
 ### Fixed
 - **The API description marks every value that may be null in the OpenAPI 3.1 way.** 36 places - the
   fasting and nutrition bodies, the household setup, the waste calendar feed - said so with the

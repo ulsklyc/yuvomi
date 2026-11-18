@@ -45,6 +45,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: birthdaysRouter } = await import('../server/routes/birthdays.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+
 const {
   daysUntilBirthday,
   BIRTHDAY_COLOR,
@@ -67,9 +69,11 @@ app.use((req, _res, next) => {
   req.session = { userId: actor.id, role: actor.role };
   next();
 });
-app.use('/', birthdaysRouter);
+app.use('/api/v1/birthdays', birthdaysRouter);
+// The central error handler of the app: validateRequest() hands its 400 on to it (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/birthdays`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
@@ -85,13 +89,30 @@ async function call(method, path, body) {
 
 const VALID_PHOTO = 'data:image/png;base64,iVBORw0KGgo=';
 
+/**
+ * A 400 that names `field`: since #2810 the schema of the operation refuses
+ * what it describes before the handler (`reason: 'validation'`, `fields`), the
+ * handler still refuses the rest with its own sentence.
+ * @param {{ body: any }} r
+ * @param {string} field
+ * @param {RegExp} handlerSentence
+ * @param {string} [note]
+ */
+function assertNamesField(r, field, handlerSentence, note) {
+  if (r.body?.reason === 'validation') {
+    assert.ok(r.body.fields.some((/** @type {{ path: string }} */ f) => f.path === `body/${field}`), `${note ?? field}: ${JSON.stringify(r.body.fields)}`);
+  } else {
+    assert.match(r.body.error, handlerSentence, note);
+  }
+}
+
 // --------------------------------------------------------------------------
 // POST / (Validierung + Anlegen + Artefakt-Sync)
 // --------------------------------------------------------------------------
 test('POST /: fehlender Name → 400', async () => {
   const r = await call('POST', '/', { birth_date: '1990-01-01' });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Name/);
+  assertNamesField(r, 'name', /Name/);
 });
 
 test('POST /: fehlendes/ungültiges Geburtsdatum → 400', async () => {
@@ -99,7 +120,7 @@ test('POST /: fehlendes/ungültiges Geburtsdatum → 400', async () => {
   assert.equal(missing.status, 400);
   const bad = await call('POST', '/', { name: 'Schlechtes Datum', birth_date: '01.01.1990' });
   assert.equal(bad.status, 400);
-  assert.match(bad.body.error, /Birth date/);
+  assertNamesField(bad, 'birth_date', /Birth date/);
 });
 
 test('POST /: ungültige Foto-Data-URL → 400', async () => {
@@ -157,7 +178,7 @@ test('POST /: rejects non-canonical and impossible name days', async () => {
       name_day: nameDay,
     });
     assert.equal(r.status, 400, `${nameDay} must be rejected`);
-    assert.match(r.body.error, /Name day/);
+    assertNamesField(r, 'name_day', /Name day/, nameDay);
   }
 });
 
@@ -198,27 +219,28 @@ const reminderRow = (id) => ({ ...db.prepare(
 ).get(id) });
 
 test('POST /: ungueltige Erinnerung → 400 mit Feldname, kein Datensatz', async () => {
+  /** @type {Array<[Record<string, unknown>, RegExp, string]>} */
   const cases = [
-    [{ reminder_offset: -60 }, /Reminder must be/],
-    [{ reminder_offset: '-60' }, /Reminder must be/],
-    [{ reminder_offset: 1.5 }, /Reminder must be/],
-    [{ reminder_offset: '1440.5' }, /Reminder must be/],
-    [{ reminder_offset: 'morgen' }, /Reminder must be/],
-    [{ reminder_offset: true }, /Reminder must be/],
-    [{ reminder_offset: 999 * 10080 + 1 }, /Reminder must be/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: 0 }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: 1000 }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: 2.5 }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: '-3' }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: 'drei' }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_unit: 'months' }, /Custom reminder unit/],
-    [{ reminder_offset: 'custom', reminder_custom_unit: 7 }, /Custom reminder unit/],
+    [{ reminder_offset: -60 }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: '-60' }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: 1.5 }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: '1440.5' }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: 'morgen' }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: true }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: 999 * 10080 + 1 }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 0 }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 1000 }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 2.5 }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: '-3' }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 'drei' }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_unit: 'months' }, /Custom reminder unit/, 'reminder_custom_unit'],
+    [{ reminder_offset: 'custom', reminder_custom_unit: 7 }, /Custom reminder unit/, 'reminder_custom_unit'],
   ];
   const before = db.prepare('SELECT COUNT(*) AS n FROM birthdays').get().n;
-  for (const [fields, message] of cases) {
+  for (const [fields, message, field] of cases) {
     const r = await call('POST', '/', { name: 'Falsch', birth_date: '1990-01-01', ...fields });
     assert.equal(r.status, 400, `${JSON.stringify(fields)} muss abgewiesen werden`);
-    assert.match(r.body.error, message, JSON.stringify(fields));
+    assertNamesField(r, field, message, JSON.stringify(fields));
   }
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM birthdays').get().n, before);
 });
@@ -792,7 +814,7 @@ test('POST /: year_unknown nimmt 0/1 und lehnt anderes ab (#2095)', async () => 
   assert.equal(zero.body.data.year_unknown, 0);
   const bad = await call('POST', '/', { name: 'Falsch', birth_date: '1990-04-01', year_unknown: 'yes' });
   assert.equal(bad.status, 400);
-  assert.match(bad.body.error, /year_unknown/);
+  assertNamesField(bad, 'year_unknown', /year_unknown/);
 });
 
 test('PUT /:id: Jahr unbekannt setzen und mit echtem Jahr wieder abnehmen (#2095)', async () => {
@@ -825,7 +847,8 @@ test('OpenAPI beschreibt year_unknown an Geburtstag und Kontakt (#2095)', async 
   for (const name of ['BirthdayCreateInput', 'BirthdayUpdateInput']) {
     const prop = schemas[name].properties.year_unknown;
     assert.ok(prop, `${name} nennt year_unknown`);
-    assert.deepEqual(prop.oneOf.map((o) => o.type), ['boolean', 'integer'], 'true/false und 0/1 wie die Route');
+    // null zaehlt in der Route als false und steht seit #2810 im Schema.
+    assert.deepEqual(prop.oneOf.map((o) => o.type), ['boolean', 'integer', 'null'], 'true/false, 0/1 und null wie die Route');
   }
   const { contactsPaths } = await import('../server/openapi/paths/contacts.js');
   const paths = contactsPaths();

@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 
 // POST und PUT pruefen ihre Felder und antworten mit 400 (validateReminder()
 // und die Nachbarn in server/routes/birthdays.js); `op()` fuehrt ohne
@@ -68,9 +68,10 @@ export function birthdaysPaths() {
         tag: 'Birthdays',
         description: 'Body: { contact_ids }. Reads the contact book, so it requires read access to the `contacts` module as well - a credential scoped to the calendar alone is refused with 403.',
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/BirthdayImportInput'),
         responses: {
           201: { description: 'Successful response' },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -94,7 +95,7 @@ export function birthdaysPaths() {
           409: { description: 'The contact is already linked to another birthday' },
         }),
       }),
-      delete: op({ summary: 'Delete birthday', tag: 'Birthdays', params: [idParam()], stateChanging: true }),
+      delete: withValidationRefusal(op({ summary: 'Delete birthday', tag: 'Birthdays', params: [idParam()], stateChanging: true })),
     },
   });
 }

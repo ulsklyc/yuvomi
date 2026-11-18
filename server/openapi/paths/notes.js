@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 
 const apiError = (description) => ({
   description,
@@ -34,19 +34,20 @@ export function notesPaths() {
     },
     '/api/v1/notes/{id}': {
       put: op({ summary: 'Update note', tag: 'Notes', params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/NoteUpdateInput'), responses: schemaResponse('NoteResponse', 'Note updated', 200, { 404: apiError('Note not found'), 409: apiError('A selected category changed concurrently') }) }),
-      delete: op({ summary: 'Delete note', tag: 'Notes', params: [idParam()], stateChanging: true }),
+      delete: withValidationRefusal(op({ summary: 'Delete note', tag: 'Notes', params: [idParam()], stateChanging: true })),
     },
     '/api/v1/notes/{id}/pin': {
-      patch: op({ summary: 'Toggle note pin state', tag: 'Notes', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      // Der Body wird nie gelesen; die App schickt `{}`, andere Clients gar keinen.
+      patch: withValidationRefusal(op({ summary: 'Toggle note pin state', tag: 'Notes', params: [idParam()], stateChanging: true, requestBody: { ...jsonBody(null), required: false } })),
     },
     '/api/v1/notes/{id}/check': {
-      patch: op({
+      patch: withValidationRefusal(op({
         summary: 'Tick one checklist item, addressed by its source line',
         tag: 'Notes',
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody(null),
-      }),
+      })),
     },
     '/api/v1/notes/categories': {
       get: op({ summary: 'List visible note categories', tag: 'Notes', responses: schemaResponse('NoteCategoryListResponse') }),

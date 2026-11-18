@@ -20,6 +20,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { str, color, collectErrors, MAX_SHORT } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { normalizeQuickLinkUrl } from '../../public/utils/quick-link-url.js';
@@ -178,7 +179,7 @@ function urlErrorMessage(reason) {
  * Die für die anfragende Person sichtbaren Schnellzugriffe.
  * Response: { data: QuickLink[] }
  */
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     res.json({ data: listQuickLinksFor(actingUser(req), isAdminRequest(req)) });
   } catch (err) {
@@ -192,7 +193,7 @@ router.get('/', (req, res) => {
  * Body: { name, url, icon_data?, icon_name?, color?, visibility? }
  * Response: { data: QuickLink }
  */
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const me = actingUser(req);
     const vName  = str(req.body.name, 'Name', { max: MAX_SHORT });
@@ -250,7 +251,7 @@ router.post('/', (req, res) => {
  * schmuggelt, verschiebt sie nicht - sie ist für ihn nicht da, und eine
  * Reihenfolge ist kein Weg, das zu ändern.
  */
-router.put('/order', (req, res) => {
+router.put('/order', validateRequest(), (req, res) => {
   try {
     const me = actingUser(req);
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isInteger) : null;
@@ -276,7 +277,7 @@ router.put('/order', (req, res) => {
  * Body: { name?, url?, icon_data?, icon_name?, color?, visibility? }
  * Response: { data: QuickLink }
  */
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const id  = parseInt(req.params.id, 10);
     const row = db.get().prepare('SELECT * FROM quick_links WHERE id = ?').get(id);
@@ -325,7 +326,7 @@ router.put('/:id', (req, res) => {
  * DELETE /api/v1/quick-links/:id
  * Response: 204
  */
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id  = parseInt(req.params.id, 10);
     const row = db.get().prepare('SELECT * FROM quick_links WHERE id = ?').get(id);
