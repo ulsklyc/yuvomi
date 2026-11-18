@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.93.0] - 2026-11-18
+
 ### Changed
 - **The inventory checks every request against the published API description.** This is about
   your own API clients; the app sends nothing that is refused now (it sends location ids as
@@ -130,7 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API clients; the app never sends such an id. On the routes that check requests against the
   API description (notes, birthdays, quick links, reminders, notification channels,
   permissions, displays, profile pictures, recipes, recipe providers, pantry, inventory,
-  housekeeping, rewards), a
+  housekeeping, rewards, waste collection, shift schedule), a
   path id above 9007199254740991 is now a 400 with the rule `maximum`, and a run of digits too
   long to be a number at all (hundreds of digits) a 400 with the rule `type`. Before, such an id
   answered 404 or 400 depending on the route. 9007199254740991 itself, `0` and a negative id
