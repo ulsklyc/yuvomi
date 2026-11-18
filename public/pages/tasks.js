@@ -3184,7 +3184,9 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
     if (savedTaskId) {
       if (canWriteReminder) {
         if (wantsReminder) {
-          await api.post('/reminders', { entity_type: 'task', entity_id: savedTaskId, remind_at: remindAt });
+          // A number, as the API schema names it: on an edit the id comes from
+          // the form field as text (#2810).
+          await api.post('/reminders', { entity_type: 'task', entity_id: Number(savedTaskId), remind_at: remindAt });
           refreshReminders();
         } else {
           try {

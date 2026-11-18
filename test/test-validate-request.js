@@ -22,6 +22,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import v8 from 'node:v8';
+import vm from 'node:vm';
 // @ts-expect-error express 5 ships no type declarations (TS7016); new code type-checks clean
 import express from 'express';
 import { buildOpenApiSpec } from '../server/openapi.js';
@@ -91,6 +93,85 @@ test('every route of the pilot files carries validateRequest() as its first hand
     'server/routes/quick-links.js': 5,
   }, 'the routes read from the pilot files');
   assert.deepEqual(missing, [], 'these routes of the pilot files run without validateRequest()');
+});
+
+/**
+ * The middleware a route hangs before its handler, as written:
+ * `router.post('/x', requireAdmin, validateRequest(), async (req, res) => ...)`
+ * -> ['requireAdmin', 'validateRequest()'].
+ * @param {string} body
+ * @returns {string[]}
+ */
+function middlewareChain(body) {
+  const m = /^\w*[Rr]outer\.\w+\(\s*'[^']*'\s*,\s*((?:[\w.]+(?:\(\))?\s*,\s*)*)/.exec(body);
+  return (m?.[1] ?? '').split(',').map((part) => part.trim()).filter(Boolean);
+}
+
+/**
+ * Group 1A (#2810): every route of these files checks its request, AFTER the
+ * gates that answer 403 or 429 (a member gets 403, never a 400 that names
+ * fields). notifications and permissions gate the whole router with
+ * `router.use(requireAdmin)`; their routes carry the check first. Their
+ * behaviour against the real routers, the 403 of a member included, holds
+ * test:validate-small-modules-a.
+ */
+const GROUP_1A_CHAINS = {
+  'server/routes/reminders.js': {
+    'GET /pending': ['validateRequest()'],
+    'GET /upcoming': ['validateRequest()'],
+    'GET /all': ['validateRequest()'],
+    'GET /': ['validateRequest()'],
+    'POST /': ['validateRequest()'],
+    'PUT /': ['validateRequest()'],
+    'PATCH /:id/dismiss': ['validateRequest()'],
+    'DELETE /:id': ['validateRequest()'],
+    'DELETE /': ['validateRequest()'],
+  },
+  'server/routes/notifications.js': {
+    'GET /providers': ['validateRequest()'],
+    'GET /channels': ['validateRequest()'],
+    'POST /channels': ['validateRequest()'],
+    'PUT /channels/:id': ['validateRequest()'],
+    'DELETE /channels/:id': ['validateRequest()'],
+    'POST /channels/:id/test': ['validateRequest()'],
+  },
+  'server/routes/modules.js': {
+    'GET /install/info': ['requireAdmin', 'validateRequest()'],
+    'POST /install/zip': ['requireAdmin', 'requireWebInstall', 'requireBrowserSession', 'installAttemptLimiter', 'installLimiter', 'validateRequest()', 'parseZipBody'],
+    'POST /install/github': ['requireAdmin', 'requireWebInstall', 'requireBrowserSession', 'installAttemptLimiter', 'installLimiter', 'validateRequest()'],
+    'GET /': ['validateRequest()'],
+    'PATCH /:id': ['requireAdmin', 'validateRequest()'],
+    'DELETE /:id': ['requireAdmin', 'requireWebInstall', 'requireBrowserSession', 'validateRequest()'],
+    'GET /assets/:id/{*assetPath}': ['validateRequest()'],
+  },
+  'server/routes/permissions.js': {
+    'GET /catalog': ['validateRequest()'],
+    'GET /role/:familyRole': ['validateRequest()'],
+    'PUT /role/:familyRole': ['validateRequest()'],
+    'GET /user/:userId': ['validateRequest()'],
+    'PUT /user/:userId': ['validateRequest()'],
+  },
+  'server/routes/email.js': {
+    'GET /config': ['requireAdmin', 'validateRequest()'],
+    'PUT /config': ['requireAdmin', 'validateRequest()'],
+    'POST /test': ['requireAdmin', 'validateRequest()'],
+  },
+  'server/routes/weather.js': {
+    'GET /': ['validateRequest()'],
+    'GET /geocode': ['validateRequest()'],
+    'GET /icon/:code': ['validateRequest()'],
+  },
+};
+
+test('every route of group 1A carries validateRequest(), after its gates', () => {
+  /** @type {Record<string, Record<string, string[]>>} */
+  const seen = {};
+  for (const route of allRoutes()) {
+    const file = Object.keys(GROUP_1A_CHAINS).find((f) => route.file.endsWith(f));
+    if (!file) continue;
+    (seen[file] ??= {})[`${route.verb.toUpperCase()} ${route.pattern}`] = middlewareChain(route.body);
+  }
+  assert.deepEqual(seen, GROUP_1A_CHAINS);
 });
 
 test('the resolution converts the Express pattern and the mount', () => {
@@ -492,6 +573,41 @@ test('the bound validator compiles the checks of every route of the app document
     }
   }
   assert.deepEqual(failures, [], 'these routes fail to compile their checks');
+});
+
+// ── No request outlives its answer ─────────────────────────────────────────
+
+test('a refused body does not outlive its answer: the check drops its error list (verbose keeps the data there)', async () => {
+  // With `verbose: true` every Ajv error carries the data it failed on - for
+  // `required` the whole body - and Ajv keeps the list on the compiled check
+  // until its next call. For a route nobody calls again that is a request,
+  // secrets included, held for the life of the process.
+  v8.setFlagsFromString('--expose-gc');
+  const collect = /** @type {() => void} */ (vm.runInNewContext('gc'));
+  const spec = {
+    openapi: '3.1.0',
+    paths: {
+      '/api/v1/leak': {
+        post: {
+          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } } } } },
+          responses: { 200: { description: 'ok' } },
+        },
+      },
+    },
+  };
+  const middleware = createRequestValidator(spec)();
+  const sent = (() => {
+    const body = { password: SECRET };
+    /** @type {any} */
+    let refused = null;
+    middleware({ method: 'POST', baseUrl: '/api/v1', route: { path: '/leak' }, params: {}, query: {}, body }, {}, (/** @type {unknown} */ err) => { refused = err; });
+    assert.deepEqual(refused?.details?.fields ?? refused?.fields, [{ path: 'body/title', rule: 'required' }]);
+    return new WeakRef(body);
+  })();
+  // A WeakRef keeps its target until the current job ends.
+  await new Promise((resolve) => setImmediate(resolve));
+  collect();
+  assert.equal(sent.deref(), undefined, 'the refused body is still held after its answer');
 });
 
 // ── The route's own reason through x-reason ─────────────────────────────────

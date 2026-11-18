@@ -36,6 +36,7 @@ const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const todoOutbound  = await import('../server/services/caldav-todo-outbound.js');
 const remindersSync = await import('../server/services/caldav-reminders-sync.js');
 const { runSerialized } = await import('../server/utils/sync-lock.js');
@@ -54,8 +55,10 @@ app.use((req, _res, next) => {
   req.session = { userId: U, role: 'admin' };
   next();
 });
-app.use('/reminders', remindersRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/reminders', remindersRouter);
 app.use('/', shoppingRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const http = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => http.on('listening', () => r(`http://127.0.0.1:${http.address().port}`)));
 
@@ -1266,7 +1269,7 @@ test('Nachtragen nach einem 412, und der neue Platz antwortet 404: die Notiz des
 
 /** Die Meldungen an der Glocke, wie die Glocke sie liefert. */
 async function bell() {
-  const res = await fetch(`${baseUrl}/reminders/pending`);
+  const res = await fetch(`${baseUrl}/api/v1/reminders/pending`);
   assert.equal(res.status, 200);
   return (await res.json()).data.filter((r) => r.entity_type === 'shopping_move_returned');
 }

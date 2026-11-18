@@ -1,6 +1,43 @@
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '../../public/utils/note-category-name.js';
 import { MAX_QUICK_LINK_URL_LENGTH } from '../../public/utils/quick-link-url.js';
 import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { DATETIME_PATTERN } from '../utils/datetime-pattern.js';
+import { ORIGIN_MODULE } from '../services/reminder-origins.js';
+
+/**
+ * A reminder time as the handlers accept it (`datetime()` in
+ * server/middleware/validate.js reads the same pattern): no `format:
+ * date-time`, which needs seconds and a zone the app does not send.
+ */
+// Create and update of a notification channel share their fields (#2810); the
+// update requires none of them. No e-mail `pattern` here: the address check
+// stays in server/services/notification-channels.js (CodeQL ReDoS history).
+const notificationChannelInputProperties = {
+  provider: { type: 'string', enum: ['gotify', 'ntfy', 'webhook', 'email'] },
+  name: { type: 'string' },
+  enabled: { type: 'boolean' },
+  config: {
+    type: 'object',
+    description: 'Provider config. Gotify uses baseUrl and priority. ntfy uses baseUrl, topic, priority, and authType. A webhook uses baseUrl and payloadTemplate, e-mail toAddress. On update it is merged over the stored config.',
+    additionalProperties: true,
+  },
+  secrets: {
+    type: 'object',
+    description: 'Write-only provider credentials. Omit fields to keep stored secrets on update.',
+    additionalProperties: true,
+  },
+  clearSecrets: {
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Explicit secret field names to clear.',
+  },
+};
+
+const reminderTime = {
+  type: 'string',
+  pattern: DATETIME_PATTERN,
+  description: '`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`, optional `:SS` and fraction, optional `Z` or offset (`+02:00`, `+0200`). Without `Z` or offset it is UTC.',
+};
 
 // THE REQUEST SCHEMAS OF NOTES, BIRTHDAYS AND QUICK LINKS ARE CHECKED (#2810):
 // validateRequest() runs them before every handler of these three modules, so
@@ -542,6 +579,43 @@ export const schemas = {
             ids: { type: 'array', items: { type: 'integer' }, description: 'The complete new order. Ids the caller cannot see are ignored.' },
           },
         },
+        ReminderCreateInput: {
+          type: 'object',
+          required: ['entity_type', 'entity_id', 'remind_at'],
+          properties: {
+            entity_type: {
+              type: 'string',
+              enum: Object.keys(ORIGIN_MODULE),
+              description: 'The origin of the entity. Only `task`, `event`, `subscription`, `inventory_item` and `inventory_tracked_date` can be set by hand; the others are rebuilt by their module and answer 400 with a sentence that says so.',
+            },
+            entity_id: {
+              // Digit text too: service workers of older app versions send the id as text.
+              anyOf: [{ type: 'integer' }, { type: 'string', pattern: '^[0-9]+$' }],
+              description: 'The id of the entity, a positive whole number, as a number or as digit text.',
+            },
+            remind_at: reminderTime,
+          },
+        },
+        ReminderSetInput: {
+          type: 'object',
+          required: ['remind_ats'],
+          properties: {
+            remind_ats: {
+              type: 'array',
+              items: reminderTime,
+              description: 'The complete new set; an empty list removes every reminder of the entity. At most 5 different instants after conversion to UTC, repeated entries count once.',
+            },
+          },
+        },
+        PermissionsInput: {
+          type: 'object',
+          description: 'The keys are the ids of the permission catalog (`GET /api/v1/permissions/catalog`); an unknown key answers 400.',
+          properties: {
+            modules: { type: 'object', additionalProperties: { type: 'string', enum: ['none', 'read', 'write'] }, description: 'Module key -> access level.' },
+            widgets: { type: 'object', additionalProperties: { type: 'string', enum: ['none', 'allow'] }, description: 'Widget id -> `none` or `allow`.' },
+            capabilities: { type: 'object', additionalProperties: { type: 'string', enum: ['none', 'allow'] }, description: 'Capability key -> `none` or `allow`. Present (even empty), it replaces the capability rows.' },
+          },
+        },
         NoteCategoryInput: {
           type: 'object',
           required: ['name'],
@@ -620,27 +694,14 @@ export const schemas = {
         },
         NotificationChannelInput: {
           type: 'object',
+          description: 'A new household channel. `name` must not be empty after trimming; the checks of `config` depend on the provider.',
           required: ['provider', 'name', 'config'],
-          properties: {
-            provider: { type: 'string', enum: ['gotify', 'ntfy', 'webhook', 'email'] },
-            name: { type: 'string' },
-            enabled: { type: 'boolean' },
-            config: {
-              type: 'object',
-              description: 'Provider config. Gotify uses baseUrl and priority. ntfy uses baseUrl, topic, priority, and authType.',
-              additionalProperties: true,
-            },
-            secrets: {
-              type: 'object',
-              description: 'Write-only provider credentials. Omit fields to keep stored secrets on update.',
-              additionalProperties: true,
-            },
-            clearSecrets: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Explicit secret field names to clear.',
-            },
-          },
+          properties: notificationChannelInputProperties,
+        },
+        NotificationChannelUpdateInput: {
+          type: 'object',
+          description: 'A partial update: what is left out keeps its stored value. The provider of a channel never changes: a `provider` sent here must be a known one, and it is not read.',
+          properties: notificationChannelInputProperties,
         },
         NotificationChannelResponse: {
           type: 'object',
@@ -3213,8 +3274,11 @@ export const schemas = {
         },
         ModuleInstallGithubRequest: {
           type: 'object',
+          // The route answered `bad_url` for a missing body, a body that is no
+          // object and a missing or non-text `url` before (#2810); it still does.
+          'x-reason': { type: 'bad_url', required: 'bad_url' },
           properties: {
-            url: { type: 'string', maxLength: 2000, description: 'GitHub URL or `owner/repo`.' },
+            url: { type: 'string', maxLength: 2000, 'x-reason': 'bad_url', description: 'GitHub URL or `owner/repo`. An empty or malformed one answers 400 `bad_url` as well.' },
             ref: { type: 'string', maxLength: 200, description: 'Branch, tag or commit; overrides the ref from the URL.' },
             path: { type: 'string', maxLength: 500, description: 'Folder inside the repository that holds module.json. Overrides the folder of a tree URL; an empty string selects the repository root.' },
             overwrite: { type: 'boolean', description: 'Replace an installed module with the same id.' },

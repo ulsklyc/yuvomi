@@ -167,17 +167,21 @@ test('sendTest reports failure reason without throwing', async () => {
 // --- Routes ---------------------------------------------------------------
 import express from 'express';
 import { buildRouter as buildEmailRouter } from '../server/routes/email.js';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
 
 function makeRouteApp(db, svc, { userEmail = 'admin@test', authRole = 'admin' } = {}) {
   const app = express();
   app.use(express.json());
   // Stub the auth context the global middleware (requireAuth) would normally set.
   app.use((req, _res, next) => { req.authUserId = 1; req.authRole = authRole; next(); });
-  app.use('/email', buildEmailRouter({
+  // At its real prefix, with the central error handler: validateRequest()
+  // finds its operation by the mount and hands its 400 on (#2810).
+  app.use('/api/v1/email', buildEmailRouter({
     database: db,
     emailService: svc,
     resolveUserEmail: () => userEmail,
   }));
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   return app;
 }
 
@@ -200,9 +204,9 @@ test('email routes reject non-admin users (gate reads req.authRole)', async () =
   const db = makeDb();
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
   const app = makeRouteApp(db, svc, { authRole: 'member' });
-  assert.equal((await call(app, 'GET', '/email/config')).status, 403);
-  assert.equal((await call(app, 'PUT', '/email/config', { host: 'x', fromAddress: 'a@b' })).status, 403);
-  assert.equal((await call(app, 'POST', '/email/test', {})).status, 403);
+  assert.equal((await call(app, 'GET', '/api/v1/email/config')).status, 403);
+  assert.equal((await call(app, 'PUT', '/api/v1/email/config', { host: 'x', fromAddress: 'a@b' })).status, 403);
+  assert.equal((await call(app, 'POST', '/api/v1/email/test', {})).status, 403);
 });
 
 test('GET /config returns masked public config', async () => {
@@ -210,7 +214,7 @@ test('GET /config returns masked public config', async () => {
   setCfg(db, { email_smtp_host: 'smtp.test', email_from_address: 'a@test', email_smtp_pass: 's' });
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
   const app = makeRouteApp(db, svc);
-  const { status, json } = await call(app, 'GET', '/email/config');
+  const { status, json } = await call(app, 'GET', '/api/v1/email/config');
   assert.equal(status, 200);
   assert.equal(json.data.host, 'smtp.test');
   assert.equal(json.data.passwordSet, true);
@@ -222,7 +226,7 @@ test('PUT /config persists fields and keeps existing password when pass omitted'
   setCfg(db, { email_smtp_pass: 'keepme' });
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
   const app = makeRouteApp(db, svc);
-  const { status } = await call(app, 'PUT', '/email/config', {
+  const { status } = await call(app, 'PUT', '/api/v1/email/config', {
     host: 'smtp.new', port: 587, secure: 'starttls', user: 'u', fromAddress: 'a@test', fromName: 'A',
   });
   assert.equal(status, 200);
@@ -234,7 +238,7 @@ test('PUT /config sets a new password when provided', async () => {
   const db = makeDb();
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
   const app = makeRouteApp(db, svc);
-  await call(app, 'PUT', '/email/config', { host: 'smtp.test', fromAddress: 'a@test', pass: 'newpass' });
+  await call(app, 'PUT', '/api/v1/email/config', { host: 'smtp.test', fromAddress: 'a@test', pass: 'newpass' });
   assert.equal(db.prepare("SELECT value FROM sync_config WHERE key='email_smtp_pass'").get().value, 'newpass');
 });
 
@@ -242,7 +246,7 @@ test('PUT /config rejects invalid secure value', async () => {
   const db = makeDb();
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
   const app = makeRouteApp(db, svc);
-  const { status } = await call(app, 'PUT', '/email/config', { host: 'smtp.test', fromAddress: 'a@test', secure: 'bogus' });
+  const { status } = await call(app, 'PUT', '/api/v1/email/config', { host: 'smtp.test', fromAddress: 'a@test', secure: 'bogus' });
   assert.equal(status, 400);
 });
 
@@ -252,7 +256,7 @@ test('POST /test sends to the admin email and reports ok', async () => {
   const nm = makeNodemailerMock();
   const svc = createEmailService({ db, nodemailer: nm, env: {} });
   const app = makeRouteApp(db, svc, { userEmail: 'admin@test' });
-  const { status, json } = await call(app, 'POST', '/email/test', {});
+  const { status, json } = await call(app, 'POST', '/api/v1/email/test', {});
   assert.equal(status, 200);
   assert.equal(json.data.ok, true);
   assert.equal(nm.sent[0].to, 'admin@test');
@@ -263,7 +267,7 @@ test('POST /test returns 400 when no recipient resolvable', async () => {
   setCfg(db, { email_smtp_host: 'smtp.test', email_from_address: 'a@test' });
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
   const app = makeRouteApp(db, svc, { userEmail: null });
-  const { status } = await call(app, 'POST', '/email/test', {});
+  const { status } = await call(app, 'POST', '/api/v1/email/test', {});
   assert.equal(status, 400);
 });
 
@@ -322,7 +326,7 @@ test('PUT /config schreibt ein env-gesteuertes Feld NICHT in die Datenbank', asy
     env: { EMAIL_SMTP_HOST: 'env.host', EMAIL_SMTP_PASS: 'env-pass' },
   });
   const app = makeRouteApp(db, svc);
-  const { status } = await call(app, 'PUT', '/email/config', {
+  const { status } = await call(app, 'PUT', '/api/v1/email/config', {
     host: 'ui.host', user: 'ui-user', pass: 'ui-pass', fromAddress: 'a@test',
   });
   assert.equal(status, 200);
@@ -339,7 +343,7 @@ test('clearPassword löscht nichts, solange EMAIL_SMTP_PASS gesetzt ist', async 
     db, nodemailer: makeNodemailerMock(), env: { EMAIL_SMTP_PASS: 'env-pass' },
   });
   const app = makeRouteApp(db, svc);
-  await call(app, 'PUT', '/email/config', { clearPassword: true });
+  await call(app, 'PUT', '/api/v1/email/config', { clearPassword: true });
   assert.equal(
     db.prepare('SELECT value FROM sync_config WHERE key = ?').get('email_smtp_pass')?.value,
     'db-pass',
@@ -401,7 +405,7 @@ test('PUT /config lehnt Port ausserhalb 1-65535 und einen Absender ohne Adresse 
     const db = makeDb();
     const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
     const app = makeRouteApp(db, svc);
-    const { status, json } = await call(app, 'PUT', '/email/config', { host: 'smtp.test', ...body });
+    const { status, json } = await call(app, 'PUT', '/api/v1/email/config', { host: 'smtp.test', ...body });
     assert.equal(status, 400, JSON.stringify(body));
     assert.equal(json.reason, reason, JSON.stringify(body));
     assert.equal(db.prepare("SELECT value FROM sync_config WHERE key='email_smtp_host'").get(), undefined,
@@ -409,9 +413,9 @@ test('PUT /config lehnt Port ausserhalb 1-65535 und einen Absender ohne Adresse 
   }
   const db = makeDb();
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
-  const ok = await call(makeRouteApp(db, svc), 'PUT', '/email/config', { host: 'smtp.test', port: 465, fromAddress: 'yuvomi@example.org' });
+  const ok = await call(makeRouteApp(db, svc), 'PUT', '/api/v1/email/config', { host: 'smtp.test', port: 465, fromAddress: 'yuvomi@example.org' });
   assert.equal(ok.status, 200);
-  const leer = await call(makeRouteApp(db, svc), 'PUT', '/email/config', { fromAddress: '' });
+  const leer = await call(makeRouteApp(db, svc), 'PUT', '/api/v1/email/config', { fromAddress: '' });
   assert.equal(leer.status, 200, 'ein leerer Absender heisst "nicht eingerichtet", kein Fehler');
 });
 
@@ -432,7 +436,7 @@ test('POST /test ohne eigene Adresse nennt den Fall email_no_recipient', async (
   const db = makeDb();
   setCfg(db, { email_smtp_host: 'smtp.test', email_from_address: 'a@test' });
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
-  const { status, json } = await call(makeRouteApp(db, svc, { userEmail: null }), 'POST', '/email/test', {});
+  const { status, json } = await call(makeRouteApp(db, svc, { userEmail: null }), 'POST', '/api/v1/email/test', {});
   assert.equal(status, 400);
   assert.equal(json.reason, 'email_no_recipient');
 });

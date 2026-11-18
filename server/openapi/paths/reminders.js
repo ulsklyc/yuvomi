@@ -1,5 +1,30 @@
-import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 import { ORIGIN_MODULE } from '../../services/reminder-origins.js';
+import { DATETIME_PATTERN } from '../../utils/datetime-pattern.js';
+
+/**
+ * The entity a reminder belongs to, named in the query of the four entity
+ * routes. validateRequest() checks them (#2810); the handler still refuses an
+ * id that is not positive and a derived origin where it cannot be written.
+ */
+function entityParams() {
+  return [{
+    name: 'entity_type',
+    in: 'query',
+    required: true,
+    description: 'The origin of the entity, for example `task` or `event`.',
+    schema: { type: 'string', enum: Object.keys(ORIGIN_MODULE) },
+  }, {
+    name: 'entity_id',
+    in: 'query',
+    required: true,
+    description: 'The id of the entity, a positive whole number written as plain digits.',
+    schema: { type: 'integer' },
+  }];
+}
+
+/** Both edges of the window of `GET /reminders/upcoming`: the shape the handler accepts. */
+const windowEdgeSchema = { type: 'string', pattern: DATETIME_PATTERN };
 
 /**
  * Gilt fuer alle vier schreibenden Wege unten, deshalb einmal statt viermal:
@@ -58,13 +83,14 @@ export function remindersPaths() {
           in: 'query',
           required: false,
           description: '`household` asks for the version for a shared surface; it carries no reminders. Anything else means the personal version.',
-          schema: { type: 'string', enum: ['household'] },
+          schema: { type: 'string' },
         }],
         responses: {
           200: {
             description: 'The due reminders',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/PendingReminderList' } } },
           },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -82,13 +108,13 @@ export function remindersPaths() {
           in: 'query',
           required: true,
           description: `Start of the window, included.${WINDOW_EDGE}`,
-          schema: { type: 'string', format: 'date-time' },
+          schema: windowEdgeSchema,
         }, {
           name: 'to',
           in: 'query',
           required: true,
           description: `End of the window, included. At most 14 days after \`from\`.${WINDOW_EDGE}`,
-          schema: { type: 'string', format: 'date-time' },
+          schema: windowEdgeSchema,
         }, {
           name: 'types',
           in: 'query',
@@ -101,8 +127,8 @@ export function remindersPaths() {
           name: 'audience',
           in: 'query',
           required: false,
-          description: '`household` asks for the version for a shared surface; it carries no reminders, as in `GET /reminders/pending`.',
-          schema: { type: 'string', enum: ['household'] },
+          description: '`household` asks for the version for a shared surface; it carries no reminders, as in `GET /reminders/pending`. Anything else means the personal version.',
+          schema: { type: 'string' },
         }],
         responses: {
           200: {
@@ -116,12 +142,12 @@ export function remindersPaths() {
         },
       }),
     },
-    '/api/v1/reminders/all': { get: op({ summary: 'List all reminders for an entity', tag: 'Reminders', description: 'Returns every non-dismissed reminder for the given entity (calendar events support multiple reminders).' }) },
+    '/api/v1/reminders/all': { get: withValidationRefusal(op({ summary: 'List all reminders for an entity', tag: 'Reminders', params: entityParams(), description: 'Returns every non-dismissed reminder for the given entity (calendar events support multiple reminders).' })) },
     '/api/v1/reminders': {
-      get: op({ summary: 'List reminders', tag: 'Reminders' }),
-      post: op({ summary: 'Create reminder', tag: 'Reminders', stateChanging: true, requestBody: jsonBody(null), description: '`pantry_item` is rejected with 400: the notification run rebuilds pantry reminders every pass, so a hand-set date would be gone within a minute. Reading and dismissing work as for any other reminder. Other derived types (subscription, inventory) stay settable - there the module only writes when its object changes.' + TARGET_VISIBLE + REMIND_AT_INPUT + EVENT_FANOUT }),
-      put: op({ summary: 'Replace reminder set for an entity', tag: 'Reminders', stateChanging: true, requestBody: jsonBody(null), description: 'Replaces all reminders of an entity with the given `remind_ats` list (deduplicated, max 5). `pantry_item` is rejected with 400: the notification run rebuilds pantry reminders every pass, so a hand-set date would be gone within a minute. Reading and dismissing work as for any other reminder. Other derived types (subscription, inventory) stay settable - there the module only writes when its object changes. Entries are deduplicated after conversion, so the same instant in two notations is one reminder.' + TARGET_VISIBLE + REMIND_AT_INPUT + EVENT_FANOUT }),
-      delete: op({ summary: 'Delete reminders by filter', tag: 'Reminders', stateChanging: true, description: '`pantry_item` is rejected with 400 - the notification run recreates the row every pass. Dismiss it instead.' + EVENT_FANOUT }),
+      get: withValidationRefusal(op({ summary: 'List reminders', tag: 'Reminders', params: entityParams() })),
+      post: withValidationRefusal(op({ summary: 'Create reminder', tag: 'Reminders', stateChanging: true, requestBody: jsonBody('#/components/schemas/ReminderCreateInput'), description: '`pantry_item` is rejected with 400: the notification run rebuilds pantry reminders every pass, so a hand-set date would be gone within a minute. Reading and dismissing work as for any other reminder. Other derived types (subscription, inventory) stay settable - there the module only writes when its object changes.' + TARGET_VISIBLE + REMIND_AT_INPUT + EVENT_FANOUT })),
+      put: withValidationRefusal(op({ summary: 'Replace reminder set for an entity', tag: 'Reminders', params: entityParams(), stateChanging: true, requestBody: jsonBody('#/components/schemas/ReminderSetInput'), description: 'Replaces all reminders of an entity with the given `remind_ats` list (deduplicated, max 5). `pantry_item` is rejected with 400: the notification run rebuilds pantry reminders every pass, so a hand-set date would be gone within a minute. Reading and dismissing work as for any other reminder. Other derived types (subscription, inventory) stay settable - there the module only writes when its object changes. Entries are deduplicated after conversion, so the same instant in two notations is one reminder.' + TARGET_VISIBLE + REMIND_AT_INPUT + EVENT_FANOUT })),
+      delete: withValidationRefusal(op({ summary: 'Delete reminders by filter', tag: 'Reminders', params: entityParams(), stateChanging: true, description: '`pantry_item` is rejected with 400 - the notification run recreates the row every pass. Dismiss it instead.' + EVENT_FANOUT })),
     },
     '/api/v1/reminders/{id}/dismiss': {
       patch: op({
@@ -144,7 +170,7 @@ export function remindersPaths() {
       }),
     },
     '/api/v1/reminders/{id}': {
-      delete: op({ summary: 'Delete reminder', tag: 'Reminders', params: [idParam()], stateChanging: true, description: '`pantry_item` is rejected with 400 - the notification run recreates the row every pass. Dismiss it instead.' + EVENT_FANOUT }),
+      delete: withValidationRefusal(op({ summary: 'Delete reminder', tag: 'Reminders', params: [idParam()], stateChanging: true, description: '`pantry_item` is rejected with 400 - the notification run recreates the row every pass. Dismiss it instead.' + EVENT_FANOUT })),
     },
   });
 }

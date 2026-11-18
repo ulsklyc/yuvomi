@@ -31,6 +31,7 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { default: pantryRouter } = await import('../server/routes/pantry.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { syncAllPantryExpiryReminders, syncPantryExpiryReminder } = await import('../server/services/pantry-reminders.js');
 const { todayKey: householdToday } = await import('../server/utils/timezone.js');
 const db = dbmod.get();
@@ -71,7 +72,10 @@ const app = express();
 app.use(express.json());
 app.use((req, _res, next) => { req.authUserId = actor.id; req.session = { userId: actor.id }; next(); });
 app.use('/pantry', pantryRouter);
-app.use('/reminders', remindersRouter);
+// At its real prefix, with the central error handler: validateRequest() finds
+// its operation by the mount and hands its 400 on (#2810).
+app.use('/api/v1/reminders', remindersRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -299,7 +303,7 @@ test('GET /reminders/pending löst den Titel für pantry_item über den Join auf
   // Fällig stellen, ohne auf die Uhr zu warten.
   db.prepare("UPDATE reminders SET remind_at = '2000-01-01T09:00' WHERE entity_type = 'pantry_item' AND entity_id = ?").run(id);
 
-  const pending = await call('GET', '/reminders/pending');
+  const pending = await call('GET', '/api/v1/reminders/pending');
   assert.equal(pending.status, 200);
   const match = pending.body.data.find((r) => r.entity_type === 'pantry_item' && r.entity_id === id);
   assert.ok(match, 'die fällige Erinnerung fehlt in /pending');
@@ -309,7 +313,7 @@ test('GET /reminders/pending löst den Titel für pantry_item über den Join auf
 
 test('POST /reminders lehnt pantry_item ab - die Meldung leitet sich aus dem Artikel ab', async () => {
   const item = await call('POST', '/pantry', { body: { name: 'Pesto', quantity: 1 } });
-  const res = await call('POST', '/reminders', {
+  const res = await call('POST', '/api/v1/reminders', {
     body: { entity_type: 'pantry_item', entity_id: item.body.data.id, remind_at: '2099-01-01T09:00' },
   });
   // Eine von Hand gesetzte Erinnerung raeumt der naechste Voll-Sync binnen einer
@@ -323,7 +327,7 @@ test('POST /reminders lehnt pantry_item ab - die Meldung leitet sich aus dem Art
 test('die Leseweg-Liste kennt pantry_item weiterhin - der Toast muss wegwischen koennen', async () => {
   const item = await call('POST', '/pantry', { body: { name: 'Ajvar', quantity: 1, expires_on: FUTURE_EXPIRY } });
   const id = item.body.data.id;
-  const res = await call('GET', `/reminders?entity_type=pantry_item&entity_id=${id}`);
+  const res = await call('GET', `/api/v1/reminders?entity_type=pantry_item&entity_id=${id}`);
   assert.equal(res.status, 200, 'ohne den Typ in VALID_ENTITY_TYPES antwortete der Lesepfad 400');
   assert.equal(res.body.data.entity_id, id);
 });
@@ -507,7 +511,7 @@ test('PUT /reminders lehnt pantry_item ebenso ab wie POST', async () => {
   const id = item.body.data.id;
   assert.equal(countReminders(id), 1);
 
-  const res = await call('PUT', `/reminders?entity_type=pantry_item&entity_id=${id}`, {
+  const res = await call('PUT', `/api/v1/reminders?entity_type=pantry_item&entity_id=${id}`, {
     body: { remind_ats: ['2099-01-01T09:00', '2099-01-02T09:00', '2099-01-03T09:00'] },
   });
 
@@ -663,18 +667,18 @@ test('DELETE /reminders lehnt pantry_item ab - verwerfen ist der Weg, der haelt'
   const id = item.body.data.id;
   assert.equal(countReminders(id), 1);
 
-  const byFilter = await call('DELETE', `/reminders?entity_type=pantry_item&entity_id=${id}`);
+  const byFilter = await call('DELETE', `/api/v1/reminders?entity_type=pantry_item&entity_id=${id}`);
   assert.equal(byFilter.status, 400);
   assert.equal(countReminders(id), 1);
 
   // Und die Hintertuer ueber die ID hat dieselbe folgenlose Wirkung.
-  const byId = await call('DELETE', `/reminders/${reminderFor(id).id}`);
+  const byId = await call('DELETE', `/api/v1/reminders/${reminderFor(id).id}`);
   assert.equal(byId.status, 400);
   assert.equal(countReminders(id), 1);
 
   // Verwerfen dagegen haelt: die Zeile bleibt stehen, der Voll-Sync sieht sie
   // und legt nichts nach.
-  const dismissed = await call('PATCH', `/reminders/${reminderFor(id).id}/dismiss`);
+  const dismissed = await call('PATCH', `/api/v1/reminders/${reminderFor(id).id}/dismiss`);
   assert.equal(dismissed.status, 200);
   syncAllPantryExpiryReminders(db);
   assert.equal(reminderFor(id).dismissed, 1);

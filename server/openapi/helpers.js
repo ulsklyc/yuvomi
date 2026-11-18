@@ -80,6 +80,18 @@ function jsonBody(schemaRef, description = 'JSON request body') {
   };
 }
 
+/**
+ * One operation of the document. Parameters, request body and responses are
+ * plain OpenAPI objects; the type only says so, so that a path file can hand
+ * them in without the checker reading `[]` and `null` as their only shape.
+ * @param {{
+ *   summary: string, operationId?: string, tag: string, description?: string,
+ *   auth?: boolean, admin?: boolean, params?: Array<Record<string, unknown>>,
+ *   requestBody?: Record<string, unknown> | null, responses?: Record<string, unknown> | null,
+ *   stateChanging?: boolean, documentDeleteConflict?: boolean, documentLinkRefusal?: boolean,
+ * }} options
+ * @returns {Record<string, any> & { responses: Record<string, unknown> }}
+ */
 function op({
   summary,
   operationId,
@@ -94,6 +106,7 @@ function op({
   documentDeleteConflict = false,
   documentLinkRefusal = false,
 }) {
+  /** @type {Record<string, any> & { responses: Record<string, unknown> }} */
   const operation = {
     tags: [tag],
     summary,

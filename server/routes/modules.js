@@ -13,6 +13,7 @@ import path from 'node:path';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { requireAdmin } from '../auth.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { createLogger } from '../logger.js';
 import { MODULES_DIR, listModules, resolveAssetPath, setModuleEnabled } from '../services/modules.js';
 import {
@@ -186,7 +187,14 @@ function installBody(result) {
 }
 
 // Static /install/* paths before any /:id route.
-router.get('/install/info', requireAdmin, async (_req, res) => {
+//
+// validateRequest() (#2810) stands after the admin gate, the web-install switch,
+// the session gate and both rate limiters: a member gets 403, never a 400 that
+// names fields, and a refused request counts against the limits like any other
+// failed attempt. On the ZIP route it stands BEFORE parseZipBody: it checks
+// only the query (the archive is no JSON body), so a bad `overwrite` or `path`
+// is refused before up to the archive limit is read into memory.
+router.get('/install/info', requireAdmin, validateRequest(), async (_req, res) => {
   try {
     const [writable, persistent] = await Promise.all([isWritable(), isPersistent()]);
     res.json({ data: { writable, persistent, webInstall: isWebInstallEnabled(), maxZipMb: MAX_ZIP_MB } });
@@ -196,7 +204,7 @@ router.get('/install/info', requireAdmin, async (_req, res) => {
   }
 });
 
-router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSession, installAttemptLimiter, installLimiter, parseZipBody, async (req, res) => {
+router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSession, installAttemptLimiter, installLimiter, validateRequest(), parseZipBody, async (req, res) => {
   try {
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       throw new InstallError('not_zip', 'Send the module ZIP file as the request body with Content-Type application/zip.');
@@ -212,7 +220,7 @@ router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSessi
   }
 });
 
-router.post('/install/github', requireAdmin, requireWebInstall, requireBrowserSession, installAttemptLimiter, installLimiter, async (req, res) => {
+router.post('/install/github', requireAdmin, requireWebInstall, requireBrowserSession, installAttemptLimiter, installLimiter, validateRequest(), async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     if (typeof body.url !== 'string' || !body.url.trim()) {
@@ -242,7 +250,7 @@ router.post('/install/github', requireAdmin, requireWebInstall, requireBrowserSe
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', validateRequest(), async (req, res) => {
   try {
     const admin = isAdminRequest(req) && req.query.admin === '1';
     const modules = await listModules({ admin });
@@ -253,7 +261,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.patch('/:id', requireAdmin, async (req, res) => {
+router.patch('/:id', requireAdmin, validateRequest(), async (req, res) => {
   try {
     if (typeof req.body?.enabled !== 'boolean') {
       return res.status(400).json({ error: 'enabled must be a boolean.', code: 400 });
@@ -283,7 +291,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/:id', requireAdmin, requireWebInstall, requireBrowserSession, async (req, res) => {
+router.delete('/:id', requireAdmin, requireWebInstall, requireBrowserSession, validateRequest(), async (req, res) => {
   try {
     const result = await deleteModule(req.params.id, { userId: req.authUserId });
     res.json({ data: result });
@@ -292,7 +300,7 @@ router.delete('/:id', requireAdmin, requireWebInstall, requireBrowserSession, as
   }
 });
 
-router.get('/assets/:id/{*assetPath}', async (req, res) => {
+router.get('/assets/:id/{*assetPath}', validateRequest(), async (req, res) => {
   try {
     const relPath = Array.isArray(req.params.assetPath)
       ? req.params.assetPath.join('/')
