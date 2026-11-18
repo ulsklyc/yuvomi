@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.92.0] - 2026-11-18
+
 ### Changed
 - **Notes, birthdays and quick links check every request against the published API description.**
   This is about your own API clients; the app sends nothing that changes. Under
@@ -173,6 +175,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pantry answered this way already.
 
 ### Fixed
+- **The calendar search no longer loses upcoming events behind old ones.** With more than 100
+  matching events it kept the oldest, so an old series or a year of past events pushed the
+  upcoming ones out of the result. It now keeps upcoming events and series first, then past
+  events from the newest - like the global search. The order of the result is unchanged.
+- **Search and the overview show rows that tie in the same order on every load.** Lists that
+  sort by date or title had no unique last sort key, so entries with the same date or the same
+  title could swap places between two loads, and the global search could drop exactly the newest
+  of several past events with the same start when it cut its candidates. Ties now follow the
+  direction of the list: newest first breaks them with the newer entry, all others with the
+  older; two recipes with the same title stand in the order they were created.
 - **Confirming which pantry row a recipe ingredient means names the ingredient in English.**
   `PUT /api/v1/recipes/{id}/ingredient-match` with an empty, blank or too long `name` answered
   `"Zutat is required."`, `"Zutat must not be empty."` or `"Zutat may be at most 200 characters

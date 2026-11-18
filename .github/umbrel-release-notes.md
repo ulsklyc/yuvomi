@@ -1,10 +1,10 @@
-<!-- version: 2.91.1 -->
-This update fixes the screen you see when Yuvomi cannot check your session at startup, for example while the server is offline or restarting. In the light theme its text stood directly on the violet background and was hard to read. The screen now sits on the same panel as the sign-in page.
+<!-- version: 2.92.0 -->
+This update fixes the calendar search. With more than 100 matching events it kept the oldest ones, so an old series or a year of past events could push upcoming events out of the result. Upcoming events and series now come first. Lists in search and on the overview also keep the same order on every load when two entries share a date or a title.
 
-Numbers now stay on one line with their unit in all 27 languages. Texts such as "up to 25 MB", "1 h 30 min" or "45 %" could break between the number and the unit, leaving the unit alone at the start of the next line.
+Taking checked shopping items into the pantry no longer fails when a storage location was deleted while the dialog was open. Yuvomi now says that the location is gone and takes nothing over.
 
-The payments chart in Housekeeping now shows all six months on a phone. On narrow screens it scrolled sideways and hid the current month. The number above each column is now a whole amount; the exact amount is still shown in the visits and the report.
+If you use the API with your own scripts or integrations: notes, birthdays, quick links, reminders, notification channels, modules, permissions, e-mail, weather, family, search, kitchen, screensaver, wall displays, recipes, recipe providers and the pantry now check every request against the published API description. Input that was quietly accepted or reinterpreted before, such as an id like "12abc" or a number sent as text, is now refused with a 400 that names the field. The app itself sends nothing that is refused.
 
 This update does not change the database. No action is needed from you.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.91.1
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.92.0
