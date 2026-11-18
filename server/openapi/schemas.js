@@ -71,7 +71,7 @@ const birthdayInputProperties = {
       { type: 'null' },
     ],
   },
-  name_day: { type: ['string', 'null'], pattern: '^\\s*(\\d{2}-\\d{2})?\\s*$', description: 'Month and day (`MM-DD`), or null or "" to clear it.' },
+  name_day: { type: ['string', 'null'], pattern: '^\\s*(\\d{2}-\\d{2}\\s*)?$', description: 'Month and day (`MM-DD`), or null or "" to clear it.' },
   notes: { type: ['string', 'null'], maxLength: MAX_TEXT },
   photo_data: { type: ['string', 'null'], description: 'A base64 image data URL (png, jpeg, webp, gif), or null to remove it.' },
   reminder_offset: {
