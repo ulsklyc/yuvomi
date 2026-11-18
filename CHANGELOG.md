@@ -126,6 +126,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
   and the own schedule settings answered this way already.
 
+### Added
+- **Family members can share their own availability** (#1591). Tap your row on the family
+  tile to set a status - available, busy, do not disturb or away - with an optional note and
+  an expiry (1 hour, 4 hours, until midnight, until tomorrow 8am, or 1 week). Everyone in the
+  household sees the status and note on your row instead of your next appointment or shift
+  while it is active; it clears itself once it expires, no manual reset needed. Only your own
+  status is editable from your own row. New endpoints: `GET/PUT/DELETE /api/v1/availability`.
+
 ### Fixed
 - **A shared expense converted into a currency with other decimal places reports the converted
   amount correctly.** `converted_amount` in the expense answers was written with the decimal
@@ -592,13 +600,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   try again. And "Active" is green only while nothing on the card asks for attention: after a
   failed run or with an overdue backup the word stays, since the schedule is still running, but
   without the green that would say all is well next to a red line.
-- **Family members can share their own availability** (#1591). Tap your row on the family
-  tile to set a status - available, busy, do not disturb or away - with an optional note and
-  an expiry (1 hour, 4 hours, until midnight, until tomorrow 8am, or 1 week). Everyone in the
-  household sees the status and note on your row instead of your next appointment or shift
-  while it is active; it clears itself once it expires, no manual reset needed. Only your own
-  status is editable from your own row. New endpoints: `GET/PUT/DELETE /api/v1/availability`.
-
 ### Fixed
 - **A wall display or a split-expense guest account no longer receives medication reminders or
   calendar feeds.** Reminders, pushes and the subscription feeds are sent without a request, and

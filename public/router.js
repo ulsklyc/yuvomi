@@ -1175,8 +1175,8 @@ function refreshThemeColorForTheme() {
 // Kontomenue -> eigenen Status setzen (#1591): der zweite Weg neben der
 // eigenen Zeile auf der Familien-Kachel, von jeder Seite aus erreichbar.
 async function openOwnAvailabilityModal() {
-  const userId = routerState.currentUser?.id;
-  if (!userId) return;
+  if (!routerState.currentUser) return;
+  const userId = routerState.currentUser.id;
   let currentAvail = null;
   try {
     const { data } = await api.get('/availability');
