@@ -743,6 +743,72 @@ test('one source: the photo length, the number of tracked dates and the day patt
   }
 });
 
+/**
+ * Whether the column takes this value, in a transaction that is rolled back.
+ * @param {string} sql an INSERT with one parameter for the value under test
+ * @param {unknown[]} params
+ */
+function columnTakes(sql, params) {
+  const ROLLBACK = new Error('rollback');
+  let taken = false;
+  try {
+    db.transaction(() => {
+      try {
+        db.prepare(sql).run(...params);
+        taken = true;
+      } catch (err) {
+        if (!/CHECK constraint failed/.test(String(/** @type {Error} */ (err).message))) throw err;
+      }
+      throw ROLLBACK;
+    })();
+  } catch (err) {
+    if (err !== ROLLBACK) throw err;
+  }
+  return taken;
+}
+
+// Since group 2B step (b) the schema is the only guard of these numbers: the
+// handlers no longer check type, list or bounds (#2810). Each bound is held as
+// a value and to the CHECK of its column, so a looser schema turns red here
+// instead of reaching SQLite as a 500.
+test('the schema is the only guard: warranty, booking share, service-log reading, reorder lists and the booking id keep their bounds', () => {
+  for (const [path, method] of [[ITEMS, 'post'], [ITEM_ID, 'put']]) {
+    const props = bodySchema(path, method).properties;
+    assert.deepEqual(props.warranty_months.type, ['integer', 'null'], `${method} warranty_months type`);
+    assert.equal(props.warranty_months.minimum, 0, `${method} warranty_months minimum`);
+    assert.equal(props.warranty_months.maximum, 600, `${method} warranty_months maximum`);
+    assert.deepEqual(props.odometer.type, ['integer', 'null'], `${method} odometer type (its bound stays the handler's)`);
+    assert.deepEqual(props.location_id.anyOf.map((/** @type {any} */ s) => s.type), ['integer', 'string', 'null'], `${method} location_id`);
+  }
+  const warranty = 'INSERT INTO inventory_items (name, warranty_months) VALUES (\'Probe\', ?)';
+  assert.deepEqual([-1, 0, 600, 601].map((v) => columnTakes(warranty, [v])), [false, true, true, false], 'warranty_months CHECK is 0..600');
+
+  const link = bodySchema('/api/v1/inventory/items/{id}/entries', 'post');
+  assert.deepEqual(link.required, ['entry_id']);
+  assert.equal(link.properties.entry_id.type, 'integer');
+  assert.deepEqual(link.properties.amount_share.type, ['number', 'null']);
+  assert.equal(link.properties.amount_share.minimum, 0, 'amount_share minimum');
+  const entryId = newEntry();
+  const share = 'INSERT INTO inventory_item_entries (item_id, entry_id, role, amount_share) VALUES (?, ?, \'refund\', ?)';
+  assert.deepEqual([-0.01, 0].map((v) => columnTakes(share, [ITEM.id, entryId, v])), [false, true], 'amount_share CHECK is >= 0');
+
+  for (const [path, method] of [['/api/v1/inventory/items/{id}/dates/{dateId}/complete', 'post'], ['/api/v1/inventory/items/{id}/service-log', 'post'], ['/api/v1/inventory/items/{id}/service-log/{logId}', 'put']]) {
+    const odometer = bodySchema(path, method).properties.odometer;
+    assert.deepEqual(odometer.type, ['integer', 'null'], `${method} ${path} odometer type`);
+    assert.equal(odometer.minimum, 0, `${method} ${path} odometer minimum`);
+  }
+  const reading = 'INSERT INTO inventory_item_service_log (item_id, label, performed_on, odometer) VALUES (?, \'Probe\', \'2026-11-01\', ?)';
+  assert.deepEqual([-1, 0].map((v) => columnTakes(reading, [ITEM.id, v])), [false, true], 'service-log odometer CHECK is >= 0');
+
+  assert.equal(bodySchema('/api/v1/inventory/locations/reorder', 'patch').properties.order.minItems, 1, 'locations order: at least one');
+  assert.equal(bodySchema('/api/v1/inventory/categories/reorder', 'patch').properties.order.minItems, 1, 'categories order: at least one');
+  for (const path of ['/api/v1/inventory/locations/reorder', '/api/v1/inventory/locations/{parentId}/subcategories/reorder', '/api/v1/inventory/categories/reorder']) {
+    const schema = bodySchema(path, 'patch');
+    assert.deepEqual(schema.required, ['order'], `${path} order required`);
+    assert.equal(schema.properties.order.type, 'array', `${path} order is a list`);
+  }
+});
+
 test('the document: real success codes, the 400 on every operation with a parameter or body, no x-reason', () => {
   /** @type {Record<string, string>} */
   const created = {

@@ -120,8 +120,8 @@ router.delete('/:id', validateRequest(), (req, res) => {
 // PATCH /api/v1/inventory/locations/reorder   Body: { order: number[] }  (Top-Ebene)
 // --------------------------------------------------------
 router.patch('/reorder', validateRequest(), (req, res) => {
-  const order = Array.isArray(req.body.order) ? req.body.order : [];
-  if (!order.length) return res.status(400).json({ error: 'order must be a non-empty array of IDs.', code: 400 });
+  // Eine nicht leere Liste von Ids (ganze Zahl oder Ziffern-Text) prueft das Schema.
+  const { order } = req.body;
   const update = db.get().prepare('UPDATE inventory_locations SET sort_order = ? WHERE id = ? AND parent_id IS NULL');
   db.get().transaction(() => { order.forEach((id, i) => update.run(i, id)); })();
   res.json({ data: loadTree() });
@@ -201,7 +201,8 @@ router.delete('/:parentId/subcategories/:id', validateRequest(), (req, res) => {
 // PATCH /api/v1/inventory/locations/:parentId/subcategories/reorder   Body: { order: number[] }
 // --------------------------------------------------------
 router.patch('/:parentId/subcategories/reorder', validateRequest(), (req, res) => {
-  const order = Array.isArray(req.body.order) ? req.body.order : [];
+  // Eine Liste von Ids prueft das Schema; `[]` aendert nichts.
+  const { order } = req.body;
   const update = db.get().prepare('UPDATE inventory_locations SET sort_order = ? WHERE id = ? AND parent_id = ?');
   db.get().transaction(() => {
     order.forEach((id, i) => update.run(i, id, req.params.parentId));

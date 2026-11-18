@@ -26,7 +26,7 @@
  */
 import * as db from '../../db.js';
 import {
-  str, date, num, collectErrors, MAX_SHORT, MAX_TEXT,
+  str, date, collectErrors, MAX_SHORT, MAX_TEXT,
 } from '../../middleware/validate.js';
 import { addMonthsClamped, parseDateKey } from '../../utils/interval-date.js';
 import {
@@ -71,6 +71,12 @@ function odometerRegressionError(item, odometer, performedOn) {
   return null;
 }
 
+/**
+ * Die Rufer sind Routen hinter validateRequest() (items.js): `odometer` ist
+ * dort schon eine ganze Zahl ab 0 oder `null` (Schema, #2810). Hier bleibt,
+ * was das Schema nicht sagen kann: Leere und Laenge nach dem Trimmen, der
+ * Kalendertag und der Rueckschritt des Kilometerstands.
+ */
 function validateServiceLogInput(body, item) {
   const results = [];
   const vLabel = str(body?.label, 'label', { max: MAX_LABEL });
@@ -78,16 +84,7 @@ function validateServiceLogInput(body, item) {
   const vPerformedOn = date(body?.performed_on, 'performed_on', true);
   results.push(vPerformedOn);
 
-  let odometer = null;
-  if (body?.odometer !== undefined && body.odometer !== null && body.odometer !== '') {
-    const vOdometer = num(body.odometer, 'odometer');
-    results.push(vOdometer);
-    if (vOdometer.value !== null && (!Number.isInteger(vOdometer.value) || vOdometer.value < 0)) {
-      results.push({ error: 'odometer must be a whole number of at least 0.' });
-    } else if (vOdometer.value !== null) {
-      odometer = vOdometer.value;
-    }
-  }
+  const odometer = body?.odometer ?? null;
   const regressionError = odometerRegressionError(item, odometer, vPerformedOn.value);
   if (regressionError) results.push({ error: regressionError });
 
@@ -115,16 +112,7 @@ function validateCompletionInput(body, item) {
   const vPerformedOn = date(body?.performed_on, 'performed_on', true);
   results.push(vPerformedOn);
 
-  let odometer = null;
-  if (body?.odometer !== undefined && body.odometer !== null && body.odometer !== '') {
-    const vOdometer = num(body.odometer, 'odometer');
-    results.push(vOdometer);
-    if (vOdometer.value !== null && (!Number.isInteger(vOdometer.value) || vOdometer.value < 0)) {
-      results.push({ error: 'odometer must be a whole number of at least 0.' });
-    } else if (vOdometer.value !== null) {
-      odometer = vOdometer.value;
-    }
-  }
+  const odometer = body?.odometer ?? null;
   const regressionError = odometerRegressionError(item, odometer, vPerformedOn.value);
   if (regressionError) results.push({ error: regressionError });
 
