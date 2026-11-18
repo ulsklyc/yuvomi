@@ -15,7 +15,11 @@
  *            - KEPT: what the routes lived with goes through as before, and
  *              what the schema cannot say still gets the handler's answer;
  *            - THE OWN FRONTEND: every request the app's pages send to these
- *              endpoints passes the middleware of its operation.
+ *              endpoints passes the middleware of its operation;
+ *            - ONE SOURCE: the enums the handlers no longer check themselves
+ *              equal their source as a set - `familyRole` the roles of
+ *              `permissionCatalog()`, every reminder `entity_type` (and
+ *              `types`) `VALID_ENTITY_TYPES`.
  *          No clock is frozen and no answer depends on the day: the reminder
  *          times lie far in the future or are compared as text.
  * Run: npm run test:validate-small-modules-a
@@ -580,3 +584,66 @@ for (const [site, method, mount, pattern, request] of FRONTEND_CALLS) {
     assert.equal(passes(method, mount, pattern, request), true);
   });
 }
+
+// ── The schema's lists against their one source ─────────────────────────────
+// Since #2820 the handlers no longer check the family role or the reminder
+// origin themselves: the enum of the operation is the only guard. These copies
+// must say exactly what the code knows, in both directions.
+
+const { buildOpenApiSpec } = await import('../server/openapi.js');
+const { permissionCatalog } = await import('../server/authorize/index.ts');
+const { VALID_ENTITY_TYPES } = await import('../server/routes/reminders.js');
+const SPEC = buildOpenApiSpec();
+
+/**
+ * The enum of one parameter of one operation of the built document.
+ * @param {string} route
+ * @param {string} method
+ * @param {string} name
+ * @param {(schema: any) => unknown} [pick]
+ */
+function parameterEnum(route, method, name, pick = (schema) => schema.enum) {
+  const operation = SPEC.paths[route]?.[method];
+  assert.ok(operation, `${method.toUpperCase()} ${route} is in the document`);
+  const parameter = (operation.parameters ?? []).find((/** @type {any} */ p) => p.name === name);
+  assert.ok(parameter, `${method.toUpperCase()} ${route} has the parameter ${name}`);
+  const values = pick(parameter.schema);
+  assert.ok(Array.isArray(values) && values.length > 0, `${method.toUpperCase()} ${route}: ${name} carries an enum`);
+  return values;
+}
+
+/** @param {unknown[]} values */
+const asSet = (values) => [...new Set(values)].sort();
+
+test('permissions: the familyRole enum of the document is exactly the roles of permissionCatalog()', () => {
+  const roles = permissionCatalog().roles;
+  assert.ok(Array.isArray(roles) && roles.length >= 7, 'permissionCatalog().roles is read');
+  for (const method of ['get', 'put']) {
+    const values = parameterEnum('/api/v1/permissions/role/{familyRole}', method, 'familyRole');
+    assert.equal(values.length, new Set(values).size, `${method.toUpperCase()}: no role twice`);
+    assert.deepEqual(asSet(values), asSet(roles), `${method.toUpperCase()} /permissions/role/{familyRole}`);
+  }
+});
+
+test('reminders: every entity_type enum of the document is exactly VALID_ENTITY_TYPES', () => {
+  assert.ok(Array.isArray(VALID_ENTITY_TYPES) && VALID_ENTITY_TYPES.length >= 16, 'VALID_ENTITY_TYPES is read');
+  const expected = asSet(VALID_ENTITY_TYPES);
+  /** @type {Array<[string, unknown[]]>} */
+  const lists = [];
+  for (const [route, method] of [
+    ['/api/v1/reminders/all', 'get'],
+    ['/api/v1/reminders', 'get'],
+    ['/api/v1/reminders', 'put'],
+    ['/api/v1/reminders', 'delete'],
+  ]) {
+    lists.push([`${method.toUpperCase()} ${route} entity_type`, parameterEnum(route, method, 'entity_type')]);
+  }
+  lists.push(['GET /api/v1/reminders/upcoming types', parameterEnum('/api/v1/reminders/upcoming', 'get', 'types', (schema) => schema.items?.enum)]);
+  const body = SPEC.components.schemas.ReminderCreateInput?.properties?.entity_type?.enum;
+  assert.ok(Array.isArray(body), 'ReminderCreateInput.entity_type carries an enum');
+  lists.push(['ReminderCreateInput.entity_type', body]);
+  for (const [where, values] of lists) {
+    assert.equal(values.length, new Set(values).size, `${where}: no type twice`);
+    assert.deepEqual(asSet(values), expected, where);
+  }
+});
