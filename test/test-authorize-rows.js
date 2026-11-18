@@ -803,6 +803,36 @@ test('wallMeals: the display wall gets the ten fields of the wall line, everyone
   }
 });
 
+test('wallFamilyStatuses: a display account drops the note (household or not), everyone else the rows unchanged', () => {
+  const wallFamilyStatuses = rowApi('wallFamilyStatuses');
+  const rows = [
+    { user_id: 1, state: 'busy', note: 'in a meeting', expires_at: '2026-11-17T12:00:00Z', updated_at: '2026-11-17T10:00:00Z' },
+    { user_id: 2, state: 'available', note: null, expires_at: '2026-11-17T12:00:00Z', updated_at: '2026-11-17T09:00:00Z' },
+  ];
+  // Unlike wallMeals/wallPantryExpiring, the gate is `audience.display` alone: a
+  // coupled display drops the note on its personal answer too (no `?audience=
+  // household` needed) - the device hangs in a shared room either way.
+  for (const audience of AUDIENCES) {
+    const out = wallFamilyStatuses(rows, audience);
+    if (!audience.display) {
+      assert.equal(out, rows, `unchanged (${JSON.stringify(audience)})`);
+      continue;
+    }
+    assert.deepEqual(out, [
+      { user_id: 1, state: 'busy', expires_at: '2026-11-17T12:00:00Z', updated_at: '2026-11-17T10:00:00Z' },
+      { user_id: 2, state: 'available', expires_at: '2026-11-17T12:00:00Z', updated_at: '2026-11-17T09:00:00Z' },
+    ]);
+    assert.deepEqual(Object.keys(out[0]), ['user_id', 'state', 'expires_at', 'updated_at']);
+    // What a JSON answer carries: never the note.
+    const wire = JSON.stringify(out);
+    assert.ok(!wire.includes('in a meeting'), 'note stays back');
+  }
+  // Not a list (a failed read): unchanged, also for a display account.
+  for (const value of [null, undefined, { error: true }]) {
+    assert.equal(wallFamilyStatuses(value, { display: true, household: true }), value);
+  }
+});
+
 test('wallPantryExpiring: the display wall gets the name of each item of today, the rest of the slice unchanged', () => {
   const wallPantry = rowApi('wallPantryExpiring');
   const slice = {
