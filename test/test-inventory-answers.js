@@ -155,6 +155,16 @@ function entry(amount) {
 const BOOKING = entry(-120);
 const BOOKING_2 = entry(-35.5);
 const BOOKING_3 = entry(-80);
+// The history timeline dates a document by the moment it was linked, and
+// SQLite stamps that from its own clock, which mock.timers does not reach.
+// Pin it to the mocked now, or the row flips to the next day once the run
+// crosses midnight in the household zone.
+db.exec(`
+  CREATE TRIGGER pin_item_document_clock AFTER INSERT ON inventory_item_documents
+  BEGIN
+    UPDATE inventory_item_documents SET created_at = '2026-11-18T12:00:00Z' WHERE id = NEW.id;
+  END
+`);
 const DOC = Number(db.prepare(`
   INSERT INTO family_documents (name, category, visibility, original_name, mime_type, file_size, content_data, created_by)
   VALUES ('Beleg', 'warranty', 'family', 'beleg.pdf', 'application/pdf', 1234, 'data:application/pdf;base64,AA==', ?)
