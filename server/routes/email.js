@@ -7,6 +7,7 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { emailService as defaultEmailService } from '../services/email.js';
 
 const log = createLogger('EmailRoutes');
@@ -68,7 +69,7 @@ export function buildRouter({ database, emailService = defaultEmailService, reso
       ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, value);
   }
 
-  router.get('/config', requireAdmin, (req, res) => {
+  router.get('/config', requireAdmin, validateRequest(), (req, res) => {
     try {
       res.json({ data: emailService.getPublicConfig() });
     } catch (err) {
@@ -77,7 +78,7 @@ export function buildRouter({ database, emailService = defaultEmailService, reso
     }
   });
 
-  router.put('/config', requireAdmin, (req, res) => {
+  router.put('/config', requireAdmin, validateRequest(), (req, res) => {
     try {
       const body = req.body || {};
       if (body.secure !== undefined && !VALID_SECURE.has(String(body.secure))) {
@@ -109,7 +110,7 @@ export function buildRouter({ database, emailService = defaultEmailService, reso
     }
   });
 
-  router.post('/test', requireAdmin, async (req, res) => {
+  router.post('/test', requireAdmin, validateRequest(), async (req, res) => {
     try {
       const resolver = resolveUserEmail || ((uid) => defaultResolveUserEmail(getDb, uid));
       const to = (typeof req.body?.to === 'string' && req.body.to.trim())

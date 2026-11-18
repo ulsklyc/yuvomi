@@ -59,7 +59,8 @@
  *          `reason` is that of the first field, else `validation`. The
  *          annotation is read through `verbose: true` (the failing keyword's
  *          parent schema on each error); the request data Ajv adds there too
- *          is never read.
+ *          is never read, and the error list is taken off the check right
+ *          after it is read, so no request outlives its answer there.
  *
  *          server/openapi.js never imports Ajv (it must load without
  *          node_modules); Ajv lives here.
@@ -374,6 +375,19 @@ function refusal(fields: Field[]): HttpError {
 }
 
 /**
+ * The errors of a compiled check, taken off it. With `verbose: true` each
+ * error holds the request data it failed on (`data`, for `required` the whole
+ * object), and Ajv keeps the list on the check until its next call - for a
+ * route nobody calls again, as long as the process lives. Read once, then
+ * dropped.
+ */
+function takeErrors(check: ValidateFunction): ErrorObject[] {
+  const errors = check.errors ?? [];
+  check.errors = null;
+  return errors;
+}
+
+/**
  * A deep copy of req.params / req.query for coercion, without a prototype (a
  * key `__proto__` stays a key). A wildcard parameter becomes its joined path,
  * a comma list (`explode: false`) its items.
@@ -457,7 +471,7 @@ function validatorFor(loadSpec: () => OpenApiDocument): () => Middleware {
         ['path', checks.path, () => copyOf(req.params, { wildcards: checks.wildcards })],
         ['query', checks.query, () => copyOf(req.query, { commaLists: checks.commaLists })],
       ] as const) {
-        if (check && !check(data())) fields.push(...(check.errors ?? []).map((e) => fieldOf(spec, place, e)));
+        if (check && !check(data())) fields.push(...takeErrors(check).map((e) => fieldOf(spec, place, e)));
       }
       if (checks.body) {
         // server/index.js puts `{}` in place of a missing body (defaultEmptyBody):
@@ -465,7 +479,7 @@ function validatorFor(loadSpec: () => OpenApiDocument): () => Middleware {
         if (req.body === undefined || hadNoBody(req)) {
           if (checks.bodyRequired) fields.push(withReason({ path: 'body', rule: 'required' }, checks.bodyMissingReason));
         } else if (!checks.body(req.body)) {
-          fields.push(...(checks.body.errors ?? []).map((e) => fieldOf(spec, 'body', e)));
+          fields.push(...takeErrors(checks.body).map((e) => fieldOf(spec, 'body', e)));
         }
       }
       if (fields.length > 0) return next(refusal(fields));

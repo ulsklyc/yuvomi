@@ -57,6 +57,7 @@ const { resolvePermissions, buildSessionModuleAccess } = await import('../server
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { DISPLAY_SCOPES } = await import('../server/services/display-accounts.js');
 
 function buildMigratedDatabase(migrations) {
@@ -107,8 +108,10 @@ app.use((req, _res, next) => {
   req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user, { isDisplay: asDisplay }));
   next();
 });
-app.use('/reminders', remindersRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/reminders', remindersRouter);
 app.use('/', dashboardRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -922,7 +925,7 @@ const DISPLAY = addUser('Wandtablett');
 
 async function reminders(userId, query = '') {
   viewer = userId;
-  const res = await fetch(`${base}/reminders/pending${query}`);
+  const res = await fetch(`${base}/api/v1/reminders/pending${query}`);
   assert.equal(res.status, 200);
   return (await res.json()).data;
 }
@@ -1027,7 +1030,14 @@ test('Persoenliches: die Haushaltsfassung traegt es gar nicht - auch nicht fuer 
 
 test('Persoenliches: auch die Erinnerungen fallen bei doppeltem Parameter nicht auf die persoenliche Fassung zurueck', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
   seedPersonal();
-  assert.deepEqual(await reminders(BEN, '?audience=household&audience=household'), []);
+  // Since #2810 `audience` is one text value in the schema of the operation:
+  // given twice it is refused with a 400 - still nothing personal goes out.
+  viewer = BEN;
+  const twice = await fetch(`${base}/api/v1/reminders/pending?audience=household&audience=household`);
+  assert.equal(twice.status, 400);
+  const refusal = await twice.json();
+  assert.deepEqual(refusal.fields, [{ path: 'query/audience', rule: 'type' }]);
+  assert.equal(refusal.data, undefined);
   assert.equal((await overview(BEN, '?audience=household&audience=household')).health.dosesTotal, 0);
   // Ein anderes Wort bleibt, was es war.
   assert.equal((await reminders(BEN, '?audience=me')).length, 1);
@@ -1221,7 +1231,7 @@ test('Persoenliches: die Glocke der Shell fragt ueber einer Wand die Haushaltsfa
       globalThis.__apiStub = {
         get: (path) => {
           asked.push(path);
-          const answer = fetch(`${base}${path}`).then((res) => res.json());
+          const answer = fetch(`${base}/api/v1${path}`).then((res) => res.json());
           inflight.push(answer);
           return answer;
         },

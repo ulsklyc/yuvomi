@@ -1,0 +1,22 @@
+/**
+ * Module: the date-time shape the API accepts as input (#2810)
+ * Purpose: ONE source for the text a date-time input field may have, read by
+ *          two sides that must never drift apart:
+ *            - the hand check `datetime()` in server/middleware/validate.js
+ *              (as `DATETIME_RE`), which every route with a time input runs;
+ *            - the OpenAPI document, where it is the `pattern` of the
+ *              reminder times (`remind_at`, `remind_ats[]`, `from`, `to`),
+ *              checked by validateRequest() before the handler.
+ *          Accepted: a date alone, or a date with `T`, hours and minutes,
+ *          optional seconds with an optional fraction, and an optional `Z` or
+ *          numeric offset (`+02:00`, `+0200`). Not the RFC 3339 `date-time`
+ *          of Ajv: that one needs seconds and a zone, and takes a lowercase
+ *          `t`, a space or `+02`, which the handlers refuse.
+ *
+ *          A string, not a RegExp: the document carries it as text. This file
+ *          imports nothing, because server/openapi.js has to load without
+ *          node_modules (the packaging contract), and the pattern must stay
+ *          linear for the ReDoS guard of test:openapi-ajv.
+ */
+
+export const DATETIME_PATTERN = '^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}(:\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:?\\d{2})?)?$';

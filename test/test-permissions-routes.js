@@ -47,12 +47,13 @@ app.use((req, _res, next) => {
   req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
   next();
 });
-app.use('/', permissionsRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/permissions', permissionsRouter);
 // Wie server/index.js: der zentrale Fehlerhandler steht hinter dem Router.
 const handlerLog = recordingLog();
 app.use(createErrorHandler(handlerLog));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/permissions`)));
 
 async function call(method, path, { actor: a, body } = {}) {
   if (a) actor = a;
@@ -330,9 +331,17 @@ for (const [name, path] of [['/role/:familyRole', '/role/child'], ['/user/:userI
     const unknown = await requestLogged(baseUrl, handlerLog, 'PUT', String(path), { modules: { __no_such_module__: 'read' } });
     assert.equal(unknown.status, 400);
     assert.deepEqual(unknown.body, { error: 'Unknown module: __no_such_module__', code: 400 });
+    // Since #2810 the access level is a rule of the schema (`none|read|write`):
+    // the schema check answers before the handler, with the field instead of
+    // the sentence. The key stays the handler's rule (the module list is dynamic).
     const invalid = await requestLogged(baseUrl, handlerLog, 'PUT', String(path), { modules: { [moduleKey]: 'bogus-access' } });
     assert.equal(invalid.status, 400);
-    assert.deepEqual(invalid.body, { error: 'Invalid module access: bogus-access', code: 400 });
+    assert.deepEqual(invalid.body, {
+      error: 'The request does not match the documented schema.',
+      code: 400,
+      reason: 'validation',
+      fields: [{ path: `body/modules/${moduleKey}`, rule: 'enum' }],
+    });
     assert.deepEqual([...unknown.errorLines, ...invalid.errorLines], []);
   });
 }

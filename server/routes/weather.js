@@ -10,6 +10,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { utcDateKey } from '../utils/timezone.js';
 import { resolveWeatherSource } from '../services/weather-source.js';
 import { supportedLocaleFor } from '../utils/i18n.js';
@@ -208,7 +209,7 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null, logger 
   // `today` traegt den Kalendertag AM WETTERORT samt Hoch/Tief; `forecast` sind
   // die Folgetage. Die Anzeige benennt ihre Tage an `today.date`, nicht am Index.
   // ---------------------------------------------------------------
-  router.get('/', async (req, res) => {
+  router.get('/', validateRequest(), async (req, res) => {
     // Ausserhalb des try, damit der catch unten den Anbieter nennen kann.
     let provider = null;
     try {
@@ -471,7 +472,7 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null, logger 
   // Antwort ganz. `language` klein geschrieben.
   // ---------------------------------------------------------------
   const geocodeCache = new Map();
-  router.get('/geocode', async (req, res) => {
+  router.get('/geocode', validateRequest(), async (req, res) => {
     const name = typeof req.query.name === 'string' ? req.query.name.trim() : '';
     if (name.length < GEOCODE_MIN_CHARS) {
       return res.status(400).json({ error: 'Name too short.', code: 400, reason: 'name_too_short' });
@@ -529,7 +530,7 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null, logger 
   // Proxy für OpenWeatherMap-Icons - vermeidet externe Bild-Requests
   // im PWA-Standalone-Modus (CORS/CSP-Probleme auf Android Chrome).
   // ---------------------------------------------------------------
-  router.get('/icon/:code', async (req, res) => {
+  router.get('/icon/:code', validateRequest(), async (req, res) => {
     const { code } = req.params;
     if (!/^[a-zA-Z0-9]{2,4}$/.test(code)) {
       return res.status(400).json({ error: 'Invalid icon code.', code: 400 });

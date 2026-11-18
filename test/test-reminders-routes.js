@@ -22,6 +22,7 @@ process.env.DB_PATH = ':memory:';
 
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 // --------------------------------------------------------
 // Test-DB via vollständige Migrationskette
@@ -129,6 +130,8 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/api/v1/reminders', remindersRouter);
+// The central error handler of the app: validateRequest() hands its 400 on to it (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/reminders`;
@@ -368,11 +371,10 @@ test('POST / lehnt ungültigen entity_type ab (400)', async () => {
   currentUid = owner;
   const res = await call('POST', '', { entity_type: 'bogus', entity_id: makeTask(owner), remind_at: at(9, 0) });
   assert.equal(res.status, 400);
-  // Die Meldung zaehlt VALID_ENTITY_TYPES auf, statt die Liste ein zweites Mal
-  // von Hand zu fuehren: sie stand hier schon einmal veraltet da, waehrend die
-  // Route laengst mehr Typen kannte. Deshalb prueft der Test die Form und die
-  // Enden, nicht den ausgeschriebenen Satz.
-  assert.match(res.body.error, /^entity_type must be one of: task, event, subscription, inventory_item, inventory_tracked_date\.$/m);
+  // Since #2810 the schema of the operation refuses an origin outside the 16
+  // known ones, naming the field; the derived ones still reach the route and
+  // its own sentence (test:validate-small-modules-a).
+  assert.deepEqual(res.body.fields, [{ path: 'body/entity_type', rule: 'enum' }]);
   // `pantry_item`/`document_expiry` stehen bewusst NICHT im Text: derselbe
   // Endpunkt weist beide im naechsten Zweig ab (der eine, weil ein Lauf ihn
   // minuetlich wieder herstellt; der andere, weil documents.js#syncDocument-

@@ -90,6 +90,7 @@ const modulesSvc = await import('../server/services/modules.js');
 const install = await import('../server/services/module-install.js');
 const github = await import('../server/services/module-github.js');
 const { default: modulesRouter } = await import('../server/routes/modules.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 // ── Kleiner ZIP-Schreiber (deflate) ─────────────────────────────────────────
@@ -173,9 +174,12 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', modulesRouter);
+// At its real prefix, with the central error handler: validateRequest() finds
+// its operation by the mount and hands its 400 on (#2810).
+app.use('/api/v1/modules', modulesRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/modules`)));
 
 async function call(method, route, { actor: a, json, raw, contentType = 'application/zip' } = {}) {
   actor = a || admin();
@@ -794,13 +798,13 @@ test('leerer ZIP-Body mit richtigem Content-Type → not_zip mit dem Satz der Ro
     };
     next();
   });
-  spyApp.use('/', modulesRouter);
+  spyApp.use('/api/v1/modules', modulesRouter);
   const spy = spyApp.listen(0, '127.0.0.1');
   await new Promise((r) => spy.on('listening', r));
   try {
     const sock = net.connect(spy.address().port, '127.0.0.1');
     sock.on('error', () => {});
-    sock.write(`POST /install/zip HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/zip\r\nContent-Length: 100\r\n\r\n${'PK'.padEnd(10, 'x')}`);
+    sock.write(`POST /api/v1/modules/install/zip HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/zip\r\nContent-Length: 100\r\n\r\n${'PK'.padEnd(10, 'x')}`);
     await enteredP;
     sock.destroy();
     let fallback;
@@ -1646,7 +1650,10 @@ test('POST /install/github ohne oder mit leerer url → 400 bad_url sofort, auch
       const r = await call('POST', '/install/github', { json });
       assert.equal(r.status, 400, `${JSON.stringify(json)} → ${JSON.stringify(r.body)}`);
       assert.equal(r.body.reason, 'bad_url');
-      assert.match(r.body.error, /github\.com\/owner\/repo/);
+      // Since #2810 a missing or non-text url is refused by the schema of the
+      // operation, with the same reason and `fields`; an empty one by the route.
+      if (typeof json.url === 'string') assert.match(r.body.error, /github\.com\/owner\/repo/);
+      else assert.equal(r.body.fields?.[0]?.path, 'body/url', JSON.stringify(r.body));
     }
     assert.equal(requests, 0);
   } finally {

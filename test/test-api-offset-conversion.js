@@ -36,6 +36,7 @@ const { datetime } = await import('../server/middleware/validate.js');
 const { storedToInstantMs, storedToInstantMsPrecise } = await import('../server/utils/timezone.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: healthRouter } = await import('../server/routes/health.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { callTool } = await import('../server/mcp/tools.js');
@@ -85,13 +86,15 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/calendar', calendarRouter);
-app.use('/reminders', remindersRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/reminders', remindersRouter);
 app.use('/health', healthRouter);
 app.use('/housekeeping', housekeepingRouter);
 // Zweite Montierung unter dem echten Pfad: das MCP-Werkzeug `create_event`
 // geht seit #2616 per Loopback durch POST /api/v1/calendar, und genau DAS ist
 // die Aussage des Falls unten - derselbe Weg wie POST, nicht ein zweiter.
 app.use('/api/v1/calendar', calendarRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening',
   () => resolve(`http://127.0.0.1:${server.address().port}`)));
@@ -410,14 +413,14 @@ function newEvent(title) {
 
 test('POST und PUT /reminders speichern einen Offset als naiv-UTC', async () => {
   const eventId = newEvent('Erinnerung POST');
-  const posted = await call('POST', '/reminders', {
+  const posted = await call('POST', '/api/v1/reminders', {
     entity_type: 'event', entity_id: eventId, remind_at: '2099-01-01T09:00:00+02:00',
   });
   assert.equal(posted.status, 201);
   assert.equal(posted.body.data.remind_at, '2099-01-01T07:00:00');
 
   const setId = newEvent('Erinnerung PUT');
-  const put = await call('PUT', `/reminders?entity_type=event&entity_id=${setId}`, {
+  const put = await call('PUT', `/api/v1/reminders?entity_type=event&entity_id=${setId}`, {
     // Derselbe Zeitpunkt in zwei Schreibweisen ist EINE Erinnerung.
     remind_ats: ['2099-01-01T07:00:00', '2099-01-01T09:00:00+02:00', '2099-01-01T05:00-0200'],
   });
@@ -427,7 +430,7 @@ test('POST und PUT /reminders speichern einen Offset als naiv-UTC', async () => 
 
 test('PUT /reminders: derselbe Zeitpunkt in jeder Schreibweise ist EINE Erinnerung', async () => {
   const withTime = newEvent('Fuenf Schreibweisen');
-  const put = await call('PUT', `/reminders?entity_type=event&entity_id=${withTime}`, {
+  const put = await call('PUT', `/api/v1/reminders?entity_type=event&entity_id=${withTime}`, {
     remind_ats: ['2099-01-01T07:00', '2099-01-01T07:00:00', '2099-01-01T07:00:00.000',
       '2099-01-01T07:00:00Z', '2099-01-01T09:00:00+02:00'],
   });
@@ -437,13 +440,13 @@ test('PUT /reminders: derselbe Zeitpunkt in jeder Schreibweise ist EINE Erinneru
   // Ein reines Datum ist Mitternacht UTC - so feuerte es schon immer, jetzt
   // steht es auch so in der Zeile und faellt mit seinen Schreibweisen zusammen.
   const dateOnly = newEvent('Reines Datum');
-  const put2 = await call('PUT', `/reminders?entity_type=event&entity_id=${dateOnly}`, {
+  const put2 = await call('PUT', `/api/v1/reminders?entity_type=event&entity_id=${dateOnly}`, {
     remind_ats: ['2099-01-01', '2099-01-01T00:00', '2099-01-01T01:00:00+01:00'],
   });
   assert.equal(put2.status, 200, JSON.stringify(put2.body));
   assert.deepEqual(put2.body.data.map((r) => r.remind_at), ['2099-01-01T00:00:00']);
 
-  const posted = await call('POST', '/reminders', {
+  const posted = await call('POST', '/api/v1/reminders', {
     entity_type: 'event', entity_id: newEvent('POST naiv'), remind_at: '2099-01-01T07:00',
   });
   assert.equal(posted.body.data.remind_at, '2099-01-01T07:00:00');
@@ -466,12 +469,12 @@ test('remind_at mit Offset feuert puenktlich - auch eine schon roh so gespeicher
     ['2026-09-22T18:00:00+02:00', '2026-09-22T13:00:00-04:00'],
   );
   // Und der Weg, den die Route jetzt geht: dieselbe Eingabe, umgerechnet gespeichert.
-  const viaRoute = await call('POST', '/reminders', {
+  const viaRoute = await call('POST', '/api/v1/reminders', {
     entity_type: 'event', entity_id: newEvent('Faellig ueber die Route'), remind_at: offsetOf(now - 30 * 60000, 120),
   });
   assert.equal(viaRoute.status, 201);
 
-  const pending = await withFrozenClock(NOW, () => call('GET', '/reminders/pending'));
+  const pending = await withFrozenClock(NOW, () => call('GET', '/api/v1/reminders/pending'));
   assert.equal(pending.status, 200);
   const ids = pending.body.data.map((r) => r.id);
   assert.ok(ids.includes(dueEast), `+02:00 vor 30 min ist faellig: ${JSON.stringify(ids)}`);

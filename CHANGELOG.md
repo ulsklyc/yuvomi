@@ -37,6 +37,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seven routes under `/api/v1/birthdays` (list, upcoming, create, import candidates, import,
   update, delete) said `"Internal error."` on a server-side failure; they now say
   `"Internal server error."` like every other module. Status 500 and `code` are unchanged.
+- **Reminders, notification channels, modules, permissions, e-mail and weather check every
+  request against the published API description.** This is about your own API clients; the app
+  sends nothing that is refused now (a task reminder now goes out with its id as a number).
+  Under these six prefixes, input that used to be quietly accepted or reinterpreted is now
+  refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (it was read as another number or looked up as 12), and a query value given twice where
+    one is expected (`audience`, `admin`, `city`, `lang`, `entity_id`);
+  - `/api/v1/reminders`: `entity_id` as `1abc` or `1.9` (it was read as 1), an unknown
+    `entity_type`, `remind_at` as a list, and a time the route never read - a lowercase `t`
+    or `z`, a space instead of `T`, an offset of hours only (`+02`). A body that is not an
+    object or a `remind_ats` that is not a list is refused before the entry is looked up;
+  - `/api/v1/notifications`: a provider that is not exactly `gotify`, `ntfy`, `webhook` or
+    `email` (`" NTFY "` was accepted), a number as `name`, `enabled` as `"false"` (it switched
+    the channel ON), `config` or `secrets` as null, and `clearSecrets` that is not a list of
+    names (a number was a 500). A `provider` sent with an update must be a known one, too;
+  - `/api/v1/modules`: `overwrite` as `true` or `yes` on a ZIP install (`true` replaced, `yes`
+    was ignored), `overwrite: "1"` on a GitHub install, a `path` over 500 characters as sent,
+    `ref` or `path` that is not text, and an asset address without a file path (it was a 404);
+  - `/api/v1/permissions`: no body, a list as the body and `capabilities: null` (all three
+    answered 200 and REMOVED the stored rights), a map that is not an object, an access level
+    other than `none`, `read`, `write` (modules) or `none`, `allow` (widgets, capabilities),
+    and a member id such as `12abc` or `1.5`;
+  - `/api/v1/email`: a missing body on `PUT /config` (it was a 200 that saved nothing), `port`
+    as text, a truth value, a list or `""` (`"587"` was stored as text), a number or truth
+    value as `host`, `user`, `fromName`, `fromAddress` or `pass`, `clearPassword: "true"`, a
+    `secure` that is not one of its three values, and `to: null` or a number on `POST /test`;
+  - `/api/v1/weather`: a place name given twice, and an icon code other than 2 to 4 letters or
+    digits.
+
+  What stays allowed is in the description now too: `entity_id` as digit text on
+  `POST /reminders`, every time form the reminder routes read (a date alone, no seconds, a
+  fraction, `Z`, `+02:00` or `+0200`), up to five reminders counted after conversion, a
+  partial channel update, null to clear an e-mail field, any `lang` on the weather routes
+  (`de-AT`, an unknown code falls back), `admin` and `audience` as any text. A refusal's
+  `reason` can now be the route's own documented reason instead of `validation`, and an entry
+  in `fields` can carry it as `reason`: `bad_url` (GitHub URL missing, not text or too long),
+  `email_port_invalid`, `email_from_invalid` (a sender that is neither text nor null) and
+  `name_too_short` (a place name that is missing, empty or given twice) keep the reason they
+  had. The check runs after the admin, session and rate-limit checks, so a member still gets
+  403, and before the entry is looked up, so a bad request for a missing channel, member or
+  reminder target is now a 400, not a 404.
 
 ### Fixed
 - **The API description marks every value that may be null in the OpenAPI 3.1 way.** 36 places - the

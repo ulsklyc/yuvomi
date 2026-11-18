@@ -151,7 +151,8 @@ app.use('/budget', requireAuth, budgetRouter);
 app.use('/dashboard', requireAuth, dashboardRouter);
 app.use('/rewards', requireAuth, rewardsRouter);
 app.use('/split-expenses', requireAuth, splitRouter);
-app.use('/permissions', requireAuth, permissionsRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/permissions', requireAuth, permissionsRouter);
 app.use('/documents', requireAuth, documentsRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -312,7 +313,7 @@ test('accounts: GET /auth/users lists everyone and marks staff and guests', asyn
 });
 
 test('accounts: GET /permissions/catalog lists everyone with access_scope', async () => {
-  const r = await call('GET', '/permissions/catalog');
+  const r = await call('GET', '/api/v1/permissions/catalog');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data.members), EVERYONE);
   assert.deepEqual(scopesOf(r.body.data.members), SCOPES);

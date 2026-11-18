@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withValidationRefusal } from '../helpers.js';
 
 export function notificationsPaths() {
   return {
@@ -47,30 +47,31 @@ export function notificationsPaths() {
         admin: true,
         stateChanging: true,
         params: [idParam()],
-        requestBody: jsonBody('#/components/schemas/NotificationChannelInput'),
+        requestBody: jsonBody('#/components/schemas/NotificationChannelUpdateInput'),
         responses: {
           200: { description: 'Successful response' },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           409: { description: 'Not a household channel; it stays unchanged and can only be deleted here' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
-      delete: op({
+      delete: withValidationRefusal(op({
         summary: 'Delete a household notification channel',
         tag: 'Notifications',
         admin: true,
         stateChanging: true,
         params: [idParam()],
-      }),
+      })),
     },
     '/api/v1/notifications/channels/{id}/test': {
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Send a test notification through a channel',
         tag: 'Notifications',
         admin: true,
         stateChanging: true,
         params: [idParam()],
-      }),
+      })),
     },
 
     // --- Health module ---

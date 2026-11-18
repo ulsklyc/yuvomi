@@ -19,6 +19,7 @@ const dbmod = await import('../server/db.js');
 const scheduleReminders = await import('../server/services/schedule-reminders.js');
 const { default: schedulePreferencesRouter } = await import('../server/routes/schedule-preferences.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 db.prepare("INSERT INTO sync_config (key, value) VALUES ('household_timezone', 'UTC')").run();
@@ -537,7 +538,9 @@ const app = express();
 app.use(express.json());
 app.use((req, _res, next) => { req.authUserId = actorId; req.sessionModuleAccess = {}; req.authScopes = null; next(); });
 app.use('/schedule/preferences', schedulePreferencesRouter);
-app.use('/reminders', remindersRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/reminders', remindersRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -673,6 +676,6 @@ test('POST /reminders lehnt ein handgesetztes schedule_entry mit 400 ab', async 
   await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
   const anchor = anchorFor(alice, REAL_TOMORROW);
 
-  const r = await call('POST', '/reminders', { body: { entity_type: 'schedule_entry', entity_id: anchor.id, remind_at: '2026-09-10T05:00:00' } });
+  const r = await call('POST', '/api/v1/reminders', { body: { entity_type: 'schedule_entry', entity_id: anchor.id, remind_at: '2026-09-10T05:00:00' } });
   assert.equal(r.status, 400);
 });

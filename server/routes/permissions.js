@@ -10,6 +10,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { requireAdmin } from '../auth.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { listModules } from '../services/modules.js';
 import { accessScopeSql, activeAccountSql, householdMemberSql, memberOrderSql } from '../services/household-members.js';
 import {
@@ -48,13 +49,15 @@ function replacePermissionsAndSync(database, subjectType, subjectId, input, user
 }
 
 // requireAuth + csrfMiddleware werden global in server/index.js angewandt.
+// Der Admin-Riegel steht vor validateRequest() jeder Route: ein Mitglied
+// bekommt 403, nie eine 400 mit Feldnamen (#2810).
 router.use(requireAdmin);
 
 /**
  * GET /api/v1/permissions/catalog
  * Liefert Module, Widgets, Rollen und die Mitgliederliste für die Rechte-Matrix.
  */
-router.get('/catalog', async (req, res) => {
+router.get('/catalog', validateRequest(), async (req, res) => {
   await listModules({ admin: true });
   const catalog = permissionCatalog();
   const members = db.get().prepare(`
@@ -72,7 +75,7 @@ router.get('/catalog', async (req, res) => {
  * GET /api/v1/permissions/role/:familyRole
  * Gespeicherte (abweichende) Rechte eines Rollen-Profils.
  */
-router.get('/role/:familyRole', (req, res) => {
+router.get('/role/:familyRole', validateRequest(), (req, res) => {
   const familyRole = String(req.params.familyRole || '');
   if (!isValidFamilyRole(familyRole)) {
     return res.status(400).json({ error: 'Invalid family role.', code: 400 });
@@ -86,7 +89,7 @@ router.get('/role/:familyRole', (req, res) => {
  * jedem Aufruf ersetzt; Capabilities nur, wenn das Feld ausdrücklich vorkommt.
  * So bleiben ältere Clients kompatibel. Standard-Werte werden nicht gespeichert.
  */
-router.put('/role/:familyRole', (req, res) => {
+router.put('/role/:familyRole', validateRequest(), (req, res) => {
   try {
     const familyRole = String(req.params.familyRole || '');
     if (!isValidFamilyRole(familyRole)) {
@@ -111,7 +114,7 @@ router.put('/role/:familyRole', (req, res) => {
  * GET /api/v1/permissions/user/:userId
  * Gespeicherte (abweichende) Mitglied-Overrides.
  */
-router.get('/user/:userId', (req, res) => {
+router.get('/user/:userId', validateRequest(), (req, res) => {
   const userId = parseInt(req.params.userId, 10);
   if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
   const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(userId);
@@ -124,7 +127,7 @@ router.get('/user/:userId', (req, res) => {
  * Body wie bei role. Leere Maps leeren jeweils ihre eigene Achse. Zum Entfernen
  * aller Overrides müssen modules, widgets und capabilities leer gesendet werden.
  */
-router.put('/user/:userId', (req, res) => {
+router.put('/user/:userId', validateRequest(), (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });

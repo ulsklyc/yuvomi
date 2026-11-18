@@ -364,9 +364,12 @@ test('keine Absage der Erinnerungs-Routen traegt deutschen Wortlaut', async () =
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  remApp.use('/reminders', remindersRouter);
+  // At its real prefix, with the central error handler: validateRequest() finds
+  // its operation by the mount and hands its 400 on (#2810).
+  remApp.use('/api/v1/reminders', remindersRouter);
+  remApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const remServer = remApp.listen(0, '127.0.0.1');
-  const remUrl = await new Promise((r) => remServer.on('listening', () => r(`http://127.0.0.1:${remServer.address().port}`)));
+  const remUrl = await new Promise((r) => remServer.on('listening', () => r(`http://127.0.0.1:${remServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body, tokenScopes = null) => {
@@ -773,7 +776,9 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
   gApp.use('/shopping', shoppingRouter);
   gApp.use('/tasks', tasksRouter);
   gApp.use('/push', pushRouter);
-  gApp.use('/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) }));
+  // The weather router at its real prefix, with the central error handler (#2810).
+  gApp.use('/api/v1/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) }));
+  gApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const gServer = gApp.listen(0, '127.0.0.1');
   const gUrl = await new Promise((r) => gServer.on('listening', () => r(`http://127.0.0.1:${gServer.address().port}`)));
   try {
@@ -827,8 +832,8 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
     await run('push-subscribe', 'POST', '/push/subscribe', {});
     await run('push-unsubscribe', 'POST', '/push/unsubscribe', {});
     await run('push-wall-mode', 'PUT', '/push/wall-mode', {});
-    await run('weather-icon-code', 'GET', '/weather/icon/!!');
-    await run('weather-icon-upstream', 'GET', '/weather/icon/01d');
+    await run('weather-icon-code', 'GET', '/api/v1/weather/icon/!!');
+    await run('weather-icon-upstream', 'GET', '/api/v1/weather/icon/01d');
 
     assertRefusedInEnglish(seen);
   } finally {
