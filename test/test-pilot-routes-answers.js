@@ -36,7 +36,11 @@ const { applyChildStartPermissions } = await import('../server/authorize/index.t
 const db = dbmod.get();
 
 // Days until a birthday, its next date and the order of the lists follow the
-// clock: it stands still at noon UTC, the same day in every household zone.
+// clock and "today" of the household zone (todayKey, server/utils/timezone.js).
+// Both are pinned: the clock stands still at noon UTC, and the household lives
+// in Europe/Berlin - without the setting the zone falls back to the process
+// TZ, and from UTC+12 on noon UTC is already the next day.
+db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', 'Europe/Berlin')").run();
 mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-11-18T12:00:00Z') });
 
 /**
