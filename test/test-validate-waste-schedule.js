@@ -546,6 +546,21 @@ test('schedule rights order: the collecting writes refuse a foreign user_id befo
   assertStatus(await call('PUT', '/schedule/overrides/2027-01-22', { actor: 'admin', json: { user_id: BOB, shift_type_id: null } }), 200);
 });
 
+// The own id with a digit prefix is not the own id: parseInt would read
+// `"<id>abc"` as <id>, the middleware must not. Digit text of the own id is
+// the legacy form and passes.
+test('schedule rights order: a digit-prefix form of the own id is foreign, digit text of the own id passes', async () => {
+  const prefixForms = [`${ALICE}abc`, `${ALICE}.0`, ` ${ALICE}`, `${ALICE}e0`];
+  for (const form of prefixForms) {
+    const body = await call('PUT', '/schedule/overrides/2027-01-23', { actor: 'alice', json: { user_id: form, shift_type_id: null } });
+    assert.deepEqual({ status: body.status, body: body.body }, { status: 403, body: FORBIDDEN }, `body ${JSON.stringify(form)}`);
+    const query = await call('DELETE', `/schedule/overrides/2027-01-23?user_id=${encodeURIComponent(form)}`, { actor: 'alice' });
+    assert.deepEqual({ status: query.status, body: query.body }, { status: 403, body: FORBIDDEN }, `query ${JSON.stringify(form)}`);
+  }
+  assertStatus(await call('PUT', '/schedule/overrides/2027-01-23', { actor: 'alice', json: { user_id: String(ALICE), shift_type_id: null } }), 200, 'own digit text in the body');
+  assertStatus(await call('DELETE', `/schedule/overrides/2027-01-23?user_id=${ALICE}`, { actor: 'alice' }), 204, 'own digit text in the query');
+});
+
 test('schedule order changes: a malformed request is a 400 before the 404 and 403, a valid one meets the old answer', async () => {
   // Bob's rows, which alice may not change.
   const bobPattern = (await call('POST', '/schedule/patterns', { actor: 'bob', json: { user_id: BOB, name: 'B', anchor_date: '2027-01-04', cycle_length: 7 } })).body.data;
