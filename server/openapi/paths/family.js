@@ -1,4 +1,4 @@
-import { jsonBody, op } from '../helpers.js';
+import { idParam, jsonBody, op } from '../helpers.js';
 
 const apiError = (description) => ({
   description,
@@ -12,8 +12,8 @@ export function familyPaths() {
         summary: "Fetch a person's profile picture",
         tag: 'Family',
         params: [
-          // Plain integer (#2810): `0` and a negative id stay the route's own answer.
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' }, description: 'User ID, plain decimal digits.' },
+          // Bounded above only (#2810): `0` and a negative id stay the route's own answer.
+          idParam('id', 'User ID, plain decimal digits.'),
           {
             name: 'v',
             in: 'query',

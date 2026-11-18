@@ -411,6 +411,16 @@ test('an integer parameter must be written as plain decimal digits: 1e2 and 0x10
   assert.equal((await call('GET', '/api/v1/things/007')).status, 200, 'leading zeros are digits');
 });
 
+test('an integer parameter too long for a finite number is a 400 of type, though Ajv would coerce it to Infinity', async () => {
+  // Ajv turns 400 digits into Infinity without checking the type again and
+  // skips maximum and minimum for a number that is not finite (#2810).
+  for (const digits of ['9'.repeat(400), `-${'9'.repeat(400)}`]) {
+    assertRefused(await call('GET', `/api/v1/things/${digits}`), [{ path: 'path/id', rule: 'type' }]);
+    assertRefused(await call('GET', `/api/v1/things?limit=${digits}`), [{ path: 'query/limit', rule: 'type' }]);
+  }
+  assert.equal((await call('GET', `/api/v1/things/${'9'.repeat(300)}`)).status, 200, 'a long but finite run of digits is a number');
+});
+
 test('a query number written as text goes through, and the handler still reads the string', async () => {
   const res = await call('GET', '/api/v1/things?limit=5');
   assert.equal(res.status, 200, JSON.stringify(res.body));

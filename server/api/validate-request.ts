@@ -336,13 +336,16 @@ function withReason(field: Field, reason: string | undefined): Field {
 
 /**
  * The integer parameters of one place that are not written as plain decimal
- * digits, with the reason their schema names for `type`.
+ * digits, or whose digits are too many for a finite number (above ~1.8e308),
+ * with the reason their schema names for `type`. Ajv coerces such a value to
+ * Infinity without checking its type again, and skips `maximum` and `minimum`
+ * for a number that is not finite: it would reach the handler unchecked.
  */
 function nonDecimalIntegers(spec: OpenApiDocument, source: Record<string, unknown> | undefined, parameters: Parameter[], place: string): Field[] {
   return parameters
     .filter((p) => {
       const value = source?.[p.name as string];
-      return typeof value === 'string' && !DECIMAL_INTEGER.test(value);
+      return typeof value === 'string' && (!DECIMAL_INTEGER.test(value) || !Number.isFinite(Number(value)));
     })
     .map((p) => withReason({ path: `${place}/${p.name}`.slice(0, MAX_PATH_LENGTH), rule: 'type' }, reasonOf(spec, p.schema, 'type')));
 }

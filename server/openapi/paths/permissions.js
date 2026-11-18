@@ -1,4 +1,4 @@
-import { op, jsonBody, withValidationRefusal } from '../helpers.js';
+import { op, jsonBody, idParam, withValidationRefusal } from '../helpers.js';
 
 /** Der Rollen-Name ist kein numerischer Bezeichner - idParam() passt hier nicht. */
 const familyRoleParam = {
@@ -9,13 +9,7 @@ const familyRoleParam = {
   description: 'Family role the profile belongs to.',
 };
 
-const userIdParam = {
-  name: 'userId',
-  in: 'path',
-  required: true,
-  schema: { type: 'integer' },
-  description: 'Member the overrides belong to.',
-};
+const userIdParam = idParam('userId', 'Member the overrides belong to.');
 
 const BODY = 'Body: { modules, widgets, capabilities } - `modules` maps a module key to `none`, `read` or `write`, '
   + '`widgets` maps a widget id to `none` or `allow`, and `capabilities` maps '
