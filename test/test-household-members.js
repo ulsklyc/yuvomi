@@ -152,7 +152,7 @@ app.use('/tasks', requireAuth, tasksRouter);
 app.use('/calendar', requireAuth, calendarRouter);
 app.use('/budget', requireAuth, budgetRouter);
 app.use('/dashboard', requireAuth, dashboardRouter);
-app.use('/rewards', requireAuth, rewardsRouter);
+app.use('/api/v1/rewards', requireAuth, rewardsRouter);
 app.use('/split-expenses', requireAuth, splitRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 app.use('/api/v1/permissions', requireAuth, permissionsRouter);
@@ -264,11 +264,11 @@ test('members only: the dashboard user list, reward standings and participant co
 });
 
 test('members only: reward balances, participant count and the participant list', async () => {
-  const overview = await call('GET', '/rewards/overview');
+  const overview = await call('GET', '/api/v1/rewards/overview');
   assert.equal(overview.status, 200);
   assert.deepEqual(idsOf(overview.body.data.balances), MEMBERS);
   assert.equal(overview.body.data.setup.participantCount, MEMBERS.length);
-  const participants = await call('GET', '/rewards/participants');
+  const participants = await call('GET', '/api/v1/rewards/participants');
   assert.equal(participants.status, 200);
   assert.deepEqual(idsOf(participants.body.data), MEMBERS);
 });
@@ -511,19 +511,19 @@ test('schedule: staff who already own a schedule keep it editable', async () => 
 });
 
 test('rewards: only a household member can be enrolled, an old enrolment can still be switched', async () => {
-  const ok = await call('PUT', `/rewards/participants/${BEN}`, { body: { enabled: true } });
+  const ok = await call('PUT', `/api/v1/rewards/participants/${BEN}`, { body: { enabled: true } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('PUT', `/rewards/participants/${EMIL}`, { body: { enabled: true } }), 'guest enrolment');
+  assertRejectsNonMember(await call('PUT', `/api/v1/rewards/participants/${EMIL}`, { body: { enabled: true } }), 'guest enrolment');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM reward_participants WHERE user_id = ?').get(EMIL).n, 0, 'a rejected PUT writes nothing');
 
   // Doras Einschreibung stammt von frueher: sie bleibt stehen, laesst sich
   // bestaetigen und abschalten - nur neu anlegen laesst sie sich nicht mehr.
-  const still = await call('PUT', `/rewards/participants/${DORA}`, { body: { enabled: true } });
+  const still = await call('PUT', `/api/v1/rewards/participants/${DORA}`, { body: { enabled: true } });
   assert.equal(still.status, 200, JSON.stringify(still.body));
-  const off = await call('PUT', `/rewards/participants/${DORA}`, { body: { enabled: false } });
+  const off = await call('PUT', `/api/v1/rewards/participants/${DORA}`, { body: { enabled: false } });
   assert.equal(off.status, 200, JSON.stringify(off.body));
   assert.equal(db.prepare('SELECT enabled FROM reward_participants WHERE user_id = ?').get(DORA).enabled, 0, 'switched off, not deleted');
-  assertRejectsNonMember(await call('PUT', `/rewards/participants/${DORA}`, { body: { enabled: true } }), 'switching an old guest enrolment back on');
+  assertRejectsNonMember(await call('PUT', `/api/v1/rewards/participants/${DORA}`, { body: { enabled: true } }), 'switching an old guest enrolment back on');
 });
 
 // --------------------------------------------------------------------------
@@ -838,12 +838,12 @@ test('rewards: an old enrolment of an account that is not a member earns, redeem
 
   const itemId = Number(db.prepare("INSERT INTO reward_catalog (name, cost, created_by) VALUES ('Eis', 1, ?)").run(ANNA).lastInsertRowid);
   db.prepare("INSERT INTO reward_ledger (user_id, delta, type, reason, created_by) VALUES (?, 10, 'bonus', 'Altbestand', ?)").run(CLARA, ANNA);
-  const redeem = await call('POST', '/rewards/redemptions', { body: { catalog_id: itemId, user_id: CLARA } });
+  const redeem = await call('POST', '/api/v1/rewards/redemptions', { body: { catalog_id: itemId, user_id: CLARA } });
   assert.equal(redeem.status, 400, `redeeming for an old staff enrolment: ${JSON.stringify(redeem.body)}`);
-  const bonus = await call('POST', '/rewards/bonus', { body: { user_id: CLARA, delta: 3 } });
+  const bonus = await call('POST', '/api/v1/rewards/bonus', { body: { user_id: CLARA, delta: 3 } });
   assert.equal(bonus.status, 400, `a bonus for an old staff enrolment: ${JSON.stringify(bonus.body)}`);
 
-  const ok = await call('POST', '/rewards/redemptions', { body: { catalog_id: itemId, user_id: BEN } });
+  const ok = await call('POST', '/api/v1/rewards/redemptions', { body: { catalog_id: itemId, user_id: BEN } });
   assert.equal(ok.status, 201, `the member redeems as before: ${JSON.stringify(ok.body)}`);
 });
 

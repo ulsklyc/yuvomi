@@ -367,7 +367,7 @@
  "server/services/recipe-providers/private-network.js\tknip/exports": 1,
  "server/services/recurrence.js\toxlint/no-restricted-syntax/UTC-DAY-KEY": 7,
  "server/services/reminder-deleted-occurrence.js\tknip/exports": 2,
- "server/services/reward-money.js\tknip/exports": 6,
+ "server/services/reward-money.js\tknip/exports": 5,
  "server/services/rewards.js\tknip/exports": 2,
  "server/services/schedule-ics.js\toxlint/no-unused-vars": 1,
  "server/services/search.js\tknip/exports": 3,

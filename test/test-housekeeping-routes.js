@@ -21,6 +21,8 @@ const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { computeHourlyAmount } = await import('../server/services/housekeeping-billing.js');
 const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
 const { householdTimeZone, utcToWall } = await import('../server/utils/timezone.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
@@ -29,6 +31,7 @@ const MEMBER = db.prepare(`INSERT INTO users (username, display_name, password_h
 let actor = { id: ADMIN, role: 'admin' };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
@@ -41,13 +44,17 @@ app.use((req, _res, next) => {
 // Die Zahlungsaufgabe ist ein zweiter Weg an den bezahlten Besuch, deshalb
 // haengt der Aufgaben-Router mit im selben Server (GHSA-4p5w-5346-8598).
 app.use('/tasks-api', tasksRouter);
-app.use('/', housekeepingRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810);
+// call() keeps the short paths of this suite.
+app.use('/api/v1/housekeeping', housekeepingRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, { as, body } = {}) {
   if (as) actor = as;
-  const res = await fetch(`${baseUrl}${path}`, {
+  const url = path.startsWith('/tasks-api') ? `${baseUrl}${path}` : `${baseUrl}/api/v1/housekeeping${path}`;
+  const res = await fetch(url, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -295,7 +302,8 @@ test('DELETE /visits/:id: entfernt Besuch (danach 404)', async () => {
   // Seite sagt den Satz der App, laedt nach, und ein zweites Loeschen ist erledigt.
   assert.equal(get.body.reason, 'housekeeping_visit_not_found');
   for (const [method, path, body] of [
-    ['PUT', `/visits/${SESSION_ID}`, { daily_rate: 50, extras: 0 }],
+    // A valid body (`date` is required): a body outside the schema is a 400 before the lookup (#2810).
+    ['PUT', `/visits/${SESSION_ID}`, { date: '2026-11-01', daily_rate: 50, extras: 0 }],
     ['POST', `/visits/${SESSION_ID}/pay`, {}],
     ['POST', `/visits/${SESSION_ID}/unpay`, {}],
     ['DELETE', `/visits/${SESSION_ID}`, undefined],

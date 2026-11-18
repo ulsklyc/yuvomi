@@ -324,11 +324,16 @@ test('der Einzelpfad verraet nicht, was die Liste verschweigt: eine fremde Geld-
   assert.equal(missing.status, 404);
 
   for (const [label, id] of [['offen', open.body.data.id], ['entschieden', decided.body.data.id]]) {
-    for (const action of ['cancel', 'fulfill', 'reject', 'unsinn']) {
+    for (const action of ['cancel', 'fulfill', 'reject']) {
       const res = await leo.call('PATCH', `/rewards/redemptions/${id}`, { action });
       assert.equal(res.status, 404, `${label}/${action}: wie eine Kennung, die es nicht gibt`);
       assert.deepEqual(res.body, missing.body, 'und mit genau derselben Antwort');
     }
+    // Eine Aktion ausserhalb der Liste ist seit #2810 ein 400 VOR dem Nachschlagen:
+    // dieselbe Antwort fuer die fremde Anfrage wie fuer eine, die es nicht gibt.
+    const nonsense = await leo.call('PATCH', `/rewards/redemptions/${id}`, { action: 'unsinn' });
+    assert.equal(nonsense.status, 400, `${label}/unsinn`);
+    assert.deepEqual(nonsense.body, (await leo.call('PATCH', '/rewards/redemptions/99999999', { action: 'unsinn' })).body, `${label}/unsinn: dieselbe Antwort`);
   }
   assert.equal(db.prepare('SELECT status FROM reward_redemptions WHERE id = ?').get(open.body.data.id).status, 'pending');
 

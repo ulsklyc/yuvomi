@@ -12,7 +12,9 @@ import * as db from '../db.js';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
 import { collectErrors, color, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
+import { MAX_WORKER_NAME, MAX_WORKER_USERNAME, PAYMENT_SCHEDULES, RATE_TYPES } from '../services/housekeeping-fields.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
 import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import {
@@ -71,7 +73,6 @@ const router = express.Router();
 
 const MAX_PHOTO_DATA_LENGTH = 6 * 1024 * 1024;
 const IMAGE_DATA_RE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
-const PAYMENT_SCHEDULES = ['daily', 'twice_monthly', 'monthly'];
 // Lese-Rueckfall fuer eine Zeile ohne Farbe - Bestand, deshalb unveraendert.
 const DEFAULT_CALENDAR_COLOR = '#7C3AED';
 // Startfarbe eines NEUEN Profils ohne eigene Wahl: die Vorgabe der geteilten
@@ -904,7 +905,7 @@ function defaultShoppingList(actorId) {
   return result.lastInsertRowid;
 }
 
-router.get('/dashboard', (req, res) => {
+router.get('/dashboard', validateRequest(), (req, res) => {
   try {
     res.json({ data: housekeepingDashboard(receiptAccess(req), req.query) });
   } catch (err) {
@@ -913,7 +914,7 @@ router.get('/dashboard', (req, res) => {
   }
 });
 
-router.get('/task-templates', (_req, res) => {
+router.get('/task-templates', validateRequest(), (_req, res) => {
   try {
     res.json({ data: TASK_TEMPLATES });
   } catch (err) {
@@ -922,7 +923,7 @@ router.get('/task-templates', (_req, res) => {
   }
 });
 
-router.get('/worker', (req, res) => {
+router.get('/worker', validateRequest(), (req, res) => {
   try {
     res.json({ data: publicWorker(loadWorker(), localDayContext(req.query), receiptAccess(req)) });
   } catch (err) {
@@ -931,7 +932,7 @@ router.get('/worker', (req, res) => {
   }
 });
 
-router.get('/workers', (req, res) => {
+router.get('/workers', validateRequest(), (req, res) => {
   try {
     const context = localDayContext(req.query);
     const receipts = receiptAccess(req);
@@ -950,8 +951,10 @@ router.get('/workers', (req, res) => {
   }
 });
 
-router.post('/worker', async (req, res) => {
-  if (!assertAdmin(req, res)) return;
+// Das Admin-Recht haengt an keiner Zeile: es steht als Middleware VOR
+// validateRequest() (#2810), ein Mitglied bekommt 403 wie bisher, nie ein 400,
+// das Felder nennt. Dieselbe Absage (refuseAdmin) wie vorher im Handler.
+router.post('/worker', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const vWorkerId = req.body.id !== undefined && req.body.id !== null && req.body.id !== ''
       ? validateId(req.body.id, 'id')
@@ -960,8 +963,8 @@ router.post('/worker', async (req, res) => {
     const existing = vWorkerId.value ? loadWorkerById(vWorkerId.value) : null;
     if (vWorkerId.value && !existing) return res.status(404).json({ error: 'Housekeeper not found.', code: 404, reason: 'housekeeping_worker_not_found' });
 
-    const vDisplayName = str(req.body.display_name, 'display_name', { max: 128 });
-    const vUsername = str(req.body.username, 'username', { max: 64, required: false });
+    const vDisplayName = str(req.body.display_name, 'display_name', { max: MAX_WORKER_NAME });
+    const vUsername = str(req.body.username, 'username', { max: MAX_WORKER_USERNAME, required: false });
     const vPhone = str(req.body.phone, 'phone', { max: MAX_SHORT, required: false });
     const vEmail = str(req.body.email, 'email', { max: MAX_TITLE, required: false });
     // Ohne Jahr (#2095) weicht das Jahr dem Platzhalter, bevor geprueft wird.
@@ -971,7 +974,7 @@ router.post('/worker', async (req, res) => {
     const vSchedule = oneOf(req.body.payment_schedule || 'monthly', PAYMENT_SCHEDULES, 'payment_schedule');
     const vCalendarColor = color(req.body.calendar_color || existing?.calendar_color || NEW_WORKER_COLOR, 'calendar_color');
     const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
-    const vRateType = oneOf(req.body.rate_type || 'daily', ['daily', 'hourly'], 'rate_type');
+    const vRateType = oneOf(req.body.rate_type || 'daily', RATE_TYPES, 'rate_type');
     const vHourlyRate = num(req.body.hourly_rate, 'hourly_rate');
     const errors = collectErrors([vDisplayName, vUsername, vPhone, vEmail, vYearUnknown, vBirthDate, vDailyRate, vSchedule, vCalendarColor, vNotes, vRateType, vHourlyRate]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
@@ -1048,7 +1051,7 @@ router.post('/worker', async (req, res) => {
   }
 });
 
-router.get('/summary', (req, res) => {
+router.get('/summary', validateRequest(), (req, res) => {
   try {
     const vMonth = month(req.query.month, 'month');
     if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
@@ -1066,7 +1069,7 @@ router.get('/summary', (req, res) => {
   }
 });
 
-router.get('/work-sessions', (req, res) => {
+router.get('/work-sessions', validateRequest(), (req, res) => {
   try {
     reconcilePaymentTasks();
     const vMonth = month(req.query.month, 'month');
@@ -1084,7 +1087,7 @@ router.get('/work-sessions', (req, res) => {
   }
 });
 
-router.get('/visits', (req, res) => {
+router.get('/visits', validateRequest(), (req, res) => {
   try {
     reconcilePaymentTasks();
     const vMonth = month(req.query.month, 'month');
@@ -1137,7 +1140,7 @@ router.get('/visits', (req, res) => {
   }
 });
 
-router.post('/work-sessions/check-in', (req, res) => {
+router.post('/work-sessions/check-in', validateRequest(), (req, res) => {
   try {
     if (loadWorkers().length === 0) {
       return res.status(400).json({ error: 'Add a housekeeper before checking in.', code: 400 });
@@ -1199,7 +1202,7 @@ router.post('/work-sessions/check-in', (req, res) => {
   }
 });
 
-router.get('/visits/:id', (req, res) => {
+router.get('/visits/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1238,7 +1241,7 @@ router.get('/visits/:id', (req, res) => {
   }
 });
 
-router.put('/visits/:id', (req, res) => {
+router.put('/visits/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1374,7 +1377,7 @@ router.put('/visits/:id', (req, res) => {
   }
 });
 
-router.post('/visits/:id/pay', (req, res) => {
+router.post('/visits/:id/pay', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1409,7 +1412,7 @@ router.post('/visits/:id/pay', (req, res) => {
 // verknuepfte Zahlungsaufgabe direkt wieder geoeffnet, ohne Punktebuchung, und
 // ihr Erledigungseintrag geht mit (#1836, services/task-completions.js). Bliebe sie 'done', setzte
 // reconcilePaymentTasks() beim naechsten GET /visits paid_at sofort wieder.
-router.post('/visits/:id/unpay', (req, res) => {
+router.post('/visits/:id/unpay', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1436,7 +1439,7 @@ router.post('/visits/:id/unpay', (req, res) => {
   }
 });
 
-router.delete('/visits/:id', (req, res) => {
+router.delete('/visits/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1454,7 +1457,7 @@ router.delete('/visits/:id', (req, res) => {
   }
 });
 
-router.post('/work-sessions/check-out', (req, res) => {
+router.post('/work-sessions/check-out', validateRequest(), (req, res) => {
   try {
     const vWorkerId = validateId(req.body.worker_id, 'worker_id');
     if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
@@ -1513,7 +1516,7 @@ const REOPEN_WINDOW_MINUTES = 10;
  * wieder eingecheckt ist: sonst stuenden zwei offene Sitzungen da, und die
  * Seite kennt nur eine.
  */
-router.post('/work-sessions/:id/reopen', (req, res) => {
+router.post('/work-sessions/:id/reopen', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1544,7 +1547,7 @@ router.post('/work-sessions/:id/reopen', (req, res) => {
   }
 });
 
-router.get('/decay-tasks', (_req, res) => {
+router.get('/decay-tasks', validateRequest(), (_req, res) => {
   try {
     const rows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks ORDER BY area COLLATE NOCASE, name COLLATE NOCASE').all();
     const tz = householdTimeZone(db.get());
@@ -1563,7 +1566,7 @@ router.get('/decay-tasks', (_req, res) => {
   }
 });
 
-router.post('/decay-tasks', (req, res) => {
+router.post('/decay-tasks', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'name', { max: MAX_TITLE });
     const vArea = str(req.body.area, 'area', { max: MAX_SHORT });
@@ -1589,7 +1592,7 @@ router.post('/decay-tasks', (req, res) => {
   }
 });
 
-router.patch('/decay-tasks/:taskId', (req, res) => {
+router.patch('/decay-tasks/:taskId', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.taskId, 'taskId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1619,7 +1622,7 @@ router.patch('/decay-tasks/:taskId', (req, res) => {
   }
 });
 
-router.post('/decay-tasks/:taskId/complete', (req, res) => {
+router.post('/decay-tasks/:taskId/complete', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.taskId, 'taskId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1635,7 +1638,7 @@ router.post('/decay-tasks/:taskId/complete', (req, res) => {
   }
 });
 
-router.delete('/decay-tasks/:taskId', (req, res) => {
+router.delete('/decay-tasks/:taskId', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.taskId, 'taskId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1648,21 +1651,31 @@ router.delete('/decay-tasks/:taskId', (req, res) => {
   }
 });
 
-router.post('/supply-requests', (req, res) => {
-  try {
-    // WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1351, Regel aus
-    // #1290, ausfuehrlich in routes/meals.js). Der Pfad sagt `housekeeping`,
-    // angelegt wird ein `shopping_items`-Eintrag und ueber
-    // `defaultShoppingList()` notfalls eine ganze Einkaufsliste. Die Riegel in
-    // server/index.js urteilen am ersten Pfadsegment und sehen davon nichts;
-    // `mayWriteModule()` prueft Mitgliedsrecht und Token-Scope in einem Aufruf.
-    //
-    // Als Erstes, vor Validierung und Transaktion: eine Antwort darf einem
-    // Gesperrten nichts ueber den Einkauf verraten, und angelegt wird nichts.
-    if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
-    }
+// WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1351, Regel aus
+// #1290, ausfuehrlich in routes/meals.js). Der Pfad sagt `housekeeping`,
+// angelegt wird ein `shopping_items`-Eintrag und ueber
+// `defaultShoppingList()` notfalls eine ganze Einkaufsliste. Die Riegel in
+// server/index.js urteilen am ersten Pfadsegment und sehen davon nichts;
+// `mayWriteModule()` prueft Mitgliedsrecht und Token-Scope in einem Aufruf.
+//
+// Als Erstes, vor Validierung und Transaktion: eine Antwort darf einem
+// Gesperrten nichts ueber den Einkauf verraten, und angelegt wird nichts. Das
+// Recht haengt an keiner Zeile und steht deshalb als Middleware VOR
+// validateRequest() (#2810): 403 bleibt 403, auch bei kaputtem Koerper.
+/**
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireShoppingWrite(req, res, next) {
+  if (!mayWriteModule(req, 'shopping')) {
+    return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
 
+router.post('/supply-requests', requireShoppingWrite, validateRequest(), (req, res) => {
+  try {
     const vName = str(req.body.name, 'name', { max: MAX_TITLE });
     const vQuantity = str(req.body.quantity, 'quantity', { max: MAX_SHORT, required: false });
     const errors = collectErrors([vName, vQuantity]);
@@ -1693,7 +1706,7 @@ router.post('/supply-requests', (req, res) => {
   }
 });
 
-router.get('/maintenance-log', (_req, res) => {
+router.get('/maintenance-log', validateRequest(), (_req, res) => {
   try {
     const rows = db.get().prepare('SELECT * FROM housekeeping_maintenance_log ORDER BY created_at DESC, id DESC').all();
     res.json({ data: rows });
@@ -1703,7 +1716,7 @@ router.get('/maintenance-log', (_req, res) => {
   }
 });
 
-router.post('/maintenance-log', (req, res) => {
+router.post('/maintenance-log', validateRequest(), (req, res) => {
   try {
     const vDescription = str(req.body.description, 'description', { max: MAX_TEXT });
     const vPhoto = validatePhotoUrl(req.body.photo_url);

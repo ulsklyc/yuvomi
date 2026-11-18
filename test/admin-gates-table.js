@@ -249,14 +249,17 @@ export const ROWS = [
     ['POST', '/test', '/test', {}],
   ]),
 
+  // An assertAdmin() in the handler until #2810: requireAdmin stands before
+  // validateRequest() now, so a member's invalid body is a 403, not a 400.
+  ...middlewareRows('server/routes/housekeeping.js', '/api/v1/housekeeping', ADMIN_REQUIRED, [
+    ['POST', '/worker', '/worker', { daily_rate: 'x' }],
+  ]),
   // --- assertAdmin (housekeeping) ----------------------------------------------
   // A settled (paid) visit: assertMayTouchSettled() asks assertAdmin().
-  { form: 'assertAdmin', file: 'server/routes/housekeeping.js', key: 'POST /worker', method: 'POST',
-    path: '/api/v1/housekeeping/worker', body: {}, expect: ADMIN_REQUIRED },
   { form: 'assertAdmin', file: 'server/routes/housekeeping.js', key: 'POST /visits/:id/unpay', method: 'POST',
     path: (s) => `/api/v1/housekeeping/visits/${s.ids.paidVisit}/unpay`, body: {}, expect: ADMIN_REQUIRED },
   { form: 'assertAdmin', file: 'server/routes/housekeeping.js', key: 'PUT /visits/:id', method: 'PUT',
-    path: (s) => `/api/v1/housekeeping/visits/${s.ids.paidVisit}`, body: { daily_rate: 'x' }, expect: ADMIN_REQUIRED },
+    path: (s) => `/api/v1/housekeeping/visits/${s.ids.paidVisit}`, body: { date: '2026-02-30' }, expect: ADMIN_REQUIRED },
   { form: 'assertAdmin', file: 'server/routes/housekeeping.js', key: 'POST /visits/:id/pay', method: 'POST',
     path: (s) => `/api/v1/housekeeping/visits/${s.ids.paidVisit}/pay`, body: {}, expect: ADMIN_REQUIRED },
   { form: 'assertAdmin', file: 'server/routes/housekeeping.js', key: 'DELETE /visits/:id', method: 'DELETE',
@@ -357,12 +360,16 @@ export const MIXED = [
     reason: 'requester or admin may cancel a redemption (test:rewards-routes)' },
 ];
 
-/** The cases where an admin gets through (not 403), one per form. */
+/**
+ * The cases where an admin gets through (not 403), one per form.
+ * @type {Array<Pick<GateRow, 'form' | 'method' | 'path' | 'body'>>}
+ */
 export const ADMIN_PASSES = [
   { form: 'requireAdmin (shared)', method: 'GET', path: '/api/v1/backup/status' },
   { form: 'requireAdmin (shared, auth router)', method: 'GET', path: '/api/v1/auth/api-tokens' },
   { form: 'requireAdmin (former local copy)', method: 'GET', path: '/api/v1/screensaver/config' },
-  { form: 'assertAdmin', method: 'POST', path: '/api/v1/housekeeping/worker', body: {} },
+  // A paid visit: the admin passes assertMayTouchSettled() and meets the calendar check (400), nothing is written.
+  { form: 'assertAdmin', method: 'PUT', path: (s) => `/api/v1/housekeeping/visits/${s.ids.paidVisit}`, body: { date: '2026-02-30' } },
   { form: 'requireAdmin (route middleware)', method: 'GET', path: '/api/v1/recipe-providers/accounts' },
   { form: 'inline', method: 'GET', path: '/api/v1/documents/dms/accounts' },
   { form: 'inline (preferences)', method: 'PUT', path: '/api/v1/preferences', body: { countdown_grace_days: 3 } },

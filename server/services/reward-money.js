@@ -32,9 +32,10 @@ import { addInterval, dateKey, liftToAnchorDay, nextRunNotBefore, parseDateKey }
 import { householdCurrency } from '../utils/household-currency.js';
 import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
 import { personAvatarUrlSql } from './person-avatar.js';
+import { ALLOWANCE_FREQUENCIES, MONEY_KINDS } from './reward-fields.js';
 
-export const MONEY_KINDS = Object.freeze(['withdrawal', 'deposit']);
-export const ALLOWANCE_FREQUENCIES = Object.freeze(['weekly', 'monthly']);
+// Die Listen stehen in reward-fields.js, die auch das OpenAPI-Dokument liest (#2810).
+export { ALLOWANCE_FREQUENCIES, MONEY_KINDS };
 
 /*
  * DIE OBERGRENZE EINES BETRAGS HAENGT NICHT AN EINER WAEHRUNG. Die erste
