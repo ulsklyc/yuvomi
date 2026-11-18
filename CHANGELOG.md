@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The inventory checks every request against the published API description.** This is about
+  your own API clients; the app sends nothing that is refused now (it sends location ids as
+  numbers from this release on, also in the order of locations and child locations). Under
+  `/api/v1/inventory`, input that used to be quietly accepted, reinterpreted or answered later
+  is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`DELETE /inventory/items/12abc` deleted item 12), a number, truth value, list or object in
+    a text field (it was stored as text), and a number written as text, a truth value or a
+    list in a number field (`"12.5"`, `true` and `[5]` were read as numbers);
+  - items: a `condition`, `status` or `odometer_unit` outside its list, and `false` or `0` for
+    them (they meant the default; null, `""` or leaving it out still do), a day that is not
+    `YYYY-MM-DD` or is a list, a location id that is neither a whole number nor digit text,
+    `warranty_months` outside 0 to 600, an odometer reading that is not a whole number - also
+    for a category without one, where it was dropped silently - and a price that is not a
+    number, also from an account without the price right (it was ignored);
+  - `tracked_dates` and `attachment_document_ids` that are not a list: on a replace, null,
+    text or an object REMOVED all tracked dates with their reminders, or all document links.
+    Leaving the field out still leaves them as they are, and `[]` still clears them. Tracked
+    date rows that are not objects, without label or day, or with numbers outside their range;
+  - linking a booking: `entry_id` as text or left out, a `role` outside its list,
+    `amount_share` as text or below zero; completing a tracked date and the service log: a day
+    that is not `YYYY-MM-DD`, an odometer reading as text or below zero;
+  - the list: `status` outside its list, `location_id` that is not plain digits, and a filter
+    given twice (they were ignored or read as the first);
+  - the order of locations, child locations and categories with entries that are not ids or
+    keys (`[{}]` and `[true]` were a 500, other entries were skipped or stored), and an order
+    of child locations without `order` (it was a silent no-op; `[]` still is).
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for a location id (older app versions send it), a currency in
+  any case, unknown fields. A `PUT` replaces the whole item, as before: left-out fields are
+  cleared or take their default, only the name is required, and `tracked_dates` and
+  `attachment_document_ids` stay untouched when left out. Rules the description cannot carry
+  stay with the routes and their sentences: an empty name after trimming, a day that does not
+  exist, a category or location that does not exist (`inventory_selected_location_not_found`
+  as before, for a number and for digit text), the photo content, the odometer that must not
+  fall below the current reading. The check runs before the entry is looked up, so a bad
+  request for a missing entry is a 400, not a 404 or 409, and an account that may change only
+  its own items gets 400 for a bad request on someone else's item and, as before, 403
+  `not_owner` for a valid one. Text lengths count the value as sent.
+
 ## [2.92.0] - 2026-11-18
 
 ### Changed

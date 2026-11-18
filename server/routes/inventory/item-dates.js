@@ -23,8 +23,8 @@
  */
 import * as db from '../../db.js';
 import { str, date, num, collectErrors } from '../../middleware/validate.js';
+import { MAX_TRACKED_DATES_PER_ITEM, MAX_LABEL } from './fields.js';
 
-const MAX_TRACKED_DATES_PER_ITEM = 10;
 const DEFAULT_REMINDER_OFFSET_DAYS = 30;
 
 function loadTrackedDates(itemId) {
@@ -68,7 +68,7 @@ function loadTrackedDate(id) {
 
 function validateTrackedDateRow(row) {
   const results = [];
-  const vLabel = str(row?.label, 'label', { max: 100 });
+  const vLabel = str(row?.label, 'label', { max: MAX_LABEL });
   results.push(vLabel);
   const vDate = date(row?.date, 'date', true);
   results.push(vDate);

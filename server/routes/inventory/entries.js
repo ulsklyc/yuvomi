@@ -12,6 +12,7 @@ import * as db from '../../db.js';
 import { createLogger } from '../../logger.js';
 import { id as idParam } from '../../middleware/validate.js';
 import { budgetViewer, visibleEntry } from './entry-links.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const log = createLogger('Inventory');
 const router = express.Router();
@@ -19,7 +20,7 @@ const router = express.Router();
 // --------------------------------------------------------
 // GET /api/v1/inventory/entries/:entryId/items
 // --------------------------------------------------------
-router.get('/:entryId/items', (req, res) => {
+router.get('/:entryId/items', validateRequest(), (req, res) => {
   try {
     const vEntryId = idParam(req.params.entryId, 'entryId');
     if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });

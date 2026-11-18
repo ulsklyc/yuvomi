@@ -23,7 +23,7 @@ import {
 } from '../../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../../services/document-deletion-lock.js';
 import {
-  ROLES, visibleEntry, linkabilityError, entryHasLinks, linkEntry, unlinkEntry, budgetViewer,
+  visibleEntry, linkabilityError, entryHasLinks, linkEntry, unlinkEntry, budgetViewer,
   loadLinkedEntriesForItems, loadLinkedEntries, computeTotal,
 } from './entry-links.js';
 import { warrantyEndDate, reminderDateForWarranty } from '../../services/inventory-deadlines.js';
@@ -36,15 +36,13 @@ import {
   validateServiceLogInput, validateCompletionInput, odometerBaselineExcluding, loadServiceLog, createServiceLogEntry,
   updateServiceLogEntry, deleteServiceLogEntry, completeTrackedDate, loadHistory,
 } from './service-log.js';
+import { CONDITIONS, STATUSES, ODOMETER_UNITS, ROLES, MAX_PHOTO_LENGTH } from './fields.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const log = createLogger('Inventory');
 const router = express.Router();
 
-const CONDITIONS = ['new', 'good', 'fair', 'poor'];
-const STATUSES = ['active', 'sold', 'disposed', 'lost'];
-const ODOMETER_UNITS = ['km', 'mi'];
 const CURRENCY_RE = /^[A-Z]{3}$/;
-const MAX_PHOTO_LENGTH = 6_990_507; // ~5 MB raw image in base64, same cap as birthdays.js
 const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 const DOCS = { table: 'inventory_item_documents', ownerColumn: 'item_id' };
 
@@ -379,7 +377,7 @@ function validateItemFields(body) {
 // --------------------------------------------------------
 // GET /api/v1/inventory/items   Query: ?category=&location_id=&status=&q=
 // --------------------------------------------------------
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const category = typeof req.query.category === 'string' && req.query.category ? req.query.category : undefined;
     let locationId;
@@ -403,7 +401,7 @@ router.get('/', (req, res) => {
 // --------------------------------------------------------
 // GET /api/v1/inventory/items/:id
 // --------------------------------------------------------
-router.get('/:id', (req, res) => {
+router.get('/:id', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -419,7 +417,7 @@ router.get('/:id', (req, res) => {
 // --------------------------------------------------------
 // POST /api/v1/inventory/items
 // --------------------------------------------------------
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const userId = req.authUserId || req.session.userId;
 
@@ -508,7 +506,7 @@ router.post('/', (req, res) => {
 // --------------------------------------------------------
 // PUT /api/v1/inventory/items/:id   Volles Replace, siehe Kommentar oben.
 // --------------------------------------------------------
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -588,7 +586,7 @@ router.put('/:id', (req, res) => {
 // --------------------------------------------------------
 // POST /api/v1/inventory/items/:id/entries   Body: { entry_id, role?, amount_share? }
 // --------------------------------------------------------
-router.post('/:id/entries', (req, res) => {
+router.post('/:id/entries', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -626,7 +624,7 @@ router.post('/:id/entries', (req, res) => {
 // DELETE /api/v1/inventory/items/:id/entries/:entryId
 // Entfernt ALLE Verknuepfungen zwischen Gegenstand und Buchung (rollenunabhaengig).
 // --------------------------------------------------------
-router.delete('/:id/entries/:entryId', (req, res) => {
+router.delete('/:id/entries/:entryId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -651,7 +649,7 @@ router.delete('/:id/entries/:entryId', (req, res) => {
 // POST /api/v1/inventory/items/:id/dates/:dateId/complete
 // Body: { performed_on, odometer?, vendor?, note? }
 // --------------------------------------------------------
-router.post('/:id/dates/:dateId/complete', (req, res) => {
+router.post('/:id/dates/:dateId/complete', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -679,7 +677,7 @@ router.post('/:id/dates/:dateId/complete', (req, res) => {
 // --------------------------------------------------------
 // GET|POST /api/v1/inventory/items/:id/service-log
 // --------------------------------------------------------
-router.get('/:id/service-log', (req, res) => {
+router.get('/:id/service-log', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -693,7 +691,7 @@ router.get('/:id/service-log', (req, res) => {
   }
 });
 
-router.post('/:id/service-log', (req, res) => {
+router.post('/:id/service-log', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -720,7 +718,7 @@ router.post('/:id/service-log', (req, res) => {
 // Teil-Update. Kein bestehender Aufrufer haengt daran: die App ruft bisher
 // nur /complete und /history auf, dieser Weg ist reine /api/v1-Oberflaeche.
 // --------------------------------------------------------
-router.put('/:id/service-log/:logId', (req, res) => {
+router.put('/:id/service-log/:logId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -745,7 +743,7 @@ router.put('/:id/service-log/:logId', (req, res) => {
   }
 });
 
-router.delete('/:id/service-log/:logId', (req, res) => {
+router.delete('/:id/service-log/:logId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -769,7 +767,7 @@ router.delete('/:id/service-log/:logId', (req, res) => {
 // Read-only aggregation: service log + linked maintenance/accessory bookings
 // + linked documents, merged into one dated timeline (DECISIONS #6).
 // --------------------------------------------------------
-router.get('/:id/history', (req, res) => {
+router.get('/:id/history', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -786,7 +784,7 @@ router.get('/:id/history', (req, res) => {
 // --------------------------------------------------------
 // DELETE /api/v1/inventory/items/:id
 // --------------------------------------------------------
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });

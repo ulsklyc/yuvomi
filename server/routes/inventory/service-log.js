@@ -33,6 +33,7 @@ import {
   loadTrackedDate, rollTrackedDateForward, removeTrackedDate,
 } from './item-dates.js';
 import { loadLinkedEntries, computeTotal } from './entry-links.js';
+import { MAX_LABEL } from './fields.js';
 import { documentLinksFor } from '../../services/document-links.js';
 import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
 
@@ -72,7 +73,7 @@ function odometerRegressionError(item, odometer, performedOn) {
 
 function validateServiceLogInput(body, item) {
   const results = [];
-  const vLabel = str(body?.label, 'label', { max: 100 });
+  const vLabel = str(body?.label, 'label', { max: MAX_LABEL });
   results.push(vLabel);
   const vPerformedOn = date(body?.performed_on, 'performed_on', true);
   results.push(vPerformedOn);
