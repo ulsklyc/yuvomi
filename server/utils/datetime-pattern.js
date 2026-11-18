@@ -31,3 +31,9 @@ export const DATE_PATTERN = '^\\d{4}-\\d{2}-\\d{2}$';
 
 /** A day key or the empty text: `today=` is "no day given", as before #2810. */
 export const OPTIONAL_DATE_PATTERN = `^(?:${DATE_PATTERN.slice(1, -1)})?$`;
+
+/**
+ * DATETIME_PATTERN or the empty text: `datetime()` reads `""` as "no value"
+ * (`last_completed` of a housekeeping task, where it clears the date).
+ */
+export const OPTIONAL_DATETIME_PATTERN = `^(?:${DATETIME_PATTERN.slice(1, -1)})?$`;

@@ -83,6 +83,8 @@ const MOUNTS = [
   { file: 'inventory/items.js', mount: '/api/v1/inventory/items' },
   { file: 'inventory/entries.js', mount: '/api/v1/inventory/entries' },
   { file: 'inventory/deadlines-feed.js', mount: '/api/v1/inventory/deadlines-feed' },
+  { file: 'housekeeping.js', mount: '/api/v1/housekeeping' },
+  { file: 'rewards.js', mount: '/api/v1/rewards' },
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */

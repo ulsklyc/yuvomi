@@ -89,7 +89,7 @@ app.use('/calendar', calendarRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 app.use('/api/v1/reminders', remindersRouter);
 app.use('/health', healthRouter);
-app.use('/housekeeping', housekeepingRouter);
+app.use('/api/v1/housekeeping', housekeepingRouter);
 // Zweite Montierung unter dem echten Pfad: das MCP-Werkzeug `create_event`
 // geht seit #2616 per Loopback durch POST /api/v1/calendar, und genau DAS ist
 // die Aussage des Falls unten - derselbe Weg wie POST, nicht ein zweiter.
@@ -646,14 +646,14 @@ test('Gesundheit: "jetzt" als Einnahmezeit ist Wanduhrzeit des Haushalts, kein U
 // ── Haushaltshilfe ───────────────────────────────────────────────────────────
 
 test('last_completed mit Offset wird der UTC-Instant, den /complete schreibt', async () => {
-  const res = await call('POST', '/housekeeping/decay-tasks', {
+  const res = await call('POST', '/api/v1/housekeeping/decay-tasks', {
     name: 'Bad', area: 'Bad', frequency_days: 7, last_completed: '2026-09-01T18:00:00+02:00',
   });
   assert.equal(res.status, 201, JSON.stringify(res.body));
   assert.equal(res.body.data.last_completed, '2026-09-01T16:00:00.000Z');
   assert.equal(res.body.data.due_date, '2026-09-08T16:00:00.000Z');
 
-  const patched = await call('PATCH', `/housekeeping/decay-tasks/${res.body.data.id}`, {
+  const patched = await call('PATCH', `/api/v1/housekeeping/decay-tasks/${res.body.data.id}`, {
     last_completed: '2026-09-02T09:00:00-04:00',
   });
   assert.equal(patched.body.data.last_completed, '2026-09-02T13:00:00.000Z');
@@ -663,7 +663,7 @@ test('last_completed ohne Offset ist Wanduhrzeit des Haushalts, nicht des Server
   // Kiritimati (UTC+14) liegt weit genug von jeder Maschinenzone weg, dass die
   // alte Lesart in der Serverzone einen anderen Zeitpunkt ergaebe.
   await inZone('Pacific/Kiritimati', async () => {
-    const res = await call('POST', '/housekeeping/decay-tasks', {
+    const res = await call('POST', '/api/v1/housekeeping/decay-tasks', {
       name: 'Kueche', area: 'Kueche', frequency_days: 7, last_completed: '2026-09-01T18:00',
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));

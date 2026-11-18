@@ -48,10 +48,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request for a missing entry is a 400, not a 404 or 409, and an account that may change only
   its own items gets 400 for a bad request on someone else's item and, as before, 403
   `not_owner` for a valid one. Text lengths count the value as sent.
+- **Housekeeping and rewards check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that is refused now (it sends the
+  housekeeper id as a number from this release on). Under `/api/v1/housekeeping` and
+  `/api/v1/rewards`, input that used to be quietly accepted, reinterpreted or answered later
+  is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `1.9`, `0x10` or ` 1`
+    (they were read as numbers), a number, truth value, list or object in a text field (it was
+    stored as text), and a number written as text, a truth value or a list in a number field
+    (`"60"`, `true` and `[5]` were read as numbers) - for amounts also from an account without
+    the amounts right, where they were ignored;
+  - `PUT /rewards/participants/{userId}` without `enabled`, or with anything but `true` or
+    `false` (`"true"`, `1`, `null`): it SWITCHED THE PARTICIPATION OFF. `enabled` is required
+    now. `PATCH /rewards/catalog/{id}` with `is_active` that is not `true` or `false`: it
+    switched the reward off;
+  - lists: `payment_schedule` and `rate_type` of a housekeeper, `action` of a redemption
+    decision (missing or unknown, it was 400 only after the request was looked up), `kind` of a
+    request, `frequency` of a pocket money plan and `direction` of a money entry outside their
+    values; `birth_year_unknown` as `0`, `1` or null;
+  - ids in a body (housekeeper, receipt, person, reward) that are neither whole numbers nor
+    digit text, and `null` for a person or reward in rewards; whole numbers outside the
+    route's own bounds (a reward's cost and quantity, a bonus, a plan's anchor day, a task
+    frequency below 1);
+  - queries: `?month=` outside 01 to 12 or before the year 1001 (`2026-13` was a 500),
+    `worker_id`, `user_id`, `limit` and `timezone_offset_minutes` that are not plain digits
+    (`?user_id=abc` listed everybody), `local_date` that is not `YYYY-MM-DD`, `status`, `kind`
+    and `all` outside their values, and any filter given twice.
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), unknown fields, a body on the routes
+  that read none. Rules the description cannot carry stay with the routes and their sentences:
+  an empty name after trimming, the username rule (`housekeeping_username_invalid`), a day that
+  does not exist, amounts below zero, the money amount and currency of an account. Texts the
+  rewards routes cut (`icon`, `note`, `reason`) are still cut, not refused. The check runs
+  before the entry is looked up, so a bad request is a 400, not a 404, 403 or 409; a valid one
+  meets those as before. The admin check of `POST /housekeeping/worker` and of the rewards
+  admin routes, and the shopping right of `POST /housekeeping/supply-requests`, come first:
+  403 stays 403, also for a bad request. Text lengths count the value as sent.
 - **A path id beyond the safe integer range is refused with a 400.** This is about your own
   API clients; the app never sends such an id. On the routes that check requests against the
   API description (notes, birthdays, quick links, reminders, notification channels,
-  permissions, displays, profile pictures, recipes, recipe providers, pantry, inventory), a
+  permissions, displays, profile pictures, recipes, recipe providers, pantry, inventory,
+  housekeeping, rewards), a
   path id above 9007199254740991 is now a 400 with the rule `maximum`, and a run of digits too
   long to be a number at all (hundreds of digits) a 400 with the rule `type`. Before, such an id
   answered 404 or 400 depending on the route. 9007199254740991 itself, `0` and a negative id

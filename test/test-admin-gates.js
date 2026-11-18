@@ -163,7 +163,7 @@ ids.feedCalendar = db.prepare(`
 
 const seed = { ids };
 
-/** @param {import('./admin-gates-table.js').GateRow} row */
+/** @param {Pick<import('./admin-gates-table.js').GateRow, 'path'>} row */
 const pathOf = (row) => (typeof row.path === 'function' ? row.path(seed) : row.path);
 /** @param {import('./admin-gates-table.js').GateRow} row */
 const nameOf = (row) => `${row.form} ${row.file.replace(/^server\//, '')} ${row.key}${row.field ? ` [${row.field}]` : ''}`;
@@ -175,8 +175,8 @@ const nameOf = (row) => `${row.form} ${row.file.replace(/^server\//, '')} ${row.
 test('an admin gets through, once per form', async () => {
   const failed = [];
   for (const c of ADMIN_PASSES) {
-    const res = await http(c.method, c.path, { headers: adminHeaders, body: c.body });
-    if (res.status === 403 || typeof res.status !== 'number') failed.push(`${c.form} ${c.method} ${c.path}: ${res.status} ${JSON.stringify(res.body)}`);
+    const res = await http(c.method, pathOf(c), { headers: adminHeaders, body: c.body });
+    if (res.status === 403 || typeof res.status !== 'number') failed.push(`${c.form} ${c.method} ${pathOf(c)}: ${res.status} ${JSON.stringify(res.body)}`);
   }
   assert.deepEqual(failed, []);
 });

@@ -20,6 +20,7 @@ const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { safeHexColor, AVATAR_FALLBACK_COLOR } = await import('../public/utils/color.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const INJECTION = 'red;position:fixed;inset:0;z-index:9999';
@@ -66,13 +67,15 @@ hkApp.use((req, _res, next) => {
   req.sessionModuleAccess = null;
   next();
 });
-hkApp.use('/', housekeepingRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+hkApp.use('/api/v1/housekeeping', housekeepingRouter);
+hkApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const hkServer = hkApp.listen(0, '127.0.0.1');
 const hkBase = await new Promise((r) => hkServer.on('listening', () => r(`http://127.0.0.1:${hkServer.address().port}`)));
 test.after(() => hkServer.close());
 
 async function hkPost(body) {
-  const res = await fetch(`${hkBase}/worker`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(`${hkBase}/api/v1/housekeeping/worker`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return { status: res.status, body: await res.json() };
 }
 

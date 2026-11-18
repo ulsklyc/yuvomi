@@ -16,8 +16,9 @@
  *          Migrated so far: the pilot (notes, birthdays, quick-links), group 1A
  *          (reminders, notifications, modules, permissions, email, weather),
  *          1B (family, people, search, kitchen, screensaver, displays), 2A
- *          (recipes, recipe-providers, pantry) and 2B (the five route files of
- *          inventory: locations, categories, items, entries, deadlines-feed).
+ *          (recipes, recipe-providers, pantry), 2B (the five route files of
+ *          inventory: locations, categories, items, entries, deadlines-feed)
+ *          and 3 (housekeeping, rewards).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -76,11 +77,9 @@ const NOT_MIGRATED = [
   'server/routes/health/prevention.js',
   'server/routes/health/visibility-defaults.js',
   'server/routes/health/vitals.js',
-  'server/routes/housekeeping.js',
   'server/routes/meals.js',
   'server/routes/preferences.js',
   'server/routes/push.js',
-  'server/routes/rewards.js',
   'server/routes/schedule-extras.js',
   'server/routes/schedule-feed.js',
   'server/routes/schedule-preferences.js',
@@ -110,6 +109,7 @@ const MIGRATED = [
   'server/routes/recipes.js', 'server/routes/recipe-providers.js', 'server/routes/pantry.js',
   'server/routes/inventory/locations.js', 'server/routes/inventory/categories.js', 'server/routes/inventory/items.js',
   'server/routes/inventory/entries.js', 'server/routes/inventory/deadlines-feed.js',
+  'server/routes/housekeeping.js', 'server/routes/rewards.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

@@ -22,13 +22,16 @@ import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, n
 import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
 import { taskReader, taskVisibleWhere } from '../authorize/index.ts';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
+import { validateRequest } from '../api/validate-request.ts';
+import {
+  MAX_BONUS, MAX_COST, MAX_QUANTITY, MONEY_DIRECTIONS, REDEMPTION_DECISIONS, REDEMPTION_KIND_FILTERS, REDEMPTION_STATUSES,
+} from '../services/reward-fields.js';
 
 const log = createLogger('Rewards');
 const router = express.Router();
 
-const MAX_COST = 1_000_000;
-const MAX_BONUS = 1_000_000;
-const MAX_QUANTITY = 1_000_000;
+// Grenzen und Listen stehen in services/reward-fields.js, die auch das
+// OpenAPI-Dokument liest (#2810).
 
 function actingUser(req) {
   return req.authUserId || req.session?.userId || null;
@@ -99,7 +102,7 @@ function soldOut(d, item) {
 // GET /overview — Salden (teilnehmende Mitglieder), aktive Prämien, offene
 // Anfragen. Basis für die Übersicht des Moduls.
 // --------------------------------------------------------
-router.get('/overview', (req, res) => {
+router.get('/overview', validateRequest(), (req, res) => {
   try {
     const d = db.get();
     const balances = balancesOfEnrolled(d);
@@ -134,7 +137,7 @@ router.get('/overview', (req, res) => {
 // --------------------------------------------------------
 // GET /participants — alle Mitglieder mit Teilnahme-Flag und Saldo (Admin).
 // --------------------------------------------------------
-router.get('/participants', requireAdmin, (req, res) => {
+router.get('/participants', requireAdmin, validateRequest(), (req, res) => {
   try {
     const rows = db.get().prepare(`
       SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
@@ -156,7 +159,7 @@ router.get('/participants', requireAdmin, (req, res) => {
 // --------------------------------------------------------
 // PUT /participants/:userId — Teilnahme aktivieren/deaktivieren (Admin).
 // --------------------------------------------------------
-router.put('/participants/:userId', requireAdmin, (req, res) => {
+router.put('/participants/:userId', requireAdmin, validateRequest(), (req, res) => {
   try {
     const userId = toInt(req.params.userId);
     const enabled = req.body?.enabled === true || req.body?.enabled === 1 ? 1 : 0;
@@ -187,7 +190,7 @@ router.put('/participants/:userId', requireAdmin, (req, res) => {
 // --------------------------------------------------------
 // GET /catalog — Prämien. Admin sieht auch inaktive.
 // --------------------------------------------------------
-router.get('/catalog', (req, res) => {
+router.get('/catalog', validateRequest(), (req, res) => {
   try {
     const all = isAdminRequest(req) && req.query.all === '1';
     const rows = db.get().prepare(`
@@ -228,7 +231,7 @@ const QUANTITY_ERROR = { error: 'quantity must be a positive number or null.', c
 // --------------------------------------------------------
 // POST /catalog — Prämie anlegen (Admin).
 // --------------------------------------------------------
-router.post('/catalog', requireAdmin, (req, res) => {
+router.post('/catalog', requireAdmin, validateRequest(), (req, res) => {
   try {
     const { name, cost, icon, description, sort_order } = readCatalogInput(req.body);
     if (!name) return res.status(400).json({ error: 'name is required.', code: 400 });
@@ -251,7 +254,7 @@ router.post('/catalog', requireAdmin, (req, res) => {
 // --------------------------------------------------------
 // PATCH /catalog/:id — Prämie bearbeiten / (de)aktivieren (Admin).
 // --------------------------------------------------------
-router.patch('/catalog/:id', requireAdmin, (req, res) => {
+router.patch('/catalog/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
     const id = toInt(req.params.id);
     const existing = db.get().prepare('SELECT * FROM reward_catalog WHERE id = ?').get(id);
@@ -307,7 +310,7 @@ router.patch('/catalog/:id', requireAdmin, (req, res) => {
 // DELETE /catalog/:id — Prämie löschen (Admin). Bereits eingelöste Anfragen
 // behalten ihren Snapshot (catalog_id wird auf NULL gesetzt).
 // --------------------------------------------------------
-router.delete('/catalog/:id', requireAdmin, (req, res) => {
+router.delete('/catalog/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
     const result = db.get().prepare('DELETE FROM reward_catalog WHERE id = ?').run(toInt(req.params.id));
     if (result.changes === 0) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
@@ -366,7 +369,7 @@ const ledgerTaskVisibleSql = (reader) => `(
   OR (l.task_id IS NULL AND (l.type IN ('bonus', 'adjust', 'redeem') OR l.redemption_id IS NOT NULL))
 )`;
 
-router.get('/ledger', (req, res) => {
+router.get('/ledger', validateRequest(), (req, res) => {
   try {
     const limit = Math.min(Math.max(toInt(req.query.limit) || 100, 1), 500);
     const userId = req.query.user_id != null && req.query.user_id !== '' ? toInt(req.query.user_id) : null;
@@ -401,9 +404,9 @@ router.get('/ledger', (req, res) => {
 // --------------------------------------------------------
 // GET /redemptions?status= — Einlöse-Anfragen mit Namen.
 // --------------------------------------------------------
-router.get('/redemptions', (req, res) => {
+router.get('/redemptions', validateRequest(), (req, res) => {
   try {
-    const status = ['pending', 'fulfilled', 'rejected', 'cancelled'].includes(req.query.status)
+    const status = REDEMPTION_STATUSES.includes(req.query.status)
       ? req.query.status : null;
     // WER NICHT ENTSCHEIDET, SIEHT NUR SEINE EIGENEN ANFRAGEN.
     //
@@ -432,10 +435,7 @@ router.get('/redemptions', (req, res) => {
     // "alles". Auch dann gehen Geld-Zeilen nur an das Kind selbst und an Admins,
     // nie an ein Display. `user_balance` ist bei ihnen der GELD-Saldo: der
     // Saldo in der Einheit der Anfrage.
-    const KINDS = {
-      reward: "r.kind = 'reward'", money: "r.kind != 'reward'", all: '1 = 1',
-      withdrawal: "r.kind = 'withdrawal'", deposit: "r.kind = 'deposit'",
-    };
+    const KINDS = REDEMPTION_KIND_FILTERS;
     const kindParam = req.query.kind === undefined ? 'reward' : String(req.query.kind);
     if (!Object.hasOwn(KINDS, kindParam)) {
       return res.status(400).json({ error: 'kind must be reward, money, withdrawal, deposit or all.', code: 400 });
@@ -489,7 +489,7 @@ router.get('/redemptions', (req, res) => {
 // Ledger-Buchung reserviert; Eltern/Admin bestätigen später. Ein Nicht-Admin
 // kann nur für sich selbst einlösen; ein Admin auch stellvertretend.
 // --------------------------------------------------------
-router.post('/redemptions', (req, res) => {
+router.post('/redemptions', validateRequest(), (req, res) => {
   try {
     const d = db.get();
     const me = actingUser(req);
@@ -793,7 +793,7 @@ function reopenRedemption(req, res, d, row, me) {
 // action: 'fulfill' | 'reject' (Admin) | 'cancel' (Eigentümer oder Admin) | 'reopen' (wer entschieden hat, R23).
 // Bei reject/cancel werden die reservierten Punkte zurückgebucht.
 // --------------------------------------------------------
-router.patch('/redemptions/:id', (req, res) => {
+router.patch('/redemptions/:id', validateRequest(), (req, res) => {
   try {
     const d = db.get();
     const me = actingUser(req);
@@ -819,7 +819,7 @@ router.patch('/redemptions/:id', (req, res) => {
       return refuseAdmin(req, res);
     if (action === 'cancel' && !isAdmin && row.user_id !== me)
       return res.status(403).json({ error: 'Not allowed.', code: 403 });
-    if (!['fulfill', 'reject', 'cancel'].includes(action))
+    if (!REDEMPTION_DECISIONS.includes(action))
       return res.status(400).json({ error: 'Invalid action.', code: 400 });
 
     if (row.kind !== 'reward') return decideMoneyRequest(res, d, row, action, me);
@@ -878,7 +878,7 @@ router.patch('/redemptions/:id', (req, res) => {
 // --------------------------------------------------------
 // POST /bonus — manuelle Punkte (Bonus positiv, Korrektur negativ). Admin.
 // --------------------------------------------------------
-router.post('/bonus', requireAdmin, (req, res) => {
+router.post('/bonus', requireAdmin, validateRequest(), (req, res) => {
   try {
     const d = db.get();
     const userId = toInt(req.body?.user_id);
@@ -909,7 +909,7 @@ router.post('/bonus', requireAdmin, (req, res) => {
 // --------------------------------------------------------
 
 // GET /money - die Konten, die der Leser sehen darf, mit Saldo und Plan.
-router.get('/money', (req, res) => {
+router.get('/money', validateRequest(), (req, res) => {
   try {
     const d = db.get();
     const reader = moneyReader(req);
@@ -929,7 +929,7 @@ router.get('/money', (req, res) => {
 });
 
 // GET /money/ledger?user_id=&limit= - Geldbuchungen, gefiltert an der Abfrage.
-router.get('/money/ledger', (req, res) => {
+router.get('/money/ledger', validateRequest(), (req, res) => {
   try {
     const limit = Math.min(Math.max(toInt(req.query.limit) || 100, 1), 500);
     const userId = req.query.user_id != null && req.query.user_id !== '' ? toInt(req.query.user_id) : null;
@@ -943,13 +943,13 @@ router.get('/money/ledger', (req, res) => {
 // POST /money/entries - Eltern buchen direkt: gutschreiben oder abziehen (Admin).
 // Die erste Buchung eroeffnet das Konto. Keine Ueberziehung, geprueft in der
 // Transaktion der Buchung.
-router.post('/money/entries', requireAdmin, (req, res) => {
+router.post('/money/entries', requireAdmin, validateRequest(), (req, res) => {
   try {
     const d = db.get();
     const userId = toInt(req.body?.user_id);
     const direction = req.body?.direction;
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'user_id is required.', code: 400 });
-    if (direction !== 'credit' && direction !== 'debit')
+    if (!MONEY_DIRECTIONS.includes(direction))
       return res.status(400).json({ error: 'direction must be credit or debit.', code: 400 });
     // EIN EHEMALIGES KONTO WIRD NUR NOCH AUSGEZAHLT: abziehen ja (nie unter
     // null), gutschreiben nein. Wer sonst kein Haushaltsmitglied ist (Gast,
@@ -999,7 +999,7 @@ router.post('/money/entries', requireAdmin, (req, res) => {
 // In der Haushaltswaehrung von jetzt; das Kind sieht es danach (Saldo null) und
 // kann anfragen. Nur Haushaltsmitglieder - ein ehemaliges Konto wird nicht
 // eroeffnet, nur noch ausgezahlt.
-router.post('/money/accounts', requireAdmin, (req, res) => {
+router.post('/money/accounts', requireAdmin, validateRequest(), (req, res) => {
   try {
     const d = db.get();
     const userId = toInt(req.body?.user_id);
@@ -1038,7 +1038,7 @@ router.post('/money/accounts', requireAdmin, (req, res) => {
 
 // DELETE /money/accounts/:userId - ein LEERES Konto schliessen (Admin): kein
 // Plan, Saldo null, keine offene Anfrage. Der Verlauf bleibt.
-router.delete('/money/accounts/:userId', requireAdmin, (req, res) => {
+router.delete('/money/accounts/:userId', requireAdmin, validateRequest(), (req, res) => {
   try {
     const outcome = closeMoneyAccount(db.get(), toInt(req.params.userId));
     if (outcome === 'not_found') return res.status(404).json({ error: 'Account not found.', code: 404, reason: 'rewards_money_account_not_found' });
@@ -1056,7 +1056,7 @@ router.delete('/money/accounts/:userId', requireAdmin, (req, res) => {
 });
 
 // PUT /money/plans/:userId - Plan fuer die Gutschrift anlegen oder aendern (Admin).
-router.put('/money/plans/:userId', requireAdmin, (req, res) => {
+router.put('/money/plans/:userId', requireAdmin, validateRequest(), (req, res) => {
   try {
     const d = db.get();
     const userId = toInt(req.params.userId);
@@ -1085,7 +1085,7 @@ router.put('/money/plans/:userId', requireAdmin, (req, res) => {
 });
 
 // DELETE /money/plans/:userId - Plan beenden (Admin). Saldo und Buchungen bleiben.
-router.delete('/money/plans/:userId', requireAdmin, (req, res) => {
+router.delete('/money/plans/:userId', requireAdmin, validateRequest(), (req, res) => {
   try {
     const result = db.get().prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(toInt(req.params.userId));
     if (result.changes === 0) return res.status(404).json({ error: 'Plan not found.', code: 404, reason: 'rewards_money_plan_not_found' });
