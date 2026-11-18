@@ -166,11 +166,12 @@ router.get('/photos', validateRequest(), async (_req, res) => {
 });
 
 // Die Kennung ist eine UUID (#2810): eine andere Form ist ein 400 vor dem 404
-// "nicht eingerichtet" (validateRequest(), dasselbe Muster wie UUID_RE).
+// "nicht eingerichtet" (validateRequest(), dasselbe Muster wie UUID_RE, aus
+// SCREENSAVER_PHOTO_ID_PATTERN). Das Schema ist der einzige Riegel, bevor die
+// Kennung in den Immich-Pfad geht; ein eigener Pruefer hier waere unerreichbar.
 router.get('/photos/:id', validateRequest(), async (req, res) => {
   const cfg = config();
   if (!cfg.enabled) return res.status(404).end();
-  if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid asset ID.', code: 400 });
 
   try {
     // Preview avoids Immich's fullsize redirect, which would additionally require

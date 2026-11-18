@@ -85,7 +85,7 @@ export const pairingRouter = express.Router();
 // Schemas zaehlt als Versuch wie jeder andere. Und VOR dem Zerstoeren der
 // Sitzung unten: ein solches 400 laesst die Sitzung stehen, es ist kein
 // Kopplungsversuch.
-pairingRouter.post('/pair', pairingLimiter, validateRequest(), (req, res) => {
+pairingRouter.post('/pair', pairingLimiter, validateRequest(), (req, res, /** @type {(err?: unknown) => void} */ next) => {
   // DIE SITZUNG STIRBT ZUERST, VOR DEM EINLOESEN - UND DAS IST DIE TEURE
   // REIHENFOLGE, ABER DIE RICHTIGE.
   //
@@ -114,6 +114,11 @@ pairingRouter.post('/pair', pairingLimiter, validateRequest(), (req, res) => {
   // die Sitzung ohnehin loswerden, und die Seite fuehrt danach zur Anmeldung
   // zurueck. Fremdauslösung scheidet aus: das Sitzungscookie ist `sameSite:
   // lax`, ein Formular von aussen schickt es gar nicht erst mit.
+  //
+  // EIN UNERWARTETER FEHLER GEHT PER next() AN DEN ZENTRALEN HANDLER (#2810),
+  // NICHT PER throw: `redeem` laeuft auch im Callback des Session-Stores, und
+  // ein Wurf dort erreichte Express nicht - der Store faengt ihn und ruft den
+  // Callback ein zweites Mal, dann mit Fehler.
   const redeem = () => {
     try {
       const paired = redeemPairingCode(req.body?.code, {
@@ -127,8 +132,7 @@ pairingRouter.post('/pair', pairingLimiter, validateRequest(), (req, res) => {
       res.cookie(DISPLAY_COOKIE, paired.token, displayCookieOptions());
       return res.status(201).json({ data: { paired: true } });
     } catch (err) {
-      log.error('POST /pair error:', err);
-      return res.status(500).json({ error: 'Internal server error.', code: 500 });
+      return next(err);
     }
   };
 
@@ -187,38 +191,33 @@ export const peopleRouter = express.Router();
  * fuer ihn endet an derselben Stelle wie fuer das Tablett selbst.
  */
 peopleRouter.get('/people', validateRequest(), (req, res) => {
-  try {
-    // NUR EIN DISPLAY. Ein Mensch hat `/family/members`, und diese Antwort
-    // traegt display-eigene Felder, die anderswo nichts bedeuten. Die Absage
-    // ist 403 und nicht 404: den Pfad gibt es, er ist nur nicht fuer diesen
-    // Aufrufer.
-    if (req.authMethod !== 'display') {
-      return res.status(403).json({ error: 'This route is for paired displays.', code: 403, reason: 'display_only' });
-    }
-    const d = db.get();
-    const rows = d.prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.role, u.family_role,
-             ${memberPositionSql('u')} AS sort_order
-      FROM users u
-      WHERE ${householdMemberSql('u')}
-      ORDER BY ${memberOrderSql('u')}
-    `).all();
-    const data = rows.map((row) => {
-      const { admin, modules } = resolvePermissions(d, row);
-      return {
-        id: row.id,
-        display_name: row.display_name,
-        avatar_color: row.avatar_color,
-        avatar_data: row.avatar_data,
-        can_tick_off: admin || modules.tasks === 'write',
-        can_redeem: (admin || modules.rewards === 'write') && isEnrolled(d, row.id),
-      };
-    });
-    res.json({ data });
-  } catch (err) {
-    log.error('GET /people error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // NUR EIN DISPLAY. Ein Mensch hat `/family/members`, und diese Antwort
+  // traegt display-eigene Felder, die anderswo nichts bedeuten. Die Absage
+  // ist 403 und nicht 404: den Pfad gibt es, er ist nur nicht fuer diesen
+  // Aufrufer.
+  if (req.authMethod !== 'display') {
+    return res.status(403).json({ error: 'This route is for paired displays.', code: 403, reason: 'display_only' });
   }
+  const d = db.get();
+  const rows = d.prepare(`
+    SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.role, u.family_role,
+           ${memberPositionSql('u')} AS sort_order
+    FROM users u
+    WHERE ${householdMemberSql('u')}
+    ORDER BY ${memberOrderSql('u')}
+  `).all();
+  const data = rows.map((row) => {
+    const { admin, modules } = resolvePermissions(d, row);
+    return {
+      id: row.id,
+      display_name: row.display_name,
+      avatar_color: row.avatar_color,
+      avatar_data: row.avatar_data,
+      can_tick_off: admin || modules.tasks === 'write',
+      can_redeem: (admin || modules.rewards === 'write') && isEnrolled(d, row.id),
+    };
+  });
+  res.json({ data });
 });
 
 // --------------------------------------------------------
@@ -229,7 +228,8 @@ const router = express.Router();
 /** Jede Route hier ist Administratorensache - ein Display anzulegen heisst,
  *  einem Geraet dauerhaft Zugang zum Haushalt zu geben. Das Gate steht vor
  *  validateRequest() jeder Route (#2810): ein Mitglied bekommt 403, nie ein
- *  400, das Felder nennt. */
+ *  400, das Felder nennt. Ein unerwarteter Fehler in einer Route dieser Datei
+ *  geht an den zentralen Fehlerhandler (#2810). */
 router.use(requireAdmin);
 
 /**
@@ -248,26 +248,21 @@ router.use(requireAdmin);
  * niemand sieht, ist keine Ausnahme, sondern ein Loch.
  */
 router.get('/', validateRequest(), (_req, res) => {
-  try {
-    const rows = db.get().prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, da.created_at, da.show_screensaver, da.device_settings
-        FROM users u
-        JOIN display_accounts da ON da.user_id = u.id
-       ORDER BY u.display_name
-    `).all();
-    const data = rows.map((row) => ({
-      ...row,
-      show_screensaver: row.show_screensaver === 1,
-      device_settings: parseDisplayDeviceSettings(row.device_settings),
-      devices: listDisplayDevices(row.id),
-    }));
-    // `area_modules` steht NEBEN der Liste, nicht in jedem Eintrag: es ist eine
-    // Tatsache ueber Displays, nicht ueber dieses eine (#1808).
-    return res.json({ data, area_modules: DISPLAY_AREA_MODULES });
-  } catch (err) {
-    log.error('GET / error:', err);
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const rows = db.get().prepare(`
+    SELECT u.id, u.display_name, u.avatar_color, da.created_at, da.show_screensaver, da.device_settings
+      FROM users u
+      JOIN display_accounts da ON da.user_id = u.id
+     ORDER BY u.display_name
+  `).all();
+  const data = rows.map((row) => ({
+    ...row,
+    show_screensaver: row.show_screensaver === 1,
+    device_settings: parseDisplayDeviceSettings(row.device_settings),
+    devices: listDisplayDevices(row.id),
+  }));
+  // `area_modules` steht NEBEN der Liste, nicht in jedem Eintrag: es ist eine
+  // Tatsache ueber Displays, nicht ueber dieses eine (#1808).
+  return res.json({ data, area_modules: DISPLAY_AREA_MODULES });
 });
 
 /**
@@ -284,40 +279,35 @@ router.get('/', validateRequest(), (_req, res) => {
  * so beantwortet wurde (SSO-Konten, `$oidc$`).
  */
 router.post('/', validateRequest(), (req, res) => {
-  try {
-    const displayName = String(req.body?.display_name || '').trim();
-    if (!displayName || displayName.length > 128) {
-      return res.status(400).json({ error: 'A display name is required.', code: 400 });
-    }
-
-    let userId = null;
-    db.get().transaction(() => {
-      // Der Benutzername ist technisch und taucht nirgends auf: ein Display
-      // meldet sich nie an. Er muss nur eindeutig sein, und die UNIQUE-Spalte
-      // haelt das - ein Zaehler waere eine zweite Buchfuehrung darueber.
-      // `randomUUID` und NICHT `Math.random()`: der Name ist zwar kein
-      // Geheimnis, aber er steht in der `users`-Tabelle neben Konten, deren
-      // Namen es sind, und CodeQL urteilt ueber den Kontext, nicht ueber die
-      // Absicht (Alert 89). Eine kryptographische Quelle kostet hier nichts.
-      const username = `display-${crypto.randomUUID()}`;
-      // `onboarding_version` auf den aktuellen Stand: die Begruessungstour ist
-      // fuer einen Menschen gedacht, der die App kennenlernt. An der Kuechenwand
-      // stuende sie als Dialog vor dem Kalender, und niemand haette den Auftrag,
-      // sie wegzutippen (im Browser gesehen, bevor diese Zeile stand).
-      const ins = db.get().prepare(`
-        INSERT INTO users (username, display_name, password_hash, role, family_role, onboarding_version)
-        VALUES (?, ?, ?, 'member', 'other', ?)
-      `).run(username, displayName, DISPLAY_PASSWORD_SENTINEL, CURRENT_ONBOARDING_VERSION);
-      userId = Number(ins.lastInsertRowid);
-      db.get().prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)')
-        .run(userId, req.authUserId || null);
-    })();
-
-    return res.status(201).json({ data: { id: userId, display_name: displayName, show_screensaver: false, device_settings: null, devices: [] } });
-  } catch (err) {
-    log.error('POST / error:', err);
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const displayName = String(req.body?.display_name || '').trim();
+  if (!displayName || displayName.length > 128) {
+    return res.status(400).json({ error: 'A display name is required.', code: 400 });
   }
+
+  let userId = null;
+  db.get().transaction(() => {
+    // Der Benutzername ist technisch und taucht nirgends auf: ein Display
+    // meldet sich nie an. Er muss nur eindeutig sein, und die UNIQUE-Spalte
+    // haelt das - ein Zaehler waere eine zweite Buchfuehrung darueber.
+    // `randomUUID` und NICHT `Math.random()`: der Name ist zwar kein
+    // Geheimnis, aber er steht in der `users`-Tabelle neben Konten, deren
+    // Namen es sind, und CodeQL urteilt ueber den Kontext, nicht ueber die
+    // Absicht (Alert 89). Eine kryptographische Quelle kostet hier nichts.
+    const username = `display-${crypto.randomUUID()}`;
+    // `onboarding_version` auf den aktuellen Stand: die Begruessungstour ist
+    // fuer einen Menschen gedacht, der die App kennenlernt. An der Kuechenwand
+    // stuende sie als Dialog vor dem Kalender, und niemand haette den Auftrag,
+    // sie wegzutippen (im Browser gesehen, bevor diese Zeile stand).
+    const ins = db.get().prepare(`
+      INSERT INTO users (username, display_name, password_hash, role, family_role, onboarding_version)
+      VALUES (?, ?, ?, 'member', 'other', ?)
+    `).run(username, displayName, DISPLAY_PASSWORD_SENTINEL, CURRENT_ONBOARDING_VERSION);
+    userId = Number(ins.lastInsertRowid);
+    db.get().prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)')
+      .run(userId, req.authUserId || null);
+  })();
+
+  return res.status(201).json({ data: { id: userId, display_name: displayName, show_screensaver: false, device_settings: null, devices: [] } });
 });
 
 /**
@@ -332,49 +322,41 @@ router.post('/', validateRequest(), (req, res) => {
  * ein String "false" waere sonst wahr.
  */
 router.patch('/:id', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    const body = req.body || {};
-    const hasScreensaver = Object.hasOwn(body, 'show_screensaver');
-    const hasSettings = Object.hasOwn(body, 'device_settings');
-    const settings = hasSettings ? normalizeDisplayDeviceSettings(body.device_settings) : null;
-    if (!hasScreensaver && !hasSettings) return res.status(400).json({ error: 'Provide show_screensaver or device_settings.', code: 400 });
-    if (hasScreensaver && typeof body.show_screensaver !== 'boolean') {
-      return res.status(400).json({ error: 'show_screensaver must be a boolean.', code: 400 });
-    }
-    if (hasSettings && !settings) return res.status(400).json({ error: 'Invalid device_settings.', code: 400 });
-    const fields = []; const values = []; const data = { id };
-    if (hasScreensaver) {
-      fields.push('show_screensaver = ?'); values.push(body.show_screensaver ? 1 : 0);
-      data.show_screensaver = body.show_screensaver;
-    }
-    if (hasSettings) {
-      fields.push('device_settings = ?'); values.push(JSON.stringify(settings)); data.device_settings = settings;
-    }
-    const result = db.get().prepare(`UPDATE display_accounts SET ${fields.join(', ')} WHERE user_id = ?`).run(...values, id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
-    return res.json({ data });
-  } catch (err) {
-    log.error('PATCH /:id error:', err);
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // `Invalid id.` stays: the schema's integer lets a digit run through whose
+  // number is not finite (400 nines), Number.isInteger does not.
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+  // The schema (#2810) requires show_screensaver or device_settings and types
+  // show_screensaver as a boolean: one of the two is always here, and the
+  // boolean is a real one. Equal night hours (a rule across two fields) stay
+  // normalizeDisplayDeviceSettings()'s `Invalid device_settings.`.
+  const body = req.body || {};
+  const hasScreensaver = Object.hasOwn(body, 'show_screensaver');
+  const hasSettings = Object.hasOwn(body, 'device_settings');
+  const settings = hasSettings ? normalizeDisplayDeviceSettings(body.device_settings) : null;
+  if (hasSettings && !settings) return res.status(400).json({ error: 'Invalid device_settings.', code: 400 });
+  const fields = []; const values = []; const data = { id };
+  if (hasScreensaver) {
+    fields.push('show_screensaver = ?'); values.push(body.show_screensaver ? 1 : 0);
+    data.show_screensaver = body.show_screensaver;
   }
+  if (hasSettings) {
+    fields.push('device_settings = ?'); values.push(JSON.stringify(settings)); data.device_settings = settings;
+  }
+  const result = db.get().prepare(`UPDATE display_accounts SET ${fields.join(', ')} WHERE user_id = ?`).run(...values, id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
+  return res.json({ data });
 });
 
 /** Ein Display samt Geraeten entfernen. Die users-Zeile geht mit; die
  *  Nebentabellen haengen per ON DELETE CASCADE daran. */
 router.delete('/:id', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    const row = db.get().prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(id);
-    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
-    db.get().prepare('DELETE FROM users WHERE id = ?').run(id);
-    return res.json({ data: { id, deleted: true } });
-  } catch (err) {
-    log.error('DELETE /:id error:', err);
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+  const row = db.get().prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(id);
+  if (!row) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
+  db.get().prepare('DELETE FROM users WHERE id = ?').run(id);
+  return res.json({ data: { id, deleted: true } });
 });
 
 /**
@@ -382,18 +364,13 @@ router.delete('/:id', validateRequest(), (req, res) => {
  * danach nirgends mehr - dieselbe Regel wie beim API-Token.
  */
 router.post('/:id/pairing-code', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    const row = db.get().prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(id);
-    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+  const row = db.get().prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(id);
+  if (!row) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
 
-    const { code, expiresAt } = issuePairingCode(id, req.authUserId || null);
-    return res.status(201).json({ data: { code, expires_at: expiresAt } });
-  } catch (err) {
-    log.error('POST /:id/pairing-code error:', err);
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const { code, expiresAt } = issuePairingCode(id, req.authUserId || null);
+  return res.status(201).json({ data: { code, expires_at: expiresAt } });
 });
 
 /**
@@ -402,23 +379,18 @@ router.post('/:id/pairing-code', validateRequest(), (req, res) => {
  * keinen zwischengespeicherten Zustand, den ein Widerruf noch einholen muesste.
  */
 router.post('/:id/devices/:deviceId/revoke', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const deviceId = Number(req.params.deviceId);
-    if (!Number.isInteger(id) || !Number.isInteger(deviceId)) {
-      return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    }
-    // Das Geraet muss zu DIESEM Display gehoeren: sonst waere der Pfad eine
-    // Verzierung und die Geraete-ID allein die Autoritaet.
-    const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
-    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404, reason: 'displays_device_not_found' });
-
-    revokeDisplayDevice(deviceId);
-    return res.json({ data: { id: deviceId, revoked: true } });
-  } catch (err) {
-    log.error('POST /:id/devices/:deviceId/revoke error:', err);
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const id = Number(req.params.id);
+  const deviceId = Number(req.params.deviceId);
+  if (!Number.isInteger(id) || !Number.isInteger(deviceId)) {
+    return res.status(400).json({ error: 'Invalid id.', code: 400 });
   }
+  // Das Geraet muss zu DIESEM Display gehoeren: sonst waere der Pfad eine
+  // Verzierung und die Geraete-ID allein die Autoritaet.
+  const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
+  if (!device) return res.status(404).json({ error: 'Device not found.', code: 404, reason: 'displays_device_not_found' });
+
+  revokeDisplayDevice(deviceId);
+  return res.json({ data: { id: deviceId, revoked: true } });
 });
 
 /**
@@ -429,28 +401,23 @@ router.post('/:id/devices/:deviceId/revoke', validateRequest(), (req, res) => {
  * hinaus ist der Widerruf eine Route darueber.
  */
 router.post('/:id/devices/:deviceId/remove', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const deviceId = Number(req.params.deviceId);
-    if (!Number.isInteger(id) || !Number.isInteger(deviceId)) {
-      return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    }
-    // Wie beim Widerruf: das Geraet muss zu DIESEM Display gehoeren.
-    const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
-    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404, reason: 'displays_device_not_found' });
-
-    if (!removeRevokedDisplayDevice(deviceId)) {
-      return res.status(409).json({
-        error: 'A paired device cannot be removed. Revoke it first.',
-        code: 409,
-        reason: 'display_device_active',
-      });
-    }
-    return res.json({ data: { id: deviceId, removed: true } });
-  } catch (err) {
-    log.error('POST /:id/devices/:deviceId/remove error:', err);
-    return res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const id = Number(req.params.id);
+  const deviceId = Number(req.params.deviceId);
+  if (!Number.isInteger(id) || !Number.isInteger(deviceId)) {
+    return res.status(400).json({ error: 'Invalid id.', code: 400 });
   }
+  // Wie beim Widerruf: das Geraet muss zu DIESEM Display gehoeren.
+  const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
+  if (!device) return res.status(404).json({ error: 'Device not found.', code: 404, reason: 'displays_device_not_found' });
+
+  if (!removeRevokedDisplayDevice(deviceId)) {
+    return res.status(409).json({
+      error: 'A paired device cannot be removed. Revoke it first.',
+      code: 409,
+      reason: 'display_device_active',
+    });
+  }
+  return res.json({ data: { id: deviceId, removed: true } });
 });
 
 export default router;

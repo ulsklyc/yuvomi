@@ -40,19 +40,17 @@ const router = express.Router();
  * Modul lesen darf - sonst las ein Token mit `search:read` Notizen, Kontakte und
  * Medikamente, die seine Scopes gar nicht nennen.
  */
+// An unexpected error goes to the central error handler (#2810), which logs
+// it - the catch here answered without a log line.
 router.get('/', validateRequest(), (req, res) => {
-  try {
-    const q = String(req.query.q ?? '').trim();
-    if (q.length < 2) return res.json(emptySearchResults());
+  const q = String(req.query.q ?? '').trim();
+  if (q.length < 2) return res.json(emptySearchResults());
 
-    const userId = req.authUserId || req.session.userId;
-    res.json(searchEverything(db.get(), q, userId, {
-      hiddenModules: hiddenModulesFor(req, SEARCH_MODULES),
-      disabledNav: householdDisabledModules(db.get()),
-    }));
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const userId = req.authUserId || req.session.userId;
+  res.json(searchEverything(db.get(), q, userId, {
+    hiddenModules: hiddenModulesFor(req, SEARCH_MODULES),
+    disabledNav: householdDisabledModules(db.get()),
+  }));
 });
 
 export default router;
