@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what stays allowed is in the description too: null or `""` for "no value", the note
   visibilities `family` and `shared`, `year_unknown: null`, a pin toggle without a body, and
   reminder fields as text or number.
+- **Birthdays answer an unexpected failure with the same sentence as the rest of the API.** The
+  seven routes under `/api/v1/birthdays` (list, upcoming, create, import candidates, import,
+  update, delete) said `"Internal error."` on a server-side failure; they now say
+  `"Internal server error."` like every other module. Status 500 and `code` are unchanged.
 
 ### Fixed
 - **The API description marks every value that may be null in the OpenAPI 3.1 way.** 36 places - the
