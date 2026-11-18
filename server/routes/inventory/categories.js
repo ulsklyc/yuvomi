@@ -111,8 +111,8 @@ router.delete('/:key', validateRequest(), (req, res) => {
 // PATCH /api/v1/inventory/categories/reorder   Body: { order: string[] }  (Keys)
 // --------------------------------------------------------
 router.patch('/reorder', validateRequest(), (req, res) => {
-  const order = Array.isArray(req.body.order) ? req.body.order : [];
-  if (!order.length) return res.status(400).json({ error: 'order must be a non-empty array of keys.', code: 400 });
+  // Eine nicht leere Liste von Key-Texten prueft das Schema.
+  const { order } = req.body;
 
   // Jeder Key muss existieren, sonst liefert stmt.get(key) weiter unten
   // undefined -> null in der JSON-Antwort (stale Client, Tippfehler, Race mit

@@ -15,12 +15,14 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import { createLogger } from '../../logger.js';
 import * as deadlinesIcs from '../../services/inventory-deadlines-ics.js';
 import { validateRequest } from '../../api/validate-request.ts';
 
-const log = createLogger('Inventory');
 const router = express.Router();
+
+// Kein try/catch je Route: ein unerwarteter Fehler (SQLite) geht an den
+// zentralen Fehlerhandler (server/middleware/error-handler.js). Der loggt ihn
+// mit Methode und Routenmuster und antwortet 500 mit dem festen Satz.
 
 // Gleiche Auflösung wie server/routes/calendar/helpers.js#getUserId; hier lokal
 // gehalten statt quer aus dem Kalender-Modul importiert, wie schon feedUrl.
@@ -42,36 +44,21 @@ function feedUrl(req, token) {
 
 // GET /api/v1/inventory/deadlines-feed → eigener Feed-Status
 router.get('/', validateRequest(), (req, res) => {
-  try {
-    const token = deadlinesIcs.getFeedToken(db.get(), getUserId(req));
-    if (!token) return res.json({ data: null });
-    res.json({ data: { token, url: feedUrl(req, token) } });
-  } catch (err) {
-    log.error('GET /deadlines-feed error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const token = deadlinesIcs.getFeedToken(db.get(), getUserId(req));
+  if (!token) return res.json({ data: null });
+  res.json({ data: { token, url: feedUrl(req, token) } });
 });
 
 // POST /api/v1/inventory/deadlines-feed/regenerate → eigenen Token neu erzeugen
 router.post('/regenerate', validateRequest(), (req, res) => {
-  try {
-    const token = deadlinesIcs.regenerateFeedToken(db.get(), getUserId(req));
-    res.json({ data: { token, url: feedUrl(req, token) } });
-  } catch (err) {
-    log.error('POST /deadlines-feed/regenerate error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const token = deadlinesIcs.regenerateFeedToken(db.get(), getUserId(req));
+  res.json({ data: { token, url: feedUrl(req, token) } });
 });
 
 // DELETE /api/v1/inventory/deadlines-feed → eigenen Feed deaktivieren
 router.delete('/', validateRequest(), (req, res) => {
-  try {
-    deadlinesIcs.clearFeedToken(db.get(), getUserId(req));
-    res.json({ data: { token: null } });
-  } catch (err) {
-    log.error('DELETE /deadlines-feed error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  deadlinesIcs.clearFeedToken(db.get(), getUserId(req));
+  res.json({ data: { token: null } });
 });
 
 export default router;
