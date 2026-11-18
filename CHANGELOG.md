@@ -79,6 +79,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   had. The check runs after the admin, session and rate-limit checks, so a member still gets
   403, and before the entry is looked up, so a bad request for a missing channel, member or
   reminder target is now a 400, not a 404.
+- **Reminders, notification channels, modules and e-mail answer an unexpected failure with the
+  same sentence as the rest of the API.** Their routes said `"Internal error."` (reminders,
+  notification channels including a failed channel test, e-mail) or `"Module install failed."`,
+  `"Module delete failed."`, `"Module install info failed."`, `"Module list failed."`,
+  `"Module update failed."` and `"Module asset failed."` (modules) on a server-side failure;
+  they now say `"Internal server error."` like every other module. Status 500 and `code` are
+  unchanged, a failed channel test still stores its error on the channel, and every answer
+  that names a known cause (a refused input, `busy`, `not_writable`, an install refusal with
+  its `reason`) stays as it was. Permissions and weather answered this way already.
 
 ### Fixed
 - **The API description marks every value that may be null in the OpenAPI 3.1 way.** 36 places - the

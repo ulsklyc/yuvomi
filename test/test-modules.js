@@ -789,7 +789,7 @@ test('Freigabe nicht schreibbar → 503 not_writable ohne Serverpfad; anderer Fe
   try {
     const r = await call('PATCH', '/ro-record-mod', { actor: ADM, body: { enabled: true } });
     assert.equal(r.status, 500, JSON.stringify(r.body));
-    assert.deepEqual(r.body, { error: 'Module update failed.', code: 500 });
+    assert.deepEqual(r.body, { error: 'Internal server error.', code: 500 });
   } finally {
     restore();
   }

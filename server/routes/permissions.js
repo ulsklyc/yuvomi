@@ -17,7 +17,6 @@ import {
   permissionCatalog,
   getSubjectPermissions,
   writeSubjectPermissions,
-  isValidFamilyRole,
 } from '../authorize/index.ts';
 import { syncFastingRemindersForUser } from '../services/fasting-reminders.js';
 import { revokePaymentTasksForUsers } from '../services/payment-task-audience.js';
@@ -28,6 +27,13 @@ const router = express.Router();
 // an den zentralen Fehlerhandler (server/middleware/error-handler.js). Der
 // loggt ihn mit Methode und Routenmuster und antwortet 500 mit dem festen Satz.
 // Die beiden PUT-Routen fangen nur, um Validator-Fehler in 400 zu übersetzen.
+//
+// Was das Schema der Operation prueft, prueft keine Route noch einmal (#2810):
+// `familyRole` ist eine der Familienrollen (enum), `userId` eine ganze Zahl aus
+// Dezimalziffern, und jeder Wert in `modules`, `widgets` und `capabilities` eine
+// der Stufen seiner Achse. Ein unbekannter SCHLUESSEL bleibt die Absage des
+// Katalogs (`Unknown module: ...`): die Schluesselmenge waechst mit den
+// installierten Erweiterungen und steht nicht im Dokument.
 
 function syncFastingForUsers(database, userIds) {
   for (const userId of userIds) {
@@ -76,11 +82,7 @@ router.get('/catalog', validateRequest(), async (req, res) => {
  * Gespeicherte (abweichende) Rechte eines Rollen-Profils.
  */
 router.get('/role/:familyRole', validateRequest(), (req, res) => {
-  const familyRole = String(req.params.familyRole || '');
-  if (!isValidFamilyRole(familyRole)) {
-    return res.status(400).json({ error: 'Invalid family role.', code: 400 });
-  }
-  res.json({ data: getSubjectPermissions(db.get(), 'role', familyRole) });
+  res.json({ data: getSubjectPermissions(db.get(), 'role', req.params.familyRole) });
 });
 
 /**
@@ -91,10 +93,7 @@ router.get('/role/:familyRole', validateRequest(), (req, res) => {
  */
 router.put('/role/:familyRole', validateRequest(), (req, res) => {
   try {
-    const familyRole = String(req.params.familyRole || '');
-    if (!isValidFamilyRole(familyRole)) {
-      return res.status(400).json({ error: 'Invalid family role.', code: 400 });
-    }
+    const familyRole = req.params.familyRole;
     const database = db.get();
     const userIds = database.prepare(`
       SELECT u.id FROM users u
@@ -116,7 +115,6 @@ router.put('/role/:familyRole', validateRequest(), (req, res) => {
  */
 router.get('/user/:userId', validateRequest(), (req, res) => {
   const userId = parseInt(req.params.userId, 10);
-  if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
   const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(userId);
   if (!exists) return res.status(404).json({ error: 'User not found.', code: 404 });
   res.json({ data: getSubjectPermissions(db.get(), 'user', userId) });
@@ -130,7 +128,6 @@ router.get('/user/:userId', validateRequest(), (req, res) => {
 router.put('/user/:userId', validateRequest(), (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
-    if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
     const target = db.get().prepare('SELECT id, role FROM users WHERE id = ?').get(userId);
     if (!target) return res.status(404).json({ error: 'User not found.', code: 404 });
     // Overrides auf Admins sind wirkungslos (Admins umgehen das System). Wir

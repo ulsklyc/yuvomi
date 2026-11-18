@@ -531,10 +531,9 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null, logger 
   // im PWA-Standalone-Modus (CORS/CSP-Probleme auf Android Chrome).
   // ---------------------------------------------------------------
   router.get('/icon/:code', validateRequest(), async (req, res) => {
+    // 2 to 4 letters or digits: the pattern of the schema of the operation
+    // (#2810), checked before this handler runs.
     const { code } = req.params;
-    if (!/^[a-zA-Z0-9]{2,4}$/.test(code)) {
-      return res.status(400).json({ error: 'Invalid icon code.', code: 400 });
-    }
     try {
       const url = `https://openweathermap.org/img/wn/${code}@2x.png`;
       const upstream = await doFetch(url, { signal: AbortSignal.timeout(5000) });

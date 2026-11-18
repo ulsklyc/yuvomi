@@ -1715,7 +1715,7 @@ test('Kanal anlegen: Pruefung bleibt 400 mit Satz, ein Datenbankfehler wird 500 
     BEGIN INSERT INTO h_guard_missing_channels (x) VALUES (1); END`);
   const broken = await call(app, 'POST', '/api/v1/notifications/channels', NTFY_CHANNEL);
   assert.equal(broken.status, 500, JSON.stringify(broken.json));
-  assert.equal(broken.json.error, 'Internal error.');
+  assert.equal(broken.json.error, 'Internal server error.');
   assert.doesNotMatch(JSON.stringify(broken.json), /h_guard_missing_channels|no such table/);
 });
 
@@ -1830,6 +1830,6 @@ test('Kanal aendern: Pruefung bleibt 400 mit Satz, Datenbank und kaputter Rumpf 
     BEGIN INSERT INTO h_guard_missing_update (x) VALUES (1); END`);
   const failing = await call(app, 'PUT', `/api/v1/notifications/channels/${channel.id}`, { name: 'Neu' });
   assert.equal(failing.status, 500, JSON.stringify(failing.json));
-  assert.equal(failing.json.error, 'Internal error.');
+  assert.equal(failing.json.error, 'Internal server error.');
   assert.doesNotMatch(JSON.stringify(failing.json), /h_guard_missing_update|no such table/);
 });

@@ -3331,6 +3331,7 @@ export const schemas = {
               },
             },
             resetAt: { type: 'string', format: 'date-time', description: 'With `rate_limited` from GitHub, when GitHub names a time: when to try again (from `retry-after` for its secondary limit, otherwise from `x-ratelimit-reset`). Left out when GitHub names none.' },
+            fields: { $ref: '#/components/schemas/ApiError/properties/fields' },
           },
           required: ['error', 'code'],
         },
