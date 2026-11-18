@@ -8,10 +8,9 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, ledgerBalanceSql, postLedger, CATALOG_SELECT, activeCatalog } from '../services/rewards.js';
 import {
-  MONEY_KINDS, closeFormerMoney, closeMoneyAccount, creditFits, ensureMoneyAccount, hasMoneyAccount, isFormerMoneyAccount,
+  closeFormerMoney, closeMoneyAccount, creditFits, ensureMoneyAccount, hasMoneyAccount, isFormerMoneyAccount,
   listMoneyAccounts, listMoneyCandidates, listMoneyLedger,
   moneyBalance, moneyCurrency, moneyParams, moneyReader, moneyVisibleSql,
   parseMoneyAmount, postMoney, readOptionalText, readPlanInput, resolveMoneyCurrency, savePlan,
@@ -23,11 +22,8 @@ import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require
 import { taskReader, taskVisibleWhere } from '../authorize/index.ts';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 import { validateRequest } from '../api/validate-request.ts';
-import {
-  MAX_BONUS, MAX_COST, MAX_QUANTITY, MONEY_DIRECTIONS, REDEMPTION_DECISIONS, REDEMPTION_KIND_FILTERS, REDEMPTION_STATUSES,
-} from '../services/reward-fields.js';
+import { REDEMPTION_KIND_FILTERS } from '../services/reward-fields.js';
 
-const log = createLogger('Rewards');
 const router = express.Router();
 
 // Grenzen und Listen stehen in services/reward-fields.js, die auch das
@@ -103,106 +99,87 @@ function soldOut(d, item) {
 // Anfragen. Basis für die Übersicht des Moduls.
 // --------------------------------------------------------
 router.get('/overview', validateRequest(), (req, res) => {
-  try {
-    const d = db.get();
-    const balances = balancesOfEnrolled(d);
-    const catalog = activeCatalog(d);
-    // `pendingCount` BLEIBT, WAS ES WAR: die offenen PRAEMIEN-Anfragen, fuer
-    // alle im Modul. Geld-Anfragen (#1734) stehen in einem eigenen Feld und
-    // zaehlen dort nur fuer den, der sie lesen darf - sonst verriete die Zahl
-    // dem Geschwisterkind und dem Wandtablett, dass jemand Geld abheben will,
-    // und ein Bestandsclient laese in seinem alten Feld ploetzlich etwas anderes.
-    const reader = moneyReader(req);
-    const pending = d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND kind = 'reward'").get().n;
-    const moneyPending = d.prepare(`
-      SELECT COUNT(*) AS n FROM reward_redemptions r
-      WHERE r.status = 'pending' AND r.kind != 'reward' AND ${moneyVisibleSql(reader, 'r.user_id')}
-    `).get(moneyParams(reader)).n;
-    // Zähler für den Eltern-Ersteinrichtungs-Hinweis (aktivierte Mitglieder,
-    // angelegte Prämien, Aufgaben mit Punktewert).
-    const participantCount = d.prepare(`SELECT COUNT(*) AS n FROM reward_participants p JOIN users u ON u.id = p.user_id WHERE p.enabled = 1 AND ${MEMBER_FILTER}`).get().n;
-    const catalogCount = d.prepare('SELECT COUNT(*) AS n FROM reward_catalog WHERE is_active = 1').get().n;
-    const pointedTaskCount = d.prepare('SELECT COUNT(*) AS n FROM tasks WHERE points > 0').get().n;
-    res.json({ data: {
-      balances, catalog, pendingCount: pending, moneyPendingCount: moneyPending,
-      isAdmin: isAdminRequest(req), me: actingUser(req),
-      setup: { participantCount, catalogCount, pointedTaskCount },
-    } });
-  } catch (err) {
-    log.error('GET /overview error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const d = db.get();
+  const balances = balancesOfEnrolled(d);
+  const catalog = activeCatalog(d);
+  // `pendingCount` BLEIBT, WAS ES WAR: die offenen PRAEMIEN-Anfragen, fuer
+  // alle im Modul. Geld-Anfragen (#1734) stehen in einem eigenen Feld und
+  // zaehlen dort nur fuer den, der sie lesen darf - sonst verriete die Zahl
+  // dem Geschwisterkind und dem Wandtablett, dass jemand Geld abheben will,
+  // und ein Bestandsclient laese in seinem alten Feld ploetzlich etwas anderes.
+  const reader = moneyReader(req);
+  const pending = d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending' AND kind = 'reward'").get().n;
+  const moneyPending = d.prepare(`
+    SELECT COUNT(*) AS n FROM reward_redemptions r
+    WHERE r.status = 'pending' AND r.kind != 'reward' AND ${moneyVisibleSql(reader, 'r.user_id')}
+  `).get(moneyParams(reader)).n;
+  // Zähler für den Eltern-Ersteinrichtungs-Hinweis (aktivierte Mitglieder,
+  // angelegte Prämien, Aufgaben mit Punktewert).
+  const participantCount = d.prepare(`SELECT COUNT(*) AS n FROM reward_participants p JOIN users u ON u.id = p.user_id WHERE p.enabled = 1 AND ${MEMBER_FILTER}`).get().n;
+  const catalogCount = d.prepare('SELECT COUNT(*) AS n FROM reward_catalog WHERE is_active = 1').get().n;
+  const pointedTaskCount = d.prepare('SELECT COUNT(*) AS n FROM tasks WHERE points > 0').get().n;
+  res.json({ data: {
+    balances, catalog, pendingCount: pending, moneyPendingCount: moneyPending,
+    isAdmin: isAdminRequest(req), me: actingUser(req),
+    setup: { participantCount, catalogCount, pointedTaskCount },
+  } });
 });
 
 // --------------------------------------------------------
 // GET /participants — alle Mitglieder mit Teilnahme-Flag und Saldo (Admin).
 // --------------------------------------------------------
 router.get('/participants', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const rows = db.get().prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
-             ${memberPositionSql('u')} AS sort_order,
-             CASE WHEN p.user_id IS NOT NULL AND p.enabled = 1 THEN 1 ELSE 0 END AS enabled,
-             ${ledgerBalanceSql('points', 'u.id')} AS balance
-      FROM users u
-      LEFT JOIN reward_participants p ON p.user_id = u.id
-      WHERE ${MEMBER_FILTER}
-      ORDER BY ${memberOrderSql('u')}
-    `).all().map((r) => ({ ...r, enabled: r.enabled === 1 }));
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /participants error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const rows = db.get().prepare(`
+    SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
+           ${memberPositionSql('u')} AS sort_order,
+           CASE WHEN p.user_id IS NOT NULL AND p.enabled = 1 THEN 1 ELSE 0 END AS enabled,
+           ${ledgerBalanceSql('points', 'u.id')} AS balance
+    FROM users u
+    LEFT JOIN reward_participants p ON p.user_id = u.id
+    WHERE ${MEMBER_FILTER}
+    ORDER BY ${memberOrderSql('u')}
+  `).all().map((r) => ({ ...r, enabled: r.enabled === 1 }));
+  res.json({ data: rows });
 });
 
 // --------------------------------------------------------
 // PUT /participants/:userId — Teilnahme aktivieren/deaktivieren (Admin).
 // --------------------------------------------------------
 router.put('/participants/:userId', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const userId = toInt(req.params.userId);
-    const enabled = req.body?.enabled === true || req.body?.enabled === 1 ? 1 : 0;
-    const user = db.get().prepare('SELECT id FROM users WHERE id = ?').get(userId);
-    if (!user) return res.status(404).json({ error: 'User not found.', code: 404 });
-    // Einschreiben nur Haushaltsmitglieder (#1207). Eine eingeschaltete
-    // Einschreibung von frueher bleibt gueltig und laesst sich abschalten;
-    // abgeschaltet ist sie keine mehr, und neu anlegen geht nicht.
-    if (enabled === 1) {
-      const current = db.get().prepare('SELECT enabled FROM reward_participants WHERE user_id = ?').get(userId);
-      const strangers = newNonMembers([userId], { stored: current?.enabled === 1 ? [userId] : [] });
-      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-    }
-
-    db.get().prepare(`
-      INSERT INTO reward_participants (user_id, enabled) VALUES (?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET enabled = excluded.enabled,
-        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-    `).run(userId, enabled);
-
-    res.json({ data: { user_id: userId, enabled: enabled === 1 } });
-  } catch (err) {
-    log.error('PUT /participants/:userId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const userId = toInt(req.params.userId);
+  // A required boolean (schema, #2810).
+  const enabled = req.body.enabled ? 1 : 0;
+  const user = db.get().prepare('SELECT id FROM users WHERE id = ?').get(userId);
+  if (!user) return res.status(404).json({ error: 'User not found.', code: 404 });
+  // Einschreiben nur Haushaltsmitglieder (#1207). Eine eingeschaltete
+  // Einschreibung von frueher bleibt gueltig und laesst sich abschalten;
+  // abgeschaltet ist sie keine mehr, und neu anlegen geht nicht.
+  if (enabled === 1) {
+    const current = db.get().prepare('SELECT enabled FROM reward_participants WHERE user_id = ?').get(userId);
+    const strangers = newNonMembers([userId], { stored: current?.enabled === 1 ? [userId] : [] });
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
   }
+
+  db.get().prepare(`
+    INSERT INTO reward_participants (user_id, enabled) VALUES (?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET enabled = excluded.enabled,
+      updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+  `).run(userId, enabled);
+
+  res.json({ data: { user_id: userId, enabled: enabled === 1 } });
 });
 
 // --------------------------------------------------------
 // GET /catalog — Prämien. Admin sieht auch inaktive.
 // --------------------------------------------------------
 router.get('/catalog', validateRequest(), (req, res) => {
-  try {
-    const all = isAdminRequest(req) && req.query.all === '1';
-    const rows = db.get().prepare(`
-      ${CATALOG_SELECT}
-      ${all ? '' : 'WHERE c.is_active = 1'}
-      ORDER BY c.is_active DESC, c.sort_order ASC, c.cost ASC, c.name COLLATE NOCASE ASC
-    `).all();
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /catalog error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const all = isAdminRequest(req) && req.query.all === '1';
+  const rows = db.get().prepare(`
+    ${CATALOG_SELECT}
+    ${all ? '' : 'WHERE c.is_active = 1'}
+    ORDER BY c.is_active DESC, c.sort_order ASC, c.cost ASC, c.name COLLATE NOCASE ASC
+  `).all();
+  res.json({ data: rows });
 });
 
 function readCatalogInput(body) {
@@ -210,100 +187,69 @@ function readCatalogInput(body) {
   const cost = toInt(body?.cost);
   const icon = body?.icon != null ? String(body.icon).trim().slice(0, 8) || null : null;
   const description = body?.description != null ? String(body.description).trim() || null : null;
-  const sort_order = Number.isFinite(toInt(body?.sort_order)) ? toInt(body.sort_order) : 0;
+  const sort_order = body?.sort_order ?? 0;
   return { name, cost, icon, description, sort_order };
 }
 
-/**
- * Stueckzahl lesen: nichts, `null` oder ein leeres Feld heissen "keine Grenze",
- * sonst eine ganze Zahl ab 1. 0 IST BEWUSST UNGUELTIG - "null Stueck" waere
- * eine Praemie, die niemand je bekommen kann, und dafuer steht `is_active` da.
- */
-function readQuantity(raw) {
-  if (raw === undefined || raw === null || raw === '') return { value: null };
-  const n = toInt(raw);
-  if (!Number.isFinite(n) || n < 1 || n > MAX_QUANTITY) return { error: true, value: null };
-  return { value: n };
-}
-
-const QUANTITY_ERROR = { error: 'quantity must be a positive number or null.', code: 400 };
+// Die Stueckzahl: nichts oder `null` heissen "keine Grenze", sonst eine ganze
+// Zahl von 1 bis MAX_QUANTITY - das Schema prueft es vor dem Handler (#2810).
+// 0 IST BEWUSST UNGUELTIG - "null Stueck" waere eine Praemie, die niemand je
+// bekommen kann, und dafuer steht `is_active` da.
 
 // --------------------------------------------------------
 // POST /catalog — Prämie anlegen (Admin).
 // --------------------------------------------------------
 router.post('/catalog', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const { name, cost, icon, description, sort_order } = readCatalogInput(req.body);
-    if (!name) return res.status(400).json({ error: 'name is required.', code: 400 });
-    if (!Number.isFinite(cost) || cost < 1 || cost > MAX_COST)
-      return res.status(400).json({ error: 'cost must be a positive number.', code: 400 });
-    const quantity = readQuantity(req.body?.quantity);
-    if (quantity.error) return res.status(400).json(QUANTITY_ERROR);
+  const { name, cost, icon, description, sort_order } = readCatalogInput(req.body);
+  if (!name) return res.status(400).json({ error: 'name is required.', code: 400 });
+  // `cost` (1 to MAX_COST) and `quantity` (1 to MAX_QUANTITY or null) hold the schema.
+  const quantity = req.body.quantity ?? null;
 
-    const result = db.get().prepare(`
-      INSERT INTO reward_catalog (name, cost, icon, description, sort_order, quantity, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(name, cost, icon, description, sort_order, quantity.value, actingUser(req));
-    res.status(201).json({ data: catalogRow(db.get(), result.lastInsertRowid) });
-  } catch (err) {
-    log.error('POST /catalog error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const result = db.get().prepare(`
+    INSERT INTO reward_catalog (name, cost, icon, description, sort_order, quantity, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(name, cost, icon, description, sort_order, quantity, actingUser(req));
+  res.status(201).json({ data: catalogRow(db.get(), result.lastInsertRowid) });
 });
 
 // --------------------------------------------------------
 // PATCH /catalog/:id — Prämie bearbeiten / (de)aktivieren (Admin).
 // --------------------------------------------------------
 router.patch('/catalog/:id', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const id = toInt(req.params.id);
-    const existing = db.get().prepare('SELECT * FROM reward_catalog WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
+  const id = toInt(req.params.id);
+  const existing = db.get().prepare('SELECT * FROM reward_catalog WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
 
-    const name = req.body?.name != null ? String(req.body.name).trim() : existing.name;
-    if (!name) return res.status(400).json({ error: 'name is required.', code: 400 });
-    let cost = existing.cost;
-    if (req.body?.cost != null) {
-      cost = toInt(req.body.cost);
-      if (!Number.isFinite(cost) || cost < 1 || cost > MAX_COST)
-        return res.status(400).json({ error: 'cost must be a positive number.', code: 400 });
-    }
-    // `undefined` (Feld fehlt) heisst "unveraendert lassen", `null` (Feld leer
-    // abgeschickt) heisst "leeren". Beides ueber `!= null` zusammenzufassen
-    // machte das Leeren unmoeglich, beides ueber `!== undefined` schickte das
-    // gesendete `null` durch `String()` - und speicherte den Text "null" als
-    // Icon. Deshalb bleiben die drei Faelle hier ausdruecklich getrennt.
-    const icon = req.body?.icon === undefined ? existing.icon
-      : (req.body.icon === null ? null : String(req.body.icon).trim().slice(0, 8) || null);
-    const description = req.body?.description === undefined ? existing.description
-      : (req.body.description === null ? null : String(req.body.description).trim() || null);
-    const sort_order = req.body?.sort_order !== undefined && Number.isFinite(toInt(req.body.sort_order))
-      ? toInt(req.body.sort_order) : existing.sort_order;
-    const is_active = req.body?.is_active !== undefined
-      ? (req.body.is_active === true || req.body.is_active === 1 ? 1 : 0) : existing.is_active;
-    // Die Stueckzahl folgt demselben Vokabular wie Icon und Beschreibung: Feld
-    // fehlt = unveraendert, `null` = Grenze aufheben. EINE GESENKTE ZAHL UNTER
-    // DAS BEREITS VERGEBENE IST ERLAUBT - ein Haushalt kann einen Gegenstand
-    // verlieren, und `remaining` klemmt bei 0. Die dann nicht mehr erfuellbaren
-    // offenen Anfragen laufen in die Ablehnung mit Grund, nicht in eine 500.
-    let quantity = existing.quantity;
-    if (req.body?.quantity !== undefined) {
-      const gelesen = readQuantity(req.body.quantity);
-      if (gelesen.error) return res.status(400).json(QUANTITY_ERROR);
-      quantity = gelesen.value;
-    }
+  const name = req.body?.name != null ? String(req.body.name).trim() : existing.name;
+  if (!name) return res.status(400).json({ error: 'name is required.', code: 400 });
+  // `cost` 1 to MAX_COST, `sort_order` a whole number, `is_active` a boolean,
+  // `quantity` 1 to MAX_QUANTITY or null: the schema holds them (#2810).
+  const cost = req.body.cost ?? existing.cost;
+  // `undefined` (Feld fehlt) heisst "unveraendert lassen", `null` (Feld leer
+  // abgeschickt) heisst "leeren". Beides ueber `!= null` zusammenzufassen
+  // machte das Leeren unmoeglich, beides ueber `!== undefined` schickte das
+  // gesendete `null` durch `String()` - und speicherte den Text "null" als
+  // Icon. Deshalb bleiben die drei Faelle hier ausdruecklich getrennt.
+  const icon = req.body?.icon === undefined ? existing.icon
+    : (req.body.icon === null ? null : String(req.body.icon).trim().slice(0, 8) || null);
+  const description = req.body?.description === undefined ? existing.description
+    : (req.body.description === null ? null : String(req.body.description).trim() || null);
+  const sort_order = req.body.sort_order ?? existing.sort_order;
+  const is_active = req.body.is_active === undefined ? existing.is_active : (req.body.is_active ? 1 : 0);
+  // Die Stueckzahl folgt demselben Vokabular wie Icon und Beschreibung: Feld
+  // fehlt = unveraendert, `null` = Grenze aufheben. EINE GESENKTE ZAHL UNTER
+  // DAS BEREITS VERGEBENE IST ERLAUBT - ein Haushalt kann einen Gegenstand
+  // verlieren, und `remaining` klemmt bei 0. Die dann nicht mehr erfuellbaren
+  // offenen Anfragen laufen in die Ablehnung mit Grund, nicht in eine 500.
+  const quantity = req.body.quantity === undefined ? existing.quantity : req.body.quantity;
 
-    db.get().prepare(`
-      UPDATE reward_catalog SET name = ?, cost = ?, icon = ?, description = ?,
-        sort_order = ?, is_active = ?, quantity = ?,
-        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-      WHERE id = ?
-    `).run(name, cost, icon, description, sort_order, is_active, quantity, id);
-    res.json({ data: catalogRow(db.get(), id) });
-  } catch (err) {
-    log.error('PATCH /catalog/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  db.get().prepare(`
+    UPDATE reward_catalog SET name = ?, cost = ?, icon = ?, description = ?,
+      sort_order = ?, is_active = ?, quantity = ?,
+      updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    WHERE id = ?
+  `).run(name, cost, icon, description, sort_order, is_active, quantity, id);
+  res.json({ data: catalogRow(db.get(), id) });
 });
 
 // --------------------------------------------------------
@@ -311,14 +257,9 @@ router.patch('/catalog/:id', requireAdmin, validateRequest(), (req, res) => {
 // behalten ihren Snapshot (catalog_id wird auf NULL gesetzt).
 // --------------------------------------------------------
 router.delete('/catalog/:id', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const result = db.get().prepare('DELETE FROM reward_catalog WHERE id = ?').run(toInt(req.params.id));
-    if (result.changes === 0) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('DELETE /catalog/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const result = db.get().prepare('DELETE FROM reward_catalog WHERE id = ?').run(toInt(req.params.id));
+  if (result.changes === 0) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
+  res.json({ ok: true });
 });
 
 // --------------------------------------------------------
@@ -370,118 +311,108 @@ const ledgerTaskVisibleSql = (reader) => `(
 )`;
 
 router.get('/ledger', validateRequest(), (req, res) => {
-  try {
-    const limit = Math.min(Math.max(toInt(req.query.limit) || 100, 1), 500);
-    const userId = req.query.user_id != null && req.query.user_id !== '' ? toInt(req.query.user_id) : null;
-    const taskVisible = ledgerTaskVisibleSql(taskReader(req));
-    const rows = db.get().prepare(`
-      SELECT l.id, l.user_id, l.delta, l.type,
-             CASE WHEN ${taskVisible} THEN l.reason  END AS reason,
-             CASE WHEN ${taskVisible} THEN l.task_id END AS task_id,
-             -- Die Audit-Felder der Spaetabzug-Rechnung haengen an der Aufgabe
-             -- fest wie die Spalte reason - wer eine private Aufgabe nicht sehen darf,
-             -- darf auch nicht erfahren, wie spaet sie erledigt wurde.
-             CASE WHEN ${taskVisible} THEN l.decay_days END AS decay_days,
-             CASE WHEN ${taskVisible} THEN l.base_points END AS base_points,
-             l.redemption_id, l.created_at,
-             u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
-             a.display_name AS actor_name
-      FROM reward_ledger l
-      JOIN users u ON u.id = l.user_id
-      LEFT JOIN users a ON a.id = l.created_by
-      WHERE l.unit = 'points'
-      ${userId ? 'AND l.user_id = @userId' : ''}
-      ORDER BY l.created_at DESC, l.id DESC
-      LIMIT @limit
-    `).all({ userId, limit, me: actingUser(req) });
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /ledger error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const limit = Math.min(Math.max(toInt(req.query.limit) || 100, 1), 500);
+  const userId = req.query.user_id != null && req.query.user_id !== '' ? toInt(req.query.user_id) : null;
+  const taskVisible = ledgerTaskVisibleSql(taskReader(req));
+  const rows = db.get().prepare(`
+    SELECT l.id, l.user_id, l.delta, l.type,
+           CASE WHEN ${taskVisible} THEN l.reason  END AS reason,
+           CASE WHEN ${taskVisible} THEN l.task_id END AS task_id,
+           -- Die Audit-Felder der Spaetabzug-Rechnung haengen an der Aufgabe
+           -- fest wie die Spalte reason - wer eine private Aufgabe nicht sehen darf,
+           -- darf auch nicht erfahren, wie spaet sie erledigt wurde.
+           CASE WHEN ${taskVisible} THEN l.decay_days END AS decay_days,
+           CASE WHEN ${taskVisible} THEN l.base_points END AS base_points,
+           l.redemption_id, l.created_at,
+           u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
+           a.display_name AS actor_name
+    FROM reward_ledger l
+    JOIN users u ON u.id = l.user_id
+    LEFT JOIN users a ON a.id = l.created_by
+    WHERE l.unit = 'points'
+    ${userId ? 'AND l.user_id = @userId' : ''}
+    ORDER BY l.created_at DESC, l.id DESC
+    LIMIT @limit
+  `).all({ userId, limit, me: actingUser(req) });
+  res.json({ data: rows });
 });
 
 // --------------------------------------------------------
 // GET /redemptions?status= — Einlöse-Anfragen mit Namen.
 // --------------------------------------------------------
 router.get('/redemptions', validateRequest(), (req, res) => {
-  try {
-    const status = REDEMPTION_STATUSES.includes(req.query.status)
-      ? req.query.status : null;
-    // WER NICHT ENTSCHEIDET, SIEHT NUR SEINE EIGENEN ANFRAGEN.
-    //
-    // Das Bestaetigen und Ablehnen ist Administratorensache, und nur dafuer
-    // braucht jemand die Anfragen der anderen. Die Oberflaeche wusste das
-    // laengst - sie filtert die Antwort seit jeher auf die eigene Person
-    // (public/pages/rewards.js) -, aber sie filterte sie NACH dem Herunterladen.
-    // Bis zu 300 Zeilen samt freiem Wunschtext und Bild jedes Mitglieds gingen
-    // also an jeden hinaus, der das Modul lesen darf. Aufgefallen ist es an
-    // einem Wandtablett mit `rewards:read`, das gar keine eigenen Zeilen haben
-    // kann - der Fehler ist aelter und traf jedes Mitglied ohne Adminrecht.
-    //
-    // `user_balance` ist der HEUTIGE Saldo des Anfragenden, aus dem Ledger
-    // gerechnet (#1623). `overview.balances` fuehrt nur, wer gerade teilnimmt;
-    // wer mit offener Anfrage ausgetragen wird, fiel dort heraus und die
-    // Genehmigungsliste rechnete mit 0. Der Wert folgt dem Subjektfilter
-    // darunter: wer entscheidet, sieht alle (wie in /participants), alle
-    // anderen nur den eigenen.
-    //
-    // GELD-ANFRAGEN (#1734) KOMMEN NUR, WENN DER AUFRUFER SIE NENNT. Ohne
-    // `kind` liefert die Route, was sie immer geliefert hat: Praemien. /api/v1
-    // ist eine zugesagte Oberflaeche, und ein Client, der `cost` als Punkte
-    // summiert, zaehlte sonst fuer Admins und Besitzer ploetzlich Cent mit.
-    // `kind=money` sind beide Geld-Arten, `kind=withdrawal|deposit` eine,
-    // `kind=all` alles; ein unbekannter Wert ist ein Fehler und kein stilles
-    // "alles". Auch dann gehen Geld-Zeilen nur an das Kind selbst und an Admins,
-    // nie an ein Display. `user_balance` ist bei ihnen der GELD-Saldo: der
-    // Saldo in der Einheit der Anfrage.
-    const KINDS = REDEMPTION_KIND_FILTERS;
-    const kindParam = req.query.kind === undefined ? 'reward' : String(req.query.kind);
-    if (!Object.hasOwn(KINDS, kindParam)) {
-      return res.status(400).json({ error: 'kind must be reward, money, withdrawal, deposit or all.', code: 400 });
-    }
-    const admin = isAdminRequest(req);
-    const me = actingUser(req);
-    const reader = moneyReader(req);
-    const rows = db.get().prepare(`
-      SELECT r.id, r.user_id, r.catalog_id, r.kind, r.currency, r.reward_name, r.reward_icon, r.cost, r.status,
-             r.note, r.decision_reason, r.decided_at, r.created_at,
-             u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
-             dec.display_name AS decided_by_name
-      FROM reward_redemptions r
-      JOIN users u ON u.id = r.user_id
-      LEFT JOIN users dec ON dec.id = r.decided_by
-      WHERE 1 = 1
-        ${status ? 'AND r.status = @status' : ''}
-        ${admin ? '' : 'AND r.user_id = @me'}
-        AND ${KINDS[kindParam]}
-        AND (r.kind = 'reward' OR ${moneyVisibleSql(reader, 'r.user_id')})
-      ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC, r.id DESC
-      LIMIT 300
-    `).all({ status, me, ...moneyParams(reader) });
-    // Je Person EINMAL summieren, nicht je Zeile: als Unterabfrage in der
-    // Liste lief die Ledger-Summe fuer jede der bis zu 300 Zeilen neu, bei
-    // einem Mitglied ohne Adminrecht 300-mal dieselbe. getBalance() ist die
-    // eine Stelle, die einen Saldo rechnet, und liefert 0 ohne Ledger-Zeile.
-    const d = db.get();
-    const balanceByUser = new Map();
-    for (const row of rows) {
-      const money = row.kind !== 'reward';
-      const key = `${money ? 'money' : 'points'}:${row.user_id}`;
-      if (!balanceByUser.has(key)) balanceByUser.set(key, money ? moneyBalance(d, row.user_id) : getBalance(d, row.user_id));
-      // An einer ENTSCHIEDENEN Geld-Anfrage steht kein Saldo: nach Schliessen
-      // und Neueroeffnen ist der heutige Saldo in der heutigen Kontowaehrung,
-      // die Zeile aber in ihrer alten - Yen neben "EUR" (Review zu #1745). Den
-      // Saldo braucht, wer entscheidet, also nur an einer offenen.
-      row.user_balance = money && row.status !== 'pending' ? null : balanceByUser.get(key);
-      // Eine Geld-Anfrage sagt, in welchen Stellen ihr Betrag steht (#1734).
-      row.minor_unit = money ? minorUnit(row.currency) : null;
-    }
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /redemptions error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // One of REDEMPTION_STATUSES or absent (schema, #2810); only an SQL parameter.
+  const status = req.query.status ?? null;
+  // WER NICHT ENTSCHEIDET, SIEHT NUR SEINE EIGENEN ANFRAGEN.
+  //
+  // Das Bestaetigen und Ablehnen ist Administratorensache, und nur dafuer
+  // braucht jemand die Anfragen der anderen. Die Oberflaeche wusste das
+  // laengst - sie filtert die Antwort seit jeher auf die eigene Person
+  // (public/pages/rewards.js) -, aber sie filterte sie NACH dem Herunterladen.
+  // Bis zu 300 Zeilen samt freiem Wunschtext und Bild jedes Mitglieds gingen
+  // also an jeden hinaus, der das Modul lesen darf. Aufgefallen ist es an
+  // einem Wandtablett mit `rewards:read`, das gar keine eigenen Zeilen haben
+  // kann - der Fehler ist aelter und traf jedes Mitglied ohne Adminrecht.
+  //
+  // `user_balance` ist der HEUTIGE Saldo des Anfragenden, aus dem Ledger
+  // gerechnet (#1623). `overview.balances` fuehrt nur, wer gerade teilnimmt;
+  // wer mit offener Anfrage ausgetragen wird, fiel dort heraus und die
+  // Genehmigungsliste rechnete mit 0. Der Wert folgt dem Subjektfilter
+  // darunter: wer entscheidet, sieht alle (wie in /participants), alle
+  // anderen nur den eigenen.
+  //
+  // GELD-ANFRAGEN (#1734) KOMMEN NUR, WENN DER AUFRUFER SIE NENNT. Ohne
+  // `kind` liefert die Route, was sie immer geliefert hat: Praemien. /api/v1
+  // ist eine zugesagte Oberflaeche, und ein Client, der `cost` als Punkte
+  // summiert, zaehlte sonst fuer Admins und Besitzer ploetzlich Cent mit.
+  // `kind=money` sind beide Geld-Arten, `kind=withdrawal|deposit` eine,
+  // `kind=all` alles; ein unbekannter Wert ist ein Fehler und kein stilles
+  // "alles". Auch dann gehen Geld-Zeilen nur an das Kind selbst und an Admins,
+  // nie an ein Display. `user_balance` ist bei ihnen der GELD-Saldo: der
+  // Saldo in der Einheit der Anfrage.
+  const KINDS = REDEMPTION_KIND_FILTERS;
+  const kindParam = req.query.kind === undefined ? 'reward' : String(req.query.kind);
+  if (!Object.hasOwn(KINDS, kindParam)) {
+    return res.status(400).json({ error: 'kind must be reward, money, withdrawal, deposit or all.', code: 400 });
   }
+  const admin = isAdminRequest(req);
+  const me = actingUser(req);
+  const reader = moneyReader(req);
+  const rows = db.get().prepare(`
+    SELECT r.id, r.user_id, r.catalog_id, r.kind, r.currency, r.reward_name, r.reward_icon, r.cost, r.status,
+           r.note, r.decision_reason, r.decided_at, r.created_at,
+           u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
+           dec.display_name AS decided_by_name
+    FROM reward_redemptions r
+    JOIN users u ON u.id = r.user_id
+    LEFT JOIN users dec ON dec.id = r.decided_by
+    WHERE 1 = 1
+      ${status ? 'AND r.status = @status' : ''}
+      ${admin ? '' : 'AND r.user_id = @me'}
+      AND ${KINDS[kindParam]}
+      AND (r.kind = 'reward' OR ${moneyVisibleSql(reader, 'r.user_id')})
+    ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.created_at DESC, r.id DESC
+    LIMIT 300
+  `).all({ status, me, ...moneyParams(reader) });
+  // Je Person EINMAL summieren, nicht je Zeile: als Unterabfrage in der
+  // Liste lief die Ledger-Summe fuer jede der bis zu 300 Zeilen neu, bei
+  // einem Mitglied ohne Adminrecht 300-mal dieselbe. getBalance() ist die
+  // eine Stelle, die einen Saldo rechnet, und liefert 0 ohne Ledger-Zeile.
+  const d = db.get();
+  const balanceByUser = new Map();
+  for (const row of rows) {
+    const money = row.kind !== 'reward';
+    const key = `${money ? 'money' : 'points'}:${row.user_id}`;
+    if (!balanceByUser.has(key)) balanceByUser.set(key, money ? moneyBalance(d, row.user_id) : getBalance(d, row.user_id));
+    // An einer ENTSCHIEDENEN Geld-Anfrage steht kein Saldo: nach Schliessen
+    // und Neueroeffnen ist der heutige Saldo in der heutigen Kontowaehrung,
+    // die Zeile aber in ihrer alten - Yen neben "EUR" (Review zu #1745). Den
+    // Saldo braucht, wer entscheidet, also nur an einer offenen.
+    row.user_balance = money && row.status !== 'pending' ? null : balanceByUser.get(key);
+    // Eine Geld-Anfrage sagt, in welchen Stellen ihr Betrag steht (#1734).
+    row.minor_unit = money ? minorUnit(row.currency) : null;
+  }
+  res.json({ data: rows });
 });
 
 // --------------------------------------------------------
@@ -490,92 +421,87 @@ router.get('/redemptions', validateRequest(), (req, res) => {
 // kann nur für sich selbst einlösen; ein Admin auch stellvertretend.
 // --------------------------------------------------------
 router.post('/redemptions', validateRequest(), (req, res) => {
-  try {
-    const d = db.get();
-    const me = actingUser(req);
+  const d = db.get();
+  const me = actingUser(req);
 
-    // EINE GELD-ANFRAGE IST DIESELBE ROUTE MIT ANDEREM INHALT (#1734): Abhebung
-    // oder Einzahlung mit freiem Betrag statt einer Praemie aus dem Katalog.
-    if (req.body?.kind !== undefined && req.body.kind !== 'reward') return fileMoneyRequest(req, res, d, me);
+  // EINE GELD-ANFRAGE IST DIESELBE ROUTE MIT ANDEREM INHALT (#1734): Abhebung
+  // oder Einzahlung mit freiem Betrag statt einer Praemie aus dem Katalog.
+  if (req.body?.kind !== undefined && req.body.kind !== 'reward') return fileMoneyRequest(req, res, d, me);
 
-    // EIN WANDTABLETT BEANTRAGT FUER EINE AM GERAET GEWAEHLTE PERSON (#1209).
-    //
-    // Es ist kein Admin, also greift die stellvertretende Einloesung darunter
-    // fuer es nicht - und der Rueckfall auf `me` waere hier besonders
-    // schaedlich: das Display-Konto nimmt an Belohnungen gar nicht teil, der
-    // Aufruf endete also an `isEnrolled` mit einer 400, die von einem Tippfehler
-    // spraeche statt von einer fehlenden Angabe. Die Person MUSS benannt sein,
-    // und `displayActingPerson` prueft dabei dasselbe, was auch das Abhaken
-    // prueft: Haushaltsmitglied, und das Modul selbst schreiben duerfen.
-    //
-    // WAS DAS DISPLAY DABEI NICHT WIRD: `requested_by` und - falls der Haushalt
-    // ohne Freigabe arbeitet - `decided_by` bleiben das Geraet. Das ist die
-    // ehrliche Buchung: beantragt hat es das Tablett, bekommen hat es die
-    // Person. Ob ueberhaupt jemand freigeben muss, bleibt unveraendert die
-    // Einstellung des Haushalts (`rewards_require_approval`) - ein Display
-    // verschiebt diese Grenze nicht, in keine Richtung.
-    let targetId;
-    if (isDisplayRequest(req)) {
-      const actor = displayActingPerson(req, req.body?.user_id, 'rewards', { db: d });
-      if (!actor.ok) return res.status(actor.status).json({ error: actor.error, code: actor.status, ...(actor.reason ? { reason: actor.reason } : {}) });
-      targetId = actor.userId;
-    } else {
-      targetId = req.body?.user_id != null && isAdminRequest(req) ? toInt(req.body.user_id) : me;
-    }
-    if (!targetId) return res.status(400).json({ error: 'user_id is required.', code: 400 });
-
-    const item = d.prepare('SELECT * FROM reward_catalog WHERE id = ? AND is_active = 1').get(toInt(req.body?.catalog_id));
-    if (!item) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
-    if (!isEnrolled(d, targetId))
-      return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400, reason: 'rewards_not_participating' });
-
-    const balance = getBalance(d, targetId);
-    if (balance < item.cost)
-      return res.status(400).json({ error: 'Insufficient points.', code: 400, reason: 'rewards_insufficient_points' });
-
-    const note = req.body?.note != null ? String(req.body.note).trim().slice(0, 500) || null : null;
-    // Ohne Eltern-Freigabe (haushaltweit deaktiviert) wird die Einlösung sofort
-    // gutgeschrieben; die reservierten Punkte bleiben abgezogen (keine Rückbuchung).
-    const autoFulfill = !requiresApproval(d);
-
-    // PRUEFEN UND SCHREIBEN SIND EIN SCHRITT, UND ZWAR EIN SYNCHRONER (#1310).
-    // Zwischen "es ist noch eine Einheit da" und der geschriebenen Einloesung
-    // darf dieser Handler nicht aussetzen, sonst kaeme die zweite Anfrage auf
-    // die letzte Einheit genau dazwischen und beide gingen durch. Der Treiber
-    // ist synchron; jedes `await` vor einem DB-Aufruf waere genau dieser
-    // Aussetzer - deshalb steht in diesem Handler keines, und die Stueckzahl
-    // wird IN der Transaktion gezaehlt statt davor.
-    const ausgang = d.transaction(() => {
-      if (soldOut(d, item)) return { soldOut: true };
-      const r = autoFulfill
-        ? d.prepare(`
-            INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, reward_icon, cost, note, requested_by, status, decided_by, decided_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'fulfilled', ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-          `).run(targetId, item.id, item.name, item.icon, item.cost, note, me, me)
-        : d.prepare(`
-            INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, reward_icon, cost, note, requested_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-          `).run(targetId, item.id, item.name, item.icon, item.cost, note, me);
-      // Punkte sofort reservieren, damit sie nicht doppelt ausgegeben werden.
-      postLedger(d, {
-        userId: targetId, delta: -item.cost, type: 'redeem',
-        reason: item.name, redemptionId: r.lastInsertRowid, createdBy: me,
-      });
-      return { id: r.lastInsertRowid };
-    })();
-
-    if (ausgang.soldOut) {
-      return res.status(409).json({
-        error: 'No units of this reward are left.', code: 409, reason: 'out_of_stock',
-      });
-    }
-
-    const row = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(ausgang.id);
-    res.status(201).json({ data: row });
-  } catch (err) {
-    log.error('POST /redemptions error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // EIN WANDTABLETT BEANTRAGT FUER EINE AM GERAET GEWAEHLTE PERSON (#1209).
+  //
+  // Es ist kein Admin, also greift die stellvertretende Einloesung darunter
+  // fuer es nicht - und der Rueckfall auf `me` waere hier besonders
+  // schaedlich: das Display-Konto nimmt an Belohnungen gar nicht teil, der
+  // Aufruf endete also an `isEnrolled` mit einer 400, die von einem Tippfehler
+  // spraeche statt von einer fehlenden Angabe. Die Person MUSS benannt sein,
+  // und `displayActingPerson` prueft dabei dasselbe, was auch das Abhaken
+  // prueft: Haushaltsmitglied, und das Modul selbst schreiben duerfen.
+  //
+  // WAS DAS DISPLAY DABEI NICHT WIRD: `requested_by` und - falls der Haushalt
+  // ohne Freigabe arbeitet - `decided_by` bleiben das Geraet. Das ist die
+  // ehrliche Buchung: beantragt hat es das Tablett, bekommen hat es die
+  // Person. Ob ueberhaupt jemand freigeben muss, bleibt unveraendert die
+  // Einstellung des Haushalts (`rewards_require_approval`) - ein Display
+  // verschiebt diese Grenze nicht, in keine Richtung.
+  let targetId;
+  if (isDisplayRequest(req)) {
+    const actor = displayActingPerson(req, req.body?.user_id, 'rewards', { db: d });
+    if (!actor.ok) return res.status(actor.status).json({ error: actor.error, code: actor.status, ...(actor.reason ? { reason: actor.reason } : {}) });
+    targetId = actor.userId;
+  } else {
+    targetId = req.body?.user_id != null && isAdminRequest(req) ? toInt(req.body.user_id) : me;
   }
+  if (!targetId) return res.status(400).json({ error: 'user_id is required.', code: 400 });
+
+  const item = d.prepare('SELECT * FROM reward_catalog WHERE id = ? AND is_active = 1').get(toInt(req.body?.catalog_id));
+  if (!item) return res.status(404).json({ error: 'Reward not found.', code: 404, reason: 'rewards_reward_not_found' });
+  if (!isEnrolled(d, targetId))
+    return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400, reason: 'rewards_not_participating' });
+
+  const balance = getBalance(d, targetId);
+  if (balance < item.cost)
+    return res.status(400).json({ error: 'Insufficient points.', code: 400, reason: 'rewards_insufficient_points' });
+
+  const note = req.body?.note != null ? String(req.body.note).trim().slice(0, 500) || null : null;
+  // Ohne Eltern-Freigabe (haushaltweit deaktiviert) wird die Einlösung sofort
+  // gutgeschrieben; die reservierten Punkte bleiben abgezogen (keine Rückbuchung).
+  const autoFulfill = !requiresApproval(d);
+
+  // PRUEFEN UND SCHREIBEN SIND EIN SCHRITT, UND ZWAR EIN SYNCHRONER (#1310).
+  // Zwischen "es ist noch eine Einheit da" und der geschriebenen Einloesung
+  // darf dieser Handler nicht aussetzen, sonst kaeme die zweite Anfrage auf
+  // die letzte Einheit genau dazwischen und beide gingen durch. Der Treiber
+  // ist synchron; jedes `await` vor einem DB-Aufruf waere genau dieser
+  // Aussetzer - deshalb steht in diesem Handler keines, und die Stueckzahl
+  // wird IN der Transaktion gezaehlt statt davor.
+  const ausgang = d.transaction(() => {
+    if (soldOut(d, item)) return { soldOut: true };
+    const r = autoFulfill
+      ? d.prepare(`
+          INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, reward_icon, cost, note, requested_by, status, decided_by, decided_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'fulfilled', ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        `).run(targetId, item.id, item.name, item.icon, item.cost, note, me, me)
+      : d.prepare(`
+          INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, reward_icon, cost, note, requested_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(targetId, item.id, item.name, item.icon, item.cost, note, me);
+    // Punkte sofort reservieren, damit sie nicht doppelt ausgegeben werden.
+    postLedger(d, {
+      userId: targetId, delta: -item.cost, type: 'redeem',
+      reason: item.name, redemptionId: r.lastInsertRowid, createdBy: me,
+    });
+    return { id: r.lastInsertRowid };
+  })();
+
+  if (ausgang.soldOut) {
+    return res.status(409).json({
+      error: 'No units of this reward are left.', code: 409, reason: 'out_of_stock',
+    });
+  }
+
+  const row = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(ausgang.id);
+  res.status(201).json({ data: row });
 });
 
 /** Ein Eingabefehler am Geld als 400 - mit dem Grund, wo der Fehler einen traegt (`currency_mismatch`). */
@@ -605,8 +531,8 @@ function moneyInputRefusal(res, err) {
  * nicht daran, dass das Geraet zufaellig kein Konto hat.
  */
 function fileMoneyRequest(req, res, d, me) {
+  // `withdrawal` or `deposit`: the schema allows only these and `reward` (#2810).
   const kind = req.body.kind;
-  if (!MONEY_KINDS.includes(kind)) return res.status(400).json({ error: 'kind must be reward, withdrawal or deposit.', code: 400 });
   if (isDisplayRequest(req)) {
     return res.status(403).json({ error: 'Pocket money is not available on a display.', code: 403, reason: 'money_not_on_display' });
   }
@@ -794,112 +720,101 @@ function reopenRedemption(req, res, d, row, me) {
 // Bei reject/cancel werden die reservierten Punkte zurückgebucht.
 // --------------------------------------------------------
 router.patch('/redemptions/:id', validateRequest(), (req, res) => {
-  try {
-    const d = db.get();
-    const me = actingUser(req);
-    const action = req.body?.action;
-    // EINE GELD-ANFRAGE, DIE DER FRAGENDE NICHT LESEN DARF, GIBT ES FUER IHN
-    // NICHT (#1734). Ohne das Praedikat an DIESER Abfrage antwortete die Route
-    // einem Geschwisterkind auf die Kennung einer fremden Geld-Anfrage mit 403
-    // (offen) oder 409 (entschieden) statt mit 404 - die Liste verschwieg die
-    // Anfrage, der Einzelpfad bestaetigte sie samt Zustand. Es ist dasselbe
-    // Fragment wie an der Liste, nicht eine zweite Regel.
-    const reader = moneyReader(req);
-    const row = d.prepare(`
-      SELECT r.* FROM reward_redemptions r
-      WHERE r.id = @id AND (r.kind = 'reward' OR ${moneyVisibleSql(reader, 'r.user_id')})
-    `).get({ id: toInt(req.params.id), ...moneyParams(reader) });
-    if (!row) return res.status(404).json({ error: 'Redemption not found.', code: 404, reason: 'rewards_redemption_not_found' });
-    if (action === 'reopen') return reopenRedemption(req, res, d, row, me);
-    if (row.status !== 'pending')
-      return res.status(409).json({ error: 'Redemption already decided.', code: 409, reason: 'rewards_redemption_decided' });
+  const d = db.get();
+  const me = actingUser(req);
+  const action = req.body?.action;
+  // EINE GELD-ANFRAGE, DIE DER FRAGENDE NICHT LESEN DARF, GIBT ES FUER IHN
+  // NICHT (#1734). Ohne das Praedikat an DIESER Abfrage antwortete die Route
+  // einem Geschwisterkind auf die Kennung einer fremden Geld-Anfrage mit 403
+  // (offen) oder 409 (entschieden) statt mit 404 - die Liste verschwieg die
+  // Anfrage, der Einzelpfad bestaetigte sie samt Zustand. Es ist dasselbe
+  // Fragment wie an der Liste, nicht eine zweite Regel.
+  const reader = moneyReader(req);
+  const row = d.prepare(`
+    SELECT r.* FROM reward_redemptions r
+    WHERE r.id = @id AND (r.kind = 'reward' OR ${moneyVisibleSql(reader, 'r.user_id')})
+  `).get({ id: toInt(req.params.id), ...moneyParams(reader) });
+  if (!row) return res.status(404).json({ error: 'Redemption not found.', code: 404, reason: 'rewards_redemption_not_found' });
+  if (action === 'reopen') return reopenRedemption(req, res, d, row, me);
+  if (row.status !== 'pending')
+    return res.status(409).json({ error: 'Redemption already decided.', code: 409, reason: 'rewards_redemption_decided' });
 
-    const isAdmin = isAdminRequest(req);
-    if ((action === 'fulfill' || action === 'reject') && !isAdmin)
-      return refuseAdmin(req, res);
-    if (action === 'cancel' && !isAdmin && row.user_id !== me)
-      return res.status(403).json({ error: 'Not allowed.', code: 403 });
-    if (!REDEMPTION_DECISIONS.includes(action))
-      return res.status(400).json({ error: 'Invalid action.', code: 400 });
+  const isAdmin = isAdminRequest(req);
+  if ((action === 'fulfill' || action === 'reject') && !isAdmin)
+    return refuseAdmin(req, res);
+  if (action === 'cancel' && !isAdmin && row.user_id !== me)
+    return res.status(403).json({ error: 'Not allowed.', code: 403 });
+  // `action` is required and one of REDEMPTION_ACTIONS (schema, #2810); `reopen` went above.
 
-    if (row.kind !== 'reward') return decideMoneyRequest(res, d, row, action, me);
+  if (row.kind !== 'reward') return decideMoneyRequest(res, d, row, action, me);
 
-    const nextStatus = action === 'fulfill' ? 'fulfilled' : action === 'reject' ? 'rejected' : 'cancelled';
+  const nextStatus = action === 'fulfill' ? 'fulfilled' : action === 'reject' ? 'rejected' : 'cancelled';
 
-    // IST DIE LETZTE EINHEIT WEG, WIRD DIE ANFRAGE ABGELEHNT - NICHT NUR
-    // ABGEWIESEN (#1310). Sie steht seit dem Stellen mit reservierten Punkten
-    // da; ein blosses "geht nicht" liesse sie offen und die Punkte gebunden.
-    // Die Ablehnung ist der Weg, den es schon gibt: sie bucht ueber `reversal`
-    // zurueck und braucht dafuer nichts Neues. Der Grund steht maschinenlesbar
-    // in der Zeile, weil der Server die Sprache des Lesers nicht kennt; die
-    // Oberflaeche uebersetzt ihn ueber t().
-    //
-    // ABLEHNEN UND ZURUECKZIEHEN BLEIBEN UNBERUEHRT: vergriffen heisst nicht
-    // unentscheidbar, es heisst nur, dass "erfuellen" keine Einheit mehr
-    // findet. Gezaehlt wird wieder IN der Transaktion - zwei Eltern, die
-    // gleichzeitig zwei Anfragen auf dieselbe letzte Einheit freigeben, duerfen
-    // nicht beide durchkommen.
-    const vergriffen = d.transaction(() => {
-      const item = row.catalog_id != null
-        ? d.prepare('SELECT id, quantity FROM reward_catalog WHERE id = ?').get(row.catalog_id)
-        : null;
-      const leer = action === 'fulfill' && soldOut(d, item);
-      const status = leer ? 'rejected' : nextStatus;
-      if (status !== 'fulfilled') {
-        // Reservierte Punkte zurückgeben.
-        postLedger(d, {
-          userId: row.user_id, delta: row.cost, type: 'reversal',
-          reason: row.reward_name, redemptionId: row.id, createdBy: me,
-        });
-      }
-      d.prepare(`
-        UPDATE reward_redemptions SET status = ?, decision_reason = ?, decided_by = ?,
-          decided_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
-          updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-        WHERE id = ?
-      `).run(status, leer ? 'out_of_stock' : null, me, row.id);
-      return leer;
-    })();
-
-    const updated = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(row.id);
-    if (vergriffen) {
-      return res.status(409).json({
-        error: 'No units of this reward are left; the request was rejected and the points returned.',
-        code: 409, reason: 'out_of_stock', data: updated,
+  // IST DIE LETZTE EINHEIT WEG, WIRD DIE ANFRAGE ABGELEHNT - NICHT NUR
+  // ABGEWIESEN (#1310). Sie steht seit dem Stellen mit reservierten Punkten
+  // da; ein blosses "geht nicht" liesse sie offen und die Punkte gebunden.
+  // Die Ablehnung ist der Weg, den es schon gibt: sie bucht ueber `reversal`
+  // zurueck und braucht dafuer nichts Neues. Der Grund steht maschinenlesbar
+  // in der Zeile, weil der Server die Sprache des Lesers nicht kennt; die
+  // Oberflaeche uebersetzt ihn ueber t().
+  //
+  // ABLEHNEN UND ZURUECKZIEHEN BLEIBEN UNBERUEHRT: vergriffen heisst nicht
+  // unentscheidbar, es heisst nur, dass "erfuellen" keine Einheit mehr
+  // findet. Gezaehlt wird wieder IN der Transaktion - zwei Eltern, die
+  // gleichzeitig zwei Anfragen auf dieselbe letzte Einheit freigeben, duerfen
+  // nicht beide durchkommen.
+  const vergriffen = d.transaction(() => {
+    const item = row.catalog_id != null
+      ? d.prepare('SELECT id, quantity FROM reward_catalog WHERE id = ?').get(row.catalog_id)
+      : null;
+    const leer = action === 'fulfill' && soldOut(d, item);
+    const status = leer ? 'rejected' : nextStatus;
+    if (status !== 'fulfilled') {
+      // Reservierte Punkte zurückgeben.
+      postLedger(d, {
+        userId: row.user_id, delta: row.cost, type: 'reversal',
+        reason: row.reward_name, redemptionId: row.id, createdBy: me,
       });
     }
-    res.json({ data: updated });
-  } catch (err) {
-    log.error('PATCH /redemptions/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    d.prepare(`
+      UPDATE reward_redemptions SET status = ?, decision_reason = ?, decided_by = ?,
+        decided_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
+        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE id = ?
+    `).run(status, leer ? 'out_of_stock' : null, me, row.id);
+    return leer;
+  })();
+
+  const updated = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(row.id);
+  if (vergriffen) {
+    return res.status(409).json({
+      error: 'No units of this reward are left; the request was rejected and the points returned.',
+      code: 409, reason: 'out_of_stock', data: updated,
+    });
   }
+  res.json({ data: updated });
 });
 
 // --------------------------------------------------------
 // POST /bonus — manuelle Punkte (Bonus positiv, Korrektur negativ). Admin.
 // --------------------------------------------------------
 router.post('/bonus', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const d = db.get();
-    const userId = toInt(req.body?.user_id);
-    const delta = toInt(req.body?.delta);
-    const reason = req.body?.reason != null ? String(req.body.reason).trim().slice(0, 200) || null : null;
-    if (!Number.isFinite(userId)) return res.status(400).json({ error: 'user_id is required.', code: 400 });
-    if (!Number.isFinite(delta) || delta === 0)
-      return res.status(400).json({ error: 'delta must be a non-zero number.', code: 400 });
-    if (Math.abs(delta) > MAX_BONUS)
-      return res.status(400).json({ error: 'delta out of range.', code: 400 });
-    if (!isEnrolled(d, userId))
-      return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400, reason: 'rewards_not_participating' });
+  const d = db.get();
+  const userId = toInt(req.body?.user_id);
+  const delta = req.body.delta;
+  const reason = req.body?.reason != null ? String(req.body.reason).trim().slice(0, 200) || null : null;
+  // Stays: digit text of 400 digits passes the schema and reads as Infinity.
+  if (!Number.isFinite(userId)) return res.status(400).json({ error: 'user_id is required.', code: 400 });
+  // A whole number from -MAX_BONUS to MAX_BONUS (schema, #2810); 0 stays the handler's.
+  if (delta === 0)
+    return res.status(400).json({ error: 'delta must be a non-zero number.', code: 400 });
+  if (!isEnrolled(d, userId))
+    return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400, reason: 'rewards_not_participating' });
 
-    postLedger(d, {
-      userId, delta, type: delta > 0 ? 'bonus' : 'adjust', reason, createdBy: actingUser(req),
-    });
-    res.status(201).json({ data: { user_id: userId, balance: getBalance(d, userId) } });
-  } catch (err) {
-    log.error('POST /bonus error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  postLedger(d, {
+    userId, delta, type: delta > 0 ? 'bonus' : 'adjust', reason, createdBy: actingUser(req),
+  });
+  res.status(201).json({ data: { user_id: userId, balance: getBalance(d, userId) } });
 });
 
 // --------------------------------------------------------
@@ -910,89 +825,73 @@ router.post('/bonus', requireAdmin, validateRequest(), (req, res) => {
 
 // GET /money - die Konten, die der Leser sehen darf, mit Saldo und Plan.
 router.get('/money', validateRequest(), (req, res) => {
-  try {
-    const d = db.get();
-    const reader = moneyReader(req);
-    const manage = reader.admin && !reader.display;
-    res.json({ data: {
-      // Die Waehrung des HAUSHALTS: darin wird ein neues Konto eroeffnet. Jedes
-      // Konto darunter nennt seine eigene.
-      ...moneyCurrency(d),
-      accounts: listMoneyAccounts(d, reader),
-      // Aus wem Eltern ein neues Konto eroeffnen - nur fuer sie.
-      candidates: manage ? listMoneyCandidates(d) : [],
-    } });
-  } catch (err) {
-    log.error('GET /money error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const d = db.get();
+  const reader = moneyReader(req);
+  const manage = reader.admin && !reader.display;
+  res.json({ data: {
+    // Die Waehrung des HAUSHALTS: darin wird ein neues Konto eroeffnet. Jedes
+    // Konto darunter nennt seine eigene.
+    ...moneyCurrency(d),
+    accounts: listMoneyAccounts(d, reader),
+    // Aus wem Eltern ein neues Konto eroeffnen - nur fuer sie.
+    candidates: manage ? listMoneyCandidates(d) : [],
+  } });
 });
 
 // GET /money/ledger?user_id=&limit= - Geldbuchungen, gefiltert an der Abfrage.
 router.get('/money/ledger', validateRequest(), (req, res) => {
-  try {
-    const limit = Math.min(Math.max(toInt(req.query.limit) || 100, 1), 500);
-    const userId = req.query.user_id != null && req.query.user_id !== '' ? toInt(req.query.user_id) : null;
-    res.json({ data: listMoneyLedger(db.get(), moneyReader(req), { userId: userId || null, limit }) });
-  } catch (err) {
-    log.error('GET /money/ledger error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const limit = Math.min(Math.max(toInt(req.query.limit) || 100, 1), 500);
+  const userId = req.query.user_id != null && req.query.user_id !== '' ? toInt(req.query.user_id) : null;
+  res.json({ data: listMoneyLedger(db.get(), moneyReader(req), { userId: userId || null, limit }) });
 });
 
 // POST /money/entries - Eltern buchen direkt: gutschreiben oder abziehen (Admin).
 // Die erste Buchung eroeffnet das Konto. Keine Ueberziehung, geprueft in der
 // Transaktion der Buchung.
 router.post('/money/entries', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const d = db.get();
-    const userId = toInt(req.body?.user_id);
-    const direction = req.body?.direction;
-    if (!Number.isFinite(userId)) return res.status(400).json({ error: 'user_id is required.', code: 400 });
-    if (!MONEY_DIRECTIONS.includes(direction))
-      return res.status(400).json({ error: 'direction must be credit or debit.', code: 400 });
-    // EIN EHEMALIGES KONTO WIRD NUR NOCH AUSGEZAHLT: abziehen ja (nie unter
-    // null), gutschreiben nein. Wer sonst kein Haushaltsmitglied ist (Gast,
-    // Hauspersonal), hat kein Taschengeld.
-    if (!isHouseholdMember(userId, { db: d })) {
-      if (!isFormerMoneyAccount(d, userId) || !hasMoneyAccount(d, userId))
-        return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
-      if (direction !== 'debit') {
-        return res.status(409).json({
-          error: 'This account is deactivated; its remaining balance can only be paid out.',
-          code: 409, reason: 'account_deactivated',
-        });
-      }
-    }
-    let amount;
-    let reason;
-    let currency;
-    try {
-      ({ currency } = resolveMoneyCurrency(d, userId, req.body?.currency));
-      amount = parseMoneyAmount(req.body?.amount, currency);
-      reason = readOptionalText(req.body?.reason, 'reason', 200);
-    } catch (err) {
-      if (err?.name === 'SplitInputError') return moneyInputRefusal(res, err);
-      throw err;
-    }
-    if (direction === 'credit' && !creditFits(d, userId, amount))
-      return res.status(400).json({ error: 'amount is too large.', code: 400 });
-    const insufficient = d.transaction(() => {
-      if (direction === 'debit' && moneyBalance(d, userId) < amount) return true;
-      // Die erste Gutschrift der Eltern eroeffnet das Konto mit.
-      if (direction === 'credit') ensureMoneyAccount(d, userId, actingUser(req));
-      postMoney(d, {
-        userId, delta: direction === 'credit' ? amount : -amount, type: direction === 'credit' ? 'bonus' : 'adjust',
-        reason, createdBy: actingUser(req), currency,
+  const d = db.get();
+  const userId = toInt(req.body?.user_id);
+  const direction = req.body?.direction;
+  if (!Number.isFinite(userId)) return res.status(400).json({ error: 'user_id is required.', code: 400 });
+  // `direction`: required, `credit` or `debit` (schema, #2810).
+  // EIN EHEMALIGES KONTO WIRD NUR NOCH AUSGEZAHLT: abziehen ja (nie unter
+  // null), gutschreiben nein. Wer sonst kein Haushaltsmitglied ist (Gast,
+  // Hauspersonal), hat kein Taschengeld.
+  if (!isHouseholdMember(userId, { db: d })) {
+    if (!isFormerMoneyAccount(d, userId) || !hasMoneyAccount(d, userId))
+      return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
+    if (direction !== 'debit') {
+      return res.status(409).json({
+        error: 'This account is deactivated; its remaining balance can only be paid out.',
+        code: 409, reason: 'account_deactivated',
       });
-      return false;
-    })();
-    if (insufficient) return res.status(400).json({ error: 'Insufficient funds.', code: 400, reason: 'insufficient_funds' });
-    res.status(201).json({ data: { user_id: userId, balance_minor: moneyBalance(d, userId), currency, minor_unit: minorUnit(currency) } });
-  } catch (err) {
-    log.error('POST /money/entries error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    }
   }
+  let amount;
+  let reason;
+  let currency;
+  try {
+    ({ currency } = resolveMoneyCurrency(d, userId, req.body?.currency));
+    amount = parseMoneyAmount(req.body?.amount, currency);
+    reason = readOptionalText(req.body?.reason, 'reason', 200);
+  } catch (err) {
+    if (err?.name === 'SplitInputError') return moneyInputRefusal(res, err);
+    throw err;
+  }
+  if (direction === 'credit' && !creditFits(d, userId, amount))
+    return res.status(400).json({ error: 'amount is too large.', code: 400 });
+  const insufficient = d.transaction(() => {
+    if (direction === 'debit' && moneyBalance(d, userId) < amount) return true;
+    // Die erste Gutschrift der Eltern eroeffnet das Konto mit.
+    if (direction === 'credit') ensureMoneyAccount(d, userId, actingUser(req));
+    postMoney(d, {
+      userId, delta: direction === 'credit' ? amount : -amount, type: direction === 'credit' ? 'bonus' : 'adjust',
+      reason, createdBy: actingUser(req), currency,
+    });
+    return false;
+  })();
+  if (insufficient) return res.status(400).json({ error: 'Insufficient funds.', code: 400, reason: 'insufficient_funds' });
+  res.status(201).json({ data: { user_id: userId, balance_minor: moneyBalance(d, userId), currency, minor_unit: minorUnit(currency) } });
 });
 
 // POST /money/accounts - ein Konto eroeffnen, ohne Plan und ohne Buchung (Admin).
@@ -1000,100 +899,80 @@ router.post('/money/entries', requireAdmin, validateRequest(), (req, res) => {
 // kann anfragen. Nur Haushaltsmitglieder - ein ehemaliges Konto wird nicht
 // eroeffnet, nur noch ausgezahlt.
 router.post('/money/accounts', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const d = db.get();
-    const userId = toInt(req.body?.user_id);
-    if (!Number.isFinite(userId) || !d.prepare('SELECT id FROM users WHERE id = ?').get(userId))
-      return res.status(404).json({ error: 'User not found.', code: 404 });
-    if (!isHouseholdMember(userId, { db: d })) {
-      if (isFormerMoneyAccount(d, userId)) {
-        return res.status(409).json({
-          error: 'This account is deactivated; no pocket money account can be opened for it.', code: 409, reason: 'account_deactivated',
-        });
-      }
-      return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
+  const d = db.get();
+  const userId = toInt(req.body?.user_id);
+  if (!Number.isFinite(userId) || !d.prepare('SELECT id FROM users WHERE id = ?').get(userId))
+    return res.status(404).json({ error: 'User not found.', code: 404 });
+  if (!isHouseholdMember(userId, { db: d })) {
+    if (isFormerMoneyAccount(d, userId)) {
+      return res.status(409).json({
+        error: 'This account is deactivated; no pocket money account can be opened for it.', code: 409, reason: 'account_deactivated',
+      });
     }
-    let opened;
-    try {
-      opened = d.transaction(() => {
-        const account = ensureMoneyAccount(d, userId, actingUser(req));
-        // Ein mitgeschickter Code muss der des Kontos sein - bei einem neuen
-        // also die Haushaltswaehrung. Sonst rollt die Transaktion zurueck.
-        if (account.created) resolveMoneyCurrency(d, userId, req.body?.currency);
-        return account;
-      })();
-    } catch (err) {
-      if (err?.name === 'SplitInputError') return moneyInputRefusal(res, err);
-      throw err;
-    }
-    if (!opened.created) {
-      return res.status(409).json({ error: 'This person already has a pocket money account.', code: 409, reason: 'money_account_exists' });
-    }
-    res.status(201).json({ data: { user_id: userId, balance_minor: 0, currency: opened.currency, minor_unit: minorUnit(opened.currency), plan: null } });
-  } catch (err) {
-    log.error('POST /money/accounts error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
   }
+  let opened;
+  try {
+    opened = d.transaction(() => {
+      const account = ensureMoneyAccount(d, userId, actingUser(req));
+      // Ein mitgeschickter Code muss der des Kontos sein - bei einem neuen
+      // also die Haushaltswaehrung. Sonst rollt die Transaktion zurueck.
+      if (account.created) resolveMoneyCurrency(d, userId, req.body?.currency);
+      return account;
+    })();
+  } catch (err) {
+    if (err?.name === 'SplitInputError') return moneyInputRefusal(res, err);
+    throw err;
+  }
+  if (!opened.created) {
+    return res.status(409).json({ error: 'This person already has a pocket money account.', code: 409, reason: 'money_account_exists' });
+  }
+  res.status(201).json({ data: { user_id: userId, balance_minor: 0, currency: opened.currency, minor_unit: minorUnit(opened.currency), plan: null } });
 });
 
 // DELETE /money/accounts/:userId - ein LEERES Konto schliessen (Admin): kein
 // Plan, Saldo null, keine offene Anfrage. Der Verlauf bleibt.
 router.delete('/money/accounts/:userId', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const outcome = closeMoneyAccount(db.get(), toInt(req.params.userId));
-    if (outcome === 'not_found') return res.status(404).json({ error: 'Account not found.', code: 404, reason: 'rewards_money_account_not_found' });
-    if (outcome === 'not_empty') {
-      return res.status(409).json({
-        error: 'Only an empty account can be closed: no balance, no plan, no open request.',
-        code: 409, reason: 'money_account_not_empty',
-      });
-    }
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('DELETE /money/accounts/:userId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const outcome = closeMoneyAccount(db.get(), toInt(req.params.userId));
+  if (outcome === 'not_found') return res.status(404).json({ error: 'Account not found.', code: 404, reason: 'rewards_money_account_not_found' });
+  if (outcome === 'not_empty') {
+    return res.status(409).json({
+      error: 'Only an empty account can be closed: no balance, no plan, no open request.',
+      code: 409, reason: 'money_account_not_empty',
+    });
   }
+  res.json({ ok: true });
 });
 
 // PUT /money/plans/:userId - Plan fuer die Gutschrift anlegen oder aendern (Admin).
 router.put('/money/plans/:userId', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const d = db.get();
-    const userId = toInt(req.params.userId);
-    if (!Number.isFinite(userId) || !d.prepare('SELECT id FROM users WHERE id = ?').get(userId))
-      return res.status(404).json({ error: 'User not found.', code: 404 });
-    if (!isHouseholdMember(userId, { db: d })) {
-      // Der Plan eines ehemaligen Kontos bleibt pausiert: weder aendern noch
-      // fortsetzen. Beenden (DELETE) geht weiter.
-      if (isFormerMoneyAccount(d, userId)) {
-        return res.status(409).json({
-          error: 'This account is deactivated; its plan stays paused.', code: 409, reason: 'account_deactivated',
-        });
-      }
-      return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
+  const d = db.get();
+  const userId = toInt(req.params.userId);
+  if (!Number.isFinite(userId) || !d.prepare('SELECT id FROM users WHERE id = ?').get(userId))
+    return res.status(404).json({ error: 'User not found.', code: 404 });
+  if (!isHouseholdMember(userId, { db: d })) {
+    // Der Plan eines ehemaligen Kontos bleibt pausiert: weder aendern noch
+    // fortsetzen. Beenden (DELETE) geht weiter.
+    if (isFormerMoneyAccount(d, userId)) {
+      return res.status(409).json({
+        error: 'This account is deactivated; its plan stays paused.', code: 409, reason: 'account_deactivated',
+      });
     }
-    const input = readPlanInput(d, userId, req.body);
-    if (input.error) return moneyInputRefusal(res, { message: input.error, reason: input.reason });
-    // Was am alten Plan faellig war, bucht savePlan() VOR der Aenderung, und
-    // einen ersten Termin heute gleich danach - alles in einer Transaktion.
-    const plan = savePlan(d, userId, input, { actorId: actingUser(req) });
-    res.json({ data: { user_id: userId, plan, balance_minor: moneyBalance(d, userId) } });
-  } catch (err) {
-    log.error('PUT /money/plans/:userId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    return res.status(400).json({ error: 'Only household members can have pocket money.', code: 400 });
   }
+  const input = readPlanInput(d, userId, req.body);
+  if (input.error) return moneyInputRefusal(res, { message: input.error, reason: input.reason });
+  // Was am alten Plan faellig war, bucht savePlan() VOR der Aenderung, und
+  // einen ersten Termin heute gleich danach - alles in einer Transaktion.
+  const plan = savePlan(d, userId, input, { actorId: actingUser(req) });
+  res.json({ data: { user_id: userId, plan, balance_minor: moneyBalance(d, userId) } });
 });
 
 // DELETE /money/plans/:userId - Plan beenden (Admin). Saldo und Buchungen bleiben.
 router.delete('/money/plans/:userId', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const result = db.get().prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(toInt(req.params.userId));
-    if (result.changes === 0) return res.status(404).json({ error: 'Plan not found.', code: 404, reason: 'rewards_money_plan_not_found' });
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('DELETE /money/plans/:userId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const result = db.get().prepare('DELETE FROM reward_allowances WHERE user_id = ?').run(toInt(req.params.userId));
+  if (result.changes === 0) return res.status(404).json({ error: 'Plan not found.', code: 404, reason: 'rewards_money_plan_not_found' });
+  res.json({ ok: true });
 });
 
 export default router;

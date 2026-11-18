@@ -737,6 +737,8 @@ const SPEC = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
 
 /** @param {string} path @param {string} method */
 const bodyOf = (path, method) => SPEC.paths[path][method].requestBody.content['application/json'].schema.properties;
+/** @param {string} path @param {string} method @returns {string[]} */
+const requiredOf = (path, method) => SPEC.paths[path][method].requestBody.content['application/json'].schema.required ?? [];
 /** @param {string} path @param {string} method @param {string} name */
 const queryOf = (path, method, name) => SPEC.paths[path][method].parameters.find((/** @type {any} */ p) => p.name === name).schema;
 /** @param {readonly unknown[]} values */
@@ -783,6 +785,55 @@ test('one source: the rewards lists and limits are the handler\'s own', () => {
   assert.equal(catalog.quantity.maximum, rw.MAX_QUANTITY);
   assert.equal(bodyOf('/api/v1/rewards/bonus', 'post').delta.maximum, rw.MAX_BONUS);
   assert.equal(bodyOf('/api/v1/rewards/bonus', 'post').delta.minimum, -rw.MAX_BONUS);
+});
+
+// Since step (b) these schema values are the only guard in front of the
+// handler: its own checks of them are gone (#2810). Literal bounds are held
+// as values here, the lists and limits of the fields files above.
+test('the schema alone guards what the handlers stopped checking: types, literal bounds, default forms', () => {
+  const worker = bodyOf('/api/v1/housekeeping/worker', 'post');
+  assert.deepEqual(worker.daily_rate.type, 'number', 'worker daily_rate');
+  assert.deepEqual(worker.hourly_rate.type, ['number', 'null'], 'worker hourly_rate');
+  assert.ok(requiredOf('/api/v1/housekeeping/worker', 'post').includes('daily_rate'), 'worker daily_rate required');
+  for (const field of ['payment_schedule', 'rate_type']) {
+    assert.deepEqual(worker[field].type, ['string', 'null'], field);
+    assert.ok(worker[field].enum.includes('') && worker[field].enum.includes(null), `${field}: "" and null are the default`);
+  }
+  assert.deepEqual(bodyOf('/api/v1/housekeeping/work-sessions/check-out', 'post').extras.type, ['number', 'null'], 'check-out extras');
+  assert.deepEqual(bodyOf('/api/v1/housekeeping/visits/{id}', 'put').minutes_worked.type, ['integer', 'null'], 'minutes_worked');
+  for (const [path, method] of [['/api/v1/housekeeping/decay-tasks', 'post'], ['/api/v1/housekeeping/decay-tasks/{taskId}', 'patch']]) {
+    const frequency = bodyOf(path, method).frequency_days;
+    assert.equal(frequency.type, 'integer', `${method} ${path}`);
+    assert.equal(frequency.minimum, 1, `${method} ${path}`);
+  }
+  assert.ok(requiredOf('/api/v1/housekeeping/decay-tasks', 'post').includes('frequency_days'), 'frequency_days required');
+  // 1 is also the CHECK of the column: 0 is refused there, 1 is not.
+  assert.throws(() => db.prepare("INSERT INTO housekeeping_decay_tasks (name, area, frequency_days, created_by) VALUES ('x', 'y', 0, ?)").run(ADMIN), /CHECK/);
+  assert.throws(() => db.transaction(() => {
+    db.prepare("INSERT INTO housekeeping_decay_tasks (name, area, frequency_days, created_by) VALUES ('x', 'y', 1, ?)").run(ADMIN);
+    throw new Error('rollback');
+  })(), /^Error: rollback$/, '1 passes the CHECK (rolled back)');
+  assert.deepEqual(bodyOf('/api/v1/housekeeping/maintenance-log', 'post').photo_url.type, ['string', 'null'], 'photo_url');
+  for (const method of ['post', 'patch']) {
+    const path = method === 'post' ? '/api/v1/rewards/catalog' : '/api/v1/rewards/catalog/{id}';
+    const catalog = bodyOf(path, method);
+    assert.equal(catalog.cost.minimum, 1, `${method} cost`);
+    assert.equal(catalog.cost.maximum, rw.MAX_COST, `${method} cost`);
+    assert.equal(catalog.quantity.minimum, 1, `${method} quantity: 0 is never a stock`);
+    assert.equal(catalog.quantity.maximum, rw.MAX_QUANTITY, `${method} quantity`);
+    assert.deepEqual(catalog.quantity.type, ['integer', 'null'], `${method} quantity`);
+    assert.equal(catalog.sort_order.type, 'integer', `${method} sort_order`);
+  }
+  assert.equal(bodyOf('/api/v1/rewards/catalog', 'post').cost.type, 'integer');
+  assert.deepEqual(bodyOf('/api/v1/rewards/catalog/{id}', 'patch').cost.type, ['integer', 'null']);
+  assert.equal(bodyOf('/api/v1/rewards/catalog/{id}', 'patch').is_active.type, 'boolean');
+  assert.equal(bodyOf('/api/v1/rewards/participants/{userId}', 'put').enabled.type, 'boolean');
+  assert.equal(bodyOf('/api/v1/rewards/bonus', 'post').delta.type, 'integer');
+  const plan = bodyOf('/api/v1/rewards/money/plans/{userId}', 'put');
+  assert.equal(plan.paused.type, 'boolean');
+  assert.equal(plan.anchor_day.type, 'integer');
+  assert.equal(plan.anchor_day.minimum, 1);
+  assert.equal(plan.anchor_day.maximum, 31);
 });
 
 test('one source: every month the pattern accepts is one the month window computes, in every zone', () => {
