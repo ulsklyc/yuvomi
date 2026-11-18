@@ -455,6 +455,24 @@ test('items: replace with tracked_dates or attachment_document_ids as null is a 
   assert.equal(links(), 0);
 });
 
+test('items: attachment_document_ids holds whole numbers only; a bad element on a replace leaves the links standing', async () => {
+  // The app sends the ids it got from the server as numbers
+  // (public/components/document-attach.js, commit()); numbers as text are no form of an own caller.
+  const doc = newDocument();
+  const item = await newItem({ attachment_document_ids: [doc] });
+  const links = () => db.prepare('SELECT COUNT(*) AS n FROM inventory_item_documents WHERE item_id = ?').get(item.id).n;
+  assert.equal(links(), 1);
+  for (const ids of [['abc'], [1.5], [null], [String(doc)], [doc, 'x'], [true], [{ id: doc }], [[doc]]]) {
+    const at = ids.length === 2 ? 1 : 0;
+    const field = [{ path: `body/attachment_document_ids/${at}`, rule: 'type' }];
+    assertRefused(await call('POST', '/items', { json: { name: 'Ding', attachment_document_ids: ids } }), field, `POST ${JSON.stringify(ids)}`);
+    assertRefused(await call('PUT', `/items/${item.id}`, { json: { name: 'Ding', attachment_document_ids: ids } }), field, `PUT ${JSON.stringify(ids)}`);
+    assert.equal(links(), 1, `the document link still there after PUT ${JSON.stringify(ids)}`);
+  }
+  assertPassed(await call('PUT', `/items/${item.id}`, { json: { name: 'Ding', attachment_document_ids: [doc] } }), 200);
+  assert.equal(links(), 1);
+});
+
 // ── ITEMS: the query of the list ────────────────────────────────────────────
 
 test('GET /items: the four filters are typed, a filter given twice is a 400', async () => {
