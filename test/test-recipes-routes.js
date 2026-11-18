@@ -28,6 +28,8 @@ const { default: shoppingRouter } = await import('../server/routes/shopping.js')
 // Meals-Router, nicht an seinem SQL-Text.
 const { default: mealsRouter } = await import('../server/routes/meals.js');
 const recipeProviders = await import('../server/services/recipe-providers/index.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const OWNER = db.prepare(`INSERT INTO users (username, display_name, avatar_color, password_hash, role) VALUES ('owner','Owner','#112233','x','member')`).run().lastInsertRowid;
@@ -38,6 +40,7 @@ const MEMBER2 = db.prepare(`INSERT INTO users (username, display_name, password_
 let actor = { id: OWNER, role: 'member' };
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
@@ -50,7 +53,14 @@ app.use('/meals', mealsRouter);
 // `/api/v1/recipes` per Loopback auf (#2197), und genau diesen Weg nimmt der
 // Test am Ende dieser Datei.
 app.use('/api/v1/recipes', recipesRouter);
-app.use('/', recipesRouter);
+// The short paths of this suite (`/`, `/:id/...`) reach the router at its real
+// prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => {
+  if (!/^\/(shopping|meals|api\/v1)(\/|\?|$)/.test(req.url)) req.url = `/api/v1/recipes${req.url}`;
+  next();
+});
+app.use('/api/v1/recipes', recipesRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -794,7 +804,8 @@ test('POST /: ohne Body → 400 mit der Titel-Meldung, nicht 500 (#2197)', async
   const before = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
   const r = await call('POST', '/');
   assert.equal(r.status, 400, JSON.stringify(r.body));
-  assert.match(r.body.error, /title is required/);
+  // The request check names the missing body since #2810 (was: "title is required.").
+  assert.deepEqual(r.body.fields, [{ path: 'body', rule: 'required' }]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n, before);
 });
 
@@ -803,7 +814,7 @@ test('PUT /:id: ohne Body → 400, das Rezept bleibt unveraendert (#2197)', asyn
   const id = created.body.data.id;
   const r = await call('PUT', `/${id}`);
   assert.equal(r.status, 400, JSON.stringify(r.body));
-  assert.match(r.body.error, /title is required/);
+  assert.deepEqual(r.body.fields, [{ path: 'body', rule: 'required' }]);
   assert.deepEqual(ingredientRows(id).map((x) => x.name), ['Bleibt']);
 });
 
@@ -828,9 +839,11 @@ test('POST / und PUT /:id: Zutaten, die keine Liste sind → 400, nichts geschri
   assert.equal(put.status, 400, JSON.stringify(put.body));
   assert.deepEqual(ingredientRows(id).map((x) => x.name), ['Salz']);
 
+  // An entry that is not an object was skipped silently; since #2810 it is a 400.
   const nullItem = await call('POST', '/', { title: 'NullZutat', ingredients: [null, { name: 'Zucker' }] });
-  assert.equal(nullItem.status, 201, JSON.stringify(nullItem.body));
-  assert.deepEqual(ingredientRows(nullItem.body.data.id).map((x) => x.name), ['Zucker']);
+  assert.equal(nullItem.status, 400, JSON.stringify(nullItem.body));
+  assert.deepEqual(nullItem.body.fields, [{ path: 'body/ingredients/0', rule: 'type' }]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM recipes WHERE title = 'NullZutat'").get().n, 0);
 });
 
 // --------------------------------------------------------------------------
@@ -860,12 +873,12 @@ test('MCP call_api_operation post_recipes: Felder neben payload → klare Meldun
     );
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n, before, 'kein Rezept ohne payload');
 
-    // Ganz ohne payload: die Route antwortet mit ihrer eigenen Validierung.
+    // Ganz ohne payload: die Anfragepruefung der Route antwortet (#2810).
     await assert.rejects(
       callTool(ctx, 'call_api_operation', { operation_key: 'post_recipes' }),
       (err) => {
         assert.doesNotMatch(err.message, /Internal error/);
-        assert.match(err.message, /title is required/);
+        assert.match(err.message, /does not match the documented schema/);
         return true;
       },
     );
@@ -945,7 +958,8 @@ test('POST/PUT /: servings ausserhalb 1-99 oder keine ganze Zahl -> 400, nichts 
   for (const servings of [0, 100, 2.5, 'vier', -1]) {
     const r = await call('POST', '/', { title: `Falsch ${servings}`, servings });
     assert.equal(r.status, 400, `servings ${servings}`);
-    assert.match(r.body.error, /Servings/);
+    // The request check answers since #2810 (was: "Servings must be a whole number from 1 to 99.").
+    assert.equal(r.body.fields[0].path, 'body/servings', JSON.stringify(r.body));
   }
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM recipes WHERE title LIKE 'Falsch %'").get().n, 0);
 });

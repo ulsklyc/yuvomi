@@ -32,6 +32,7 @@ import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantr
 import { assignPantryProduct, productKey, writeMinimumThrough } from '../services/pantry-products.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
 import { mayReadModule } from '../authorize/index.ts';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Pantry');
 const router = express.Router();
@@ -215,7 +216,7 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
 // Alle Lagerorte in Sortierreihenfolge.
 // Response: { data: PantryLocation[] }
 // --------------------------------------------------------
-router.get('/locations', (_req, res) => {
+router.get('/locations', validateRequest(), (_req, res) => {
   try {
     res.json({ data: loadLocations() });
   } catch (err) {
@@ -229,7 +230,7 @@ router.get('/locations', (_req, res) => {
 // Body: { name, icon? }
 // Response: { data: PantryLocation }
 // --------------------------------------------------------
-router.post('/locations', (req, res) => {
+router.post('/locations', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -264,7 +265,7 @@ router.post('/locations', (req, res) => {
 // Body: { order: number[] }  (IDs in gewünschter Reihenfolge)
 // Response: { data: PantryLocation[] }
 // --------------------------------------------------------
-router.patch('/locations/reorder', (req, res) => {
+router.patch('/locations/reorder', validateRequest(), (req, res) => {
   try {
     const { order } = req.body;
     if (!Array.isArray(order) || order.length === 0)
@@ -287,7 +288,7 @@ router.patch('/locations/reorder', (req, res) => {
 // Body: { name?, icon? }
 // Response: { data: PantryLocation }
 // --------------------------------------------------------
-router.put('/locations/:locId', (req, res) => {
+router.put('/locations/:locId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.locId, 'locId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -322,7 +323,7 @@ router.put('/locations/:locId', (req, res) => {
 // Der letzte verbleibende Ort kann nicht gelöscht werden.
 // Response: { ok: true, orphaned: number }
 // --------------------------------------------------------
-router.delete('/locations/:locId', (req, res) => {
+router.delete('/locations/:locId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.locId, 'locId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -346,6 +347,19 @@ router.delete('/locations/:locId', (req, res) => {
   }
 });
 
+/**
+ * Lesen der Einkaufsliste fuer /import-shopping, vor validateRequest() (#2810).
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireShoppingRead(req, res, next) {
+  if (!mayReadModule(req, 'shopping')) {
+    return res.status(403).json({ error: 'Read access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
+
 // --------------------------------------------------------
 // POST /api/v1/pantry/import-shopping
 // Übernimmt abgehakte Artikel einer Einkaufsliste in den Vorrat.
@@ -359,7 +373,16 @@ router.delete('/locations/:locId', (req, res) => {
 // LESEN BRAUCHT DAS LESERECHT DER QUELLE. Der Pfad-Guard misst diese Route als
 // `pantry`; Name und Kategorie der Einkaufsartikel stehen danach im Vorrat.
 // Deshalb fragt die Route selbst nach `shopping: read` (beide Achsen), und
-// zwar vor der Listensuche, damit ein 404 keine Listen-ID bestaetigt.
+// zwar vor der Listensuche, damit ein 404 keine Listen-ID bestaetigt - als
+// Routen-Middleware (requireShoppingRead) VOR validateRequest() (#2810): ohne
+// das Recht bleibt es 403 fuer jeden Rumpf, nie ein 400, das Felder nennt.
+//
+// EIN UNBEKANNTER LAGERORT IST EIN 400, KEIN 500 (#2810). Bis dahin lief eine
+// `location_id` eines Orts, den es nicht (mehr) gibt - etwa in einer anderen
+// Sitzung geloescht, waehrend der Dialog offen stand -, in den Fremdschluessel
+// und rollte als 500 zurueck. Jetzt prueft die Route jeden Ort vor dem
+// Schreiben und antwortet wie POST /pantry mit `Location not found.`; nichts
+// wird teilweise uebernommen.
 // Response: { data: { added, merged, skipped, changes } }
 //
 // ZUSAMMENFUEHREN (R23, D3). Eine Zeile wandert in eine bestehende Charge, wenn
@@ -377,12 +400,8 @@ router.delete('/locations/:locId', (req, res) => {
 // alten Stand zurueckzuschreiben - was jemand in der Zwischenzeit an der
 // Charge geaendert hat, bleibt.
 // --------------------------------------------------------
-router.post('/import-shopping', (req, res) => {
+router.post('/import-shopping', requireShoppingRead, validateRequest(), (req, res) => {
   try {
-    if (!mayReadModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Read access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
-    }
-
     const vList = idParam(req.body.list_id, 'list_id');
     if (vList.error) return res.status(400).json({ error: vList.error, code: 400 });
 
@@ -396,6 +415,18 @@ router.post('/import-shopping', (req, res) => {
       .prepare('SELECT * FROM shopping_items WHERE list_id = ? AND is_checked = 1')
       .all(vList.value);
     const checkedById = new Map(checked.map((i) => [i.id, i]));
+
+    // Jeder Ort einer Zeile, die geschrieben wird, muss es geben - vor der
+    // Transaktion, damit ein unbekannter keinen Teilimport hinterlaesst.
+    const locationOf = (/** @type {any} */ entry) => (entry.location_id ? Number(entry.location_id) || null : null);
+    const locationExists = db.get().prepare('SELECT id FROM pantry_locations WHERE id = ?');
+    for (const entry of entries) {
+      if (!checkedById.has(Number(entry?.shopping_item_id))) continue;
+      const locationId = locationOf(entry);
+      if (locationId !== null && !locationExists.get(locationId)) {
+        return res.status(400).json({ error: 'Location not found.', code: 400 });
+      }
+    }
 
     const userId = req.authUserId || req.session.userId;
     const categoryNames = validCategoryNames();
@@ -448,7 +479,7 @@ router.post('/import-shopping', (req, res) => {
 
         const quantity = normalizePantryQuantity(entry.quantity, { fallback: 1 });
         const unit = normalizePantryUnit(entry.unit);
-        const locationId = entry.location_id ? Number(entry.location_id) || null : null;
+        const locationId = locationOf(entry);
         // KALENDARISCH prüfen, nicht nur die Form: `date()` ist dieselbe
         // Funktion, die POST/PUT/PATCH benutzen. Die rohe Regex liess ein
         // '2027-02-30' durch - vorher nur eine unsinnige Zeile, seit die
@@ -517,7 +548,7 @@ router.post('/import-shopping', (req, res) => {
 // Kein Lesen des Einkaufs, also kein zweiter Riegel: die Route schreibt nur in
 // den Vorrat und gehoert damit allein dessen Schreibrecht (Pfad-Guard).
 // --------------------------------------------------------
-router.post('/import-shopping/undo', (req, res) => {
+router.post('/import-shopping/undo', validateRequest(), (req, res) => {
   try {
     const raw = Array.isArray(req.body?.changes) ? req.body.changes : [];
     const changes = raw
@@ -572,7 +603,7 @@ router.post('/import-shopping/undo', (req, res) => {
 // including products without batches (#1448).
 // Response: { data: PantryItem[], products: [], locations: [], categories: [] }
 // --------------------------------------------------------
-router.get('/', (_req, res) => {
+router.get('/', validateRequest(), (_req, res) => {
   try {
     res.json({ data: loadItems(), products: loadProducts(), locations: loadLocations(), categories: loadCategories() });
   } catch (err) {
@@ -594,7 +625,7 @@ router.get('/', (_req, res) => {
 // (module gate in server/index.js).
 // Response: 204
 // --------------------------------------------------------
-router.delete('/products/:productId', (req, res) => {
+router.delete('/products/:productId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.productId, 'productId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -630,7 +661,7 @@ router.delete('/products/:productId', (req, res) => {
 // Body: { name, quantity?, unit?, location_id?, category?, expires_on?, min_quantity?, notes? }
 // Response: { data: PantryItem }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const { values, errors } = validateItemFields(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
@@ -670,7 +701,7 @@ router.post('/', (req, res) => {
 // Vollständiges Update (Bearbeiten-Formular).
 // Response: { data: PantryItem }
 // --------------------------------------------------------
-router.put('/:itemId', (req, res) => {
+router.put('/:itemId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.itemId, 'itemId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -720,7 +751,7 @@ router.put('/:itemId', (req, res) => {
 // Vollobjekts, damit ein Tap keine ganze Zeile überschreibt.
 // Response: { data: PantryItem }
 // --------------------------------------------------------
-router.patch('/:itemId', (req, res) => {
+router.patch('/:itemId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.itemId, 'itemId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -770,7 +801,7 @@ router.patch('/:itemId', (req, res) => {
 // DELETE /api/v1/pantry/:itemId
 // Response: 204
 // --------------------------------------------------------
-router.delete('/:itemId', (req, res) => {
+router.delete('/:itemId', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.itemId, 'itemId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });

@@ -845,8 +845,11 @@ test('keine Absage von Essensplan, Vorrat und Rezepten traegt deutschen Wortlaut
   const { default: mealsRouter } = await import('../server/routes/meals.js');
   const { default: pantryRouter } = await import('../server/routes/pantry.js');
   const { default: recipesRouter } = await import('../server/routes/recipes.js');
+  const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+  const { createErrorHandler } = await import('../server/middleware/error-handler.js');
   const kApp = express();
   kApp.use(express.json({ limit: '10mb' }));
+  kApp.use(defaultEmptyBody);
   kApp.use((req, _res, next) => {
     req.authUserId = ADMIN;
     req.authRole = 'admin';
@@ -854,8 +857,15 @@ test('keine Absage von Essensplan, Vorrat und Rezepten traegt deutschen Wortlaut
     next();
   });
   kApp.use('/meals', mealsRouter);
-  kApp.use('/pantry', pantryRouter);
-  kApp.use('/recipes', recipesRouter);
+  // Pantry and recipes at their real prefix: validateRequest() reads the
+  // operation from the mount and hands its 400 to the error handler (#2810).
+  kApp.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => {
+    if (/^\/(pantry|recipes)(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`;
+    next();
+  });
+  kApp.use('/api/v1/pantry', pantryRouter);
+  kApp.use('/api/v1/recipes', recipesRouter);
+  kApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const kServer = kApp.listen(0, '127.0.0.1');
   const kUrl = await new Promise((r) => kServer.on('listening', () => r(`http://127.0.0.1:${kServer.address().port}`)));
   try {
@@ -908,9 +918,9 @@ test('keine Absage von Essensplan, Vorrat und Rezepten traegt deutschen Wortlaut
     await run('pantry-expires', 'POST', '/pantry', { name: 'Reis', expires_on: 'x' });
     await run('pantry-min', 'POST', '/pantry', { name: 'Reis', min_quantity: -1 });
     await run('pantry-notes', 'POST', '/pantry', { name: 'Reis', notes: longText });
-    await run('pantry-item-id', 'PUT', '/pantry/x', { name: 'Reis' });
+    await run('pantry-item-id', 'PUT', '/pantry/0', { name: 'Reis' });
     await run('location-name', 'POST', '/pantry/locations', {});
-    await run('location-id', 'PUT', '/pantry/locations/x', { name: 'X' });
+    await run('location-id', 'PUT', '/pantry/locations/0', { name: 'X' });
     await run('recipe-title', 'POST', '/recipes', {});
     await run('recipe-notes', 'POST', '/recipes', { title: 'A', notes: longText });
 

@@ -15,6 +15,7 @@ import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { handOverToShoppingList } from '../services/kitchen-handover.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -120,7 +121,7 @@ function loadRecipeWithIngredients(req, id) {
   return withSource({ ...recipe, meal_types: normalizeRecipeMealTypes(recipe.meal_types), ingredients });
 }
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const recipes = db.get().prepare(`
       SELECT r.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
@@ -172,7 +173,8 @@ router.get('/', (req, res) => {
  * raeumte jedes Teil-Update das Bild ab - derselbe Fehler, den `meal_types`
  * weiter unten schon einmal hatte.
  */
-const MAX_RECIPE_IMAGE_LENGTH = 6_990_507; // ~5 MB Rohbild in base64, wie inventory/birthdays
+// Exportiert: das OpenAPI-Dokument nennt dieselbe Zahl, test:validate-recipes-pantry haelt beide gleich (#2810).
+export const MAX_RECIPE_IMAGE_LENGTH = 6_990_507; // ~5 MB Rohbild in base64, wie inventory/birthdays
 const RECIPE_IMAGE_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 
 function validateRecipeImage(val) {
@@ -226,7 +228,7 @@ function validateServings(val) {
   return { value: n, error: null };
 }
 
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const body = bodyOf(req);
     const vIngredients = validateIngredients(body.ingredients);
@@ -273,7 +275,7 @@ router.post('/', (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
@@ -397,7 +399,7 @@ router.put('/:id', (req, res) => {
  * hier - genau wie beim Provider-Thumbnail nebenan, das aus demselben Grund
  * ein Proxy ist.
  */
-router.get('/:id/image', (req, res) => {
+router.get('/:id/image', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
@@ -424,7 +426,7 @@ router.get('/:id/image', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
@@ -483,7 +485,7 @@ router.delete('/:id', (req, res) => {
  * die Adresse je Version eindeutig, damit der Browser nie ein altes Bild als
  * Kandidaten fuer die Nachfrage nimmt.
  */
-router.get('/:id/provider-thumbnail', async (req, res) => {
+router.get('/:id/provider-thumbnail', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
@@ -533,6 +535,39 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
   }
 });
 
+/** RECHTE OHNE ZEILENBEZUG STEHEN VOR validateRequest() (#2810).
+ *
+ * Dieselbe Regel wie im Essensplan (#1290, ausfuehrlich in routes/meals.js):
+ * `/recipes` gehoert dem Scope-Modul `meals`, angelegt werden
+ * `shopping_items`. Wer in den Einkauf schreibt, braucht dessen Schreibrecht -
+ * als Mitglied wie als Token. Als Routen-Middleware vor der Schemapruefung und
+ * vor den 404ern: ohne Recht bleibt es 403 fuer jeden Rumpf, nie ein 400, das
+ * Felder nennt, und keine Antwort bestaetigt eine Rezept- oder Listen-ID.
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireShoppingWrite(req, res, next) {
+  if (!mayWriteModule(req, 'shopping')) {
+    return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
+
+/** Dasselbe fuer die bestaetigte Zuordnung zum Vorrat (Begruendung an der
+ * Route PUT /:id/ingredient-match unten): das Schreibrecht des Vorrats, vor
+ * validateRequest() und vor den 404ern.
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requirePantryWrite(req, res, next) {
+  if (!mayWriteModule(req, 'pantry')) {
+    return res.status(403).json({ error: 'Write access to the pantry is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
+
 // --------------------------------------------------------
 // Integration: Rezeptzutaten → Einkaufsliste
 // --------------------------------------------------------
@@ -557,17 +592,8 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
  * eine ganze Zutatenliste in eine Liste, die der Nutzer gerade nicht ansieht
  * (Audit 2026-07-30, P1-B).
  */
-router.post('/:id/to-shopping-list', (req, res) => {
+router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (req, res) => {
   try {
-    // Dieselbe Regel wie im Essensplan (#1290, ausfuehrlich in
-    // routes/meals.js): `/recipes` gehoert dem Scope-Modul `meals`, angelegt
-    // werden `shopping_items`. Wer in den Einkauf schreibt, braucht dessen
-    // Schreibrecht - als Mitglied wie als Token. Vor den 404ern, damit die
-    // Antwort keine Rezept- und Listen-IDs bestaetigt.
-    if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
-    }
-
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 
@@ -664,15 +690,12 @@ router.post('/:id/to-shopping-list', (req, res) => {
  * Riegel in server/index.js urteilt am ersten Pfadsegment und fragt nur danach.
  * Benannt wird hier aber eine Zeile des VORRATS, und sie wird dauerhaft in ein
  * anderes Modul eingehaengt. Wer das tut, braucht das Schreibrecht des Vorrats,
- * auf beiden Achsen (Mitgliedsrecht und Token-Scope). Der Riegel steht vor den
- * 404ern, damit die Antwort keine Rezept- und Vorrats-IDs bestaetigt.
+ * auf beiden Achsen (Mitgliedsrecht und Token-Scope). Der Riegel
+ * (requirePantryWrite) steht vor validateRequest() und vor den 404ern, damit
+ * die Antwort keine Rezept- und Vorrats-IDs bestaetigt.
  */
-router.put('/:id/ingredient-match', (req, res) => {
+router.put('/:id/ingredient-match', requirePantryWrite, validateRequest(), (req, res) => {
   try {
-    if (!mayWriteModule(req, 'pantry')) {
-      return res.status(403).json({ error: 'Write access to the pantry is required.', code: 403, reason: 'cross_module_access' });
-    }
-
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid recipe ID.', code: 400 });
 

@@ -681,6 +681,55 @@ test('#1997: Artikel speichern - eine spaete Antwort schliesst nur mit dem Konte
   }
 });
 
+// #2810: the API takes the storage location as a number; digit text is only a
+// legacy form. The real save click sends the option's value as a number, and
+// "no place" (the empty option) as null.
+test('#2810: Artikel speichern schickt den Lagerort als Zahl, ohne Ort null', async () => {
+  const g = /** @type {any} */ (globalThis);
+  for (const [value, expected] of /** @type {Array<[string, number | null]>} */ ([['3', 3], ['', null]])) {
+    resetPantry();
+    __test.state.items = [];
+    __test.setContainerForTest(makeNode());
+    /** @type {Record<string, any>} */
+    const klicks = {};
+    /** @type {Record<string, any>} */
+    const felder = {};
+    const panel = {
+      querySelector: (/** @type {string} */ sel) => {
+        felder[sel] ??= { value: '', dataset: {}, addEventListener(/** @type {string} */ _typ, /** @type {any} */ fn) { klicks[sel] = fn; } };
+        return felder[sel];
+      },
+      querySelectorAll: () => [],
+    };
+    /** @type {any} */
+    let optionen = null;
+    /** @type {any} */
+    let gesendet = null;
+    g.__openModal = (/** @type {any} */ opts) => { optionen = opts; };
+    g.__modalContextId = () => 'dialog';
+    g.__closeModal = () => true;
+    g.window.yuvomi.showToast = () => {};
+    g.__apiStub = {
+      post: async (/** @type {string} */ _path, /** @type {any} */ body) => { gesendet = body; return { data: rice(3, { name: 'Reis' }) }; },
+      get: async () => ({ data: [rice(3)], locations: [], categories: [] }),
+    };
+    try {
+      __test.openItemModal('create', null);
+      optionen.onSave(panel);
+      felder['#pantry-name'].value = 'Reis';
+      felder['#pantry-location'] = { value, dataset: {}, addEventListener() {} };
+      await klicks['#pantry-save']();
+      assert.strictEqual(gesendet?.location_id, expected, `Ort ${JSON.stringify(value)}`);
+    } finally {
+      delete g.__openModal;
+      delete g.__modalContextId;
+      delete g.__closeModal;
+      delete g.window.yuvomi.showToast;
+      resetPantry();
+    }
+  }
+});
+
 // --------------------------------------------------------
 // #1448 Schritt 2: Produkte ueber den Chargen
 // --------------------------------------------------------

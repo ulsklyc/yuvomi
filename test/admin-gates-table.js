@@ -227,6 +227,17 @@ export const ROWS = [
     ['PUT', '/money/plans/:userId', `/money/plans/${NO_ID}`, {}],
     ['DELETE', '/money/plans/:userId', `/money/plans/${NO_ID}`],
   ]),
+  // Inline refuseAdmin() calls in the handlers until #2810: requireAdmin stands
+  // before validateRequest() now, so a member's invalid body is a 403, not a 400.
+  ...middlewareRows('server/routes/recipe-providers.js', '/api/v1/recipe-providers', ADMIN_REQUIRED, [
+    ['GET', '/accounts'],
+    ['POST', '/accounts', '/accounts', { provider: 'x', base_url: 5 }],
+    ['PATCH', '/accounts/:id', `/accounts/${NO_ID}`, { enabled: 'x' }],
+    ['DELETE', '/accounts/:id', `/accounts/${NO_ID}`],
+    ['POST', '/accounts/:id/test', `/accounts/${NO_ID}/test`, []],
+    ['POST', '/accounts/:id/sync', `/accounts/${NO_ID}/sync`, []],
+    ['POST', '/sync', '/sync', {}],
+  ]),
   // An inline refuseAdmin() in the handler until #2810: it stands before
   // validateRequest() now, so a member's invalid order is a 403, not a 400.
   ...middlewareRows('server/routes/family.js', '/api/v1/family', ADMIN_REQUIRED, [
@@ -317,18 +328,6 @@ export const ROWS = [
     form: 'inline', file: 'server/routes/dms.js', key: `${method} ${key}`, method,
     path: `/api/v1/documents/dms${path}`, ...(body ? { body } : {}), expect: ADMIN_REQUIRED,
   })),
-  .../** @type {[string, string, string, unknown?][]} */ ([
-    ['GET', '/accounts', '/accounts'],
-    ['POST', '/accounts', '/accounts', {}],
-    ['PATCH', '/accounts/:id', `/accounts/${NO_ID}`, {}],
-    ['DELETE', '/accounts/:id', `/accounts/${NO_ID}`],
-    ['POST', '/accounts/:id/test', `/accounts/${NO_ID}/test`, {}],
-    ['POST', '/accounts/:id/sync', `/accounts/${NO_ID}/sync`, {}],
-    ['POST', '/sync', '/sync', {}],
-  ]).map(([method, key, path, body]) => ({
-    form: 'inline', file: 'server/routes/recipe-providers.js', key: `${method} ${key}`, method,
-    path: `/api/v1/recipe-providers${path}`, ...(body ? { body } : {}), expect: ADMIN_REQUIRED,
-  })),
   { form: 'inline', file: 'server/routes/documents.js', key: 'GET /storage/config', method: 'GET',
     path: '/api/v1/documents/storage/config', expect: ADMIN_REQUIRED },
   { form: 'inline', file: 'server/routes/documents.js', key: 'PUT /storage/config', method: 'PUT',
@@ -364,7 +363,8 @@ export const ADMIN_PASSES = [
   { form: 'requireAdmin (shared, auth router)', method: 'GET', path: '/api/v1/auth/api-tokens' },
   { form: 'requireAdmin (former local copy)', method: 'GET', path: '/api/v1/screensaver/config' },
   { form: 'assertAdmin', method: 'POST', path: '/api/v1/housekeeping/worker', body: {} },
-  { form: 'inline', method: 'GET', path: '/api/v1/recipe-providers/accounts' },
+  { form: 'requireAdmin (route middleware)', method: 'GET', path: '/api/v1/recipe-providers/accounts' },
+  { form: 'inline', method: 'GET', path: '/api/v1/documents/dms/accounts' },
   { form: 'inline (preferences)', method: 'PUT', path: '/api/v1/preferences', body: { countdown_grace_days: 3 } },
 ];
 
@@ -376,5 +376,6 @@ export const ADMIN_PASSES = [
 export const DEVICE_CASES = [
   { form: 'requireAdmin (shared)', method: 'GET', path: '/api/v1/backup/status', expect: DEVICE_CREDENTIAL },
   { form: 'requireAdmin (former local copy)', method: 'GET', path: '/api/v1/screensaver/config', expect: DEVICE_CREDENTIAL },
-  { form: 'inline', method: 'GET', path: '/api/v1/recipe-providers/accounts', expect: DEVICE_CREDENTIAL },
+  { form: 'requireAdmin (route middleware)', method: 'GET', path: '/api/v1/recipe-providers/accounts', expect: DEVICE_CREDENTIAL },
+  { form: 'inline', method: 'GET', path: '/api/v1/documents/dms/accounts', expect: DEVICE_CREDENTIAL },
 ];

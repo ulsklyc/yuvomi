@@ -69,6 +69,7 @@ globalThis.window.matchMedia = globalThis.window.matchMedia
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: recipesRouter } = await import('../server/routes/recipes.js');
 const { default: mealsRouter } = await import('../server/routes/meals.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { setPermissions } = await import('../public/permissions.js');
 const { __test: page } = await import('../public/pages/recipes.js');
 const { __test: meals } = await import('../public/pages/meals.js');
@@ -111,6 +112,8 @@ app.use((req, _res, next) => {
 });
 app.use('/api/v1/recipes', recipesRouter);
 app.use('/api/v1/meals', mealsRouter);
+// validateRequest() (#2810) hands its 400 to the central error handler.
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));
@@ -182,7 +185,8 @@ test('Server: ein Rezept einplanen, das es nicht mehr gibt - anlegen, Plan ueber
 // nicht leerer Name ergibt nie einen leeren Schluessel. Gemessen wird deshalb
 // nur dieser hier.
 test('Server: der deutsche Satz zur Rezept-ID ist englisch', async () => {
-  const r = await call('PUT', '/recipes/abc', { title: 'x' });
+  // `abc` is refused by the request check since #2810; `0` is plain digits and still reaches the handler.
+  const r = await call('PUT', '/recipes/0', { title: 'x' });
   assert.deepEqual([r.status, r.body?.error], [400, 'Invalid recipe ID.']);
 });
 
