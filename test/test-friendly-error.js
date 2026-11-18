@@ -300,7 +300,11 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // A WebDAV backup route failed on this server (#2622); the real answer
     // measures test:backup-routes.
     '../server/routes/backup.js',
-  ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
+  ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'")
+    // A reason the request schema names (`x-reason`, #2810): since group 2A
+    // step (b) the address checks of the recipe providers stand only there.
+    // The real answer, with `fields`, measures test:recipe-provider-routes.
+    + `\n${read('../server/openapi/paths/recipeproviders.js').replace(/'x-reason': (?:\{ [a-zA-Z]+: )?'([a-z_]+)'/g, "reason: '$1'")}`;
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {

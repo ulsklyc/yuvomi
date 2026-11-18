@@ -731,3 +731,52 @@ test('recipes: the image length of the document is the route\'s own limit', () =
     assert.equal(bodySchema(path, method).properties.image_data.maxLength, MAX_RECIPE_IMAGE_LENGTH);
   }
 });
+
+// Since step (b) of group 2A the handler no longer checks these itself: the
+// schema is their only guard, so it is held to the one source here.
+
+test('recipes: the servings bounds of the document are the CHECK of the column (1 to 99)', () => {
+  // The insert never stays: the transaction throws after it and rolls back.
+  const UNDONE = new Error('undone');
+  const probe = db.transaction((/** @type {number} */ value) => {
+    db.prepare("INSERT INTO recipes (title, servings, created_by) VALUES ('Probe', ?, ?)").run(value, ADMIN);
+    throw UNDONE;
+  });
+  for (const [path, method] of [['/api/v1/recipes', 'post'], ['/api/v1/recipes/{id}', 'put']]) {
+    const { minimum, maximum } = bodySchema(path, method).properties.servings;
+    assert.ok(Number.isInteger(minimum) && Number.isInteger(maximum), `${method} ${path}: bounds are set`);
+    for (const value of [minimum - 1, minimum, maximum, maximum + 1]) {
+      let stored = false;
+      try {
+        probe(value);
+      } catch (err) {
+        if (err === UNDONE) stored = true;
+        else assert.match(String(/** @type {Error} */ (err).message), /CHECK constraint/);
+      }
+      assert.equal(stored, value >= minimum && value <= maximum, `${method} ${path}: servings ${value}`);
+    }
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM recipes WHERE title = 'Probe'").get().n, 0, 'nothing stayed');
+});
+
+test('pantry: the kind enum of the undo is exactly the kinds a take-over answers', async () => {
+  const list = Number(db.prepare("INSERT INTO shopping_lists (name, created_by) VALUES ('Kinds', ?)").run(ADMIN).lastInsertRowid);
+  const item = Number(db.prepare("INSERT INTO shopping_items (list_id, name, is_checked) VALUES (?, 'Kindprobe', 1)").run(list).lastInsertRowid);
+  const kinds = new Set();
+  for (let i = 0; i < 2; i++) {
+    const res = await call('POST', '/pantry/import-shopping', { json: { list_id: list, items: [{ shopping_item_id: item }] } });
+    assertPassed(res, 200);
+    for (const change of res.body.data.changes) kinds.add(change.kind);
+  }
+  const schema = bodySchema('/api/v1/pantry/import-shopping/undo', 'post').properties.changes.items;
+  assert.deepEqual(asSet(schema.properties.kind.enum), asSet([...kinds]), 'added on the first take-over, merged on the second');
+  assert.deepEqual(asSet(schema.required), ['kind', 'pantry_item_id']);
+});
+
+test('pantry: quantity and min_quantity are refused below 0 by the document', () => {
+  for (const [path, method] of [['/api/v1/pantry', 'post'], ['/api/v1/pantry/{itemId}', 'put'], ['/api/v1/pantry/{itemId}', 'patch']]) {
+    const { properties } = bodySchema(path, method);
+    assert.equal(properties.quantity.minimum, 0, `${method} ${path} quantity`);
+    assert.equal(properties.min_quantity.minimum, 0, `${method} ${path} min_quantity`);
+  }
+});
