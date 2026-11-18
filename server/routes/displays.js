@@ -25,6 +25,7 @@ import rateLimit from 'express-rate-limit';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
 import { resolvePermissions } from '../authorize/index.ts';
 import { DISPLAY_AREA_MODULES } from '../display-scopes.js';
@@ -79,7 +80,12 @@ export const pairingRouter = express.Router();
  * EINE ABSAGE FUER DREI FAELLE. Unbekannt, abgelaufen, schon benutzt - alle
  * antworten gleich. Wer raet, soll nicht erfahren, ob er nah dran war.
  */
-pairingRouter.post('/pair', pairingLimiter, (req, res) => {
+//
+// validateRequest() (#2810) steht HINTER dem Limiter: ein Rumpf ausserhalb des
+// Schemas zaehlt als Versuch wie jeder andere. Und VOR dem Zerstoeren der
+// Sitzung unten: ein solches 400 laesst die Sitzung stehen, es ist kein
+// Kopplungsversuch.
+pairingRouter.post('/pair', pairingLimiter, validateRequest(), (req, res) => {
   // DIE SITZUNG STIRBT ZUERST, VOR DEM EINLOESEN - UND DAS IST DIE TEURE
   // REIHENFOLGE, ABER DIE RICHTIGE.
   //
@@ -180,7 +186,7 @@ export const peopleRouter = express.Router();
  * (`isEnrolled`): wer nicht teilnimmt, hat keinen Punktestand, und ein Antrag
  * fuer ihn endet an derselben Stelle wie fuer das Tablett selbst.
  */
-peopleRouter.get('/people', (req, res) => {
+peopleRouter.get('/people', validateRequest(), (req, res) => {
   try {
     // NUR EIN DISPLAY. Ein Mensch hat `/family/members`, und diese Antwort
     // traegt display-eigene Felder, die anderswo nichts bedeuten. Die Absage
@@ -221,7 +227,9 @@ peopleRouter.get('/people', (req, res) => {
 const router = express.Router();
 
 /** Jede Route hier ist Administratorensache - ein Display anzulegen heisst,
- *  einem Geraet dauerhaft Zugang zum Haushalt zu geben. */
+ *  einem Geraet dauerhaft Zugang zum Haushalt zu geben. Das Gate steht vor
+ *  validateRequest() jeder Route (#2810): ein Mitglied bekommt 403, nie ein
+ *  400, das Felder nennt. */
 router.use(requireAdmin);
 
 /**
@@ -239,7 +247,7 @@ router.use(requireAdmin);
  * erlaubt gewesen, ohne Eintrag und ohne Begruendung. Eine Ausnahme, die
  * niemand sieht, ist keine Ausnahme, sondern ein Loch.
  */
-router.get('/', (_req, res) => {
+router.get('/', validateRequest(), (_req, res) => {
   try {
     const rows = db.get().prepare(`
       SELECT u.id, u.display_name, u.avatar_color, da.created_at, da.show_screensaver, da.device_settings
@@ -275,7 +283,7 @@ router.get('/', (_req, res) => {
  * NULL ist und "dieses Konto hat kein Passwort" in diesem Schema schon einmal
  * so beantwortet wurde (SSO-Konten, `$oidc$`).
  */
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const displayName = String(req.body?.display_name || '').trim();
     if (!displayName || displayName.length > 128) {
@@ -323,7 +331,7 @@ router.post('/', (req, res) => {
  * die Spalte bei jedem Zugriff mit dem Credential. Nur ein echter Boolean -
  * ein String "false" waere sonst wahr.
  */
-router.patch('/:id', (req, res) => {
+router.patch('/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
@@ -355,7 +363,7 @@ router.patch('/:id', (req, res) => {
 
 /** Ein Display samt Geraeten entfernen. Die users-Zeile geht mit; die
  *  Nebentabellen haengen per ON DELETE CASCADE daran. */
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
@@ -373,7 +381,7 @@ router.delete('/:id', (req, res) => {
  * Einen Kopplungscode ausstellen. Der Klartext steht in DIESER Antwort und
  * danach nirgends mehr - dieselbe Regel wie beim API-Token.
  */
-router.post('/:id/pairing-code', (req, res) => {
+router.post('/:id/pairing-code', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
@@ -393,7 +401,7 @@ router.post('/:id/pairing-code', (req, res) => {
  * Request, weil die Pruefung bei JEDEM Request in die Datenbank sieht - es gibt
  * keinen zwischengespeicherten Zustand, den ein Widerruf noch einholen muesste.
  */
-router.post('/:id/devices/:deviceId/revoke', (req, res) => {
+router.post('/:id/devices/:deviceId/revoke', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const deviceId = Number(req.params.deviceId);
@@ -420,7 +428,7 @@ router.post('/:id/devices/:deviceId/revoke', (req, res) => {
  * gilt, geht. Ein gekoppeltes Geraet antwortet 409 mit `reason` - sein Weg
  * hinaus ist der Widerruf eine Route darueber.
  */
-router.post('/:id/devices/:deviceId/remove', (req, res) => {
+router.post('/:id/devices/:deviceId/remove', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const deviceId = Number(req.params.deviceId);

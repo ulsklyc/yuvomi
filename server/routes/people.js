@@ -19,6 +19,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import * as db from '../db.js';
 import { parseAvatarDataUrl } from '../services/person-avatar.js';
 import { createLogger } from '../logger.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('People');
 const router = express.Router();
@@ -45,7 +46,11 @@ function keyMatches(given, stored) {
  * die Nachfrage laeuft durch alle Gates, und die Antwort ist ein 304 ohne
  * Bytes. Fehlerantworten behalten das globale `no-store` aus server/index.js.
  */
-router.get('/:id/avatar', (req, res) => {
+// validateRequest() (#2810): ein `v`, der fehlt oder nicht die Form des
+// Schluessels hat (32 Hex-Zeichen, einmal), ist ein 400, bevor eine Zeile
+// gelesen wird - das verraet nichts ueber die Person. Ein wohlgeformter, aber
+// falscher Schluessel bleibt das 404 unten.
+router.get('/:id/avatar', validateRequest(), (req, res) => {
   try {
     if (!/^\d+$/.test(req.params.id)) {
       return res.status(400).json({ error: 'Invalid person ID.', code: 400 });

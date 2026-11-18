@@ -1382,6 +1382,13 @@ test('das Display-Dashboard liefert Einkauf, Haushaltshilfe, Abfuhr und Vorrat f
   assert.ok('pantryExpiring' in res.body, 'pantryExpiring muss vorhanden sein');
 });
 
+/**
+ * Whether a 400 names a field: in `fields` (validateRequest(), #2810) or in the handler's sentence.
+ * @param {any} body @param {string} field
+ */
+const names = (body, field) => (body?.fields ?? []).some((/** @type {any} */ f) => f.path === `body/${field}` || f.path.startsWith(`body/${field}/`))
+  || new RegExp(field).test(body?.error ?? '');
+
 test('an admin manages this display’s night hours and screensaver without changing household preferences (#2436)', async () => {
   const created = await admin('POST', '/displays', { display_name: 'Remote settings probe' });
   const id = created.body.data.id;
@@ -1397,11 +1404,12 @@ test('an admin manages this display’s night hours and screensaver without chan
   for (const invalid of [{...settings, night_from:7}, {...settings, night_until:24}, {...settings, idle_seconds:61}, {...settings, show_clock:'false'}, {...settings, cover_photo:1}, {night_from:21}, {...settings, unknown:true}, null]) {
     const rejected = await admin('PATCH', `/displays/${id}`, {device_settings:invalid, show_screensaver:true});
     assert.equal(rejected.status, 400, JSON.stringify(invalid));
-    assert.match(rejected.body.error, /device_settings/, 'the error names the invalid field');
+    // The schema names the field in `fields` (#2810); a rule across fields stays the handler's sentence.
+    assert.ok(names(rejected.body, 'device_settings'), `the refusal names the invalid field: ${JSON.stringify(rejected.body)}`);
   }
   const rejectedSwitch = await admin('PATCH', `/displays/${id}`, {device_settings:{...settings, idle_seconds:300}, show_screensaver:'false'});
   assert.equal(rejectedSwitch.status, 400);
-  assert.match(rejectedSwitch.body.error, /show_screensaver/);
+  assert.ok(names(rejectedSwitch.body, 'show_screensaver'), JSON.stringify(rejectedSwitch.body));
   const listed = (await admin('GET', '/displays')).body.data.find(d => d.id === id);
   assert.deepEqual(listed.device_settings, settings); assert.equal(listed.show_screensaver, false, 'invalid changes are atomic');
   const other = (await admin('POST', '/displays', { display_name:'Other display' })).body.data;

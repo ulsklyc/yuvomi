@@ -331,11 +331,16 @@ function membersInFreshProcess() {
   const code = `
     import express from 'express';
     const { default: router } = await import('./server/routes/family.js');
+    const { defaultEmptyBody } = await import('./server/middleware/empty-body.js');
+    const { createErrorHandler } = await import('./server/middleware/error-handler.js');
     const app = express();
-    app.use('/', router);
+    app.use(express.json());
+    app.use(defaultEmptyBody);
+    app.use('/api/v1/family', router);
+    app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
     const server = app.listen(0, '127.0.0.1');
     await new Promise((resolve) => server.on('listening', resolve));
-    const res = await fetch('http://127.0.0.1:' + server.address().port + '/members');
+    const res = await fetch('http://127.0.0.1:' + server.address().port + '/api/v1/family/members');
     process.stdout.write('RESULT ' + JSON.stringify((await res.json()).data.map((m) => [m.id, m.sort_order])));
     server.close();
   `;

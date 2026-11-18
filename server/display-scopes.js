@@ -168,7 +168,14 @@ export const DISPLAY_READ_PATHS = Object.freeze([
  * importiert, damit die beiden nicht auseinanderlaufen). Was keine ist, faellt
  * schon am Gate durch. Nur GET.
  */
-export const SCREENSAVER_PHOTO_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+//
+// AS TEXT, TOO (#2810): the OpenAPI document carries it as the `pattern` of the
+// photo id, and validateRequest() checks it before the route. A JSON schema
+// pattern has no flags, so both letter cases are spelled out; the regular
+// expression is the same text and accepts exactly what the former `/i` did.
+// Fixed length, no repetition around an optional group (test:openapi-ajv).
+export const SCREENSAVER_PHOTO_ID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
+export const SCREENSAVER_PHOTO_ID = new RegExp(SCREENSAVER_PHOTO_ID_PATTERN);
 
 export const DISPLAY_READ_ROUTES = Object.freeze([
   /^\/screensaver\/photos$/,

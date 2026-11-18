@@ -45,6 +45,8 @@ globalThis.document.documentElement.classList = globalThis.document.documentElem
 const dbmod = await import('../server/db.js');
 const { default: mealsRouter } = await import('../server/routes/meals.js');
 const { default: familyRouter } = await import('../server/routes/family.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { addDays } = await import('../server/services/meal-recurrence.js');
 const { removeUser } = await import('../server/services/user-removal.js');
 await import('../server/auth.js');
@@ -76,14 +78,17 @@ const CARLA = addUser('Carla');
 
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = ADMIN;
   req.authRole = 'admin';
   req.session = { userId: ADMIN, role: 'admin' };
   next();
 });
-app.use('/family', familyRouter);
+// The family router at its real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use('/api/v1/family', familyRouter);
 app.use('/meals', mealsRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -145,7 +150,7 @@ async function dialog(s, index) {
   const week = await weekOf(s, index);
   const meal = week.find((m) => m.id === s.ids[index]);
   Object.assign(meals.state, {
-    members: (await call('GET', '/family/members')).body.data,
+    members: (await call('GET', '/api/v1/family/members')).body.data,
     meals: week, currentWeek: s.start, recipes: [], lists: [], categories: [], loadError: null, modal: null,
   });
   meals.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
@@ -432,7 +437,7 @@ test('Koch der Vorlage nicht waehlbar: der Wechsel auf "ganze Serie" laesst die 
 test('leere Mitgliederliste: der Dialog laedt sie beim Oeffnen nach und reicht die Auswahl nach', async () => {
   const s = await serie(ANNA);
   const meal = (await weekOf(s, 0)).find((m) => m.id === s.ids[0]);
-  const mitglieder = (await call('GET', '/family/members')).body.data;
+  const mitglieder = (await call('GET', '/api/v1/family/members')).body.data;
   const abrufe = [];
   globalThis.__apiStub = { get: async (path) => { abrufe.push(path); return { data: mitglieder }; } };
 

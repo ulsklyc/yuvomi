@@ -14,6 +14,7 @@ import * as db from '../db.js';
 import { searchEverything, emptySearchResults, SEARCH_MODULES } from '../services/search.js';
 import { householdDisabledModules } from '../services/household-modules.js';
 import { hiddenModulesFor } from '../authorize/index.ts';
+import { validateRequest } from '../api/validate-request.ts';
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ const router = express.Router();
  * Modul lesen darf - sonst las ein Token mit `search:read` Notizen, Kontakte und
  * Medikamente, die seine Scopes gar nicht nennen.
  */
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const q = String(req.query.q ?? '').trim();
     if (q.length < 2) return res.json(emptySearchResults());

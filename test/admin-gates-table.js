@@ -227,6 +227,11 @@ export const ROWS = [
     ['PUT', '/money/plans/:userId', `/money/plans/${NO_ID}`, {}],
     ['DELETE', '/money/plans/:userId', `/money/plans/${NO_ID}`],
   ]),
+  // An inline refuseAdmin() in the handler until #2810: it stands before
+  // validateRequest() now, so a member's invalid order is a 403, not a 400.
+  ...middlewareRows('server/routes/family.js', '/api/v1/family', ADMIN_REQUIRED, [
+    ['PATCH', '/members/reorder', '/members/reorder', { order: 'x' }],
+  ]),
   ...middlewareRows('server/routes/screensaver.js', '/api/v1/screensaver', ADMIN_REQUIRED, [
     ['GET', '/config'],
     ['PUT', '/config', '/config', { interval: 'x' }],
@@ -330,8 +335,6 @@ export const ROWS = [
     path: '/api/v1/documents/storage/config', body: { selected_upload_backend: 'x' }, expect: ADMIN_REQUIRED },
   { form: 'inline', file: 'server/routes/documents.js', key: 'POST /storage/test', method: 'POST',
     path: '/api/v1/documents/storage/test', body: {}, expect: ADMIN_REQUIRED },
-  { form: 'inline', file: 'server/routes/family.js', key: 'PATCH /members/reorder', method: 'PATCH',
-    path: '/api/v1/family/members/reorder', body: { order: 'x' }, expect: ADMIN_REQUIRED },
 ];
 
 /**

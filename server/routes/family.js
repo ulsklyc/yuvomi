@@ -8,7 +8,8 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
+import { requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
 import {
   householdMemberSql, memberOrderProblem, memberOrderSql, memberPositionSql, writeMemberOrder,
 } from '../services/household-members.js';
@@ -39,7 +40,7 @@ function listMembers() {
   `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 }));
 }
 
-router.get('/members', (req, res) => {
+router.get('/members', validateRequest(), (req, res) => {
   try {
     res.json({ data: listMembers() });
   } catch (err) {
@@ -57,18 +58,18 @@ router.get('/members', (req, res) => {
 //
 // NUR ADMINISTRATOREN. Die Reihenfolge gilt fuer alle, die hinsehen - sie ist
 // eine Einstellung des Haushalts wie die Familienrollen, keine Vorliebe einer
-// Person. Die Absage ist die eine Admin-Absage (refuseAdmin, Phase 2 C2) mit
-// `reason: 'admin_required'`.
+// Person. Die Absage ist die eine Admin-Absage (requireAdmin, Phase 2 C2) mit
+// `reason: 'admin_required'`. Sie steht als Routen-Middleware VOR
+// validateRequest() (#2810): ein Mitglied bekommt 403, nie ein 400, das Felder
+// nennt. Die Form der Liste (`invalid_order`, `duplicate_member`) prueft das
+// Schema; ob sie genau die Mitglieder nennt, bleibt Sache des Handlers.
 //
 // KEIN `await` VOR DER DATENBANK: Pruefen und Schreiben laufen ohne
 // Yield-Punkt hintereinander, sonst koennte zwischen beidem ein Mitglied
 // deaktiviert werden und bekaeme trotzdem eine Position.
 // --------------------------------------------------------
-router.patch('/members/reorder', (req, res) => {
+router.patch('/members/reorder', requireAdmin, validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) {
-      return refuseAdmin(req, res);
-    }
     const order = req.body?.order;
     const problem = memberOrderProblem(order);
     if (problem) return res.status(400).json({ error: problem.error, code: 400, reason: problem.reason });

@@ -39,11 +39,17 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { deniedModules } from '../authorize/index.ts';
 import { todayKey } from '../utils/timezone.js';
+import { DATE_PATTERN } from '../utils/datetime-pattern.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Kitchen');
 const router = express.Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// One source with the `today` pattern of the OpenAPI document (#2810).
+// validateRequest() refuses any other shape but the empty text, which still
+// means "no day given"; a day of that shape that does not exist (2026-02-30)
+// is compared as text, as before.
+const DATE_RE = new RegExp(DATE_PATTERN);
 
 // Nichts zu melden - dieselbe Form, nur ohne Zahlen.
 const EMPTY_PANTRY = Object.freeze({ attention: 0, expired: 0, low: 0, out: 0 });
@@ -79,7 +85,7 @@ const EMPTY_PANTRY = Object.freeze({ attention: 0, expired: 0, low: 0, out: 0 })
  * DB_ALLOW_NEWER_SCHEMA, until the next start adopts it) stands for itself,
  * with its own minimum, as the client treats it.
  */
-router.get('/summary', (req, res) => {
+router.get('/summary', validateRequest(), (req, res) => {
   try {
     const today = DATE_RE.test(req.query.today ?? '')
       ? req.query.today
