@@ -52,6 +52,7 @@ export function notificationsPaths() {
           200: { description: 'Successful response' },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'No notification channel with this id' },
           409: { description: 'Not a household channel; it stays unchanged and can only be deleted here' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },

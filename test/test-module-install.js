@@ -1978,7 +1978,7 @@ test('ein unerwarteter Fehler beim Installieren → 500 mit festem Satz, ohne di
   try {
     const r = await postZip(makeZip(moduleFiles('raw500-mod')));
     assert.equal(r.status, 500);
-    assert.deepEqual(r.body, { error: 'Module install failed.', code: 500 }, 'kein EIO, kein Serverpfad');
+    assert.deepEqual(r.body, { error: 'Internal server error.', code: 500 }, 'kein EIO, kein Serverpfad');
   } finally {
     restore();
   }
@@ -2429,7 +2429,7 @@ test('asset route: a filesystem error answers with a fixed sentence, never the p
     const text = r.buf.toString('utf8');
     assert.ok(!text.includes(TMP_ROOT) && !text.includes('modules'), `no path in the answer: ${text}`);
     assert.ok(!/EEXIST|ENOTDIR|mkdir/.test(text), `no error class text in the answer: ${text}`);
-    assert.equal(r.body.error, 'Module asset failed.');
+    assert.equal(r.body.error, 'Internal server error.');
     assert.equal(r.body.code, 500);
   } finally {
     if (fs.existsSync(aside)) {

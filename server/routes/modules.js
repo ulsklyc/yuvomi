@@ -158,12 +158,15 @@ function parseZipBody(req, res, next) {
   });
 }
 
-function sendInstallError(res, err, fallback) {
+// An InstallError is an expected refusal with its own status, sentence and
+// reason. Anything else is a raw error whose text may name a server path: it
+// goes on to the central error handler, which logs it and answers 500 with its
+// fixed sentence (#2810).
+function sendInstallError(res, err) {
   if (err instanceof InstallError) {
     return res.status(err.status).json({ error: err.message, code: err.status, reason: err.reason, ...err.extra });
   }
-  log.error(`${fallback}:`, err);
-  return res.status(500).json({ error: `${fallback}.`, code: 500 });
+  throw err;
 }
 
 function wantsOverwrite(value) {
@@ -195,13 +198,8 @@ function installBody(result) {
 // only the query (the archive is no JSON body), so a bad `overwrite` or `path`
 // is refused before up to the archive limit is read into memory.
 router.get('/install/info', requireAdmin, validateRequest(), async (_req, res) => {
-  try {
-    const [writable, persistent] = await Promise.all([isWritable(), isPersistent()]);
-    res.json({ data: { writable, persistent, webInstall: isWebInstallEnabled(), maxZipMb: MAX_ZIP_MB } });
-  } catch (err) {
-    log.error('Module install info failed:', err);
-    res.status(500).json({ error: 'Module install info failed.', code: 500 });
-  }
+  const [writable, persistent] = await Promise.all([isWritable(), isPersistent()]);
+  res.json({ data: { writable, persistent, webInstall: isWebInstallEnabled(), maxZipMb: MAX_ZIP_MB } });
 });
 
 router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSession, installAttemptLimiter, installLimiter, validateRequest(), parseZipBody, async (req, res) => {
@@ -216,7 +214,7 @@ router.post('/install/zip', requireAdmin, requireWebInstall, requireBrowserSessi
     });
     res.status(201).json(installBody(result));
   } catch (err) {
-    sendInstallError(res, err, 'Module install failed');
+    sendInstallError(res, err);
   }
 });
 
@@ -246,45 +244,40 @@ router.post('/install/github', requireAdmin, requireWebInstall, requireBrowserSe
     });
     res.status(201).json(installBody(result));
   } catch (err) {
-    sendInstallError(res, err, 'Module install failed');
+    sendInstallError(res, err);
   }
 });
 
 router.get('/', validateRequest(), async (req, res) => {
-  try {
-    const admin = isAdminRequest(req) && req.query.admin === '1';
-    const modules = await listModules({ admin });
-    res.json({ data: modules });
-  } catch (err) {
-    log.error('Module list failed:', err);
-    res.status(500).json({ error: 'Module list failed.', code: 500 });
-  }
+  const admin = isAdminRequest(req) && req.query.admin === '1';
+  const modules = await listModules({ admin });
+  res.json({ data: modules });
 });
 
 router.patch('/:id', requireAdmin, validateRequest(), async (req, res) => {
+  // `enabled` is a boolean and required by the schema of the operation (#2810).
+  // Only the ON direction needs the session: it is the approval that makes
+  // installed code live (see requireBrowserSession). Not a middleware, because
+  // the direction is in the body.
+  if (req.body.enabled && req.authMethod !== 'session') {
+    return sessionRefusal(res, 'Enabling a module');
+  }
   try {
-    if (typeof req.body?.enabled !== 'boolean') {
-      return res.status(400).json({ error: 'enabled must be a boolean.', code: 400 });
-    }
-    // Only the ON direction needs the session: it is the approval that makes
-    // installed code live (see requireBrowserSession). Not a middleware, because
-    // the direction is in the body.
-    if (req.body.enabled && req.authMethod !== 'session') {
-      return sessionRefusal(res, 'Enabling a module');
-    }
     const module = await setModuleEnabled(req.params.id, req.body.enabled);
     res.json({ data: module });
   } catch (err) {
     const status = err.status || 500;
-    if (status >= 500) log.error('Module update failed:', err);
     // A 5xx without a reason is a raw filesystem or database error, and its
     // message names the absolute path it failed on (EACCES on the temp file
-    // under modules/): a fixed sentence instead. With a reason the service
-    // wrote the sentence itself (409 `busy`, 503 `not_writable`) and the page
-    // picks its text by the reason.
+    // under modules/): it goes on to the central error handler, which logs it
+    // and answers with its fixed sentence. With a reason the service wrote the
+    // sentence itself (409 `busy`, 503 `not_writable`) and the page picks its
+    // text by the reason.
     const known = Boolean(err.reason) || status < 500;
+    if (!known) throw err;
+    if (status >= 500) log.error('Module update failed:', err);
     res.status(status).json({
-      error: known && err.message ? err.message : 'Module update failed.',
+      error: err.message || 'Module update failed.',
       code: status,
       ...(err.reason ? { reason: err.reason } : {}),
     });
@@ -296,7 +289,7 @@ router.delete('/:id', requireAdmin, requireWebInstall, requireBrowserSession, va
     const result = await deleteModule(req.params.id, { userId: req.authUserId });
     res.json({ data: result });
   } catch (err) {
-    sendInstallError(res, err, 'Module delete failed');
+    sendInstallError(res, err);
   }
 });
 
@@ -319,11 +312,12 @@ router.get('/assets/:id/{*assetPath}', validateRequest(), async (req, res) => {
     res.sendFile(path.relative(moduleRoot, assetPath), { root: moduleRoot });
   } catch (err) {
     const status = err.status || 500;
-    if (status >= 500) log.error('Module asset failed:', err);
     // Like PATCH /:id: only resolveAssetPath's own 4xx keep their sentence; a
     // raw filesystem error (no status) names the absolute path of modules/ and
-    // gets a fixed sentence (Phase 0 section H).
-    res.status(status).json({ error: status < 500 && err.message ? err.message : 'Module asset failed.', code: status });
+    // goes on to the central error handler with its fixed sentence (Phase 0
+    // section H, #2810).
+    if (status >= 500) throw err;
+    res.status(status).json({ error: err.message || 'Module asset failed.', code: status });
   }
 });
 
