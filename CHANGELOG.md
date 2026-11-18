@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Waste collection and the shift schedule answer an unexpected failure with the same sentence
+  as the rest of the API.** The routes under `/api/v1/waste` (types, schedules and their
+  overrides, one-off pickups, occurrences, import sources, file import, reminder settings) said
+  `"Internal error"` on a server-side failure, `DELETE /api/v1/schedule/shift-types/{id}` said
+  `"Internal error."` and `GET /api/v1/schedule/entries` said `"Schedule entries could not be
+  resolved."`; they now say `"Internal server error."` like every other module. Status 500 and
+  `code` are unchanged. Every answer that names a known cause stays as it was: a refused input,
+  a missing record or a conflict of waste collection, the 502 of a subscribed address without
+  calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
+  and the own schedule settings answered this way already.
+
 ## [2.93.0] - 2026-11-18
 
 ### Changed

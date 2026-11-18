@@ -8,6 +8,7 @@
  *        schedule-reminders.js importiert scheduleData aus routes/schedule.js
  *        für den Sync - ein Rückimport hier hätte einen Zyklus ergeben
  *        (gleicher Grund wie routes/schedule-feed.js).
+ *        Ein unerwarteter Fehler geht an den zentralen Fehlerhandler (#2810).
  *
  * PERSONENBEZOGEN, NICHT HAUSHALTWEIT: ein Teilzeit- und ein
  * Vollzeit-Mitglied im selben Haushalt haben unterschiedliche Sollstunden,
@@ -18,7 +19,7 @@
  *
  * EIN EIGENER SCHALTER STATT weeklyHours: 0 ALS "AUS" (S-24, PLAN.md
  * Entscheidung D-C): 0 Wochenstunden ist ohnehin keine gueltige Angabe
- * (unten weiterhin abgewiesen), und ein wiederverwendeter Sonderwert zwingt
+ * (das Schema weist sie ab), und ein wiederverwendeter Sonderwert zwingt
  * jede lesende Stelle, sich zu merken, dass 0 hier etwas anderes bedeutet als
  * ueberall sonst eine Zahl. `overtimeEnabled` beantwortet die Frage direkt.
  */
@@ -26,15 +27,9 @@
 import express from 'express';
 import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
-import { createLogger } from '../logger.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
-import { MAX_REMINDER_OFFSET_MINUTES as MAX_OFFSET_MINUTES, MAX_WEEKLY_HOURS, MIN_WEEKLY_HOURS } from '../services/schedule-fields.js';
 
-const log = createLogger('Schedule');
 const router = express.Router();
-
-// MAX_WEEKLY_HOURS (services/schedule-fields.js): 168 = Stunden einer Woche -
-// alles darueber ist kein Sollwert mehr, sondern eine Falscheingabe.
 
 function getUserId(req) {
   const candidates = [req.authUserId, req.user?.id, req.session?.userId];
@@ -49,78 +44,41 @@ function getUserId(req) {
 // ob Ueberstunden ueberhaupt verfolgt werden (alle drei null/1 = Voreinstellung:
 // Erinnerung aus, 40 Stunden, Verfolgung an)
 router.get('/', validateRequest(), (req, res) => {
-  try {
-    const row = db.get().prepare(
-      'SELECT schedule_reminder_offset_minutes AS m, schedule_weekly_hours AS h, schedule_overtime_enabled AS o FROM users WHERE id = ?'
-    ).get(getUserId(req));
-    res.json({ data: { reminderOffsetMinutes: row?.m ?? null, weeklyHours: row?.h ?? null, overtimeEnabled: row?.o !== 0 } });
-  } catch (err) {
-    log.error('GET /schedule/preferences error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const row = db.get().prepare(
+    'SELECT schedule_reminder_offset_minutes AS m, schedule_weekly_hours AS h, schedule_overtime_enabled AS o FROM users WHERE id = ?'
+  ).get(getUserId(req));
+  res.json({ data: { reminderOffsetMinutes: row?.m ?? null, weeklyHours: row?.h ?? null, overtimeEnabled: row?.o !== 0 } });
 });
 
 // PUT /api/v1/schedule/preferences { reminderOffsetMinutes?, weeklyHours?, overtimeEnabled? }
 // Nur mitgeschickte Felder aendern sich - ein Aufrufer, der nur die
 // Wochenstunden speichert, darf den Erinnerungs-Vorlauf nicht anfassen.
+// Das Schema (server/openapi/paths/schedule.js) weist vor dem Handler ab, was
+// keine ganze Zahl in den Grenzen aus services/schedule-fields.js oder `null`
+// ist (Vorlauf 0 bis MAX_REMINDER_OFFSET_MINUTES, Wochenstunden
+// MIN_WEEKLY_HOURS bis MAX_WEEKLY_HOURS), und einen Schalter, der kein
+// Boolean ist (#2810).
 router.put('/', validateRequest(), (req, res) => {
-  try {
-    const userId = getUserId(req);
-    const current = db.get().prepare(
-      'SELECT schedule_reminder_offset_minutes AS m, schedule_weekly_hours AS h, schedule_overtime_enabled AS o FROM users WHERE id = ?'
-    ).get(userId);
+  const userId = getUserId(req);
+  const body = req.body ?? {};
+  const current = db.get().prepare(
+    'SELECT schedule_reminder_offset_minutes AS m, schedule_weekly_hours AS h, schedule_overtime_enabled AS o FROM users WHERE id = ?'
+  ).get(userId);
 
-    let offsetMinutes = current?.m ?? null;
-    if ('reminderOffsetMinutes' in (req.body ?? {})) {
-      const raw = req.body.reminderOffsetMinutes;
-      if (raw === null || raw === undefined) {
-        offsetMinutes = null;
-      } else {
-        const n = Number(raw);
-        if (!Number.isInteger(n) || n < 0 || n > MAX_OFFSET_MINUTES) {
-          return res.status(400).json({ error: `reminderOffsetMinutes must be an integer between 0 and ${MAX_OFFSET_MINUTES}, or null.`, code: 400 });
-        }
-        offsetMinutes = n;
-      }
-    }
+  const offsetMinutes = 'reminderOffsetMinutes' in body ? body.reminderOffsetMinutes : (current?.m ?? null);
+  const weeklyHours = 'weeklyHours' in body ? body.weeklyHours : (current?.h ?? null);
+  // S-24: kein null-Zustand wie bei den beiden Feldern oben - ein Schalter
+  // ist immer eindeutig an oder aus, "noch nicht entschieden" gibt es hier
+  // nicht (die GET-Antwort liest ein ungesetztes `null` bereits als "an").
+  const overtimeEnabled = 'overtimeEnabled' in body ? body.overtimeEnabled : current?.o !== 0;
 
-    let weeklyHours = current?.h ?? null;
-    if ('weeklyHours' in (req.body ?? {})) {
-      const raw = req.body.weeklyHours;
-      if (raw === null || raw === undefined) {
-        weeklyHours = null;
-      } else {
-        const n = Number(raw);
-        if (!Number.isInteger(n) || n < MIN_WEEKLY_HOURS || n > MAX_WEEKLY_HOURS) {
-          return res.status(400).json({ error: `weeklyHours must be an integer between ${MIN_WEEKLY_HOURS} and ${MAX_WEEKLY_HOURS}, or null.`, code: 400 });
-        }
-        weeklyHours = n;
-      }
-    }
-
-    // S-24: kein null-Zustand wie bei den beiden Feldern oben - ein Schalter
-    // ist immer eindeutig an oder aus, "noch nicht entschieden" gibt es hier
-    // nicht (die GET-Antwort liest ein ungesetztes `null` bereits als "an").
-    let overtimeEnabled = current?.o !== 0;
-    if ('overtimeEnabled' in (req.body ?? {})) {
-      const raw = req.body.overtimeEnabled;
-      if (typeof raw !== 'boolean') {
-        return res.status(400).json({ error: 'overtimeEnabled must be a boolean.', code: 400 });
-      }
-      overtimeEnabled = raw;
-    }
-
-    db.get().prepare('UPDATE users SET schedule_reminder_offset_minutes = ?, schedule_weekly_hours = ?, schedule_overtime_enabled = ? WHERE id = ?')
-      .run(offsetMinutes, weeklyHours, overtimeEnabled ? 1 : 0, userId);
-    // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
-    // Erwartung wie beim Vorrat (server/routes/pantry.js ruft die Ein-
-    // Artikel-Fassung direkt nach dem Speichern).
-    syncScheduleRemindersForUser(db.get(), userId);
-    res.json({ data: { reminderOffsetMinutes: offsetMinutes, weeklyHours, overtimeEnabled } });
-  } catch (err) {
-    log.error('PUT /schedule/preferences error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  db.get().prepare('UPDATE users SET schedule_reminder_offset_minutes = ?, schedule_weekly_hours = ?, schedule_overtime_enabled = ? WHERE id = ?')
+    .run(offsetMinutes, weeklyHours, overtimeEnabled ? 1 : 0, userId);
+  // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
+  // Erwartung wie beim Vorrat (server/routes/pantry.js ruft die Ein-
+  // Artikel-Fassung direkt nach dem Speichern).
+  syncScheduleRemindersForUser(db.get(), userId);
+  res.json({ data: { reminderOffsetMinutes: offsetMinutes, weeklyHours, overtimeEnabled } });
 });
 
 export default router;

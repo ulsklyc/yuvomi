@@ -7,6 +7,9 @@
  *          all of these share server/services/waste-store.js's
  *          previewImport/commitImport and, for URL sources,
  *          server/services/waste-url-source.js's fetch/refresh logic.
+ *          A catch answers only the typed waste errors (and, on re-import, a
+ *          URL source without entries); anything else reaches the central
+ *          error handler (#2810).
  */
 
 import express from 'express';
@@ -15,7 +18,7 @@ import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
 import { id as validateId } from '../../middleware/validate.js';
-import { wasteErrorResponse, currentUserId, hasWasteWriteAccess, redactSourceForReader } from './helpers.js';
+import { wasteErrorResponse, currentUserId, redactSourceForReader } from './helpers.js';
 import { MAX_ICS_BYTES, MAX_ICS_MB } from '../../services/waste-import.js';
 import { createUrlSource, refreshUrlSource, fetchIcsText, minutesFromNow, classifyFetchFailure, emptyFeedAsFetchFailure } from '../../services/waste-url-source.js';
 
@@ -23,26 +26,16 @@ const log = createLogger('Waste');
 const router = express.Router();
 
 router.get('/', validateRequest(), (req, res) => {
-  try {
-    const sources = store.listSources(db.get()).map((s) => redactSourceForReader(s, req));
-    res.json({ data: sources });
-  } catch (err) {
-    log.error('GET /waste/sources error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  const sources = store.listSources(db.get()).map((s) => redactSourceForReader(s, req));
+  res.json({ data: sources });
 });
 
 router.get('/:id', validateRequest(), (req, res) => {
-  try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
-    res.json({ data: { ...redactSourceForReader(source, req), mappings: store.listMappings(db.get(), vId.value) } });
-  } catch (err) {
-    log.error('GET /waste/sources/:id error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const source = store.getSource(db.get(), vId.value);
+  if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
+  res.json({ data: { ...redactSourceForReader(source, req), mappings: store.listMappings(db.get(), vId.value) } });
 });
 
 // Creates a URL subscription source. Fresh FILE sources are still created via
@@ -50,11 +43,12 @@ router.get('/:id', validateRequest(), (req, res) => {
 // commit immediately, a URL source has only a URL until the first fetch this
 // call performs synchronously.
 router.post('/', validateRequest(), async (req, res) => {
+  const body = req.body ?? {};
+  // The schema requires `name` as text; empty after trimming is the route's.
+  if (typeof body.name !== 'string' || !body.name.trim()) {
+    return res.status(400).json({ error: 'name is required.', code: 400 });
+  }
   try {
-    const body = req.body ?? {};
-    if (typeof body.name !== 'string' || !body.name.trim()) {
-      return res.status(400).json({ error: 'name is required.', code: 400 });
-    }
     const result = await createUrlSource(db.get(), {
       name: body.name,
       url: body.url,
@@ -64,34 +58,31 @@ router.post('/', validateRequest(), async (req, res) => {
     res.status(201).json({ data: { ...result, source: redactSourceForReader(result.source, req) } });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('POST /waste/sources error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
 router.put('/:id', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const source = store.renameSource(db.get(), vId.value, req.body?.name);
     res.json({ data: redactSourceForReader(source, req) });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('PUT /waste/sources/:id error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
 router.delete('/:id', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     store.deleteSource(db.get(), vId.value);
     res.status(204).end();
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('DELETE /waste/sources/:id error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
@@ -100,75 +91,70 @@ router.delete('/:id', validateRequest(), (req, res) => {
 // the response's `outcome` tells the client whether to show a mapping wizard
 // (see .../reimport/preview|commit below, which a URL source also drives).
 router.post('/:id/refresh', validateRequest(), async (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const source = store.getSource(db.get(), vId.value);
+  if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
+  if (source.kind !== 'url') {
+    return res.status(400).json({ error: 'Manual refresh only applies to URL sources; use re-import for file sources.', code: 400, reason: 'waste_source_not_url' });
+  }
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
-    if (source.kind !== 'url') {
-      return res.status(400).json({ error: 'Manual refresh only applies to URL sources; use re-import for file sources.', code: 400, reason: 'waste_source_not_url' });
-    }
     const result = await refreshUrlSource(db.get(), vId.value);
     res.json({ data: { ...result, source: redactSourceForReader(result.source, req) } });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('POST /waste/sources/:id/refresh error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
 // GET /api/v1/waste/sources/:id/mapping-profile/export -> portable {pattern, type_name} snapshot (#1063 Phase 10)
 router.get('/:id/mapping-profile/export', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     res.json({ data: store.exportMappingProfile(db.get(), vId.value) });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('GET /waste/sources/:id/mapping-profile/export error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
 router.post('/:id/mapping-profile/import/preview', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const preview = store.previewMappingProfileImport(db.get(), vId.value, req.body?.profile);
     res.json({ data: preview });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('POST /waste/sources/:id/mapping-profile/import/preview error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
 router.post('/:id/mapping-profile/import/commit', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const body = req.body ?? {};
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const body = req.body ?? {};
     const result = store.commitMappingProfileImport(db.get(), vId.value, body.profile, body.profile_digest ?? null);
     res.json({ data: result });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('POST /waste/sources/:id/mapping-profile/import/commit error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
 router.put('/:id/mappings/:mappingId', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const vMappingId = validateId(req.params.mappingId, 'mappingId');
+  if (vMappingId.error) return res.status(400).json({ error: vMappingId.error, code: 400 });
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const vMappingId = validateId(req.params.mappingId, 'mappingId');
-    if (vMappingId.error) return res.status(400).json({ error: vMappingId.error, code: 400 });
     const mapping = store.updateMapping(db.get(), vId.value, vMappingId.value, req.body ?? {});
     res.json({ data: mapping });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('PUT /waste/sources/:id/mappings/:mappingId error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
@@ -243,34 +229,31 @@ function emptyFeedResponse(res, source, err) {
 }
 
 router.post('/:id/reimport/preview', validateRequest(), async (req, res) => {
-  let source = null;
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const source = store.getSource(db.get(), vId.value);
+  if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
+  const fetched = await icsTextForReimport(source, req, res);
+  if (fetched === null) return;
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
-    const fetched = await icsTextForReimport(source, req, res);
-    if (fetched === null) return;
     const preview = store.previewImport(db.get(), { sourceId: vId.value, icsText: fetched.text });
     res.json({ data: preview });
   } catch (err) {
     if (emptyFeedResponse(res, source, err)) return;
     if (wasteErrorResponse(res, err)) return;
-    log.error('POST /waste/sources/:id/reimport/preview error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
 router.post('/:id/reimport/commit', validateRequest(), async (req, res) => {
-  let source = null;
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const source = store.getSource(db.get(), vId.value);
+  if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
+  const fetched = await icsTextForReimport(source, req, res);
+  if (fetched === null) return;
+  const body = req.body ?? {};
   try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    source = store.getSource(db.get(), vId.value);
-    if (!source) return res.status(404).json({ error: 'Waste import source not found.', code: 404, reason: 'waste_source_not_found' });
-    const fetched = await icsTextForReimport(source, req, res);
-    if (fetched === null) return;
-    const body = req.body ?? {};
     // One transaction for the commit AND the URL source's own attempt record
     // (nests via SAVEPOINT under commitImport's own transaction): these were
     // two separate writes before, so a failure recording the attempt after a
@@ -310,8 +293,7 @@ router.post('/:id/reimport/commit', validateRequest(), async (req, res) => {
   } catch (err) {
     if (emptyFeedResponse(res, source, err)) return;
     if (wasteErrorResponse(res, err)) return;
-    log.error('POST /waste/sources/:id/reimport/commit error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 

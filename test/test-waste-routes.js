@@ -1311,6 +1311,24 @@ test('every waste_* reason the server source carries is answered by a real route
   const codes = [...importer.matchAll(/new WasteImportError\([^\n]*?,\s*'([a-z_]+)'\s*[,)]/g)].map((m) => m[1]);
   assert.equal(codes.length, 6, `the scan reads the import refusals (found ${codes.join(', ')})`);
   for (const code of codes) inSource.add(`waste_import_${code}`);
+  // A refusal the schema of the operation makes names its reason through
+  // `x-reason` in the OpenAPI document (#2810): since group 4 step (b) the
+  // bounds and the time of a reminder setting are refused there only.
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const spec = buildOpenApiSpec(null, '0.0.0-test');
+  const fromDocument = new Set();
+  const walk = (/** @type {unknown} */ node) => {
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'x-reason' && value && typeof value === 'object') {
+        for (const reason of Object.values(value)) if (typeof reason === 'string' && reason.startsWith('waste_')) fromDocument.add(reason);
+      } else walk(value);
+    }
+  };
+  walk(Object.fromEntries(Object.entries(spec.paths).filter(([path]) => path.startsWith('/api/v1/waste'))));
+  walk(Object.fromEntries(Object.entries(spec.components.schemas).filter(([name]) => name.startsWith('Waste'))));
+  assert.ok(fromDocument.has('waste_reminder_offset_invalid'), `the scan reads the document's reasons (found ${[...fromDocument].join(', ')})`);
+  for (const reason of fromDocument) inSource.add(reason);
   assert.ok(inSource.size >= 20, `the scan reads reasons at all (found ${inSource.size})`);
   assert.deepEqual([...seenReasons].sort(), [...inSource].sort(),
     'a reason in the server source has no case above that sees it in a real answer - or a case sees one the scan misses');
