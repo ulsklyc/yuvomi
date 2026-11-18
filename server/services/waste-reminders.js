@@ -25,6 +25,7 @@ import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { listTypes, getOccurrences } from './waste-store.js';
+import { MIN_OFFSET_DAYS, MAX_OFFSET_DAYS } from './waste-fields.js';
 
 const log = createLogger('Waste');
 
@@ -34,8 +35,8 @@ const log = createLogger('Waste');
 // not real storage (invariant #8 - every list has a measured work limit).
 const REMINDER_WINDOW_DAYS = 45;
 
-export const MIN_OFFSET_DAYS = 0;
-export const MAX_OFFSET_DAYS = 14;
+// The bounds live in waste-fields.js (#2810), read by the OpenAPI document too.
+export { MIN_OFFSET_DAYS, MAX_OFFSET_DAYS };
 
 function toNaiveUTC(isoWithZ) {
   // reminders.remind_at is naive-UTC, HH:MM (no seconds) throughout this app

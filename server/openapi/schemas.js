@@ -3,6 +3,7 @@ import { MAX_QUICK_LINK_URL_LENGTH } from '../../public/utils/quick-link-url.js'
 import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { DATETIME_PATTERN } from '../utils/datetime-pattern.js';
 import { ORIGIN_MODULE } from '../services/reminder-origins.js';
+import { wasteInputSchemas } from './waste-inputs.js';
 
 /**
  * A reminder time as the handlers accept it (`datetime()` in
@@ -3403,16 +3404,6 @@ export const schemas = {
             updated_at: { type: 'string' },
           },
         },
-        WasteTypeInput: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', maxLength: 100 },
-            icon: { type: 'string', maxLength: 60 },
-            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
-            archived: { type: 'boolean' },
-            sort_order: { type: 'integer' },
-          },
-        },
         WasteSchedule: {
           type: 'object',
           required: ['id', 'type_id', 'recurrence_kind', 'anchor_date', 'interval', 'active'],
@@ -3437,28 +3428,6 @@ export const schemas = {
             updated_at: { type: 'string' },
           },
         },
-        WasteScheduleInput: {
-          type: 'object',
-          properties: {
-            type_id: { type: 'integer' },
-            recurrence_kind: { type: 'string', enum: ['weekly', 'monthly_fixed_day', 'monthly_ordinal_weekday'] },
-            anchor_date: { type: 'string', format: 'date' },
-            interval: { type: 'integer', minimum: 1 },
-            weekdays: {
-              description: 'weekly: an array of BYDAY codes, e.g. ["MO","TH"]. monthly_ordinal_weekday: a single code string, e.g. "MO".',
-              oneOf: [
-                { type: 'array', items: { type: 'string', enum: ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] } },
-                { type: 'string', enum: ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] },
-              ],
-            },
-            month_day: {
-              type: 'integer',
-              description: 'monthly_fixed_day: 1-31 or -1. monthly_ordinal_weekday: the ordinal position, -1 (last) or 1-4 (nth).',
-            },
-            valid_until: { type: ['string', 'null'], format: 'date' },
-            active: { type: 'boolean' },
-          },
-        },
         WasteScheduleOverride: {
           type: 'object',
           required: ['id', 'schedule_id', 'original_date'],
@@ -3472,13 +3441,6 @@ export const schemas = {
             updated_at: { type: 'string' },
           },
         },
-        WasteScheduleOverrideInput: {
-          type: 'object',
-          properties: {
-            replacement_date: { type: ['string', 'null'], format: 'date', description: 'A date to move this occurrence to, or null to skip it.' },
-            note: { type: ['string', 'null'] },
-          },
-        },
         WasteOneOffPickup: {
           type: 'object',
           required: ['id', 'type_id', 'date'],
@@ -3490,14 +3452,6 @@ export const schemas = {
             created_by: { type: ['integer', 'null'] },
             created_at: { type: 'string' },
             updated_at: { type: 'string' },
-          },
-        },
-        WasteOneOffPickupInput: {
-          type: 'object',
-          properties: {
-            type_id: { type: 'integer' },
-            date: { type: 'string', format: 'date' },
-            note: { type: ['string', 'null'] },
           },
         },
         WasteOccurrenceOrigin: {
@@ -3618,9 +3572,6 @@ export const schemas = {
             { type: 'object', properties: { mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteSourceMapping' } } } },
           ],
         },
-        WasteSourceRenameInput: {
-          type: 'object', required: ['name'], properties: { name: { type: 'string', maxLength: 150 } },
-        },
         WasteSourceMapping: {
           type: 'object',
           required: ['id', 'source_id', 'original_label', 'normalized_label', 'ignored'],
@@ -3632,15 +3583,6 @@ export const schemas = {
             type_ids: { type: 'array', items: { type: 'integer' }, description: 'Every type this label maps to, ascending; one pickup per type is created for each of its entries. Empty when the label is ignored.' },
             type_id: { type: ['integer', 'null'], deprecated: true, description: 'The lowest of type_ids, or null. Kept for callers from before a label could map to several types; read type_ids instead.' },
             ignored: { type: 'boolean', description: 'True exactly when type_ids is empty.' },
-          },
-        },
-        WasteSourceMappingUpdateInput: {
-          type: 'object',
-          description: 'Either ignored: true, or the label\'s full new type set as type_ids (or a single type_id) - never both, and never type_id together with type_ids.',
-          properties: {
-            type_ids: { type: 'array', items: { type: 'integer' }, minItems: 1, description: 'Replaces the label\'s whole type set.' },
-            type_id: { type: 'integer', description: 'Shorthand for type_ids with one entry.' },
-            ignored: { type: 'boolean', default: false },
           },
         },
         WasteImportDiagnostic: {
@@ -3687,36 +3629,8 @@ export const schemas = {
             labels: { type: 'array', items: { $ref: '#/components/schemas/WasteImportLabel' } },
           },
         },
-        WasteImportPreviewInput: {
-          type: 'object', required: ['ics'],
-          properties: { ics: { type: 'string', description: 'The raw ICS file text.' } },
-        },
         WasteImportPreviewResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteImportPreview' } },
-        },
-        WasteImportMappingDecision: {
-          type: 'object',
-          required: ['normalized_label'],
-          description: 'Either ignored: true, or at least one type: existing ones as type_ids (or a single type_id), a new_type to create inline, or both together. One decision is required per distinct label reported by the preview; each entry of a label becomes one pickup per type.',
-          properties: {
-            normalized_label: { type: 'string' },
-            type_ids: { type: 'array', items: { type: 'integer' } },
-            type_id: { type: 'integer', description: 'Shorthand for type_ids with one entry; not together with type_ids.' },
-            new_type: { $ref: '#/components/schemas/WasteTypeInput' },
-            ignored: { type: 'boolean' },
-          },
-        },
-        WasteImportCommitInput: {
-          type: 'object',
-          required: ['ics', 'mappings'],
-          properties: {
-            ics: { type: 'string', description: 'The raw ICS file text (re-parsed on commit; never trusts a client-supplied candidate list).' },
-            name: { type: 'string', maxLength: 150, description: 'Required for a fresh import (POST /import/commit); defaults to the existing name on a re-import.' },
-            mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteImportMappingDecision' } },
-            skip_event_keys: { type: 'array', items: { type: 'string' }, description: 'Blocking-diagnostic event_key values explicitly acknowledged and excluded.' },
-            preview_digest: { type: 'string', description: 'The digest returned by the matching preview; a mismatch (the parsed content actually changed since that preview) is refused with 409.' },
-            expected_version: { type: 'integer', description: 'Required on a re-import commit; the source\'s version as last seen in a preview (409 on mismatch).' },
-          },
         },
         WasteImportDiff: {
           type: 'object',
@@ -3742,15 +3656,6 @@ export const schemas = {
         },
         WasteSourceMappingResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteSourceMapping' } },
-        },
-        WasteUrlSourceCreateInput: {
-          type: 'object',
-          required: ['name', 'url'],
-          properties: {
-            name: { type: 'string', maxLength: 150 },
-            url: { type: 'string', description: 'https:// only by default; http:// is accepted only under the operator opt-in WASTE_SOURCE_ALLOW_PRIVATE_NETWORK.' },
-            refresh_interval_minutes: { type: 'integer', default: 1440, description: 'Bounded 60-43200 (hourly to monthly).' },
-          },
         },
         WasteUrlSourceRefreshResult: {
           type: 'object',
@@ -3792,14 +3697,6 @@ export const schemas = {
         WasteReminderSettingsListResponse: {
           type: 'object', required: ['data'], properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteReminderSetting' } } },
         },
-        WasteReminderSettingUpdateInput: {
-          type: 'object',
-          properties: {
-            enabled: { type: 'boolean', default: false },
-            offset_days: { type: 'integer', default: 1 },
-            delivery_time: { type: 'string', default: '08:00' },
-          },
-        },
         WasteReminderSettingResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteReminderSetting' } },
         },
@@ -3816,16 +3713,6 @@ export const schemas = {
         },
         WasteFeedStatusResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteFeedStatus' } },
-        },
-        WasteFeedTypeSelectionInput: {
-          type: 'object',
-          required: ['type_ids'],
-          properties: {
-            type_ids: {
-              type: ['array', 'null'], items: { type: 'integer' },
-              description: 'Waste type ids to include, or null to include every active type again.',
-            },
-          },
         },
         WasteMappingProfileEntry: {
           type: 'object',
@@ -3846,9 +3733,6 @@ export const schemas = {
         },
         WasteMappingProfileExportResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfile' } },
-        },
-        WasteMappingProfileImportPreviewInput: {
-          type: 'object', required: ['profile'], properties: { profile: { $ref: '#/components/schemas/WasteMappingProfile' } },
         },
         WasteMappingProfilePreviewEntry: {
           type: 'object',
@@ -3879,14 +3763,6 @@ export const schemas = {
         WasteMappingProfileImportPreviewResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfilePreview' } },
         },
-        WasteMappingProfileImportCommitInput: {
-          type: 'object',
-          required: ['profile', 'profile_digest'],
-          properties: {
-            profile: { $ref: '#/components/schemas/WasteMappingProfile' },
-            profile_digest: { type: 'string' },
-          },
-        },
         WasteMappingProfileImportCommitResult: {
           type: 'object',
           required: ['applied_count', 'entries'],
@@ -3898,4 +3774,6 @@ export const schemas = {
         WasteMappingProfileImportCommitResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfileImportCommitResult' } },
         },
+        // Die Anfrage-Schemata der Abfuhr (#2810) stehen in waste-inputs.js.
+        ...wasteInputSchemas(),
 };

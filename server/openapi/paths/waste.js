@@ -1,4 +1,25 @@
-import { op, jsonBody, idParam, stringPathParam } from '../helpers.js';
+import { op, jsonBody, idParam } from '../helpers.js';
+import { DATE_PATTERN } from '../../utils/datetime-pattern.js';
+import { QUERY_FLAG_VALUES } from '../../services/waste-fields.js';
+
+/**
+ * A body whose fields are all optional (#2810): a request without one reaches
+ * the handler as before (an empty update, a skipped occurrence, a URL source's
+ * re-import that reads no `ics`).
+ * @param {string} schemaRef
+ */
+const optionalBody = (schemaRef) => ({ ...jsonBody(schemaRef), required: false });
+
+/**
+ * A day key in the path: the shape `YYYY-MM-DD`; whether the day exists stays the route's.
+ * @param {string} name
+ * @param {string} description
+ */
+const dayPathParam = (name, description) => ({
+  name, in: 'path', required: true, description, schema: { type: 'string', pattern: DATE_PATTERN },
+});
+
+const FLAG_FORMS = QUERY_FLAG_VALUES.map((v) => `\`${v}\``).join(', ');
 
 const apiError = (description) => ({
   description,
@@ -30,15 +51,15 @@ const includeArchivedParam = {
   name: 'include_archived',
   in: 'query',
   required: false,
-  description: 'Include archived types. Defaults to false.',
-  schema: { type: 'boolean', default: false },
+  description: `Include archived types: one of ${FLAG_FORMS} (\`1\` and \`true\` include them). Left out is false; any other value, or the parameter given twice, is refused.`,
+  schema: { type: 'string', enum: [...QUERY_FLAG_VALUES] },
 };
 
 const typeIdParam = {
   name: 'type_id',
   in: 'query',
   required: false,
-  description: 'Filter to one waste type.',
+  description: 'Filter to one waste type, plain decimal digits. Up to v2.91 a malformed value was silently no filter; it is refused now.',
   schema: { type: 'integer' },
 };
 
@@ -69,9 +90,10 @@ export function wastePaths() {
       put: op({
         summary: 'Update a waste type',
         tag: 'Waste',
+        description: 'A body outside the schema answers 400 before the type is looked up, so it comes before the 404.',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/WasteTypeInput'),
+        requestBody: optionalBody('#/components/schemas/WasteTypeUpdateInput'),
         responses: schemaResponse('WasteTypeResponse', 'Type updated', 200, { 404: apiError('Type not found (`reason: "waste_type_not_found"`)') }),
       }),
       delete: op({
@@ -92,8 +114,8 @@ export function wastePaths() {
         tag: 'Waste',
         params: [typeIdParam, {
           name: 'include_inactive', in: 'query', required: false,
-          description: 'Include paused (active=0) schedules. Defaults to true.',
-          schema: { type: 'boolean', default: true },
+          description: `Include paused (active=0) schedules: one of ${FLAG_FORMS} (\`0\` and \`false\` leave them out). Left out is true; any other value, or the parameter given twice, is refused.`,
+          schema: { type: 'string', enum: [...QUERY_FLAG_VALUES] },
         }],
         responses: schemaResponse('WasteScheduleListResponse'),
       }),
@@ -121,9 +143,11 @@ export function wastePaths() {
       put: op({
         summary: 'Update a waste schedule',
         tag: 'Waste',
+        description: 'A partial update. A body outside the schema answers 400 before the schedule is looked up, so it comes before the 404. '
+          + 'The 400 reasons of the dialog are those of POST /waste/schedules (`waste_selected_type_not_found`, `waste_schedule_anchor_date_invalid`, `waste_schedule_interval_invalid`, ...).',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/WasteScheduleInput'),
+        requestBody: optionalBody('#/components/schemas/WasteScheduleUpdateInput'),
         responses: schemaResponse('WasteScheduleResponse', 'Schedule updated', 200, { 404: apiError('Schedule not found (`reason: "waste_schedule_not_found"`)') }),
       }),
       delete: op({
@@ -140,15 +164,16 @@ export function wastePaths() {
         summary: 'Move or skip one calculated occurrence',
         tag: 'Waste',
         description: 'Sets an override for the schedule\'s calculated occurrence on original_date: a replacement_date moves it, null explicitly skips it. Refused with 400 if original_date is not really one of the schedule\'s own calculated dates (`reason: "waste_occurrence_not_found"`), if replacement_date is not a date (`waste_override_date_invalid`) or equals original_date (`waste_override_same_date`).',
-        params: [idParam(), stringPathParam('originalDate', 'The occurrence\'s own calculated date (YYYY-MM-DD), not the replacement date')],
+        params: [idParam(), dayPathParam('originalDate', 'The occurrence\'s own calculated date (YYYY-MM-DD), not the replacement date')],
         stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/WasteScheduleOverrideInput'),
+        requestBody: optionalBody('#/components/schemas/WasteScheduleOverrideInput'),
         responses: schemaResponse('WasteScheduleOverrideResponse', 'Override set', 200, { 404: apiError('Schedule not found (`reason: "waste_schedule_not_found"`)') }),
       }),
       delete: op({
         summary: 'Restore one calculated occurrence to its schedule-computed date',
         tag: 'Waste',
-        params: [idParam(), stringPathParam('originalDate', 'The occurrence\'s own calculated date (YYYY-MM-DD)')],
+        description: 'An `originalDate` that is not shaped `YYYY-MM-DD` answers 400 (up to v2.91 a 404).',
+        params: [idParam(), dayPathParam('originalDate', 'The occurrence\'s own calculated date (YYYY-MM-DD)')],
         stateChanging: true,
         responses: noContentResponse('Override removed', { 404: apiError('No override exists for this schedule/date (`reason: "waste_override_not_found"`)') }),
       }),
@@ -179,9 +204,10 @@ export function wastePaths() {
       put: op({
         summary: 'Update a one-off pickup',
         tag: 'Waste',
+        description: 'A partial update; `type_id` is ignored. A body outside the schema answers 400 before the pickup is looked up, so it comes before the 404. A malformed date is refused with 400 and `reason: "waste_pickup_date_invalid"`.',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/WasteOneOffPickupInput'),
+        requestBody: optionalBody('#/components/schemas/WasteOneOffPickupUpdateInput'),
         responses: schemaResponse('WasteOneOffPickupResponse', 'Pickup updated', 200, { 404: apiError('Pickup not found (`reason: "waste_pickup_not_found"`)'), 409: apiError('A pickup already exists for this type and date (`reason: "waste_pickup_exists"`)') }),
       }),
       delete: op({
@@ -198,8 +224,8 @@ export function wastePaths() {
         tag: 'Waste',
         description: 'Inclusive on both ends; the range must not exceed 731 days (matching Schedule\'s own ceiling). Combines every active schedule and one-off pickup, across every type (including archived ones, so history stays visible).',
         params: [
-          { name: 'from', in: 'query', required: true, description: 'YYYY-MM-DD', schema: { type: 'string', format: 'date' } },
-          { name: 'to', in: 'query', required: true, description: 'YYYY-MM-DD', schema: { type: 'string', format: 'date' } },
+          { name: 'from', in: 'query', required: true, description: 'YYYY-MM-DD; a day that does not exist is refused by the route.', schema: { type: 'string', pattern: DATE_PATTERN } },
+          { name: 'to', in: 'query', required: true, description: 'YYYY-MM-DD; a day that does not exist is refused by the route.', schema: { type: 'string', pattern: DATE_PATTERN } },
         ],
         responses: schemaResponse('WasteOccurrenceListResponse'),
       }),
@@ -219,7 +245,7 @@ export function wastePaths() {
         description: 'Parses the given ICS text and returns candidate pickups, per-label mapping suggestions, and diagnostics. Writes nothing; a "blocking" diagnostic excludes its event\'s instances from the preview and must be explicitly acknowledged via skip_event_keys on commit, or the whole commit is refused. '
           + '400 with a machine-readable `reason` next to `error` when the calendar hits a limit: `waste_import_empty_file`, `waste_import_no_events` (text without a single calendar entry is never a calendar, #1938; a calendar whose entries all fall outside the import window still previews), `waste_import_file_too_large` (`params.limit_mb`), `waste_import_event_cap_exceeded`, `waste_import_instance_cap_exceeded`, `waste_import_label_cap_exceeded` (each `params.limit`).',
         stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/WasteImportPreviewInput'),
+        requestBody: optionalBody('#/components/schemas/WasteImportPreviewInput'),
         responses: schemaResponse('WasteImportPreviewResponse', 'Preview', 200, { 400: apiError('No ICS text, or an import limit was hit (see `reason` and `params`)') }),
       }),
     },
@@ -316,7 +342,7 @@ export function wastePaths() {
           + 'or the reason of the URL validation). The import limits answer 400 as on POST /waste/import/preview; a FILE without a single calendar entry is one of them (`waste_import_no_events`).',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/WasteImportPreviewInput'),
+        requestBody: optionalBody('#/components/schemas/WasteImportPreviewInput'),
         responses: schemaResponse('WasteImportPreviewResponse', 'Preview', 200, {
           400: apiError('No ICS text, or an import limit was hit (see `reason` and `params`)'),
           404: apiError('Source not found (`reason: "waste_source_not_found"`)'),
@@ -328,11 +354,11 @@ export function wastePaths() {
       post: op({
         summary: 'Commit a re-import onto an existing source',
         tag: 'Waste',
-        description: 'Requires expected_version to match the source\'s current version (409 on mismatch - invariant #9, two editors cannot silently replace each other\'s reviewed snapshot). Applies additions/changes/removals atomically; a failure preserves the last good snapshot. '
+        description: 'Requires expected_version to match the source\'s current version (missing: 400 since #2810; 409 on mismatch - invariant #9, two editors cannot silently replace each other\'s reviewed snapshot). Applies additions/changes/removals atomically; a failure preserves the last good snapshot. '
           + 'Content without a single calendar entry is refused instead of emptying the source (#1938): 400 with `reason: "waste_import_no_events"` for a file, 502 with `reason: "waste_source_fetch_no_events"` for a URL source. To empty a source, delete it.',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/WasteImportCommitInput'),
+        requestBody: jsonBody('#/components/schemas/WasteReimportCommitInput'),
         responses: schemaResponse('WasteImportCommitResponse', 'Import applied', 200, {
           400: apiError('Invalid input or an import limit was hit (see `reason` and `params`)'),
           404: apiError('Source not found (`reason: "waste_source_not_found"`)'),
@@ -353,7 +379,8 @@ export function wastePaths() {
       put: op({
         summary: "Upsert the calling user's own reminder setting for one waste type",
         tag: 'Waste',
-        description: 'Applies immediately - triggers a synchronous reminder-sync for this user in addition to the periodic one, so a change is not left waiting for the next scheduler tick. 400 with `reason: "waste_reminder_offset_invalid"` for offset_days outside its bound and `reason: "waste_reminder_time_invalid"` for a delivery_time that is empty or not HH:MM.',
+        description: 'Applies immediately - triggers a synchronous reminder-sync for this user in addition to the periodic one, so a change is not left waiting for the next scheduler tick. 400 with `reason: "waste_reminder_offset_invalid"` for offset_days outside its bound and `reason: "waste_reminder_time_invalid"` for a delivery_time that is empty or not HH:MM. '
+          + 'The body is the whole setting: `enabled`, `offset_days` and `delivery_time` are all required (#2810); up to v2.91 a missing `enabled` switched the reminder off and a missing lead time or time was reset to 1 day / 08:00.',
         params: [idParam('typeId', 'Waste type ID')],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteReminderSettingUpdateInput'),
@@ -387,7 +414,7 @@ export function wastePaths() {
       post: op({
         summary: 'Apply a previewed mapping profile to a source',
         tag: 'Waste',
-        description: 'Requires profile_digest to match the profile being committed (409 on mismatch, same guard as the ICS import digest). Re-runs the preview server-side before applying, so a mapping row changed since the preview is never silently overwritten with a stale decision.',
+        description: 'Requires profile_digest to match the profile being committed (409 on mismatch, same guard as the ICS import digest; a missing profile_digest is a 400 since #2810, before the 404 of the source). Re-runs the preview server-side before applying, so a mapping row changed since the preview is never silently overwritten with a stale decision.',
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/WasteMappingProfileImportCommitInput'),

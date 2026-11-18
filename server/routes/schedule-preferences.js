@@ -24,17 +24,17 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
+import { MAX_REMINDER_OFFSET_MINUTES as MAX_OFFSET_MINUTES, MAX_WEEKLY_HOURS, MIN_WEEKLY_HOURS } from '../services/schedule-fields.js';
 
 const log = createLogger('Schedule');
 const router = express.Router();
 
-const MAX_OFFSET_MINUTES = 24 * 60;
-// 168 = Stunden einer Woche - alles darueber ist kein Sollwert mehr, sondern
-// eine Falscheingabe.
-const MAX_WEEKLY_HOURS = 168;
+// MAX_WEEKLY_HOURS (services/schedule-fields.js): 168 = Stunden einer Woche -
+// alles darueber ist kein Sollwert mehr, sondern eine Falscheingabe.
 
 function getUserId(req) {
   const candidates = [req.authUserId, req.user?.id, req.session?.userId];
@@ -48,7 +48,7 @@ function getUserId(req) {
 // GET /api/v1/schedule/preferences → eigener Vorlauf + eigene Wochenstunden +
 // ob Ueberstunden ueberhaupt verfolgt werden (alle drei null/1 = Voreinstellung:
 // Erinnerung aus, 40 Stunden, Verfolgung an)
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const row = db.get().prepare(
       'SELECT schedule_reminder_offset_minutes AS m, schedule_weekly_hours AS h, schedule_overtime_enabled AS o FROM users WHERE id = ?'
@@ -63,7 +63,7 @@ router.get('/', (req, res) => {
 // PUT /api/v1/schedule/preferences { reminderOffsetMinutes?, weeklyHours?, overtimeEnabled? }
 // Nur mitgeschickte Felder aendern sich - ein Aufrufer, der nur die
 // Wochenstunden speichert, darf den Erinnerungs-Vorlauf nicht anfassen.
-router.put('/', (req, res) => {
+router.put('/', validateRequest(), (req, res) => {
   try {
     const userId = getUserId(req);
     const current = db.get().prepare(
@@ -91,8 +91,8 @@ router.put('/', (req, res) => {
         weeklyHours = null;
       } else {
         const n = Number(raw);
-        if (!Number.isInteger(n) || n < 1 || n > MAX_WEEKLY_HOURS) {
-          return res.status(400).json({ error: `weeklyHours must be an integer between 1 and ${MAX_WEEKLY_HOURS}, or null.`, code: 400 });
+        if (!Number.isInteger(n) || n < MIN_WEEKLY_HOURS || n > MAX_WEEKLY_HOURS) {
+          return res.status(400).json({ error: `weeklyHours must be an integer between ${MIN_WEEKLY_HOURS} and ${MAX_WEEKLY_HOURS}, or null.`, code: 400 });
         }
         weeklyHours = n;
       }

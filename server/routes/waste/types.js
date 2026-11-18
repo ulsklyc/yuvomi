@@ -6,6 +6,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
@@ -15,7 +16,7 @@ import { wasteErrorResponse, currentUserId } from './helpers.js';
 const log = createLogger('Waste');
 const router = express.Router();
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const includeArchived = req.query.include_archived === '1' || req.query.include_archived === 'true';
     res.json({ data: store.listTypes(db.get(), { includeArchived }) });
@@ -25,7 +26,7 @@ router.get('/', (req, res) => {
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const type = store.createType(db.get(), req.body ?? {}, currentUserId(req));
     res.status(201).json({ data: type });
@@ -36,7 +37,7 @@ router.post('/', (req, res) => {
   }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -49,7 +50,7 @@ router.get('/:id', (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -62,7 +63,7 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });

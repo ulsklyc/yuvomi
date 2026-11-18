@@ -85,12 +85,26 @@ const MOUNTS = [
   { file: 'inventory/deadlines-feed.js', mount: '/api/v1/inventory/deadlines-feed' },
   { file: 'housekeeping.js', mount: '/api/v1/housekeeping' },
   { file: 'rewards.js', mount: '/api/v1/rewards' },
+  { file: 'waste/types.js', mount: '/api/v1/waste/types' },
+  { file: 'waste/schedules.js', mount: '/api/v1/waste/schedules' },
+  { file: 'waste/pickups.js', mount: '/api/v1/waste/pickups' },
+  { file: 'waste/occurrences.js', mount: '/api/v1/waste/occurrences' },
+  { file: 'waste/sources.js', mount: '/api/v1/waste/sources' },
+  { file: 'waste/import.js', mount: '/api/v1/waste/import' },
+  { file: 'waste/reminder-settings.js', mount: '/api/v1/waste/reminder-settings' },
+  { file: 'waste/feed.js', mount: '/api/v1/waste/feed' },
+  // In der Reihenfolge von server/index.js: die Unterpfade vor /schedule.
+  { file: 'schedule-feed.js', mount: '/api/v1/schedule/feed' },
+  { file: 'schedule-preferences.js', mount: '/api/v1/schedule/preferences' },
+  { file: 'schedule-extras.js', mount: '/api/v1/schedule/extras' },
+  { file: 'schedule.js', mount: '/api/v1/schedule' },
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
 const WITHOUT_INTEGER_PATH_ID = [
   'email.js', 'family.js', 'inventory/categories.js', 'inventory/deadlines-feed.js', 'kitchen.js',
-  'modules.js', 'screensaver.js', 'search.js', 'weather.js',
+  'modules.js', 'schedule-feed.js', 'schedule-preferences.js', 'screensaver.js', 'search.js',
+  'waste/feed.js', 'waste/import.js', 'waste/occurrences.js', 'weather.js',
 ];
 
 const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));

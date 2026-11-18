@@ -6,6 +6,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
@@ -14,7 +15,7 @@ import { wasteErrorResponse } from './helpers.js';
 const log = createLogger('Waste');
 const router = express.Router();
 
-router.get('/next', (req, res) => {
+router.get('/next', validateRequest(), (req, res) => {
   try {
     res.json({ data: store.getNextPerType(db.get(), {}) });
   } catch (err) {
@@ -23,7 +24,7 @@ router.get('/next', (req, res) => {
   }
 });
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const from = String(req.query.from ?? '');
     const to = String(req.query.to ?? '');

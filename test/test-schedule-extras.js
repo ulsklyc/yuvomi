@@ -36,6 +36,8 @@ const BOB = { id: 2, role: 'member' };
 const ADMIN = { id: 3, role: 'admin' };
 const typeId = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Early', '06:00', '14:00', '#6C3AED')").run().lastInsertRowid;
 
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 let actor = ALICE;
 const app = express();
 app.use((req, _res, next) => {
@@ -47,10 +49,14 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', scheduleRouter);
-app.use('/extras', scheduleExtrasRouter);
+app.use(defaultEmptyBody);
+// The real prefixes, in the mount order of server/index.js: validateRequest()
+// finds its operation by `req.baseUrl` (#2810).
+app.use('/api/v1/schedule/extras', scheduleExtrasRouter);
+app.use('/api/v1/schedule', scheduleRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}/api/v1/schedule`)));
 test.after(() => server.close());
 
 async function call(method, path, { as = ALICE, body } = {}) {
@@ -97,7 +103,8 @@ test('extras CRUD: create, fill, update, and delete are addressed by the extra\'
 
   const badOffset = await call('POST', '/extras', { as: ALICE, body: { user_id: ALICE.id, date_key: '2027-07-01', shift_type_id: typeId, reminder_offset_minutes: -5 } });
   assert.equal(badOffset.status, 400);
-  assert.match(badOffset.body.error, /reminder_offset_minutes must be/);
+  // The bounds 0-1440 stand in the schema since #2810.
+  assert.deepEqual(badOffset.body.fields, [{ path: 'body/reminder_offset_minutes', rule: 'minimum' }]);
 
   const created = await call('POST', '/extras', { as: ALICE, body: { user_id: ALICE.id, date_key: '2027-07-01', shift_type_id: typeId, note: 'On-call', reminder_offset_minutes: 30 } });
   assert.equal(created.status, 201);
@@ -224,7 +231,8 @@ test('#1777: a reversed range of extras is refused with reason range_reversed', 
   assert.equal(other.body.reason, 'schedule_selected_shift_type_not_found');
   const plain = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2033-10-07', to: 'not-a-date', shift_type_id: typeId } });
   assert.equal(plain.status, 400);
-  assert.equal('reason' in plain.body, false);
+  // Outside the schema since #2810: the reason of the check, never range_reversed.
+  assert.equal(plain.body.reason, 'validation');
   const stored = database.prepare("SELECT COUNT(*) AS n FROM schedule_extra_shifts WHERE date_key IN ('2033-10-07', '2033-10-08')").get();
   assert.equal(stored.n, 0, 'none of the refused requests wrote a row');
 });
@@ -261,7 +269,8 @@ test('#1909: the cases a user reaches carry a reason, the status and text stay',
   await expect('POST', '/extras', { user_id: ADMIN.id, date_key: '2034-01-05', shift_type_id: GONE }, 400, 'schedule_selected_shift_type_not_found');
   await expect('PUT', `/shift-types/${typeId}/fields`, { fields: [{ custom_field_id: GONE, position: 0 }] }, 400, 'schedule_selected_custom_field_not_found', 'custom_field_id does not exist.');
   // Keine Schichtart gewaehlt (Zusatzschicht).
-  await expect('POST', '/extras', { user_id: ADMIN.id, date_key: '2034-01-06' }, 400, 'schedule_shift_type_required', 'shift_type_id must be a positive number.');
+  // A missing shift type is refused by the schema since #2810, with the same reason (its `x-reason`).
+  await expect('POST', '/extras', { user_id: ADMIN.id, date_key: '2034-01-06' }, 400, 'schedule_shift_type_required');
   await expect('POST', '/extras/fill', { user_id: ADMIN.id, from: '2034-01-06', to: '2034-01-07' }, 400, 'schedule_shift_type_required');
   // Noch in Benutzung, und ein Zyklus, der gesetzte Tage abschneiden wuerde.
   const used = await call('POST', '/shift-types', { as: ADMIN, body: { name: 'Used', start_time: '08:00', end_time: '16:00' } });
@@ -279,5 +288,6 @@ test('#1909: the cases a user reaches carry a reason, the status and text stay',
   assert.equal('reason' in foreign.body, false);
   const other = await call('POST', '/patterns', { as: ADMIN, body: { user_id: ADMIN.id, name: 'x', anchor_date: '2034-02-01', cycle_length: 999 } });
   assert.equal(other.status, 400);
-  assert.equal('reason' in other.body, false);
+  // Outside the schema since #2810 (cycle_length above 366): the reason of the check.
+  assert.equal(other.body.reason, 'validation');
 });

@@ -433,7 +433,8 @@ test('ein Fall, bei dem die Seite selbst nachlaedt, sagt in jeder Sprache nur, w
 // Sprache und in westlichen Ziffern.
 test('die Grenzen in den Abfuhr-Saetzen sind die des Servers', async () => {
   const { WEEKLY_INTERVAL_MAX, MONTHLY_INTERVAL_MAX } = await import('../server/services/waste-domain.js');
-  const reminders = readFileSync(new URL('../server/services/waste-reminders.js', import.meta.url), 'utf8');
+  // The bounds live in waste-fields.js since #2810 (read by the handler and the OpenAPI document).
+  const reminders = readFileSync(new URL('../server/services/waste-fields.js', import.meta.url), 'utf8');
   const bound = (name) => Number(reminders.match(new RegExp(`export const ${name} = (\\d+);`))[1]);
   const dir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(dir).filter((name) => name.endsWith('.json'));

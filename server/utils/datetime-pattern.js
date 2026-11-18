@@ -37,3 +37,16 @@ export const OPTIONAL_DATE_PATTERN = `^(?:${DATE_PATTERN.slice(1, -1)})?$`;
  * (`last_completed` of a housekeeping task, where it clears the date).
  */
 export const OPTIONAL_DATETIME_PATTERN = `^(?:${DATETIME_PATTERN.slice(1, -1)})?$`;
+
+/**
+ * A wall-clock time `HH:MM` (00:00 to 23:59), read by `time()` in
+ * server/middleware/validate.js and by the time fields of the OpenAPI
+ * document (waste reminder `delivery_time`, shift `start_time`/`end_time`).
+ */
+export const TIME_PATTERN = '^(?:[01]\\d|2[0-3]):[0-5]\\d$';
+
+/**
+ * A HEX color `#RRGGBB`, read by `color()` in server/middleware/validate.js
+ * and by the color fields of the OpenAPI document (#2810).
+ */
+export const COLOR_PATTERN = '^#[0-9A-Fa-f]{6}$';
