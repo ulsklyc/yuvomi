@@ -210,6 +210,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   title, the sentence and "Technical details" stood directly on the violet light field behind
   them, and in the light theme the sentence and the details link fell below the WCAG AA
   contrast of 4.5:1. The screen now sits on the same glass panel as the sign-in page.
+- **CalDAV: a calendar address that points at one calendar is honoured.** Point an account's
+  CalDAV address directly at a specific calendar collection - a public or shared calendar
+  outside your own folder, for example `.../dav/calendars/public/FamilyCalendar/` on
+  Grommunio or Nextcloud - and the account now lists, reads and writes that calendar.
+  Before, synchronization followed the sign-in discovery to the user's own root folder and
+  silently used that instead: the configured calendar never appeared in the selection, and
+  one that was selected was switched off as if it had vanished. (#2529)
 - **The retry countdown keeps number and unit together in Traditional Chinese.** On the same
   screen, the hint "Trying again in 2 s" could break between the number and 秒 on a narrow
   panel. Every other language already joined them with a non-breaking space; zh-Hant now does
