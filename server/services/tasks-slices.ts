@@ -167,9 +167,12 @@ export function tasksOverviewSlice(
     return (db.prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
         ${ASSIGNED_USERS_SQL},
+        cu.display_name AS created_by_name, cu.avatar_color AS created_by_color,
+        ${personAvatarUrlSql('cu')} AS created_by_avatar,
         t.due_date || 'T' || COALESCE(t.due_time, '23:59:59') AS __due_sort
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN users cu ON t.created_by = cu.id
       WHERE t.status != 'done'
         -- Archived tasks do not belong in "today at a glance" (#688): an archived
         -- task is out of the run, and whoever opened it from here did not find it
