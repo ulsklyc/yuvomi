@@ -8,6 +8,10 @@
  *          No schema carries the OpenAPI 3.0 keywords `nullable` or `example`:
  *          null belongs in the type list, samples in `examples`.
  *          No `pattern` backtracks super-linearly on long adversarial input.
+ *          Every `x-reason` annotation (the route's own reason for a schema
+ *          refusal, server/api/validate-request.ts) is a reason or an object
+ *          of keyword -> reason, each `^[a-z][a-z0-9_]*$`, never beside a
+ *          `$ref`; the Ajv here knows the keyword with the runtime's check.
  *          server/openapi.js itself never imports Ajv: it must stay loadable
  *          without node_modules.
  * Run: node --test test/test-openapi-ajv.js
@@ -18,6 +22,7 @@ import { Ajv2020 } from 'ajv/dist/2020.js';
 import ajvFormats from 'ajv-formats';
 import { Validator } from '@seriousme/openapi-schema-validator';
 import { buildOpenApiSpec } from '../server/openapi.js';
+import { X_REASON_KEYWORD } from '../server/api/validate-request.ts';
 
 // ajv-formats is CommonJS: the default import is module.exports, whose
 // `.default` is the plugin both at runtime and for the type checker.
@@ -79,6 +84,8 @@ test('every schema of the document compiles with Ajv 2020 in strict mode', () =>
   addFormats(ajv);
   // The components wrapper only makes local $refs resolvable inside one document.
   ajv.addKeyword('components');
+  // The annotation x-reason, with the same shape check as at runtime.
+  ajv.addKeyword(X_REASON_KEYWORD);
   ajv.addSchema({ $id: 'spec', components: spec.components }, 'spec');
 
   const schemas = collectSchemas();
@@ -105,8 +112,9 @@ test('every schema of the document compiles with Ajv 2020 in strict mode', () =>
  * Visits every key of the document - components, request bodies, parameters
  * and responses alike - with its value and the JSON pointer of its parent.
  * @param {(key: string, child: unknown, where: string) => void} visit
+ * @param {unknown} [root] another document, for a synthetic case
  */
-function walkSpec(visit) {
+function walkSpec(visit, root = spec) {
   /**
    * @param {unknown} node
    * @param {string} where
@@ -122,8 +130,87 @@ function walkSpec(visit) {
       walk(child, `${where}/${key}`);
     }
   };
-  walk(spec, '#');
+  walk(root, '#');
 }
+
+const REASON = /^[a-z][a-z0-9_]*$/;
+const KEYWORD_NAME = /^[a-zA-Z$][a-zA-Z0-9]*$/;
+
+/**
+ * Every `x-reason` annotation of a document that has no allowed shape: a
+ * reason string, or a non-empty object of keyword -> reason (key `default`
+ * included), each reason matching `^[a-z][a-z0-9_]*$`; never beside a `$ref`.
+ * A property named `x-reason` (key under `properties`) is no annotation.
+ * @param {unknown} root
+ * @returns {{ seen: number, wrong: string[] }}
+ */
+function xReasonFindings(root) {
+  let seen = 0;
+  /** @type {string[]} */
+  const wrong = [];
+  walkSpec((key, child, where) => {
+    if (key !== 'x-reason' || where.endsWith('/properties')) return;
+    seen += 1;
+    const at = `${where}/x-reason`;
+    if (typeof child === 'string') {
+      if (!REASON.test(child)) wrong.push(`${at}: ${JSON.stringify(child)} is no reason`);
+      return;
+    }
+    if (!child || typeof child !== 'object' || Array.isArray(child) || Object.keys(child).length === 0) {
+      wrong.push(`${at}: neither a reason nor a non-empty object of keyword -> reason`);
+      return;
+    }
+    for (const [keyword, reason] of Object.entries(child)) {
+      if (!KEYWORD_NAME.test(keyword)) wrong.push(`${at}/${keyword}: no keyword name`);
+      if (typeof reason !== 'string' || !REASON.test(reason)) wrong.push(`${at}/${keyword}: ${JSON.stringify(reason)} is no reason`);
+    }
+  }, root);
+  walkSpec((key, child, where) => {
+    // The `properties` map itself holds property names, not keywords.
+    if (key === 'properties' || !child || typeof child !== 'object') return;
+    if (Object.hasOwn(child, 'x-reason') && Object.hasOwn(child, '$ref')) {
+      wrong.push(`${where}/${key}: x-reason beside a $ref is never read`);
+    }
+  }, root);
+  return { seen, wrong };
+}
+
+test('every x-reason of the document has the allowed shape and reasons', () => {
+  // The walker on a synthetic document first: the document itself carries no
+  // annotation yet (#2810 builds the mechanism only), and a check that reads
+  // nothing would pass for that reason alone.
+  const synthetic = {
+    components: {
+      schemas: {
+        Good: {
+          type: 'object',
+          'x-reason': { required: 'good_missing', default: 'good_invalid' },
+          properties: { name: { type: 'string', 'x-reason': 'name_too_short' }, 'x-reason': { type: 'string' } },
+        },
+        Upper: { type: 'string', 'x-reason': 'Name_Invalid' },
+        Spaced: { type: 'string', 'x-reason': { minLength: 'too short' } },
+        Number: { type: 'string', 'x-reason': 7 },
+        Empty: { type: 'string', 'x-reason': {} },
+        Ref: { $ref: '#/components/schemas/Good', 'x-reason': 'ref_reason' },
+      },
+    },
+  };
+  const probe = xReasonFindings(synthetic);
+  assert.equal(probe.seen, 7, 'the walker sees each annotation, and a property named x-reason is none');
+  assert.deepEqual(probe.wrong, [
+    '#/components/schemas/Upper/x-reason: "Name_Invalid" is no reason',
+    '#/components/schemas/Spaced/x-reason/minLength: "too short" is no reason',
+    '#/components/schemas/Number/x-reason: neither a reason nor a non-empty object of keyword -> reason',
+    '#/components/schemas/Empty/x-reason: neither a reason nor a non-empty object of keyword -> reason',
+    '#/components/schemas/Ref: x-reason beside a $ref is never read',
+  ]);
+
+  const real = xReasonFindings(spec);
+  assert.deepEqual(real.wrong, [], 'these x-reason annotations have no allowed shape');
+  // Today the document carries none; the count is printed so a reader of the
+  // run sees that the case is the synthetic one above until a schema has one.
+  if (real.seen === 0) console.log('# x-reason: the document carries no annotation yet, the shape check ran on the synthetic document only');
+});
 
 test('no schema carries the OpenAPI 3.0 keywords nullable or example', () => {
   /** @type {string[]} */

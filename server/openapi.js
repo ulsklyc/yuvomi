@@ -64,7 +64,7 @@ function buildOpenApiSpec(req, appVersion) {
       },
       responses: {
         BadRequest: {
-          description: 'Bad request',
+          description: 'Bad request. A request outside the schema of its operation carries `fields`; its `reason` is the documented reason of the operation when the failing rule names one, else `validation`.',
           content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
         },
         Unauthorized: {

@@ -263,9 +263,19 @@ function miniApp(log) {
  * @param {string} path
  * @param {{ json?: unknown, raw?: string, headers?: Record<string, string> }} [options]
  */
-async function call(method, path, { json, raw, headers = {} } = {}) {
+async function call(method, path, options = {}) {
+  return callApp(miniApp, method, path, options);
+}
+
+/**
+ * @param {(log: RecordingLog) => any} appFor
+ * @param {string} method
+ * @param {string} path
+ * @param {{ json?: unknown, raw?: string, headers?: Record<string, string> }} [options]
+ */
+async function callApp(appFor, method, path, { json, raw, headers = {} } = {}) {
   const log = recordingLog();
-  const server = miniApp(log).listen(0, '127.0.0.1');
+  const server = appFor(log).listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     /** @type {RequestInit} */
@@ -482,4 +492,250 @@ test('the bound validator compiles the checks of every route of the app document
     }
   }
   assert.deepEqual(failures, [], 'these routes fail to compile their checks');
+});
+
+// ── The route's own reason through x-reason ─────────────────────────────────
+
+const REASONED = {
+  openapi: '3.1.0',
+  info: { title: 'reasoned', version: '0' },
+  paths: {
+    '/api/v1/r/items/{id}': {
+      get: {
+        parameters: [
+          { in: 'path', name: 'id', required: true, schema: { type: 'integer', minimum: 1, 'x-reason': 'item_id_invalid' } },
+          { in: 'query', name: 'limit', schema: { type: 'integer', maximum: 50, 'x-reason': { maximum: 'limit_too_high', default: 'limit_invalid' } } },
+          { in: 'query', name: 'plain', schema: { type: 'integer' } },
+        ],
+        responses: {},
+      },
+    },
+    '/api/v1/r/items': {
+      post: {
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ItemInput' } } } },
+        responses: {},
+      },
+    },
+    '/api/v1/r/parent': {
+      post: {
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                'x-reason': { required: 'parent_incomplete' },
+                required: ['a', 'b'],
+                properties: { a: { type: 'string', 'x-reason': 'a_invalid' }, b: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {},
+      },
+    },
+    '/api/v1/r/fallback': {
+      post: {
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                'x-reason': 'whole_invalid',
+                required: ['a', 'c'],
+                properties: { a: { type: 'string', 'x-reason': 'a_invalid' }, c: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {},
+      },
+    },
+  },
+  components: {
+    schemas: {
+      ItemInput: {
+        type: 'object',
+        required: ['title', 'color'],
+        properties: {
+          title: { type: 'string', minLength: 2, maxLength: 40, pattern: '^[a-z-]+$', 'x-reason': 'title_invalid' },
+          color: { $ref: '#/components/schemas/Color' },
+          count: { type: 'integer', minimum: 0, 'x-reason': { minimum: 'count_negative', default: 'count_invalid' } },
+          size: { type: 'integer', minimum: 1, 'x-reason': { minimum: 'size_too_small' } },
+          note: { type: 'string', maxLength: 3 },
+        },
+      },
+      Color: { type: 'string', enum: ['red', 'blue'], 'x-reason': { enum: 'color_unknown', required: 'color_missing' } },
+    },
+  },
+};
+
+/** @param {RecordingLog} log */
+function reasonedApp(log) {
+  const validateRequest = createRequestValidator(REASONED);
+  const app = express();
+  app.use(express.json());
+  app.use(defaultEmptyBody);
+  const router = express.Router();
+  /** @param {any} _req @param {any} res */
+  const ok = (_req, res) => res.json({ ok: true });
+  router.get('/items/:id', validateRequest(), ok);
+  router.post('/items', validateRequest(), ok);
+  router.post('/parent', validateRequest(), ok);
+  router.post('/fallback', validateRequest(), ok);
+  app.use('/api/v1/r', router);
+  app.use(createErrorHandler(log));
+  return app;
+}
+
+/**
+ * @param {string} method
+ * @param {string} path
+ * @param {{ json?: unknown }} [options]
+ */
+function callReasoned(method, path, options) {
+  return callApp(reasonedApp, method, path, options);
+}
+
+/**
+ * @param {{ status: number, body: any }} res
+ * @param {string} reason
+ * @param {{ path: string, rule: string, reason?: string }[]} fields
+ */
+function assertRefusedAs(res, reason, fields) {
+  assert.equal(res.status, 400, JSON.stringify(res.body));
+  assert.deepEqual(res.body, { error: SENTENCE, code: 400, reason, fields });
+}
+
+const ITEM = { title: 'pen', color: 'red' };
+
+test('x-reason as a string answers every keyword failing at its node', async () => {
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, title: 5 } }), 'title_invalid',
+    [{ path: 'body/title', rule: 'type', reason: 'title_invalid' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, title: 'p' } }), 'title_invalid',
+    [{ path: 'body/title', rule: 'minLength', reason: 'title_invalid' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, title: 'Pen' } }), 'title_invalid',
+    [{ path: 'body/title', rule: 'pattern', reason: 'title_invalid' }]);
+  assert.equal((await callReasoned('POST', '/api/v1/r/items', { json: ITEM })).status, 200, 'the annotation refuses nothing itself');
+});
+
+test('x-reason as an object answers per keyword, falls back to default, else to none', async () => {
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, count: -1 } }), 'count_negative',
+    [{ path: 'body/count', rule: 'minimum', reason: 'count_negative' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, count: 'x' } }), 'count_invalid',
+    [{ path: 'body/count', rule: 'type', reason: 'count_invalid' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, size: 0 } }), 'size_too_small',
+    [{ path: 'body/size', rule: 'minimum', reason: 'size_too_small' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, size: 'x' } }), 'validation',
+    [{ path: 'body/size', rule: 'type' }]);
+});
+
+test('a missing property answers with its own reason, behind a $ref too', async () => {
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { color: 'red' } }), 'title_invalid',
+    [{ path: 'body/title', rule: 'required', reason: 'title_invalid' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { title: 'pen' } }), 'color_missing',
+    [{ path: 'body/color', rule: 'required', reason: 'color_missing' }]);
+});
+
+test('an annotation behind a $ref answers for its own keywords', async () => {
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, color: 'pink' } }), 'color_unknown',
+    [{ path: 'body/color', rule: 'enum', reason: 'color_unknown' }]);
+});
+
+test('a required entry of the parent wins over the property, and a missing body reads it', async () => {
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/parent', { json: { b: 'x' } }), 'parent_incomplete',
+    [{ path: 'body/a', rule: 'required', reason: 'parent_incomplete' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/parent', { json: { a: 1, b: 'x' } }), 'a_invalid',
+    [{ path: 'body/a', rule: 'type', reason: 'a_invalid' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/parent'), 'parent_incomplete',
+    [{ path: 'body', rule: 'required', reason: 'parent_incomplete' }]);
+});
+
+test('the parent string covers its own keywords and a missing property without a reason of its own', async () => {
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/fallback', { json: { c: 'x' } }), 'a_invalid',
+    [{ path: 'body/a', rule: 'required', reason: 'a_invalid' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/fallback', { json: { a: 'x' } }), 'whole_invalid',
+    [{ path: 'body/c', rule: 'required', reason: 'whole_invalid' }]);
+  assertRefusedAs(await callReasoned('POST', '/api/v1/r/fallback', { json: ['x'] }), 'whole_invalid',
+    [{ path: 'body', rule: 'type', reason: 'whole_invalid' }]);
+});
+
+test('path and query parameters carry their reason, the decimal-integer check too', async () => {
+  assertRefusedAs(await callReasoned('GET', '/api/v1/r/items/0'), 'item_id_invalid',
+    [{ path: 'path/id', rule: 'minimum', reason: 'item_id_invalid' }]);
+  assertRefusedAs(await callReasoned('GET', '/api/v1/r/items/1e2'), 'item_id_invalid',
+    [{ path: 'path/id', rule: 'type', reason: 'item_id_invalid' }]);
+  assertRefusedAs(await callReasoned('GET', '/api/v1/r/items/1?limit=99'), 'limit_too_high',
+    [{ path: 'query/limit', rule: 'maximum', reason: 'limit_too_high' }]);
+  assertRefusedAs(await callReasoned('GET', '/api/v1/r/items/1?limit=0x10'), 'limit_invalid',
+    [{ path: 'query/limit', rule: 'type', reason: 'limit_invalid' }]);
+  assertRefusedAs(await callReasoned('GET', '/api/v1/r/items/1?plain=0x10'), 'validation',
+    [{ path: 'query/plain', rule: 'type' }]);
+});
+
+test('the first field decides the reason of the answer, a field without one keeps none', async () => {
+  assertRefusedAs(await callReasoned('GET', '/api/v1/r/items/0?limit=99'), 'item_id_invalid', [
+    { path: 'path/id', rule: 'minimum', reason: 'item_id_invalid' },
+    { path: 'query/limit', rule: 'maximum', reason: 'limit_too_high' },
+  ]);
+  assertRefusedAs(await callReasoned('GET', '/api/v1/r/items/1?plain=0x10&limit=99'), 'validation', [
+    { path: 'query/plain', rule: 'type' },
+    { path: 'query/limit', rule: 'maximum', reason: 'limit_too_high' },
+  ]);
+});
+
+test('a malformed x-reason throws when the operation is compiled', () => {
+  /** @param {unknown} note @param {'body' | 'path' | 'ref' | 'beside'} where */
+  const specWith = (note, where) => {
+    const annotated = { type: 'integer', 'x-reason': note };
+    return {
+      paths: {
+        '/api/v1/m/{id}': {
+          post: {
+            parameters: [{ in: 'path', name: 'id', required: true, schema: where === 'path' ? annotated : { type: 'integer' } }],
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: where === 'body' ? annotated
+                    : where === 'beside' ? { $ref: '#/components/schemas/N', 'x-reason': note }
+                      : { $ref: '#/components/schemas/N' },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: { schemas: { N: where === 'ref' ? annotated : { type: 'integer' } } },
+    };
+  };
+  /** @param {object} spec */
+  const compile = (spec) => {
+    const middleware = createRequestValidator(spec)();
+    middleware({ method: 'POST', baseUrl: '/api/v1/m', route: { path: '/:id' }, params: { id: '1' }, query: {}, body: 1 }, {}, () => {});
+  };
+  for (const where of /** @type {const} */ (['body', 'path', 'ref'])) {
+    for (const note of [7, 'Name_Invalid', 'too short', '', {}, { minimum: 'Too_Small' }, { minimum: 3 }, ['a_b'], { 'not-a-keyword': 'a_b' }]) {
+      assert.throws(() => compile(specWith(note, where)), /validateRequest\(\): POST \/api\/v1\/m\/\{id\} does not compile: .*x-reason/,
+        `${where}: ${JSON.stringify(note)} passed`);
+    }
+    assert.doesNotThrow(() => compile(specWith({ minimum: 'too_small', default: 'id_invalid' }, where)), `${where}: a valid annotation`);
+  }
+  assert.throws(() => compile(specWith('a_b', 'beside')), /x-reason beside a \$ref/);
+});
+
+test('with a reason, neither answer nor log carries a value; the log names the reason', async () => {
+  const runs = [
+    await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, title: `${SECRET}` } }),
+    await callReasoned('POST', '/api/v1/r/items', { json: { ...ITEM, color: SECRET } }),
+    await callReasoned('GET', `/api/v1/r/items/${SECRET}`),
+  ];
+  for (const run of runs) {
+    assert.equal(run.status, 400, run.text);
+    const seen = `${run.text} | ${run.log.join(' | ')}`;
+    assert.ok(!seen.includes(SECRET), `a value of the request leaked: ${seen}`);
+    assert.ok(!/must (be|have|match|NOT)/.test(seen), `an Ajv message leaked: ${seen}`);
+    assert.deepEqual(Object.keys(run.body.fields[0]).sort(), ['path', 'reason', 'rule']);
+  }
+  const line = runs[0].log.join(' | ');
+  assert.ok(line.includes('pattern at body/title as title_invalid'), `the log names rule, path and reason: ${line}`);
 });

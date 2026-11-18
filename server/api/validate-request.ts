@@ -3,9 +3,11 @@
  * Purpose: validateRequest() is a middleware that checks a request against the
  *          schema of its operation in the OpenAPI document - path, query and a
  *          JSON body - and refuses it with a 400 before the handler runs:
- *            { error, code: 400, reason: 'validation', fields: [{ path, rule }] }
+ *            { error, code: 400, reason, fields: [{ path, rule, reason? }] }
  *          `path` is the place plus a pointer (`body/title`, `query/limit`,
- *          `path/id`), `rule` the Ajv keyword (`type`, `required`, `maxLength`).
+ *          `path/id`), `rule` the Ajv keyword (`type`, `required`, `maxLength`),
+ *          `reason` the route's own one where the schema names it (`x-reason`
+ *          below); the answer's `reason` is `validation` otherwise.
  *          Never a value of the request and never a message text of Ajv.
  *
  *          A route hangs it in its own stack:
@@ -39,6 +41,26 @@
  *          Headers are not checked. `allErrors` stays off (Ajv's advice for
  *          untrusted input).
  *
+ *          A schema node may name the route's own `reason` for a refusal with
+ *          the annotation `x-reason`, so the schema stays the one source of a
+ *          rule and the reason a client already translates is not lost:
+ *            - a string: every keyword failing at that node answers with it;
+ *            - an object `{ <keyword>: <reason>, ..., default?: <reason> }`:
+ *              per failing keyword, else `default`, else no reason;
+ *            - `required` fails at the parent object: an explicit `required`
+ *              entry of the parent wins, then the missing property's own
+ *              annotation (string, `required` or `default`, behind a `$ref`
+ *              too), then the parent's string or `default`; a missing body
+ *              reads the body schema the same way.
+ *          A reason matches `^[a-z][a-z0-9_]*$`. A malformed annotation, or
+ *          one beside a `$ref` (it would never be read: the keyword fails in
+ *          the target), throws when the operation is compiled. Each field
+ *          carries the `reason` its annotation gives; the answer's own
+ *          `reason` is that of the first field, else `validation`. The
+ *          annotation is read through `verbose: true` (the failing keyword's
+ *          parent schema on each error); the request data Ajv adds there too
+ *          is never read.
+ *
  *          server/openapi.js never imports Ajv (it must load without
  *          node_modules); Ajv lives here.
  */
@@ -71,7 +93,7 @@ type PathItem = Record<string, unknown> & { parameters?: Parameter[] };
 type OpenApiDocument = { paths?: Record<string, PathItem>; components?: Record<string, unknown> };
 
 type ResolvedOperation = { method: string; path: string; operation: Operation; pathItem: PathItem };
-type Field = { path: string; rule: string };
+type Field = { path: string; rule: string; reason?: string };
 
 type RouteRequest = {
   method: string;
@@ -85,12 +107,14 @@ type Next = (err?: unknown) => void;
 type Middleware = (req: RouteRequest, res: unknown, next: Next) => void;
 
 type Checks = {
+  spec: OpenApiDocument;
   path: ValidateFunction | null;
   query: ValidateFunction | null;
-  integers: { path: string[]; query: string[] };
+  integers: { path: Parameter[]; query: Parameter[] };
   commaLists: string[];
   body: ValidateFunction | null;
   bodyRequired: boolean;
+  bodyMissingReason: string | undefined;
   wildcards: string[];
 };
 
@@ -163,9 +187,90 @@ function rebase(schema: unknown): Schema {
   ));
 }
 
+const REASON_PATTERN = '^[a-z][a-z0-9_]*$';
+
+/**
+ * The keyword `x-reason` for Ajv: its own shape is checked when a schema
+ * compiles (a string reason, or an object of keyword -> reason with an
+ * optional `default`), and it never refuses data itself. Beside a `$ref` it
+ * throws: the keywords that fail are those of the target, so it would never
+ * be read - the annotation belongs on the target.
+ */
+export const X_REASON_KEYWORD = {
+  keyword: 'x-reason',
+  metaSchema: {
+    anyOf: [
+      { type: 'string', pattern: REASON_PATTERN },
+      {
+        type: 'object',
+        minProperties: 1,
+        propertyNames: { pattern: '^[a-zA-Z$][a-zA-Z0-9]*$' },
+        additionalProperties: { type: 'string', pattern: REASON_PATTERN },
+      },
+    ],
+  },
+  errors: false,
+  compile(_value: unknown, parentSchema: Record<string, unknown>) {
+    if (parentSchema.$ref !== undefined) {
+      throw new Error('x-reason beside a $ref is never read: put it on the target schema');
+    }
+    return () => true;
+  },
+};
+
+/** The reason an annotation names for one keyword, or undefined. */
+function annotated(schema: unknown, keyword: string, fallback = true): string | undefined {
+  const note = (schema as Schema | null | undefined)?.['x-reason'];
+  if (typeof note === 'string') return fallback ? note : undefined;
+  if (!note || typeof note !== 'object') return undefined;
+  const entries = note as Record<string, unknown>;
+  if (Object.hasOwn(entries, keyword) && typeof entries[keyword] === 'string') return entries[keyword] as string;
+  if (fallback && typeof entries.default === 'string') return entries.default;
+  return undefined;
+}
+
+/** The schema a local `$ref` (`#/...` or rebased `spec#/...`) points to, or the schema itself. */
+function deref(spec: OpenApiDocument, schema: unknown): unknown {
+  let node = schema;
+  for (let hops = 0; hops < 16; hops++) {
+    const ref = (node as Schema | null | undefined)?.$ref;
+    if (typeof ref !== 'string') return node;
+    const pointer = ref.replace(/^spec#/, '#');
+    if (!pointer.startsWith('#/')) return node;
+    node = pointer.slice(2).split('/')
+      .map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'))
+      .reduce<unknown>((at, part) => (at && typeof at === 'object' ? (at as Record<string, unknown>)[part] : undefined), spec);
+  }
+  return node;
+}
+
+/** The reason of a schema node for one keyword, following a `$ref` to its target. */
+function reasonOf(spec: OpenApiDocument, schema: unknown, keyword: string): string | undefined {
+  return annotated(deref(spec, schema), keyword);
+}
+
+/**
+ * The reason of one Ajv error. `required` fails at the parent object: its
+ * explicit `required` entry wins, then the missing property's own reason,
+ * then the parent's string or `default`.
+ */
+function reasonOfError(spec: OpenApiDocument, error: ErrorObject): string | undefined {
+  const parent = error.parentSchema;
+  if (error.keyword !== 'required') return annotated(parent, error.keyword);
+  const missing = (error.params as { missingProperty?: unknown }).missingProperty;
+  const properties = (parent as Schema | undefined)?.properties as Record<string, unknown> | undefined;
+  const property = typeof missing === 'string' && properties && Object.hasOwn(properties, missing) ? properties[missing] : undefined;
+  return annotated(parent, 'required', false)
+    ?? (property === undefined ? undefined : reasonOf(spec, property, 'required'))
+    ?? annotated(parent, 'required');
+}
+
 function newAjv(options: { coerceTypes?: 'array' }, spec: OpenApiDocument): Ajv2020 {
-  const ajv = new Ajv2020({ strict: true, ...options });
+  // verbose: each error carries the schema node whose keyword failed, where
+  // `x-reason` is read. It also carries the request data, which is never read.
+  const ajv = new Ajv2020({ strict: true, verbose: true, ...options });
   addFormats(ajv);
+  ajv.addKeyword(X_REASON_KEYWORD);
   // The components wrapper only makes local $refs resolvable inside one document.
   ajv.addKeyword('components');
   ajv.addSchema({ $id: 'spec', components: spec.components ?? {} }, 'spec');
@@ -213,26 +318,32 @@ function commaListsOf(resolved: ResolvedOperation, parameters: Parameter[]): str
  * be written as plain decimal digits with an optional minus, or it is refused
  * with the rule `type` before Ajv sees it.
  */
-function integersOf(parameters: Parameter[], place: 'path' | 'query'): string[] {
+function integersOf(parameters: Parameter[], place: 'path' | 'query'): Parameter[] {
   return parameters
     .filter((p) => p.in === place && typeof p.name === 'string')
     .filter((p) => {
       const type = p.schema?.type;
       return type === 'integer' || (Array.isArray(type) && type.includes('integer') && !type.includes('string'));
-    })
-    .map((p) => p.name as string);
+    });
 }
 
 const DECIMAL_INTEGER = /^-?\d+$/;
 
-/** The integer parameters of one place that are not written as plain decimal digits. */
-function nonDecimalIntegers(source: Record<string, unknown> | undefined, names: string[], place: string): Field[] {
-  return names
-    .filter((name) => {
-      const value = source?.[name];
+function withReason(field: Field, reason: string | undefined): Field {
+  return reason === undefined ? field : { ...field, reason };
+}
+
+/**
+ * The integer parameters of one place that are not written as plain decimal
+ * digits, with the reason their schema names for `type`.
+ */
+function nonDecimalIntegers(spec: OpenApiDocument, source: Record<string, unknown> | undefined, parameters: Parameter[], place: string): Field[] {
+  return parameters
+    .filter((p) => {
+      const value = source?.[p.name as string];
       return typeof value === 'string' && !DECIMAL_INTEGER.test(value);
     })
-    .map((name) => ({ path: `${place}/${name}`.slice(0, MAX_PATH_LENGTH), rule: 'type' }));
+    .map((p) => withReason({ path: `${place}/${p.name}`.slice(0, MAX_PATH_LENGTH), rule: 'type' }, reasonOf(spec, p.schema, 'type')));
 }
 
 function compileParameters(ajv: Ajv2020, parameters: Parameter[], place: 'path' | 'query'): ValidateFunction | null {
@@ -244,16 +355,22 @@ function compileParameters(ajv: Ajv2020, parameters: Parameter[], place: 'path' 
   return ajv.compile({ type: 'object', properties, ...(required.length ? { required } : {}) });
 }
 
-/** One entry of `fields`: place plus pointer, cut to a fixed length, and the keyword. */
-function fieldOf(place: string, error: ErrorObject): Field {
+/**
+ * One entry of `fields`: place plus pointer, cut to a fixed length, the
+ * keyword, and the reason its annotation names, if any.
+ */
+function fieldOf(spec: OpenApiDocument, place: string, error: ErrorObject): Field {
   const missing = error.keyword === 'required' ? (error.params as { missingProperty?: unknown }).missingProperty : undefined;
   const pointer = `${error.instancePath}${typeof missing === 'string' ? `/${missing}` : ''}`;
-  return { path: `${place}${pointer}`.slice(0, MAX_PATH_LENGTH), rule: error.keyword };
+  return withReason({ path: `${place}${pointer}`.slice(0, MAX_PATH_LENGTH), rule: error.keyword }, reasonOfError(spec, error));
 }
 
+/** The 400: the answer's `reason` is that of the first field, else `validation`. */
 function refusal(fields: Field[]): HttpError {
-  const unique = fields.filter((f, i) => fields.findIndex((g) => g.path === f.path && g.rule === f.rule) === i);
-  return new HttpError(400, SENTENCE, { reason: 'validation', fields: unique.slice(0, MAX_FIELDS) });
+  const unique = fields
+    .filter((f, i) => fields.findIndex((g) => g.path === f.path && g.rule === f.rule) === i)
+    .slice(0, MAX_FIELDS);
+  return new HttpError(400, SENTENCE, { reason: unique[0]?.reason ?? 'validation', fields: unique });
 }
 
 /**
@@ -303,13 +420,25 @@ function validatorFor(loadSpec: () => OpenApiDocument): () => Middleware {
     const requestBody = resolved.operation.requestBody;
     const bodySchema = requestBody?.content?.['application/json']?.schema;
     const hasBodySchema = !!bodySchema && Object.keys(bodySchema).length > 0;
+    const { params, body } = state;
+    // A schema Ajv refuses (a malformed `x-reason` among others) names its operation.
+    const compiled = <T>(build: () => T): T => {
+      try {
+        return build();
+      } catch (err) {
+        const why = err instanceof Error ? err.message : String(err);
+        throw new Error(`validateRequest(): ${resolved.method.toUpperCase()} ${resolved.path} does not compile: ${why}`, { cause: err });
+      }
+    };
     const checks: Checks = {
-      path: compileParameters(state.params, parameters, 'path'),
-      query: compileParameters(state.params, parameters, 'query'),
+      spec: state.spec,
+      path: compiled(() => compileParameters(params, parameters, 'path')),
+      query: compiled(() => compileParameters(params, parameters, 'query')),
       integers: { path: integersOf(parameters, 'path'), query: integersOf(parameters, 'query') },
       commaLists: commaListsOf(resolved, parameters),
-      body: hasBodySchema ? state.body.compile(rebase(bodySchema)) : null,
+      body: hasBodySchema ? compiled(() => body.compile(rebase(bodySchema))) : null,
       bodyRequired: hasBodySchema && requestBody?.required === true,
+      bodyMissingReason: hasBodySchema ? reasonOf(state.spec, bodySchema, 'required') : undefined,
       wildcards: [...String(pattern).matchAll(/\{\*(\w+)\}/g)].map((m) => m[1]),
     };
     cache.set(key, checks);
@@ -319,23 +448,24 @@ function validatorFor(loadSpec: () => OpenApiDocument): () => Middleware {
   return function validateRequest(): Middleware {
     return function validateRequestMiddleware(req, _res, next) {
       const checks = checksFor(req);
+      const spec = checks.spec;
       const fields: Field[] = [
-        ...nonDecimalIntegers(req.params, checks.integers.path, 'path'),
-        ...nonDecimalIntegers(req.query, checks.integers.query, 'query'),
+        ...nonDecimalIntegers(spec, req.params, checks.integers.path, 'path'),
+        ...nonDecimalIntegers(spec, req.query, checks.integers.query, 'query'),
       ];
       for (const [place, check, data] of [
         ['path', checks.path, () => copyOf(req.params, { wildcards: checks.wildcards })],
         ['query', checks.query, () => copyOf(req.query, { commaLists: checks.commaLists })],
       ] as const) {
-        if (check && !check(data())) fields.push(...(check.errors ?? []).map((e) => fieldOf(place, e)));
+        if (check && !check(data())) fields.push(...(check.errors ?? []).map((e) => fieldOf(spec, place, e)));
       }
       if (checks.body) {
         // server/index.js puts `{}` in place of a missing body (defaultEmptyBody):
         // missing is either, and that `{}` is never held against the schema.
         if (req.body === undefined || hadNoBody(req)) {
-          if (checks.bodyRequired) fields.push({ path: 'body', rule: 'required' });
+          if (checks.bodyRequired) fields.push(withReason({ path: 'body', rule: 'required' }, checks.bodyMissingReason));
         } else if (!checks.body(req.body)) {
-          fields.push(...(checks.body.errors ?? []).map((e) => fieldOf('body', e)));
+          fields.push(...(checks.body.errors ?? []).map((e) => fieldOf(spec, 'body', e)));
         }
       }
       if (fields.length > 0) return next(refusal(fields));

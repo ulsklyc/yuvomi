@@ -97,19 +97,19 @@ function routePattern(req) {
 /**
  * The `fields` of an HttpError, or null: only a non-empty array counts.
  * @param {any} err
- * @returns {{ path: string, rule: string }[] | null}
+ * @returns {{ path: string, rule: string, reason?: string }[] | null}
  */
 function fieldsOf(err) {
   return err instanceof HttpError && Array.isArray(err.fields) && err.fields.length > 0 ? err.fields : null;
 }
 
 /**
- * ` (fields: <rule> at <path>, ...)` for the log, or ''. Rule and path only,
- * never a value of the request.
- * @param {{ path: string, rule: string }[] | null} fields
+ * ` (fields: <rule> at <path> as <reason>, ...)` for the log, or ''. Rule,
+ * path and the schema's reason only, never a value of the request.
+ * @param {{ path: string, rule: string, reason?: string }[] | null} fields
  */
 function fieldsNote(fields) {
-  return fields ? ` (fields: ${fields.map((f) => `${f.rule} at ${f.path}`).join(', ')})` : '';
+  return fields ? ` (fields: ${fields.map((f) => `${f.rule} at ${f.path}${f.reason ? ` as ${f.reason}` : ''}`).join(', ')})` : '';
 }
 
 /**

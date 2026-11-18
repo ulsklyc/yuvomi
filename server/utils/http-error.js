@@ -13,17 +13,18 @@
  *          upstream error that quotes a URL with a token, a password): wrap
  *          such an error in one of our own first.
  *
- *          `fields` names what a request got wrong, one `{ path, rule }` per
- *          place (server/api/validate-request.ts): place plus pointer and the
- *          schema keyword, never a value of the request. The handler sends it
- *          only when it is a non-empty array.
+ *          `fields` names what a request got wrong, one `{ path, rule, reason? }`
+ *          per place (server/api/validate-request.ts): place plus pointer, the
+ *          schema keyword and the reason its schema names (`x-reason`), never a
+ *          value of the request. The handler sends it only when it is a
+ *          non-empty array.
  */
 
 export class HttpError extends Error {
   /**
    * @param {number} status HTTP status, 4xx to reach the client
    * @param {string} message our own sentence for the client
-   * @param {{ reason?: string, cause?: unknown, fields?: { path: string, rule: string }[] }} [options]
+   * @param {{ reason?: string, cause?: unknown, fields?: { path: string, rule: string, reason?: string }[] }} [options]
    */
   constructor(status, message, { reason, cause, fields } = {}) {
     super(message, cause === undefined ? undefined : { cause });
