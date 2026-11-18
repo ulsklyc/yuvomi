@@ -165,8 +165,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged, a failed channel test still stores its error on the channel, and every answer
   that names a known cause (a refused input, `busy`, `not_writable`, an install refusal with
   its `reason`) stays as it was. Permissions and weather answered this way already.
+- **Recipes answer an unexpected failure with the same sentence as the rest of the API.** The
+  recipe routes (list, create, update, delete, own image, transfer to the shopping list,
+  ingredient match) said `"Internal error"` on a server-side failure; they now say
+  `"Internal server error."` like every other module. Status 500 and `code` are unchanged. The
+  image proxy of imported recipes keeps its own answers (`404`, `502`). Recipe providers and the
+  pantry answered this way already.
 
 ### Fixed
+- **Confirming which pantry row a recipe ingredient means names the ingredient in English.**
+  `PUT /api/v1/recipes/{id}/ingredient-match` with an empty, blank or too long `name` answered
+  `"Zutat is required."`, `"Zutat must not be empty."` or `"Zutat may be at most 200 characters
+  long."` - a German word in an English message. It now says `"Ingredient ..."`. Status and
+  `code` are unchanged.
 - **Taking checked shopping items into the pantry no longer fails with a server error when a
   storage location was deleted meanwhile.** If one of the chosen locations no longer exists -
   for example removed in another session while the dialog was open - the take-over now answers
