@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request for a missing entry is a 400, not a 404 or 409, and an account that may change only
   its own items gets 400 for a bad request on someone else's item and, as before, 403
   `not_owner` for a valid one. Text lengths count the value as sent.
+- **A path id beyond the safe integer range is refused with a 400.** This is about your own
+  API clients; the app never sends such an id. On the routes that check requests against the
+  API description (notes, birthdays, quick links, reminders, notification channels,
+  permissions, displays, profile pictures, recipes, recipe providers, pantry, inventory), a
+  path id above 9007199254740991 is now a 400 with the rule `maximum`, and a run of digits too
+  long to be a number at all (hundreds of digits) a 400 with the rule `type`. Before, such an id
+  answered 404 or 400 depending on the route. 9007199254740991 itself, `0` and a negative id
+  are answered by the route as before. The API description gives every numeric path id this
+  upper bound.
 
 ## [2.92.0] - 2026-11-18
 

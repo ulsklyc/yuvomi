@@ -210,7 +210,7 @@ export function splitexpensesPaths() {
       get: op({ summary: 'List users and contacts that can be added to a group', description: 'Phone and email come only with read access to the Contacts module, a member\'s birthday only with read access to the Calendar module (for API tokens `contacts:read` and `calendar:read`); otherwise they are null. `birth_year_unknown` (boolean) marks a birthday known by day and month only (#2095). Contacts without an account are offered as candidates only with write access to Contacts (`contacts:write`), because adding one links it to the new guest.', tag: 'SplitExpenses', params: [idParam()] }),
     },
     '/api/v1/split-expenses/groups/{id}/members/{userId}': {
-      delete: op({ summary: 'Remove member from group', tag: 'SplitExpenses', params: [idParam(), { name: 'userId', in: 'path', required: true, schema: { type: 'integer' } }], stateChanging: true }),
+      delete: op({ summary: 'Remove member from group', tag: 'SplitExpenses', params: [idParam(), idParam('userId', 'User ID of the member to remove')], stateChanging: true }),
     },
     '/api/v1/split-expenses/groups/{id}/guests': {
       post: op({ summary: 'Create a guest user and add them to a group', description: 'An `email` that already belongs to another account (split-expense guests excluded) is refused with 409 and `reason: "email_in_use"` unless the caller is an admin; a guest is never linked to SSO through its address.', tag: 'SplitExpenses', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),

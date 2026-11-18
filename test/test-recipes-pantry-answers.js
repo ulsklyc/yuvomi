@@ -640,7 +640,7 @@ const EXPECTED = {
   "rec put zero": {"status":400,"body":{"error":"Invalid recipe ID.","code":400}},
   "rec put unknown": {"status":404,"body":{"error":"Recipe not found.","code":404,"reason":"recipes_recipe_not_found"}},
   "rec put letters": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"path/id","rule":"type"}]}},
-  "rec put huge": {"status":404,"body":{"error":"Recipe not found.","code":404,"reason":"recipes_recipe_not_found"}},
+  "rec put huge": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"path/id","rule":"type"}]}},
   "rec put mirrored": {"status":403,"body":{"error":"Mirrored recipes are managed by their source provider and cannot be edited here.","code":403,"reason":"recipe_mirrored"}},
   "rec put mirrored bad body": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/title","rule":"type"}]}},
   "rec image": {"status":200,"body":{"type":"image/jpeg","length":9}},

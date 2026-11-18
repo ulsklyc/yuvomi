@@ -153,13 +153,21 @@ function withValidationRefusal(operation) {
   return operation;
 }
 
+/**
+ * Upper bound of a numeric path id (#2810): Number.MAX_SAFE_INTEGER. Above it
+ * a JavaScript number no longer holds every integer, so the id a handler reads
+ * is not the one the client sent. No lower bound: `0` and a negative id stay
+ * the route's own answer.
+ */
+const MAX_PATH_ID = 9007199254740991;
+
 function idParam(name = 'id', description = 'Resource ID') {
   return {
     name,
     in: 'path',
     required: true,
     description,
-    schema: { type: 'integer' },
+    schema: { type: 'integer', maximum: MAX_PATH_ID },
   };
 }
 
