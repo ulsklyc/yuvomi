@@ -2166,7 +2166,8 @@ async function saveItem(panel, mode, item) {
     name,
     quantity: normalizePantryQuantity(panel.querySelector('#pantry-quantity').value, { fallback: 1 }),
     unit: panel.querySelector('#pantry-unit').value,
-    location_id: panel.querySelector('#pantry-location').value || null,
+    // A number, not the option's digit text: the API takes digit text only as a legacy form (#2810).
+    location_id: Number(panel.querySelector('#pantry-location').value) || null,
     category: panel.querySelector('#pantry-category').value,
     expires_on: panel.querySelector('#pantry-expires').value || null,
     notes: panel.querySelector('#pantry-notes').value.trim() || null,
@@ -2353,6 +2354,8 @@ async function openLocationManager() {
         groups: [{ key: '', labelKey: '', addLabelKey: 'common.add' }],
         // Schon geloescht ist ein Erfolg (#1909).
         alreadyDeletedReason: 'pantry_location_not_found',
+        // The keys are location ids: the order goes out as numbers (#2810).
+        numericKeys: true,
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem

@@ -1077,6 +1077,54 @@ async function inDenVorrat(offen, bestaetigt, ausgang = 'frist') {
   return { content: opts.content, calls, toast };
 }
 
+// #2810: the API takes a storage location as a number; digit text is only a
+// legacy form. The real confirm click sends each row's place as a number, and
+// "no place" (the empty option) as null.
+test('„In den Vorrat": der Ort jeder Zeile geht als Zahl hinaus, ohne Ort als null', async () => {
+  const g = /** @type {any} */ (globalThis);
+  zustand({ items: [artikel({ is_checked: 1 }), artikel({ id: 2, name: 'Brot', is_checked: 1 })] });
+  /** @type {any} */
+  let opts;
+  const zuvor = g.__openModal;
+  g.__openModal = (/** @type {any} */ o) => { opts = o; };
+  try {
+    await withAccess(SCHREIBEN, () => aufrufe(() => shopping.openPantryTransfer(container())));
+  } finally {
+    g.__openModal = zuvor;
+  }
+  const zeile = (/** @type {number} */ id, /** @type {string} */ ort) => {
+    /** @type {Record<string, { value: string }>} */
+    const werte = { '.pantry-transfer__qty': { value: '1' }, '.pantry-transfer__unit': { value: 'pcs' }, '.pantry-transfer__loc': { value: ort } };
+    return { dataset: { id: String(id) }, querySelector: (/** @type {string} */ sel) => werte[sel] ?? null };
+  };
+  /** @type {Record<string, any>} */
+  const felder = {};
+  const panel = {
+    querySelector: (/** @type {string} */ sel) => (felder[sel] ??= {
+      value: '', checked: false, listeners: {},
+      addEventListener(/** @type {string} */ type, /** @type {any} */ fn) { this.listeners[type] = fn; },
+    }),
+    querySelectorAll: (/** @type {string} */ sel) => (sel === '.pantry-transfer__row' ? [zeile(1, '4'), zeile(2, '')] : []),
+  };
+  opts.onSave(panel);
+  /** @type {any} */
+  let gesendet = null;
+  const stubZuvor = g.__apiStub;
+  g.__apiStub = {
+    post: async (/** @type {string} */ path, /** @type {any} */ body) => {
+      if (path === '/pantry/import-shopping') gesendet = body;
+      return { data: { added: 0, merged: 0, changes: [] } };
+    },
+    get: async () => ({ data: [] }),
+  };
+  try {
+    await withAccess(SCHREIBEN, () => felder['#pantry-transfer-confirm'].listeners.click({ currentTarget: {} }));
+  } finally {
+    g.__apiStub = stubZuvor;
+  }
+  assert.deepEqual(gesendet?.items.map((/** @type {any} */ i) => i.location_id), [4, null]);
+});
+
 test('„In den Vorrat": ohne Schreibrecht im Einkauf kein Abraeumen der Liste', async () => {
   const lesend = await inDenVorrat(LESEN, LESEN);
   assert.doesNotMatch(lesend.content, /pantry-transfer-clear/, 'die Checkbox verspraeche ein DELETE, das im 403 endet');

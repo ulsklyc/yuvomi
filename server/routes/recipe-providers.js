@@ -12,7 +12,8 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { str, MAX_TITLE, MAX_URL } from '../middleware/validate.js';
-import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
+import { requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { getAdapter, SUPPORTED_PROVIDERS } from '../services/recipe-providers/index.js';
 import {
   isBlockedBaseUrl, isPrivateNetworkRefusal, withPrivateNetworkHint, PRIVATE_NETWORK_MESSAGE,
@@ -48,9 +49,14 @@ function externalUrlInvalid(res) {
   return res.status(400).json({ error: 'External URL must start with http(s)://', code: 400, reason: 'recipe_providers_external_url_invalid' });
 }
 
-router.get('/accounts', (req, res) => {
+// ADMIN VOR DEM SCHEMA (#2810). Sieben der acht Routen sind
+// Administratorensache; die Pruefung stand bis #2810 als erste Zeile im Handler
+// und steht jetzt als Routen-Middleware VOR validateRequest(): ein Mitglied
+// bekommt fuer jeden Rumpf dieselbe Absage (`admin_required`, auf einem
+// angemeldeten Geraet `device_credential`), nie ein 400, das Felder nennt.
+// `GET /status` bleibt fuer jedes Mitglied offen (siehe unten).
+router.get('/accounts', requireAdmin, validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const rows = db.get().prepare('SELECT * FROM recipe_provider_accounts ORDER BY name COLLATE NOCASE').all();
     res.json({ data: rows.map(publicAccount) });
   } catch (err) {
@@ -59,9 +65,8 @@ router.get('/accounts', (req, res) => {
   }
 });
 
-router.post('/accounts', async (req, res) => {
+router.post('/accounts', requireAdmin, validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const provider = SUPPORTED_PROVIDERS.includes(req.body.provider) ? req.body.provider : 'mealie';
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl = str(req.body.base_url, 'Base URL', { max: MAX_URL });
@@ -122,9 +127,8 @@ router.post('/accounts', async (req, res) => {
   }
 });
 
-router.patch('/accounts/:id', (req, res) => {
+router.patch('/accounts/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.params.id));
     if (!account) return accountGone(res);
 
@@ -157,9 +161,8 @@ router.patch('/accounts/:id', (req, res) => {
   }
 });
 
-router.delete('/accounts/:id', (req, res) => {
+router.delete('/accounts/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const id = Number(req.params.id);
     const existing = getAccount(id);
     if (!existing) return accountGone(res);
@@ -174,9 +177,8 @@ router.delete('/accounts/:id', (req, res) => {
   }
 });
 
-router.post('/accounts/:id/test', async (req, res) => {
+router.post('/accounts/:id/test', requireAdmin, validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.params.id));
     if (!account) return accountGone(res);
     const probe = await getAdapter(account).testConnection();
@@ -203,9 +205,8 @@ router.post('/accounts/:id/test', async (req, res) => {
   }
 });
 
-router.post('/accounts/:id/sync', async (req, res) => {
+router.post('/accounts/:id/sync', requireAdmin, validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.params.id));
     if (!account) return accountGone(res);
     const result = await syncOne(account.id);
@@ -216,9 +217,8 @@ router.post('/accounts/:id/sync', async (req, res) => {
   }
 });
 
-router.post('/sync', async (req, res) => {
+router.post('/sync', requireAdmin, validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const result = await sync();
     res.json({ data: result });
   } catch (err) {
@@ -230,7 +230,7 @@ router.post('/sync', async (req, res) => {
 // Auch für Nicht-Admins lesbar: die Rezepte-Seite zeigt "zuletzt synchronisiert"
 // pro Account, ohne den API-Token selbst offenzulegen (publicAccount-Strip greift
 // hier ohnehin nicht, getStatus() liefert nie den Token).
-router.get('/status', (_req, res) => {
+router.get('/status', validateRequest(), (_req, res) => {
   try {
     res.json({ data: getStatus() });
   } catch (err) {

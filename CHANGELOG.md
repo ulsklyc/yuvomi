@@ -113,6 +113,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   incomplete or names someone outside the household, the Immich URL scheme and album UUID
   after trimming, a display name of spaces only, equal night hours. The check runs after the
   admin check and the pairing rate limit, so a member still gets 403.
+- **Recipes, recipe providers and the pantry check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now
+  (it sends storage location ids as numbers from this release on). Under `/api/v1/recipes`,
+  `/api/v1/recipe-providers` and `/api/v1/pantry`, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`DELETE /recipes/42abc` deleted recipe 42, and `0x1e` or `31.0` deleted provider account
+    30 or 31), a query value given twice, a number, truth value, list or object in a text
+    field (it was stored as text), and a number written as text (`"5"`, `true` and `[5]` were
+    read as numbers);
+  - `/api/v1/recipes`: `ingredients` that is null, not a list, or holds entries that are not
+    objects (null emptied the list, odd entries were skipped), `servings` outside 1 to 99 or as
+    text or `""`, `meal_types` that is neither a list of texts, a text nor null, `listId` and
+    `ingredientIds` of the transfer to a shopping list as text, and `pantryItemId: ""` on an
+    ingredient match (it cleared the match; `null` or leaving it out still does);
+  - `/api/v1/recipe-providers` (admin only): a `provider` other than `mealie` or `tandoor`
+    (an unknown one was stored as `mealie`; left out it still is), `enabled` that is not a
+    real truth value (`"false"` switched an account ON, `null` and `0` OFF), and a `PATCH`
+    without a body. A base or external address that does not start with `http://` or
+    `https://` keeps its reason `recipe_providers_url_invalid` or
+    `recipe_providers_external_url_invalid`, now with `fields`;
+  - `/api/v1/pantry`: a `unit` outside the unit list (it became `pcs`, and on `PATCH` it
+    overwrote the stored unit), a quantity or minimum as text or below zero, `min_quantity: ""`
+    (use null to clear), `expires_on` that is not `YYYY-MM-DD`, empty or null, a storage
+    location id that is neither a whole number nor digit text, a `PATCH` without a body,
+    `items` or `changes` that is not a list (null or text took over or undid nothing), an
+    `order` of storage locations with entries that are not ids (`[{}]` and `[true]` were a
+    500, other entries were skipped), and undo entries that are not the shape the take-over
+    answered with.
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, `meal_types` as comma text, unknown recipe meal types (dropped), an
+  address in upper case or with leading spaces, `""` for no external address, digit text for a
+  storage location id (older app versions send it), null to keep a pantry item's unit or
+  category on a change, `{}` on a partial update and on the provider test and sync. A `PUT`
+  replaces the whole recipe or pantry item, as before: left-out fields are cleared, and only
+  the name is required. Rules the description cannot carry stay with the routes and their
+  sentences: an empty name after trimming, a day that does not exist, a category or storage
+  location that does not exist, the image content, a provider address in a private network.
+  The admin check of the providers and the second module right of the recipe transfer, the
+  ingredient match and the shopping-list take-over run first, so a caller without them still
+  gets 403 for any body; the check then runs before the entry is looked up, so a bad request
+  for a missing entry is a 400, not a 404 or 409. Text lengths count the value as sent.
 - **Reminders, notification channels, modules and e-mail answer an unexpected failure with the
   same sentence as the rest of the API.** Their routes said `"Internal error."` (reminders,
   notification channels including a failed channel test, e-mail) or `"Module install failed."`,
@@ -124,6 +167,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its `reason`) stays as it was. Permissions and weather answered this way already.
 
 ### Fixed
+- **Taking checked shopping items into the pantry no longer fails with a server error when a
+  storage location was deleted meanwhile.** If one of the chosen locations no longer exists -
+  for example removed in another session while the dialog was open - the take-over now answers
+  400 `Location not found.` like adding a pantry item does, and nothing is taken over. Before,
+  the whole take-over ended as a 500.
 - **The API description marks every value that may be null in the OpenAPI 3.1 way.** 36 places - the
   fasting and nutrition bodies, the household setup, the waste calendar feed - said so with the
   OpenAPI 3.0 keyword `nullable`, which a 3.1 client generator ignores, so a generated client treated

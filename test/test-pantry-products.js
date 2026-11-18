@@ -62,7 +62,9 @@ app.use((req, _res, next) => {
   req.session = { userId: USER, role: 'member' };
   next();
 });
-app.use('/pantry', pantryRouter);
+// At their real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/pantry(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`; next(); });
+app.use('/api/v1/pantry', pantryRouter);
 app.use('/shopping', shoppingRouter);
 // At its real prefix: validateRequest() reads the operation from the mount (#2810).
 app.use('/api/v1/kitchen', kitchenRouter);

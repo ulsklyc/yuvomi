@@ -31,6 +31,7 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { default: pantryRouter } = await import('../server/routes/pantry.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { syncAllPantryExpiryReminders, syncPantryExpiryReminder } = await import('../server/services/pantry-reminders.js');
 const { todayKey: householdToday } = await import('../server/utils/timezone.js');
@@ -70,8 +71,11 @@ const A = db.prepare("INSERT INTO users (username, display_name, password_hash, 
 let actor = { id: A };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => { req.authUserId = actor.id; req.session = { userId: actor.id }; next(); });
-app.use('/pantry', pantryRouter);
+// At its real prefix too (#2810), the suite keeps its short paths.
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/pantry(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`; next(); });
+app.use('/api/v1/pantry', pantryRouter);
 // At its real prefix, with the central error handler: validateRequest() finds
 // its operation by the mount and hands its 400 on (#2810).
 app.use('/api/v1/reminders', remindersRouter);
