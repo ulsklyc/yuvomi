@@ -1005,7 +1005,12 @@ const REASONS_PASSED_THROUGH = new Map([
   // Restores und der Grund einer 4xx mit `expose` (HttpError). Heute wirft
   // keine Stelle eine HttpError mit 403; wer es tut, traegt den Grund hier ein.
   ['middleware/error-handler.js: err.reason', { sites: 2, at403: [], why: 'feste 503 (Restore) und die 4xx einer HttpError, heute keine 403' }],
-  ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
+  // validateRequest() (#2810): der Grund einer Schema-Absage kommt aus der
+  // Annotation `x-reason` am verletzten Schema-Knoten, sonst `validation`; der
+  // Status ist immer 400. Die zweite Stelle ist der Typ eines Parameters.
+  ["api/validate-request.ts: unique[0]?.reason ?? 'validation'", { sites: 1, at403: [], why: 'refusal(): feste 400' }],
+  ['api/validate-request.ts: string | undefined', { sites: 1, at403: [], why: 'keine Antwort; Parametertyp von withReason()' }],
+  ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON',{ sites: 1, at403: [], why: '503 oder 409' }],
   ['routes/weather.js: WEATHER_REASON.NOT_CONFIGURED', { sites: 1, at403: [], why: 'Antwort 200 ohne Daten' }],
   ['routes/weather.js: WEATHER_REASON.UPSTREAM_ERROR', { sites: 5, at403: [], why: 'Antwort 200 ohne Daten (Wetter 3x, Ortssuche 2x)' }],
   ['routes/rewards.js: item.name', { sites: 1, at403: [], why: 'Buchungstext im Punktekonto, keine Antwort' }],
