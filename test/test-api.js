@@ -947,7 +947,7 @@ const REASONS_PASSED_THROUGH = new Map([
   // Testmail. Beides reist an einer festen 400 bzw. in einer 200, nie an 403.
   ['routes/email.js: refusal.reason', { sites: 1, at403: [], why: 'emailConfigRefusal: feste 400' }],
   ['services/email.js: smtpFailureReason(err)', { sites: 1, at403: [], why: 'sendTest: in der 200-Antwort von POST /email/test' }],
-  ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben sendet refuseAdmin' }],
+  ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 sendet requireAdmin vor der Route' }],
   // parseDataUrl (#1909): der Fall einer gewaehlten Datei (Typ, Inhalt, leer).
   ['routes/documents.js: parsed.reason', { sites: 1, at403: [], why: 'parseDataUrl: feste 400' }],
   // problemBody (#1909): der Grund einer Abo-Pruefung, nur bei genau einem Befund.

@@ -48,6 +48,8 @@ const { default: rewardsRouter } = await import('../server/routes/rewards.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
 const { default: permissionsRouter } = await import('../server/routes/permissions.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { householdOverview } = await import('../server/services/two-factor.js');
 const { listEmailableMembers } = await import('../server/services/member-email.js');
 const { householdMemberSql, isHouseholdMember, memberOrderSql } = await import('../server/services/household-members.js');
@@ -133,6 +135,7 @@ assert.deepEqual(byId(EVERYONE), [...EVERYONE].reverse(), 'Vorbedingung: ids lau
 let actor = ANNA;
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use(sessionMiddleware);
 app.use((req, _res, next) => {
   if (actor) {
@@ -142,7 +145,7 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/auth', authRouter);
-app.use('/family', requireAuth, familyRouter);
+app.use('/api/v1/family', requireAuth, familyRouter);
 app.use('/schedule/extras', requireAuth, scheduleExtrasRouter);
 app.use('/schedule', requireAuth, scheduleRouter);
 app.use('/tasks', requireAuth, tasksRouter);
@@ -154,6 +157,7 @@ app.use('/split-expenses', requireAuth, splitRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 app.use('/api/v1/permissions', requireAuth, permissionsRouter);
 app.use('/documents', requireAuth, documentsRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -211,7 +215,7 @@ test('members only: GET /schedule/household-members', async () => {
 });
 
 test('members only: GET /family/members (the source of the pickers)', async () => {
-  const r = await call('GET', '/family/members');
+  const r = await call('GET', '/api/v1/family/members');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data), MEMBERS);
 });

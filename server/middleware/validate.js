@@ -2,11 +2,11 @@
  * Modul: Eingabe-Validierung (Validate)
  * Zweck: Wiederverwendbare Validierungs-Helfer für alle API-Routen
  * Abhängigkeiten: server/utils/timezone.js (reine Rechnung, keine Datenbank),
- *                 server/utils/datetime-pattern.js (das Muster von DATETIME_RE)
+ *                 server/utils/datetime-pattern.js (die Muster von DATE_RE und DATETIME_RE)
  */
 
 import { isValidTimeZone, utcToWall } from '../utils/timezone.js';
-import { DATETIME_PATTERN } from '../utils/datetime-pattern.js';
+import { DATE_PATTERN, DATETIME_PATTERN } from '../utils/datetime-pattern.js';
 
 // Globale Längengrenzen
 const MAX_TITLE    = 200;
@@ -20,7 +20,8 @@ const MAX_URL      = 2000;
 const MAX_SECRET   = 4096;
 
 // Regex-Muster
-const DATE_RE     = /^\d{4}-\d{2}-\d{2}$/;
+// One source with the day-key `pattern` of the OpenAPI document (#2810).
+const DATE_RE     = new RegExp(DATE_PATTERN);
 const TIME_RE     = /^\d{2}:\d{2}$/;
 // One source with the `pattern` of the reminder times in the OpenAPI document (#2810).
 const DATETIME_RE = new RegExp(DATETIME_PATTERN);

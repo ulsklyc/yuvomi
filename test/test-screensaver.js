@@ -21,22 +21,27 @@ import assert from 'node:assert/strict';
 import express from 'express';
 
 const { __test, default: screensaverRouter } = await import('../server/routes/screensaver.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 let actor = { id: 1, role: 'admin' };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   next();
 });
-app.use('/', screensaverRouter);
+// At its real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use('/api/v1/screensaver', screensaverRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}/api/v1/screensaver${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -95,7 +100,8 @@ test('ohne Konfiguration antwortet /photos ruhig statt zu scheitern', async () =
 });
 
 test('der Thumbnail-Proxy nimmt nur UUIDs an', async () => {
-  // Ohne Konfiguration endet jeder Aufruf mit 404, bevor die Id geprueft wird.
+  // Seit #2810 prueft validateRequest() die Id vor dem 404 "nicht eingerichtet"
+  // (test:validate-small-modules-b); hier der Weg mit Konfiguration.
   process.env.IMMICH_URL = 'https://photos.example';
   process.env.IMMICH_API_KEY = 'secret';
   try {
@@ -121,7 +127,7 @@ test('ein Foto aus Immich landet nicht im HTTP-Cache des Geraets', async () => {
   process.env.IMMICH_URL = `http://127.0.0.1:${fake.address().port}`;
   process.env.IMMICH_API_KEY = 'secret';
   try {
-    const res = await fetch(`${baseUrl}/photos/0b4f5b2e-6f1a-4c3d-9e8f-1a2b3c4d5e6f`);
+    const res = await fetch(`${baseUrl}/api/v1/screensaver/photos/0b4f5b2e-6f1a-4c3d-9e8f-1a2b3c4d5e6f`);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-type'), 'image/jpeg');
     // Familienfotos gehoeren nicht als Kopie in den Browser-Cache eines

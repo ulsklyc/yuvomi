@@ -1965,15 +1965,54 @@ export const schemas = {
           },
           required: ['id', 'display_name', 'avatar_color', 'family_role'],
         },
+        // Checked by validateRequest() (#2810) with the route's own reasons:
+        // the shape is `invalid_order`, a repeated id `duplicate_member`. Ajv
+        // checks `items` before `uniqueItems`, as memberOrderProblem() checks
+        // the shape before the repeats, so `[1, 1, "x"]` is `invalid_order` on
+        // both sides. Who the ids are (not_a_household_member,
+        // incomplete_order) stays the handler's: it reads the database.
+        // Checked by validateRequest() (#2810). Only what agrees with the route:
+        // a field that is not text answered `immich_url_invalid` /
+        // `immich_album_id_invalid` there too (it was read through String());
+        // the URL scheme, the album UUID and the length after trimming stay the
+        // route's, it trims and lets `""` clear a value. An API key over 1000
+        // characters is `immich_api_key_invalid` on both sides (Ajv counts code
+        // points, the route UTF-16 units, so the route keeps its own check).
+        ScreensaverConfigInput: {
+          type: 'object',
+          description: 'Only the fields that are sent change. A field set by an environment variable is not read.',
+          properties: {
+            url: {
+              type: 'string',
+              maxLength: 2048,
+              'x-reason': 'immich_url_invalid',
+              description: 'The Immich server, `http://` or `https://`, at most 2048 characters. `""` clears it.',
+            },
+            albumId: {
+              type: 'string',
+              'x-reason': 'immich_album_id_invalid',
+              description: 'The album to show, a UUID. `""` shows the whole library.',
+            },
+            apiKey: {
+              type: 'string',
+              maxLength: 1000,
+              'x-reason': { maxLength: 'immich_api_key_invalid' },
+              description: 'Write-only. At most 1000 characters; `""` keeps the stored key.',
+            },
+            clearApiKey: { type: 'boolean', description: '`true` removes the stored API key when no new one is sent.' },
+          },
+        },
         FamilyMemberReorderInput: {
           type: 'object',
+          'x-reason': 'invalid_order',
           required: ['order'],
           properties: {
             order: {
               type: 'array',
               minItems: 1,
               uniqueItems: true,
-              items: { type: 'integer', minimum: 1 },
+              'x-reason': { uniqueItems: 'duplicate_member', default: 'invalid_order' },
+              items: { type: 'integer', minimum: 1, 'x-reason': 'invalid_order' },
               description: 'The ids of all household members, in the wanted order.',
             },
           },

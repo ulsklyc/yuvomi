@@ -1,5 +1,5 @@
 /**
- * Module: the date-time shape the API accepts as input (#2810)
+ * Module: the date-time and day-key shapes the API accepts as input (#2810)
  * Purpose: ONE source for the text a date-time input field may have, read by
  *          two sides that must never drift apart:
  *            - the hand check `datetime()` in server/middleware/validate.js
@@ -20,3 +20,14 @@
  */
 
 export const DATETIME_PATTERN = '^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}(:\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:?\\d{2})?)?$';
+
+/**
+ * The day key `YYYY-MM-DD` as text, the shape only: whether the day exists is
+ * the handler's (calendar). Read by `DATE_RE` in server/middleware/validate.js,
+ * by the `today` check of server/routes/kitchen.js and, as
+ * OPTIONAL_DATE_PATTERN, by the `today` parameter of `GET /kitchen/summary`.
+ */
+export const DATE_PATTERN = '^\\d{4}-\\d{2}-\\d{2}$';
+
+/** A day key or the empty text: `today=` is "no day given", as before #2810. */
+export const OPTIONAL_DATE_PATTERN = `^(?:${DATE_PATTERN.slice(1, -1)})?$`;

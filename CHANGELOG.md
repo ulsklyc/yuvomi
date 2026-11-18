@@ -79,6 +79,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   had. The check runs after the admin, session and rate-limit checks, so a member still gets
   403, and before the entry is looked up, so a bad request for a missing channel, member or
   reminder target is now a 400, not a 404.
+- **Family, profile pictures, search, kitchen, screensaver and wall displays check every request
+  against the published API description.** This is about your own API clients; the app sends
+  nothing that is refused now. Under these prefixes, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`5.0` and `1e2` were read as 5 and 100), and a query value given twice where one is
+    expected (`q` on `/api/v1/search` searched for `a,b`, `today` on `/api/v1/kitchen/summary`);
+  - `/api/v1/family/members/reorder`: the order is checked before the members are looked up.
+    It keeps its reasons `invalid_order` and `duplicate_member`, now with `fields`. A member who
+    is not an administrator gets 403 for any body, as before;
+  - `/api/v1/people/{id}/avatar`: a missing `v`, one that is not 32 lowercase hex characters,
+    or one given twice (it was a 404). A well-formed key that does not match is still a 404;
+  - `/api/v1/kitchen/summary`: `today` that is neither `YYYY-MM-DD` nor empty (it fell back
+    to the household day). An empty or missing `today` still means the household day;
+  - `/api/v1/screensaver`: no body or a list on `PUT /config` (it was a 200 that saved
+    nothing), `url` or `albumId` that is not text (they were read through `String()`, so a
+    list with one URL was stored), a `url` over 2048 or an `apiKey` over 1000 characters as
+    sent, an `apiKey` that is not text (it was ignored), `clearApiKey: "true"`, and a photo id
+    that is not a UUID - also when Immich is not set up (that was a 404). `url`, `albumId` and
+    the key length keep `immich_url_invalid`, `immich_album_id_invalid` and
+    `immich_api_key_invalid`, and a refused body stores no field at all;
+  - `/api/v1/displays`: a `display_name` that is a number, a truth value, a list (they were
+    stored as text) or empty, or longer than 128 characters as sent; `show_screensaver` as
+    text; on `POST /displays/pair` a missing `code`, a `code` or `label` that is not text and a
+    `label` over 120 characters (it was cut). A refused pairing counts against the rate limit
+    like any attempt and leaves a signed-in session in place.
+
+  What stays allowed is in the description now too: `q` of any length, an empty `today`, a
+  day of the right shape that does not exist (compared as text, as before), `""` to clear the
+  Immich URL and album, a photo id in either letter case, `label: null` or `""`. Rules the
+  description cannot carry stay with the routes and their sentences: a member order that is
+  incomplete or names someone outside the household, the Immich URL scheme and album UUID
+  after trimming, a display name of spaces only, equal night hours. The check runs after the
+  admin check and the pairing rate limit, so a member still gets 403.
 - **Reminders, notification channels, modules and e-mail answer an unexpected failure with the
   same sentence as the rest of the API.** Their routes said `"Internal error."` (reminders,
   notification channels including a failed channel test, e-mail) or `"Module install failed."`,
