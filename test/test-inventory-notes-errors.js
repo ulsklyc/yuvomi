@@ -50,6 +50,8 @@ const { default: inventoryRouter } = await import('../server/routes/inventory/in
 const { default: notesRouter } = await import('../server/routes/notes.js');
 const { default: contactsRouter } = await import('../server/routes/contacts.js');
 const { default: birthdaysRouter } = await import('../server/routes/birthdays.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { setPermissions } = await import('../public/permissions.js');
 const { __test: inventory } = await import('../public/pages/inventory.js');
 const { __test: notes } = await import('../public/pages/notes.js');
@@ -85,6 +87,9 @@ const admin = db.prepare(`INSERT INTO users (username, display_name, password_ha
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+// As server/index.js: a missing body is `{}`, and the 400 of validateRequest()
+// (#2810) goes to the central error handler behind the routers.
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = admin;
   req.authRole = 'admin';
@@ -95,6 +100,7 @@ app.use('/api/v1/inventory', inventoryRouter);
 app.use('/api/v1/notes', notesRouter);
 app.use('/api/v1/contacts', contactsRouter);
 app.use('/api/v1/birthdays', birthdaysRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));
@@ -842,6 +848,31 @@ test('Inventar: Orts- und Kategorie-Verwalter sagen den Satz der App und nehmen 
     assert.ok(options, `${reason}: der Verwalter wurde nicht eingerichtet`);
     assert.equal(options.errorFallbackKey, 'common.errorGeneric', `${reason}: ohne Rueckfall zeigt der Verwalter den Text des Servers`);
     assert.equal(options.alreadyDeletedReason, reason);
+  }
+});
+
+test('Inventar (#2810): das Formular schickt den Ort als Zahl, ohne Ort null', async () => {
+  for (const [ort, erwartet] of [['1', 1], ['', null]]) {
+    for (const mode of ['create', 'edit']) {
+      /** @type {any} */
+      let gesendet = null;
+      const merken = async (/** @type {string} */ _path, /** @type {any} */ body) => { gesendet = body; return { data: gegenstand() }; };
+      await mitInventar(() => mit({ post: merken, put: merken },
+        () => inventory.saveItem(formular({ '#inv-name': 'Bohrer', '#inv-location': ort }), mode, mode === 'edit' ? gegenstand() : null, null, null, null)));
+      assert.ok(gesendet, `${mode} ${JSON.stringify(ort)}: gespeichert`);
+      assert.strictEqual(gesendet.location_id, erwartet, `${mode} ${JSON.stringify(ort)}`);
+    }
+  }
+});
+
+test('Inventar (#2810): der Orts-Verwalter schickt Reihenfolgen als Zahlen, der Kategorie-Verwalter seine Schluessel als Text', async () => {
+  for (const [open, numeric] of /** @type {Array<[() => unknown, boolean]>} */ ([[inventory.openLocationManager, true], [inventory.openCategoryManager, false]])) {
+    /** @type {any} */
+    let options = null;
+    const manager = { addEventListener() {}, configure(/** @type {any} */ o) { options = o; } };
+    const panel = { querySelector: (/** @type {string} */ sel) => (sel === 'yuvomi-category-manager' ? manager : null) };
+    await oeffne(panel, () => open());
+    assert.equal(options?.numericKeys === true, numeric, options?.basePath);
   }
 });
 

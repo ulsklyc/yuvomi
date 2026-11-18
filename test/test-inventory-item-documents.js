@@ -24,6 +24,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: itemsRouter } = await import('../server/routes/inventory/items.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const A = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('a','A','x','member')").run().lastInsertRowid;
@@ -32,6 +34,7 @@ const B = db.prepare("INSERT INTO users (username, display_name, password_hash, 
 let actor = { id: A };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.session = { userId: actor.id };
@@ -40,7 +43,10 @@ app.use((req, _res, next) => {
   req.authScopes = actor.authScopes ?? null;
   next();
 });
-app.use('/items', itemsRouter);
+// At its real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/(items|entries)(\/|\?|$)/.test(req.url)) req.url = `/api/v1/inventory${req.url}`; next(); });
+app.use('/api/v1/inventory/items', itemsRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

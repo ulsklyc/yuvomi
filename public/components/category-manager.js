@@ -29,9 +29,10 @@
  *     wer etwas anderes verwaltet, nennt sie selbst (#1929, heute die Laeden des
  *     Einkaufs). Ohne sie bleibt der bisherige `category.*`-Text. Unterzeilen
  *     behalten ihre eigenen Texte
- *   - `numericKeys: true` schickt die Reihenfolge (`PATCH basePath/reorder`) als
- *     Zahlen statt als Text der Schluessel (#2810). Nur fuer Verwalter, deren
- *     Schluessel sicher Ziffern-IDs sind (heute die Lagerorte des Vorrats); ohne
+ *   - `numericKeys: true` schickt die Reihenfolge (`PATCH basePath/reorder` und
+ *     die der Unterzeilen, `.../subcategories/reorder`) als Zahlen statt als
+ *     Text der Schluessel (#2810). Nur fuer Verwalter, deren Schluessel sicher
+ *     Ziffern-IDs sind (heute die Lagerorte des Vorrats und des Inventars); ohne
  *     die Option bleibt es Text, wie die anderen Routen es lesen
  *   - Räumt Listener in disconnectedCallback() auf
  *
@@ -1121,7 +1122,8 @@ class CategoryManagerElement extends HTMLElement {
     try {
       const res = await api.patch(
         `${this._basePath}/${encodeURIComponent(parent)}/subcategories/reorder`,
-        { order: orderedSubKeys }
+        // Wie _persistOrder: eine id-gefuehrte Route bekommt Zahlen (#2810).
+        { order: this._numericKeys ? orderedSubKeys.map(Number) : orderedSubKeys }
       );
       if (Array.isArray(res?.data)) this._cats = res.data;
       else await this._fetch();

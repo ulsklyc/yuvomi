@@ -768,7 +768,40 @@ test('without numericKeys the order stays the key text', async () => {
   assert.deepEqual(await sentOrder({ numericKeys: 'yes' }), ['5', '3', '12'], 'only a real true switches it on');
 });
 
-test('numericKeys: only the pantry locations switch it on', async () => {
+// The order of the sub rows (child locations of the inventory) follows the
+// same option: `PATCH basePath/{parent}/subcategories/reorder`.
+/** @param {Record<string, unknown>} options */
+async function sentSubOrder(options) {
+  const manager = managerWithCategory(options);
+  manager._fetch = async () => {};
+  manager._renderSublist = () => {};
+  manager._announceMove = () => {};
+  manager._notifyChanged = () => {};
+  const previousPatch = api.patch;
+  /** @type {any} */
+  let sent = null;
+  /** @type {string} */
+  let sentPath = '';
+  api.patch = async (/** @type {string} */ path, /** @type {any} */ body) => { sentPath = path; sent = body; return { data: [] }; };
+  try {
+    await manager._persistSubOrder('7', ['5', '3', '12'], '3');
+  } finally {
+    api.patch = previousPatch;
+  }
+  return { path: sentPath, order: sent?.order };
+}
+
+test('numericKeys: the order of the sub rows goes out as numbers too', async () => {
+  const sent = await sentSubOrder({ numericKeys: true });
+  assert.match(sent.path, /\/7\/subcategories\/reorder$/);
+  assert.deepEqual(sent.order, [5, 3, 12]);
+});
+
+test('without numericKeys the order of the sub rows stays the key text', async () => {
+  assert.deepEqual((await sentSubOrder({})).order, ['5', '3', '12']);
+});
+
+test('numericKeys: only the managers keyed by location ids switch it on (pantry and inventory locations)', async () => {
   const { readFileSync, readdirSync } = await import('node:fs');
   const { withoutCommentsKeepingLines } = await import('./source-text.js');
   const dir = new URL('../public/pages/', import.meta.url);
@@ -779,5 +812,5 @@ test('numericKeys: only the pantry locations switch it on', async () => {
       if (/numericKeys:\s*true/.test(m[0])) found.push(`${file}: ${m[1]}`);
     }
   }
-  assert.deepEqual(found, ['pantry.js: /pantry/locations']);
+  assert.deepEqual(found.sort(), ['inventory.js: /inventory/locations', 'pantry.js: /pantry/locations']);
 });

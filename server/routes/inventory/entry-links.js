@@ -32,7 +32,8 @@
 import * as db from '../../db.js';
 import { mayReadModule, resolveBudgetMode, budgetDetailsVisibleWhere } from '../../authorize/index.ts';
 
-export const ROLES = ['purchase', 'refund', 'instalment', 'maintenance', 'accessory'];
+// Die Liste steht in fields.js, einer Quelle mit dem OpenAPI-Dokument (#2810).
+export { ROLES } from './fields.js';
 
 function mode() {
   return resolveBudgetMode(db.get());
