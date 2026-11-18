@@ -1060,8 +1060,8 @@ const SINGLE_FIELD_CASES = Object.groupBy(
 
 const catalogByField = () => new Map(settingsCatalog().map((entry) => [entry.field, entry]));
 
-test('registry: the measured fields are what this suite expects (52 PUT fields, the route views)', () => {
-  assert.equal(PUT_FIELDS.length, 52, PUT_FIELDS.join(', '));
+test('registry: the measured fields are what this suite expects (53 PUT fields, the route views)', () => {
+  assert.equal(PUT_FIELDS.length, 53, PUT_FIELDS.join(', '));
   for (const field of PUT_FIELDS) assert.ok(SINGLE_FIELD_CASES[field]?.length, `a single-field case for ${field}`);
   for (const view of ROUTE_VIEWS) assert.ok(GET_FIELDS.includes(view), view);
 });
