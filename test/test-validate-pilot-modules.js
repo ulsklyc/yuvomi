@@ -251,6 +251,25 @@ test('optional text fields take null and "" as no value: name_day and notes of a
   }
 });
 
+test('a name_day of 50,000 spaces and an x is a quick 400; surrounding spaces stay allowed (#2810)', async () => {
+  // The first pattern backtracked quadratically: this one request held the
+  // event loop for about 4 s. The budget covers the whole HTTP round trip.
+  const long = `${' '.repeat(50_000)}x`;
+  const birthday = await newBirthday();
+  for (const [method, path] of [['POST', '/birthdays'], ['PUT', `/birthdays/${birthday.id}`]]) {
+    const start = performance.now();
+    const res = await call(method, path, { name: 'Ada', birth_date: '1990-05-01', name_day: long });
+    const ms = performance.now() - start;
+    assertRefused(res, 'body/name_day');
+    assert.ok(ms < 1000, `${method} ${path} took ${ms.toFixed(0)} ms`);
+  }
+  const res = await call('POST', '/birthdays', { name: 'Ada', birth_date: '1990-05-01', name_day: ' 01-02 ' });
+  assertPassed(res, 201);
+  assert.equal(res.body.data.name_day, '01-02');
+  assertPassed(await call('PUT', `/birthdays/${birthday.id}`, { name_day: '\t12-31\n' }), 200);
+  assert.equal(db.prepare('SELECT name_day FROM birthdays WHERE id = ?').get(birthday.id).name_day, '12-31');
+});
+
 test('year_unknown: null counts as false', async () => {
   const res = await call('POST', '/birthdays', { name: 'Cem', birth_date: '1992-02-02', year_unknown: null });
   assertPassed(res, 201);
