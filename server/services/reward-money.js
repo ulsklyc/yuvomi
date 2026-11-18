@@ -480,8 +480,10 @@ function stepAnchor(plan) {
  * Plan einer Person lesen und pruefen. Gibt `{ error }` oder die Werte zurueck.
  */
 export function readPlanInput(d, userId, body) {
+  // `frequency` (ALLOWANCE_FREQUENCIES), `anchor_day` (a whole number 1 to 31)
+  // and `paused` (boolean) are held by the schema of the only caller,
+  // PUT /rewards/money/plans/{userId} (#2810); the weekly bound of 7 stays here.
   const frequency = body?.frequency;
-  if (!ALLOWANCE_FREQUENCIES.includes(frequency)) return { error: 'frequency must be weekly or monthly.' };
   const anchorDay = Number(body?.anchor_day);
   const max = frequency === 'weekly' ? 7 : 31;
   if (!Number.isInteger(anchorDay) || anchorDay < 1 || anchorDay > max) {
@@ -496,7 +498,6 @@ export function readPlanInput(d, userId, body) {
     if (err?.name === 'SplitInputError') return { error: err.message, reason: err.reason };
     throw err;
   }
-  if (body?.paused !== undefined && typeof body.paused !== 'boolean') return { error: 'paused must be a boolean.' };
   // `undefined` heisst "nicht angefasst": der gespeicherte Zustand bleibt.
   return { frequency, anchorDay, amountMinor, currency, paused: body?.paused };
 }
