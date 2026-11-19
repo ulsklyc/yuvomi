@@ -25,6 +25,13 @@ const NO_CONTENT = {
 
 const RECIPE_ID = 'Recipe ID, plain decimal digits.';
 
+// The match fields on every ingredient (#1314, #1448 part 4), described on
+// GET /recipes (the answers of POST and PUT carry the same fields).
+const PANTRY_MATCH_FIELDS = 'Every ingredient carries `pantry_product_id` and `pantry_product_name`, the household\'s own confirmed match to one product of its pantry, both `null` when there is none. '
+  + 'A match belongs to the household and is keyed by the ingredient wording (trimmed, case-insensitive, collapsed spaces): every recipe with the same wording shows the same product. '
+  + 'It names the product, not a batch, so it stays when a batch is used up or deleted; a product without batches is still matched. '
+  + '`pantry_item_id` and `pantry_item_name` are deprecated and will be removed in the first minor release on or after 2027-03-01: until then they name one batch of the matched product (the one with the lowest id), and are `null` when there is no match or the product has no batch left.';
+
 // Die Grenze von validateRecipeImage() in server/routes/recipes.js (~5 MB Rohbild in base64).
 const MAX_RECIPE_IMAGE_LENGTH = 6_990_507;
 
@@ -105,7 +112,7 @@ function recipeInput({ replace }) {
 export function recipesPaths() {
   return withCaseReasons('recipes', CASE_REASONS, {
     '/api/v1/recipes': {
-      get: op({ summary: 'List recipes', tag: 'Recipes', description: 'Every ingredient carries `pantry_item_id` and `pantry_item_name`, the household\'s own confirmed match to one row of its pantry, both `null` when there is none. They name a row of the `pantry` module although this path belongs to `meals`, so they are also `null` for a member whose pantry access is `none` and for a token that carries no pantry scope - the ingredient itself stays, simply unmatched.' }),
+      get: op({ summary: 'List recipes', tag: 'Recipes', description: `${PANTRY_MATCH_FIELDS} They name a product of the \`pantry\` module although this path belongs to \`meals\`, so all four are also \`null\` for a member whose pantry access is \`none\` and for a token that carries no pantry scope - the ingredient itself stays, simply unmatched.` }),
       post: op({
         summary: 'Create recipe',
         tag: 'Recipes',
@@ -120,7 +127,7 @@ export function recipesPaths() {
       put: withValidationRefusal(op({
         summary: 'Update recipe',
         tag: 'Recipes',
-        description: 'Replaces the recipe including its whole ingredient list - the ingredient rows are deleted and reinserted, so their ids change on every save. Confirmed pantry matches are keyed by the ingredient name and survive that; a match whose ingredient is no longer in the recipe is deleted in the same transaction rather than left behind, so renaming an ingredient really drops its match instead of hiding one that could come back. The response follows the same pantry-access rule as the list. `servings` behaves like the image: left out it stays as stored, `null` clears it, otherwise a whole number from 1 to 99. '
+        description: 'Replaces the recipe including its whole ingredient list - the ingredient rows are deleted and reinserted, so their ids change on every save. Confirmed pantry matches belong to the household and are keyed by the ingredient wording, not by a recipe or a row, so they survive that, and a save never deletes one: an ingredient renamed to a wording the household has confirmed elsewhere shows that match, and one renamed back shows its old one again. The response follows the same pantry-access rule as the list. `servings` behaves like the image: left out it stays as stored, `null` clears it, otherwise a whole number from 1 to 99. '
           + 'A full replace: only `title` is required, and `notes`, `recipe_url` and `ingredients` left out are cleared; `image_data`, `servings` and `meal_types` left out stay. '
           + 'The body is checked against the schema before the recipe is looked up, so a malformed body for a missing or mirrored recipe answers 400, not 404 or 403.',
         params: [idParam('id', RECIPE_ID)],
@@ -173,9 +180,18 @@ export function recipesPaths() {
     },
     '/api/v1/recipes/{id}/ingredient-match': {
       put: op({
-        summary: 'Confirm which stock row a recipe ingredient means',
+        summary: 'Confirm which household product a recipe ingredient means',
         tag: 'Recipes',
-        description: 'Stores the household\'s own confirmed match between one ingredient of this recipe and one row of its pantry, or clears it with `pantryItemId: null`. Body: `{ name, pantryItemId }`. Nothing else in Yuvomi ever writes this link - no import, no recipe save, and no name similarity: a guessed identity would be a product catalogue built one inference at a time, which is declined (see #714). The match is keyed by the ingredient name, not by its row id, because saving a recipe replaces all of its ingredient rows. It requires write access to the `pantry` module in addition to `meals` (which owns `/recipes`) - a credential scoped to the recipes alone is refused with 403, for any body. Then the body is checked against the schema (`name` text of at most 200 characters, `pantryItemId` a whole number or null), before the recipe is looked up. `pantryItemId` left out clears the match like `null`. 404 when the recipe, the ingredient or the stock row does not exist.',
+        description: 'Stores the household\'s own confirmed statement that an ingredient wording means one product of its pantry, or clears it. Body: `{ name, pantryProductId }`. '
+          + 'The statement belongs to the household, not to this recipe: it is keyed by the ingredient name compared trimmed, case-insensitive and with collapsed spaces, so every recipe with the same wording reads it, a later confirmation from any recipe replaces it, and clearing it clears it for every recipe. '
+          + 'It names a product, not a batch, so using up or deleting a batch keeps it; deleting the product removes it. The ingredient has to be in this recipe: that is where the household confirms it. '
+          + 'Nothing else in Yuvomi ever writes this link - no import, no recipe save, and no name similarity: a guessed identity would be a product catalogue built one inference at a time, which is declined (see #714). '
+          + 'It requires write access to the `pantry` module in addition to `meals` (which owns `/recipes`) - a credential scoped to the recipes alone is refused with 403, for any body. '
+          + 'Then the body is checked against the schema (`name` text of at most 200 characters, `pantryProductId` and `pantryItemId` each a whole number or null), before the recipe is looked up. '
+          + 'With neither `pantryProductId` nor `pantryItemId` (left out or `null`) the match is cleared; with a number in both the answer is 400 `Send pantryProductId or pantryItemId, not both.`. '
+          + '`pantryItemId` is deprecated and will be removed in the first minor release on or after 2027-03-01: it names a batch and confirms the product that batch belongs to. '
+          + 'The answer carries `name` (the ingredient as written in this recipe), `ingredient_key` and the four match fields of `GET /recipes`. '
+          + '404 when the recipe, the ingredient, the product or the batch does not exist.',
         params: [idParam('id', RECIPE_ID)],
         stateChanging: true,
         requestBody: {
@@ -188,7 +204,8 @@ export function recipesPaths() {
                 required: ['name'],
                 properties: {
                   name: { type: 'string', maxLength: MAX_TITLE, description: 'The ingredient as named in the recipe; compared trimmed, case-insensitive, with collapsed spaces.' },
-                  pantryItemId: { type: ['integer', 'null'], description: 'The pantry item; `null` or left out clears the match.' },
+                  pantryProductId: { type: ['integer', 'null'], description: 'The household product (`id` in `products` of `GET /api/v1/pantry`); `null` or left out, together with no `pantryItemId`, clears the match.' },
+                  pantryItemId: { type: ['integer', 'null'], deprecated: true, description: 'Deprecated, removed in the first minor release on or after 2027-03-01: a pantry batch, which confirms the product it belongs to. Send `pantryProductId` instead; not together with it.' },
                 },
               },
             },
@@ -199,7 +216,7 @@ export function recipesPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
-          404: { description: 'No such recipe, no such ingredient in it, or no such pantry item' },
+          404: { description: 'No such recipe, no such ingredient in it, or no such pantry product or batch' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -257,6 +274,6 @@ const CASE_REASONS = {
     post: `${RECIPE_GONE}, \`shopping_list_not_found\` (404, the chosen shopping list does not exist), \`recipes_ingredients_changed\` (409, the ingredients changed since \`ingredientIds\` were loaded; \`recipe\` carries the current recipe), ${SHOPPING_WRITE_REQUIRED}`,
   },
   '/api/v1/recipes/{id}/ingredient-match': {
-    put: `${RECIPE_GONE}, \`recipes_ingredient_not_found\` (404, the recipe no longer has this ingredient), \`recipes_selected_pantry_item_not_found\` (404, the chosen pantry item does not exist), ${PANTRY_WRITE_REQUIRED}`,
+    put: `${RECIPE_GONE}, \`recipes_ingredient_not_found\` (404, the recipe no longer has this ingredient), \`recipes_selected_pantry_item_not_found\` (404, the chosen pantry product, or the batch named by \`pantryItemId\`, does not exist), ${PANTRY_WRITE_REQUIRED}`,
   },
 };

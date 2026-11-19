@@ -1,5 +1,5 @@
 /**
- * Test: A household product above the stock batch (#1448, parts 1 and 3)
+ * Test: A household product above the stock batch (#1448, parts 1, 3 and 4)
  * Purpose: Migration 253 groups the existing batches into products by their
  *          own wording (trimmed, whitespace collapsed, case-insensitive, Unicode
  *          case included) and unit, with its own frozen grouping; the start of
@@ -15,6 +15,11 @@
  *          product without batches only when it has a minimum (#2118); a
  *          rename takes the minimum along, and the product it leaves without
  *          batches keeps none, so the count stays where it was (#2118).
+ *          Part 4: migration 283 carries the batch matches of v222 over to
+ *          the household's product matches (a conflict keeps the most recently
+ *          confirmed one and is counted in the log), keeps the old table, and
+ *          is frozen; a move that empties a product takes its matches along.
+ *          The routes of part 4 are in test:recipe-pantry-match.
  *
  *          The migration runs through the real runner on a database migrated
  *          to v249, as an existing installation runs the update. The routes are
@@ -898,4 +903,196 @@ test('kitchen: a batch without a product (an older version wrote it) counts for 
   db.prepare(`INSERT INTO pantry_items (name, quantity, min_quantity, expires_on) VALUES ('Alt', 1, 2, '2026-01-01')`).run();
   assert.deepEqual(await kitchen(), { attention: 1, expired: 1, low: 1, out: 0 });
   resetStock();
+});
+
+// --------------------------------------------------------------------------
+// Migration 283: recipe matches move to the household product (#1448, step 4)
+// --------------------------------------------------------------------------
+
+/**
+ * The migration of step 4, found by what it does, not by its number: the next
+ * free number may change on a rebase. The titles name today's.
+ */
+/** @type {any} */
+const MATCH_MIGRATION = dbmod.MIGRATIONS.find((m) => typeof m.up === 'string'
+  && m.up.includes('CREATE TABLE IF NOT EXISTS pantry_product_matches'));
+
+test('migration 283 is found by what it does, exactly once, after the minimum of step 3', () => {
+  assert.ok(MATCH_MIGRATION, 'the migration that creates pantry_product_matches');
+  assert.equal(dbmod.MIGRATIONS.filter((m) => typeof m.up === 'string'
+    && m.up.includes('CREATE TABLE IF NOT EXISTS pantry_product_matches')).length, 1);
+  assert.ok(MINIMUM_MIGRATION, 'the migration of step 3');
+  assert.ok(MATCH_MIGRATION.version > MINIMUM_MIGRATION.version, 'after migration 276, and so after 222 and 253');
+  assert.equal(typeof MATCH_MIGRATION.afterUp, 'function', 'the carry-over is a JS step');
+});
+
+/**
+ * A database just before migration 283, as part 3 left it: products with
+ * batches, recipes and the batch matches of v222. Timestamps are explicit,
+ * because "most recently confirmed" decides a conflict.
+ */
+function databaseWithBatchMatches() {
+  const database = databaseAt(MATCH_MIGRATION.version - 1);
+  const product = database.prepare('INSERT INTO pantry_products (id, name, name_key, unit) VALUES (?, ?, ?, ?)');
+  product.run(1, 'Weizenmehl', 'weizenmehl', 'kg');
+  product.run(2, 'Dinkelmehl', 'dinkelmehl', 'kg');
+  product.run(3, 'Milch', 'milch', 'l');
+  product.run(4, 'Zucker', 'zucker', 'kg');
+  product.run(5, 'Tee', 'tee', 'pkg');
+  const batch = database.prepare('INSERT INTO pantry_items (id, name, unit, quantity, product_id) VALUES (?, ?, ?, 1, ?)');
+  batch.run(10, 'Weizenmehl', 'kg', 1);
+  batch.run(11, 'Dinkelmehl', 'kg', 2);
+  batch.run(12, 'Milch', 'l', 3); // the fridge
+  batch.run(13, 'milch', 'l', 3); // the garage
+  batch.run(14, 'Zucker', 'kg', 4);
+  // Two batches an older version wrote without a product: one whose wording
+  // has a product, one whose wording has none yet.
+  batch.run(15, ' TEE ', 'pkg', null);
+  batch.run(16, 'Kakao', 'g', null);
+  const recipe = database.prepare('INSERT INTO recipes (id, title, created_by) VALUES (?, ?, 1)');
+  for (const [id, title] of [[1, 'Brot'], [2, 'Kuchen'], [3, 'Waffeln'], [4, 'Fruehstueck']]) recipe.run(id, title);
+  const match = database.prepare(`
+    INSERT INTO recipe_ingredient_pantry_matches (recipe_id, ingredient_key, pantry_item_id, confirmed_by, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  // "mehl": Brot says wheat, Kuchen says spelt (confirmed last), Waffeln says
+  // wheat again but before Kuchen: spelt is kept, one wording in conflict.
+  match.run(1, 'mehl', 10, 1, '2026-01-01T08:00:00Z', '2026-01-01T08:00:00Z');
+  match.run(2, 'mehl', 11, 2, '2026-01-02T08:00:00Z', '2026-03-01T08:00:00Z');
+  match.run(3, 'mehl', 10, 1, '2026-01-03T08:00:00Z', '2026-02-01T08:00:00Z');
+  // "milch": two recipes, two batches of ONE product: no conflict. The row that
+  // is not kept was created first: the household match is as old as that one.
+  match.run(1, 'milch', 12, 1, '2026-01-03T08:00:00Z', '2026-01-05T08:00:00Z');
+  match.run(2, 'milch', 13, 2, '2026-01-04T08:00:00Z', '2026-01-06T08:00:00Z');
+  match.run(2, 'zucker', 14, 2, '2026-01-07T08:00:00Z', '2026-01-07T08:00:00Z');
+  match.run(4, 'tee', 15, 1, '2026-01-08T08:00:00Z', '2026-01-08T08:00:00Z');
+  match.run(4, 'kakao', 16, 1, '2026-01-09T08:00:00Z', '2026-01-09T08:00:00Z');
+  // An empty wording (v222 had no CHECK): no wording, left out and not counted.
+  match.run(3, '', 14, 1, '2026-01-10T08:00:00Z', '2026-01-10T08:00:00Z');
+  return database;
+}
+
+/**
+ * Run the real runner from v282 on, with the log lines captured.
+ * @param {any} database
+ */
+function migrateCapturingLog(database) {
+  const info = console.info;
+  /** @type {string[]} */
+  const lines = [];
+  console.info = (...args) => { lines.push(args.join(' ')); };
+  try {
+    dbmod.migrate(database, dbmod.MIGRATIONS);
+  } finally {
+    console.info = info;
+  }
+  return lines;
+}
+
+const householdMatchesOf = (/** @type {any} */ database) => Object.fromEntries(database.prepare(`
+  SELECT ingredient_key, product_id, confirmed_by, created_at, updated_at FROM pantry_product_matches ORDER BY ingredient_key
+`).all().map((/** @type {any} */ { ingredient_key: key, ...rest }) => [key, rest]));
+
+test('migration 283 carries every batch match over to its product; a conflict keeps the most recently confirmed one', () => {
+  const database = databaseWithBatchMatches();
+  migrateCapturingLog(database);
+  assert.deepEqual(householdMatchesOf(database), {
+    mehl: { product_id: 2, confirmed_by: 2, created_at: '2026-01-02T08:00:00Z', updated_at: '2026-03-01T08:00:00Z' },
+    milch: { product_id: 3, confirmed_by: 2, created_at: '2026-01-03T08:00:00Z', updated_at: '2026-01-06T08:00:00Z' },
+    tee: { product_id: 5, confirmed_by: 1, created_at: '2026-01-08T08:00:00Z', updated_at: '2026-01-08T08:00:00Z' },
+    zucker: { product_id: 4, confirmed_by: 2, created_at: '2026-01-07T08:00:00Z', updated_at: '2026-01-07T08:00:00Z' },
+  }, 'mehl: spelt, confirmed last (Kuchen, March), beats wheat twice; milch: one product for both batches, '
+    + 'kept from Kuchen (updated last) but as old as Brot\'s earlier confirmation; the empty wording is left out; tee: the batch without a product found its product by wording and unit; '
+    + 'kakao: a batch without a product and no product of that wording is not carried');
+});
+
+test('migration 283 logs how many matches it carried, how many wordings had a conflict and how many it could not carry', () => {
+  const lines = migrateCapturingLog(databaseWithBatchMatches());
+  const line = lines.find((l) => l.includes('household product match'));
+  assert.ok(line, `no log line of the carry-over in ${JSON.stringify(lines)}`);
+  assert.match(line, /Found 8 recipe match\(es\); carried 7 of them over to 4 household product match\(es\)/,
+    'the empty wording is not found; kakao is found and not carried: 7 + 1 = 8');
+  assert.match(line, /; 1 wording\(s\) named different products in different recipes and kept the most recently confirmed one/);
+  assert.match(line, /; 1 match\(es\) of a batch without a product were not carried over/);
+});
+
+test('migration 283: within the same second the row inserted later wins, and an installation without matches logs nothing', () => {
+  const database = databaseAt(MATCH_MIGRATION.version - 1);
+  database.prepare("INSERT INTO pantry_products (id, name, name_key, unit) VALUES (1, 'A', 'a', 'pcs'), (2, 'B', 'b', 'pcs')").run();
+  database.prepare("INSERT INTO pantry_items (id, name, unit, product_id) VALUES (1, 'A', 'pcs', 1), (2, 'B', 'pcs', 2)").run();
+  database.prepare("INSERT INTO recipes (id, title, created_by) VALUES (1, 'x', 1), (2, 'y', 1)").run();
+  database.prepare(`
+    INSERT INTO recipe_ingredient_pantry_matches (recipe_id, ingredient_key, pantry_item_id, created_at, updated_at) VALUES
+      (2, 'salz', 2, '2026-01-01T08:00:00Z', '2026-01-01T08:00:00Z'),
+      (1, 'salz', 1, '2026-01-01T08:00:00Z', '2026-01-01T08:00:00Z')
+  `).run();
+  migrateCapturingLog(database);
+  assert.equal(householdMatchesOf(database).salz.product_id, 1, 'the row inserted later into the old table wins a tie');
+
+  const empty = databaseAt(MATCH_MIGRATION.version - 1);
+  const lines = migrateCapturingLog(empty);
+  assert.equal(lines.filter((l) => l.includes('household product match')).length, 0);
+  assert.deepEqual(householdMatchesOf(empty), {});
+});
+
+test('migration 283 keeps the old table as it was, and a product that loses its last batch afterwards keeps its match', () => {
+  const database = databaseWithBatchMatches();
+  const before = database.prepare('SELECT * FROM recipe_ingredient_pantry_matches ORDER BY rowid').all();
+  migrateCapturingLog(database);
+  assert.deepEqual(database.prepare('SELECT * FROM recipe_ingredient_pantry_matches ORDER BY rowid').all(), before,
+    'unread for one release, so the previous version still finds its matches (#1448); a later migration drops it');
+
+  database.prepare('DELETE FROM pantry_items WHERE id = 14').run();
+  assert.equal(householdMatchesOf(database).zucker?.product_id, 4, 'the match names the product, which outlives its last batch');
+  database.prepare('DELETE FROM pantry_products WHERE id = 4').run();
+  assert.equal(householdMatchesOf(database).zucker, undefined, 'deleting the product deletes its match (CASCADE)');
+  assert.ok(database.prepare('SELECT 1 FROM recipes WHERE id = 2').get(), 'the recipe stays');
+});
+
+test('migration 283 knows no "confirmed: not in stock" state: an ingredient without a match stays without one', () => {
+  // v222 cleared a match by deleting its row; nothing else marked an
+  // ingredient. Unknown, not missing.
+  const database = databaseWithBatchMatches();
+  database.prepare("INSERT INTO recipe_ingredients (recipe_id, name) VALUES (1, 'Hefe'), (1, 'Mehl')").run();
+  migrateCapturingLog(database);
+  assert.equal(householdMatchesOf(database).hefe, undefined);
+  const columns = database.prepare('PRAGMA table_info(pantry_product_matches)').all().map((/** @type {any} */ c) => c.name);
+  assert.deepEqual(columns, ['ingredient_key', 'product_id', 'confirmed_by', 'created_at', 'updated_at'],
+    'one wording, one product; no state column');
+  const fk = database.prepare('PRAGMA foreign_key_list(pantry_product_matches)').all();
+  assert.deepEqual(fk.map((/** @type {any} */ f) => [f.from, f.table, f.on_delete]).sort(), [
+    ['confirmed_by', 'users', 'SET NULL'],
+    ['product_id', 'pantry_products', 'CASCADE'],
+  ]);
+  assert.throws(() => database.prepare("INSERT INTO pantry_product_matches (ingredient_key, product_id) VALUES ('', 1)").run(),
+    /CHECK constraint failed/, 'an empty wording is no wording');
+});
+
+test('migration 283 is frozen: it imports nothing and carries its own copy of the key', () => {
+  const source = MATCH_MIGRATION.afterUp.toString();
+  for (const live of ['ingredientMatchKey', 'productKey', 'groupBatchesIntoProducts', 'assignPantryProduct']) {
+    assert.ok(!source.includes(live), `the carry-over calls ${live} - a later change to it would change this migration`);
+  }
+  assert.ok(source.includes("const frozenKey = (name) => String(name ?? '').trim().replace(/\\s+/g, ' ').toLowerCase() || null;"),
+    'the key of v253, frozen');
+  assert.doesNotMatch(MATCH_MIGRATION.up, /DROP TABLE/, 'the old table stays');
+});
+
+test('a move that empties a product takes its recipe matches along; one that leaves a batch does not', () => {
+  const database = databaseAt(Infinity);
+  const milk = database.prepare("INSERT INTO pantry_items (name, unit, created_by) VALUES ('Milch', 'l', 1)").run().lastInsertRowid;
+  const from = assignPantryProduct(database, milk, { userId: 1 });
+  database.prepare("INSERT INTO pantry_product_matches (ingredient_key, product_id) VALUES ('milch', ?), ('vollmilch', ?)").run(from, from);
+  database.prepare("UPDATE pantry_items SET name = 'Vollmilch' WHERE id = ?").run(milk);
+  const to = assignPantryProduct(database, milk, { userId: 1 });
+  assert.notEqual(to, from);
+  assert.deepEqual(database.prepare('SELECT DISTINCT product_id AS p FROM pantry_product_matches').all().map((/** @type {any} */ r) => r.p), [to],
+    'the same single UPDATE a merge of two products needs');
+
+  const second = database.prepare("INSERT INTO pantry_items (name, unit, created_by) VALUES ('Vollmilch', 'l', 1)").run().lastInsertRowid;
+  assignPantryProduct(database, second, { userId: 1 });
+  database.prepare("UPDATE pantry_items SET name = 'Hafermilch' WHERE id = ?").run(second);
+  assignPantryProduct(database, second, { userId: 1 });
+  assert.deepEqual(database.prepare('SELECT DISTINCT product_id AS p FROM pantry_product_matches').all().map((/** @type {any} */ r) => r.p), [to],
+    'Vollmilch keeps a batch and its matches');
 });

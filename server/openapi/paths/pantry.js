@@ -86,18 +86,26 @@ const LOCATION_FIELDS = {
   icon: { type: ['string', 'null'], maxLength: MAX_SHORT, description: 'A Lucide icon name; `null` or `""` keeps the stored one (on create: `package`).' },
 };
 
+// GET /api/v1/pantry: batches, their product and the products list (#1448).
+// A constant of its own, like MIN_QUANTITY_MIRROR, so pantryPaths() stays a
+// list of operations.
+const PANTRY_LIST_DESCRIPTION =
+  'Each pantry item is one batch (a quantity with its own location and best-before date). `product_id` names the household product the batch belongs to: '
+  + 'batches with the same name, compared trimmed, case-insensitive and with collapsed whitespace, and the same unit share one product. '
+  + 'The server sets it on every write that changes the name, unit or category, and moves the batch to another product when the name or unit no longer matches; '
+  + 'a move that leaves its product without batches takes that product\'s minimum (when the target has none) and its recipe matches along; '
+  + 'a `product_id` in a request body is ignored. Every pantry item response carries it. '
+  + '`products` lists the household products (`id`, `name`, `unit`, `category`, `min_quantity`, `batch_count`, `total_quantity`, `match_count`), including products whose last batch is gone (`batch_count` 0, `total_quantity` 0). '
+  + '`match_count` is the number of ingredient wordings the household has confirmed for the product (recipe matches, `pantry_product_id` on recipe ingredients); deleting the product deletes them. '
+  + 'The minimum belongs to the product: a product is out of stock when `total_quantity` is 0 and running low when it is at or below `min_quantity`. '
+  + MIN_QUANTITY_MIRROR;
+
 export function pantryPaths() {
   return withCaseReasons('pantry', CASE_REASONS, {
     '/api/v1/pantry': {
       get: op({
         summary: 'List pantry items with storage locations and categories',
-        description: 'Each pantry item is one batch (a quantity with its own location and best-before date). `product_id` names the household product the batch belongs to: '
-          + 'batches with the same name, compared trimmed, case-insensitive and with collapsed whitespace, and the same unit share one product. '
-          + 'The server sets it on every write that changes the name, unit or category, and moves the batch to another product when the name or unit no longer matches; '
-          + 'a `product_id` in a request body is ignored. Every pantry item response carries it. '
-          + '`products` lists the household products (`id`, `name`, `unit`, `category`, `min_quantity`, `batch_count`, `total_quantity`), including products whose last batch is gone (`batch_count` 0, `total_quantity` 0). '
-          + 'The minimum belongs to the product: a product is out of stock when `total_quantity` is 0 and running low when it is at or below `min_quantity`. '
-          + MIN_QUANTITY_MIRROR,
+        description: PANTRY_LIST_DESCRIPTION,
         tag: 'Pantry',
       }),
       post: op({
@@ -245,7 +253,8 @@ export function pantryPaths() {
       delete: op({
         summary: 'Delete pantry product without batches',
         description: 'Deletes a household product whose last batch is gone (`batch_count` 0 in `GET /api/v1/pantry`). '
-          + 'A product that still has batches is refused with 409 and `reason` `pantry_product_has_batches`; its batches are never deleted along with it.',
+          + 'A product that still has batches is refused with 409 and `reason` `pantry_product_has_batches`; its batches are never deleted along with it. '
+          + 'The household\'s recipe matches that name the product (`pantry_product_id` on recipe ingredients) are deleted with it; the ingredients stay in their recipes, unmatched.',
         tag: 'Pantry',
         params: [idParam('productId', 'Product ID, plain decimal digits.')],
         stateChanging: true,

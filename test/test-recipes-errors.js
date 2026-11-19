@@ -219,7 +219,14 @@ const fehler = (status, reason) => Object.assign(new Error(SERVER_TEXT), {
   data: { error: SERVER_TEXT, code: status, ...(reason ? { reason } : {}) },
 });
 
-const PANTRY = [{ id: 7, name: 'Mehl', location_name: 'Keller' }, { id: 8, name: 'Zucker', location_name: 'Kueche' }];
+// Die Antwort von GET /pantry: Chargen in `data`, die Produkte in `products`.
+// Die Auswahl listet seit #1448 Teil 4 die Produkte (7, 8), nicht die Chargen.
+const PANTRY = {
+  data: [{ id: 70, product_id: 7, name: 'Mehl', location_id: 1, location_name: 'Keller' }, { id: 80, product_id: 8, name: 'Zucker', location_id: 2, location_name: 'Kueche' }],
+  products: [{ id: 7, name: 'Mehl', unit: 'kg', total_quantity: 1 }, { id: 8, name: 'Zucker', unit: 'kg', total_quantity: 2 }],
+};
+/** Die Antwort einer Zuordnung auf Mehl (Produkt 7). */
+const MEHL_MATCH = { name: 'Mehl', ingredient_key: 'mehl', pantry_product_id: 7, pantry_product_name: 'Mehl', pantry_item_id: 70, pantry_item_name: 'Mehl' };
 const rezept = (extra = {}) => ({
   id: 5, title: 'Suppe', source: 'native', meal_types: ['dinner'],
   ingredients: [{ name: 'Mehl', pantry_item_id: null }, { name: 'Salz', pantry_item_id: null }], ...extra,
@@ -362,7 +369,7 @@ const ZUORDNEN_FAELLE = [
 ];
 
 /** Nach dem Oeffnen nur noch Mehl im Vorrat: Zucker wurde inzwischen geloescht. */
-const vorratDanach = { get: (path) => (path === '/pantry' ? { data: [PANTRY[0]] } : { data: [] }) };
+const vorratDanach = { get: (path) => (path === '/pantry' ? { data: [PANTRY.data[0]], products: [PANTRY.products[0]] } : { data: [] }) };
 
 test('Seite: eine Zutat zuordnen - der Fall wird sein Satz; "gibt es nicht mehr" schliesst und nimmt Rezept oder Zutat aus dem Stand, die weggefallene Vorratszeile frischt die Auswahl auf', async () => {
   for (const [err, expected, art, was] of ZUORDNEN_FAELLE) {
@@ -371,7 +378,7 @@ test('Seite: eine Zutat zuordnen - der Fall wird sein Satz; "gibt es nicht mehr"
     let ersterGet = true;
     const { gets, closed, stand } = await mitSeite({}, () => mit({
       get: (path) => {
-        if (path === '/pantry' && ersterGet) { ersterGet = false; return { data: PANTRY }; }
+        if (path === '/pantry' && ersterGet) { ersterGet = false; return PANTRY; }
         return vorratDanach.get(path);
       },
       put: async () => { throw err; },
@@ -407,7 +414,7 @@ test('Seite: eine Zutat zuordnen - wechselt der Dialog zwischen Anfrage und Antw
   try {
     const panel = formular({ '#pantry-match-select': '7' });
     const { closed, gets, stand } = await mitSeite({}, () => mit({
-      get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+      get: (path) => (path === '/pantry' ? PANTRY : { data: [] }),
       put: async () => { kontext = 'ein-anderer-dialog'; throw fehler(404, 'recipes_recipe_not_found'); },
     }, async () => {
       await oeffne(panel, () => page.openPantryMatchModal(rezept(), 'Mehl'));
@@ -433,7 +440,7 @@ test('Seite: mehrere Zutaten zuordnen - derselbe Weg; die weggefallene Vorratsze
     let ersterGet = true;
     const { gets, closed, stand } = await mitSeite({}, () => mit({
       get: (path) => {
-        if (path === '/pantry' && ersterGet) { ersterGet = false; return { data: PANTRY }; }
+        if (path === '/pantry' && ersterGet) { ersterGet = false; return PANTRY; }
         return vorratDanach.get(path);
       },
       put: async () => { throw err; },
@@ -750,9 +757,9 @@ test('Seite: ein offener Zuordnungsdialog speichert nach "gibt es nicht mehr" an
     const panel = formular({ '#pantry-match-select': '7' });
     await mit({
       // Was ein Nachladen jetzt holte: frische Objekte derselben Suppe.
-      get: (path) => (path === '/pantry' ? { data: PANTRY } : path === '/recipes' ? { data: [rezept()] } : { data: [] }),
+      get: (path) => (path === '/pantry' ? PANTRY : path === '/recipes' ? { data: [rezept()] } : { data: [] }),
       post: async () => { throw fehler(404, 'recipes_recipe_not_found'); },
-      put: async () => ({ data: { pantry_item_id: 7, pantry_item_name: 'Mehl' } }),
+      put: async () => ({ data: MEHL_MATCH }),
     }, async () => {
       await oeffne(panel, () => page.openPantryMatchModal(suppe, 'Mehl'));
       // Waehrend der Dialog offen steht, scheitert die Uebernahme des Eintopfs.
@@ -762,7 +769,7 @@ test('Seite: ein offener Zuordnungsdialog speichert nach "gibt es nicht mehr" an
       await panel.querySelector('#pantry-match-save').handlers.click();
     });
     const mehl = page.state.recipes.find((r) => r.id === 5).ingredients.find((i) => i.name === 'Mehl');
-    assert.equal(mehl.pantry_item_id, 7, 'die Zuordnung steht im Stand, den die Liste zeichnet');
+    assert.equal(mehl.pantry_product_id, 7, 'die Zuordnung steht im Stand, den die Liste zeichnet');
   });
 });
 
@@ -802,7 +809,7 @@ test('Seite: Zutat weg - jede Zutat mit demselben Schluessel wie beim Server fae
   const zutaten = [{ name: 'Salz', pantry_item_id: null }, { name: '  salz ', pantry_item_id: null }, { name: 'SALZ  ', pantry_item_id: null }, { name: 'Salzbutter', pantry_item_id: null }, { name: 'Mehl', pantry_item_id: null }];
   const panel = formular({ '#pantry-match-select': '7' });
   const { stand } = await mitSeite({ recipes: [rezept({ ingredients: zutaten.map((z) => ({ ...z })) })] }, () => mit({
-    get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+    get: (path) => (path === '/pantry' ? PANTRY : { data: [] }),
     put: async () => { throw fehler(404, 'recipes_ingredient_not_found'); },
   }, async () => {
     await oeffne(panel, () => page.openPantryMatchModal(page.state.recipes[0], 'Salz'));
@@ -845,7 +852,7 @@ test('Seite: verlassen und zurueck (neuer Container), dann kommt eine spaete "gi
       };
       const panel = formular({ '#pantry-match-select': '7', '#plan-date': '20.10.2026', '#plan-type': 'dinner' });
       const { stand } = await mitSeite({}, () => mit({
-        get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+        get: (path) => (path === '/pantry' ? PANTRY : { data: [] }),
         put: async () => zurueck(), post: async () => zurueck(),
       }, () => lauf(panel)));
       assert.deepEqual(stand, STAND_VORHER, `${name}: der neue Stand bleibt`);
@@ -871,7 +878,7 @@ test('Seite: Zuordnen haengt, das Rezept wird inzwischen gespeichert - die spaet
       let freigeben;
       const tor = new Promise((r) => { freigeben = r; });
       return mit({
-        get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+        get: (path) => (path === '/pantry' ? PANTRY : { data: [] }),
         put: async (path) => {
           if (path.endsWith('/ingredient-match')) { await tor; throw fehler(404, 'recipes_ingredient_not_found'); }
           // Das Speichern des Rezepts: der Server legt Mehl wieder an.
@@ -912,7 +919,7 @@ test('Seite: gewaehlte Vorratszeile weg, aber Seite verlassen und zurueck oder D
       try {
         const neu = { querySelector: () => null, querySelectorAll: () => [], isConnected: true };
         const { gets } = await mitSeite({}, () => mit({
-          get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+          get: (path) => (path === '/pantry' ? PANTRY : { data: [] }),
           put: async () => {
             if (art === 'seite') page.setContainerForTest(neu); else kontext = 'ein-anderer-dialog';
             throw fehler(404, 'recipes_selected_pantry_item_not_found');
@@ -988,9 +995,9 @@ test('Seite: Erfolg nach Dialogwechsel - jeder Erfolgsweg schliesst nur mit dem 
     const wechsel = async (antwort) => { kontext = 'ein-anderer-dialog'; return antwort; };
     try {
       const { closed } = await mitSeite({}, () => mit({
-        get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+        get: (path) => (path === '/pantry' ? PANTRY : { data: [] }),
         put: (path) => wechsel({ data: path.endsWith('/ingredient-match')
-          ? { pantry_item_id: 7, pantry_item_name: 'Mehl' } : rezept() }),
+          ? MEHL_MATCH : rezept() }),
         post: () => wechsel({ data: {} }),
       }, lauf));
       assert.equal(closed.length, 1, `${name}: genau ein Schliessen`);
@@ -1040,11 +1047,11 @@ test('Seite: Zuordnen-Erfolg - gezeichnet nur auf der Seite, die noch steht; Fok
           await mitSeite({}, async () => {
             page.setContainerForTest(seite);
             await mit({
-              get: (path) => (path === '/pantry' ? { data: PANTRY } : { data: [] }),
+              get: (path) => (path === '/pantry' ? PANTRY : { data: [] }),
               put: async () => {
                 if (!seiteBleibt) seite.isConnected = false;
                 gezeichnet.length = 0;
-                return { data: { pantry_item_id: 7, pantry_item_name: 'Mehl' } };
+                return { data: MEHL_MATCH };
               },
             }, lauf);
           });

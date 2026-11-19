@@ -311,7 +311,7 @@ test('to-shopping-list: listId a whole number, quantities texts or null, ingredi
   assertPassed(await call('POST', route, { json: { listId: LIST } }), 200);
 });
 
-test('ingredient-match: name text, pantryItemId a whole number or null and not required; 400 before 404', async () => {
+test('ingredient-match: name text, pantryProductId and pantryItemId each a whole number or null and not required; 400 before 404', async () => {
   const recipe = await newRecipe('Zuordnung');
   const item = await newPantryItem('Nudeln');
   const route = `/recipes/${recipe.id}/ingredient-match`;
@@ -322,6 +322,11 @@ test('ingredient-match: name text, pantryItemId a whole number or null and not r
     [{ name: 'Nudeln', pantryItemId: String(item.id) }, { path: 'body/pantryItemId', rule: 'type' }],
     [{ name: 'Nudeln', pantryItemId: '' }, { path: 'body/pantryItemId', rule: 'type' }],
     [{ name: 'Nudeln', pantryItemId: true }, { path: 'body/pantryItemId', rule: 'type' }],
+    // #1448 part 4: the product, by the same rule.
+    [{ name: 'Nudeln', pantryProductId: String(item.product_id) }, { path: 'body/pantryProductId', rule: 'type' }],
+    [{ name: 'Nudeln', pantryProductId: '' }, { path: 'body/pantryProductId', rule: 'type' }],
+    [{ name: 'Nudeln', pantryProductId: 1.5 }, { path: 'body/pantryProductId', rule: 'type' }],
+    [{ name: 'Nudeln', pantryProductId: [item.product_id] }, { path: 'body/pantryProductId', rule: 'type' }],
   ])) {
     assertRefused(await call('PUT', route, { json }), [field]);
   }
@@ -331,6 +336,16 @@ test('ingredient-match: name text, pantryItemId a whole number or null and not r
   assertPassed(cleared, 200);
   assert.equal(cleared.body.data.pantry_item_id, null, 'left out clears, as documented');
   assertPassed(await call('PUT', route, { json: { name: ' NUDELN ', pantryItemId: null } }), 200);
+
+  // The new shape passes and names the product; both numbers at once is the handler's English 400.
+  const byProduct = await call('PUT', route, { json: { name: 'Nudeln', pantryProductId: item.product_id } });
+  assertPassed(byProduct, 200);
+  assert.equal(byProduct.body.data.pantry_product_id, item.product_id);
+  assert.equal(byProduct.body.data.pantry_product_name, 'Nudeln');
+  assertPassed(await call('PUT', route, { json: { name: 'Nudeln', pantryProductId: null, pantryItemId: null } }), 200);
+  const both = await call('PUT', route, { json: { name: 'Nudeln', pantryProductId: item.product_id, pantryItemId: item.id } });
+  assert.deepEqual(both, { status: 400, body: { error: 'Send pantryProductId or pantryItemId, not both.', code: 400 } });
+  assertRefused(await call('PUT', '/recipes/999999/ingredient-match', { json: { name: 'Nudeln', pantryProductId: 'x' } }), [{ path: 'body/pantryProductId', rule: 'type' }]);
 });
 
 // ── RECIPE PROVIDERS ────────────────────────────────────────────────────────
@@ -642,8 +657,9 @@ const FRONTEND_CALLS = [
   ['recipe-thumb.js provider image', 'GET', R, '/:id/provider-thumbnail', { params: { id: '7' }, query: { v: '2026-11-18T10:00:00Z' } }],
   ['kitchen-transfer.js to the list', 'POST', R, '/:id/to-shopping-list', { params: { id: '7' }, body: { listId: 3 } }],
   ['recipes.js scaled to the list', 'POST', R, '/:id/to-shopping-list', { params: { id: '7' }, body: { listId: 3, quantities: ['1 kg', null], ingredientIds: [11, 12] } }],
-  ['recipes.js confirm a match', 'PUT', R, '/:id/ingredient-match', { params: { id: '7' }, body: { name: 'Reis', pantryItemId: 4 } }],
-  ['recipes.js clear a match', 'PUT', R, '/:id/ingredient-match', { params: { id: '7' }, body: { name: 'Reis', pantryItemId: null } }],
+  ['recipes.js confirm a match', 'PUT', R, '/:id/ingredient-match', { params: { id: '7' }, body: { name: 'Reis', pantryProductId: 4 } }],
+  ['recipes.js clear a match', 'PUT', R, '/:id/ingredient-match', { params: { id: '7' }, body: { name: 'Reis', pantryProductId: null } }],
+  ['an API client of before #1448 part 4 (deprecated batch)', 'PUT', R, '/:id/ingredient-match', { params: { id: '7' }, body: { name: 'Reis', pantryItemId: 4 } }],
   ['modules-kitchen.js status', 'GET', RP, '/status', {}],
   ['modules-kitchen.js delete', 'DELETE', RP, '/accounts/:id', { params: { id: '2' } }],
   ['modules-kitchen.js sync', 'POST', RP, '/accounts/:id/sync', { params: { id: '2' }, body: {} }],
