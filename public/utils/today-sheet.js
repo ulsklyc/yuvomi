@@ -412,7 +412,13 @@ export function todaySheetContext({
     if (isDisplay && WALL_DISPLAY_MODULES.has(module)) return false;
     return moduleAccess(module) === 'none';
   };
-  return { todayKey, tomorrowKey, nowTime, isAdmin, viewer, moduleOff, canSeeWidget, widgetShown, existing };
+  // Dasselbe fuer das Widget-Recht: der Server vererbt die Modulsperre auf die
+  // Widgets (catalog.ts), ein Display hat also auch `widgets.waste = 'none'`.
+  // Ohne diese Ausnahme schwiege die Quelle am zweiten Riegel von
+  // `sourceSpeaks()`, obwohl die Daten ankommen (#2753). Die fuenf Widgets
+  // heissen wie ihre Module. Das Cockpit des Displays fragt ohne `isDisplay`.
+  const canSee = (/** @type {string} */ widget) => (isDisplay && WALL_DISPLAY_MODULES.has(widget)) || canSeeWidget(widget);
+  return { todayKey, tomorrowKey, nowTime, isAdmin, viewer, moduleOff, canSeeWidget: canSee, widgetShown, existing };
 }
 
 /** Die Zeilen aller sprechenden Quellen, plus ob eine davon „heute erledigt" meldet. */
