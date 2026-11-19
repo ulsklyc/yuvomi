@@ -96,5 +96,4 @@ router.delete('/', (req, res) => {
   res.json({ data: null });
 });
 
-export { getAllStatuses };
 export default router;
