@@ -171,6 +171,7 @@ const { optionsQuery } = await seedOverviewExtras({
     inThreeDays: shiftDateKey(today, 3),
     nowIso,
     oneHourAgoIso: new Date(FROZEN_NOW - 60 * 60 * 1000).toISOString(),
+    inOneHourIso: new Date(FROZEN_NOW + 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
   },
 });
 

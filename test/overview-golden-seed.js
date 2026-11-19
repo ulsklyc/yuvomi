@@ -62,7 +62,7 @@ const SEVEN = Object.freeze(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
  * @param {Record<string, number>} options.ids        account ids of the matrix seed
  * @param {Record<string, Array<{ name: string, id: number }>>} options.rows  matrix rows by type
  * @param {(key: string, days: number) => string} options.shift  shiftDateKey
- * @param {{ today: string, yesterday: string, monthStart: string, inThreeDays: string, nowIso: string, oneHourAgoIso: string }} options.dates
+ * @param {{ today: string, yesterday: string, monthStart: string, inThreeDays: string, nowIso: string, oneHourAgoIso: string, inOneHourIso: string }} options.dates
  * @returns {Promise<{ helperId: number, optionsQuery: string }>}
  */
 export async function seedOverviewExtras({ db, call, adminHeaders, ids, rows, shift, dates }) {
@@ -220,6 +220,13 @@ export async function seedOverviewExtras({ db, call, adminHeaders, ids, rows, sh
   const insertLink = db.prepare('INSERT INTO quick_links (name, url, visibility, created_by, position) VALUES (?, ?, ?, ?, ?)');
   insertLink.run('golden.link.all', 'https://example.invalid/all', 'all', ids.admin, 0);
   insertLink.run('golden.link.private', 'https://example.invalid/private', 'private', ids.member, 1);
+
+  // ---- Availability ---------------------------------------------------------
+  // The member has an active status (#1591), not yet expired, so the
+  // dashboard's familyStatuses block has data to show.
+  db.prepare(
+    'INSERT INTO user_availability (user_id, state, note, expires_at) VALUES (?, ?, ?, ?)',
+  ).run(ids.member, 'busy', 'golden availability note', dates.inOneHourIso);
 
   seedConditions({ db, ids, rows, shift, dates });
 
