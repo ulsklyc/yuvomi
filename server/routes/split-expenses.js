@@ -1728,9 +1728,23 @@ function recurringResponse(id, req) {
  * beim Bearbeiten der geschickte (Schema) oder der gespeicherte (CHECK der
  * Spalte) (#2810). `participants` ist eine Liste (Schema bzw.
  * storedSplitInput) oder fehlt.
+ *
+ * An den Parser der Ausgabe gehen NUR die Felder, die das Schema einer Serie
+ * nennt (RECURRING_CREATE/_UPDATE). Felder, die es nicht nennt, ignoriert die
+ * Pruefung, statt sie abzuweisen; eine Serie kennt keinen umgerechneten
+ * Betrag, und ein `converted_currency` aus dem Rumpf erreichte sonst
+ * ungeprueft parseMoneyToMinor() (Codex an #2840).
  */
 function parseRecurringBody(body, groupId, fallbackCurrency, fallbackPayerId) {
-  const parsed = parseExpenseBody({ ...body, expense_date: body.next_run_date }, fallbackCurrency);
+  const parsed = parseExpenseBody({
+    title: body.title,
+    amount: body.amount,
+    description: body.description,
+    currency: body.currency,
+    split_method: body.split_method,
+    category: body.category,
+    expense_date: body.next_run_date,
+  }, fallbackCurrency);
   const frequency = body.frequency;
   const payerId = Number(body.payer_id || fallbackPayerId);
   const participants = body.participants ?? [payerId];

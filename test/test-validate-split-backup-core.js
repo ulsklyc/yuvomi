@@ -515,6 +515,30 @@ test('comments, settlements, recurring: own forms pass, garbage is a 400', async
   assert.equal(pause.body.reason, 'invalid_missed');
 });
 
+// A series has no converted amount: RECURRING_CREATE/_UPDATE declare neither
+// `converted_amount` nor `converted_currency`, and fields the schema does not
+// name are ignored, not refused. Until step (b) the expense parser replaced a
+// foreign `converted_currency`; once that guard was gone, the whole body
+// reached it and `{}` or a number ended in a 500. The parser of a series hands
+// on only the fields its schema declares (Codex at #2840).
+test('recurring: undeclared converted_* fields are ignored, the series keeps the validated currency', async () => {
+  for (const convertedCurrency of [{}, 5, 'XYZ', '__proto__', ['EUR'], { toString: 1 }, { toUpperCase: 1 }]) {
+    const label = JSON.stringify(convertedCurrency);
+    const created = await call('POST', `/split-expenses/groups/${GROUP}/recurring`, {
+      json: recurringForm({ converted_amount: '1.00', converted_currency: convertedCurrency }),
+    });
+    assertPassed(created, 201, `POST ${label}`);
+    assert.equal(created.body.data.currency, 'EUR', `POST ${label}: the group currency`);
+    assert.equal(created.body.data.amount_minor, 80000, `POST ${label}: the amount, not converted_amount`);
+    const updated = await call('PUT', `/split-expenses/recurring/${created.body.data.id}`, {
+      json: { amount: '2.00', converted_amount: 5, converted_currency: convertedCurrency },
+    });
+    assertPassed(updated, 200, `PUT ${label}`);
+    assert.equal(updated.body.data.currency, 'EUR', `PUT ${label}`);
+    assert.equal(updated.body.data.amount_minor, 200, `PUT ${label}`);
+  }
+});
+
 test('order: a malformed request is a 400 before 404, 403 and 409; a valid one meets the old answer', async () => {
   const UNKNOWN = 999999;
   for (const [method, route, broken, valid, old] of /** @type {Array<[string, string, Record<string, unknown>, Record<string, unknown>, number]>} */ ([
