@@ -691,6 +691,32 @@ test('Umgerechnete Ausgabe: ein geaenderter Betrag oder eine andere Waehrung sch
   });
 });
 
+// Die Feldpruefung der Anteile laeuft in der Genauigkeit von converted_currency,
+// nicht von currency: 1500 JPY -> 9,00 EUR, Anteile 4,50 + 4,50 sind gueltige
+// EUR-Betraege, unter JPY (keine Nachkommastellen) waeren sie abgewiesen.
+test('Umgerechnete Ausgabe: die Anteile pruefen die Nachkommastellen der umgerechneten Waehrung', async () => {
+  const yen = () => ({
+    ...umgerechnet(), amount: '1500', amount_minor: 1500, currency: 'JPY',
+    splits: [
+      { user_id: 1, amount: '4.50', amount_minor: 450, currency: 'EUR' },
+      { user_id: 3, amount: '4.50', amount_minor: 450, currency: 'EUR' },
+    ],
+  });
+  await unter('de', async () => {
+    const { gesendet, gemeldet } = await speichern(() => offen(yen()),
+      formularAny({ amount: '1500', currency: 'JPY', method: 'exact', teilnehmer: { 1: '4,50', 3: '4,50' } }).panel, { currency: 'JPY' });
+    assert.deepEqual(gemeldet, [], 'kein Anteil am Feld abgewiesen');
+    assert.equal(gesendet.length, 1, 'die Ausgabe geht an den Server');
+    assert.deepEqual(gesendet[0].daten.splits, [{ user_id: 1, amount: '4.50' }, { user_id: 3, amount: '4.50' }]);
+    assert.equal(gesendet[0].daten.converted_currency, 'EUR');
+    // Gegenprobe: ohne Umrechnung (neue Ausgabe in JPY) gilt das Raster von JPY.
+    const neu = await speichern(() => offen(null),
+      formularAny({ amount: '9', currency: 'JPY', method: 'exact', teilnehmer: { 1: '4,50', 3: '4,50' } }).panel, { currency: 'JPY' });
+    assert.deepEqual(neu.gesendet, []);
+    assert.match(neu.gemeldet[0]?.text ?? '', /^common\.amountPrecisionRequired\{"currency":"JPY"/);
+  });
+});
+
 test('Umgerechnete Ausgabe: neue Ausgaben und andere Aufteilungen bleiben, wie sie waren', async () => {
   await unter('de', async () => {
     const neu = formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '6,00', 3: '4,00' } });
