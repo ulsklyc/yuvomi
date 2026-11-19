@@ -1281,6 +1281,53 @@ test('#2085: deleting a product without batches folds the row away, undo brings 
   }
 });
 
+test('#1448 part 4: a product with recipe links says in its undo toast that the links go with it; undo keeps everything', async () => {
+  groupedPantry();
+  const stage = makeNode();
+  pageStub({ stage: /** @type {any} */ (stage) });
+  /** @type {any} */
+  let pending = null;
+  /** @type {string[]} */
+  const deleted = [];
+  const g = /** @type {any} */ (globalThis);
+  g.__undoStub = (/** @type {any} */ opts) => { pending = opts; };
+  g.__apiStub = { delete: async (/** @type {string} */ path) => { deleted.push(path); } };
+  /** @type {any} */
+  const toothpaste = __test.state.products.find((/** @type {any} */ p) => p.id === 13);
+  assert.ok(toothpaste, 'the fixture has Zahnpasta without batches');
+  try {
+    // GET /pantry names the confirmed wordings of each product (match_count).
+    toothpaste.match_count = 3;
+    __test.removeProduct(toothpaste);
+    assert.equal(pending.message, 'pantry.productDeletedWithLinks{"name":"Zahnpasta","count":3}',
+      'the toast names the product and its recipe links (plural forms in the locale)');
+    // Undo before the window ends: nothing reaches the server, so the links stay.
+    pending.restore();
+    assert.deepEqual(deleted, [], 'the delete (and with it the cascade) only runs on the commit');
+    assert.equal(__test.pendingProductDeletes.size, 0);
+
+    toothpaste.match_count = 1;
+    __test.removeProduct(toothpaste);
+    assert.equal(pending.message, 'pantry.productDeletedWithLinks{"name":"Zahnpasta","count":1}');
+    pending.restore();
+
+    // Counter-check: without links the plain sentence, as before.
+    toothpaste.match_count = 0;
+    __test.removeProduct(toothpaste);
+    assert.equal(pending.message, 'pantry.deleted');
+    pending.restore();
+    delete toothpaste.match_count;
+    __test.removeProduct(toothpaste);
+    assert.equal(pending.message, 'pantry.deleted', 'an answer without the field (an older server) is the plain sentence too');
+    pending.restore();
+    assert.deepEqual(deleted, []);
+  } finally {
+    delete toothpaste.match_count;
+    __test.pendingProductDeletes.clear();
+    delete g.__undoStub;
+  }
+});
+
 test('#2085: the server refuses a product that has batches again: the row comes back, the toast says why, the page reloads', async () => {
   groupedPantry();
   const stage = makeNode();

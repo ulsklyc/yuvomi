@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 const db = await import('../server/db.js');
 const sync = await import('../server/services/recipe-provider-sync.js');
 const { _setAdapterFactory } = await import('../server/services/recipe-providers/index.js');
+const { assignPantryProduct } = await import('../server/services/pantry-products.js');
 const conn = db.get();
 
 const OWNER = conn.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('owner','Owner','x','member')`).run().lastInsertRowid;
@@ -559,69 +560,65 @@ test('getStatus(): unlesbare Zahlen werden null, ein Fall ohne Text zaehlt nicht
 });
 
 // =========================================================================
-// Die bestaetigte Zuordnung Zutat -> Vorratszeile (#1314) am Spiegel-Weg
+// Die bestaetigte Zuordnung Zutat -> Produkt (#1314, #1448 Teil 4) am Spiegel-Weg
 // =========================================================================
 
 /*
  * DERSELBE VORGANG WIE `PUT /recipes/:id`, NUR OHNE MENSCHEN DAVOR: ein
  * Spiegel-Lauf loescht die Zutaten eines Rezepts und legt sie neu an. Die
- * Zuordnung aus #1314 haengt am normalisierten Zutatennamen, also ueberlebt sie
- * das - und bleibt liegen, wenn der Provider die Zutat umbenennt. Sie ist dann
- * unsichtbar, aber wiederbelebbar: heisst spaeter wieder eine Zutat so, haengt
- * die Leseseite die alte Vorratszeile erneut an, ohne dass irgendwer DIESE
- * Zuordnung bestaetigt haette.
- *
- * Und hier entscheidet der Provider ueber den Namen, nicht der Haushalt: die
- * Umbenennung passiert, ohne dass jemand hier etwas tut.
+ * Zuordnung sagt seit Teil 4 von #1448 "diese Schreibweise meint dieses
+ * Produkt" fuer den ganzen Haushalt (pantry_product_matches) und gehoert keinem
+ * Rezept: ein Lauf setzt keine, auch nicht bei gleichem Namen, und er loescht
+ * keine, auch nicht, wenn der Provider eine Zutat umbenennt. Kommt die alte
+ * Schreibweise zurueck, meint sie, was der Haushalt bestaetigt hat.
  *
  * Gemessen wird der LAUF, nicht der Quelltext. Ein Textguard laesst offen, ob
  * ihn ueberhaupt jemand als Programm ausfuehrt.
  */
 
-function pantryRow(name) {
-  return Number(conn.prepare(
+/**
+ * Eine Charge mit ihrem Produkt, wie jeder Schreibweg sie anlegt; gibt das Produkt zurueck.
+ * @param {string} name
+ */
+function pantryProduct(name) {
+  const item = Number(conn.prepare(
     "INSERT INTO pantry_items (name, quantity, unit, created_by) VALUES (?, 2, 'pcs', ?)",
   ).run(name, OWNER).lastInsertRowid);
+  return assignPantryProduct(conn, item, { userId: OWNER });
 }
-// Immer auf EIN Rezept eingegrenzt: die Suite teilt sich eine Datenbank, und
-// eine Zeile aus einem Nachbartest waere ein Fehlschlag aus dem falschen Grund.
-const matchRowsFor = (recipeId) => conn.prepare(
-  'SELECT ingredient_key, pantry_item_id FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? ORDER BY ingredient_key',
-).all(recipeId);
+const matchOf = (/** @type {string} */ key) => conn.prepare('SELECT product_id FROM pantry_product_matches WHERE ingredient_key = ?').get(key)?.product_id ?? null;
+const confirmMatch = (/** @type {string} */ key, /** @type {number|null} */ productId) => conn.prepare(`
+  INSERT INTO pantry_product_matches (ingredient_key, product_id, confirmed_by) VALUES (?, ?, ?)
+  ON CONFLICT(ingredient_key) DO UPDATE SET product_id = excluded.product_id
+`).run(key, productId, OWNER);
 
 test('sync(): ein Spiegel-Lauf setzt nie eine Zuordnung, auch bei identischem Namen', async () => {
-  pantryRow('Mehl');
+  pantryProduct('Hartweizengriess');
   const accountId = newAccount('Nie-geraten');
   _setAdapterFactory(fakeAdapter(
-    [{ id: 'uuid-brot', ref: 'brot', updatedAt: '2026-01-01T00:00:00Z' }],
-    { brot: { id: 'uuid-brot', updatedAt: '2026-01-01T00:00:00Z', slug: 'brot', title: 'Brot', notes: null, hasImage: false, ingredients: [{ name: 'Mehl', quantity: null, category: 'Sonstiges' }] } },
+    [{ id: 'uuid-nudeln', ref: 'nudeln', updatedAt: '2026-01-01T00:00:00Z' }],
+    { nudeln: { id: 'uuid-nudeln', updatedAt: '2026-01-01T00:00:00Z', slug: 'nudeln', title: 'Nudeln', notes: null, hasImage: false, ingredients: [{ name: 'Hartweizengriess', quantity: null, category: 'Sonstiges' }] } },
   ));
   await sync.sync();
 
-  assert.deepEqual(ingredientsFor(accountId, 'uuid-brot').map((i) => i.name), ['Mehl'], 'Vorbedingung: die Zutat ist da');
-  const brotId = conn.prepare('SELECT id FROM recipes WHERE provider_account_id = ?').get(accountId).id;
-  assert.deepEqual(matchRowsFor(brotId), [],
+  assert.deepEqual(ingredientsFor(accountId, 'uuid-nudeln').map((/** @type {any} */ i) => i.name), ['Hartweizengriess'], 'Vorbedingung: die Zutat ist da');
+  assert.equal(matchOf('hartweizengriess'), null,
     'ein gleicher Name ist eine Namensaehnlichkeit, keine Aussage des Haushalts (docs/DECISIONS.md Abschnitt 7)');
 });
 
-test('sync(): benennt der Provider eine zugeordnete Zutat um, faellt die Zuordnung weg statt liegen zu bleiben', async () => {
-  const glas = pantryRow('Weizenmehl 405');
+test('sync(): benennt der Provider eine zugeordnete Zutat um, bleibt die Zuordnung des Haushalts stehen', async () => {
+  const glas = pantryProduct('Weizenmehl 405');
   const accountId = newAccount('Umbenannte-Zutat');
   _setAdapterFactory(fakeAdapter(
     [{ id: 'uuid-waffel', ref: 'waffel', updatedAt: '2026-01-01T00:00:00Z' }],
     { waffel: { id: 'uuid-waffel', updatedAt: '2026-01-01T00:00:00Z', slug: 'waffel', title: 'Waffeln', notes: null, hasImage: false, ingredients: [{ name: 'Mehl', quantity: null, category: 'Sonstiges' }] } },
   ));
   await sync.sync();
-  const recipeId = conn.prepare('SELECT id FROM recipes WHERE provider_account_id = ?').get(accountId).id;
 
-  // Der Haushalt bestaetigt die Zuordnung von Hand - der einzige Weg, auf dem
-  // eine entsteht (PUT /recipes/:id/ingredient-match verbietet Mirror-Rezepte
-  // nicht, es haengt nur eine Vorratszeile an eine Zutat).
-  conn.prepare(`
-    INSERT INTO recipe_ingredient_pantry_matches (recipe_id, ingredient_key, pantry_item_id, confirmed_by)
-    VALUES (?, 'mehl', ?, ?)
-  `).run(recipeId, glas, OWNER);
-  assert.equal(matchRowsFor(recipeId).length, 1, 'Vorbedingung: die Zuordnung steht');
+  // Der Haushalt bestaetigt die Zuordnung - der einzige Weg, auf dem eine
+  // entsteht (PUT /recipes/:id/ingredient-match verbietet Mirror-Rezepte
+  // nicht, es haengt nur ein Produkt an eine Schreibweise).
+  confirmMatch('mehl', glas);
 
   // Der Provider benennt die Zutat um. Hier tut niemand etwas.
   _setAdapterFactory(fakeAdapter(
@@ -629,32 +626,21 @@ test('sync(): benennt der Provider eine zugeordnete Zutat um, faellt die Zuordnu
     { waffel: { id: 'uuid-waffel', updatedAt: '2026-02-01T00:00:00Z', slug: 'waffel', title: 'Waffeln', notes: null, hasImage: false, ingredients: [{ name: 'Dinkelmehl', quantity: null, category: 'Sonstiges' }] } },
   ));
   await sync.sync();
-
-  assert.deepEqual(matchRowsFor(recipeId), [],
-    'die Aussage galt einer Zutat, die dieses Rezept nicht mehr hat - sie bleibt nicht als Blindgaenger liegen');
-
-  // Und sie kommt auch nicht zurueck, wenn der alte Name wieder auftaucht.
-  _setAdapterFactory(fakeAdapter(
-    [{ id: 'uuid-waffel', ref: 'waffel', updatedAt: '2026-03-01T00:00:00Z' }],
-    { waffel: { id: 'uuid-waffel', updatedAt: '2026-03-01T00:00:00Z', slug: 'waffel', title: 'Waffeln', notes: null, hasImage: false, ingredients: [{ name: 'Mehl', quantity: null, category: 'Sonstiges' }] } },
-  ));
-  await sync.sync();
-  assert.deepEqual(matchRowsFor(recipeId), [], 'eine auferstandene Zuordnung ist eine geratene');
+  assert.deepEqual(ingredientsFor(accountId, 'uuid-waffel').map((/** @type {any} */ i) => i.name), ['Dinkelmehl'], 'Vorbedingung: die Zutat ist umbenannt');
+  assert.equal(matchOf('mehl'), glas, 'die Aussage gehoert dem Haushalt, nicht diesem Rezept');
+  assert.equal(matchOf('dinkelmehl'), null, 'und die neue Schreibweise erbt sie nicht');
 });
 
 test('sync(): ein unveraenderter Lauf laesst eine bestaetigte Zuordnung in Ruhe', async () => {
-  // Die Gegenrichtung, und ohne sie sagt jedes leere Ergebnis oben nichts: ein
-  // Aufraeumen, das immer alles wegnimmt, saehe genauso aus.
-  const glas = pantryRow('Rohrzucker');
+  // Die Gegenrichtung, und ohne sie sagt ein stehen gebliebenes Ergebnis oben
+  // wenig: ein Lauf, der gar nichts neu schreibt, saehe genauso aus.
+  const glas = pantryProduct('Rohrzucker');
   const accountId = newAccount('Bleibt-stehen');
   const details = { kuchen: { id: 'uuid-kuchen', updatedAt: '2026-01-01T00:00:00Z', slug: 'kuchen', title: 'Kuchen', notes: null, hasImage: false, ingredients: [{ name: 'Zucker', quantity: null, category: 'Sonstiges' }] } };
   _setAdapterFactory(fakeAdapter([{ id: 'uuid-kuchen', ref: 'kuchen', updatedAt: '2026-01-01T00:00:00Z' }], details));
   await sync.sync();
-  const recipeId = conn.prepare('SELECT id FROM recipes WHERE provider_account_id = ?').get(accountId).id;
-  conn.prepare(`
-    INSERT INTO recipe_ingredient_pantry_matches (recipe_id, ingredient_key, pantry_item_id, confirmed_by)
-    VALUES (?, 'zucker', ?, ?)
-  `).run(recipeId, glas, OWNER);
+  const before = ingredientsFor(accountId, 'uuid-kuchen');
+  confirmMatch('zucker', glas);
 
   // Neues updatedAt, gleiche Zutat: die Zutaten werden wirklich neu geschrieben.
   _setAdapterFactory(fakeAdapter(
@@ -662,11 +648,31 @@ test('sync(): ein unveraenderter Lauf laesst eine bestaetigte Zuordnung in Ruhe'
     { kuchen: { ...details.kuchen, updatedAt: '2026-02-01T00:00:00Z' } },
   ));
   await sync.sync();
+  assert.deepEqual(ingredientsFor(accountId, 'uuid-kuchen'), before);
+  assert.equal(matchOf('zucker'), glas, 'die Schreibweise ist dieselbe, also gilt die Bestaetigung weiter');
+});
 
-  assert.deepEqual(
-    matchRowsFor(recipeId), [{ ingredient_key: 'zucker', pantry_item_id: glas }],
-    'die Zutat heisst noch so, also gilt die Bestaetigung weiter',
-  );
+test('sync(): ein Rezept, das die Quelle loescht, nimmt die Zuordnung des Haushalts nicht mit', async () => {
+  const dose = pantryProduct('Kokosmilch Dose');
+  const accountId = newAccount('Geloescht');
+  _setAdapterFactory(fakeAdapter(
+    [{ id: 'uuid-curry', ref: 'curry', updatedAt: '2026-01-01T00:00:00Z' }, { id: 'uuid-dal', ref: 'dal', updatedAt: '2026-01-01T00:00:00Z' }],
+    {
+      curry: { id: 'uuid-curry', updatedAt: '2026-01-01T00:00:00Z', slug: 'curry', title: 'Curry', notes: null, hasImage: false, ingredients: [{ name: 'Kokosmilch', quantity: null, category: 'Sonstiges' }] },
+      dal: { id: 'uuid-dal', updatedAt: '2026-01-01T00:00:00Z', slug: 'dal', title: 'Dal', notes: null, hasImage: false, ingredients: [{ name: 'Linsen', quantity: null, category: 'Sonstiges' }] },
+    },
+  ));
+  await sync.sync();
+  confirmMatch('kokosmilch', dose);
+
+  // Die Quelle fuehrt das Curry nicht mehr: der Spiegel loescht das Rezept.
+  _setAdapterFactory(fakeAdapter(
+    [{ id: 'uuid-dal', ref: 'dal', updatedAt: '2026-01-01T00:00:00Z' }],
+    { dal: { id: 'uuid-dal', updatedAt: '2026-01-01T00:00:00Z', slug: 'dal', title: 'Dal', notes: null, hasImage: false, ingredients: [{ name: 'Linsen', quantity: null, category: 'Sonstiges' }] } },
+  ));
+  await sync.sync();
+  assert.deepEqual(mirroredRecipes(accountId).map((/** @type {any} */ r) => r.title), ['Dal'], 'Vorbedingung: das Curry ist weg');
+  assert.equal(matchOf('kokosmilch'), dose, 'die Schreibweise meint fuer den Haushalt weiter dieses Produkt');
 });
 
 // --------------------------------------------------------
