@@ -227,8 +227,12 @@ export async function seedOverviewExtras({ db, call, adminHeaders, ids, rows, sh
   // runs against SQLite's real clock (strftime('now')), which Node's
   // mock.timers never touches - expires_at has to come from that same
   // clock, not from a JS Date tied to the test's frozen FROZEN_NOW.
+  // +10 days, not +1 hour: settleSqliteClock() (below) rewrites every
+  // stamp within +-2 days of the real 'now' back onto the frozen
+  // timeline, which would read as expired again by the time the block
+  // is queried; past that window it is left untouched.
   db.prepare(
-    "INSERT INTO user_availability (user_id, state, note, expires_at) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+1 hour'))",
+    "INSERT INTO user_availability (user_id, state, note, expires_at) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+10 days'))",
   ).run(ids.member, 'busy', 'golden availability note');
 
   seedConditions({ db, ids, rows, shift, dates });
