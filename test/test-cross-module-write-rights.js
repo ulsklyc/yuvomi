@@ -270,17 +270,20 @@ function seedPantryItem(name) {
     "INSERT INTO pantry_items (name, quantity, unit, created_by) VALUES (?, 1, 'pcs', ?)",
   ).run(name, U).lastInsertRowid);
 }
-const matchCount = () => db.prepare('SELECT COUNT(*) AS c FROM recipe_ingredient_pantry_matches').get().c;
+// Die Zuordnung nennt seit #1448 Teil 4 das Produkt, fuer den Haushalt.
+const matchCount = () => db.prepare('SELECT COUNT(*) AS c FROM pantry_product_matches').get().c;
 
 test('Vorbedingung: mit vollem Recht laesst sich eine Zutat dem Vorrat zuordnen', async () => {
   asMember({});
   const recipeId = seedRecipe(['Mehl-zuordnung']);
   const item = seedPantryItem('Mehl im Schrank');
+  const vorher = matchCount();
   const res = await call('PUT', `/recipes/${recipeId}/ingredient-match`, {
     name: 'Mehl-zuordnung', pantryItemId: item,
   });
   assert.equal(res.status, 200);
   assert.equal(res.body.data.pantry_item_id, item);
+  assert.equal(matchCount(), vorher + 1, 'die Zaehlung unten misst die Tabelle, in die geschrieben wird');
 });
 
 for (const stufe of ['none', 'read']) {
