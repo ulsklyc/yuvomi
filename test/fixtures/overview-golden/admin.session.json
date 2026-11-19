@@ -468,6 +468,9 @@
         "external_rrule": null,
         "assigned_name": "child",
         "assigned_color": "#D97706",
+        "created_by_name": "Admin",
+        "created_by_color": "#DB2777",
+        "created_by_avatar": null,
         "assigned_users": [
           {
             "id": 3,
@@ -530,6 +533,9 @@
         "external_rrule": null,
         "assigned_name": null,
         "assigned_color": null,
+        "created_by_name": "Admin",
+        "created_by_color": "#DB2777",
+        "created_by_avatar": null,
         "assigned_users": [
           {
             "id": 3,
@@ -580,6 +586,9 @@
         "external_rrule": null,
         "assigned_name": null,
         "assigned_color": null,
+        "created_by_name": "Admin",
+        "created_by_color": "#DB2777",
+        "created_by_avatar": null,
         "assigned_users": [
           {
             "id": 3,
@@ -630,6 +639,9 @@
         "external_rrule": null,
         "assigned_name": null,
         "assigned_color": null,
+        "created_by_name": "Admin",
+        "created_by_color": "#DB2777",
+        "created_by_avatar": null,
         "assigned_users": [
           {
             "id": 3,
@@ -680,6 +692,9 @@
         "external_rrule": null,
         "assigned_name": null,
         "assigned_color": null,
+        "created_by_name": "Admin",
+        "created_by_color": "#DB2777",
+        "created_by_avatar": null,
         "assigned_users": [
           {
             "id": 3,

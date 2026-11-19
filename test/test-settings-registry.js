@@ -325,6 +325,7 @@ const GET_STATES = {
       health_cycle_enabled: '0',
       rewards_require_approval: '0',
       tasks_subtasks_expanded: '1',
+      tasks_show_creator: '1',
       tasks_default_points: '15',
       tasks_late_decay_enabled: '1',
       countdown_grace_days: '0',
@@ -377,6 +378,7 @@ const GET_STATES = {
       health_cycle_enabled: 'no',
       rewards_require_approval: '',
       tasks_subtasks_expanded: 'true',
+      tasks_show_creator: 'true',
       tasks_default_points: '-5',
       tasks_late_decay_enabled: 'x',
       countdown_grace_days: '500',
@@ -428,8 +430,8 @@ const HOUSEHOLD_KEYS = [
   'dashboard_widgets_default', 'dashboard_today_glance_default',
   'dashboard_widgets', 'dashboard_today_glance', 'module_order', // fossils, household-wide last stage
   'disabled_modules', 'housekeeping_payment_tasks', 'budget_mode', 'calendar_default_duration',
-  'health_cycle_enabled', 'rewards_require_approval', 'tasks_subtasks_expanded', 'tasks_default_points',
-  'tasks_late_decay_enabled', 'countdown_grace_days', 'schedule_hidden_templates',
+  'health_cycle_enabled', 'rewards_require_approval', 'tasks_subtasks_expanded', 'tasks_show_creator',
+  'tasks_default_points', 'tasks_late_decay_enabled', 'countdown_grace_days', 'schedule_hidden_templates',
   'weather_provider', 'weather_lat', 'weather_lon', 'weather_city', 'weather_units', 'weather_auto_locate',
   'holiday_country', 'holiday_subdivision', 'holiday_group', 'holiday_show_public', 'holiday_show_school',
   'holiday_public_color', 'holiday_school_color', 'holiday_last_sync',
@@ -437,7 +439,7 @@ const HOUSEHOLD_KEYS = [
 const PERSONAL_KEYS = Object.keys(personalValid('x', 0)).map((key) => key.replace(/:user:x$/, ''));
 
 test('the valid and the invalid GET seed set every storage key of the route', () => {
-  assert.equal(HOUSEHOLD_KEYS.length, 41);
+  assert.equal(HOUSEHOLD_KEYS.length, 42);
   assert.equal(PERSONAL_KEYS.length, 19);
   for (const state of ['valid', 'invalid']) {
     const keys = Object.keys(GET_STATES[state].seed);
@@ -588,6 +590,8 @@ const PUT_CASES = [
   { name: 'rewards_require_approval not boolean', body: { rewards_require_approval: 'x' } },
   { name: 'tasks_subtasks_expanded true', body: { tasks_subtasks_expanded: true } },
   { name: 'tasks_subtasks_expanded not boolean', body: { tasks_subtasks_expanded: 'x' } },
+  { name: 'tasks_show_creator true', body: { tasks_show_creator: true } },
+  { name: 'tasks_show_creator not boolean', body: { tasks_show_creator: 'x' } },
   { name: 'tasks_default_points valid', body: { tasks_default_points: '25' } },
   { name: 'tasks_default_points zero', body: { tasks_default_points: 0 } },
   { name: 'tasks_default_points negative', body: { tasks_default_points: -1 } },
@@ -756,8 +760,8 @@ const CHECK_ORDER = [
   'housekeeping_payment_tasks', 'calendar_default_duration', 'calendar_default_reminders',
   'calendar_default_target', 'tasks_default_target', 'tasks_default_visibility', 'tasks_default_locked',
   'health_cycle_enabled', 'health_cycle_enabled_user', 'health_prevention_notify_caregivers',
-  'rewards_require_approval', 'tasks_subtasks_expanded', 'tasks_default_points', 'tasks_late_decay_enabled',
-  'countdown_grace_days',
+  'rewards_require_approval', 'tasks_subtasks_expanded', 'tasks_show_creator', 'tasks_default_points',
+  'tasks_late_decay_enabled', 'countdown_grace_days',
   'weather_provider', 'weather_lat', 'weather_lon', 'weather_units', 'weather_auto_locate', 'weather_user',
   'holiday_country', 'holiday_subdivision', 'holiday_group', 'holiday_show_public', 'holiday_show_school',
   'holiday_public_color', 'holiday_school_color',
@@ -1054,8 +1058,8 @@ const SINGLE_FIELD_CASES = Object.groupBy(
 
 const catalogByField = () => new Map(settingsCatalog().map((entry) => [entry.field, entry]));
 
-test('registry: the measured fields are what this suite expects (52 PUT fields, the route views)', () => {
-  assert.equal(PUT_FIELDS.length, 52, PUT_FIELDS.join(', '));
+test('registry: the measured fields are what this suite expects (53 PUT fields, the route views)', () => {
+  assert.equal(PUT_FIELDS.length, 53, PUT_FIELDS.join(', '));
   for (const field of PUT_FIELDS) assert.ok(SINGLE_FIELD_CASES[field]?.length, `a single-field case for ${field}`);
   for (const view of ROUTE_VIEWS) assert.ok(GET_FIELDS.includes(view), view);
 });

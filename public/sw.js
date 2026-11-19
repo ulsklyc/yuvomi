@@ -627,6 +627,7 @@ const AVATAR_URL_RE = /^\/api\/v1\/people\/\d+\/avatar\?v=[0-9a-f]{32}$/;
 // Treffer einen Abruf aus, bei jedem Laden wieder (Codex-Review zu #2056).
 const AVATAR_FIELDS = new Set([
   'assigned_avatar', 'avatar_data', 'creator_avatar', 'worker_avatar_data', 'user_avatar', 'person_avatar',
+  'created_by_avatar',
 ]);
 
 /** Die Bildadressen aus den Bildfeldern einer Antwort, jede einmal. */
