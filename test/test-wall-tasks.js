@@ -1673,3 +1673,51 @@ test('Wand-Display: gleiche Programm-Zeilen und gleicher Ueberlauf wie das Mitgl
     setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
   })();
 });
+
+test('Wand-Display: mit den echten Display-Rechten (Widgets erben `none`) bleiben Abfuhr, Vorrat und Haushaltshilfe stehen (#2753)', async () => {
+  /** @type {any} */ let memberWall;
+  /** @type {any} */ let displayWall;
+  await withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+    seedWallSources();
+    memberWall = await overview(ANNA, householdQuery());
+    displayWall = await asCoupledDisplay(() => overview(DISPLAY, '?audience=household'));
+  })();
+  // Die Rechte, die ein gekoppeltes Display wirklich bekommt - nicht `widgets: {}`.
+  const displayUser = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(DISPLAY);
+  const displayPerms = resolvePermissions(db, displayUser, { isDisplay: true });
+  const sheetKinds = ['waste', 'pantry', 'housekeeping'];
+  for (const kind of sheetKinds) {
+    assert.equal(displayPerms.widgets[kind], 'none', `Reichweite: das Display erbt widgets.${kind} = 'none'`);
+  }
+  await onWallAt(NOON_BERLIN, () => {
+    const now = new Date();
+    const kinds = (/** @type {any} */ data, opts = {}) => new Set(dash.buildTodayCockpitModel(data, [], {
+      cap: dash.WALL_ROW_CAP, now, groupOverdue: false, ...opts,
+    }).allRows.map((/** @type {{ kind: string }} */ row) => row.kind));
+    const prevDisabled = global.window.yuvomi.isModuleDisabled;
+    try {
+      // Die Wand des Displays traegt dieselben drei Quellen wie die des Mitglieds.
+      const member = kinds(memberWall);
+      for (const kind of sheetKinds) assert.ok(member.has(kind), `Reichweite: die Wand des Mitglieds zeigt ${kind}`);
+      setPermissions(displayPerms);
+      const wall = kinds(displayWall, { isDisplay: true });
+      for (const kind of sheetKinds) {
+        assert.ok(wall.has(kind), `die Wand des Displays zeigt ${kind} trotz widgets.${kind} = 'none' (#2753)`);
+      }
+      // Der Haushaltsschalter geht weiter vor.
+      global.window.yuvomi.isModuleDisabled = (m) => m === 'waste';
+      assert.ok(!kinds(displayWall, { isDisplay: true }).has('waste'), 'eine haushaltsweit abgeschaltete Abfuhr schweigt auch am Display');
+      global.window.yuvomi.isModuleDisabled = prevDisabled;
+      // Ohne Wand (Cockpit) bleibt das Widget-Recht ein Riegel - fuer das Display
+      // wie fuer ein Mitglied, dem nur die Widgets gesperrt sind.
+      const cockpit = kinds(displayWall, { isDisplay: false });
+      for (const kind of sheetKinds) assert.ok(!cockpit.has(kind), `das Cockpit des Displays zeigt ${kind} nicht`);
+      setPermissions({ admin: false, modules: {}, widgets: { waste: 'none', pantry: 'none', housekeeping: 'none' }, capabilities: {} });
+      const locked = kinds(memberWall);
+      for (const kind of sheetKinds) assert.ok(!locked.has(kind), `ein gesperrtes Widget ${kind} schweigt fuer ein Mitglied weiter`);
+    } finally {
+      global.window.yuvomi.isModuleDisabled = prevDisabled;
+      setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
+    }
+  })();
+});

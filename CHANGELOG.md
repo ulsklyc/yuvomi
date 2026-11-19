@@ -134,6 +134,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or replacing an expense without a rate stored the text `"null"`, and the expense answers
   returned `"exchange_snapshot": "null"` for it. New and replaced expenses now store no value and
   answer `null`; expenses saved before keep `"null"` until they are saved again.
+- **The wall on a paired display shows waste pickups, expiring pantry items and a housekeeper
+  who is in** (#2753). Since #1903 the dashboard delivers them to the
+  display, but its wall dropped the rows: a display inherits a locked widget from every module
+  it cannot open, and the wall still checked the widget right for these sources. On a display
+  the wall now lets them through, as it already did for the module right. A module switched
+  off for the household stays off, and the display's normal overview is unchanged.
 
 ## [2.93.0] - 2026-11-18
 
