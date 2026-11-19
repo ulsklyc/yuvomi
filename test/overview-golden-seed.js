@@ -225,14 +225,16 @@ export async function seedOverviewExtras({ db, call, adminHeaders, ids, rows, sh
   // The member has an active status (#1591), so the dashboard's
   // familyStatuses block has data to show. The route's own expiry check
   // runs against SQLite's real clock (strftime('now')), which Node's
-  // mock.timers never touches - expires_at has to come from that same
-  // clock, not from a JS Date tied to the test's frozen FROZEN_NOW.
-  // +10 days, not +1 hour: settleSqliteClock() (below) rewrites every
-  // stamp within +-2 days of the real 'now' back onto the frozen
-  // timeline, which would read as expired again by the time the block
-  // is queried; past that window it is left untouched.
+  // mock.timers never touches, so expires_at can be neither a JS Date
+  // tied to the test's frozen FROZEN_NOW nor an offset from the real
+  // 'now' at seed time: a golden fixture is compared byte for byte
+  // wherever and whenever it runs, and the real clock differs between
+  // this machine and CI. A fixed far-future date is in the future on
+  // any machine at any time, and - safely outside the +-2 day window
+  // settleSqliteClock() (below) rewrites onto the frozen timeline -
+  // is left untouched, so it stays exactly this string forever.
   db.prepare(
-    "INSERT INTO user_availability (user_id, state, note, expires_at) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+10 days'))",
+    "INSERT INTO user_availability (user_id, state, note, expires_at) VALUES (?, ?, ?, '2099-01-01T00:00:00Z')",
   ).run(ids.member, 'busy', 'golden availability note');
 
   seedConditions({ db, ids, rows, shift, dates });
