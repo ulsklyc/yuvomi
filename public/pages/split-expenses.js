@@ -2223,7 +2223,9 @@ function validateSplitForm(panel, { reveal = false } = {}) {
     const converted = basis.from
       ? ` ${t('splitExpenses.exactSharesConverted', { currency: basis.currency, amount: formatMoney(Number(basis.from.amount), basis.from.currency) })}`
       : '';
-    message = `${message}${converted} ${t('splitExpenses.splitCurrentTotal', { total: formatMoney(total, basis.currency) })}`;
+    // Die Summe mit den Stellen, die der Server fuer die Anteile fuehrt (#2810):
+    // "3.581,47 HUF", nicht die CLDR-Anzeige "3.581 HUF".
+    message = `${message}${converted} ${t('splitExpenses.splitCurrentTotal', { total: formatMoney(total, basis.currency, { digits: basis.digits }) })}`;
   } else if (valid && method === 'shares') {
     valid = selected.every((input) => {
       const value = numberValue(panel.querySelector(`[name="split_value_${input.value}"]`)?.value);

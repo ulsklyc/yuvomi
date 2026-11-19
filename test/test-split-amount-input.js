@@ -743,6 +743,14 @@ test('Umgerechnete Ausgabe nach HUF: exakte Anteile pruefen die Stellen des Serv
     const { panel, felder } = formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '1790,74', 3: '1790,73' } });
     await oeffneMit(() => offen(forint()), { currency: 'USD', panel, dabei: () => split.validateSplitForm(panel) });
     assert.equal(felder['[name="split_value_1"]'].placeholder, '0,00');
+    // Die laufende Summe mit denselben Stellen: "3.581,47 HUF", nicht "3.581 HUF".
+    const summe = (/** @type {string} */ text) => JSON.parse(text.slice(text.indexOf('splitExpenses.splitCurrentTotal') + 'splitExpenses.splitCurrentTotal'.length)).total.replace(/\s/g, ' ');
+    assert.equal(summe(felder['#split-method-hint'].textContent), '3.581,47 HUF');
+
+    // Gegenprobe: ohne Umrechnung zeigt die Summe HUF wie der CLDR, ohne Stellen.
+    const ohne = formularAny({ amount: '3581', currency: 'HUF', method: 'exact', teilnehmer: { 1: '1790', 3: '1791' } });
+    await oeffneMit(() => offen(null), { currency: 'HUF', panel: ohne.panel, dabei: () => split.validateSplitForm(ohne.panel) });
+    assert.equal(summe(ohne.felder['#split-method-hint'].textContent), '3.581 HUF');
 
     // Mehr Stellen als der Server fuehrt bleiben am Feld, der Satz nennt 0,01.
     const zuGenau = await speichern(() => offen(forint()),

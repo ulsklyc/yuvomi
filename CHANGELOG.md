@@ -135,6 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   converted amount keeps two decimal places (for example 3581.47 HUF), but the share fields
   allowed none for these currencies, so the shares could never add up to it. They now accept
   the decimal places the converted amount is stored with.
+- **The running total under exact shares of such an expense shows the stored decimal places.**
+  It showed 3,581 HUF while the shares had to add up to 3,581.47 HUF; it now shows 3,581.47 HUF.
 - **A shared expense saved without an exchange rate answers `exchange_snapshot: null`.** Creating
   or replacing an expense without a rate stored the text `"null"`, and the expense answers
   returned `"exchange_snapshot": "null"` for it. New and replaced expenses now store no value and

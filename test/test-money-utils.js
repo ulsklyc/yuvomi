@@ -373,6 +373,17 @@ test('amountPlaceholder: `digits` ersetzt die Stellen der Waehrung', () => {
   });
 });
 
+test('formatMoney: `digits` ersetzt die Stellen der Waehrung, ohne Option bleibt der CLDR', () => {
+  withFormatLocale('de', () => {
+    const plain = (/** @type {string} */ text) => text.replace(/\s/g, ' ');
+    assert.equal(plain(formatMoney(3581.47, 'HUF')), '3.581 HUF');
+    assert.equal(plain(formatMoney(3581.47, 'HUF', { digits: 2 })), '3.581,47 HUF');
+    assert.equal(plain(formatMoney(3581.47, 'HUF', { digits: null })), '3.581 HUF');
+    assert.equal(plain(formatMoney(12.5, 'EUR')), '12,50 €');
+    assert.equal(plain(formatMoney(12.5, 'EUR', { digits: 2 })), '12,50 €');
+  });
+});
+
 test('jeder Speicherweg der Aufteilung verlangt einen Betrag', async () => {
   const { readFileSync } = await import('node:fs');
   const quelle = readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8');
