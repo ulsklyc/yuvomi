@@ -280,6 +280,24 @@ const SPLIT_ENTRY = {
 };
 
 /**
+ * The fields of an expense on update that replace stored state when left out
+ * (#2810): PUT /expenses/{id} is a full replacement, so they are required
+ * there. `null` stays allowed wherever it was (`description`,
+ * `converted_amount`, `exchange_snapshot`), and `expense_date: ""` stays
+ * today; only the absence is refused. The fields that keep their stored value
+ * when left out (`payer_id`, `participants`, `category`, `budget_category`,
+ * `attachment_document_ids`) and `splits` (left out with a method that reads
+ * values: a 400 of the handler, ignored with `equal`) stay optional.
+ */
+const EXPENSE_REPLACE_REQUIRED = ['title', 'amount', 'description', 'currency', 'converted_amount', 'converted_currency', 'exchange_snapshot', 'split_method', 'expense_date'];
+
+/**
+ * Why a field is required on update: what leaving it out did up to v2.93.
+ * @param {string} what
+ */
+const wasReset = (what) => `Required on update (#2810); up to v2.93 leaving it out ${what}.`;
+
+/**
  * The fields of an expense, for create and update.
  * @param {{ update?: boolean }} [options]
  */
@@ -287,24 +305,46 @@ function expenseProperties({ update = false } = {}) {
   return {
     title: TITLE,
     amount: AMOUNT,
-    description: noteText('Note'),
-    currency: currency(update ? 'Without it: the converted currency of the expense.' : 'Without it: the currency of the group.'),
-    converted_amount: { type: ['string', 'null'], description: 'The amount in `converted_currency`, a decimal string. `null`, `""` or left out: the amount.' },
-    converted_currency: currency('The currency the splits and the ledger are kept in. Without it: `currency`.'),
-    exchange_snapshot: { description: 'Any JSON the client wants kept with the expense (exchange rate and source); stored as sent.' },
+    description: update
+      ? { ...noteText('Note'), description: `Note, at most ${MAX_TEXT} characters; \`null\` or \`""\` means none. ${wasReset('cleared the stored note')}` }
+      : noteText('Note'),
+    currency: currency(update ? wasReset('read the amount in the converted currency of the expense') : 'Without it: the currency of the group.'),
+    converted_amount: {
+      type: ['string', 'null'],
+      description: update
+        ? `The amount in \`converted_currency\`, a decimal string; \`null\` or \`""\`: the amount. ${wasReset('replaced it with the amount')}`
+        : 'The amount in `converted_currency`, a decimal string. `null`, `""` or left out: the amount.',
+    },
+    converted_currency: currency(update
+      ? `The currency the splits and the ledger are kept in. ${wasReset('replaced it with `currency`')}`
+      : 'The currency the splits and the ledger are kept in. Without it: `currency`.'),
+    exchange_snapshot: {
+      description: update
+        ? `Any JSON the client wants kept with the expense (exchange rate and source); stored as sent, \`null\` for none. ${wasReset('cleared the stored one')}`
+        : 'Any JSON the client wants kept with the expense (exchange rate and source); stored as sent.',
+    },
     payer_id: bodyId(update ? 'Who paid; left out: the stored payer.' : 'Who paid; left out: the caller.'),
-    split_method: oneOf(SPLIT_METHODS, 'How the amount is split; left out: `equal`.'),
+    split_method: oneOf(SPLIT_METHODS, update ? `How the amount is split. ${wasReset('split it `equal`')}` : 'How the amount is split; left out: `equal`.'),
     participants: {
       type: 'array',
       items: bodyId('A member of the group.'),
       description: update ? 'Who shares the amount; left out: the stored participants.' : 'Who shares the amount; left out: the payer.',
     },
-    splits: { type: 'array', items: SPLIT_ENTRY, description: 'The value per participant for `exact`, `percentage` and `shares`; ignored with `equal`.' },
+    splits: {
+      type: 'array',
+      items: SPLIT_ENTRY,
+      description: 'The value per participant for `exact`, `percentage` and `shares`; ignored with `equal`. Left out with a method that reads values: 400.',
+    },
     category: update
       ? oneOf(CATEGORIES, 'The older split-expense category. Left out or `null`: the stored one.', { nullable: true })
       : oneOf(CATEGORIES, 'The older split-expense category; left out: `general`.'),
-    budget_category: BUDGET_CATEGORY,
-    expense_date: { type: 'string', description: '`YYYY-MM-DD`; left out or `""`: today in the household time zone.' },
+    budget_category: update ? { ...BUDGET_CATEGORY, description: `${BUDGET_CATEGORY.description} Left out: the stored one.` } : BUDGET_CATEGORY,
+    expense_date: {
+      type: 'string',
+      description: update
+        ? `\`YYYY-MM-DD\`; \`""\`: today in the household time zone. ${wasReset('moved the expense to today')}`
+        : '`YYYY-MM-DD`; left out or `""`: today in the household time zone.',
+    },
     attachment_document_ids: {
       type: 'array',
       items: bodyId('A document of the Documents module.'),
@@ -637,11 +677,11 @@ function movementPaths() {
         summary: 'Update expense (`attachment_document_ids` replaces the receipt links; omit the field to leave them untouched)',
         tag: 'SplitExpenses',
         params: [EXPENSE_ID],
-        description: withOrder(`${AMOUNT_NOTE} ${BUDGET_CATEGORY_NOTE} ${EXACT_SPLIT_NOTE} Omit \`category\` (or send \`null\`) to keep the stored category. ${DOCUMENT_LINKS_READ_NOTE}`),
+        description: withOrder(`The body is the whole expense (#2810): \`title\`, \`amount\`, \`description\`, \`currency\`, \`converted_amount\`, \`converted_currency\`, \`exchange_snapshot\`, \`split_method\` and \`expense_date\` are required, because leaving one out replaced the stored value (up to v2.93 a missing note or exchange snapshot was cleared, a missing currency, converted amount or converted currency was derived anew, a missing split method became \`equal\` and a missing date became today). \`null\` stays allowed where it was. \`payer_id\`, \`participants\`, \`category\`, \`budget_category\` and \`attachment_document_ids\` left out keep the stored value. ${AMOUNT_NOTE} ${BUDGET_CATEGORY_NOTE} ${EXACT_SPLIT_NOTE} Omit \`category\` (or send \`null\`) to keep the stored category. ${DOCUMENT_LINKS_READ_NOTE}`),
         stateChanging: true,
         documentDeleteConflict: true,
         documentLinkRefusal: true,
-        requestBody: body({ required: ['title', 'amount'], properties: expenseProperties({ update: true }) }),
+        requestBody: body({ required: EXPENSE_REPLACE_REQUIRED, properties: expenseProperties({ update: true }) }),
         responses: answers(200, 'The expense after the update'),
       }),
       delete: op({

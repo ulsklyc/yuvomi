@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "Slett denne tomme gruppen? Grupper med utgifter må arkiveres.",
         "deleteGroupConfirmDetail": "Medlemslisten, standardfordelingen, faste utgifter og aktivitetsloggen vil bli slettet permanent. En gruppe regnes som tom uten utgifter og oppgjør.",
         "splitCurrentTotal": "Nåværende totalt: {{total}}",
+        "exactSharesConverted": "Eksakte andeler i {{currency}}, omregnet fra {{amount}}.",
         "statusLabel": "Status",
         "statusActive": "Aktiv",
         "statusArchived": "Arkivert",

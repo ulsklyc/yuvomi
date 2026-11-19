@@ -501,8 +501,13 @@ function serializeExpense(expense, prefetched, viewer) {
   const attachments = prefetched
     ? documentLinksOf(prefetched.attachments, expense.id, viewer)
     : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, viewer });
+  // `converted_amount` in der Genauigkeit von `converted_currency`, nicht von
+  // `currency` (decorateMoney liest nur `currency`): aus 1500 JPY wurde sonst
+  // "15.00", und der Bearbeiten-Dialog, der diesen Text zurueckschickt (#2810),
+  // bekam 400 "too many decimal places for JPY".
   return {
-    ...decorateMoney(expense, ['amount_minor', 'converted_amount_minor']),
+    ...decorateMoney(expense),
+    converted_amount: minorToDecimal(expense.converted_amount_minor, expense.converted_currency ?? expense.currency),
     splits,
     attachments,
   };
@@ -566,6 +571,12 @@ function replaceExpenseSplits(database, expense, splits) {
  * null` on PUT /expenses, which keeps the stored one) means the default.
  * `split_method` keeps its fallback: PUT /recurring/:id hands in the STORED
  * method of the series, and `recurring_expenses.split_method` has no CHECK.
+ * The fallbacks for a LEFT-OUT field serve POST /groups/:id/expenses and the
+ * series only: PUT /expenses/:id requires `description`, `currency`,
+ * `converted_amount`, `converted_currency`, `split_method` and `expense_date`
+ * (full representation, #2810), so none of them reaches it there; an
+ * explicit `null` or `""` keeps its documented meaning (no note, the amount,
+ * today).
  */
 function parseExpenseBody(body, fallbackCurrency) {
   const currency = body.currency ?? fallbackCurrency;
@@ -1198,6 +1209,13 @@ router.put('/expenses/:id', validateRequest(), (req, res) => {
     if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const archived = archivedRefusal(existing.group_id);
     if (archived) return sendRefusal(res, archived);
+    // Volle Darstellung (#2810): das Schema verlangt description, currency,
+    // converted_amount, converted_currency, exchange_snapshot, split_method und
+    // expense_date. Die Rueckfaelle von parseExpenseBody fuer ein FEHLENDES
+    // Feld (und der Ersatz-Waehrungscode hier) greifen an dieser Operation nie;
+    // payer_id, participants, category, budget_category und
+    // attachment_document_ids bleiben optional und halten weggelassen den
+    // gespeicherten Wert.
     const parsed = parseExpenseBody(req.body, existing.converted_currency);
     // Die Kategorie (#1941) wie beim Bearbeiten einer Serie: ein Aufruf, der
     // sie nicht nennt (oder `null` schickt), laesst sie stehen. Sonst setzte

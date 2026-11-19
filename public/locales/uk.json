@@ -4890,6 +4890,7 @@
         "deleteGroupConfirm": "Видалити цю порожню групу? Групи з витратами треба архівувати.",
         "deleteGroupConfirmDetail": "Список учасників, типовий поділ, регулярні витрати та журнал дій зникнуть назавжди. Порожньою група вважається вже без витрат і розрахунків.",
         "splitCurrentTotal": "Поточна сума: {{total}}",
+        "exactSharesConverted": "Точні частки в {{currency}}, перераховано з {{amount}}.",
         "statusLabel": "Статус",
         "statusActive": "Активний",
         "statusArchived": "Архівований",

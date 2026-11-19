@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "Ta bort den här tomma gruppen? Grupper med utgifter måste arkiveras.",
         "deleteGroupConfirmDetail": "Medlemslistan, standardfördelningen, återkommande utgifter och aktivitetsloggen är borta för gott. En grupp räknas som tom redan utan utgifter och regleringar.",
         "splitCurrentTotal": "Aktuell summa: {{total}}",
+        "exactSharesConverted": "Exakta andelar i {{currency}}, omräknat från {{amount}}.",
         "statusLabel": "Status",
         "statusActive": "Aktiva",
         "statusArchived": "Arkiverad",

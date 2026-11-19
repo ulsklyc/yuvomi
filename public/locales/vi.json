@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "Xóa nhóm trống này? Các nhóm có chi phí phải được lưu trữ.",
         "deleteGroupConfirmDetail": "Danh sách thành viên, cách chia mặc định, các khoản chi định kỳ và nhật ký hoạt động sẽ mất vĩnh viễn. Nhóm được coi là trống khi không có khoản chi và quyết toán.",
         "splitCurrentTotal": "Tổng hiện tại: {{total}}",
+        "exactSharesConverted": "Phần chính xác tính bằng {{currency}}, quy đổi từ {{amount}}.",
         "statusLabel": "Trạng thái",
         "statusActive": "Đang hoạt động",
         "statusArchived": "Đã lưu trữ",

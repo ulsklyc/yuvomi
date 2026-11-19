@@ -5018,6 +5018,7 @@
         "deleteGroupConfirm": "هل تريد حذف هذه المجموعة الفارغة؟ يجب أرشفة المجموعات التي تحتوي على مصاريف.",
         "deleteGroupConfirmDetail": "تضيع نهائيًا قائمة الأعضاء والتقسيم الافتراضي والنفقات المتكررة وسجل النشاط. وتُعدّ المجموعة فارغة بمجرد خلوّها من النفقات والتسويات.",
         "splitCurrentTotal": "المجموع الحالي: {{total}}",
+        "exactSharesConverted": "الحصص الدقيقة بعملة {{currency}}، محوّلة من {{amount}}.",
         "statusLabel": "الحالة",
         "statusActive": "نشط",
         "statusArchived": "مؤرشف",

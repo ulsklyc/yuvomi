@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Editing a shared expense takes the whole expense.** This is about your own API clients; the
+  app sends every field now. `PUT /split-expenses/expenses/{id}` without `description`,
+  `currency`, `converted_amount`, `converted_currency`, `exchange_snapshot`, `split_method` or
+  `expense_date` cleared the stored note and exchange snapshot, read the amount in the converted
+  currency, set the converted amount and currency back to the amount and currency, split the
+  amount equally and moved the expense to today. All seven are required now besides `title` and
+  `amount`; `null` still clears the note and the snapshot and stands for the amount, and
+  `expense_date: ""` is still today. `payer_id`, `participants`, `category`, `budget_category`
+  and `attachment_document_ids` stay optional and keep the stored value when left out. The edit
+  dialog no longer drops the stored conversion and exchange snapshot of an expense whose amount
+  and currency it leaves unchanged, and the exact shares of such a converted expense are entered
+  and checked in the converted currency, as the server adds them up.
 - **Backup answers an unexpected failure with the same sentence as the rest of the API.**
   `GET /api/v1/backup/database` said `"Database backup failed."`, `POST /api/v1/backup/trigger`
   `"Backup trigger failed."` and `PUT /api/v1/backup/webdav/config` `"Failed to save WebDAV
@@ -76,6 +88,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a missing record or a conflict of waste collection, the 502 of a subscribed address without
   calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
   and the own schedule settings answered this way already.
+
+### Fixed
+- **A shared expense converted into a currency with other decimal places reports the converted
+  amount correctly.** `converted_amount` in the expense answers was written with the decimal
+  places of `currency` instead of `converted_currency`: 1500 JPY converted from USD read
+  `"15.00"`, and sending it back was refused. `converted_amount_minor` was always right.
 
 ## [2.93.0] - 2026-11-18
 

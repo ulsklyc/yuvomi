@@ -4890,6 +4890,7 @@
         "deleteGroupConfirm": "Usunąć tę pustą grupę? Grupy z wydatkami muszą być zarchiwizowane.",
         "deleteGroupConfirmDetail": "Lista uczestników, domyślny podział, wydatki cykliczne i dziennik aktywności przepadają bezpowrotnie. Grupa liczy się jako pusta już bez wydatków i rozliczeń.",
         "splitCurrentTotal": "Aktualna suma: {{total}}",
+        "exactSharesConverted": "Dokładne udziały w {{currency}}, przeliczone z {{amount}}.",
         "statusLabel": "Status",
         "statusActive": "Aktywny",
         "statusArchived": "Zarchiwizowany",

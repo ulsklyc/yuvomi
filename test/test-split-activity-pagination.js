@@ -299,6 +299,8 @@ test('Ein bearbeiteter Betrag aendert den Betrag im "erstellt"-Eintrag nicht', a
   const groupId = await newGroup('Snapshot');
   const body = (amount, title) => ({
     title, amount, currency: 'EUR', payer_id: CR.id, split_method: 'equal', participants: [OWN.id, CR.id],
+    // Die ganze Ausgabe (#2810): der PUT unten nimmt denselben Rumpf.
+    description: null, converted_amount: null, converted_currency: 'EUR', exchange_snapshot: null, expense_date: '',
   });
   const created = await CR.call('POST', `/split-expenses/groups/${groupId}/expenses`, body('50.00', 'Einkauf'));
   assert.equal(created.status, 201, JSON.stringify(created.body));
