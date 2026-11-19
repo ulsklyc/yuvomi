@@ -717,6 +717,47 @@ test('Umgerechnete Ausgabe: die Anteile pruefen die Nachkommastellen der umgerec
   });
 });
 
+// COP, HUF, IDR und IRR zeigt der CLDR ohne Nachkommastellen, der Server
+// speichert sie mit zwei (CURRENCY_MINOR_UNITS in server/services/split-expenses.js).
+// Eine Umrechnung nach HUF traegt deshalb Nachkommastellen ("3581.47"), und
+// exakte Anteile muessen sie treffen koennen - mit der Genauigkeit, die der
+// Server fuehrt, abgelesen am Dezimaltext `converted_amount`, nicht am CLDR.
+test('Umgerechnete Ausgabe nach HUF: exakte Anteile pruefen die Stellen des Servers, nicht die des CLDR', async () => {
+  const forint = () => ({
+    ...umgerechnet(), converted_amount: '3581.47', converted_amount_minor: 358147, converted_currency: 'HUF',
+    splits: [
+      { user_id: 1, amount: '1790.74', amount_minor: 179074, currency: 'HUF' },
+      { user_id: 3, amount: '1790.73', amount_minor: 179073, currency: 'HUF' },
+    ],
+  });
+  await unter('de', async () => {
+    const { gesendet, gemeldet } = await speichern(() => offen(forint()),
+      formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '1790,74', 3: '1790,73' } }).panel, { currency: 'USD' });
+    assert.deepEqual(gemeldet.map((m) => m.text), [], 'kein Anteil am Feld abgewiesen');
+    assert.equal(gesendet.length, 1, 'die Ausgabe geht an den Server');
+    assert.deepEqual(gesendet[0].daten.splits, [{ user_id: 1, amount: '1790.74' }, { user_id: 3, amount: '1790.73' }]);
+    assert.equal(gesendet[0].daten.converted_amount, '3581.47');
+    assert.equal(gesendet[0].daten.converted_currency, 'HUF');
+
+    // Platzhalter aus derselben Quelle: zwei Stellen, nicht "0".
+    const { panel, felder } = formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '1790,74', 3: '1790,73' } });
+    await oeffneMit(() => offen(forint()), { currency: 'USD', panel, dabei: () => split.validateSplitForm(panel) });
+    assert.equal(felder['[name="split_value_1"]'].placeholder, '0,00');
+
+    // Mehr Stellen als der Server fuehrt bleiben am Feld, der Satz nennt 0,01.
+    const zuGenau = await speichern(() => offen(forint()),
+      formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '1790,745', 3: '1790,725' } }).panel, { currency: 'USD' });
+    assert.deepEqual(zuGenau.gesendet, []);
+    assert.match(zuGenau.gemeldet[0]?.text ?? '', /^common\.amountPrecisionRequired\{"currency":"HUF","step":"0,01"\}/);
+
+    // Gegenprobe: eine neue HUF-Ausgabe folgt weiter dem Raster von HUF.
+    const neu = await speichern(() => offen(null),
+      formularAny({ amount: '3581,47', currency: 'HUF', method: 'exact', teilnehmer: { 1: '1790,74', 3: '1790,73' } }).panel, { currency: 'HUF' });
+    assert.deepEqual(neu.gesendet, []);
+    assert.match(neu.gemeldet[0]?.text ?? '', /^common\.amountPrecisionRequired\{"currency":"HUF"/);
+  });
+});
+
 test('Umgerechnete Ausgabe: neue Ausgaben und andere Aufteilungen bleiben, wie sie waren', async () => {
   await unter('de', async () => {
     const neu = formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '6,00', 3: '4,00' } });

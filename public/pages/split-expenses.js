@@ -2091,8 +2091,10 @@ function updateSplitInputs(panel) {
   // und Anteile sind reine Zahlen und behalten ihren festen Platzhalter.
   const currency = panel.querySelector('[name="currency"]')?.value || state.meta?.default_currency || 'EUR';
   const zero = amountPlaceholder(currency);
-  // Exakte Anteile einer behaltenen Umrechnung stehen in deren Waehrung (#2810).
-  const shareZero = amountPlaceholder(shareBasis(panel, currency).currency);
+  // Exakte Anteile einer behaltenen Umrechnung stehen in deren Waehrung und mit
+  // den Stellen, die der Server dafuer fuehrt (#2810).
+  const basis = shareBasis(panel, currency);
+  const shareZero = amountPlaceholder(basis.currency, { digits: basis.digits });
   const amountInput = panel.querySelector('[name="amount"]');
   if (amountInput) amountInput.placeholder = zero;
   panel.querySelectorAll('.split-split-value').forEach((input) => {
@@ -2141,13 +2143,19 @@ const decimalString = toAmountDecimalString;
  * `original` und `originalCurrency` tragen den Bestandsschutz (siehe
  * amountInputProblem): er endet, sobald die Währung gewechselt wurde.
  *
+ * `digits`: die Stellen, die der Server fuer diesen Betrag fuehrt, wenn sie
+ * nicht die der Waehrung sind (exactShareBasis) - sonst null.
+ *
+ * @param {any} input
+ * @param {string} currency
+ * @param {{ original?: any, originalCurrency?: string | null, required?: boolean, digits?: number | null }} [options]
  * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
  */
-function rejectSplitAmount(input, currency, { original = null, originalCurrency = null, required = false } = {}) {
+function rejectSplitAmount(input, currency, { original = null, originalCurrency = null, required = false, digits = null } = {}) {
   if (input == null) return false;
-  const problem = amountInputProblem(input.value, currency, { original, originalCurrency, required, decimalComma: true });
+  const problem = amountInputProblem(input.value, currency, { original, originalCurrency, required, decimalComma: true, digits });
   if (!problem) return false;
-  reportFieldError(input, amountProblemText(problem, currency));
+  reportFieldError(input, amountProblemText(problem, currency, { digits: digits ?? undefined }));
   return true;
 }
 
@@ -2694,7 +2702,7 @@ function openExpenseModal(expense = null, prefill = null) {
         const expenseCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
         if (rejectSplitAmounts(form, expenseCurrency,
           { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null,
-            shareCurrency: shareBasis(panel, expenseCurrency).currency })) return;
+            shareBasis: shareBasis(panel, expenseCurrency) })) return;
         const { participants, splits } = collectSplitPayload(form);
         // IDs als Zahl (#2810): Ziffern-Text nimmt der Server nur noch als Altform.
         const payload = { ...data, payer_id: Number(data.payer_id), participants, splits };
@@ -2769,17 +2777,20 @@ function wireSplitFields(panel, formSelector) {
  * (parseMoneyToMinor), und die Antwort kaeme englisch und ortlos zurueck. Wer
  * nichts traegt, wird abgehakt.
  *
- * `shareCurrency`: die Waehrung der Anteile, wenn sie nicht die des Betrags ist
- * (behaltene Umrechnung beim Bearbeiten, #2810).
+ * `shareBasis`: Waehrung und Stellen der Anteile, wenn sie nicht die des
+ * Betrags sind (behaltene Umrechnung beim Bearbeiten, #2810; exactShareBasis).
  *
+ * @param {any} form
+ * @param {string} currency
+ * @param {{ original?: any, originalCurrency?: string | null, shareBasis?: { currency: string, digits: number | null } | null }} [options]
  * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
  */
-function rejectSplitAmounts(form, currency, { original = null, originalCurrency = null, shareCurrency = currency } = {}) {
+function rejectSplitAmounts(form, currency, { original = null, originalCurrency = null, shareBasis = null } = {}) {
   if (rejectSplitAmount(form.querySelector('[name="amount"]'), currency, { original, originalCurrency, required: true })) return true;
   if (form.querySelector('[name="split_method"]')?.value !== 'exact') return false;
   for (const field of form.querySelectorAll('.split-split-value')) {
     if (field.hidden || field.disabled) continue;
-    if (rejectSplitAmount(field, shareCurrency, { required: true })) return true;
+    if (rejectSplitAmount(field, shareBasis?.currency ?? currency, { required: true, digits: shareBasis?.digits ?? null })) return true;
   }
   return false;
 }
