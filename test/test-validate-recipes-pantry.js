@@ -660,6 +660,9 @@ const FRONTEND_CALLS = [
   ['pantry.js create without place and day, minimum changed', 'POST', P, '/', { body: { ...PANTRY_FORM, location_id: null, expires_on: null, min_quantity: 2 } }],
   ['pantry.js edit, minimum cleared', 'PUT', P, '/:itemId', { params: { itemId: '9' }, body: { ...PANTRY_FORM, min_quantity: null } }],
   ['pantry.js stepper', 'PATCH', P, '/:itemId', { params: { itemId: '9' }, body: { quantity: 2.5 } }],
+  ['pantry.js take an amount', 'POST', P, '/:itemId/take', { params: { itemId: '9' }, body: { amount: 30 } }],
+  ['pantry.js take a decimal amount', 'POST', P, '/:itemId/take', { params: { itemId: '9' }, body: { amount: 0.25 } }],
+  ['pantry.js undo a take', 'POST', P, '/:itemId/take/undo', { params: { itemId: '9' }, body: { amount: 20 } }],
   ['pantry.js delete', 'DELETE', P, '/:itemId', { params: { itemId: '9' } }],
   ['pantry.js delete product', 'DELETE', P, '/products/:productId', { params: { productId: '9' } }],
   ['category-manager.js locations', 'GET', P, '/locations', {}],
@@ -773,6 +776,20 @@ test('pantry: the kind enum of the undo is exactly the kinds a take-over answers
   const schema = bodySchema('/api/v1/pantry/import-shopping/undo', 'post').properties.changes.items;
   assert.deepEqual(asSet(schema.properties.kind.enum), asSet([...kinds]), 'added on the first take-over, merged on the second');
   assert.deepEqual(asSet(schema.required), ['kind', 'pantry_item_id']);
+});
+
+test('pantry: the amount of a take and its undo is at least 0.01 and at most MAX_PANTRY_QUANTITY (#1891)', async () => {
+  const { MAX_PANTRY_QUANTITY, normalizePantryQuantity } = await import('../public/utils/pantry-units.js');
+  for (const path of ['/api/v1/pantry/{itemId}/take', '/api/v1/pantry/{itemId}/take/undo']) {
+    const schema = bodySchema(path, 'post');
+    assert.deepEqual(schema.required, ['amount'], path);
+    assert.equal(schema.properties.amount.type, 'number', path);
+    assert.equal(schema.properties.amount.maximum, MAX_PANTRY_QUANTITY, `${path}: the cap of every quantity`);
+    // The smallest amount is the smallest step a quantity keeps: below it,
+    // rounding to two decimals would take nothing.
+    assert.equal(normalizePantryQuantity(schema.properties.amount.minimum), schema.properties.amount.minimum, path);
+    assert.equal(normalizePantryQuantity(schema.properties.amount.minimum / 2.1), 0, path);
+  }
 });
 
 test('pantry: quantity and min_quantity are refused below 0 by the document', () => {

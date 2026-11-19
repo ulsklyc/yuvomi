@@ -841,3 +841,155 @@ test('Lagerorte nennen "gibt es schon", "gibt es nicht mehr" und "letzter Ort" (
   const last = await call('DELETE', `/pantry/locations/${ids[0]}`);
   assert.deepEqual([last.status, last.body?.reason], [400, 'pantry_location_last']);
 });
+
+// --------------------------------------------------------------------------
+// #1891: take an amount - the server subtracts
+// --------------------------------------------------------------------------
+const { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } = await import('../server/scopes.js');
+const { moduleAccessVerdict, MODULE_ACCESS_READ_ONLY } = await import('../server/authorize/index.ts');
+
+async function butter(quantity = 250, extra = {}) {
+  return (await call('POST', '/pantry', { name: 'Butter', quantity, unit: 'g', ...extra })).body.data;
+}
+
+test('#1891: taking 30 from 250 leaves 220, and the answer says what was taken', async () => {
+  const item = await butter();
+  const r = await call('POST', `/pantry/${item.id}/take`, { amount: 30 });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.quantity, 220);
+  assert.equal(r.body.taken, 30);
+  assert.equal(r.body.data.id, item.id);
+  assert.equal(r.body.data.product_id, item.product_id, 'the batch stays in its product');
+  assert.equal(itemRow(item.id).quantity, 220);
+});
+
+test('#1891: the request carries the amount, so two takes sent from the same seen quantity both count', async () => {
+  const item = await butter();
+  // One after the other, each sent knowing 250: 190, not 220.
+  await call('POST', `/pantry/${item.id}/take`, { amount: 30 });
+  const second = await call('POST', `/pantry/${item.id}/take`, { amount: 30 });
+  assert.equal(second.body.data.quantity, 190);
+  // Sent together, both from what the page showed: both count again (the
+  // handler runs synchronously, so this proves the relative request, not a race).
+  const both = await Promise.all([
+    call('POST', `/pantry/${item.id}/take`, { amount: 40 }),
+    call('POST', `/pantry/${item.id}/take`, { amount: 50 }),
+  ]);
+  assert.deepEqual(both.map((r) => r.status), [200, 200]);
+  assert.equal(itemRow(item.id).quantity, 100);
+  // The PATCH of the stepper still sets the quantity as a whole.
+  const patched = await call('PATCH', `/pantry/${item.id}`, { quantity: 300 });
+  assert.equal(patched.body.data.quantity, 300);
+});
+
+test('#1891: more than is there sets the batch to 0 and says how much was really taken', async () => {
+  const item = await butter(20);
+  const r = await call('POST', `/pantry/${item.id}/take`, { amount: 30 });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.quantity, 0);
+  assert.equal(r.body.taken, 20);
+  // From an empty batch nothing is taken, and the batch stays (it is not deleted).
+  const empty = await call('POST', `/pantry/${item.id}/take`, { amount: 5 });
+  assert.equal(empty.status, 200);
+  assert.equal(empty.body.data.quantity, 0);
+  assert.equal(empty.body.taken, 0);
+  assert.ok(itemRow(item.id), 'the empty batch is still there');
+});
+
+test('#1891: the amount is in the unit of the batch and rounded like every quantity', async () => {
+  const flour = (await call('POST', '/pantry', { name: 'Mehl', quantity: 1.5, unit: 'kg' })).body.data;
+  const r = await call('POST', `/pantry/${flour.id}/take`, { amount: 0.25 });
+  assert.equal(r.body.data.quantity, 1.25, '0.25 kg, not 0.25 g: no conversion');
+  assert.equal(r.body.data.unit, 'kg');
+  const odd = await call('POST', `/pantry/${flour.id}/take`, { amount: 0.333 });
+  assert.equal(odd.body.taken, 0.33);
+  assert.equal(odd.body.data.quantity, 0.92);
+});
+
+test('#1891: the undo puts back what was taken, on top of a change made in between', async () => {
+  const item = await butter();
+  const took = await call('POST', `/pantry/${item.id}/take`, { amount: 30 });
+  assert.equal(took.body.data.quantity, 220);
+  // Someone steps the batch down in the window of the toast.
+  await call('PATCH', `/pantry/${item.id}`, { quantity: 120 });
+  const undo = await call('POST', `/pantry/${item.id}/take/undo`, { amount: took.body.taken });
+  assert.equal(undo.status, 200);
+  assert.equal(undo.body.data.quantity, 150, 'added, not written back as 250');
+  assert.equal(undo.body.taken, undefined, 'the undo answers with the item only');
+  // An undo of a take that hit 0 puts back only what was there.
+  const small = await butter(20);
+  const all = await call('POST', `/pantry/${small.id}/take`, { amount: 100 });
+  const back = await call('POST', `/pantry/${small.id}/take/undo`, { amount: all.body.taken });
+  assert.equal(back.body.data.quantity, 20);
+});
+
+test('#1891: the undo stops at the cap of every quantity, and says what the batch holds then', async () => {
+  const { MAX_PANTRY_QUANTITY } = await import('../public/utils/pantry-units.js');
+  const item = await butter(MAX_PANTRY_QUANTITY - 10);
+  const back = await call('POST', `/pantry/${item.id}/take/undo`, { amount: 100 });
+  assert.equal(back.status, 200);
+  assert.equal(back.body.data.quantity, MAX_PANTRY_QUANTITY, 'not 1,000,090');
+  assert.equal(itemRow(item.id).quantity, MAX_PANTRY_QUANTITY);
+  const took = await call('POST', `/pantry/${item.id}/take`, { amount: MAX_PANTRY_QUANTITY });
+  assert.deepEqual([took.body.data.quantity, took.body.taken], [0, MAX_PANTRY_QUANTITY]);
+});
+
+test('#1891: a take changes the total of the product in GET /pantry', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  db.prepare('DELETE FROM pantry_products').run();
+  const fridge = await butter(250);
+  await butter(250, { expires_on: '2099-01-01' });
+  await call('POST', `/pantry/${fridge.id}/take`, { amount: 30 });
+  const list = await call('GET', '/pantry');
+  const product = list.body.products.find((/** @type {any} */ p) => p.id === fridge.product_id);
+  assert.equal(product.batch_count, 2);
+  assert.equal(product.total_quantity, 470);
+});
+
+test('#1891: 0, a negative amount and one that is not a number are refused, nothing changes', async () => {
+  const item = await butter();
+  for (const [body, field] of [
+    [{ amount: 0 }, { path: 'body/amount', rule: 'minimum' }],
+    [{ amount: -30 }, { path: 'body/amount', rule: 'minimum' }],
+    [{ amount: 0.001 }, { path: 'body/amount', rule: 'minimum' }],
+    [{ amount: 1_000_001 }, { path: 'body/amount', rule: 'maximum' }],
+    [{ amount: '30' }, { path: 'body/amount', rule: 'type' }],
+    [{ amount: null }, { path: 'body/amount', rule: 'type' }],
+    [{ amount: true }, { path: 'body/amount', rule: 'type' }],
+    [{}, { path: 'body/amount', rule: 'required' }],
+    [{ quantity: 30 }, { path: 'body/amount', rule: 'required' }],
+    [undefined, { path: 'body', rule: 'required' }],
+  ]) {
+    for (const route of [`/pantry/${item.id}/take`, `/pantry/${item.id}/take/undo`]) {
+      const r = await call('POST', route, body);
+      assert.equal(r.status, 400, `${route} ${JSON.stringify(body)}`);
+      assert.equal(r.body.reason, 'validation');
+      assert.equal(r.body.error, 'The request does not match the documented schema.', 'an English refusal');
+      assert.deepEqual(r.body.fields, [field], `${route} ${JSON.stringify(body)}`);
+    }
+  }
+  assert.equal(itemRow(item.id).quantity, 250, 'no refused request changed the batch');
+});
+
+test('#1891: an unknown batch is a 404, an id that is not plain digits a 400', async () => {
+  for (const route of ['/pantry/999999/take', '/pantry/999999/take/undo']) {
+    const r = await call('POST', route, { amount: 1 });
+    assert.deepEqual([r.status, r.body.error], [404, 'Item not found.'], route);
+  }
+  for (const id of ['abc', '1e2', '0x10']) {
+    const r = await call('POST', `/pantry/${id}/take`, { amount: 1 });
+    assert.equal(r.status, 400, id);
+    assert.deepEqual(r.body.fields, [{ path: 'path/itemId', rule: 'type' }], id);
+  }
+});
+
+test('#1891: take and undo are pantry writes, so pantry read gets 403 on both axes', () => {
+  for (const path of ['/pantry/5/take', '/pantry/5/take/undo']) {
+    const session = sessionModuleAccessRequirement(path, 'POST');
+    assert.deepEqual(session, { moduleKey: 'pantry', access: 'write' }, path);
+    assert.equal(moduleAccessVerdict({ pantry: 'read' }, session.moduleKey, session.access), MODULE_ACCESS_READ_ONLY, path);
+    const token = tokenAccessRequirement(path, 'POST');
+    assert.equal(tokenAllows(['pantry:read'], token.moduleKey, token.access), false, path);
+    assert.equal(tokenAllows(['pantry:write'], token.moduleKey, token.access), true, path);
+  }
+});

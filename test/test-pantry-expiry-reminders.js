@@ -236,6 +236,29 @@ test('der ±-Stepper auf 0 räumt die Erinnerung ab', async () => {
   assert.equal(countReminders(id), 0);
 });
 
+test('#1891: taking the last of a batch clears the reminder as the stepper does, the undo brings it back', async () => {
+  const res = await call('POST', '/pantry', /** @type {any} */ ({ body: { name: 'Butter', quantity: 250, unit: 'g', expires_on: FUTURE_EXPIRY } }));
+  const id = res.body.data.id;
+  const before = reminderFor(id);
+  assert.ok(before);
+
+  // A part leaves the reminder as it was: same row, same time.
+  const part = await call('POST', `/pantry/${id}/take`, /** @type {any} */ ({ body: { amount: 30 } }));
+  assert.equal(part.status, 200);
+  assert.equal(countReminders(id), 1);
+  assert.equal(reminderFor(id).remind_at, before.remind_at);
+
+  // The last of it: gone, like PATCH with quantity 0 above.
+  const last = await call('POST', `/pantry/${id}/take`, /** @type {any} */ ({ body: { amount: 500 } }));
+  assert.equal(last.body.data.quantity, 0);
+  assert.equal(countReminders(id), 0);
+
+  // Put back: the reminder is due again.
+  await call('POST', `/pantry/${id}/take/undo`, /** @type {any} */ ({ body: { amount: last.body.taken } }));
+  assert.equal(countReminders(id), 1);
+  assert.equal(reminderFor(id).remind_at, before.remind_at);
+});
+
 test('PUT ersetzt die Erinnerung vollständig statt sie zu verdoppeln', async () => {
   const res = await call('POST', '/pantry', { body: { name: 'Käse', quantity: 1, expires_on: FUTURE_EXPIRY } });
   const id = res.body.data.id;
