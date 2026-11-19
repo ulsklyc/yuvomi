@@ -126,6 +126,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   amount correctly.** `converted_amount` in the expense answers was written with the decimal
   places of `currency` instead of `converted_currency`: 1500 JPY converted from USD read
   `"15.00"`, and sending it back was refused. `converted_amount_minor` was always right.
+- **Exact shares of an expense converted into COP, HUF, IDR or IRR can be saved again.** The
+  converted amount keeps two decimal places (for example 3581.47 HUF), but the share fields
+  allowed none for these currencies, so the shares could never add up to it. They now accept
+  the decimal places the converted amount is stored with.
+- **A shared expense saved without an exchange rate answers `exchange_snapshot: null`.** Creating
+  or replacing an expense without a rate stored the text `"null"`, and the expense answers
+  returned `"exchange_snapshot": "null"` for it. New and replaced expenses now store no value and
+  answer `null`; expenses saved before keep `"null"` until they are saved again.
 
 ## [2.93.0] - 2026-11-18
 

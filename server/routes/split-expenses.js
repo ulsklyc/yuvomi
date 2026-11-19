@@ -174,6 +174,19 @@ function expenseSnapshot(title, amountMinor, currency) {
   return { title, amount_minor: amountMinor, currency };
 }
 
+/**
+ * Der Kurs einer Ausgabe fuer die Spalte `exchange_snapshot` (Text). Fehlt er
+ * oder ist er `null`, steht SQL NULL in der Zeile (#2810): bis v2.93 schrieben
+ * POST und PUT `JSON.stringify(null)`, also den Text "null". `false`, `0` und
+ * `""` nimmt das Schema als JSON an; sie behalten das bisherige "null".
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function storedSnapshot(value) {
+  if (value == null) return null;
+  return JSON.stringify(value || null);
+}
+
 function groupSelectWhere(where) {
   return `
     SELECT g.*,
@@ -1179,7 +1192,7 @@ router.post('/groups/:id/expenses', validateRequest(), (req, res) => {
         INSERT INTO expenses
           (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency, exchange_snapshot, payer_id, category, budget_category, split_method, expense_date, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, budgetCategory, parsed.method, parsed.expenseDate, userId(req));
+      `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, storedSnapshot(req.body.exchange_snapshot), payerId, parsed.category, budgetCategory, parsed.method, parsed.expenseDate, userId(req));
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
       replaceExpenseSplits(db.get(), expense, splits);
       // Belege (#583): nur sichtbare Dokumente, sonst liesse sich über geratene
@@ -1233,7 +1246,7 @@ router.put('/expenses/:id', validateRequest(), (req, res) => {
         SET title = ?, description = ?, amount_minor = ?, currency = ?, converted_amount_minor = ?, converted_currency = ?,
             exchange_snapshot = ?, payer_id = ?, category = ?, budget_category = ?, split_method = ?, expense_date = ?
         WHERE id = ?
-      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, budgetCategory, parsed.method, parsed.expenseDate, existing.id);
+      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, storedSnapshot(req.body.exchange_snapshot), payerId, parsed.category, budgetCategory, parsed.method, parsed.expenseDate, existing.id);
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(existing.id);
       replaceExpenseSplits(db.get(), expense, splits);
       // Belege nur anfassen, wenn das Feld mitkommt - ein PUT, das nur den

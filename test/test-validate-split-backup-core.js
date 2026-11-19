@@ -555,12 +555,41 @@ test('PUT /expenses/{id} is the whole expense - a left-out required field is a 4
   // `null` stays allowed where it was: no note, converted = entered, no snapshot; `""` is today.
   assertPassed(await call('PUT', route, { json: { ...stored, description: null, converted_amount: null, exchange_snapshot: null, expense_date: '' } }), 200, 'nulls');
   const cleared = row();
-  assert.deepEqual([cleared.description, cleared.converted_amount_minor, cleared.converted_currency, cleared.exchange_snapshot], [null, 1000, 'EUR', 'null']);
+  assert.deepEqual([cleared.description, cleared.converted_amount_minor, cleared.converted_currency, cleared.exchange_snapshot], [null, 1000, 'EUR', null]);
   assert.notEqual(cleared.expense_date, '2026-03-01', '`""` is the documented today');
 
   // The edit form of the app after a changed amount.
   assertPassed(await call('PUT', route, { json: expenseEdit({ title: 'Reise', amount: '11.00', attachment_document_ids: [doc] }) }), 200, 'the app\'s edit form');
   assert.deepEqual(row().receipts, [doc]);
+});
+
+// Without a rate the column holds SQL NULL, not the text "null" (#2810): POST
+// and PUT wrote JSON.stringify(null). `false`, `0` and `""` are JSON the schema
+// accepts; they keep the old answer ("null") until that is decided on its own.
+test('exchange_snapshot: none sent or null is stored as SQL NULL, on POST and PUT', async () => {
+  const snapshotOf = (/** @type {number} */ id) => db.prepare('SELECT exchange_snapshot, exchange_snapshot IS NULL AS missing FROM expenses WHERE id = ?').get(id);
+  const created = [];
+  for (const [label, extra] of /** @type {Array<[string, Record<string, unknown>]>} */ ([['left out', {}], ['null', { exchange_snapshot: null }]])) {
+    const answer = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, { json: expenseForm({ title: `Ohne Kurs ${label}`, ...extra }) });
+    assertPassed(answer, 201, `POST ${label}`);
+    assert.deepEqual({ ...snapshotOf(answer.body.data.id) }, { exchange_snapshot: null, missing: 1 }, `POST ${label}: SQL NULL`);
+    assert.equal(answer.body.data.exchange_snapshot, null, `POST ${label}: the answer says null`);
+    created.push(answer.body.data.id);
+  }
+  // PUT: a stored rate cleared with null is SQL NULL as well.
+  const withRate = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, { json: expenseForm({ title: 'Mit Kurs', exchange_snapshot: { rate: '0.9' } }) });
+  assertPassed(withRate, 201, 'with rate');
+  assert.equal(snapshotOf(withRate.body.data.id).exchange_snapshot, '{"rate":"0.9"}');
+  const cleared = await call('PUT', `/split-expenses/expenses/${withRate.body.data.id}`, { json: expenseEdit({ title: 'Mit Kurs' }) });
+  assertPassed(cleared, 200, 'PUT null');
+  assert.deepEqual({ ...snapshotOf(withRate.body.data.id) }, { exchange_snapshot: null, missing: 1 }, 'PUT null: SQL NULL');
+  assert.equal(cleared.body.data.exchange_snapshot, null);
+  // Unchanged: falsy JSON other than null keeps the text "null".
+  for (const value of [false, 0, '']) {
+    const answer = await call('PUT', `/split-expenses/expenses/${created[0]}`, { json: expenseEdit({ title: 'Ohne Kurs left out', exchange_snapshot: value }) });
+    assertPassed(answer, 200, `PUT ${JSON.stringify(value)}`);
+    assert.equal(snapshotOf(created[0]).exchange_snapshot, 'null', `PUT ${JSON.stringify(value)}: as before`);
+  }
 });
 
 /**
@@ -659,7 +688,7 @@ test('PUT /expenses/{id}: exact shares of a kept conversion add up to the conver
   assert.deepEqual(listed.splits.map((/** @type {any} */ s) => [s.amount, s.currency]).sort(), [['3.60', 'EUR'], ['5.40', 'EUR']]);
 
   const basis = exactShareBasis(listed, listed.amount, listed.currency);
-  assert.deepEqual(basis, { amount: '9.00', currency: 'EUR', from: { amount: '10.00', currency: 'USD' } });
+  assert.deepEqual(basis, { amount: '9.00', currency: 'EUR', digits: 2, from: { amount: '10.00', currency: 'USD' } });
   const kept = keptConversion(listed, listed.amount, listed.currency);
   const edit = (/** @type {string[]} */ [a, b]) => call('PUT', `/split-expenses/expenses/${id}`, {
     json: expenseForm({ title: 'Taxi', amount: listed.amount, currency: listed.currency, ...kept, split_method: 'exact', splits: [{ user_id: OWNER, amount: a }, { user_id: MEM, amount: b }] }),
@@ -673,14 +702,43 @@ test('PUT /expenses/{id}: exact shares of a kept conversion add up to the conver
 
   // A changed currency drops the conversion: the basis is the input again,
   // and the server agrees.
-  assert.deepEqual(exactShareBasis(listed, listed.amount, 'EUR'), { amount: listed.amount, currency: 'EUR', from: null });
-  assert.deepEqual(exactShareBasis(listed, '10.50', 'USD'), { amount: '10.50', currency: 'USD', from: null });
+  assert.deepEqual(exactShareBasis(listed, listed.amount, 'EUR'), { amount: listed.amount, currency: 'EUR', digits: null, from: null });
+  assert.deepEqual(exactShareBasis(listed, '10.50', 'USD'), { amount: '10.50', currency: 'USD', digits: null, from: null });
   assert.equal(conversionKept(listed, listed.amount, 'EUR'), false);
   assert.equal(conversionKept(null, '10.00', 'USD'), false);
   const dropped = keptConversion(listed, listed.amount, 'EUR');
   assertPassed(await call('PUT', `/split-expenses/expenses/${id}`, {
     json: expenseForm({ title: 'Taxi', amount: listed.amount, currency: 'EUR', ...dropped, split_method: 'exact', splits: [{ user_id: OWNER, amount: '6.00' }, { user_id: MEM, amount: '4.00' }] }),
   }), 200, 'changed currency: shares on the entered amount');
+});
+
+// The decimal places of the shares come from the server's own text (#2810):
+// COP, HUF, IDR and IRR are kept with two places (CURRENCY_MINOR_UNITS), the
+// CLDR shows them with none. converted_amount is written by minorToDecimal
+// with full scale, so its text carries what the server keeps - also "x.00".
+test('PUT /expenses/{id}: a kept conversion into HUF reports the stored decimal places, and shares at that precision pass', async () => {
+  for (const [convertedAmount, currency, places, shares] of /** @type {Array<[string, string, number, string[]]>} */ ([
+    ['3581.47', 'HUF', 2, ['1790.74', '1790.73']],
+    ['3581.00', 'HUF', 2, ['1790.50', '1790.50']],
+    ['1500', 'JPY', 0, ['750', '750']],
+  ])) {
+    const created = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, {
+      json: expenseForm({
+        title: `Nach ${currency}`, amount: '10.00', currency: 'USD', converted_amount: convertedAmount, converted_currency: currency,
+        exchange_snapshot: { rate: 'x' }, split_method: 'exact', splits: [{ user_id: OWNER, amount: shares[0] }, { user_id: MEM, amount: shares[1] }],
+      }),
+    });
+    assertPassed(created, 201, `create ${convertedAmount} ${currency}`);
+    const id = created.body.data.id;
+    const listed = (await call('GET', `/split-expenses/groups/${GROUP}/expenses?limit=100`)).body.data.find((/** @type {any} */ e) => e.id === id);
+    assert.equal(listed.converted_amount, convertedAmount, 'the server writes the full scale');
+    const basis = exactShareBasis(listed, listed.amount, listed.currency);
+    assert.deepEqual([basis.amount, basis.currency, basis.digits], [convertedAmount, currency, places]);
+    const kept = keptConversion(listed, listed.amount, listed.currency);
+    assertPassed(await call('PUT', `/split-expenses/expenses/${id}`, {
+      json: expenseForm({ title: `Nach ${currency}`, amount: listed.amount, currency: listed.currency, ...kept, split_method: 'exact', splits: [{ user_id: OWNER, amount: shares[0] }, { user_id: MEM, amount: shares[1] }] }),
+    }), 200, `shares at ${places} places`);
+  }
 });
 
 test('the own caller: the expense PUT of the page sends every required field of its schema', () => {

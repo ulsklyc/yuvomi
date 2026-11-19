@@ -66,15 +66,25 @@ export function conversionKept(expense, amount, currency) {
  * Waehrung stehen als die Eingabe - sonst null. Der Betrag bleibt Text des
  * Servers, hier wird nichts zurueckgerechnet.
  *
+ * `digits`: die Nachkommastellen, die der SERVER fuer die Anteile fuehrt, oder
+ * null (dann gelten die der Waehrung). Bei behaltener Umrechnung abgelesen am
+ * Dezimaltext `converted_amount` - der Server schreibt ihn ueber
+ * minorToDecimal immer mit voller Stellenzahl. COP, HUF, IDR und IRR zeigt
+ * der CLDR ohne Nachkommastellen, der Server speichert sie mit zwei: eine
+ * Umrechnung nach HUF ergibt "3581.47", und mit der Genauigkeit des CLDR
+ * koennten die Anteile diese Summe nie treffen. Die EINE Quelle fuer
+ * Feldpruefung, Platzhalter und Fehlertext.
+ *
  * @param {any} expense die gespeicherte Ausgabe oder null
  * @param {string} amount der Betrag des Dialogs (Dezimaltext mit Punkt)
  * @param {string} currency die Waehrung des Dialogs
- * @returns {{ amount: string, currency: string, from: { amount: string, currency: string } | null }}
+ * @returns {{ amount: string, currency: string, digits: number | null, from: { amount: string, currency: string } | null }}
  */
 export function exactShareBasis(expense, amount, currency) {
-  if (!conversionKept(expense, amount, currency)) return { amount, currency, from: null };
+  if (!conversionKept(expense, amount, currency)) return { amount, currency, digits: null, from: null };
   const from = expense.converted_currency === currency ? null : { amount: String(expense.amount), currency };
-  return { amount: expense.converted_amount, currency: expense.converted_currency, from };
+  const digits = (expense.converted_amount.split('.')[1] ?? '').length;
+  return { amount: expense.converted_amount, currency: expense.converted_currency, digits, from };
 }
 
 /**
