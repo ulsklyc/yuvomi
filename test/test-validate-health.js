@@ -336,6 +336,15 @@ test('caregiver_ids: ["abc"] is 400 and care stays (withdrew all care before)', 
   assert.ok(before.length > 0, 'a grant to keep');
   refused(await call('PUT', `/caregivers/${MEM}`, { json: { caregiver_ids: ['abc'] } }), 'body/caregiver_ids/0', 'caregiver ["abc"]');
   assert.deepEqual(db.prepare('SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?').all(MEM), before, 'care stays');
+  // Digit text is the legacy form of an id, but "0" and "00" are no id: the
+  // route read them as 0 and dropped them silently, like "abc".
+  for (const zero of ['0', '00']) {
+    refused(await call('PUT', `/caregivers/${MEM}`, { json: { caregiver_ids: [zero] } }), 'body/caregiver_ids/0', `caregiver ["${zero}"]`);
+    assert.deepEqual(db.prepare('SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?').all(MEM), before, `care stays after "${zero}"`);
+  }
+  // Leading zeros before a real id stay the legacy form.
+  accepted(await call('PUT', `/caregivers/${MEM}`, { json: { caregiver_ids: [`00${PARTNER}`] } }), 'caregiver with leading zeros');
+  assert.deepEqual(db.prepare('SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?').all(MEM), [{ caregiver_id: PARTNER }]);
 });
 
 test('type_id: a number or digit text, nothing else (read by parseInt before)', async () => {
