@@ -15,7 +15,7 @@ import { requireAdmin } from '../auth.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { createLogger } from '../logger.js';
-import { MODULES_DIR, listModules, resolveAssetPath, setModuleEnabled } from '../services/modules.js';
+import { MODULES_DIR, listModules, normalizeCommitSha, resolveAssetPath, setModuleEnabled } from '../services/modules.js';
 import {
   InstallError,
   MAX_ZIP_MB,
@@ -230,9 +230,14 @@ router.post('/install/github', requireAdmin, requireWebInstall, requireBrowserSe
         path: pathOption(body.path),
       });
       const { files, comment } = unpackArchive(gh.buffer);
-      // GitHub writes the commit SHA as the zipball's archive comment. Optional:
-      // a missing or odd comment only means the details view shows no commit.
-      const commit = /^[0-9a-f]{40}$/i.test(comment.trim()) ? comment.trim().toLowerCase() : null;
+      // GitHub writes the commit SHA as the zipball's archive comment (git
+      // archive stores the commit id there). Read from the archive itself, it
+      // names exactly the bytes being installed: resolving the ref through the
+      // API first could name a different commit if the branch moved before the
+      // download, and would cost a request against the rate limit (#2064).
+      // Optional: a missing or odd comment only means the details view shows
+      // no commit and a replace offers no compare link.
+      const commit = normalizeCommitSha(comment);
       return installFilesUnlocked(files, {
         source: 'github',
         overwrite: wantsOverwrite(body.overwrite),

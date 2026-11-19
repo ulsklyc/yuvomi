@@ -337,6 +337,24 @@ export const INSTALL_META_FILE = '.yuvomi-install.json';
 const INSTALL_META_MAX_BYTES = 4096;
 const INSTALL_SOURCES = new Set(['zip', 'github']);
 
+// Ein Commit, wie GitHub ihn ins Archiv schreibt: 40 Hex-Zeichen (SHA-1). Nur
+// was so aussieht, landet im Datensatz und in einer Antwort; aus diesem Wert
+// baut die Seite Links auf github.com (#2064), und ein von Hand verdorbener
+// Datensatz soll dort weder einen Pfad noch einen falschen Commit hineintragen.
+// SHA-256-Repositories gibt es auf GitHub nicht.
+const COMMIT_SHA_RE = /^[0-9a-f]{40}$/;
+
+/**
+ * Der Commit in 40 kleinen Hex-Zeichen, sonst null. Schneidet Leerraum ab, wirft nie.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function normalizeCommitSha(value) {
+  if (typeof value !== 'string') return null;
+  const sha = value.trim().toLowerCase();
+  return COMMIT_SHA_RE.test(sha) ? sha : null;
+}
+
 // Was das Dateisystem sagt, wenn der Server in den Ordner nicht schreiben darf.
 // EINE Liste fuer die Installation (module-install.js assertWritable) und die
 // Freigabe hier: beide antworten damit 503 `not_writable`, nie eine rohe
@@ -393,11 +411,20 @@ export async function readInstallRecord(basePath) {
     const raw = JSON.parse(await fs.readFile(file, 'utf8'));
     if (!raw || typeof raw !== 'object' || !INSTALL_SOURCES.has(raw.source)) return null;
     const str = (v, max) => (typeof v === 'string' && v ? v.slice(0, max) : null);
+    // Einen Commit kennt nur eine Installation von GitHub (#2064). Ein ZIP traegt
+    // keinen, auch wenn jemand das Feld von Hand in die Datei schreibt.
+    const github = raw.source === 'github';
+    const commit = github ? normalizeCommitSha(raw.commit) : null;
+    // Nur nach einem Ersetzen aus demselben Repository mit anderem Commit
+    // (installFilesUnlocked); sonst fehlt das Feld ganz. Ohne den neuen Commit
+    // gibt es keinen Vergleich, und derselbe Commit zweimal ist keiner.
+    const previous = commit ? normalizeCommitSha(raw.previousCommit) : null;
     return {
       source: raw.source,
       url: str(raw.url, 500),
       ref: str(raw.ref, 200),
-      commit: str(raw.commit, 64),
+      commit,
+      ...(previous && previous !== commit ? { previousCommit: previous } : {}),
       path: str(raw.path, 500),
       installedAt: str(raw.installedAt, 40),
       // Nur das Literal `true` zaehlt: eine Datei, die das Feld nicht kennt

@@ -753,6 +753,50 @@ test('readInstallRecord/readInstallMeta/writeInstallApproval: Felder, Grenzen, A
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// #2064: aus `commit` und `previousCommit` baut die Seite Links auf github.com.
+// Gelesen wird darum nur, was wie ein Commit aussieht (40 Hex-Zeichen, klein
+// geschrieben zurueck), nur fuer eine Installation von GitHub, und den alten
+// Commit nur neben einem neuen, der anders ist. Ein aelterer Datensatz ohne
+// Commit laedt wie bisher, mit `commit: null` und ohne `previousCommit`.
+test('#2064: readInstallRecord liest commit und previousCommit nur als Commit von GitHub', async () => {
+  const dir = path.join(MODULES_DIR, 'rec-sha-mod');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, '.yuvomi-install.json');
+  const sha = 'a'.repeat(40);
+  const old = 'b'.repeat(40);
+  const github = { source: 'github', url: 'https://github.com/o/r', ref: 'main' };
+  const read = async (/** @type {object} */ overrides) => {
+    fs.writeFileSync(file, installRecord(overrides));
+    return /** @type {any} */ (await svc.readInstallRecord(dir));
+  };
+  try {
+    const legacy = await read(github);
+    assert.equal(legacy.commit, null, 'ein Datensatz von vor dem Commit laedt, ohne Commit');
+    assert.equal('previousCommit' in legacy, false);
+    assert.equal(legacy.url, 'https://github.com/o/r');
+
+    assert.equal((await read({ ...github, commit: sha })).commit, sha);
+    assert.equal((await read({ ...github, commit: ` ${sha.toUpperCase()}\n` })).commit, sha, 'klein geschrieben und ohne Leerraum');
+    for (const bad of ['a'.repeat(39), 'a'.repeat(41), 'g'.repeat(40), `${'a'.repeat(39)}/`, '../../x', 'main', 42, null, ['x']]) {
+      const record = await read({ ...github, commit: bad, previousCommit: old });
+      assert.equal(record.commit, null, JSON.stringify(bad));
+      assert.equal('previousCommit' in record, false, `ohne neuen Commit kein alter: ${JSON.stringify(bad)}`);
+    }
+
+    const replaced = await read({ ...github, commit: sha, previousCommit: old });
+    assert.equal(replaced.previousCommit, old);
+    assert.equal((await svc.readInstallMeta(dir))?.previousCommit, old, 'auch in der Antwortform');
+    assert.equal('previousCommit' in await read({ ...github, commit: sha, previousCommit: sha }), false, 'derselbe Commit zweimal ist kein Vergleich');
+    assert.equal('previousCommit' in await read({ ...github, commit: sha, previousCommit: 'HEAD~1' }), false);
+
+    const zip = await read({ source: 'zip', commit: sha, previousCommit: old });
+    assert.equal(zip.commit, null, 'ein ZIP hat keinen Commit, auch wenn die Datei einen nennt');
+    assert.equal('previousCommit' in zip, false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // Runde 4 der Review (#1671): kann die Freigabe nicht geschrieben werden, weil
 // der Modulordner schreibgeschuetzt ist, antwortet die Route 503 not_writable -
 // nicht 500 mit der rohen Meldung, die den absoluten Serverpfad der Temp-Datei

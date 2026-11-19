@@ -4652,6 +4652,123 @@ test('Eigenes Modul: Fokus, veraltete Kandidaten, ein Fehler, Persistenz-Hinweis
   assert.match(activeFlat, /installedBy \? \{ label: t\('settings\.moduleDetailInstalledBy'\), value: installedBy \} : null/);
 });
 
+// #2064: die Details nennen den Commit, der WIRKLICH installiert ist (kurz,
+// verlinkt, kopierbar), und nach einem Ersetzen aus demselben Repository den
+// Vergleich alt...neu auf GitHub. Links nur aus geprueften Teilen; ein ZIP, ein
+// Datensatz ohne Commit und alles Verdorbene ergibt keine Zeile.
+test('#2064: Commit und Vergleich in den Details eines Moduls von GitHub', async () => {
+  // Der Pfad als Wert: tsc loest die Browser-Adresse nicht auf (TS2307), der Loader schon.
+  /** @type {string} */
+  const activePage = '/settings/pages/modules-active.js';
+  const { githubCommitLinks, copyCommit } = await import(activePage);
+  const sha = '0123456789abcdef0123456789abcdef01234567';
+  const old = 'fedcba9876543210fedcba9876543210fedcba98';
+  const gh = { source: 'github', url: 'https://github.com/owner-1/repo.js', ref: 'main', commit: sha, approved: false };
+
+  assert.deepEqual(githubCommitLinks(gh), {
+    commit: sha,
+    short: '0123456',
+    commitUrl: `https://github.com/owner-1/repo.js/commit/${sha}`,
+    compareUrl: null,
+  }, 'nach einer neuen Installation: der Commit, kein Vergleich');
+  assert.equal(githubCommitLinks({ ...gh, previousCommit: old }).compareUrl,
+    `https://github.com/owner-1/repo.js/compare/${old}...${sha}`, 'nach dem Ersetzen: alt...neu');
+  assert.equal(githubCommitLinks({ ...gh, previousCommit: sha }).compareUrl, null, 'derselbe Commit: nichts zu vergleichen');
+  assert.equal(githubCommitLinks({ ...gh, previousCommit: 'HEAD~1' }).compareUrl, null);
+  assert.equal(githubCommitLinks({ ...gh, previousCommit: `${old}/../x` }).compareUrl, null, 'ein alter Commit mit Pfad dahinter');
+  assert.equal(githubCommitLinks({ ...gh, previousCommit: `${old}0` }).compareUrl, null, '41 Hex-Zeichen sind kein Commit');
+  assert.equal(githubCommitLinks({ ...gh, previousCommit: old.toUpperCase() }).compareUrl, null, 'der Server schreibt klein; alles andere ist kein Commit');
+
+  // Keine Zeile statt eines falschen Links.
+  /** @type {Array<[string, any]>} */
+  const broken = [
+    ['ZIP', { source: 'zip', commit: sha }],
+    ['von Hand kopiert', null],
+    ['aelterer Datensatz ohne Commit', { ...gh, commit: null }],
+    ['Commit zu kurz', { ...gh, commit: sha.slice(0, 39) }],
+    ['Commit mit Pfad', { ...gh, commit: `${sha.slice(0, 39)}/` }],
+    ['Commit mit Pfad dahinter', { ...gh, commit: `${sha}/../x` }],
+    ['41 Hex-Zeichen', { ...gh, commit: `${sha}0` }],
+    ['Commit gross', { ...gh, commit: sha.toUpperCase() }],
+    ['keine URL', { ...gh, url: null }],
+    ['anderer Host', { ...gh, url: 'https://gitlab.com/o/r' }],
+    ['Unterdomain', { ...gh, url: 'https://github.com.evil.example/o/r' }],
+    ['http', { ...gh, url: 'http://github.com/o/r' }],
+    ['javascript:', { ...gh, url: 'javascript:alert(1)//github.com/o/r' }],
+    ['Pfad dahinter', { ...gh, url: 'https://github.com/o/r/../../evil' }],
+    ['Query', { ...gh, url: 'https://github.com/o/r?x=1' }],
+    ['Punkt-Repo', { ...gh, url: 'https://github.com/o/..' }],
+    ['Owner mit Bindestrich vorn', { ...gh, url: 'https://github.com/-o/r' }],
+  ];
+  for (const [why, install] of broken) {
+    assert.equal(githubCommitLinks(install), null, why);
+  }
+
+  // Kopieren: der VOLLE Commit. Ohne navigator.clipboard (http im Heimnetz)
+  // steht er markiert im Feld, und execCommand kopiert die Markierung.
+  const navDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const prev = { window: globalThis.window, document: globalThis.document };
+  const setNavigator = (/** @type {unknown} */ value) => Object.defineProperty(globalThis, 'navigator', { value, configurable: true, writable: true });
+  let selected = null;
+  let execResult = true;
+  globalThis.window = /** @type {any} */ ({ getSelection: () => ({ selectAllChildren: (/** @type {unknown} */ el) => { selected = el; } }) });
+  globalThis.document = /** @type {any} */ ({ execCommand: (/** @type {string} */ cmd) => cmd === 'copy' && execResult });
+  try {
+    /** @type {string[]} */
+    const written = [];
+    setNavigator({ clipboard: { writeText: async (/** @type {string} */ text) => { written.push(text); } } });
+    const code = { textContent: '0123456' };
+    assert.equal(await copyCommit(code, sha), true);
+    assert.deepEqual(written, [sha], 'in die Zwischenablage kommt der volle Commit');
+    assert.equal(code.textContent, '0123456', 'mit der Zwischenablage bleibt die Anzeige kurz');
+
+    setNavigator({});
+    assert.equal(await copyCommit(code, sha), true, 'ohne Zwischenablage ueber die Markierung');
+    assert.equal(code.textContent, sha, 'markiert steht der volle Commit');
+    assert.equal(selected, code);
+
+    setNavigator({ clipboard: { writeText: async () => { throw new Error('denied'); } } });
+    execResult = false;
+    code.textContent = '0123456';
+    assert.equal(await copyCommit(code, sha), false, 'scheitert beides, wird nichts behauptet');
+    assert.equal(code.textContent, sha, 'und der volle Commit steht markiert zum Kopieren von Hand');
+  } finally {
+    if (navDesc) Object.defineProperty(globalThis, 'navigator', navDesc);
+    else delete /** @type {any} */ (globalThis).navigator;
+    globalThis.window = prev.window;
+    globalThis.document = prev.document;
+  }
+
+  // Die Zeilen in den Details: Commit nach der Quelle, der Vergleich nur mit
+  // compareUrl, beide als Links in einem neuen Tab ohne Opener und Referrer.
+  const src = await readFile(new URL('../public/settings/pages/modules-active.js', import.meta.url), 'utf8');
+  const flat = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').replace(/\s+/g, ' ');
+  assert.ok(flat.includes("{ label: t('settings.moduleDetailSource'), value: moduleSourceText(install) }, commit ? { label: t('settings.moduleDetailCommit'), value: commitValueElement(commit) } : null, commit?.compareUrl ? { label: t('settings.moduleDetailChanges'), value: compareValueElement(commit.compareUrl) } : null,"),
+    'Commit und Vergleich stehen nach der Quelle, und nur wenn es sie gibt');
+  assert.ok(flat.includes("link.target = '_blank'; link.rel = 'noopener noreferrer';"), 'externer Link wie auf dem Install-Blatt');
+  assert.ok(flat.includes("link.setAttribute('aria-label', t('settings.moduleCommitOpen', { commit: links.short }));"),
+    'der Name des Links enthaelt den sichtbaren kurzen Commit');
+  assert.ok(flat.includes("const copied = await copyCommit(code, links.commit);"), 'kopiert wird der volle Commit');
+  assert.ok(flat.includes("link.setAttribute('aria-label', t('settings.moduleCommitOpen', { commit: code.textContent }));"),
+    'nach dem Kopieren nennt der Link, was er zeigt: steht der volle Commit da, auch im Namen (WCAG 2.5.3)');
+
+  // Ein Weg ist als Weg zu sehen (R22, D13): reset.css nimmt Links Farbe und
+  // Unterstrich, die Links der Details bekommen beides zurueck wie im Hinweis.
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const sel = ".settings-module-row__details .settings-info-value a:not([class*='btn'])";
+  const base = rules.find((r) => !r.at.length && r.selector.trim() === sel);
+  assert.match(base?.body ?? '', /color:\s*var\(--color-accent\)/, 'Commit und Vergleich stehen in Akzenttinte, nicht in Textfarbe');
+  assert.match(rules.find((r) => r.at.some((a) => /hover:\s*hover/.test(a)) && r.selector.trim() === `${sel}:hover`)?.body ?? '',
+    /text-decoration:\s*underline/, 'unter dem Zeiger unterstrichen');
+  assert.match(rules.find((r) => !r.at.length && r.selector.trim() === `${sel}:focus-visible`)?.body ?? '',
+    /text-decoration:\s*underline/, 'am Tastaturfokus unterstrichen');
+  assert.match(rules.find((r) => !r.at.length && r.selector.trim() === '.settings-module-commit code')?.body ?? '',
+    /overflow-wrap:\s*anywhere/, 'der volle Commit bricht statt ueber den Rand');
+  // Keine neue Vertrauensaussage: kein "verified" oder "geprueft".
+  assert.doesNotMatch(flat, /verified|moduleCommitVerified/i);
+});
+
 // Review Runde 3 (N4): die Dateigroesse kommt aus dem Locale-Formatter, nicht
 // aus toFixed(1) + " MB" - Ziffern aus der Region, das Wort aus der Sprache.
 test('Eigenes Modul: die Dateigroesse folgt der Locale', async () => {
