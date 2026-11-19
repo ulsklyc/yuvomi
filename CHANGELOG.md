@@ -12,10 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entry.** This is about your own API clients; the app sends every field already. A `PUT`
   replaces what is stored, so a field left out no longer stands for a value:
   - `PUT /waste/schedules/{id}/overrides/{originalDate}` without `replacement_date` and `note`:
-    an empty body SKIPPED THE PICKUP, and a missing note wiped the stored one. Both are required
+    an empty body skipped the pickup, and a missing note wiped the stored one. Both are required
     now; `replacement_date: null` skips the pickup;
   - `PUT /schedule/overrides/{dateKey}` without `shift_type_id`, `note` and `field_values`: a
-    missing shift type MADE THE DAY FREE, a missing note wiped the stored one, and missing field
+    missing shift type made the day free, a missing note wiped the stored one, and missing field
     values kept the stored ones while everything else was replaced. All three are required now;
     `shift_type_id: null` is the free day, and `field_values: {}` clears the values. `user_id`
     stays optional and defaults to you.
