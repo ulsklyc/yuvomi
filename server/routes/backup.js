@@ -17,6 +17,7 @@ import { secretOrigin, storedSecretPath } from '../utils/auto-secrets.js';
 import { createLocalBackup, getStatus as getSchedulerStatus, triggerBackup } from '../services/backup-scheduler.js';
 import * as webdavBackup from '../services/backup-webdav.js';
 import { isLocalFailure, remoteFailure } from '../utils/http.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const router = express.Router();
 const log = createLogger('Backup');
@@ -121,7 +122,7 @@ const databaseDownloadLimiter = rateLimit({
   message: { error: 'Too many backup downloads. Please wait before downloading again.', code: 429 },
 });
 
-router.get('/status', requireAdmin, (req, res) => {
+router.get('/status', requireAdmin, validateRequest(), (req, res) => {
   const schedulerStatus = getSchedulerStatus();
   res.json({
     data: {
@@ -145,7 +146,7 @@ router.get('/status', requireAdmin, (req, res) => {
  * Datenbank herunterladen darf, hat ihren Inhalt ohnehin. Ein Geraet kommt
  * nicht durch - `requireAuth` macht einen Admin dort zum Mitglied.
  */
-router.get('/database-key', requireAdmin, databaseKeyLimiter, (req, res) => {
+router.get('/database-key', requireAdmin, databaseKeyLimiter, validateRequest(), (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const status = databaseKeyStatus();
   if (!databaseKeyIsRevealable(status)) {
@@ -162,7 +163,7 @@ router.get('/database-key', requireAdmin, databaseKeyLimiter, (req, res) => {
   });
 });
 
-router.get('/database', requireAdmin, databaseDownloadLimiter, async (req, res) => {
+router.get('/database', requireAdmin, databaseDownloadLimiter, validateRequest(), async (req, res) => {
   let tmpPath = null;
   try {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-backup-'));
@@ -195,6 +196,9 @@ router.post(
   (_req, res, next) => { untrackWriteRequest(res); next(); },
   requireAdmin,
   express.raw({ type: 'application/octet-stream', limit: RESTORE_LIMIT }),
+  // Nach dem Lesen des Rumpfs (#2810): das Dokument beschreibt ihn als
+  // application/octet-stream, den Rumpf und `X-Backup-Key` prueft der Handler.
+  validateRequest(),
   async (req, res) => {
     let dir = null;
     let backupKey = null;
@@ -236,7 +240,7 @@ router.post(
   }
 );
 
-router.post('/trigger', requireAdmin, async (req, res) => {
+router.post('/trigger', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const result = await triggerBackup();
     res.json({ data: result });
@@ -266,7 +270,7 @@ function passwordRequiredResponse(res) {
  * GET /api/v1/backup/webdav/config
  * Returns current WebDAV configuration (password masked).
  */
-router.get('/webdav/config', requireAdmin, (req, res) => {
+router.get('/webdav/config', requireAdmin, validateRequest(), (req, res) => {
   res.json({ data: webdavBackup.getStatus() });
 });
 
@@ -275,7 +279,7 @@ router.get('/webdav/config', requireAdmin, (req, res) => {
  * Persists WebDAV configuration.
  * Body: { enabled?, url?, username?, password?, remotePath?, keep? }
  */
-router.put('/webdav/config', requireAdmin, async (req, res) => {
+router.put('/webdav/config', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const { enabled, url, username, password, remotePath, keep } = req.body;
 
@@ -328,7 +332,7 @@ function sendWebdavFailure(res, err, sentence) {
  * Tests the WebDAV connection.
  * Body: { url?, username?, password?, remotePath? }  (optional overrides)
  */
-router.post('/webdav/test', requireAdmin, async (req, res) => {
+router.post('/webdav/test', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const { url, username, password, remotePath } = req.body ?? {};
     // VOR jeder Anfrage: sonst ginge das gespeicherte Passwort an die neue Adresse.
@@ -356,7 +360,7 @@ router.post('/webdav/test', requireAdmin, async (req, res) => {
  * GET /api/v1/backup/webdav/files
  * Lists backup files stored on the remote WebDAV server.
  */
-router.get('/webdav/files', requireAdmin, async (req, res) => {
+router.get('/webdav/files', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const files = await webdavBackup.getRemoteFiles();
     res.json({ data: files });
@@ -372,7 +376,7 @@ router.get('/webdav/files', requireAdmin, async (req, res) => {
  * A fresh, uniquely named file is created on every trigger so manual uploads
  * never overwrite a previous remote backup.
  */
-router.post('/webdav/trigger', requireAdmin, async (req, res) => {
+router.post('/webdav/trigger', requireAdmin, validateRequest(), async (req, res) => {
   try {
     // Two steps with two kinds of failure: the local snapshot (filesystem,
     // a fixed 500) and the upload (the server's answer, its class).

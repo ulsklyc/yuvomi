@@ -155,7 +155,7 @@ test('buildChangelogPayload reports current version missing from releases', () =
 
 test('changelog router fetches and sanitizes GitHub release JSON', async () => {
   const app = express();
-  app.use(buildRouter({
+  app.use('/api/v1/changelog', buildRouter({
     appVersion: '1.2.1',
     now: () => 1000,
     fetchFn: async (url, options) => {
@@ -177,7 +177,7 @@ test('changelog router fetches and sanitizes GitHub release JSON', async () => {
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/changelog`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.data.current_in_releases, true);
@@ -293,7 +293,7 @@ test('die mitgelieferte CHANGELOG.md laesst sich lesen und parsen', () => {
 
 test('faellt GitHub aus, kommt die mitgelieferte Datei statt 502', async () => {
   const app = express();
-  app.use(buildRouter({
+  app.use('/api/v1/changelog', buildRouter({
     appVersion: '1.2.1',
     now: () => 1000,
     fetchFn: async () => { throw new Error('getaddrinfo ENOTFOUND api.github.com'); },
@@ -303,7 +303,7 @@ test('faellt GitHub aus, kommt die mitgelieferte Datei statt 502', async () => {
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/changelog`);
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.data.source, 'local');
@@ -315,7 +315,7 @@ test('faellt GitHub aus, kommt die mitgelieferte Datei statt 502', async () => {
 
 test('ohne mitgelieferte Datei bleibt es beim 502', async () => {
   const app = express();
-  app.use(buildRouter({
+  app.use('/api/v1/changelog', buildRouter({
     appVersion: '1.2.1',
     now: () => 1000,
     fetchFn: async () => { throw new Error('offline'); },
@@ -325,7 +325,7 @@ test('ohne mitgelieferte Datei bleibt es beim 502', async () => {
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/changelog`);
     assert.equal(res.status, 502);
   } finally {
     await new Promise((resolve) => server.close(resolve));
@@ -336,7 +336,7 @@ test('nach einem Fehlschlag wird GitHub eine Weile nicht erneut gefragt', async 
   let versuche = 0;
   let jetzt = 1000;
   const app = express();
-  app.use(buildRouter({
+  app.use('/api/v1/changelog', buildRouter({
     appVersion: '1.2.1',
     now: () => jetzt,
     fetchFn: async () => { versuche++; throw new Error('offline'); },
@@ -346,7 +346,7 @@ test('nach einem Fehlschlag wird GitHub eine Weile nicht erneut gefragt', async 
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   const hole = async () => {
-    const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/changelog`);
     return res.json();
   };
   try {

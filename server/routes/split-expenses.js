@@ -27,6 +27,11 @@ import {
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts } from '../services/contact-identity.js';
 import { todayKey } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
+import { validateRequest } from '../api/validate-request.ts';
+import {
+  CATEGORIES, FAMILY_ROLES, FREQUENCIES, GROUP_ROLES, GROUP_TYPES, MAX_GUEST_EMAIL, MAX_GUEST_NAME, MAX_GUEST_PHONE, MISSED_MODES,
+  SPLIT_METHODS,
+} from '../services/split-expense-fields.js';
 
 const log = createLogger('SplitExpenses');
 const router = express.Router();
@@ -36,11 +41,8 @@ const randomAvatarColor = () => avatarColors[Math.floor(Math.random() * avatarCo
 
 // Derselbe Waehrungsvorrat wie in den Einstellungen und in den Abos - eine
 // Liste fuer Server und Browser (#841, public/utils/currency-codes.js).
-const GROUP_TYPES = ['household', 'couple', 'travel', 'event', 'shopping', 'general'];
-const GROUP_ROLES = ['owner', 'admin', 'guest'];
-const SPLIT_METHODS = ['equal', 'exact', 'percentage', 'shares'];
-const CATEGORIES = ['groceries', 'rent', 'utilities', 'baby', 'pets', 'school', 'travel', 'shopping', 'subscriptions', 'health', 'home', 'general'];
-const FREQUENCIES = ['weekly', 'monthly', 'yearly'];
+// Die Listen stehen in services/split-expense-fields.js, die auch das
+// OpenAPI-Dokument liest (#2810).
 
 /**
  * DIE KATEGORIE EINER AUSGABE IST EINE BUDGET-KATEGORIE (R24, E12, Migration
@@ -70,7 +72,6 @@ function parseBudgetCategory(value, keep = null) {
   if (!known) throw new Refusal(400, 'Unknown budget category.', 'unknown_budget_category');
   return key;
 }
-const FAMILY_ROLES = ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'];
 
 function userId(req) {
   return req.authUserId || req.session.userId;
@@ -95,6 +96,19 @@ function splitGuestScope(req) {
 
 function isSplitGuest(req) {
   return Boolean(splitGuestScope(req));
+}
+
+/**
+ * Ein Ausgaben-Gast legt keine Gruppe an. Ein Recht ohne Zeilenbezug und
+ * deshalb VOR validateRequest() (#2810): ein Gast bekommt 403, auch mit einem
+ * kaputten Rumpf. Die Pruefung im Handler bleibt bis Schritt (b).
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function refuseSplitGuest(req, res, next) {
+  if (isSplitGuest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  return next();
 }
 
 function defaultCurrency() {
@@ -587,7 +601,7 @@ function normalizeSplitDefaults(body, groupId, fallbackMethod = 'equal') {
   return { method, config: entries.length ? JSON.stringify(entries) : null };
 }
 
-router.get('/meta', (_req, res) => {
+router.get('/meta', validateRequest(), (_req, res) => {
   try {
     res.json({ data: { group_types: GROUP_TYPES, group_roles: GROUP_ROLES, split_methods: SPLIT_METHODS, categories: CATEGORIES, currencies: CURRENCY_CODES, frequencies: FREQUENCIES, default_currency: defaultCurrency() } });
   } catch (err) {
@@ -596,7 +610,7 @@ router.get('/meta', (_req, res) => {
   }
 });
 
-router.get('/dashboard', (req, res) => {
+router.get('/dashboard', validateRequest(), (req, res) => {
   try {
     const uid = userId(req);
     // Alle drei Abfragen tragen dasselbe Confinement: die Mitgliedschaft allein
@@ -643,7 +657,7 @@ router.get('/dashboard', (req, res) => {
   }
 });
 
-router.get('/groups', (req, res) => {
+router.get('/groups', validateRequest(), (req, res) => {
   try {
     const status = req.query.status === 'archived' ? 'archived' : 'active';
     const query = String(req.query.q || '').trim();
@@ -659,7 +673,7 @@ router.get('/groups', (req, res) => {
   }
 });
 
-router.post('/groups', (req, res) => {
+router.post('/groups', refuseSplitGuest, validateRequest(), (req, res) => {
   try {
     if (isSplitGuest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
@@ -695,7 +709,7 @@ router.post('/groups', (req, res) => {
   }
 });
 
-router.patch('/groups/:id', (req, res) => {
+router.patch('/groups/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -729,7 +743,7 @@ router.patch('/groups/:id', (req, res) => {
   }
 });
 
-router.post('/groups/:id/archive', (req, res) => {
+router.post('/groups/:id/archive', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -746,7 +760,7 @@ router.post('/groups/:id/archive', (req, res) => {
 // Gegenstück zu /archive (#574): ohne diese Route wäre Archivieren eine
 // Einbahnstraße - archivierte Gruppen sind über ?status=archived sichtbar,
 // aber ohne Weg zurück in die aktive Liste.
-router.post('/groups/:id/unarchive', (req, res) => {
+router.post('/groups/:id/unarchive', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -780,7 +794,7 @@ router.post('/groups/:id/unarchive', (req, res) => {
   }
 });
 
-router.delete('/groups/:id', (req, res) => {
+router.delete('/groups/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -801,7 +815,7 @@ router.delete('/groups/:id', (req, res) => {
   }
 });
 
-router.get('/groups/:id/members', (req, res) => {
+router.get('/groups/:id/members', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -819,7 +833,7 @@ router.get('/groups/:id/members', (req, res) => {
   }
 });
 
-router.get('/groups/:id/member-candidates', (req, res) => {
+router.get('/groups/:id/member-candidates', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -910,7 +924,7 @@ router.get('/groups/:id/member-candidates', (req, res) => {
   }
 });
 
-router.post('/groups/:id/members', async (req, res) => {
+router.post('/groups/:id/members', validateRequest(), async (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -991,7 +1005,7 @@ router.post('/groups/:id/members', async (req, res) => {
   }
 });
 
-router.delete('/groups/:id/members/:userId', (req, res) => {
+router.delete('/groups/:id/members/:userId', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     const memberUserId = Number(req.params.userId);
@@ -1011,7 +1025,7 @@ router.delete('/groups/:id/members/:userId', (req, res) => {
   }
 });
 
-router.post('/groups/:id/guests', async (req, res) => {
+router.post('/groups/:id/guests', validateRequest(), async (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -1020,9 +1034,9 @@ router.post('/groups/:id/guests', async (req, res) => {
     const archivedEarly = archivedRefusal(groupId);
     if (archivedEarly) return sendRefusal(res, archivedEarly);
 
-    const vDisplayName = str(req.body.display_name, 'Display name', { max: 128 });
-    const vPhone = str(req.body.phone, 'Phone', { max: 100, required: false });
-    const vEmail = str(req.body.email, 'Email', { max: 200, required: false });
+    const vDisplayName = str(req.body.display_name, 'Display name', { max: MAX_GUEST_NAME });
+    const vPhone = str(req.body.phone, 'Phone', { max: MAX_GUEST_PHONE, required: false });
+    const vEmail = str(req.body.email, 'Email', { max: MAX_GUEST_EMAIL, required: false });
     const vBirthDate = validateDate(req.body.birth_date, 'Birth date');
     const errors = collectErrors([vDisplayName, vPhone, vEmail, vBirthDate]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
@@ -1108,7 +1122,7 @@ function expenseCursor(query) {
   return { cursor: { beforeDate: query.before_date, beforeAt: query.before_at, beforeId } };
 }
 
-router.get('/groups/:id/expenses', (req, res) => {
+router.get('/groups/:id/expenses', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -1164,7 +1178,7 @@ router.get('/groups/:id/expenses', (req, res) => {
   }
 });
 
-router.post('/groups/:id/expenses', (req, res) => {
+router.post('/groups/:id/expenses', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     const group = requireGroupAccess(groupId, req);
@@ -1212,7 +1226,7 @@ router.post('/groups/:id/expenses', (req, res) => {
   }
 });
 
-router.put('/expenses/:id', (req, res) => {
+router.put('/expenses/:id', validateRequest(), (req, res) => {
   try {
     const existing = loadExpense(Number(req.params.id), req);
     if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
@@ -1281,7 +1295,7 @@ router.put('/expenses/:id', (req, res) => {
  * Loeschungen haben ihre Zeilen schon verloren und brauchen nichts: ihr Saldo
  * stimmt, nur der Verlauf fehlt dort.
  */
-router.delete('/expenses/:id', (req, res) => {
+router.delete('/expenses/:id', validateRequest(), (req, res) => {
   try {
     const existing = loadExpense(Number(req.params.id), req);
     if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
@@ -1324,7 +1338,7 @@ router.delete('/expenses/:id', (req, res) => {
   }
 });
 
-router.post('/expenses/:id/comments', (req, res) => {
+router.post('/expenses/:id/comments', validateRequest(), (req, res) => {
   try {
     const expense = loadExpense(Number(req.params.id), req);
     if (!expense) return res.status(404).json({ error: 'Expense not found.', code: 404 });
@@ -1413,7 +1427,7 @@ function groupBudgetCategoryTotals(groupId) {
   `).all(groupId).map((row) => ({ ...row, total: minorToDecimal(row.total_minor, row.currency) }));
 }
 
-router.get('/groups/:id/balances', (req, res) => {
+router.get('/groups/:id/balances', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -1435,7 +1449,7 @@ router.get('/groups/:id/balances', (req, res) => {
   }
 });
 
-router.post('/groups/:id/settlements', (req, res) => {
+router.post('/groups/:id/settlements', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     const group = requireGroupAccess(groupId, req);
@@ -1490,7 +1504,7 @@ router.post('/groups/:id/settlements', (req, res) => {
  * Pruefung und Buchung stehen in EINER Transaktion ohne await dazwischen.
  * Korrigieren heisst: stornieren und neu eintragen.
  */
-router.post('/groups/:id/settlements/:settlementId/reverse', (req, res) => {
+router.post('/groups/:id/settlements/:settlementId/reverse', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -1573,7 +1587,7 @@ function activityCursor(query) {
 // Typen, deren Metadaten einen Betrag in Minor-Units festhalten.
 const AMOUNT_SNAPSHOT_ACTIVITY = new Set(['ledger_restored', 'ledger_removed', 'expense_created', 'expense_edited', 'expense_deleted', 'recurring_edited', 'recurring_deleted']);
 
-router.get('/groups/:id/activity', (req, res) => {
+router.get('/groups/:id/activity', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -1789,7 +1803,6 @@ function parseRecurringBody(body, groupId, fallbackCurrency, fallbackPayerId) {
 // waehrend der Pause faelligen, beim Anlegen und Verlegen die zwischen dem
 // gesetzten Datum und heute (#1748). `skip` heisst: ab dem ersten Termin, der
 // nicht vor heute liegt; `book`: der Lauf bucht sie nach.
-const MISSED_MODES = ['skip', 'book'];
 
 /**
  * `missed` aus dem Aufruf, oder null, wenn er es nicht nennt. Beim Anlegen und
@@ -1822,7 +1835,7 @@ function loadRecurring(id, req) {
   return row;
 }
 
-router.get('/groups/:id/recurring', (req, res) => {
+router.get('/groups/:id/recurring', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
@@ -1837,7 +1850,7 @@ router.get('/groups/:id/recurring', (req, res) => {
   }
 });
 
-router.post('/groups/:id/recurring', (req, res) => {
+router.post('/groups/:id/recurring', validateRequest(), (req, res) => {
   try {
     const groupId = Number(req.params.id);
     const group = requireGroupAccess(groupId, req);
@@ -1915,7 +1928,7 @@ router.post('/groups/:id/recurring', (req, res) => {
  * ohne await: gemessen wird an der Zeile und der letzten Buchung, die auch
  * geschrieben werden.
  */
-router.put('/recurring/:id', (req, res) => {
+router.put('/recurring/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const sent = req.body && typeof req.body === 'object' ? req.body : {};
@@ -1983,7 +1996,7 @@ router.put('/recurring/:id', (req, res) => {
  * aus einer Serie stammen. Titel und Betrag haelt der Verlaufseintrag fest, die
  * Zeile gibt es danach nicht mehr.
  */
-router.delete('/recurring/:id', (req, res) => {
+router.delete('/recurring/:id', validateRequest(), (req, res) => {
   try {
     const existing = loadRecurring(Number(req.params.id), req);
     if (!existing) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
@@ -2001,7 +2014,7 @@ router.delete('/recurring/:id', (req, res) => {
   }
 });
 
-router.post('/recurring/:id/pause', (req, res) => {
+router.post('/recurring/:id/pause', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const row = loadRecurring(id, req);
@@ -2046,7 +2059,7 @@ router.post('/recurring/:id/pause', (req, res) => {
   }
 });
 
-router.get('/search', (req, res) => {
+router.get('/search', validateRequest(), (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
     const uid = userId(req);

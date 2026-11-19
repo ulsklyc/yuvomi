@@ -18,8 +18,9 @@
  *          1B (family, people, search, kitchen, screensaver, displays), 2A
  *          (recipes, recipe-providers, pantry), 2B (the five route files of
  *          inventory: locations, categories, items, entries, deadlines-feed),
- *          3 (housekeeping, rewards) and 4 (the eight route files of waste,
- *          schedule, schedule-extras, schedule-feed, schedule-preferences).
+ *          3 (housekeeping, rewards), 4 (the eight route files of waste,
+ *          schedule, schedule-extras, schedule-feed, schedule-preferences) and
+ *          5 (split-expenses, backup, and of the core system and changelog).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -40,7 +41,6 @@ const ROUTES = join(ROOT, 'server', 'routes');
  * Only shrinks: a file leaves the list in the PR that migrates it.
  */
 const NOT_MIGRATED = [
-  'server/routes/backup.js',
   'server/routes/birthday-feed.js',
   'server/routes/budget/accounts.js',
   'server/routes/budget/categories.js',
@@ -60,7 +60,6 @@ const NOT_MIGRATED = [
   'server/routes/calendar/subscriptions.js',
   'server/routes/calendar/sync-targets.js',
   'server/routes/cardav.js',
-  'server/routes/changelog.js',
   'server/routes/contacts.js',
   'server/routes/dashboard.js',
   'server/routes/dms.js',
@@ -82,9 +81,7 @@ const NOT_MIGRATED = [
   'server/routes/preferences.js',
   'server/routes/push.js',
   'server/routes/shopping.js',
-  'server/routes/split-expenses.js',
   'server/routes/subscriptions.js',
-  'server/routes/system.js',
   'server/routes/tasks.js',
 ];
 
@@ -104,6 +101,7 @@ const MIGRATED = [
   'server/routes/waste/reminder-settings.js', 'server/routes/waste/feed.js',
   'server/routes/schedule.js', 'server/routes/schedule-extras.js', 'server/routes/schedule-feed.js',
   'server/routes/schedule-preferences.js',
+  'server/routes/split-expenses.js', 'server/routes/backup.js', 'server/routes/system.js', 'server/routes/changelog.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

@@ -47,6 +47,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: backupRouter } = await import('../server/routes/backup.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const database = () => dbmod.get(); // frisch lesen: restore re-initialisiert das Singleton
 
 // ── Loopback-WebDAV-Stub (in-process, kein externes Netz) ───────────────────────
@@ -89,9 +91,12 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', backupRouter);
+app.use(defaultEmptyBody);
+// Der echte Praefix: validateRequest() liest die Operation aus `req.baseUrl` (#2810).
+app.use('/api/v1/backup', backupRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/backup`)));
 
 const ADM = { id: 1, role: 'admin' };
 const MEM = { id: 2, role: 'member' };
@@ -230,17 +235,20 @@ test('GET /webdav/config: unkonfiguriert → Passwort null, nicht configured', a
 });
 
 test('PUT /webdav/config: Validierungsfehler → 400', async () => {
+  // Typ und Grenzen prueft seit #2810 das Schema (`fields` statt Satz), das
+  // Muster der Adresse weiter die Route (`errorCode: url_invalid`).
   const cases = [
-    { body: { enabled: 'yes' }, rx: /enabled/ },
-    { body: { url: 123 }, rx: /url/ },
+    { body: { enabled: 'yes' }, field: 'body/enabled' },
+    { body: { url: 123 }, field: 'body/url' },
     { body: { url: 'ftp://example.com/dav' }, rx: /http/ },
-    { body: { keep: 0 }, rx: /keep/ },
-    { body: { keep: 'many' }, rx: /keep/ },
+    { body: { keep: 0 }, field: 'body/keep' },
+    { body: { keep: 'many' }, field: 'body/keep' },
   ];
   for (const c of cases) {
     const r = await call('PUT', '/webdav/config', { actor: ADM, body: c.body });
     assert.equal(r.status, 400, `Body ${JSON.stringify(c.body)} muss 400 liefern`);
-    assert.match(r.body.error, c.rx);
+    if (c.rx) assert.match(r.body.error, c.rx);
+    else assert.equal(r.body.fields?.[0]?.path, c.field, JSON.stringify(r.body));
   }
   const badUrl = await call('PUT', '/webdav/config', { actor: ADM, body: { url: 'ftp://x' } });
   assert.equal(badUrl.body.errorCode, 'url_invalid', 'die App sagt den Satz, nicht der Server (#1909)');

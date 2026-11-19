@@ -28,6 +28,8 @@ const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 function buildMigratedDatabase(migrations) {
   const database = new Database(':memory:');
@@ -97,6 +99,7 @@ let actor = ME;
 let tokenScopes = null;
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor);
   req.authUserId = user.id;
@@ -107,7 +110,9 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/dashboard', dashboardRouter);
-app.use('/split-expenses', splitRouter);
+// Der echte Praefix: validateRequest() liest die Operation aus `req.baseUrl` (#2810).
+app.use('/api/v1/split-expenses', splitRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -138,10 +143,10 @@ async function postJson(path, body) {
   return json;
 }
 
-const addExpense = (groupId, payerId, amount, participants, extra = {}) => postJson(`/split-expenses/groups/${groupId}/expenses`, {
+const addExpense = (groupId, payerId, amount, participants, extra = {}) => postJson(`/api/v1/split-expenses/groups/${groupId}/expenses`, {
   title: `Ausgabe ${amount}`, amount, payer_id: payerId, participants, expense_date: '2026-09-20', ...extra,
 });
-const settle = (groupId, payerId, payeeId, amount, currency = 'EUR') => postJson(`/split-expenses/groups/${groupId}/settlements`, {
+const settle = (groupId, payerId, payeeId, amount, currency = 'EUR') => postJson(`/api/v1/split-expenses/groups/${groupId}/settlements`, {
   payer_id: payerId, payee_id: payeeId, amount, currency,
 });
 
@@ -157,7 +162,7 @@ async function modulePositionsOf(userId, groupIds) {
   return as(userId, async () => {
     const out = [];
     for (const groupId of groupIds) {
-      const { data } = await getJson(`/split-expenses/groups/${groupId}/balances`);
+      const { data } = await getJson(`/api/v1/split-expenses/groups/${groupId}/balances`);
       for (const debt of data.simplified_debts) {
         if (debt.from_user_id === userId) out.push({ groupId, direction: 'owe', userId: debt.to_user_id, currency: debt.currency, amountMinor: debt.amount_minor });
         if (debt.to_user_id === userId) out.push({ groupId, direction: 'owed', userId: debt.from_user_id, currency: debt.currency, amountMinor: debt.amount_minor });
@@ -464,7 +469,7 @@ test('Kachel: Wert und Position kommen aus der Waehrung, in der wirklich etwas o
 
 async function moduleNetOf(userId) {
   return as(userId, async () => {
-    const { data } = await getJson('/split-expenses/dashboard');
+    const { data } = await getJson('/api/v1/split-expenses/dashboard');
     const out = new Map();
     for (const row of data.total_owed) out.set(row.currency, (out.get(row.currency) ?? 0) + row.amount_minor);
     for (const row of data.total_owing) out.set(row.currency, (out.get(row.currency) ?? 0) - row.amount_minor);
@@ -492,24 +497,27 @@ test('Aequivalenz: Kachel-Netto und Kennzahlband des Moduls sind dieselbe Summe,
 
   // Geloeschte Ausgabe: ihre Ledger-Zeilen fallen mit ihr.
   const gone = await as(ME, () => addExpense(SWAP, ME, '90.00', [ME, ALEX, CLEO]));
-  await as(ME, () => deleteJson(`/split-expenses/expenses/${gone.data.id}`));
+  await as(ME, () => deleteJson(`/api/v1/split-expenses/expenses/${gone.data.id}`));
   // Offene Ausgabe mit Rest-Cent (Aufteilung 100,00 / 3).
   await as(ALEX, () => addExpense(SWAP, ALEX, '100.00', [ME, ALEX, CLEO]));
   // Zahlung und ihr Storno (Gegenbuchung) - danach wieder offen.
   const paid = await as(ME, () => settle(SWAP, ME, ALEX, '20.00'));
   await as(ME, async () => {
-    const response = await fetch(`${base}/split-expenses/groups/${SWAP}/settlements/${paid.data.id}/reverse`, { method: 'POST' });
+    const response = await fetch(`${base}/api/v1/split-expenses/groups/${SWAP}/settlements/${paid.data.id}/reverse`, { method: 'POST' });
     assert.equal(response.status, 200, 'Storno');
   });
   // Eine Zahlung, die stehen bleibt.
   await as(CLEO, () => settle(SWAP, CLEO, ALEX, '10.00'));
   // Fremdwaehrungen mit 2 und 3 Nachkommastellen.
   await as(BEA, () => addExpense(USD, BEA, '75.50', [ME, BEA, CLEO], { currency: 'USD' }));
-  await as(ALEX, () => addExpense(KWD, ALEX, '12.345', [ME, ALEX], { currency: 'KWD' }));
+  // KWD steht nicht in der Auswahl (CURRENCY_CODES): seit #2810 waere es als
+  // `currency` ein 400; ohne das Feld gilt die Gruppenwaehrung, wie vorher
+  // ueber den stillen Rueckfall.
+  await as(ALEX, () => addExpense(KWD, ALEX, '12.345', [ME, ALEX]));
   // Ein Mitglied, das mit offenem Saldo aus der Gruppe entfernt wurde: seine
   // Zeilen bleiben im Ledger, zaehlen fuer ihn aber an keiner der beiden Stellen.
   await as(CLEO, () => addExpense(LEFT, CLEO, '40.00', [ALEX, CLEO]));
-  await as(ALEX, () => deleteJson(`/split-expenses/groups/${LEFT}/members/${CLEO}`));
+  await as(ALEX, () => deleteJson(`/api/v1/split-expenses/groups/${LEFT}/members/${CLEO}`));
   // Archivierte Gruppe mit offenem Saldo (ARCHIVED aus dem Test oben) bleibt aussen vor.
 
   for (const [name, uid] of [['Linda', ME], ['Alex', ALEX], ['Bea', BEA], ['Cleo', CLEO]]) {
