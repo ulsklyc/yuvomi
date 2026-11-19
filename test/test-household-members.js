@@ -495,7 +495,7 @@ test('schedule: a new schedule owner must be a household member', async () => {
   const ok = await call('POST', '/api/v1/schedule/patterns', { body: { ...pattern, user_id: BEN } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assertRejectsNonMember(await call('POST', '/api/v1/schedule/patterns', { body: { ...pattern, user_id: DORA } }), 'guest pattern');
-  assertRejectsNonMember(await call('PUT', '/api/v1/schedule/overrides/2030-01-02', { body: { user_id: DORA, shift_type_id: null } }), 'guest override');
+  assertRejectsNonMember(await call('PUT', '/api/v1/schedule/overrides/2030-01-02', { body: { user_id: DORA, shift_type_id: null, note: null, field_values: {} } }), 'guest override');
   assertRejectsNonMember(await call('POST', '/api/v1/schedule/overrides/fill', { body: { user_id: EMIL, from: '2030-01-02', to: '2030-01-03' } }), 'guest override fill');
 
   const extra = await call('POST', '/api/v1/schedule/extras', { body: { user_id: BEN, date_key: '2030-01-04', shift_type_id: SHIFT } });
@@ -505,7 +505,7 @@ test('schedule: a new schedule owner must be a household member', async () => {
 });
 
 test('schedule: staff who already own a schedule keep it editable', async () => {
-  const override = await call('PUT', '/api/v1/schedule/overrides/2030-01-08', { body: { user_id: CLARA, shift_type_id: null } });
+  const override = await call('PUT', '/api/v1/schedule/overrides/2030-01-08', { body: { user_id: CLARA, shift_type_id: null, note: null, field_values: {} } });
   assert.equal(override.status, 200, JSON.stringify(override.body));
   const extra = await call('POST', '/api/v1/schedule/extras', { body: { user_id: CLARA, date_key: '2030-01-09', shift_type_id: SHIFT } });
   assert.equal(extra.status, 201, JSON.stringify(extra.body));

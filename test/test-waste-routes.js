@@ -217,7 +217,7 @@ test('PUT /waste/schedules/:id: pause (active:false) then reactivate', async () 
 test('DELETE /waste/schedules/:id: cascades its overrides, leaves the type alone', async () => {
   const type = await createType();
   const schedule = await createWeeklySchedule(type.id);
-  await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: '2026-01-06' } });
+  await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: '2026-01-06', note: null } });
 
   const del = await call('DELETE', `/waste/schedules/${schedule.id}`);
   assert.equal(del.status, 204);
@@ -233,7 +233,7 @@ test('DELETE /waste/schedules/:id: cascades its overrides, leaves the type alone
 test('PUT .../overrides/:originalDate: 400 when original_date is not a real calculated occurrence', async () => {
   const type = await createType();
   const schedule = await createWeeklySchedule(type.id); // Mondays only
-  const r = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-07' } });
+  const r = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-07', note: null } });
   assert.equal(r.status, 400);
 });
 
@@ -241,7 +241,7 @@ test('PUT then DELETE .../overrides/:originalDate: move, then restore', async ()
   const type = await createType();
   const schedule = await createWeeklySchedule(type.id);
 
-  const moved = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: '2026-01-07' } });
+  const moved = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: '2026-01-07', note: null } });
   assert.equal(moved.status, 200);
   assert.equal(moved.body.data.replacement_date, '2026-01-07');
 
@@ -255,7 +255,7 @@ test('PUT then DELETE .../overrides/:originalDate: move, then restore', async ()
 test('PUT .../overrides/:originalDate with replacement_date: null skips the occurrence', async () => {
   const type = await createType();
   const schedule = await createWeeklySchedule(type.id);
-  const skipped = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: null } });
+  const skipped = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: null, note: null } });
   assert.equal(skipped.status, 200);
   assert.equal(skipped.body.data.replacement_date, null);
 });
@@ -825,7 +825,7 @@ test('reason waste_schedule_not_found: get, update, delete and an override on a 
   await expectReason(call('GET', `/waste/schedules/${MISSING}`), 404, 'waste_schedule_not_found');
   await expectReason(call('PUT', `/waste/schedules/${MISSING}`, { body: { active: false } }), 404, 'waste_schedule_not_found');
   await expectReason(call('DELETE', `/waste/schedules/${MISSING}`), 404, 'waste_schedule_not_found');
-  await expectReason(call('PUT', `/waste/schedules/${MISSING}/overrides/2026-01-05`, { body: { replacement_date: null } }), 404, 'waste_schedule_not_found');
+  await expectReason(call('PUT', `/waste/schedules/${MISSING}/overrides/2026-01-05`, { body: { replacement_date: null, note: null } }), 404, 'waste_schedule_not_found');
 });
 
 test('reason waste_pickup_not_found: get, update and delete of a pickup that is gone', async () => {
@@ -861,7 +861,7 @@ test('reason waste_override_not_found and waste_occurrence_not_found: restoring 
   const schedule = await createWeeklySchedule(type.id);
   await expectReason(call('DELETE', `/waste/schedules/${schedule.id}/overrides/2026-01-05`), 404, 'waste_override_not_found');
   // 2026-01-06 is a Tuesday; the schedule runs on Mondays.
-  await expectReason(call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-08' } }), 400, 'waste_occurrence_not_found');
+  await expectReason(call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-08', note: null } }), 400, 'waste_occurrence_not_found');
 });
 
 test('reason waste_type_in_use and waste_pickup_exists: the two conflicts', async () => {
@@ -930,7 +930,7 @@ test('reasons waste_pickup_date_invalid, waste_override_date_invalid, waste_over
   await expectReason(call('PUT', `/waste/pickups/${pickup.body.data.id}`, { body: { date: '' } }), 400, 'waste_pickup_date_invalid');
 
   const schedule = await createWeeklySchedule(type.id);
-  const override = (replacement) => call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: replacement } });
+  const override = (replacement) => call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: replacement, note: null } });
   await expectReason(override(''), 400, 'waste_override_date_invalid');
   await expectReason(override('2026-01-05'), 400, 'waste_override_same_date');
 });

@@ -166,7 +166,7 @@ export function wastePaths() {
         description: 'Sets an override for the schedule\'s calculated occurrence on original_date: a replacement_date moves it, null explicitly skips it. Refused with 400 if original_date is not really one of the schedule\'s own calculated dates (`reason: "waste_occurrence_not_found"`), if replacement_date is not a date (`waste_override_date_invalid`) or equals original_date (`waste_override_same_date`).',
         params: [idParam(), dayPathParam('originalDate', 'The occurrence\'s own calculated date (YYYY-MM-DD), not the replacement date')],
         stateChanging: true,
-        requestBody: optionalBody('#/components/schemas/WasteScheduleOverrideInput'),
+        requestBody: jsonBody('#/components/schemas/WasteScheduleOverrideInput'),
         responses: schemaResponse('WasteScheduleOverrideResponse', 'Override set', 200, { 404: apiError('Schedule not found (`reason: "waste_schedule_not_found"`)') }),
       }),
       delete: op({

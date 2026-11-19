@@ -72,10 +72,13 @@ router.put('/:id/overrides/:originalDate', validateRequest(), (req, res) => {
   const vId = validateId(req.params.id, 'id');
   if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
   try {
+    // WasteScheduleOverrideInput (server/openapi/waste-inputs.js) requires
+    // both fields and refuses before this handler runs (#2810): the body is
+    // the whole override, `replacement_date: null` the explicit skip.
     const override = store.upsertOverride(db.get(), vId.value, {
       original_date: req.params.originalDate,
-      replacement_date: req.body?.replacement_date ?? null,
-      note: req.body?.note ?? null,
+      replacement_date: req.body.replacement_date,
+      note: req.body.note,
     });
     res.json({ data: override });
   } catch (err) {

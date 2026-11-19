@@ -245,14 +245,14 @@ test('members may write only themselves while admins may write any household sch
   const allowed = await call('POST', '/patterns', { as: ADMIN, body: { ...body, name: 'Admin pattern', is_active: false } });
   assert.equal(allowed.status, 201);
   assert.equal(allowed.body.data.is_active, 0);
-  const self = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: null, note: 'Vacation' } });
+  const self = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: null, note: 'Vacation', field_values: {} } });
   assert.equal(self.status, 200);
-  const foreign = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: BOB.id, shift_type_id: null } });
+  const foreign = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: BOB.id, shift_type_id: null, note: null, field_values: {} } });
   assert.equal(foreign.status, 403);
 });
 
 test('a member API token sent next to an admin session may not write someone else\'s schedule; the admin session alone may', async () => {
-  const body = { user_id: BOB.id, shift_type_id: null, note: 'Token probe' };
+  const body = { user_id: BOB.id, shift_type_id: null, note: 'Token probe', field_values: {} };
   try {
     const withToken = await call('PUT', '/overrides/2031-02-03', { as: { ...ALICE, cookieSession: { userId: ADMIN.id, role: 'admin' } }, body });
     assert.equal(withToken.status, 403, 'the gate judges by the token subject\'s role');
@@ -307,7 +307,7 @@ test('overrides can be filled across a date range, self or admin-on-behalf, capp
 
   // A pre-existing override in-range must be overwritten, not duplicated -
   // fill uses the same ON CONFLICT upsert as the single-date PUT.
-  await call('PUT', '/overrides/2027-03-02', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'stale' } });
+  await call('PUT', '/overrides/2027-03-02', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'stale', field_values: {} } });
 
   const filled = await call('POST', '/overrides/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2027-03-01', to: '2027-03-05', shift_type_id: null, note: 'Vacation' } });
   assert.equal(filled.status, 200);
@@ -361,7 +361,7 @@ test('an override\'s field_values round-trip, fill shares one set across the ran
   const client = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Client' } })).body.data.id;
   await call('PUT', `/shift-types/${type}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: client, position: 0 }] } });
 
-  const set = await call('PUT', '/overrides/2027-05-01', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: { [client]: 'Acme Corp' } } });
+  const set = await call('PUT', '/overrides/2027-05-01', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: null, field_values: { [client]: 'Acme Corp' } } });
   assert.equal(set.status, 200);
   assert.deepEqual(set.body.data.field_values, { [client]: 'Acme Corp' });
   const overrideId = set.body.data.id;
@@ -441,28 +441,27 @@ test('validateFieldValues() rejects normalized-duplicate keys directly', () => {
   assert.match(result.error, /must not repeat/);
 });
 
-// PUT /overrides/:dateKey's field_values contract (Migration 189, matching
-// what /extras already does): OMITTING field_values from the body means
-// "leave whatever is stored alone", but an EXPLICIT {} means "clear it" -
-// these must not collapse into the same behaviour, or a caller that only
-// meant to touch `note` would silently wipe out field values it never
-// mentioned.
-test('PUT /overrides/:dateKey: omitting field_values preserves stored values, an explicit {} clears them', async () => {
+// PUT /overrides/:dateKey's field_values contract: up to v2.93 OMITTING
+// field_values kept the stored values while a missing note wiped the stored
+// note. Since #2810 the body is the whole override - omitting field_values is
+// a 400 that leaves the stored values alone, an EXPLICIT {} clears them.
+test('PUT /overrides/:dateKey: omitting field_values is a 400 that keeps stored values, an explicit {} clears them', async () => {
   const type = (await call('POST', '/shift-types', { as: ALICE, body: { name: 'Omit-vs-clear type' } })).body.data.id;
   const field = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Omit-vs-clear field' } })).body.data.id;
   await call('PUT', `/shift-types/${type}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: field, position: 0 }] } });
 
-  const set = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: { [field]: 'Kept' } } });
+  const set = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: null, field_values: { [field]: 'Kept' } } });
   assert.equal(set.status, 200);
   assert.deepEqual(set.body.data.field_values, { [field]: 'Kept' });
   const overrideId = set.body.data.id;
 
   const omitted = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: 'Just a note change' } });
-  assert.equal(omitted.status, 200);
-  assert.deepEqual(omitted.body.data.field_values, { [field]: 'Kept' }, 'field_values omitted from the body must leave the stored values alone');
+  assert.equal(omitted.status, 400, 'field_values omitted from the body is refused (full representation, #2810)');
+  assert.equal(omitted.body.reason, 'validation');
+  assert.equal(database.prepare('SELECT note FROM schedule_overrides WHERE id = ?').get(overrideId).note, null, 'the refused body changed nothing');
   assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 1);
 
-  const cleared = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: {} } });
+  const cleared = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: null, field_values: {} } });
   assert.equal(cleared.status, 200);
   assert.deepEqual(cleared.body.data.field_values, {}, 'an explicit empty object must clear the stored values');
   assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 0);
@@ -493,7 +492,7 @@ test('PUT /overrides/:dateKey resyncs reminders immediately, and a throwing resy
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const dateKey = tomorrow.toISOString().slice(0, 10);
 
-  const put = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType } });
+  const put = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType, note: null, field_values: {} } });
   assert.equal(put.status, 200);
 
   const anchor = database.prepare('SELECT * FROM schedule_reminder_entries WHERE user_id = ? AND date_key = ?').get(ALICE.id, dateKey);
@@ -510,7 +509,7 @@ test('PUT /overrides/:dateKey resyncs reminders immediately, and a throwing resy
   };
   let throwing;
   try {
-    throwing = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType, note: 'still saved' } });
+    throwing = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType, note: 'still saved', field_values: {} } });
   } finally {
     database.prepare = originalPrepare;
   }
@@ -846,7 +845,7 @@ test('PUT /patterns/:id/days: a foreign user is refused with 403 and writes noth
 });
 
 test('DELETE /overrides/:dateKey: a foreign user is refused with 403 and the override survives', async () => {
-  await call('PUT', '/overrides/2027-10-25', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'Must survive' } });
+  await call('PUT', '/overrides/2027-10-25', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'Must survive', field_values: {} } });
 
   const foreign = await call('DELETE', '/overrides/2027-10-25?user_id=' + ALICE.id, { as: BOB });
   assert.equal(foreign.status, 403);

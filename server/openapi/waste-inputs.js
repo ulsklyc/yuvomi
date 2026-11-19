@@ -187,13 +187,16 @@ export function wasteInputSchemas() {
     },
     WasteScheduleOverrideInput: {
       type: 'object',
-      description: 'An empty body, or `replacement_date: null`, skips the occurrence.',
+      description: 'The whole override: both fields are required (#2810), `replacement_date: null` skips the occurrence. Up to v2.93 an empty body skipped the occurrence and a missing `note` wiped the stored one.',
+      required: ['replacement_date', 'note'],
       properties: {
         replacement_date: {
           type: ['string', 'null'],
           pattern: DATE_PATTERN,
-          'x-reason': 'waste_override_date_invalid',
-          description: 'A date `YYYY-MM-DD` to move this occurrence to, or null (or left out) to skip it.',
+          // Only the shape: a missing field is the generic `validation` of the
+          // full-representation rule, not "date required" of the move dialog.
+          'x-reason': { type: 'waste_override_date_invalid', pattern: 'waste_override_date_invalid' },
+          description: 'A date `YYYY-MM-DD` to move this occurrence to, or null to skip it.',
         },
         note: { type: ['string', 'null'], description: 'A note; the route sets no length limit.' },
       },
