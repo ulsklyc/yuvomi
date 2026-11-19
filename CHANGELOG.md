@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A module installed from GitHub shows the commit that was installed, and a replace links the
+  changes** (#2064). Settings > Modules > Active modules: the Details of a module from GitHub
+  name the commit in its short form, linked to that commit on GitHub, with a button that copies
+  the full SHA. A branch or a tag can point somewhere else after the next push; the commit names
+  the code that is on the server. After a replace from the same repository with a different
+  commit, which arrives switched off as before, Details also offer "See changes on GitHub",
+  GitHub's comparison from the commit last approved to the new one, so the review before
+  switching it on again can start from what changed. The commit comes from the downloaded
+  archive itself, with no extra request to GitHub, and modules installed from GitHub since
+  2.77.0 already have it recorded. A ZIP upload shows neither. Nothing here says the code was
+  checked. For your own API clients: `install.previousCommit` in `GET /api/v1/modules?admin=1`,
+  and `install.commit` is only ever 40 lowercase hex characters.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation
