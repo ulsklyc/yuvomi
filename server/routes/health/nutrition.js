@@ -31,6 +31,8 @@ import {
   resolveOwner, wallClockInput,
 } from './helpers.js';
 import { canWriteFor, careAwareClause, OPEN_ALL, writableClause } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
+import { MAX_NUTRIENT } from '../../services/health-fields.js';
 
 const router = express.Router();
 
@@ -39,7 +41,6 @@ const router = express.Router();
 // EINZELNE Mahlzeit so weit jenseits, dass niemand sie versehentlich trifft -
 // die Grenze ist gegen den verrutschten Dezimalpunkt gerichtet, nicht gegen
 // eine ungewoehnliche Ernaehrung.
-const MAX_NUTRIENT = 100000;
 
 /**
  * Ein Naehrwert: Zahl >= 0, oder ausdruecklich NULL ("nicht angegeben").
@@ -85,7 +86,7 @@ function mayReadTarget(viewer, ownerId) {
  * zweiten einen Fortschritt gegen 0 - beides ist eine Aussage, und sie sind
  * nicht dieselbe.
  */
-router.get('/nutrition/targets', (req, res) => {
+router.get('/nutrition/targets', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const ownerId = req.query.user_id ? parseInt(req.query.user_id, 10) : viewer;
@@ -112,7 +113,7 @@ router.get('/nutrition/targets', (req, res) => {
  * Schreibweise fuer "kein Ziel" - dieselbe Regel, nach der eine
  * Sichtbarkeits-Voreinstellung 'private' gar nicht erst gespeichert wird.
  */
-router.put('/nutrition/targets', (req, res) => {
+router.put('/nutrition/targets', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
@@ -154,7 +155,7 @@ router.put('/nutrition/targets', (req, res) => {
 // --------------------------------------------------------
 
 // GET /nutrition/entries?user_id=&from=&to=&meal_type=
-router.get('/nutrition/entries', (req, res) => {
+router.get('/nutrition/entries', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -177,7 +178,7 @@ router.get('/nutrition/entries', (req, res) => {
 });
 
 // POST /nutrition/entries
-router.post('/nutrition/entries', (req, res) => {
+router.post('/nutrition/entries', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
@@ -221,7 +222,7 @@ router.post('/nutrition/entries', (req, res) => {
 });
 
 // PATCH /nutrition/entries/:id
-router.patch('/nutrition/entries/:id', (req, res) => {
+router.patch('/nutrition/entries/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -265,7 +266,7 @@ router.patch('/nutrition/entries/:id', (req, res) => {
 });
 
 // DELETE /nutrition/entries/:id
-router.delete('/nutrition/entries/:id', (req, res) => {
+router.delete('/nutrition/entries/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -296,7 +297,7 @@ router.delete('/nutrition/entries/:id', (req, res) => {
  * Antwort braucht: zwei Rechnungen waeren zwei Zahlen, und die Kachel wuerde
  * dem Tab widersprechen.
  */
-router.get('/nutrition/summary', (req, res) => {
+router.get('/nutrition/summary', validateRequest(), (req, res) => {
   try {
     const viewer  = viewerId(req);
     const ownerId = req.query.user_id ? parseInt(req.query.user_id, 10) : viewer;

@@ -19,8 +19,9 @@
  *          (recipes, recipe-providers, pantry), 2B (the five route files of
  *          inventory: locations, categories, items, entries, deadlines-feed),
  *          3 (housekeeping, rewards), 4 (the eight route files of waste,
- *          schedule, schedule-extras, schedule-feed, schedule-preferences) and
- *          5 (split-expenses, backup, and of the core system and changelog).
+ *          schedule, schedule-extras, schedule-feed, schedule-preferences),
+ *          5 (split-expenses, backup, and of the core system and changelog) and
+ *          6 (the twelve route files of health under server/routes/health/).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -65,18 +66,6 @@ const NOT_MIGRATED = [
   'server/routes/dms.js',
   'server/routes/document-storage-google-drive.js',
   'server/routes/documents.js',
-  'server/routes/health/activities.js',
-  'server/routes/health/caregivers.js',
-  'server/routes/health/cycle-feed.js',
-  'server/routes/health/cycle.js',
-  'server/routes/health/export.js',
-  'server/routes/health/fasting.js',
-  'server/routes/health/labs.js',
-  'server/routes/health/medications.js',
-  'server/routes/health/nutrition.js',
-  'server/routes/health/prevention.js',
-  'server/routes/health/visibility-defaults.js',
-  'server/routes/health/vitals.js',
   'server/routes/meals.js',
   'server/routes/preferences.js',
   'server/routes/push.js',
@@ -102,6 +91,10 @@ const MIGRATED = [
   'server/routes/schedule.js', 'server/routes/schedule-extras.js', 'server/routes/schedule-feed.js',
   'server/routes/schedule-preferences.js',
   'server/routes/split-expenses.js', 'server/routes/backup.js', 'server/routes/system.js', 'server/routes/changelog.js',
+  'server/routes/health/vitals.js', 'server/routes/health/medications.js', 'server/routes/health/labs.js',
+  'server/routes/health/activities.js', 'server/routes/health/export.js', 'server/routes/health/cycle.js',
+  'server/routes/health/cycle-feed.js', 'server/routes/health/caregivers.js', 'server/routes/health/visibility-defaults.js',
+  'server/routes/health/fasting.js', 'server/routes/health/prevention.js', 'server/routes/health/nutrition.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

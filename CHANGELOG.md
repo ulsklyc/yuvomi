@@ -8,6 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Health checks every request against the published API description.** This is about your
+  own API clients; the app sends nothing that is refused now (from this release on it sends the
+  type of a preventive-care record as a number). Under `/api/v1/health`, input that used to be
+  quietly accepted, replaced or answered later is now refused with a 400:
+  - a path id that is not plain digits: `7abc`, `1e2`, `1.5` and `" 5"` reached row 7, 1, 1 and
+    5, and on fasting records `0x10` reached record 16;
+  - a number sent as text, a truth value or a list in a number field: `"0x10"`, `" "`, `[]` and
+    `true` were stored as 16, 0, 0 and 1 (vital values, stock and doses, lab values, activity
+    numbers, nutrients, cycle settings);
+  - an unknown value where the module has a list: visibility, dose status, lab flag, cycle flow
+    and the day log choices, basal temperature unit, contraception, preventive-care kind, meal
+    type, the areas of the visibility defaults; `active` and `prn` of a new medication or
+    schedule that are not `true`/`false`/`1`/`0` became the default;
+  - a number, list or object in a text field (stored as text, `{}` as `"[object Object]"`), ids
+    in a body that are neither whole numbers nor digit text (`user_id`, `schedule_id`,
+    `type_id`, `notify_partner_user_id`), `symptoms` that is neither a list nor text (it cleared
+    the day's symptoms) and `results` of a lab report that is not a list (dropped);
+  - `caregiver_ids` with an entry that is not an id: `["abc"]` WITHDREW ALL CARE for the person;
+  - `PATCH /health/fasting/{id}` with `visibility: null`, which made a shared fast private;
+    fasting `goal_minutes`, `rating` and `expected_revision` sent as text;
+  - queries: `user_id` that is not plain digits or `0` (read as "everybody visible"), `active`
+    other than `1`, `0`, `true`, `false`, export dates that are not a day (ignored), an unknown
+    `meal_type`, and any parameter given twice;
+  - a missing body on the routes that read one; `{}` sent on purpose still passes where the
+    route took it before. `POST /health/logs/{id}/skip` reads no body.
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404 or 409; a
+  valid one meets those as before. The fasting capability and the admin check of caregivers and
+  preventive-care types come first: 403 stays 403, also for a bad request. Rules the
+  description cannot carry stay with the routes: vital limits and units, the order of start and
+  end, the CSV import rows, revisions and overlaps of fasts. A basal temperature unit named like
+  a built-in property (`constructor`) no longer passes the range check.
 - **Editing a shared expense takes the whole expense.** This is about your own API clients; the
   app sends every field now. `PUT /split-expenses/expenses/{id}` without `description`,
   `currency`, `converted_amount`, `converted_currency`, `exchange_snapshot`, `split_method` or

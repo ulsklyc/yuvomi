@@ -15,14 +15,16 @@ import {
   resolveOwner, wallClockInput, wallClockNow,
 } from './helpers.js';
 import { careAwareClause, readableClause, writableChild, writableClause } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
+import { MAX_INTERVAL_HOURS, MAX_SCHEDULES_ON_CREATE } from '../../services/health-fields.js';
 
 const router = express.Router();
 
 // Ein Mindestabstand von mehr als vier Wochen beschreibt keine Bedarfsdosis
 // mehr, sondern einen Zeitplan - und ein negativer oder 0 ergaebe einen
 // Countdown, der immer abgelaufen ist. Die Grenze liegt deshalb hier und nicht
-// erst im Formular (#700).
-const MAX_INTERVAL_HOURS = 24 * 28;
+// erst im Formular (#700); MAX_INTERVAL_HOURS steht in health-fields.js, eine
+// Quelle mit dem OpenAPI-Dokument (#2810).
 
 /** Zeitpunkt eines Dosis-Eintrags fuer Filter und Reihenfolge (GET .../logs). */
 const LOG_WHEN = 'COALESCE(scheduled_at, taken_at, created_at)';
@@ -128,8 +130,8 @@ function insertSchedule(medId, s) {
 }
 
 // So viele Zeitfenster bringt ein Medikament beim Anlegen hoechstens mit:
-// grosszuegig fuer jeden echten Plan, aber kein unbegrenzter Body.
-const MAX_SCHEDULES_ON_CREATE = 48;
+// grosszuegig fuer jeden echten Plan, aber kein unbegrenzter Body
+// (MAX_SCHEDULES_ON_CREATE, health-fields.js).
 
 // Diese beiden Helfer sind der einzige Zugang zu einem Medikament: Plaene und
 // Einnahmeprotokolle haengen daran und erben ihr Scoping von hier. Die Betreuung
@@ -193,7 +195,7 @@ function attachPlansAndLogs(meds, query) {
 }
 
 // GET /medications?user_id=&active=&include=schedules,logs&logs_from=&logs_to=
-router.get('/medications', (req, res) => {
+router.get('/medications', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -215,7 +217,7 @@ router.get('/medications', (req, res) => {
 });
 
 // POST /medications
-router.post('/medications', (req, res) => {
+router.post('/medications', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
@@ -290,7 +292,7 @@ router.post('/medications', (req, res) => {
 });
 
 // PATCH /medications/:id
-router.patch('/medications/:id', (req, res) => {
+router.patch('/medications/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -328,7 +330,7 @@ router.patch('/medications/:id', (req, res) => {
 });
 
 // DELETE /medications/:id
-router.delete('/medications/:id', (req, res) => {
+router.delete('/medications/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -348,7 +350,7 @@ router.delete('/medications/:id', (req, res) => {
 // ---- Einnahmeplan (Schedules) ----
 
 // GET /medications/:id/schedules
-router.get('/medications/:id/schedules', (req, res) => {
+router.get('/medications/:id/schedules', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
@@ -366,7 +368,7 @@ router.get('/medications/:id/schedules', (req, res) => {
 });
 
 // POST /medications/:id/schedules
-router.post('/medications/:id/schedules', (req, res) => {
+router.post('/medications/:id/schedules', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
@@ -386,7 +388,7 @@ router.post('/medications/:id/schedules', (req, res) => {
 });
 
 // PATCH /schedules/:id
-router.patch('/schedules/:id', (req, res) => {
+router.patch('/schedules/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -429,7 +431,7 @@ router.patch('/schedules/:id', (req, res) => {
 });
 
 // DELETE /schedules/:id
-router.delete('/schedules/:id', (req, res) => {
+router.delete('/schedules/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -453,7 +455,7 @@ router.delete('/schedules/:id', (req, res) => {
 // ---- Dosis-Log (Logs) ----
 
 // GET /medications/:id/logs?from=&to=
-router.get('/medications/:id/logs', (req, res) => {
+router.get('/medications/:id/logs', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
@@ -488,7 +490,7 @@ router.get('/medications/:id/logs', (req, res) => {
 });
 
 // POST /medications/:id/logs
-router.post('/medications/:id/logs', (req, res) => {
+router.post('/medications/:id/logs', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
@@ -632,7 +634,7 @@ function ownLogRow(id, viewer) {
 // `status: 'pending'` ist das Zurücknehmen: der Eintrag steht wieder aus, als
 // wäre nichts angehakt worden.
 // --------------------------------------------------------
-router.patch('/logs/:id', (req, res) => {
+router.patch('/logs/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -691,7 +693,7 @@ router.patch('/logs/:id', (req, res) => {
 // sähe aus wie ein Erfolg und wäre eine Rückkehr auf Raten. Zurücknehmen heißt
 // dort `PATCH { status: 'pending' }`, und darauf verweist die Antwort auch.
 // --------------------------------------------------------
-router.delete('/logs/:id', (req, res) => {
+router.delete('/logs/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -730,7 +732,7 @@ router.delete('/logs/:id', (req, res) => {
 // Die Gutschrift ist gedeckelt auf die Dosis des Eintrags, und nur, wer das
 // Medikament schreiben darf, kommt hierher (writableChild).
 // --------------------------------------------------------
-router.post('/logs/:id/undo', (req, res) => {
+router.post('/logs/:id/undo', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -772,13 +774,13 @@ router.post('/logs/:id/undo', (req, res) => {
 });
 
 // POST /logs/:id/take
-router.post('/logs/:id/take', (req, res) => {
+router.post('/logs/:id/take', validateRequest(), (req, res) => {
   try { updateLogStatus(req, res, 'taken'); }
   catch (err) { log.error('Error taking dose:', err.message); res.status(500).json({ error: 'Internal error.', code: 500 }); }
 });
 
 // POST /logs/:id/skip
-router.post('/logs/:id/skip', (req, res) => {
+router.post('/logs/:id/skip', validateRequest(), (req, res) => {
   try { updateLogStatus(req, res, 'skipped'); }
   catch (err) { log.error('Error skipping dose:', err.message); res.status(500).json({ error: 'Internal error.', code: 500 }); }
 });

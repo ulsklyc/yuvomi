@@ -102,6 +102,10 @@ const MOUNTS = [
   { file: 'backup.js', mount: '/api/v1/backup' },
   { file: 'system.js', mount: '/api/v1/system' },
   { file: 'changelog.js', mount: '/api/v1/changelog' },
+  // Gesundheit: die zwoelf Unterrouter haengen ohne eigenen Pfad unter
+  // /api/v1/health (server/routes/health.js), in dessen Reihenfolge.
+  ...['vitals', 'medications', 'labs', 'activities', 'export', 'cycle', 'cycle-feed', 'caregivers',
+    'visibility-defaults', 'fasting', 'prevention', 'nutrition'].map((name) => ({ file: `health/${name}.js`, mount: '/api/v1/health' })),
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
@@ -110,6 +114,7 @@ const WITHOUT_INTEGER_PATH_ID = [
   'modules.js', 'schedule-feed.js', 'schedule-preferences.js', 'screensaver.js', 'search.js',
   'waste/feed.js', 'waste/import.js', 'waste/occurrences.js', 'weather.js',
   'backup.js', 'system.js', 'changelog.js',
+  'health/export.js', 'health/cycle-feed.js', 'health/visibility-defaults.js',
 ];
 
 const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));

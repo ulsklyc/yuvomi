@@ -27,13 +27,12 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import express from 'express';
+import { createHealthApp } from './health-app.js';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
 
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
-const { default: healthRouter } = await import('../server/routes/health.js');
 const { NUTRIENT_KEYS } = await import('../server/services/health-nutrition.js');
 const { HEALTH_EXPORT_HEADERS } = await import('../server/services/health-export.js');
 // `utcDateKey` ist hier die RICHTIGE Funktion und nicht der Fehler, den sie
@@ -80,15 +79,16 @@ const userD = db.prepare(`INSERT INTO users (username, display_name, password_ha
 db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)').run(userB, userD);
 
 let session = { userId: userA, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = session.userId;
-  req.authRole = session.role;
-  req.session = { userId: session.userId, role: session.role };
-  next();
+// createHealthApp (test/health-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createHealthApp({
+  auth: (req, _res, next) => {
+    req.authUserId = session.userId;
+    req.authRole = session.role;
+    req.session = { userId: session.userId, role: session.role };
+    next();
+  },
 });
-app.use('/api/v1/health', healthRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/health`;

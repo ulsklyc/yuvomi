@@ -37,6 +37,7 @@ const { storedToInstantMs, storedToInstantMsPrecise } = await import('../server/
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 const { default: healthRouter } = await import('../server/routes/health.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { callTool } = await import('../server/mcp/tools.js');
@@ -79,6 +80,7 @@ const BEN = db.prepare(`
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = ADMIN;
   req.authRole = 'admin';
@@ -88,7 +90,8 @@ app.use((req, _res, next) => {
 app.use('/calendar', calendarRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 app.use('/api/v1/reminders', remindersRouter);
-app.use('/health', healthRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/housekeeping', housekeepingRouter);
 // Zweite Montierung unter dem echten Pfad: das MCP-Werkzeug `create_event`
 // geht seit #2616 per Loopback durch POST /api/v1/calendar, und genau DAS ist
@@ -574,31 +577,31 @@ test('Kalenderumzug: eine vergangene geerbte Erinnerung mit Offset gilt als verw
 test('Gesundheit: ein Zeitstempel mit `Z` oder Offset wird Wanduhrzeit des Haushalts', async () => {
   // Dieselbe Minute, einmal aus `utcnow()`, einmal aus `now()` mit Ortsoffset.
   for (const measuredAt of ['2026-09-16T18:15:32.123456+00:00', '2026-09-16T20:15:32.123456+02:00']) {
-    const res = await call('POST', '/health/vitals', { type: 'weight', value_num: 80, unit: 'kg', measured_at: measuredAt });
+    const res = await call('POST', '/api/v1/health/vitals', { type: 'weight', value_num: 80, unit: 'kg', measured_at: measuredAt });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(res.body.data.measured_at, '2026-09-16T20:15', measuredAt);
   }
-  const vital = await call('POST', '/health/vitals', { type: 'weight', value_num: 81, unit: 'kg', measured_at: '2026-09-16T08:00' });
-  const patched = await call('PATCH', `/health/vitals/${vital.body.data.id}`, { measured_at: '2026-09-16T06:00:00Z' });
+  const vital = await call('POST', '/api/v1/health/vitals', { type: 'weight', value_num: 81, unit: 'kg', measured_at: '2026-09-16T08:00' });
+  const patched = await call('PATCH', `/api/v1/health/vitals/${vital.body.data.id}`, { measured_at: '2026-09-16T06:00:00Z' });
   assert.equal(patched.body.data.measured_at, '2026-09-16T08:00');
 
-  const activity = await call('POST', '/health/activities', { type: 'run', duration_min: 30, performed_at: '2026-09-16T12:00:00-04:00' });
+  const activity = await call('POST', '/api/v1/health/activities', { type: 'run', duration_min: 30, performed_at: '2026-09-16T12:00:00-04:00' });
   assert.equal(activity.status, 201, JSON.stringify(activity.body));
   assert.equal(activity.body.data.performed_at, '2026-09-16T18:00');
 
-  const meal = await call('POST', '/health/nutrition/entries', { title: 'Abendessen', consumed_at: '2026-09-16T17:30:00Z' });
+  const meal = await call('POST', '/api/v1/health/nutrition/entries', { title: 'Abendessen', consumed_at: '2026-09-16T17:30:00Z' });
   assert.equal(meal.status, 201, JSON.stringify(meal.body));
   assert.equal(meal.body.data.consumed_at, '2026-09-16T19:30');
 
-  const med = await call('POST', '/health/medications', { name: 'Ibuprofen' });
+  const med = await call('POST', '/api/v1/health/medications', { name: 'Ibuprofen' });
   assert.equal(med.status, 201, JSON.stringify(med.body));
-  const doseLog = await call('POST', `/health/medications/${med.body.data.id}/logs`, {
+  const doseLog = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, {
     scheduled_at: '2026-09-16T06:00:00Z', status: 'taken', taken_at: '2026-09-16T06:10:00Z',
   });
   assert.equal(doseLog.status, 201, JSON.stringify(doseLog.body));
   assert.equal(doseLog.body.data.scheduled_at, '2026-09-16T08:00');
   assert.equal(doseLog.body.data.taken_at, '2026-09-16T08:10');
-  const taken = await call('POST', `/health/logs/${doseLog.body.data.id}/take`, { taken_at: '2026-09-16T06:20:00Z' });
+  const taken = await call('POST', `/api/v1/health/logs/${doseLog.body.data.id}/take`, { taken_at: '2026-09-16T06:20:00Z' });
   assert.equal(taken.body.data.taken_at, '2026-09-16T08:20');
 });
 
@@ -609,16 +612,17 @@ test('Gesundheit: "jetzt" als Einnahmezeit ist Wanduhrzeit des Haushalts, kein U
   // die UTC-Uhrzeit, und der Tag kippte in Kiritimati (+14) auf den Vortag.
   // 2026-09-16T11:30Z ist in Kiritimati der 17.09. um 01:30.
   await inZone('Pacific/Kiritimati', async () => {
-    const med = await call('POST', '/health/medications', { name: 'Jetztprobe' });
-    const takeLog = await call('POST', `/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00' });
-    const patchLog = await call('POST', `/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00' });
+    const med = await call('POST', '/api/v1/health/medications', { name: 'Jetztprobe' });
+    const takeLog = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00' });
+    const patchLog = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00' });
 
     await withFrozenClock('2026-09-16T11:30:00.000Z', async () => {
-      const taken = await call('POST', `/health/logs/${takeLog.body.data.id}/take`);
+      // `{}` statt keines Rumpfs: seit #2810 ist der Rumpf Pflicht, wie ihn die App schickt.
+      const taken = await call('POST', `/api/v1/health/logs/${takeLog.body.data.id}/take`, {});
       assert.equal(taken.status, 200, JSON.stringify(taken.body));
-      assert.equal(taken.body.data.taken_at, '2026-09-17T01:30', 'POST /take ohne Body');
+      assert.equal(taken.body.data.taken_at, '2026-09-17T01:30', 'POST /take ohne taken_at');
 
-      const patched = await call('PATCH', `/health/logs/${patchLog.body.data.id}`, { status: 'taken' });
+      const patched = await call('PATCH', `/api/v1/health/logs/${patchLog.body.data.id}`, { status: 'taken' });
       assert.equal(patched.status, 200, JSON.stringify(patched.body));
       assert.equal(patched.body.data.taken_at, '2026-09-17T01:30', 'PATCH auf taken ohne Zeit');
 
@@ -631,13 +635,13 @@ test('Gesundheit: "jetzt" als Einnahmezeit ist Wanduhrzeit des Haushalts, kein U
         { status: 'taken', taken_at: null },
         { status: 'taken', taken_at: '' },
       ]) {
-        const created = await call('POST', `/health/medications/${med.body.data.id}/logs`, body);
+        const created = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, body);
         assert.equal(created.status, 201, JSON.stringify(created.body));
         assert.equal(created.body.data.taken_at, '2026-09-17T01:30', `POST logs ${JSON.stringify(body)}`);
       }
 
       // Nicht genommen bleibt ohne Zeit - "jetzt" gehoert nur zu `taken`.
-      const pending = await call('POST', `/health/medications/${med.body.data.id}/logs`, { status: 'pending' });
+      const pending = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, { status: 'pending' });
       assert.equal(pending.body.data.taken_at, null, 'POST logs pending');
     });
   });
