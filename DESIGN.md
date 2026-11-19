@@ -2345,6 +2345,14 @@ hakt der Zeilen-Tipp ab; sonst oeffnet er. Loeschen = Wisch mobil + ein fester O
   ueber den Eintrag "Loeschen" im Mehr-Knopf der Zeile (fester Ort), mit Rueckgaengig wie eine
   Charge. Die Chipzeile des Vorrats traegt bewusst ZWEI Dimensionen (Status und Lagerort) als
   Chips mit Einfachauswahl, auf Wunsch des Maintainers in #2085: benannte Ausnahme von D2.
+  Eine Menge ENTNEHMEN (#1891, "30 g Butter fuer die Mehlschwitze") steht im Dialog der Charge
+  unter Menge und Einheit, nicht in der Zeile: ein Mehr-Knopf waere dort das vierte Ziel der
+  benannten Ausnahme in D10, und ein zweites Feld in der Zeile ist im Ticket verworfen (der Tipp
+  auf die Zeile IST das Bearbeiten). Der Knopf oeffnet einen kleinen Dialog mit EINEM Zahlfeld in
+  der Einheit der Charge (Zeile nach `formRowHtml`, Textfeld mit `inputmode="decimal"` und
+  `parseAmountInput()` wie das Betragsfeld, nie `type="number"`; die Einheit als Suffix, der Bestand als
+  Beschreibung, "mehr als vorraetig" als Nachfrage ohne Sperre); der Server zieht ab, der Toast
+  quittiert mit Rueckgaengig (D6). Eine Produktzeile mit mehreren Chargen entnimmt nicht.
 - **Mahlzeiten:** die Karte oeffnet das LESEBLATT (R24, E1; bis dahin den Bearbeiten-Dialog
   mit 13 Feldern): Datum, Mahlzeit, Koch, Zutaten, Rezept, Notiz - am Desktop als Popover an
   der Karte, am Telefon als Blatt (`openDetailView`). Im Fuss EIN Primaerknopf "Bearbeiten"

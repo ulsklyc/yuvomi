@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Stock: take an amount from an item by typing it** (#1891). 30 g of butter for a roux from
+  250 g: the item dialog has "Take an amount" under the quantity, you type 30, and the item goes
+  to 220 g, without doing the sum yourself. The amount is in the unit of the item, and the server
+  subtracts it, so two people taking from the same item at the same time both count. Taking more
+  than there is sets the item to 0; the dialog warns before, and the message says the item is used
+  up. The message offers undo, which puts back exactly what was taken, also when someone changed
+  the item in between. Taking the last of an item stops its best-before reminder, as the minus
+  button does. The amount is read in your region's writing, so "0,5" is half a kilo also in a
+  browser set to English, and a second tap after a lost answer does not take twice. Plus and
+  minus keep their fixed steps. For API clients,
+  `POST /api/v1/pantry/{itemId}/take` takes `{ amount }` and answers with the item and `taken`,
+  the amount really taken; `POST /api/v1/pantry/{itemId}/take/undo` puts it back. `PATCH` with
+  `quantity` works as before.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation
