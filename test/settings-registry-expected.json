@@ -38,6 +38,7 @@
       ],
       "hidden_modules": [],
       "module_order": [],
+      "module_colors": {},
       "mobile_nav_order": [],
       "housekeeping_payment_tasks": false,
       "budget_mode": "shared",
@@ -128,6 +129,7 @@
       ],
       "hidden_modules": [],
       "module_order": [],
+      "module_colors": {},
       "mobile_nav_order": [],
       "housekeeping_payment_tasks": false,
       "budget_mode": "shared",
@@ -310,6 +312,12 @@
        "tasks",
        "dashboard"
       ],
+      "module_colors": {
+       "tasks": {
+        "light": "#223344",
+        "dark": "#556677"
+       }
+      },
       "mobile_nav_order": [
        "tasks",
        "kitchen",
@@ -464,6 +472,12 @@
        "dashboard",
        "tasks"
       ],
+      "module_colors": {
+       "dashboard": {
+        "light": "#112233",
+        "dark": "#445566"
+       }
+      },
       "mobile_nav_order": [
        "tasks",
        "kitchen",
@@ -627,6 +641,12 @@
        "notes"
       ],
       "module_order": [],
+      "module_colors": {
+       "notes": {
+        "light": "#112233",
+        "dark": "#445566"
+       }
+      },
       "mobile_nav_order": [],
       "housekeeping_payment_tasks": false,
       "budget_mode": "shared",
@@ -712,6 +732,12 @@
        "notes"
       ],
       "module_order": [],
+      "module_colors": {
+       "notes": {
+        "light": "#112233",
+        "dark": "#445566"
+       }
+      },
       "mobile_nav_order": [],
       "housekeeping_payment_tasks": false,
       "budget_mode": "shared",
@@ -855,6 +881,7 @@
        "calendar",
        "tasks"
       ],
+      "module_colors": {},
       "mobile_nav_order": [],
       "housekeeping_payment_tasks": false,
       "budget_mode": "shared",
@@ -961,6 +988,7 @@
        "calendar",
        "tasks"
       ],
+      "module_colors": {},
       "mobile_nav_order": [],
       "housekeeping_payment_tasks": false,
       "budget_mode": "shared",
@@ -1102,6 +1130,7 @@
    ],
    "hidden_modules": [],
    "module_order": [],
+   "module_colors": {},
    "mobile_nav_order": [],
    "housekeeping_payment_tasks": false,
    "budget_mode": "shared",
@@ -1178,6 +1207,7 @@
    ],
    "hidden_modules": [],
    "module_order": [],
+   "module_colors": {},
    "mobile_nav_order": [],
    "housekeeping_payment_tasks": false,
    "budget_mode": "shared",
@@ -2705,6 +2735,54 @@
     "rows": {},
     "body": {
      "error": "module_order must be an array.",
+     "code": 400
+    }
+   }
+  },
+  "module_colors valid": {
+   "admin": {
+    "status": 200,
+    "rows": {
+     "module_colors:user:admin": "{\"tasks\":{\"light\":\"#112233\",\"dark\":\"#445566\"}}"
+    },
+    "changed": {
+     "module_colors": {
+      "tasks": {
+       "light": "#112233",
+       "dark": "#445566"
+      }
+     }
+    }
+   },
+   "member": {
+    "status": 200,
+    "rows": {
+     "module_colors:user:member": "{\"tasks\":{\"light\":\"#112233\",\"dark\":\"#445566\"}}"
+    },
+    "changed": {
+     "module_colors": {
+      "tasks": {
+       "light": "#112233",
+       "dark": "#445566"
+      }
+     }
+    }
+   }
+  },
+  "module_colors not an object": {
+   "admin": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "module_colors must be an object.",
+     "code": 400
+    }
+   },
+   "member": {
+    "status": 400,
+    "rows": {},
+    "body": {
+     "error": "module_colors must be an object.",
      "code": 400
     }
    }
@@ -5076,6 +5154,7 @@
      "visible_meal_types": [
       "lunch"
      ],
+     "module_colors": {},
      "meal_type_names": {
       "lunch": "Z"
      },

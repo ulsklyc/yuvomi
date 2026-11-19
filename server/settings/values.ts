@@ -391,6 +391,31 @@ export function parseModuleOrder(raw: string | null): string[] {
   }
 }
 
+export type ModuleColor = { light: string, dark: string };
+
+// Module colours: an object { moduleId: { light, dark } }, at most 30
+// entries. Unknown module ids and invalid colours are silently dropped.
+export function parseModuleColors(raw: string | null): Record<string, ModuleColor> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const result: Record<string, ModuleColor> = {};
+    for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!MODULE_ORDER_RE.test(key)) continue;
+      const color = val as { light?: unknown, dark?: unknown } | null;
+      if (color && typeof color === 'object' && !Array.isArray(color)
+          && typeof color.light === 'string' && HEX_COLOR_RE.test(color.light)
+          && typeof color.dark === 'string' && HEX_COLOR_RE.test(color.dark)) {
+        result[key] = { light: color.light, dark: color.dark };
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 export function normalizeMobileNavOrder(order: unknown): string[] {
   const normalized: string[] = [];
 
