@@ -763,6 +763,11 @@
         "importMeals": "Uit het maaltijdplan",
         "sendList": "Lijst versturen",
         "sendListTitle": "Boodschappenlijst versturen",
+        "sendWebhook": "Open artikelen versturen",
+        "sendWebhookSent": "{{count}} artikelen verstuurd.",
+        "sendWebhookSent_one": "{{count}} artikel verstuurd.",
+        "sendWebhookUnconfigured": "Er is geen webhookbestemming ingesteld.",
+        "sendWebhookError": "Versturen naar de webhook is mislukt.",
         "sendListDescription": "{{count}} openstaande items gaan naar het gekozen lid.",
         "sendListDescription_one": "{{count}} openstaand item gaat naar het gekozen lid.",
         "sendListRecipient": "Ontvanger",
@@ -844,7 +849,8 @@
             "waited": "„{{item}}” is niet verplaatst naar „{{target}}”: de synchronisatie van „{{back}}” staat al meer dan een week uit. Het artikel verschijnt weer op „{{back}}” zodra die lijst wordt ingeschakeld."
         },
         "moreDetailsHint": "Prijs, winkel, link, notitie",
-        "toPantryAllToPlaceholder": "Kies een plek …"
+        "toPantryAllToPlaceholder": "Kies een plek …",
+        "sendWebhookPrivateNetwork": "De bestemming staat in je eigen netwerk. De server moet dat toestaan (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediënt",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "Teruggezet naar standaard huishouden",
         "pushDeviceDescription": "Web Push geldt alleen voor dit apparaat en deze browser.",
         "notificationChannelsTitle": "Huishoudkanalen",
+        "shoppingWebhookTitle": "Webhook voor de boodschappenlijst",
+        "shoppingWebhookDescription": "Stuurt de open artikelen van een lijst als JSON naar dit adres. Alleen beheerders stellen de bestemming in; daarna kan elk huisgenoot versturen via het menu van de lijst.",
+        "shoppingWebhookUrl": "Webhookadres",
+        "shoppingWebhookSaved": "Opgeslagen.",
         "notificationChannelsDescription": "Beheerders kunnen kanalen toevoegen die herinneringen ontvangen naast Web Push.",
         "notificationChannelAdd": "Kanaal toevoegen",
         "notificationChannelProvider": "Provider",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "Dit lid bestaat niet meer.",
         "memberErrorSsoEmailRequired": "Een account met alleen SSO heeft een e-mailadres nodig, zodat de eerste SSO-aanmelding het kan vinden.",
         "memberErrorSsoEmailAmbiguous": "Een ander lid heeft dit e-mailadres al. SSO zou de accounts niet uit elkaar kunnen houden.",
+        "shoppingWebhookPrivateNetworkHint": "Een bestemming in je eigen netwerk (Home Assistant, een lokale n8n) werkt alleen als de server is gestart met NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "Dat is geen geldig webadres. Het moet beginnen met http:// of https://.",
         "twoFactorAlreadyEnabled": "Tweestapsverificatie is al ingeschakeld. Laad de pagina opnieuw om de huidige stand te zien.",
         "twoFactorSetupExpired": "De instelling is verlopen. Annuleer en begin opnieuw.",
         "oidcLinkErrorNotConfigured": "SSO is niet meer ingesteld op deze server.",

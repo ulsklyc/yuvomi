@@ -763,6 +763,11 @@
         "importMeals": "Dal piano dei pasti",
         "sendList": "Invia la lista",
         "sendListTitle": "Invia la lista della spesa",
+        "sendWebhook": "Invia gli articoli da comprare",
+        "sendWebhookSent": "{{count}} articoli inviati.",
+        "sendWebhookSent_one": "{{count}} articolo inviato.",
+        "sendWebhookUnconfigured": "Nessuna destinazione webhook configurata.",
+        "sendWebhookError": "Invio al webhook non riuscito.",
         "sendListDescription": "{{count}} articoli aperti andranno al membro scelto.",
         "sendListDescription_one": "{{count}} articolo aperto andrà al membro scelto.",
         "sendListRecipient": "Destinatario",
@@ -844,7 +849,8 @@
             "waited": "«{{item}}» non è stato spostato in «{{target}}»: la sincronizzazione di «{{back}}» è disattivata da oltre una settimana. L’articolo ricomparirà in «{{back}}» non appena riattivi quella lista."
         },
         "moreDetailsHint": "Prezzo, negozio, link, nota",
-        "toPantryAllToPlaceholder": "Scegli un posto …"
+        "toPantryAllToPlaceholder": "Scegli un posto …",
+        "sendWebhookPrivateNetwork": "La destinazione è nella tua rete locale. Il server deve consentirlo (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediente",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "Ripristinata la predefinita della famiglia",
         "pushDeviceDescription": "Web Push vale solo per questo dispositivo e questo browser.",
         "notificationChannelsTitle": "Canali della famiglia",
+        "shoppingWebhookTitle": "Webhook della lista della spesa",
+        "shoppingWebhookDescription": "Invia gli articoli da comprare di una lista come JSON a questo indirizzo. Solo gli amministratori possono impostare la destinazione; poi ogni membro della famiglia può inviare dal menu della lista.",
+        "shoppingWebhookUrl": "Indirizzo del webhook",
+        "shoppingWebhookSaved": "Salvato.",
         "notificationChannelsDescription": "Gli amministratori possono aggiungere canali che ricevono i promemoria oltre alle Web Push.",
         "notificationChannelAdd": "Aggiungi canale",
         "notificationChannelProvider": "Provider",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "Questo membro non esiste più.",
         "memberErrorSsoEmailRequired": "Un account solo SSO ha bisogno di un indirizzo email, così il primo accesso SSO può trovarlo.",
         "memberErrorSsoEmailAmbiguous": "Un altro membro ha già questo indirizzo email. L'SSO non potrebbe distinguere gli account.",
+        "shoppingWebhookPrivateNetworkHint": "Una destinazione nella tua rete (Home Assistant, un n8n locale) funziona solo se il server è stato avviato con NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
+        "shoppingWebhookUrlInvalid": "Questo non è un indirizzo web valido. Deve iniziare con http:// o https://.",
         "twoFactorAlreadyEnabled": "L'autenticazione a due fattori è già attiva. Ricarica la pagina per vedere lo stato attuale.",
         "twoFactorSetupExpired": "La configurazione è scaduta. Annullala e ricomincia.",
         "oidcLinkErrorNotConfigured": "L'SSO non è più configurato su questo server.",

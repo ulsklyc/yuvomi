@@ -763,6 +763,11 @@
         "importMeals": "भोजन योजना से",
         "sendList": "सूची भेजें",
         "sendListTitle": "खरीदारी सूची भेजें",
+        "sendWebhook": "बचे हुए आइटम भेजें",
+        "sendWebhookSent": "{{count}} आइटम भेजे गए।",
+        "sendWebhookSent_one": "{{count}} आइटम भेजा गया।",
+        "sendWebhookUnconfigured": "कोई webhook गंतव्य सेट नहीं है।",
+        "sendWebhookError": "webhook पर नहीं भेजा जा सका।",
         "sendListDescription": "{{count}} शेष वस्तुएँ चुने गए सदस्य को जाएँगी।",
         "sendListDescription_one": "{{count}} शेष वस्तु चुने गए सदस्य को जाएगी।",
         "sendListRecipient": "प्राप्तकर्ता",
@@ -844,7 +849,8 @@
             "waited": "“{{item}}” को “{{target}}” में नहीं ले जाया गया: “{{back}}” का सिंक एक हफ़्ते से ज़्यादा समय से बंद है। सूची चालू होते ही आइटम फिर से “{{back}}” में दिखेगा।"
         },
         "moreDetailsHint": "कीमत, दुकान, लिंक, नोट",
-        "toPantryAllToPlaceholder": "जगह चुनें …"
+        "toPantryAllToPlaceholder": "जगह चुनें …",
+        "sendWebhookPrivateNetwork": "गंतव्य आपके स्थानीय नेटवर्क में है। सर्वर को इसकी अनुमति देनी होगी (NOTIFICATION_ALLOW_PRIVATE_NETWORK)।"
     },
     "meals": {
         "ingredientCount_one": "{{count}} सामग्री",
@@ -3129,6 +3135,10 @@
         "personalWeatherReset": "घर के डिफ़ॉल्ट पर रीसेट किया गया",
         "pushDeviceDescription": "Web Push केवल इस डिवाइस और इस ब्राउज़र पर लागू होता है।",
         "notificationChannelsTitle": "घर के चैनल",
+        "shoppingWebhookTitle": "खरीद सूची का webhook",
+        "shoppingWebhookDescription": "किसी सूची के बचे हुए आइटम JSON के रूप में इस पते पर भेजता है। गंतव्य केवल प्रशासक तय कर सकते हैं; उसके बाद घर का कोई भी सदस्य सूची के मेनू से भेज सकता है।",
+        "shoppingWebhookUrl": "webhook पता",
+        "shoppingWebhookSaved": "सहेजा गया।",
         "notificationChannelsDescription": "व्यवस्थापक ऐसे चैनल जोड़ सकते हैं जो वेब पुश के अतिरिक्त अनुस्मारक प्राप्त करते हैं।",
         "notificationChannelAdd": "चैनल जोड़ें",
         "notificationChannelProvider": "प्रदाता",
@@ -3583,6 +3593,8 @@
         "memberErrorGone": "यह सदस्य अब मौजूद नहीं है।",
         "memberErrorSsoEmailRequired": "केवल SSO वाले खाते को ईमेल पते की ज़रूरत है, ताकि पहला SSO साइन-इन उसे ढूँढ सके।",
         "memberErrorSsoEmailAmbiguous": "यह ईमेल पता पहले से किसी दूसरे सदस्य के पास है। SSO खातों में अंतर नहीं कर पाएगा।",
+        "shoppingWebhookPrivateNetworkHint": "आपके अपने नेटवर्क का गंतव्य (Home Assistant, स्थानीय n8n) तभी काम करता है जब सर्वर NOTIFICATION_ALLOW_PRIVATE_NETWORK=true के साथ शुरू किया गया हो।",
+        "shoppingWebhookUrlInvalid": "यह मान्य वेब पता नहीं है। इसे http:// या https:// से शुरू होना चाहिए।",
         "twoFactorAlreadyEnabled": "दो-चरणीय प्रमाणीकरण पहले से चालू है। मौजूदा स्थिति देखने के लिए पेज फिर से लोड करें।",
         "twoFactorSetupExpired": "सेटअप की समय-सीमा खत्म हो गई। इसे रद्द करें और फिर से शुरू करें।",
         "oidcLinkErrorNotConfigured": "इस सर्वर पर SSO अब सेट अप नहीं है।",

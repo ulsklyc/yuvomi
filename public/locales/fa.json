@@ -781,6 +781,11 @@
         "importMeals": "از برنامهٔ غذایی",
         "sendList": "ارسال فهرست",
         "sendListTitle": "ارسال فهرست خرید",
+        "sendWebhook": "ارسال اقلام باز",
+        "sendWebhookSent": "{{count}} قلم ارسال شد.",
+        "sendWebhookSent_one": "{{count}} قلم ارسال شد.",
+        "sendWebhookUnconfigured": "هیچ مقصد webhook تنظیم نشده است.",
+        "sendWebhookError": "ارسال به webhook ممکن نشد.",
         "sendListDescription": "{{count}} مورد باز برای عضوی که انتخاب می‌کنید فرستاده می‌شود.",
         "sendListDescription_one": "{{count}} مورد باز برای عضوی که انتخاب می‌کنید فرستاده می‌شود.",
         "sendListRecipient": "گیرنده",
@@ -862,7 +867,8 @@
             "waited": "«{{item}}» به «{{target}}» منتقل نشد: همگام‌سازی «{{back}}» بیش از یک هفته است که خاموش است. مورد به محض روشن شدن این فهرست دوباره در «{{back}}» نمایش داده می‌شود."
         },
         "moreDetailsHint": "قیمت، فروشگاه، پیوند، یادداشت",
-        "toPantryAllToPlaceholder": "یک مکان انتخاب کنید …"
+        "toPantryAllToPlaceholder": "یک مکان انتخاب کنید …",
+        "sendWebhookPrivateNetwork": "مقصد در شبکه محلی شماست. سرور باید آن را مجاز کند (NOTIFICATION_ALLOW_PRIVATE_NETWORK)."
     },
     "meals": {
         "ingredientCount_one": "{{count}} مادهٔ لازم",
@@ -3147,6 +3153,10 @@
         "personalWeatherReset": "به پیش‌فرض خانوار بازنشانی شد",
         "pushDeviceDescription": "Web Push فقط برای این دستگاه و این مرورگر معتبر است.",
         "notificationChannelsTitle": "کانال‌های خانوار",
+        "shoppingWebhookTitle": "Webhook فهرست خرید",
+        "shoppingWebhookDescription": "اقلام باز یک فهرست را به صورت JSON به این نشانی می‌فرستد. فقط مدیران می‌توانند مقصد را تعیین کنند؛ سپس هر عضو خانه می‌تواند از منوی فهرست ارسال کند.",
+        "shoppingWebhookUrl": "نشانی webhook",
+        "shoppingWebhookSaved": "ذخیره شد.",
         "notificationChannelsDescription": "مدیران می‌توانند کانال‌هایی اضافه کنند که یادآوری‌ها را افزون بر وب‌پوش دریافت کنند.",
         "notificationChannelAdd": "افزودن کانال",
         "notificationChannelProvider": "ارائه‌دهنده",
@@ -3601,6 +3611,8 @@
         "memberErrorGone": "این عضو دیگر وجود ندارد.",
         "memberErrorSsoEmailRequired": "حسابی که فقط با SSO وارد می‌شود به نشانی ایمیل نیاز دارد تا نخستین ورود با SSO آن را پیدا کند.",
         "memberErrorSsoEmailAmbiguous": "این نشانی ایمیل را عضو دیگری دارد. SSO نمی‌تواند این حساب‌ها را از هم تشخیص دهد.",
+        "shoppingWebhookPrivateNetworkHint": "مقصدی در شبکه خودتان (Home Assistant یا n8n محلی) تنها در صورتی کار می‌کند که سرور با NOTIFICATION_ALLOW_PRIVATE_NETWORK=true اجرا شده باشد.",
+        "shoppingWebhookUrlInvalid": "این یک نشانی وب معتبر نیست. باید با http:// یا https:// شروع شود.",
         "twoFactorAlreadyEnabled": "احراز هویت دومرحله‌ای از قبل فعال است. صفحه را دوباره بارگذاری کنید تا وضعیت فعلی را ببینید.",
         "twoFactorSetupExpired": "زمان راه‌اندازی تمام شده است. آن را لغو کنید و دوباره شروع کنید.",
         "oidcLinkErrorNotConfigured": "SSO دیگر روی این سرور راه‌اندازی نشده است.",

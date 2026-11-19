@@ -290,6 +290,10 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
     // test:sync-form-errors.
     '../server/routes/calendar/apple.js',
+    // Haushaltweite Einstellungen (#1909): die Webhook-Adresse der
+    // Einkaufsliste (#2502) wird dort abgewiesen und benennt ihren Fall; die
+    // echte Antwort misst test:shopping-webhook.
+    '../server/routes/preferences.js',
     // Kategorien des Budgets im Kategorie-Verwalter (#1909); die echte Antwort
     // misst test:budget-categories-routes.
     '../server/routes/budget/categories.js',
