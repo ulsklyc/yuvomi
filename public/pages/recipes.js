@@ -4,7 +4,7 @@
  */
 
 import { api } from '/api.js';
-import { t, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDateInput, parseDateInput, isDateInputValid, getNumberFormat } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
@@ -31,6 +31,8 @@ import { openDetailView, closeDetailView, detailFooterEl, withPrimaryEdit } from
 import { mayWritePath } from '/utils/module-access.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { ingredientMatchKey } from '/utils/ingredient-match-key.js';
+import { pantryQuantityLabel } from '/utils/pantry-units.js';
+import { locationLabel } from '/utils/pantry-locations.js';
 
 let _container = null;
 /** Laufende Nummer fuer die Label-IDs der Portionen-Stepper (Spalte + Blatt). */
@@ -1374,13 +1376,20 @@ function renderIngredientSections(recipe) {
   if (sections.length && window.lucide) window.lucide.createIcons({ el: _container });
 }
 
-/* DIE BESTAETIGTE ZUORDNUNG ZU EINER VORRATSZEILE (#1314, Stufe 1).
+/* DIE BESTAETIGTE ZUORDNUNG ZU EINEM PRODUKT DES HAUSHALTS (#1314, #1448 Teil 4).
  *
  * Sie steht im Rezeptdetail, neben der Zutat, und nirgends sonst: eine eigene
  * Zuordnungsseite oeffnet niemand ein zweites Mal (#1314, Punkt 2). Yuvomi
- * schlaegt dabei NICHTS vor - auch dann nicht, wenn eine Vorratszeile genauso
+ * schlaegt dabei NICHTS vor - auch dann nicht, wenn ein Produkt genauso
  * heisst. Ein geratener Treffer waere der gepflegte Katalog, eine Ableitung
  * nach der anderen (docs/DECISIONS.md Abschnitt 7).
+ *
+ * SIE GILT FUER DEN HAUSHALT. Gespeichert ist "diese Schreibweise meint dieses
+ * Produkt": einmal bestaetigt, steht sie an jedem Rezept mit derselben
+ * Schreibweise, und das Aufbrauchen einer Packung nimmt sie nicht mit. Die
+ * Auswahl listet deshalb Produkte, nicht Chargen, und der Hinweis des Dialogs
+ * sagt dazu, dass die Wahl ueberall gilt (im selben Satz der Uebersetzung,
+ * damit jede Sprache ihren Abstand selbst setzt).
  *
  * UND DAS WORT ZAEHLT. Eine Zutat ohne Zuordnung heisst „nicht zugeordnet",
  * niemals „fehlt": Stufe 1 weiss nur, worauf der Haushalt gezeigt hat, und
@@ -1429,9 +1438,9 @@ function pantryMatchEl(recipe, ing) {
   const access = pantryAccess();
   if (access === 'none') return document.createDocumentFragment();
 
-  const matched = Boolean(ing.pantry_item_id);
+  const matched = Boolean(ing.pantry_product_id);
   if (!matched) return document.createDocumentFragment();
-  const text = ing.pantry_item_name;
+  const text = ing.pantry_product_name;
 
   if (!mayMatchIngredient(recipe.id)) {
     const span = document.createElement('span');
@@ -1461,9 +1470,27 @@ function pantryMatchEl(recipe, ing) {
  * Nur-Lesende sehen die bestehenden Zuordnungen und keine Handlung (#467).
  * `null`, wenn es nichts zu tun gibt.
  */
+/**
+ * Die offenen Zutaten eines Rezepts, je Schreibweise EINE (#1448, Teil 4): die
+ * Zuordnung gilt fuer die Schreibweise, zwei gleich geschriebene Zutaten waeren
+ * zwei Auswahlfelder fuer dieselbe Frage, und das zuletzt gespeicherte gewaenne
+ * still. Die erste in der Liste steht fuer sie.
+ * @param {{ ingredients?: any[] }} recipe
+ */
+function openMatchIngredients(recipe) {
+  const seen = new Set();
+  return (recipe.ingredients ?? []).filter((ing) => {
+    if (ing.pantry_product_id) return false;
+    const key = ingredientMatchKey(ing.name);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function pantryMatchBulkEl(recipe) {
   if (!mayMatchIngredient(recipe.id)) return null;
-  const open = (recipe.ingredients ?? []).filter((ing) => !ing.pantry_item_id);
+  const open = openMatchIngredients(recipe);
   if (!open.length) return null;
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -1477,24 +1504,98 @@ function pantryMatchBulkEl(recipe) {
   return btn;
 }
 
-/** Eine Vorratszeile im Auswahlfeld: Name, Ort und MHD unterscheiden Chargen. */
-function pantryOptionLabel(item) {
-  const teile = [item.name];
-  if (item.location_name) teile.push(item.location_name);
-  if (item.expires_on) teile.push(dateText(item.expires_on));
+/**
+ * Die Produkte des Haushalts aus der Antwort von GET /pantry, fuer die Auswahl
+ * (#1448, Teil 4): je Produkt Name, Einheit, Summe und die Orte seiner Chargen.
+ * Ein Produkt ohne Charge steht mit 0 darin - es ueberlebt seine letzte
+ * Packung, und eine Zuordnung darauf bleibt richtig.
+ * @param {{ data?: Array<{ product_id?: number|null, location_id?: number|null, location_name?: string|null }>, products?: Array<{ id: number, name: string, unit: string, total_quantity?: number }> }} body
+ * @returns {Array<{ id: number, name: string, unit: string, total: number, places: Array<string|null> }>}
+ */
+function pantryChoices(body) {
+  /** @type {Map<number, Map<string, string|null>>} */
+  const places = new Map();
+  for (const batch of body?.data ?? []) {
+    if (batch.product_id == null) continue;
+    if (!places.has(batch.product_id)) places.set(batch.product_id, new Map());
+    places.get(batch.product_id)?.set(String(batch.location_id ?? 'none'), batch.location_name ?? null);
+  }
+  return (body?.products ?? []).map((product) => ({
+    id: product.id,
+    name: product.name,
+    unit: product.unit,
+    total: Number(product.total_quantity) || 0,
+    places: [...(places.get(product.id)?.values() ?? [])],
+  }));
+}
+
+/**
+ * Ein Produkt im Auswahlfeld, wie die Produktzeile im Vorrat es sagt:
+ * "Milch · 2 l insgesamt · 2 Orte", mit einem Ort "Milch · 1 l · Kühlschrank",
+ * ohne Charge "Zahnpasta · 0 Stück".
+ * @param {{ name: string, unit: string, total: number, places: Array<string|null> }} product
+ */
+function pantryOptionLabel(product) {
+  const quantity = pantryQuantityLabel(product.total, product.unit, {
+    t, formatNumber: (/** @type {number} */ n) => getNumberFormat({ maximumFractionDigits: 2 }).format(n),
+  });
+  const teile = [product.name];
+  if (product.places.length > 1) {
+    teile.push(t('pantry.productTotal', { quantity }), t('pantry.productPlaces', { count: product.places.length }));
+  } else {
+    teile.push(quantity);
+    if (product.places.length === 1) {
+      const place = product.places[0];
+      teile.push(place ? locationLabel(place) : t('pantry.unlocated'));
+    }
+  }
   return teile.join(' · ');
 }
 
 /**
- * Die Optionen EINER Vorrats-Auswahl: "nicht zugeordnet" und je Zeile ihr
- * Name samt Ort und MHD. Ein Helfer fuer jede Auswahl - Einzel- und
- * Sammeldialog und den Neuaufbau nach "die gewaehlte Zeile gibt es nicht
+ * Die Optionen EINER Vorrats-Auswahl: "nicht zugeordnet" und je Produkt sein
+ * Name samt Menge und Ort. Ein Helfer fuer jede Auswahl - Einzel- und
+ * Sammeldialog und den Neuaufbau nach "das gewaehlte Produkt gibt es nicht
  * mehr", damit sie nicht auseinanderlaufen.
+ * @param {Array<{ id: number, name: string, unit: string, total: number, places: Array<string|null> }>} products
+ * @param {number|null} [selectedId]
  */
-function pantrySelectOptionsHtml(items, selectedId = null) {
-  return `<option value="">${esc(t('recipes.ingredientMatchNone'))}</option>${items.map((item) => `<option value="${esc(String(item.id))}"${
-    item.id === selectedId ? ' selected' : ''
-  }>${esc(pantryOptionLabel(item))}</option>`).join('')}`;
+function pantrySelectOptionsHtml(products, selectedId = null) {
+  return `<option value="">${esc(t('recipes.ingredientMatchNone'))}</option>${products.map((product) => `<option value="${esc(String(product.id))}"${
+    product.id === selectedId ? ' selected' : ''
+  }>${esc(pantryOptionLabel(product))}</option>`).join('')}`;
+}
+
+/**
+ * Die Antwort einer Zuordnung in den geladenen Stand tragen: an JEDE Zutat
+ * jedes Rezepts mit derselben Schreibweise (#1448, Teil 4) - die Zuordnung
+ * gilt fuer den Haushalt, und die Seite soll das zeigen, ohne die Liste neu
+ * zu laden. `own` ist die Zutat des Dialogs, falls der Stand sie inzwischen
+ * durch ein frisches Objekt ersetzt hat. Gibt die betroffenen Rezepte zurueck.
+ * @param {{ ingredient_key?: string, pantry_product_id: number|null, pantry_product_name: string|null, pantry_item_id?: number|null, pantry_item_name?: string|null }} data
+ * @param {any} own
+ */
+function applyHouseholdMatch(data, own) {
+  const key = data.ingredient_key ?? ingredientMatchKey(own?.name ?? '');
+  const fields = {
+    pantry_product_id: data.pantry_product_id ?? null,
+    pantry_product_name: data.pantry_product_name ?? null,
+    pantry_item_id: data.pantry_item_id ?? null,
+    pantry_item_name: data.pantry_item_name ?? null,
+  };
+  if (own) Object.assign(own, fields);
+  /** @type {any[]} */
+  const touched = [];
+  for (const recipe of /** @type {any[]} */ (state.recipes)) {
+    let hit = false;
+    for (const ing of recipe.ingredients ?? []) {
+      if (ingredientMatchKey(ing.name) !== key) continue;
+      Object.assign(ing, fields);
+      hit = true;
+    }
+    if (hit) touched.push(recipe);
+  }
+  return touched;
 }
 
 /**
@@ -1509,8 +1610,7 @@ function pantrySelectOptionsHtml(items, selectedId = null) {
 async function offerCurrentPantryItems(selects) {
   let items;
   try {
-    const res = await api.get('/pantry');
-    items = res.data ?? [];
+    items = pantryChoices(await api.get('/pantry'));
   } catch (err) {
     console.warn('[Recipes] pantry reload failed:', err);
     return;
@@ -1540,8 +1640,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
   // oder die Seite verlassen hat, geht die Zuordnung nicht mehr auf (#1997).
   const context = captureOpenContext();
   try {
-    const res = await api.get('/pantry');
-    items = res.data ?? [];
+    items = pantryChoices(await api.get('/pantry'));
   } catch (err) {
     reportError(err, { owner, fallbackKey: 'recipes.ingredientMatchLoadError' });
     return;
@@ -1557,7 +1656,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
         <div class="form-group">
           <label class="form-label" for="pantry-match-select">${t('recipes.ingredientMatchLabel')}</label>
           <select id="pantry-match-select" class="form-input">
-            ${pantrySelectOptionsHtml(items, ing.pantry_item_id)}
+            ${pantrySelectOptionsHtml(items, ing.pantry_product_id ?? null)}
           </select>
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -1575,7 +1674,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
       panel.querySelector('#pantry-match-cancel')?.addEventListener('click', () => closeSharedModal());
       panel.querySelector('#pantry-match-save')?.addEventListener('click', async () => {
         const raw = panel.querySelector('#pantry-match-select')?.value ?? '';
-        const pantryItemId = raw === '' ? null : Number(raw);
+        const pantryProductId = raw === '' ? null : Number(raw);
         // Die Rechte koennen sich aendern, waehrend der Dialog offen steht.
         if (!mayMatchIngredient(recipe.id)) return;
         const dialog = captureModalContext();
@@ -1583,12 +1682,12 @@ async function openPantryMatchModal(recipe, ingredientName) {
         try {
           const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, {
             name: ingredientName,
-            pantryItemId,
+            pantryProductId,
           });
           // Den geladenen Stand nachziehen statt neu zu holen: die Antwort
-          // traegt genau die beiden Felder, die sich geaendert haben.
-          ing.pantry_item_id = res.data.pantry_item_id;
-          ing.pantry_item_name = res.data.pantry_item_name;
+          // traegt die Felder, die sich geaendert haben - an jeder Zutat mit
+          // derselben Schreibweise, in jedem geladenen Rezept.
+          const touched = applyHouseholdMatch(res.data, ing);
           // force: der Schreibvorgang ist durch, eine Verwerfen-Frage waere
           // eine Frage nach etwas, das schon gespeichert ist. `context`: nur
           // DIESEN Dialog - einen inzwischen geoeffneten anderen laesst die
@@ -1596,7 +1695,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
           const ownDialog = isOwnModalOpen(dialog);
           closeSharedModal({ force: true, context: dialog });
           window.yuvomi?.showToast(
-            pantryItemId === null ? t('recipes.ingredientMatchCleared') : t('recipes.ingredientMatchSaved'),
+            pantryProductId === null ? t('recipes.ingredientMatchCleared') : t('recipes.ingredientMatchSaved'),
             'success',
           );
           // Seite verlassen (oder neu betreten): nichts zeichnen, keinen Fokus
@@ -1611,7 +1710,10 @@ async function openPantryMatchModal(recipe, ingredientName) {
           // der Detailspalte. Beide ziehen nach, sonst zeigte der Aufklapper
           // nach dem naechsten Schmalerziehen den alten Stand. Als ganzer
           // Abschnitt, weil der Sammelknopf darunter seine Zahl mitaendert.
+          // Und jedes andere Rezept mit derselben Schreibweise, das gerade
+          // aufgeklappt steht.
           renderIngredientSections(recipe);
+          for (const other of touched) if (other !== recipe) renderIngredientSections(other);
           // Der Ausloeser ist mit dem Abschnitt ersetzt: den Fokus auf seinen
           // Nachfolger tragen (gleiches data-action/data-id) - nur, wenn es
           // dieser Dialog war, der eben zuging. Sonst gehoert der Fokus dem,
@@ -1641,7 +1743,7 @@ async function openPantryMatchModal(recipe, ingredientName) {
  */
 async function openPantryBulkMatchModal(recipe) {
   if (!mayMatchIngredient(recipe.id)) return;
-  const open = (recipe.ingredients ?? []).filter((ing) => !ing.pantry_item_id);
+  const open = openMatchIngredients(recipe);
   if (!open.length) return;
 
   let items = [];
@@ -1650,8 +1752,7 @@ async function openPantryBulkMatchModal(recipe) {
   // oder die Seite verlassen hat, geht die Zuordnung nicht mehr auf (#1997).
   const context = captureOpenContext();
   try {
-    const res = await api.get('/pantry');
-    items = res.data ?? [];
+    items = pantryChoices(await api.get('/pantry'));
   } catch (err) {
     reportError(err, { owner, fallbackKey: 'recipes.ingredientMatchLoadError' });
     return;
@@ -1688,7 +1789,7 @@ async function openPantryBulkMatchModal(recipe) {
       save?.addEventListener('click', async () => {
         const chosen = [...panel.querySelectorAll('select[data-ingredient-index]')]
           .filter((sel) => sel.value !== '')
-          .map((sel) => ({ ing: open[Number(sel.dataset.ingredientIndex)], pantryItemId: Number(sel.value) }));
+          .map((sel) => ({ ing: open[Number(sel.dataset.ingredientIndex)], pantryProductId: Number(sel.value) }));
         if (!chosen.length) { closeSharedModal({ force: true }); return; }
         if (!mayMatchIngredient(recipe.id)) return;
         save.disabled = true;
@@ -1696,14 +1797,15 @@ async function openPantryBulkMatchModal(recipe) {
         // Die Zutat, an der ein Fehler haengt: "gibt es nicht mehr" nimmt sie
         // aus dem Stand (reportError).
         let current = null;
+        // Andere Rezepte mit derselben Schreibweise ziehen mit (#1448, Teil 4).
+        const touched = new Set();
         const dialog = captureModalContext();
         const owner = _container;
         try {
-          for (const { ing, pantryItemId } of chosen) {
+          for (const { ing, pantryProductId } of chosen) {
             current = ing;
-            const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, { name: ing.name, pantryItemId });
-            ing.pantry_item_id = res.data.pantry_item_id;
-            ing.pantry_item_name = res.data.pantry_item_name;
+            const res = await api.put(`/recipes/${recipe.id}/ingredient-match`, { name: ing.name, pantryProductId });
+            for (const other of applyHouseholdMatch(res.data, ing)) touched.add(other);
             saved += 1;
           }
           // Wie im Einzeldialog: nur diesen Dialog schliessen, nur auf dieser
@@ -1713,11 +1815,15 @@ async function openPantryBulkMatchModal(recipe) {
           window.yuvomi?.showToast(t('recipes.ingredientMatchSaved'), 'success');
           if (!stillShown(owner)) return;
           renderIngredientSections(recipe);
+          for (const other of touched) if (other !== recipe) renderIngredientSections(other);
           if (ownDialog) refocusAfterRender();
         } catch (err) {
           // Was bis zum Fehler gespeichert ist, bleibt gespeichert und steht
           // gleich in der Liste; der Dialog bleibt fuer den Rest offen.
-          if (saved && stillShown(owner)) renderIngredientSections(recipe);
+          if (saved && stillShown(owner)) {
+            renderIngredientSections(recipe);
+            for (const other of touched) if (other !== recipe) renderIngredientSections(other);
+          }
           save.disabled = false;
           if (isSelectedPantryItemGone(err)) {
             window.yuvomi?.showToast(errorSentence(err), 'danger');
@@ -2358,4 +2464,9 @@ export const __test = {
   openPantryBulkMatchModal,
   pantryMatchEl,
   pantryMatchBulkEl,
+  // #1448 Teil 4: die Auswahl listet Produkte, und eine Zuordnung gilt fuer jede
+  // Zutat derselben Schreibweise (test-kitchen-readonly-ui.js).
+  pantryChoices,
+  pantrySelectOptionsHtml,
+  applyHouseholdMatch,
 };

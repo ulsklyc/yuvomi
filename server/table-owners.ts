@@ -164,6 +164,7 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   outlook_event_links: 'calendar',
   pantry_items: 'pantry',
   pantry_locations: 'pantry',
+  pantry_product_matches: 'pantry',
   pantry_products: 'pantry',
   password_resets: 'auth',
   push_subscriptions: 'delivery',
