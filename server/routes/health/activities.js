@@ -13,11 +13,13 @@ import {
   resolveOwner, wallClockInput,
 } from './helpers.js';
 import { careAwareClause, writableClause } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
+import { MAX_TYPE } from '../../services/health-fields.js';
 
 const router = express.Router();
 
 // GET /activities?user_id=&type=&from=&to=
-router.get('/activities', (req, res) => {
+router.get('/activities', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -38,11 +40,11 @@ router.get('/activities', (req, res) => {
 });
 
 // POST /activities
-router.post('/activities', (req, res) => {
+router.post('/activities', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
-    const type        = v.str(b.type, 'type', { max: 50 });
+    const type        = v.str(b.type, 'type', { max: MAX_TYPE });
     const duration    = v.num(b.duration_min, 'duration_min');
     const distance    = v.num(b.distance_km, 'distance_km');
     const intensity   = v.str(b.intensity, 'intensity', { max: MAX_UNIT, required: false });
@@ -74,7 +76,7 @@ router.post('/activities', (req, res) => {
 });
 
 // PATCH /activities/:id
-router.patch('/activities/:id', (req, res) => {
+router.patch('/activities/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -88,7 +90,7 @@ router.patch('/activities/:id', (req, res) => {
     const fields = {};
     const checks = [];
 
-    if (b.type !== undefined)         { const r = v.str(b.type, 'type', { max: 50 });                          checks.push(r); if (!r.error) fields.type = r.value; }
+    if (b.type !== undefined)         { const r = v.str(b.type, 'type', { max: MAX_TYPE });                          checks.push(r); if (!r.error) fields.type = r.value; }
     if (b.duration_min !== undefined) { const r = v.num(b.duration_min, 'duration_min');                       checks.push(r); if (!r.error) fields.duration_min = r.value; }
     if (b.distance_km !== undefined)  { const r = v.num(b.distance_km, 'distance_km');                         checks.push(r); if (!r.error) fields.distance_km = r.value; }
     if (b.intensity !== undefined)    { const r = v.str(b.intensity, 'intensity', { max: MAX_UNIT, required: false }); checks.push(r); if (!r.error) fields.intensity = r.value; }
@@ -109,7 +111,7 @@ router.patch('/activities/:id', (req, res) => {
 });
 
 // DELETE /activities/:id
-router.delete('/activities/:id', (req, res) => {
+router.delete('/activities/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);

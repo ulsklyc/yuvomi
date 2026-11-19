@@ -23,7 +23,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { readFileSync } from 'node:fs';
-import express from 'express';
+import { createHealthApp } from './health-app.js';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -34,7 +34,6 @@ const toasts = [];
 globalThis.window.yuvomi = { ...globalThis.window.yuvomi, showToast: (text, kind) => { toasts.push([text, kind]); } };
 
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
-const { default: healthRouter } = await import('../server/routes/health.js');
 const { __test: page } = await import('../public/pages/health.js');
 const { __test: settings } = await import('../public/settings/pages/modules-health.js');
 const { CASE_MESSAGES, GONE_REASONS } = await import('../public/utils/friendly-error.js');
@@ -62,15 +61,17 @@ _setTestDatabase(db);
 const admin = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
   VALUES ('ada', 'Ada', '$2b$12$x', 'admin')`).run().lastInsertRowid;
 
-const app = express();
-app.use(express.json({ limit: '10mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = admin;
-  req.authRole = 'admin';
-  req.session = { userId: admin, role: 'admin' };
-  next();
+// createHealthApp (test/health-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createHealthApp({
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = admin;
+    req.authRole = 'admin';
+    req.session = { userId: admin, role: 'admin' };
+    next();
+  },
 });
-app.use('/api/v1/health', healthRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));
@@ -455,6 +456,21 @@ test('Seite: ein Nachladen, das vor dem gelungenen Loeschen losging, bringt die 
 const vorsorgeDialog = (row) => dialog(() => page.openPreventionModal(row), {
   '#prevention-type': { value: '12' }, '#prevention-name': { value: '' }, '#prevention-given-on': { value: '2026-01-05' },
   '#prevention-next-due': null,
+});
+
+test('Seite: die gewaehlte Vorsorgeart geht als Zahl ueber die Leitung (#2810)', async () => {
+  // Der Wert des Selects ist Text; das Dokument nimmt Ziffern-Text nur noch
+  // als Altform an, die Seite schickt die Id als Zahl.
+  page.setViewStateForTest('prevention', { types: [{ id: 12, name: 'Tetanus' }], records: [] });
+  try {
+    const d = await vorsorgeDialog(null);
+    /** @type {any} */
+    let sent = null;
+    await mit({ post: async (_path, body) => { sent = body; return { data: { id: 1 } }; } }, () => d.absenden('#prevention-form'));
+    assert.equal(sent?.type_id, 12);
+  } finally {
+    page.setViewStateForTest('prevention', { types: [], records: [] });
+  }
 });
 
 test('Seite: die gewaehlte Vorsorgeart ist weg - der Dialog bleibt, die Auswahl steht auf "keine Art", die Arten kommen frisch', async () => {

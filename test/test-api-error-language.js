@@ -647,17 +647,18 @@ test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
 });
 
 test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
-  const { default: healthRouter } = await import('../server/routes/health.js');
   const who = { userId: ADMIN, role: 'admin' };
-  const hApp = express();
-  hApp.use(express.json());
-  hApp.use((req, _res, next) => {
-    req.authUserId = who.userId;
-    req.authRole = who.role;
-    req.session = { userId: who.userId, role: who.role };
-    next();
+  // At its real prefix with the central error handler (#2810): validateRequest()
+  // finds its operation by the mount and refuses through next(err).
+  const { createHealthApp } = await import('./health-app.js');
+  const hApp = await createHealthApp({
+    auth: (req, _res, next) => {
+      req.authUserId = who.userId;
+      req.authRole = who.role;
+      req.session = { userId: who.userId, role: who.role };
+      next();
+    },
   });
-  hApp.use('/health', healthRouter);
   const hServer = hApp.listen(0, '127.0.0.1');
   const hUrl = await new Promise((r) => hServer.on('listening', () => r(`http://127.0.0.1:${hServer.address().port}`)));
   try {
@@ -667,7 +668,7 @@ test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const res = await fetch(`${hUrl}${route}`, { method, headers, body: payload });
+      const res = await fetch(`${hUrl}/api/v1${route}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
       return { status: res.status, body: json };

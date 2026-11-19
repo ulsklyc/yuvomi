@@ -15,6 +15,7 @@ import { log, viewerId } from './helpers.js';
 import { allCareGrants, caredForIds, caregiversOf, replaceCaregivers } from '../../authorize/index.ts';
 import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
 import { isActiveAccount } from '../../services/household-members.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ const router = express.Router();
  * IDs der Personen, für die der eingeloggte Nutzer eintragen darf.
  * Für jedes Mitglied zugänglich - es ist die Auskunft über die eigenen Rechte.
  */
-router.get('/caregivers/me', (req, res) => {
+router.get('/caregivers/me', validateRequest(), (req, res) => {
   try {
     res.json({ data: caredForIds(db.get(), viewerId(req)) });
   } catch (err) {
@@ -36,7 +37,7 @@ router.get('/caregivers/me', (req, res) => {
  * GET /caregivers
  * Alle Beziehungen als { subject_id: [caregiver_id, ...] } für die Admin-UI.
  */
-router.get('/caregivers', requireAdmin, (req, res) => {
+router.get('/caregivers', requireAdmin, validateRequest(), (req, res) => {
   try {
     /** @type {Record<number, number[]>} */
     const bySubject = {};
@@ -56,7 +57,7 @@ router.get('/caregivers', requireAdmin, (req, res) => {
  * Array entzieht die Betreuung - Löschen ist damit derselbe Weg wie Ändern und
  * braucht keine eigene Route.
  */
-router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
+router.put('/caregivers/:subjectId', requireAdmin, validateRequest(), (req, res) => {
   try {
     const subjectId = parseInt(req.params.subjectId, 10);
     if (!subjectId) return res.status(400).json({ error: 'Invalid user_id.', code: 400 });

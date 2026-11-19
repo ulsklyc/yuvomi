@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import express from 'express';
+import { createHealthApp } from './health-app.js';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
-const { default: healthRouter } = await import('../server/routes/health.js');
 
 const database = new Database(':memory:');
 database.pragma('foreign_keys = ON');
@@ -20,10 +19,11 @@ const userB = database.prepare("INSERT INTO users (username, display_name, passw
 for (const id of [userA, userB]) database.prepare("INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access) VALUES ('user', ?, 'capability', 'health_use_fasting', 'allow')").run(String(id));
 
 let viewer = userA;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = viewer; req.session = { userId: viewer }; next(); });
-app.use('/api/v1/health', healthRouter);
+// createHealthApp (test/health-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createHealthApp({
+  auth: (req, _res, next) => { req.authUserId = viewer; req.session = { userId: viewer }; next(); },
+});
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/health`;

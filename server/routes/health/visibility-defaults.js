@@ -24,7 +24,9 @@ import express from 'express';
 import * as db from '../../db.js';
 import { FastingError, requireFastingCapability } from '../../services/fasting.js';
 import { log, VISIBILITIES, viewerId, badRequest } from './helpers.js';
+import { FLAT_SCOPE_KEYS, SCOPE_KEY_PATTERN, VITAL_SCOPE_PREFIX } from '../../services/health-fields.js';
 import { OPEN_ALL, OPEN_FAMILY } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
@@ -70,14 +72,22 @@ export function openVisibilityFor(scopeKey) {
 // auch `health_vitals.type` beim Anlegen nicht gegen eine Liste. Ein
 // unbekannter Name ergibt hier eine Zeile, die nie greift, und das ist der
 // harmlose Ausgang.
-const VITAL_PREFIX = 'vital:';
-const VITAL_TYPE_PATTERN = /^[a-z][a-z0-9_]{0,49}$/;
+//
+// Die erlaubten Schluessel stehen EINMAL in server/services/health-fields.js
+// (#2810), dieselbe Quelle wie das Muster im OpenAPI-Dokument. FLAT_SCOPES
+// traegt je Bereich seine Tabelle und muss genau diese Bereiche fuehren: ein
+// Bereich, der nur hier stuende, liesse das Dokument ihn abweisen, einer, der
+// nur dort stuende, faende hier keine Tabelle.
+const VITAL_PREFIX = VITAL_SCOPE_PREFIX;
+const SCOPE_KEY_RE = new RegExp(SCOPE_KEY_PATTERN);
+if ([...Object.keys(FLAT_SCOPES)].sort().join() !== [...FLAT_SCOPE_KEYS].sort().join()) {
+  throw new Error('visibility-defaults: FLAT_SCOPES and FLAT_SCOPE_KEYS (server/services/health-fields.js) name different areas');
+}
 
 /** Ist das ein Schluessel, den diese Tabelle fuehren darf? */
 export function isValidScopeKey(key) {
   const s = String(key || '');
-  if (s.startsWith(VITAL_PREFIX)) return VITAL_TYPE_PATTERN.test(s.slice(VITAL_PREFIX.length));
-  return Object.prototype.hasOwnProperty.call(FLAT_SCOPES, s);
+  return SCOPE_KEY_RE.test(s) && (s.startsWith(VITAL_PREFIX) || Object.hasOwn(FLAT_SCOPES, s));
 }
 
 /**
@@ -126,11 +136,32 @@ function allowFastingMutation(database, viewer, res, scopes) {
 }
 
 /**
+ * The fasting capability in front of validateRequest() (#2810): a right
+ * without a row, so it answers before the request is checked. Only when the
+ * call names the area `fasting` - a key of `defaults` (PUT) or `scope`
+ * (PATCH apply); for every other area there is nothing to refuse here. A body
+ * of another shape names no area and goes on to the check.
+ * @param {any} req
+ * @param {any} res
+ * @param {(err?: unknown) => void} next
+ */
+function refuseFastingWithoutCapability(req, res, next) {
+  try {
+    const b = req.body;
+    const named = req.method === 'PUT'
+      ? (b?.defaults && typeof b.defaults === 'object' && !Array.isArray(b.defaults) ? Object.keys(b.defaults) : [])
+      : [b?.scope];
+    if (!allowFastingMutation(db.get(), viewerId(req), res, named)) return undefined;
+    return next();
+  } catch (err) { return next(err); }
+}
+
+/**
  * GET /visibility-defaults
  * Response: { data: { defaults: { 'vital:bp': 'family', ... } } }
  * Nur die Abweichungen - was fehlt, ist 'private'.
  */
-router.get('/visibility-defaults', (req, res) => {
+router.get('/visibility-defaults', validateRequest(), (req, res) => {
   try {
     const rows = db.get().prepare(
       'SELECT scope_key, visibility FROM health_visibility_defaults WHERE user_id = ?'
@@ -153,7 +184,7 @@ router.get('/visibility-defaults', (req, res) => {
  * einzige Schreibweise fuer den Standard, und die Tabelle waechst nicht mit
  * Eintraegen, die nichts aussagen.
  */
-router.put('/visibility-defaults', (req, res) => {
+router.put('/visibility-defaults', refuseFastingWithoutCapability, validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const input = req.body?.defaults;
@@ -207,7 +238,7 @@ router.put('/visibility-defaults', (req, res) => {
  * nicht in einem Zug die Sichtbarkeit fremder Bestandsdaten umlegen - das ist
  * eine Entscheidung ueber die eigene Privatsphaere, keine Pflegehandlung.
  */
-router.patch('/visibility-defaults/apply', (req, res) => {
+router.patch('/visibility-defaults/apply', refuseFastingWithoutCapability, validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const scope = String(req.body?.scope || '');

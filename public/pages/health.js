@@ -58,7 +58,7 @@ import {
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, pmsWindow, periodFlowSummary,
   sortPeriodsAsc, periodFlowLoad, heavyBleedingSignal, painSummary, peakPainDay, daysBetween,
-  CERVIX_MUCUS_TYPES, TEST_RESULT_VALUES, INTIMACY_TYPES, CONTRACEPTION_TYPES,
+  CERVIX_MUCUS_TYPES, TEST_RESULT_VALUES, INTIMACY_TYPES, CONTRACEPTION_TYPES, BASAL_TEMP_UNITS,
 } from '/utils/health-cycle.js';
 import {
   HEALTH_ROUTES, HEALTH_AREAS, HEALTH_OVERVIEW_ID, healthAddress, healthAreaId, healthAreaRoute,
@@ -6632,7 +6632,9 @@ function collectPreventionBody(panel) {
 
   const strField = (sel) => panel.querySelector(sel)?.value.trim() || undefined;
   const body = {
-    type_id: typeId || null,
+    // Die Id als Zahl (#2810): der Wert des Selects ist Text, das Dokument
+    // nimmt Ziffern-Text nur noch als Altform an.
+    type_id: typeId ? Number(typeId) : null,
     given_on: givenOn,
     visibility: panel.querySelector('#prevention-visibility')?.value || 'private',
   };
@@ -10204,6 +10206,10 @@ function symptomIntensityDotsHTML(level) {
   return `<span class="health-choice__dots" role="img" aria-label="${esc(labelKey ? t(labelKey) : '')}">${dots}</span>`;
 }
 
+/** Beschriftung je Einheit der Basaltemperatur (BASAL_TEMP_UNITS, health-cycle.js). */
+/** @type {Readonly<Record<string, string>>} */
+const BBT_UNIT_LABEL_KEYS = Object.freeze({ c: 'health.cycle.bbt.celsius', f: 'health.cycle.bbt.fahrenheit' });
+
 function openDayLogModal(dateKey) {
   if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const key = String(dateKey).slice(0, 10);
@@ -10244,7 +10250,7 @@ function openDayLogModal(dateKey) {
   const feelingsButtons = MOOD_TYPES.map((m) => `<button type="button" class="health-choice health-choice--chip" data-feeling="${esc(m.value)}" aria-pressed="${existingFeelings.has(m.value)}">
     <i data-lucide="${esc(m.icon)}" aria-hidden="true"></i>${esc(t(m.labelKey))}</button>`).join('');
 
-  const bbtUnit = existing?.basal_temp_unit === 'f' ? 'f' : 'c';
+  const bbtUnit = BASAL_TEMP_UNITS.find((unit) => unit === existing?.basal_temp_unit) ?? BASAL_TEMP_UNITS[0];
   const bbtValue = existing?.basal_temp != null ? String(existing.basal_temp) : '';
 
   // Zervixschleim und die beiden Testergebnisse - dieselbe
@@ -10281,8 +10287,7 @@ function openDayLogModal(dateKey) {
           <div class="form-field">
             <label class="form-label" for="cycle-bbt-unit">${esc(t('health.cycle.bbt.unitLabel'))}</label>
             <select class="form-input" id="cycle-bbt-unit">
-              <option value="c" ${bbtUnit === 'c' ? 'selected' : ''}>${esc(t('health.cycle.bbt.celsius'))}</option>
-              <option value="f" ${bbtUnit === 'f' ? 'selected' : ''}>${esc(t('health.cycle.bbt.fahrenheit'))}</option>
+              ${BASAL_TEMP_UNITS.map((unit) => `<option value="${esc(unit)}" ${bbtUnit === unit ? 'selected' : ''}>${esc(t(BBT_UNIT_LABEL_KEYS[unit]))}</option>`).join('')}
             </select>
           </div>
         </div>

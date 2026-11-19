@@ -23,14 +23,15 @@
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
-import { OPEN_ALL, canWriteFor } from '../../authorize/index.ts';
+import { canWriteFor } from '../../authorize/index.ts';
+import { LOG_STATUS, MAX_UNIT, NUTRITION_VISIBILITIES, VISIBILITIES } from '../../services/health-fields.js';
 
 export const log = createLogger('Health');
 
-// Value lists for input validation; the open values themselves are rules and come
-// from server/authorize/care.ts.
-export const VISIBILITIES = ['private', 'family'];
-export const NUTRITION_VISIBILITIES = ['private', OPEN_ALL];
+// Value lists for input validation: one source with the OpenAPI document in
+// server/services/health-fields.js (#2810); the open values themselves are
+// rules and come from server/authorize/care.ts.
+export { LOG_STATUS, MAX_UNIT, NUTRITION_VISIBILITIES, VISIBILITIES };
 
 /**
  * Wie die Zeitstempel der Gesundheit geprueft werden (`measured_at`,
@@ -57,9 +58,6 @@ export function wallClockNow() {
   return wall ? `${wall.date}T${wall.time.slice(0, 5)}` : nowIso;
 }
 
-export const LOG_STATUS   = ['taken', 'skipped', 'pending'];
-export const FLOW_LEVELS  = ['spotting', 'light', 'medium', 'heavy'];
-export const MAX_UNIT     = 30;
 
 export function viewerId(req) {
   return req.authUserId || req.session.userId;

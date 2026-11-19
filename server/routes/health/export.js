@@ -17,11 +17,12 @@ import {
   exportFilename, sendCsv, exportRange,
 } from './helpers.js';
 import { careAwareClause, OPEN_ALL } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
 // GET /export/vitals?user_id=&from=&to=
-router.get('/export/vitals', (req, res) => {
+router.get('/export/vitals', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -42,7 +43,7 @@ router.get('/export/vitals', (req, res) => {
 });
 
 // GET /export/activities?user_id=&from=&to=
-router.get('/export/activities', (req, res) => {
+router.get('/export/activities', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -63,7 +64,7 @@ router.get('/export/activities', (req, res) => {
 });
 
 // GET /export/labs?user_id=&from=&to=
-router.get('/export/labs', (req, res) => {
+router.get('/export/labs', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -84,7 +85,7 @@ router.get('/export/labs', (req, res) => {
 });
 
 // GET /export/nutrition?user_id=&from=&to=
-router.get('/export/nutrition', (req, res) => {
+router.get('/export/nutrition', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -111,7 +112,7 @@ router.get('/export/nutrition', (req, res) => {
 });
 
 // GET /export/meds-logs?user_id=&from=&to=
-router.get('/export/meds-logs', (req, res) => {
+router.get('/export/meds-logs', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;

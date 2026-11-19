@@ -196,6 +196,11 @@ export const CERVIX_MUCUS_VALUES = Object.freeze(CERVIX_MUCUS_TYPES.map((m) => m
 // ableitbar (siehe Aufrufstellen in health.js).
 export const TEST_RESULT_VALUES = Object.freeze(['negative', 'positive']);
 
+// Einheit der Basaltemperatur: Celsius oder Fahrenheit, in Kleinbuchstaben.
+// EINE Liste fuer das Einheiten-Select des Tages-Logs, die Wertebereiche je
+// Einheit in server/routes/health/cycle.js und das OpenAPI-Dokument (#2810).
+export const BASAL_TEMP_UNITS = Object.freeze(['c', 'f']);
+
 // Hart privat (siehe server/routes/health/cycle.js GET /cycle/logs und
 // docs/SPEC.md, Abschnitt "Owner-only axis").
 export const INTIMACY_TYPES = Object.freeze([
