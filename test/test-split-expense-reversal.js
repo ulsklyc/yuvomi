@@ -391,6 +391,8 @@ test('erst bearbeitet, dann geloescht: aufgehoben wird der bearbeitete Stand', a
   const edited = await MGR.call('PUT', `/split-expenses/expenses/${eid}`, {
     title: 'Kino', amount: '12.00', currency: 'EUR', split_method: 'equal', payer_id: OWN.id,
     participants: [OWN.id, OTH.id, MGR.id], expense_date: '2026-09-01',
+    // Die ganze Ausgabe (#2810).
+    description: null, converted_amount: null, converted_currency: 'EUR', exchange_snapshot: null,
   });
   assert.equal(edited.status, 200, JSON.stringify(edited.body));
   const booked = ledger(eid, 'expense');

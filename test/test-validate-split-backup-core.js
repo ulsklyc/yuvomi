@@ -9,7 +9,18 @@
  *          defaultEmptyBody, the routers, the central error handler):
  *            - THE OWN CALLERS: every request public/pages/split-expenses.js,
  *              public/settings/pages/admin-backup.js and admin-system.js send
- *              passes, ids as numbers and as legacy digit text;
+ *              passes, ids as numbers and as legacy digit text; the body of
+ *              the page's `api.put(...expenses/...)` names every `required`
+ *              field of its schema, read from the source;
+ *            - FULL REPRESENTATION: PUT /expenses/{id} requires `description`,
+ *              `currency`, `converted_amount`, `converted_currency`,
+ *              `exchange_snapshot`, `split_method` and `expense_date` besides
+ *              title and amount; each one left out is a 400 and leaves the
+ *              stored expense as it was (it cleared the note and the snapshot,
+ *              derived the currencies and the converted amount anew, split
+ *              `equal` and moved the date to today). `null` stays allowed
+ *              where it was; payer, participants, category, budget category
+ *              and receipts left out keep the stored value;
  *            - REFUSED: garbage per field is a 400 with `reason: 'validation'`
  *              and `fields`: a path id that is not plain decimal digits
  *              (`0x10` read group 16 before), an unknown value of a list
@@ -37,6 +48,7 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 // @ts-expect-error express 5 ships no type declarations (TS7016)
 import express from 'express';
 
@@ -190,6 +202,16 @@ const expenseForm = (over = {}) => ({
   ...over,
 });
 
+/**
+ * The edit form of openExpenseModal after #2810 (PUT /expenses/{id}): the
+ * fields of expenseForm, the required ones as their own keys, and what
+ * keptConversion adds for an expense whose amount or currency the dialog
+ * changed (converted = entered, no snapshot). With amount and currency
+ * unchanged it sends the stored conversion instead (the whole expense below).
+ * @param {Record<string, unknown>} [over]
+ */
+const expenseEdit = (over = {}) => expenseForm({ converted_amount: null, converted_currency: 'EUR', exchange_snapshot: null, ...over });
+
 const firstExpense = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, { json: expenseForm() });
 assert.equal(firstExpense.status, 201, JSON.stringify(firstExpense.body));
 const EXPENSE = firstExpense.body.data.id;
@@ -329,6 +351,10 @@ test('only guard: the types and bounds the handlers no longer check are the docu
     assert.equal(requestOf(path, method).required, true, `${method} expenses: a body`);
   }
   assert.equal(bodyOf(`${S}/groups/{id}/expenses`, 'post').properties.category.type, 'string');
+  // PUT is the whole expense (#2810); POST keeps its defaults.
+  assert.deepEqual([...bodyOf(`${S}/expenses/{id}`, 'put').required].sort(),
+    ['amount', 'converted_amount', 'converted_currency', 'currency', 'description', 'exchange_snapshot', 'expense_date', 'split_method', 'title']);
+  assert.deepEqual([...bodyOf(`${S}/groups/{id}/expenses`, 'post').required].sort(), ['amount', 'title']);
   assert.deepEqual(bodyOf(`${S}/expenses/{id}`, 'put').properties.category.type, ['string', 'null']);
   assert.equal(bodyOf(`${S}/groups/{id}/settlements`, 'post').properties.currency.type, 'string');
   // Recurring: frequency required on create; on update a body is required and no list field is null.
@@ -464,15 +490,135 @@ test('expenses: the own form passes (payer as number or digit text), garbage per
 test('PUT /expenses/{id}: a non-list `attachment_document_ids` is a 400 and the receipts stay; left out they stay too', async () => {
   assert.deepEqual(receiptsOf(RECEIPT_EXPENSE), [RECEIPT]);
   for (const value of [null, 'x', 5, {}]) {
-    assertRefusedAt(await call('PUT', `/split-expenses/expenses/${RECEIPT_EXPENSE}`, { json: expenseForm({ title: 'Mit Beleg', attachment_document_ids: value }) }),
+    assertRefusedAt(await call('PUT', `/split-expenses/expenses/${RECEIPT_EXPENSE}`, { json: expenseEdit({ title: 'Mit Beleg', attachment_document_ids: value }) }),
       'body/attachment_document_ids', 'type', JSON.stringify(value));
     assert.deepEqual(receiptsOf(RECEIPT_EXPENSE), [RECEIPT], `receipts after ${JSON.stringify(value)}`);
   }
-  assertPassed(await call('PUT', `/split-expenses/expenses/${RECEIPT_EXPENSE}`, { json: expenseForm({ title: 'Mit Beleg', category: null }) }), 200, 'left out');
+  assertPassed(await call('PUT', `/split-expenses/expenses/${RECEIPT_EXPENSE}`, { json: expenseEdit({ title: 'Mit Beleg', category: null }) }), 200, 'left out');
   assert.deepEqual(receiptsOf(RECEIPT_EXPENSE), [RECEIPT]);
-  assertPassed(await call('PUT', `/split-expenses/expenses/${RECEIPT_EXPENSE}`, { json: expenseForm({ title: 'Mit Beleg', attachment_document_ids: [String(RECEIPT)] }) }), 200, 'digit text');
+  assertPassed(await call('PUT', `/split-expenses/expenses/${RECEIPT_EXPENSE}`, { json: expenseEdit({ title: 'Mit Beleg', attachment_document_ids: [String(RECEIPT)] }) }), 200, 'digit text');
   assert.deepEqual(receiptsOf(RECEIPT_EXPENSE), [RECEIPT]);
   assertRefusedAt(await call('PUT', `/split-expenses/expenses/${RECEIPT_EXPENSE}`), 'body', 'required');
+});
+
+test('PUT /expenses/{id} is the whole expense - a left-out required field is a 400 and changes nothing', async () => {
+  const doc = insertDocument('Kassenbon');
+  // A stored expense with a value in every field a left-out key used to reset.
+  const stored = {
+    title: 'Reise', amount: '10.00', description: 'Notiz', currency: 'USD', converted_amount: '9.00', converted_currency: 'EUR',
+    exchange_snapshot: { rate: '0.9', source: 'manual' }, payer_id: MEM, split_method: 'shares', participants: [OWNER, MEM],
+    splits: [{ user_id: OWNER, shares: 2 }, { user_id: MEM, shares: 1 }], category: 'travel', budget_category: 'food',
+    expense_date: '2026-03-01', attachment_document_ids: [doc],
+  };
+  const created = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, { json: stored });
+  assertPassed(created, 201, 'seed');
+  const id = created.body.data.id;
+  const route = `/split-expenses/expenses/${id}`;
+  const row = () => ({
+    ...db.prepare(`SELECT title, description, amount_minor, currency, converted_amount_minor, converted_currency, exchange_snapshot,
+      payer_id, category, budget_category, split_method, expense_date FROM expenses WHERE id = ?`).get(id),
+    splits: db.prepare('SELECT user_id, amount_minor, currency FROM expense_splits WHERE expense_id = ? ORDER BY user_id').all(id).map((/** @type {any} */ r) => ({ ...r })),
+    receipts: receiptsOf(id),
+  });
+  const before = row();
+  assert.deepEqual(
+    [before.description, before.currency, before.converted_amount_minor, before.converted_currency, before.exchange_snapshot, before.split_method, before.expense_date],
+    ['Notiz', 'USD', 900, 'EUR', '{"rate":"0.9","source":"manual"}', 'shares', '2026-03-01'],
+  );
+  // The edit form with amount and currency unchanged sends the stored
+  // conversion back (keptConversion): the whole expense, nothing changes.
+  assertPassed(await call('PUT', route, { json: stored }), 200, 'the whole expense');
+  assert.deepEqual(row(), before, 'the stored expense sent back changes nothing');
+
+  for (const key of ['title', 'amount', 'description', 'currency', 'converted_amount', 'converted_currency', 'exchange_snapshot', 'split_method', 'expense_date']) {
+    const { [key]: _left, ...partial } = /** @type {Record<string, unknown>} */ (stored);
+    assertRefusedAt(await call('PUT', route, { json: partial }), `body/${key}`, 'required', `without ${key}`);
+    assert.deepEqual(row(), before, `without ${key}: the stored expense is unchanged`);
+  }
+
+  // Documented "left out = unchanged": optional, the stored value stays.
+  for (const key of ['payer_id', 'participants', 'category', 'budget_category', 'attachment_document_ids']) {
+    const { [key]: _left, ...partial } = /** @type {Record<string, unknown>} */ (stored);
+    assertPassed(await call('PUT', route, { json: partial }), 200, `without ${key}`);
+    assert.deepEqual(row(), before, `without ${key}: the stored value stays`);
+  }
+  // `splits` left out: a method that reads values refuses (the handler's own
+  // 400, never a silent fallback), `equal` reads none.
+  const { splits: _splits, ...noSplits } = stored;
+  const refused = await call('PUT', route, { json: noSplits });
+  assert.deepEqual([refused.status, refused.body], [400, { error: 'Shares must be positive integers.', code: 400 }]);
+  assert.deepEqual(row(), before, 'without splits: unchanged');
+  assertPassed(await call('PUT', route, { json: { ...noSplits, split_method: 'equal' } }), 200, 'equal without splits');
+  assert.equal(row().split_method, 'equal');
+
+  // `null` stays allowed where it was: no note, converted = entered, no snapshot; `""` is today.
+  assertPassed(await call('PUT', route, { json: { ...stored, description: null, converted_amount: null, exchange_snapshot: null, expense_date: '' } }), 200, 'nulls');
+  const cleared = row();
+  assert.deepEqual([cleared.description, cleared.converted_amount_minor, cleared.converted_currency, cleared.exchange_snapshot], [null, 1000, 'EUR', 'null']);
+  assert.notEqual(cleared.expense_date, '2026-03-01', '`""` is the documented today');
+
+  // The edit form of the app after a changed amount.
+  assertPassed(await call('PUT', route, { json: expenseEdit({ title: 'Reise', amount: '11.00', attachment_document_ids: [doc] }) }), 200, 'the app\'s edit form');
+  assert.deepEqual(row().receipts, [doc]);
+});
+
+/**
+ * Every `api.put(` call in a page source whose path names `pathPart`, with the
+ * top-level keys of its object-literal body (a spread names none). A small
+ * scanner, not a parser: it balances (), {}, [] and skips over '...' and "..."
+ * strings, enough for the page's own calls; a body that is not an object
+ * literal yields `null`. The same scanner as test-validate-waste-schedule.js.
+ * @param {string} source
+ * @param {string} pathPart
+ * @returns {Array<{ path: string, keys: string[] | null }>}
+ */
+function putCalls(source, pathPart) {
+  const calls = [];
+  for (let at = source.indexOf('api.put('); at !== -1; at = source.indexOf('api.put(', at + 1)) {
+    const start = at + 'api.put('.length;
+    let depth = 1;
+    let i = start;
+    let comma = -1;
+    for (; i < source.length && depth > 0; i++) {
+      const c = source[i];
+      if (c === "'" || c === '"') { i = source.indexOf(c, i + 1); continue; }
+      if ('({['.includes(c)) depth++;
+      else if (')}]'.includes(c)) depth--;
+      else if (c === ',' && depth === 1 && comma === -1) comma = i;
+    }
+    const path = source.slice(start, comma === -1 ? i - 1 : comma);
+    if (!path.includes(pathPart)) continue;
+    const body = comma === -1 ? '' : source.slice(comma + 1, i - 1).trim();
+    let keys = null;
+    if (body.startsWith('{')) {
+      keys = [];
+      let d = 0;
+      for (let j = 0; j < body.length; j++) {
+        const c = body[j];
+        if ('({['.includes(c)) d++;
+        else if (')}]'.includes(c)) d--;
+        if (d === 1 && (c === '{' || c === ',')) {
+          const m = /^\s*([A-Za-z_$][\w$]*)\s*[:,}]/.exec(body.slice(j + 1));
+          if (m) keys.push(m[1]);
+        }
+      }
+    }
+    calls.push({ path, keys });
+  }
+  return calls;
+}
+
+test('the own caller: the expense PUT of the page sends every required field of its schema', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const required = /** @type {string[]} */ (spec.paths['/api/v1/split-expenses/expenses/{id}'].put.requestBody.content['application/json'].schema.required);
+  assert.ok(Array.isArray(required) && required.length > 2, JSON.stringify(required));
+  const calls = putCalls(readFileSync(new URL('../public/pages/split-expenses.js', import.meta.url), 'utf8'), '/split-expenses/expenses/');
+  assert.equal(calls.length, 1, `the expense PUTs found ${JSON.stringify(calls)}`);
+  for (const put of calls) {
+    assert.ok(put.keys, `the body of ${put.path} is an object literal`);
+    const missing = required.filter((key) => !put.keys?.includes(key));
+    assert.deepEqual(missing, [], `${put.path} sends ${JSON.stringify(put.keys)}`);
+  }
 });
 
 test('comments, settlements, recurring: own forms pass, garbage is a 400', async () => {
@@ -548,7 +694,7 @@ test('order: a malformed request is a 400 before 404, 403 and 409; a valid one m
     ['POST', `/split-expenses/groups/${UNKNOWN}/recurring`, recurringForm({ frequency: 'daily' }), recurringForm(), 404],
     ['POST', `/split-expenses/groups/${UNKNOWN}/members`, { user_id: 'x' }, { user_id: MEM }, 404],
     ['POST', `/split-expenses/groups/${UNKNOWN}/guests`, { display_name: 1 }, { display_name: 'G', password: 'gast-passwort' }, 404],
-    ['PUT', `/split-expenses/expenses/${UNKNOWN}`, expenseForm({ currency: 'XYZ' }), expenseForm(), 404],
+    ['PUT', `/split-expenses/expenses/${UNKNOWN}`, expenseEdit({ currency: 'XYZ' }), expenseEdit(), 404],
     ['POST', `/split-expenses/expenses/${UNKNOWN}/comments`, { comment: 1 }, { comment: 'x' }, 404],
     ['PUT', `/split-expenses/recurring/${UNKNOWN}`, { frequency: 'daily' }, { title: 'x' }, 404],
     ['POST', `/split-expenses/recurring/${UNKNOWN}/pause`, { missed: 'all' }, {}, 404],

@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Editing a shared expense takes the whole expense.** This is about your own API clients; the
+  app sends every field now. `PUT /split-expenses/expenses/{id}` without `description`,
+  `currency`, `converted_amount`, `converted_currency`, `exchange_snapshot`, `split_method` or
+  `expense_date` cleared the stored note and exchange snapshot, read the amount in the converted
+  currency, set the converted amount and currency back to the amount and currency, split the
+  amount equally and moved the expense to today. All seven are required now besides `title` and
+  `amount`; `null` still clears the note and the snapshot and stands for the amount, and
+  `expense_date: ""` is still today. `payer_id`, `participants`, `category`, `budget_category`
+  and `attachment_document_ids` stay optional and keep the stored value when left out. The edit
+  dialog no longer drops the stored conversion and exchange snapshot of an expense whose amount
+  and currency it leaves unchanged.
 - **Backup answers an unexpected failure with the same sentence as the rest of the API.**
   `GET /api/v1/backup/database` said `"Database backup failed."`, `POST /api/v1/backup/trigger`
   `"Backup trigger failed."` and `PUT /api/v1/backup/webdav/config` `"Failed to save WebDAV
