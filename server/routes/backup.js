@@ -178,14 +178,15 @@ router.get('/database', requireAdmin, databaseDownloadLimiter, validateRequest()
       }
     });
   } catch (err) {
-    log.error('Database backup failed:', err);
     if (tmpPath) {
       try { await fs.rm(path.dirname(tmpPath), { recursive: true, force: true }); } catch { /* best effort */ }
     }
     // Das Backup hat die Integritaetspruefung nicht bestanden (#2520): fester
-    // Grund statt des Satzes, der Befund steht im Log.
-    const reason = err?.reason === 'backup_verify_failed' ? { reason: 'backup_verify_failed' } : {};
-    res.status(500).json({ error: 'Database backup failed.', code: 500, ...reason });
+    // Grund statt des Satzes, der Befund steht im Log. Jeder andere Fehler
+    // geht an den zentralen Fehlerhandler (#2810).
+    if (err?.reason !== 'backup_verify_failed') throw err;
+    log.error('Database backup failed:', err);
+    res.status(500).json({ error: 'Database backup failed.', code: 500, reason: 'backup_verify_failed' });
   }
 });
 
@@ -241,13 +242,8 @@ router.post(
 );
 
 router.post('/trigger', requireAdmin, validateRequest(), async (req, res) => {
-  try {
-    const result = await triggerBackup();
-    res.json({ data: result });
-  } catch (err) {
-    log.error('Manual backup trigger failed:', err);
-    res.status(500).json({ error: 'Backup trigger failed.', code: 500 });
-  }
+  const result = await triggerBackup();
+  res.json({ data: result });
 });
 
 // ─── WebDAV backup target ──────────────────────────────────────────────────────
@@ -278,35 +274,25 @@ router.get('/webdav/config', requireAdmin, validateRequest(), (req, res) => {
  * PUT /api/v1/backup/webdav/config
  * Persists WebDAV configuration.
  * Body: { enabled?, url?, username?, password?, remotePath?, keep? }
+ * Types and `keep` from 1 are the schema's (#2810): `enabled` a boolean,
+ * `url`, `username`, `password`, `remotePath` text or null, `keep` an integer.
+ * The route keeps the address form (`url_invalid`) and the password rule
+ * (`password_required`); anything unexpected reaches the central error handler.
  */
 router.put('/webdav/config', requireAdmin, validateRequest(), async (req, res) => {
-  try {
-    const { enabled, url, username, password, remotePath, keep } = req.body;
+  const { enabled, url, username, password, remotePath, keep } = req.body;
 
-    if (enabled !== undefined && typeof enabled !== 'boolean') {
-      return res.status(400).json({ error: 'enabled must be a boolean.', code: 400 });
-    }
-    if (url !== undefined && url !== null && url !== '' && typeof url !== 'string') {
-      return res.status(400).json({ error: 'url must be a string.', code: 400 });
-    }
-    if (url && !/^https?:\/\/.+/.test(url.trim())) {
-      return res.status(400).json({ error: 'url must start with http:// or https://.', errorCode: 'url_invalid', code: 400 });
-    }
-    if (keep !== undefined && (typeof keep !== 'number' || keep < 1)) {
-      return res.status(400).json({ error: 'keep must be a positive integer.', code: 400 });
-    }
-
-    // Neuer Server oder Benutzer braucht das Passwort neu (passwordRequired).
-    if (webdavBackup.passwordRequired({ url, username, password })) {
-      return passwordRequiredResponse(res);
-    }
-
-    webdavBackup.saveConfig({ enabled, url, username, password, remotePath, keep });
-    res.json({ data: webdavBackup.getStatus() });
-  } catch (err) {
-    log.error('WebDAV config save failed:', err);
-    res.status(500).json({ error: 'Failed to save WebDAV config.', code: 500 });
+  if (url && !/^https?:\/\/.+/.test(url.trim())) {
+    return res.status(400).json({ error: 'url must start with http:// or https://.', errorCode: 'url_invalid', code: 400 });
   }
+
+  // Neuer Server oder Benutzer braucht das Passwort neu (passwordRequired).
+  if (webdavBackup.passwordRequired({ url, username, password })) {
+    return passwordRequiredResponse(res);
+  }
+
+  webdavBackup.saveConfig({ enabled, url, username, password, remotePath, keep });
+  res.json({ data: webdavBackup.getStatus() });
 });
 
 /**
