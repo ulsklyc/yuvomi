@@ -1545,6 +1545,7 @@
         "intervalMonthly": "每月",
         "intervalWeekly": "每周",
         "intervalYearly": "每年",
+        "seriesEndDateLabel": "结束于（可选）",
         "confirmFirstLabel": "确认后再记账",
         "confirmFirstHint": "每笔生成的记账都会等待你确认。在此之前它显示在列表中，但不计入任何合计；确认时可以调整金额和日期。",
         "pendingBadge": "待确认",

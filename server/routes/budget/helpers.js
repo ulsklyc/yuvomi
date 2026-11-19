@@ -373,7 +373,7 @@ const SERIES_SELECT = `
            a.recurrence_interval, a.recurrence_interval_count,
            a.recurrence_virtual, a.recurrence_confirm,
            s.title, s.amount, s.category, s.subcategory, s.account_id, s.visibility,
-           s.grid_from
+           s.grid_from, s.end_date
       FROM budget_series s
       JOIN budget_entries a ON a.id = s.anchor_id
      WHERE a.is_recurring = 1`;
@@ -490,13 +490,16 @@ function occurrenceWriter(database) {
  * @returns {string[]}
  */
 function seriesDatesInMonth(orig, month) {
+  let dates;
   if (!orig.recurrence_virtual) {
-    return occurrenceDatesInMonth(orig.start_date, orig.recurrence_interval || 'monthly',
+    dates = occurrenceDatesInMonth(orig.start_date, orig.recurrence_interval || 'monthly',
       orig.recurrence_interval_count, month);
+  } else {
+    const [y, m] = month.split('-').map(Number);
+    const day = Math.min(parseInt(orig.start_date.split('-')[2], 10), new Date(Date.UTC(y, m, 0)).getUTCDate());
+    dates = [`${month}-${String(day).padStart(2, '0')}`];
   }
-  const [y, m] = month.split('-').map(Number);
-  const day = Math.min(parseInt(orig.start_date.split('-')[2], 10), new Date(Date.UTC(y, m, 0)).getUTCDate());
-  return [`${month}-${String(day).padStart(2, '0')}`];
+  return orig.end_date ? dates.filter((d) => d <= orig.end_date) : dates;
 }
 
 /**
@@ -525,11 +528,12 @@ function seriesDatesInMonth(orig, month) {
  * @param {string} month  YYYY-MM
  */
 export function generateRecurringInstances(database, month) {
-  // Alle laufenden Serien, die vor diesem Monat begonnen haben.
+  // Alle laufenden Serien, die vor diesem Monat begonnen haben und noch nicht enden.
   const originals = database.prepare(`
     ${SERIES_SELECT}
        AND strftime('%Y-%m', COALESCE(s.start_date, a.date)) < ?
-  `).all(month);
+       AND (s.end_date IS NULL OR strftime('%Y-%m', s.end_date) >= ?)
+  `).all(month, month);
 
   const writeOccurrence = occurrenceWriter(database);
 
@@ -1321,11 +1325,13 @@ export function entryWithLoanMeta(id) {
            p.loan_id AS loan_id,
            p.installment_number AS loan_installment_number,
            l.title AS loan_title,
-           l.borrower AS loan_borrower
+           l.borrower AS loan_borrower,
+           s.end_date AS series_end_date
     FROM budget_entries b
     LEFT JOIN users u ON u.id = b.created_by
     LEFT JOIN budget_loan_payments p ON p.budget_entry_id = b.id
     LEFT JOIN budget_loans l ON l.id = p.loan_id
+    LEFT JOIN budget_series s ON s.anchor_id = b.id
     WHERE b.id = ?
   `).get(id));
 }

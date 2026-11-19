@@ -1545,6 +1545,7 @@
         "intervalMonthly": "每月",
         "intervalWeekly": "每週",
         "intervalYearly": "每年",
+        "seriesEndDateLabel": "結束於（選填）",
         "confirmFirstLabel": "確認後再記帳",
         "confirmFirstHint": "每筆生成的記帳都會等待你確認。在此之前它顯示在列表中，但不計入任何合計；確認時可以調整金額和日期。",
         "pendingBadge": "待確認",

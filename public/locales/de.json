@@ -1564,6 +1564,7 @@
         "intervalMonthly": "Monatlich",
         "intervalWeekly": "Wöchentlich",
         "intervalYearly": "Jährlich",
+        "seriesEndDateLabel": "Endet am (optional)",
         "confirmFirstLabel": "Erst nach Bestätigung buchen",
         "confirmFirstHint": "Jede erzeugte Buchung wartet auf deine Bestätigung. Bis dahin steht sie in der Liste, zählt aber in keiner Summe mit - Betrag und Datum lassen sich beim Bestätigen anpassen.",
         "pendingBadge": "Erwartet",

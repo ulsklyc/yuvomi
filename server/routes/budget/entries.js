@@ -315,11 +315,13 @@ router.get('/', (req, res) => {
              p.loan_id AS loan_id,
              p.installment_number AS loan_installment_number,
              l.title AS loan_title,
-             l.borrower AS loan_borrower
+             l.borrower AS loan_borrower,
+             s.end_date AS series_end_date
       FROM budget_entries b
       LEFT JOIN users u ON u.id = b.created_by
       LEFT JOIN budget_loan_payments p ON p.budget_entry_id = b.id
       LEFT JOIN budget_loans l ON l.id = p.loan_id
+      LEFT JOIN budget_series s ON s.anchor_id = b.id
     `;
     const params = [];
 
@@ -423,11 +425,13 @@ function searchEntries(req, res) {
            p.loan_id AS loan_id,
            p.installment_number AS loan_installment_number,
            l.title AS loan_title,
-           l.borrower AS loan_borrower
+           l.borrower AS loan_borrower,
+           s.end_date AS series_end_date
     FROM budget_entries b
     LEFT JOIN users u ON u.id = b.created_by
     LEFT JOIN budget_loan_payments p ON p.budget_entry_id = b.id
     LEFT JOIN budget_loans l ON l.id = p.loan_id
+    LEFT JOIN budget_series s ON s.anchor_id = b.id
     WHERE 1 = 1
   `;
   const params = [];
@@ -471,6 +475,10 @@ router.post('/', (req, res) => {
     const vCount = req.body.recurrence_interval_count !== undefined
       ? intervalCountCheck(req.body.recurrence_interval_count)
       : { value: 1, error: null };
+    const endDateRaw = req.body.end_date;
+    const vEndDate = (endDateRaw !== undefined && endDateRaw !== null && endDateRaw !== '')
+      ? validateDate(endDateRaw, 'end_date', true)
+      : { value: null, error: null };
     const errors  = [
       ...refusals('entry_title_invalid', [vTitle]),
       ...refusals('entry_amount_invalid', [vAmount]),
@@ -478,8 +486,12 @@ router.post('/', (req, res) => {
       ...refusals('entry_date_invalid', [vDate]),
       ...refusals('entry_recurrence_invalid', [vRrule, vInterval]),
       ...refusals('entry_interval_count_invalid', [vCount]),
+      ...refusals('entry_end_date_invalid', [vEndDate]),
     ];
     if (errors.length) return refuse(res, errors);
+    if (vEndDate.value && vDate.value && vEndDate.value < vDate.value) {
+      return refuse(res, [refusal('entry_end_date_invalid', 'The end date cannot be before the start date.')]);
+    }
     const subcategory = validateSubcategory(vCat.value, req.body.subcategory);
     if (subcategory === null) {
       return refuse(res, [refusal('entry_subcategory_invalid', 'Invalid subcategory.')]);
@@ -531,7 +543,13 @@ router.post('/', (req, res) => {
     replaceResponsibles(result.lastInsertRowid, req.body.responsible_user_ids);
     // Eine neue Serie ist ihre eigene Vorlage (#1035): die Werte legt der
     // Trigger aus v228 an, die Zustaendigen kommen erst hier dazu.
-    if (isRecurring) seedSeriesResponsibles(result.lastInsertRowid);
+    if (isRecurring) {
+      seedSeriesResponsibles(result.lastInsertRowid);
+      if (vEndDate.value) {
+        db.get().prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?')
+          .run(vEndDate.value, result.lastInsertRowid);
+      }
+    }
 
     const entry = entryWithLoanMeta(result.lastInsertRowid);
 
@@ -590,6 +608,7 @@ router.put('/:id/series', (req, res) => {
     if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Interval')]);
     if (req.body.recurrence_interval_count !== undefined) checks.push(['entry_interval_count_invalid', intervalCountCheck(req.body.recurrence_interval_count)]);
     if (req.body.start_date !== undefined) checks.push(['entry_start_date_invalid', validateDate(req.body.start_date, 'start_date', true)]);
+    if (req.body.end_date !== undefined && req.body.end_date !== null && req.body.end_date !== '') checks.push(['entry_end_date_invalid', validateDate(req.body.end_date, 'end_date', true)]);
     const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
     if (errors.length) return refuse(res, errors);
     // EINE SERIEN-AENDERUNG BEENDET DIE SERIE NICHT (#1546).
@@ -723,6 +742,23 @@ router.put('/:id/series', (req, res) => {
     const currentStart = series?.start_date ?? parent.date;
     const finalStart   = req.body.start_date !== undefined ? req.body.start_date : currentStart;
     const startChanged = finalStart !== currentStart;
+    // end_date: undefined → keep existing; null/'' → clear; date string → set.
+    const endDateProvided = req.body.end_date !== undefined;
+    const finalEndDate = endDateProvided
+      ? (req.body.end_date || null)
+      : (series?.end_date ?? null);
+    // Geprueft gegen `finalEndDate`, nicht nur bei `endDateProvided`: ein
+    // Anfrage, die bloss `start_date` nach hinten schiebt, laesst das
+    // gespeicherte Enddatum unberuehrt - trifft der neue Starttag es aber,
+    // muss das genauso ablehnen wie ein zu frueh gesetztes Enddatum selbst
+    // (Review-Befund zu #1742). Eigener Grund `series_end_before_start`
+    // statt `series_start_too_early`: der Dialog zeigte sonst "the start day
+    // cannot lie in a month before the first entry" am Startfeld, wenn der
+    // eigentliche Fehler das Enddatum ist - der eigene Grund zeigt am
+    // Endfeld (#bm-end-date) die richtige Meldung.
+    if (finalEndDate && finalEndDate < finalStart) {
+      return refuse(res, [refusal('series_end_before_start', "The end date can't be before the start date.")]);
+    }
     // NICHT VOR DEN MONAT DER GEBUCHTEN ERSTEN BUCHUNG. Der Monatsaufruf laesst
     // nur den Monat des Starttags aus - er gehoert der ersten Buchung. Laege
     // der Starttag einen Monat frueher, entstuende in ihrem Monat ein zweites
@@ -801,10 +837,13 @@ router.put('/:id/series', (req, res) => {
           visibility  = COALESCE(?, visibility),
           account_id  = CASE WHEN ? = 1 THEN ? ELSE account_id END,
           start_date  = ?,
+          end_date    = CASE WHEN ? = 1 THEN ? ELSE end_date END,
           updated_at  = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         WHERE anchor_id = ?
       `).run(finalTitle, storeAmount, finalFull, finalCategory, finalSubcat, nextVisibility,
-             accountProvided ? 1 : 0, accountValue, finalStart, parentId);
+             accountProvided ? 1 : 0, accountValue, finalStart,
+             endDateProvided ? 1 : 0, finalEndDate,
+             parentId);
 
       // 4. Die vorhandenen Instanzen ab heute.
       //
@@ -863,6 +902,17 @@ router.put('/:id/series', (req, res) => {
           UPDATE budget_entries SET visibility = ? WHERE recurrence_parent_id = ?
         `).run(nextVisibility, parentId);
       }
+
+      // 6. Enddatum: Vorkommen nach dem Enddatum loeschen, sofern sie ab heute
+      //    liegen (noch nicht gebucht). Vor heute gebuchte Zeilen bleiben auch
+      //    dann erhalten, wenn das Enddatum hinter ihnen liegt. Ausstehende
+      //    (is_pending = 1) werden unabhaengig von ihrem Datum entfernt.
+      if (endDateProvided && finalEndDate) {
+        db.get().prepare(`
+          DELETE FROM budget_entries
+           WHERE recurrence_parent_id = ? AND date > ? AND (date >= ? OR is_pending = 1)
+        `).run(parentId, finalEndDate, cutoffDate);
+      }
     })();
 
     // Belege bleiben hier bewusst unberuehrt (#583): sie gehoeren zur einzelnen
@@ -897,7 +947,7 @@ router.put('/:id/series', (req, res) => {
 
     const updated = entryWithLoanMeta(parentId);
     const definition = db.get().prepare(`
-      SELECT title, amount, full_amount, category, subcategory, account_id, visibility, start_date
+      SELECT title, amount, full_amount, category, subcategory, account_id, visibility, start_date, end_date
         FROM budget_series WHERE anchor_id = ?
     `).get(parentId) ?? null;
     res.json({ data: {
@@ -979,6 +1029,13 @@ router.put('/:id', (req, res) => {
     if (req.body.recurrence_rule !== undefined) checks.push(['entry_recurrence_invalid', rrule(req.body.recurrence_rule, 'recurrence_rule')]);
     if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Interval')]);
     if (req.body.recurrence_interval_count !== undefined) checks.push(['entry_interval_count_invalid', intervalCountCheck(req.body.recurrence_interval_count)]);
+    // end_date: nur Format hier, die Reihenfolge gegen den Starttag folgt
+    // weiter unten, sobald der endgueltige Starttag der Serie feststeht.
+    const endDateRaw = req.body.end_date;
+    const vEndDate = (endDateRaw !== undefined && endDateRaw !== null && endDateRaw !== '')
+      ? validateDate(endDateRaw, 'end_date', true)
+      : { value: null, error: null };
+    if (endDateRaw !== undefined) checks.push(['entry_end_date_invalid', vEndDate]);
     const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
     if (errors.length) return refuse(res, errors);
     // Neu nur Haushaltsmitglieder (#1207); wer schon zustaendig ist, bleibt es.
@@ -1105,6 +1162,19 @@ router.put('/:id', (req, res) => {
       || finalRrule !== entry.recurrence_rule);
     const cutoffDate = gridChanged ? todayKey(db.get()) : null;
 
+    // WIRD EINE EINZELBUCHUNG HIER ZUR SERIE (#1035), legt der Trigger aus
+    // v228 die Definition an, aber ohne `end_date` - die Spalte existiert nur
+    // an budget_series, nicht an budget_entries, und der Trigger kennt nur
+    // Spalten der Zeile, die ihn ausloest. Ein `end_date` im selben Request
+    // ginge damit stillschweigend verloren (Review-Befund zu #1742). Der
+    // Starttag der frischen Serie ist der Anker-Tag selbst (#1545,
+    // `seriesDatesInMonth()` liest bei NULL `start_date` genauso).
+    const becomingSeries = !entry.is_recurring && finalRecurring && entry.recurrence_parent_id == null;
+    const anchorStartDate = date ?? entry.date;
+    if (becomingSeries && endDateRaw !== undefined && vEndDate.value && vEndDate.value < anchorStartDate) {
+      return refuse(res, [refusal('series_end_before_start', "The end date can't be before the start date.")]);
+    }
+
     const tx = db.get().transaction(() => {
       if (gridChanged) freezeSeriesPast(db.get(), id, cutoffDate);
 
@@ -1164,6 +1234,14 @@ router.put('/:id', (req, res) => {
         db.get().prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?')
           .run(id, cutoffDate);
         db.get().prepare('UPDATE budget_series SET grid_from = ? WHERE anchor_id = ?').run(cutoffDate, id);
+      }
+
+      // Nach der UPDATE oben hat der v228-Trigger die Definition angelegt
+      // (siehe Kommentar vor `becomingSeries`) - end_date greift hier, nicht
+      // vorher, sonst gaebe es die Zeile noch nicht.
+      if (becomingSeries && endDateRaw !== undefined) {
+        db.get().prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?')
+          .run(vEndDate.value, id);
       }
     });
     tx();

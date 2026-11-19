@@ -1545,6 +1545,7 @@
         "intervalMonthly": "Havi",
         "intervalWeekly": "Hetente",
         "intervalYearly": "Éves",
+        "seriesEndDateLabel": "Véget ér (nem kötelező)",
         "confirmFirstLabel": "Csak megerősítés után könyvelje",
         "confirmFirstHint": "Minden létrehozott tétel a megerősítésedre vár. Addig szerepel a listában, de egyetlen összegbe sem számít bele - megerősítéskor az összeg és a dátum módosítható.",
         "pendingBadge": "Várható",
