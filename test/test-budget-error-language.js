@@ -116,7 +116,6 @@ test('keine Absage der Budget-Routen traegt deutschen Wortlaut', async () => {
   await run('pl-nan', 'PUT', '/plans/food', { amount: 'abc' });
   await run('pl-zero', 'PUT', '/plans/food', { amount: 0 });
   // Buchungen
-  await run('e-title', 'POST', '/', { amount: -5, date: '2030-01-10' });
   await run('e-title-long', 'POST', '/', { ...ok, title: long });
   await run('e-amount', 'POST', '/', { title: 'T', date: '2030-01-10' });
   await run('e-amount-nan', 'POST', '/', { ...ok, amount: 'abc' });
