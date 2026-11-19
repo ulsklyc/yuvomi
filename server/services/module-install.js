@@ -49,6 +49,7 @@ import {
   listModules,
   loadModuleDir,
   moduleFolderPath,
+  normalizeCommitSha,
   readInstallMeta,
   readInstallRecord,
   setModuleDisabledFlag,
@@ -649,6 +650,39 @@ async function writeStaged(stageDir, keep, meta) {
 }
 
 /**
+ * The base of GitHub's compare view for an install over `target` (#2064): the
+ * commit the admin last had in front of them. Only when both the installed
+ * record and the incoming one come from GitHub and name the same repository.
+ * The URL is the one module-github.js builds from the parsed owner and
+ * repository, and GitHub treats both case-insensitively. A changed repository,
+ * a ZIP on either side or an older record without a commit gives null: the
+ * compare view across two repositories shows nothing the admin could review.
+ *
+ * Normally the base is the installed commit. While the installed version is
+ * not approved and carries a `previousCommit` of its own, that one stays the
+ * base: approved A, replaced by B, replaced by C before anyone switched B on,
+ * is A...C, not B...C - nobody reviewed B. The same holds for B again (A...B
+ * stays) and for a way back to A (nothing to compare). Switching a module off
+ * also writes `approved: false`, so after a disable the range can reach back
+ * further than needed; it never leaves out what changed. Never throws; a
+ * target that is no module folder is refused later in installFilesUnlocked.
+ *
+ * @param {string} target  modules/<id>
+ * @param {{ source: string, url?: string, commit?: string }} incoming  the record about to be staged
+ * @returns {Promise<string|null>}
+ */
+async function replacedCommit(target, incoming) {
+  if (incoming.source !== 'github' || !incoming.commit || !incoming.url) return null;
+  const st = await lstatOrNull(target).catch(() => null);
+  if (!st || st.isSymbolicLink() || !st.isDirectory()) return null;
+  const installed = await readInstallMeta(target);
+  if (installed?.source !== 'github' || !installed.commit || !installed.url) return null;
+  if (installed.url.toLowerCase() !== incoming.url.toLowerCase()) return null;
+  const base = installed.approved !== true && installed.previousCommit ? installed.previousCommit : installed.commit;
+  return base === incoming.commit ? null : base;
+}
+
+/**
  * Installs from already-unpacked files. Caller holds the lock.
  *
  * @param {{ name: string, data: Buffer }[]} files
@@ -657,7 +691,8 @@ async function writeStaged(stageDir, keep, meta) {
  * @param {string}  [opts.path]      sub-folder inside the archive
  * @param {'zip'|'github'} opts.source
  * @param {number}  [opts.userId]
- * @param {object}  [opts.meta]      { url, ref, commit } for GitHub installs
+ * @param {{ url?: string, ref?: string, commit?: unknown }} [opts.meta]  for GitHub installs; a
+ *   commit that is not 40 hex characters is left out, and a ZIP install records none
  * @returns {Promise<{ module: object, replaced: boolean, skipped: string[] }>}
  *   The module is disabled either way: a fresh install and a replace both
  *   write `approved: false` into the install record (see TRUST MODEL).
@@ -671,11 +706,15 @@ export async function installFilesUnlocked(files, opts = {}) {
   const id = rawManifest.id;
   const { keep, skipped } = selectFiles(files, located.dir);
 
+  const source = opts.source === 'github' ? 'github' : 'zip';
+  // What the details show and link to on github.com (#2064): only a GitHub
+  // install has a commit, and only one in the form GitHub writes it.
+  const commit = source === 'github' ? normalizeCommitSha(opts.meta?.commit) : null;
   const meta = {
-    source: opts.source === 'github' ? 'github' : 'zip',
+    source,
     ...(opts.meta?.url ? { url: String(opts.meta.url) } : {}),
     ...(opts.meta?.ref ? { ref: String(opts.meta.ref) } : {}),
-    ...(opts.meta?.commit ? { commit: String(opts.meta.commit) } : {}),
+    ...(commit ? { commit } : {}),
     ...(located.relDir ? { path: located.relDir } : {}),
     installedAt: new Date().toISOString(),
     installedBy: opts.userId ?? null,
@@ -700,6 +739,11 @@ export async function installFilesUnlocked(files, opts = {}) {
     || path.dirname(path.resolve(stageDir)) !== path.resolve(stagingRoot)) {
     throw new InstallError('bad_manifest', 'module.json must define an id that names a single folder inside modules/.');
   }
+  // Read before the staged record is written, so it goes into that record: a
+  // replace removes the old folder and its record with it, and the approval
+  // that follows is exactly when the admin needs the old commit (#2064).
+  const previousCommit = await replacedCommit(target, meta);
+  if (previousCommit) Object.assign(meta, { previousCommit });
   try {
     await fs.mkdir(stagingRoot, { mode: 0o755 });
     await writeStaged(stageDir, keep, meta);

@@ -54,8 +54,9 @@ import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
  * EIN DRITTMODUL WIRD HIER GEPRUEFT, BEVOR ES ANGEHT. Seit Module aus den
  * Einstellungen installiert werden (modules-install.js), kommen sie
  * ausgeschaltet an; ihre Zeile traegt deshalb Details (Kennung, Version,
- * Quelle, Installationszeitpunkt, wer installiert hat, Ordner) und - nur bei
- * einem Modul, das die Oberflaeche selbst installiert hat, und nur solange
+ * Quelle, bei GitHub der installierte Commit und nach einem Ersetzen der Link
+ * auf die Aenderungen, Installationszeitpunkt, wer installiert hat, Ordner)
+ * und - nur bei einem Modul, das die Oberflaeche selbst installiert hat, und nur solange
  * der Server das Loeschen auch annimmt - einen Loeschen-Knopf. Einen von Hand
  * kopierten Ordner loescht der Server nicht (Review zu PR #1671: er kann ein
  * Checkout mit offener Arbeit sein), und mit ausgeschaltetem
@@ -309,6 +310,122 @@ export function moduleSourceText(install) {
   return t('settings.moduleSourceManual');
 }
 
+// Dieselben Regeln wie OWNER_RE und REPO_RE in server/services/module-github.js:
+// die Adresse im Datensatz baut der Server aus genau diesen Teilen. Was nicht so
+// aussieht (ein von Hand verdorbener Datensatz, ein aelterer Server), wird kein
+// Link - keine Zeile ist besser als ein Link an einen falschen Ort.
+const GITHUB_REPO_URL_RE = /^https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9._-]{1,100})$/;
+const COMMIT_SHA_RE = /^[0-9a-f]{40}$/;
+const SHORT_SHA_LENGTH = 7;
+
+/**
+ * Der installierte Commit eines Drittmoduls von GitHub und die Links dazu
+ * (#2064), oder null. Eine Rangliste gibt es nicht (DECISIONS.md, 15); die
+ * eigene Pruefung des Admins ist die Sicherung, und die braucht den Code, der
+ * WIRKLICH installiert ist: ref ist ein Zweig oder ein verschiebbarer Tag, der
+ * Commit nicht. `compareUrl` steht nur nach einem Ersetzen aus demselben
+ * Repository mit anderem Commit (der Server schreibt dann `previousCommit`) -
+ * GitHubs Vergleich `alt...neu`, vor dem erneuten Freigeben. Ein ZIP, ein
+ * Datensatz ohne Commit und alles, was nicht wie ein Commit aussieht, ergibt
+ * null; Links entstehen nur aus geprueften Teilen.
+ * @param {{ source?: unknown, url?: unknown, commit?: unknown, previousCommit?: unknown }|null|undefined} install
+ * @returns {{ commit: string, short: string, commitUrl: string, compareUrl: string|null }|null}
+ */
+export function githubCommitLinks(install) {
+  if (!install || typeof install !== 'object' || install.source !== 'github') return null;
+  const match = GITHUB_REPO_URL_RE.exec(typeof install.url === 'string' ? install.url : '');
+  if (!match || match[2] === '.' || match[2] === '..') return null;
+  const commit = typeof install.commit === 'string' && COMMIT_SHA_RE.test(install.commit) ? install.commit : null;
+  if (!commit) return null;
+  const previous = typeof install.previousCommit === 'string' && COMMIT_SHA_RE.test(install.previousCommit)
+    && install.previousCommit !== commit ? install.previousCommit : null;
+  const repo = `https://github.com/${match[1]}/${match[2]}`;
+  return {
+    commit,
+    short: commit.slice(0, SHORT_SHA_LENGTH),
+    commitUrl: `${repo}/commit/${commit}`,
+    compareUrl: previous ? `${repo}/compare/${previous}...${commit}` : null,
+  };
+}
+
+/** @param {string} href */
+function externalLink(href) {
+  const link = document.createElement('a');
+  link.href = href;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  return link;
+}
+
+/**
+ * Kopiert den vollen Commit. Ueber http im Heimnetz gibt es `navigator.clipboard`
+ * nicht; dann steht der volle Commit markiert im Feld und `execCommand` kopiert
+ * die Markierung, und scheitert auch das, bleibt er markiert stehen - dasselbe
+ * Muster wie `copyFieldValue` (sync-calendar.js), nur auf Text statt auf einem
+ * Eingabefeld. Gibt zurueck, ob kopiert wurde.
+ * @param {HTMLElement} code  das `<code>` mit dem kurzen Commit
+ * @param {string} commit  der volle Commit
+ * @returns {Promise<boolean>}
+ */
+export async function copyCommit(code, commit) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(commit);
+      return true;
+    } catch { /* auf den Auswahl-Weg zurueckfallen */ }
+  }
+  code.textContent = commit;
+  try {
+    window.getSelection()?.selectAllChildren(code);
+    return document.execCommand('copy') === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Kurzer Commit als Link auf GitHub, daneben "Commit kopieren" (kopiert den vollen).
+ * @param {{ commit: string, short: string, commitUrl: string }} links
+ */
+function commitValueElement(links) {
+  const wrap = document.createElement('span');
+  wrap.className = 'settings-module-commit';
+  const link = externalLink(links.commitUrl);
+  link.setAttribute('aria-label', t('settings.moduleCommitOpen', { commit: links.short }));
+  const code = document.createElement('code');
+  code.textContent = links.short;
+  link.appendChild(code);
+
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn btn--secondary btn--sm';
+  const icon = document.createElement('i');
+  icon.dataset.lucide = 'copy';
+  icon.className = 'icon-sm';
+  icon.setAttribute('aria-hidden', 'true');
+  copy.append(icon, document.createTextNode(` ${t('settings.moduleCommitCopy')}`));
+  copy.addEventListener('click', async () => {
+    const copied = await copyCommit(code, links.commit);
+    if (copied) {
+      code.textContent = links.short;
+      window.getSelection()?.removeAllRanges();
+    }
+    // Der Name des Links nennt, was er zeigt (WCAG 2.5.3): nach gescheitertem
+    // Kopieren den vollen Commit, sonst wieder den kurzen.
+    link.setAttribute('aria-label', t('settings.moduleCommitOpen', { commit: code.textContent }));
+    window.yuvomi?.showToast(t(copied ? 'settings.moduleCommitCopied' : 'settings.moduleCommitCopyFailed'), copied ? 'success' : 'danger');
+  });
+  wrap.append(link, copy);
+  return wrap;
+}
+
+/** @param {string} compareUrl */
+function compareValueElement(compareUrl) {
+  const link = externalLink(compareUrl);
+  link.textContent = t('settings.moduleCompareLink');
+  return link;
+}
+
 /**
  * Die Details einer Drittmodul-Zeile, aufklappbar unter ihrer Titelzeile.
  *
@@ -323,11 +440,14 @@ export function moduleSourceText(install) {
 function moduleDetailsElement(module) {
   const install = module.install && typeof module.install === 'object' ? module.install : null;
   const installedBy = installedByText(install);
+  const commit = githubCommitLinks(install);
   const content = createInfoList([
     { label: t('settings.moduleDetailId'), value: module.id, code: true },
     { label: t('settings.moduleDetailVersion'), value: module.version || t('settings.moduleDetailUnknown') },
     module.description ? { label: t('settings.moduleDetailDescription'), value: module.description } : null,
     { label: t('settings.moduleDetailSource'), value: moduleSourceText(install) },
+    commit ? { label: t('settings.moduleDetailCommit'), value: commitValueElement(commit) } : null,
+    commit?.compareUrl ? { label: t('settings.moduleDetailChanges'), value: compareValueElement(commit.compareUrl) } : null,
     install ? { label: t('settings.moduleDetailInstalledAt'), value: installedAtText(install) } : null,
     installedBy ? { label: t('settings.moduleDetailInstalledBy'), value: installedBy } : null,
     { label: t('settings.moduleDetailFolder'), value: `modules/${module.id}`, code: true },
