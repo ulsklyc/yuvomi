@@ -3215,6 +3215,7 @@
         "notificationChannelDelete": "Tanggalin ang channel",
         "notificationChannelDeleted": "Natanggal ang channel.",
         "notificationChannelError": "Hindi ma-update ang channel ng abiso.",
+        "notificationChannelErrorPrivateNetwork": "Tumuturo ang URL ng channel sa isang pribado o lokal na network. Para payagan ito, itakda ang NOTIFICATION_ALLOW_PRIVATE_NETWORK=true sa server.",
         "notificationChannelSecretKeep": "Iwanang blangko para panatilihin ang lihim",
         "notificationChannelEmpty": "Wala pang naka-configure na channel ng sambahayan.",
         "notificationChannelAdminOnlyHint": "Mga admin lamang ang makakapamahala ng mga channel ng sambahayan.",

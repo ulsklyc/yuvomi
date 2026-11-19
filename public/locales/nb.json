@@ -3197,6 +3197,7 @@
         "notificationChannelDelete": "Slett kanal",
         "notificationChannelDeleted": "Kanal slettet.",
         "notificationChannelError": "Varslingskanalen kunne ikke oppdateres.",
+        "notificationChannelErrorPrivateNetwork": "Kanal-URL-en peker til et privat eller lokalt nettverk. For å tillate dette, sett NOTIFICATION_ALLOW_PRIVATE_NETWORK=true på serveren.",
         "notificationChannelSecretKeep": "La det stå tomt for å beholde hemmeligheten",
         "notificationChannelEmpty": "Ingen husholdningskanaler er konfigurert ennå.",
         "notificationChannelAdminOnlyHint": "Kun administratorer kan administrere husholdningskanaler.",

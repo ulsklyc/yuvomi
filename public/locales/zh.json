@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "删除频道",
         "notificationChannelDeleted": "频道已删除。",
         "notificationChannelError": "无法更新通知频道。",
+        "notificationChannelErrorPrivateNetwork": "频道网址指向私有或本地网络。如需允许，请在服务器上设置 NOTIFICATION_ALLOW_PRIVATE_NETWORK=true。",
         "notificationChannelSecretKeep": "留空以保留密钥",
         "notificationChannelEmpty": "尚未配置家庭频道。",
         "notificationChannelAdminOnlyHint": "只有管理员可以管理家庭频道。",

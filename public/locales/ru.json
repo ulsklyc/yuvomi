@@ -3366,6 +3366,7 @@
         "notificationChannelDelete": "Удалить канал",
         "notificationChannelDeleted": "Канал удалён.",
         "notificationChannelError": "Не удалось обновить канал уведомлений.",
+        "notificationChannelErrorPrivateNetwork": "URL канала указывает на частную или локальную сеть. Чтобы разрешить это, задайте на сервере NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
         "notificationChannelSecretKeep": "Оставьте пустым, чтобы сохранить секрет",
         "notificationChannelEmpty": "Каналы семьи ещё не настроены.",
         "notificationChannelAdminOnlyHint": "Только администраторы могут управлять каналами семьи.",

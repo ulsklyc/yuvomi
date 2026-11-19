@@ -6,6 +6,7 @@ import { pushSupported, pushStatus, enablePush, disablePush, repairPush } from '
 import { api, notifications } from '/api.js';
 import { confirmModal, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { esc } from '/utils/html.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { getPwaInstallState } from '/utils/pwa-install.js';
 import { toggleRowHtml, settingSwitchRowHtml } from '/settings/components.js';
@@ -400,8 +401,9 @@ async function setupChannelControls(container, user) {
       else await notifications.createChannel(body);
       setStatus(t('settings.notificationChannelSaved'));
       await reload();
-    } catch {
-      setStatus(t('settings.notificationChannelError'));
+    } catch (err) {
+      // Ein Ziel im privaten Netz nennt den Schalter, der es erlaubt (#2837).
+      setStatus(errorSentence(err, 'settings.notificationChannelError'));
     }
   });
 
@@ -416,8 +418,9 @@ async function setupChannelControls(container, user) {
       try {
         await notifications.testChannel(id);
         setStatus(t('settings.notificationChannelTestSent'));
-      } catch {
-        setStatus(t('settings.notificationChannelError'));
+      } catch (err) {
+        // Ein Name, der erst beim Senden ins private Netz aufloest, ebenso (#2837).
+        setStatus(errorSentence(err, 'settings.notificationChannelError'));
       } finally {
         button.disabled = false;
       }
@@ -566,4 +569,4 @@ export async function render(container, { user } = {}) {
 // DOM-Ausschnitt und damit ohne Browser pruefbar. Sie hat zwei Fehler getragen,
 // die ein Textguard nicht gesehen haette: ein verstecktes `type="email"`, das
 // das Absenden blockiert, und einen Hinweis, der beim Anlegen nie erscheint.
-export const __test = { updateProviderVisibility, setBlockActive, providerNotReady, channelDefaults, usesBaseUrl, readChannelForm, renderChannelList };
+export const __test = { updateProviderVisibility, setBlockActive, providerNotReady, channelDefaults, usesBaseUrl, readChannelForm, renderChannelList, setupChannelControls };

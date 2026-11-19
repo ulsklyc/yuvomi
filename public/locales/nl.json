@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "Kanaal verwijderen",
         "notificationChannelDeleted": "Kanaal verwijderd.",
         "notificationChannelError": "Meldingskanaal kon niet worden bijgewerkt.",
+        "notificationChannelErrorPrivateNetwork": "De kanaal-URL wijst naar een privé- of lokaal netwerk. Stel NOTIFICATION_ALLOW_PRIVATE_NETWORK=true in op de server om dit toe te staan.",
         "notificationChannelSecretKeep": "Laat leeg om het geheim te behouden",
         "notificationChannelEmpty": "Er zijn nog geen huishoudkanalen ingesteld.",
         "notificationChannelAdminOnlyHint": "Alleen beheerders kunnen huishoudkanalen beheren.",

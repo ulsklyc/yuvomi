@@ -3178,6 +3178,7 @@
         "notificationChannelDelete": "Hapus saluran",
         "notificationChannelDeleted": "Saluran dihapus.",
         "notificationChannelError": "Saluran notifikasi tidak dapat diperbarui.",
+        "notificationChannelErrorPrivateNetwork": "URL saluran mengarah ke jaringan pribadi atau lokal. Untuk mengizinkannya, atur NOTIFICATION_ALLOW_PRIVATE_NETWORK=true di server.",
         "notificationChannelSecretKeep": "Biarkan kosong untuk mempertahankan secret",
         "notificationChannelEmpty": "Belum ada saluran rumah tangga yang disiapkan.",
         "notificationChannelAdminOnlyHint": "Hanya admin yang dapat mengelola saluran rumah tangga.",

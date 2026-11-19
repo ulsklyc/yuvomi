@@ -8,10 +8,12 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
-import { createNotificationChannelStore, NOTIFICATION_PROVIDERS } from '../services/notification-channels.js';
+import { createNotificationChannelStore, NOTIFICATION_PROVIDERS, PRIVATE_NETWORK_MESSAGE } from '../services/notification-channels.js';
 import { notificationService as defaultNotificationService } from '../services/notifications.js';
 import { NotificationProviderError } from '../services/notification-providers/provider-error.js';
+import { ENV_ALLOW_PRIVATE_NETWORK } from '../services/notification-providers/guarded-fetch.js';
 import { remoteFailure } from '../utils/http.js';
+import { BlockedAddressError } from '../utils/ssrf.js';
 
 const log = createLogger('NotificationRoutes');
 
@@ -32,6 +34,8 @@ function parseId(value) {
  */
 function storedTestError(err) {
   if (err instanceof NotificationProviderError) return err.message;
+  // The deployment's refusal says what to do, like the answer (#2837).
+  if (err instanceof BlockedAddressError) return PRIVATE_NETWORK_MESSAGE;
   const failure = remoteFailure(err);
   if (failure?.reason === 'remote_unreachable') return failure.detail;
   return 'The test notification could not be delivered.';
@@ -47,9 +51,13 @@ function householdChannelInput(body) {
  * as a 400 - SQLite's included (Phase 0 section H). The channel checks mark
  * their own sentences (`notification_channel_invalid`); everything else goes
  * on to the central error handler, which logs it and answers 500 with its fixed
- * sentence (#2810).
+ * sentence (#2810). A URL in a private network carries its case as well, so
+ * the page can name the switch in the admin's language (#2837).
  */
 function sendChannelWriteFailure(res, err) {
+  if (err?.code === 'notification_channel_invalid' && err.reason === 'notifications_private_network') {
+    return res.status(400).json({ error: PRIVATE_NETWORK_MESSAGE, code: 400, reason: 'notifications_private_network' });
+  }
   if (err?.code === 'notification_channel_invalid') return res.status(400).json({ error: err.message, code: 400 });
   throw err;
 }
@@ -153,9 +161,19 @@ export function buildRouter({
       // providers' own sentences ("Webhook authentication failed.") stay; a
       // network error is stored as its code, anything else - nodemailer's
       // "Invalid login: 535 ...", a TypeError - as a fixed sentence. Their text
-      // names host, port or the server's reply (Phase 0 section H). The answer
-      // and the log line are the central error handler's.
+      // names host, port or the server's reply (Phase 0 section H). Except for
+      // the case below, the answer and the log line are the central error
+      // handler's.
       if (id) store.markChannelTestResult(id, { ok: false, error: storedTestError(err) });
+      // A host name that resolves into a private network passes the save (that
+      // check needs no DNS) and meets the lookup only here. That is the refusal
+      // the save gives for an IP literal, not a failure of this server: until
+      // #2837 it went on as a 500 "Internal server error." with an "Unhandled
+      // error" in the log, and the switch that allows it was named nowhere.
+      if (err instanceof BlockedAddressError) {
+        log.warn(`Channel test refused: the URL resolves to a private or local network address and ${ENV_ALLOW_PRIVATE_NETWORK} is not set.`);
+        return res.status(400).json({ error: PRIVATE_NETWORK_MESSAGE, code: 400, reason: 'notifications_private_network' });
+      }
       throw err;
     }
   });

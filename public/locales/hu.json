@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "Csatorna törlése",
         "notificationChannelDeleted": "Csatorna törölve.",
         "notificationChannelError": "A csatorna frissítése sikertelen.",
+        "notificationChannelErrorPrivateNetwork": "A csatorna URL-je privát vagy helyi hálózatra mutat. Ha ezt engedélyezni szeretnéd, állítsd be a szerveren: NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
         "notificationChannelSecretKeep": "Hagyja üresen a titok megtartásához",
         "notificationChannelEmpty": "Még nincsenek háztartási csatornák konfigurálva.",
         "notificationChannelAdminOnlyHint": "Csak az adminisztrátorok kezelhetik a háztartási csatornákat.",

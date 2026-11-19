@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "チャンネルを削除",
         "notificationChannelDeleted": "チャンネルを削除しました。",
         "notificationChannelError": "通知チャンネルを更新できませんでした。",
+        "notificationChannelErrorPrivateNetwork": "チャンネルのURLがプライベートまたはローカルネットワークを指しています。許可するには、サーバーで NOTIFICATION_ALLOW_PRIVATE_NETWORK=true を設定してください。",
         "notificationChannelSecretKeep": "シークレットを保持するには空のままにします",
         "notificationChannelEmpty": "世帯チャンネルはまだ設定されていません。",
         "notificationChannelAdminOnlyHint": "世帯チャンネルを管理できるのは管理者のみです。",

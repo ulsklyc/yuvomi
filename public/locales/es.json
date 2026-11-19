@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "Eliminar canal",
         "notificationChannelDeleted": "Canal eliminado.",
         "notificationChannelError": "No se pudo actualizar el canal de notificaciones.",
+        "notificationChannelErrorPrivateNetwork": "La URL del canal apunta a una red privada o local. Para permitirlo, establece NOTIFICATION_ALLOW_PRIVATE_NETWORK=true en el servidor.",
         "notificationChannelSecretKeep": "Déjalo vacío para conservar el secreto",
         "notificationChannelEmpty": "Aún no hay canales del hogar configurados.",
         "notificationChannelAdminOnlyHint": "Solo los administradores pueden gestionar canales del hogar.",
