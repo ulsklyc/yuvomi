@@ -204,11 +204,12 @@ test('die Route setzt no-store selbst, nicht erst der /api-Rahmen', async () => 
   const { default: backupRouter } = await import('../server/routes/backup.js');
   const bare = express();
   bare.use((req, _res, next) => { req.authUserId = 99; req.authRole = 'admin'; next(); });
-  bare.use('/', backupRouter);
+  // Der echte Praefix: validateRequest() liest die Operation aus `req.baseUrl` (#2810).
+  bare.use('/api/v1/backup', backupRouter);
   const server = bare.listen(0, '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   try {
-    const res = await fetch(`http://127.0.0.1:${server.address().port}/database-key`);
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/backup/database-key`);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('cache-control'), 'no-store');
     assert.equal((await res.json()).data.origin, 'generated');

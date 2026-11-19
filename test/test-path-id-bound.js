@@ -98,6 +98,10 @@ const MOUNTS = [
   { file: 'schedule-preferences.js', mount: '/api/v1/schedule/preferences' },
   { file: 'schedule-extras.js', mount: '/api/v1/schedule/extras' },
   { file: 'schedule.js', mount: '/api/v1/schedule' },
+  { file: 'split-expenses.js', mount: '/api/v1/split-expenses' },
+  { file: 'backup.js', mount: '/api/v1/backup' },
+  { file: 'system.js', mount: '/api/v1/system' },
+  { file: 'changelog.js', mount: '/api/v1/changelog' },
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
@@ -105,6 +109,7 @@ const WITHOUT_INTEGER_PATH_ID = [
   'email.js', 'family.js', 'inventory/categories.js', 'inventory/deadlines-feed.js', 'kitchen.js',
   'modules.js', 'schedule-feed.js', 'schedule-preferences.js', 'screensaver.js', 'search.js',
   'waste/feed.js', 'waste/import.js', 'waste/occurrences.js', 'weather.js',
+  'backup.js', 'system.js', 'changelog.js',
 ];
 
 const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));

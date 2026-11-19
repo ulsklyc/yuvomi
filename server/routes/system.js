@@ -25,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as db from '../db.js';
 import { requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
 import { checkReadiness } from '../services/readiness.js';
 import { getStatus as getBackupStatus } from '../services/backup-scheduler.js';
 import { listModules } from '../services/modules.js';
@@ -96,7 +97,7 @@ async function freeBytes(/** @type {string | null} */ dir) {
   }
 }
 
-router.get('/diagnostics', requireAdmin, async (/** @type {unknown} */ _req, /** @type {any} */ res) => {
+router.get('/diagnostics', requireAdmin, validateRequest(), async (/** @type {unknown} */ _req, /** @type {any} */ res) => {
   // Everything that reads the database first, in one go; the waits come after.
   const facts = databaseFacts();
   // A part that cannot be read becomes null in the answer, and a line in the

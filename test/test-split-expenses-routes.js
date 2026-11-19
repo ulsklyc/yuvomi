@@ -18,6 +18,8 @@ import bcrypt from 'bcrypt';
 
 const dbmod = await import('../server/db.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 // --- Nutzer: Owner + In-Gruppen-Manager + einfaches Mitglied + Aussenstehender + System-Admin ---
@@ -38,6 +40,7 @@ function as(id, role = 'member') { actor = { id, role }; }
 
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
@@ -50,9 +53,12 @@ app.use((req, _res, next) => {
   req.authScopes = actor.scopes ?? null;
   next();
 });
-app.use('/', splitRouter);
+// Der echte Praefix aus server/index.js samt zentralem Fehlerhandler: validateRequest()
+// liest die Operation aus `req.baseUrl` (#2810).
+app.use('/api/v1/split-expenses', splitRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/split-expenses`)));
 
 async function call(method, path, { actor: a, body } = {}) {
   if (a) actor = a;
@@ -424,7 +430,7 @@ test('GET /groups/:id/expenses: Seiten ueber dieselbe Sekunde ohne Doppel und Lu
     // eslint-disable-next-line no-await-in-loop
     const e = await call('POST', `/groups/${gid}/expenses`, {
       actor: owner,
-      body: { title: `Gleiche Sekunde ${i}`, amount: '5.00', split_method: 'equal', category: 'other', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-02' },
+      body: { title: `Gleiche Sekunde ${i}`, amount: '5.00', split_method: 'equal', category: 'general', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-02' },
     });
     assert.equal(e.status, 201, JSON.stringify(e.body));
     ids.push(e.body.data.id);
@@ -453,7 +459,7 @@ test('GET /groups/:id/expenses: Cursor blaettert ohne Luecke, auch wenn zwischen
     // eslint-disable-next-line no-await-in-loop
     const e = await call('POST', `/groups/${gid}/expenses`, {
       actor: owner,
-      body: { title: `Cursor ${i}`, amount: '2.00', split_method: 'equal', category: 'other', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-04' },
+      body: { title: `Cursor ${i}`, amount: '2.00', split_method: 'equal', category: 'general', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-04' },
     });
     ids.push(e.body.data.id);
   }
@@ -496,7 +502,7 @@ test('GET /groups/:id/expenses: has_more ist bei genau `limit` Ausgaben false (k
     // eslint-disable-next-line no-await-in-loop
     const e = await call('POST', `/groups/${gid}/expenses`, {
       actor: owner,
-      body: { title: `Genau ${i}`, amount: '1.00', split_method: 'equal', category: 'other', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-03' },
+      body: { title: `Genau ${i}`, amount: '1.00', split_method: 'equal', category: 'general', payer_id: OWNER, participants: [OWNER], expense_date: '2026-04-03' },
     });
     assert.equal(e.status, 201);
   }
@@ -1193,8 +1199,9 @@ test('POST /groups/:id/recurring: ungueltige Aufteilung -> 400, nichts gespeiche
     ['Beteiligte leer', await serie({ participants: [] }), /^participants must contain at least one member\.$/],
     ['Genau: Summe ungleich Betrag', await serie({ split_method: 'exact', splits: [{ user_id: OWNER, amount: '4.00' }, { user_id: MEM, amount: '5.00' }] }), /^Exact splits must add up to the expense amount\.$/],
     ['Genau: Anteil fehlt', await serie({ split_method: 'exact', splits: [{ user_id: OWNER, amount: '10.00' }] }), /^Each participant needs an exact split amount\.$/],
-    ['Genau: Betrag als Zahl', await serie({ split_method: 'exact', splits: [{ user_id: OWNER, amount: 4 }, { user_id: MEM, amount: 6 }] }), /^split amount must be sent as a decimal string/],
-    ['Genau: splits ist kein Array', await serie({ split_method: 'exact', splits: 'alles ich' }), /^Each participant needs an exact split amount\.$/],
+    // Seit #2810 die Absage des Schemas: ein Betrag als Zahl, `splits` als Text.
+    ['Genau: Betrag als Zahl', await serie({ split_method: 'exact', splits: [{ user_id: OWNER, amount: 4 }, { user_id: MEM, amount: 6 }] }), /^The request does not match the documented schema\.$/],
+    ['Genau: splits ist kein Array', await serie({ split_method: 'exact', splits: 'alles ich' }), /^The request does not match the documented schema\.$/],
     ['Prozent: Summe 90', await serie({ split_method: 'percentage', splits: [{ user_id: OWNER, percentage: '50' }, { user_id: MEM, percentage: '40' }] }), /^Percentages must add up to 100\.$/],
     ['Prozent: ohne splits', await serie({ split_method: 'percentage' }), /^Percentages must be decimal strings/],
     ['Anteile: 0', await serie({ split_method: 'shares', splits: [{ user_id: OWNER, shares: 0 }, { user_id: MEM, shares: 1 }] }), /^Shares must be positive integers\.$/],
@@ -1580,7 +1587,10 @@ test('Fortsetzen: unbekannter Wert fuer missed -> 400 mit reason, nichts aendert
     for (const missed of ['all', '', 0, true, ['book'], { book: 1 }, 'BOOK']) {
       const r = await setzeFort(id, { missed });
       assert.equal(r.status, 400, JSON.stringify(missed));
-      assert.deepEqual(r.body, { error: 'missed must be "skip" or "book".', code: 400, reason: 'invalid_missed' });
+      // Seit #2810 die Absage des Schemas (`x-reason` am Feld), derselbe Grund.
+      assert.equal(r.body.error, 'The request does not match the documented schema.', JSON.stringify(missed));
+      assert.equal(r.body.reason, 'invalid_missed', JSON.stringify(missed));
+      assert.equal(r.body.fields[0].path, 'body/missed', JSON.stringify(missed));
     }
     assert.deepEqual(serienStand(id), vorher, 'weiter pausiert, Termin unveraendert');
     assert.deepEqual(fortgesetzt(id), []);
@@ -2132,12 +2142,18 @@ test('POST /unarchive auf einer aktiven Gruppe: 200, Serien bleiben, wie sie sin
   assert.deepEqual(JSON.parse(eintrag.metadata || '{}'), {}, 'kein skipped bei einer Gruppe, die nicht archiviert war');
 });
 
-test('archivierte Gruppe: Mitglied und Gast antworten 409 noch vor der Body-Pruefung (kein 400)', async () => {
+// Seit #2810 steht die Pruefung des Schemas vor allem: ein Rumpf ausserhalb
+// des Schemas ist 400. Ein Rumpf in seiner Form, den erst der Handler ablehnt
+// (members ohne ID, ein Gast mit zu kurzem Passwort), trifft die 409 weiter zuerst.
+test('archivierte Gruppe: Mitglied und Gast antworten 409 noch vor der Body-Pruefung des Handlers (kein 400)', async () => {
   const { gid } = await archivGruppe('Archiv-Body');
   await call('POST', `/groups/${gid}/archive`, { actor: OWNER_ACTOR });
   const vorher = gruppenStand(gid);
-  for (const [name, path] of [['members', `/groups/${gid}/members`], ['guests', `/groups/${gid}/guests`]]) {
-    const r = await call('POST', path, { actor: OWNER_ACTOR, body: {} });
+  for (const [name, path, body] of /** @type {Array<[string, string, Record<string, unknown>]>} */ ([
+    ['members', `/groups/${gid}/members`, {}],
+    ['guests', `/groups/${gid}/guests`, { display_name: 'Gast', password: 'kurz' }],
+  ])) {
+    const r = await call('POST', path, { actor: OWNER_ACTOR, body });
     assert.equal(r.status, 409, `${name}: ${JSON.stringify(r.body)}`);
     assert.equal(r.body.reason, 'group_archived', name);
   }
@@ -2159,7 +2175,7 @@ async function summen(viewer = OWNER_A) {
 }
 
 test('setup Summen: Gruppe mit zwei Waehrungen, geloeschter Ausgabe, Ausgleich und 31 Kleinbetraegen', async () => {
-  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Reise-Kasse', type: 'trip', default_currency: 'EUR' } });
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Reise-Kasse', type: 'travel', default_currency: 'EUR' } });
   SUM_GROUP = g.body.data.id;
   await call('POST', `/groups/${SUM_GROUP}/members`, { actor: OWNER_A, body: { user_id: MGR, role: 'admin' } });
   await call('POST', `/groups/${SUM_GROUP}/members`, { actor: OWNER_A, body: { user_id: MEM, role: 'guest' } });
@@ -2230,7 +2246,7 @@ test('#1941: wer das Modul nur lesen darf, bekommt dieselben Summen', async () =
 });
 
 test('#1941: eine Gruppe ohne Ausgaben hat keine Summen', async () => {
-  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Leer-Kasse', type: 'trip', default_currency: 'EUR' } });
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Leer-Kasse', type: 'travel', default_currency: 'EUR' } });
   const r = await call('GET', `/groups/${g.body.data.id}/balances`, { actor: OWNER_A });
   assert.deepEqual(r.body.data.member_totals, []);
   assert.deepEqual(r.body.data.category_totals, []);
@@ -2257,9 +2273,11 @@ test('#1941: PUT ohne `category` laesst die Kategorie stehen, eine unbekannte fa
   assert.equal(mitNull.body.data.category, 'travel', 'null heisst: nicht genannt');
   const gewechselt = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { title: 'Zug', amount: '14.00', currency: 'EUR', category: 'shopping' } });
   assert.equal(gewechselt.body.data.category, 'shopping');
+  // Seit #2810 ist eine unbekannte Kategorie 400 statt still `general`, und nichts aendert sich.
   const unbekannt = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { title: 'Zug', amount: '14.00', currency: 'EUR', category: 'casino' } });
-  assert.equal(unbekannt.status, 200);
-  assert.equal(unbekannt.body.data.category, 'general', 'unbekannt faellt wie beim Anlegen auf general');
+  assert.equal(unbekannt.status, 400);
+  assert.deepEqual(unbekannt.body.fields, [{ path: 'body/category', rule: 'enum' }]);
+  assert.equal(db.prepare('SELECT category FROM expenses WHERE id = ?').get(id).category, 'shopping');
   assert.equal((await call('DELETE', `/expenses/${id}`, { actor: OWNER_A })).status, 200);
 });
 

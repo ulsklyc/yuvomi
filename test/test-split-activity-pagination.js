@@ -227,11 +227,24 @@ test('Obergrenze: limit ueber 100 liefert 100 je Seite, auch mit Cursor', async 
 
 test('Ungueltiger Cursor -> 400, Cursor und offset zusammen -> 400', async () => {
   const at = '2026-03-01T10:00:00Z';
-  for (const query of [{ before_at: at }, { before_id: '5' }, { before_at: at, before_id: '0' }, { before_at: at, before_id: 'x' }, { before_at: 'x'.repeat(65), before_id: '5' }]) {
+  for (const query of [{ before_at: at }, { before_id: '5' }]) {
     // eslint-disable-next-line no-await-in-loop
     const r = await feed(OWN, A, query);
     assert.equal(r.status, 400, JSON.stringify(query));
     assert.match(r.body.error, /before_at and before_id/);
+  }
+  // Seit #2810 prueft das Schema Typ und Grenzen eines Cursorteils: 400 mit `fields`.
+  const cases = /** @type {Array<[Record<string, string>, string]>} */ ([
+    [{ before_at: at, before_id: '0' }, 'query/before_id'],
+    [{ before_at: at, before_id: 'x' }, 'query/before_id'],
+    [{ before_at: 'x'.repeat(65), before_id: '5' }, 'query/before_at'],
+  ]);
+  const answers = await Promise.all(cases.map(([query]) => feed(OWN, A, query)));
+  for (const [i, [query, path]] of cases.entries()) {
+    const r = answers[i];
+    assert.equal(r.status, 400, JSON.stringify(query));
+    assert.equal(r.body.reason, 'validation', JSON.stringify(query));
+    assert.ok(r.body.fields.some((/** @type {any} */ f) => f.path === path), JSON.stringify(r.body));
   }
   const both = await feed(OWN, A, { before_at: at, before_id: '5', offset: '3' });
   assert.equal(both.status, 400);

@@ -2663,7 +2663,8 @@ function openExpenseModal(expense = null, prefill = null) {
         if (rejectSplitAmounts(form, expenseCurrency,
           { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null })) return;
         const { participants, splits } = collectSplitPayload(form);
-        const payload = { ...data, participants, splits };
+        // IDs als Zahl (#2810): Ziffern-Text nimmt der Server nur noch als Altform.
+        const payload = { ...data, payer_id: Number(data.payer_id), participants, splits };
         const dialog = captureModalContext();
         // commit() lädt wartende Dateien erst jetzt hoch: ein abgebrochenes
         // Formular hinterlässt keine verwaiste Datei im Dokumente-Modul.
@@ -3001,7 +3002,7 @@ function readRecurringForm(form) {
     title: String(data.title ?? ''),
     amount: decimalString(data.amount),
     currency: data.currency,
-    payer_id: data.payer_id,
+    payer_id: Number(data.payer_id),
     frequency: data.frequency,
     next_run_date: data.next_run_date,
     split_method: data.split_method || 'equal',
@@ -3140,7 +3141,9 @@ function openSettlementModal() {
         const dialog = captureModalContext();
         const proofIds = proof ? await proof.commit() : [];
         if (proofIds.length) data.proof_document_id = proofIds[0];
-        await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`, data);
+        // IDs als Zahl (#2810): Ziffern-Text nimmt der Server nur noch als Altform.
+        await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`,
+          { ...data, payer_id: Number(data.payer_id), payee_id: Number(data.payee_id) });
         // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
         // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
         const ownDialog = isOwnModalOpen(dialog);

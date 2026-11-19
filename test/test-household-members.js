@@ -154,7 +154,7 @@ app.use('/calendar', requireAuth, calendarRouter);
 app.use('/budget', requireAuth, budgetRouter);
 app.use('/dashboard', requireAuth, dashboardRouter);
 app.use('/api/v1/rewards', requireAuth, rewardsRouter);
-app.use('/split-expenses', requireAuth, splitRouter);
+app.use('/api/v1/split-expenses', requireAuth, splitRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 app.use('/api/v1/permissions', requireAuth, permissionsRouter);
 app.use('/documents', requireAuth, documentsRouter);
@@ -285,10 +285,10 @@ test('members only: householdSize at /auth/me counts neither staff nor guests', 
 // --------------------------------------------------------------------------
 
 test('split member candidates: members plus the guests of this group, not of another', async () => {
-  const here = await call('GET', `/split-expenses/groups/${GROUP}/member-candidates`);
+  const here = await call('GET', `/api/v1/split-expenses/groups/${GROUP}/member-candidates`);
   assert.equal(here.status, 200);
   assert.deepEqual(idsOf(here.body.data.filter((row) => row.source === 'user'), 'user_id'), [ANNA, BEN, DORA]);
-  const other = await call('GET', `/split-expenses/groups/${OTHER}/member-candidates`);
+  const other = await call('GET', `/api/v1/split-expenses/groups/${OTHER}/member-candidates`);
   assert.equal(other.status, 200);
   assert.deepEqual(idsOf(other.body.data.filter((row) => row.source === 'user'), 'user_id'), [ANNA, BEN, EMIL]);
 });
@@ -624,15 +624,15 @@ test('synced calendars: a stored Outlook account owner stays saveable, a new non
 test('split expenses: members and guests can join a group, staff cannot, a stored staff membership stays', async () => {
   const membership = (groupId, userId) => db.prepare('SELECT role FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, userId);
 
-  const member = await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: BEN } });
+  const member = await call('POST', `/api/v1/split-expenses/groups/${GROUP}/members`, { body: { user_id: BEN } });
   assert.equal(member.status, 201, JSON.stringify(member.body));
-  const guest = await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: EMIL } });
+  const guest = await call('POST', `/api/v1/split-expenses/groups/${GROUP}/members`, { body: { user_id: EMIL } });
   assert.equal(guest.status, 201, `the guest mechanism stays: a guest of another group can still join ${JSON.stringify(guest.body)}`);
-  assertRejectsNonMember(await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: CLARA } }), 'staff joining a group');
+  assertRejectsNonMember(await call('POST', `/api/v1/split-expenses/groups/${GROUP}/members`, { body: { user_id: CLARA } }), 'staff joining a group');
   assert.equal(membership(GROUP, CLARA), undefined, 'a rejected POST writes nothing');
 
   db.prepare("INSERT INTO expense_group_members (group_id, user_id, role) VALUES (?, ?, 'guest')").run(OTHER, CLARA);
-  const kept = await call('POST', `/split-expenses/groups/${OTHER}/members`, { body: { user_id: CLARA, role: 'admin' } });
+  const kept = await call('POST', `/api/v1/split-expenses/groups/${OTHER}/members`, { body: { user_id: CLARA, role: 'admin' } });
   assert.equal(kept.status, 201, JSON.stringify(kept.body));
   assert.equal(membership(OTHER, CLARA).role, 'admin', 'a stored staff membership can still be changed');
 });
@@ -800,10 +800,10 @@ test('split expenses: creating a group follows the same rule as adding a member'
   // POST /groups/:id/members ablehnt.
   const groups = () => db.prepare('SELECT COUNT(*) AS n FROM expense_groups').get().n;
   const before = groups();
-  assertRejectsNonMember(await call('POST', '/split-expenses/groups', { as: CLARA, body: { name: 'Putzkasse' } }), 'staff creating a group');
+  assertRejectsNonMember(await call('POST', '/api/v1/split-expenses/groups', { as: CLARA, body: { name: 'Putzkasse' } }), 'staff creating a group');
   assert.equal(groups(), before, 'a refused request creates no group');
 
-  const ok = await call('POST', '/split-expenses/groups', { as: ANNA, body: { name: 'Haushaltskasse' } });
+  const ok = await call('POST', '/api/v1/split-expenses/groups', { as: ANNA, body: { name: 'Haushaltskasse' } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assert.equal(groups(), before + 1);
 });
@@ -812,13 +812,13 @@ test('split member candidates: a stored member who may not join anew stays liste
   // Clara (Hauspersonal) ist seit dem Test oben Mitglied der zweiten Gruppe.
   // Der Editor baut seine Kaestchen nur aus den Kandidaten - fehlt sie dort,
   // kann niemand ihre Mitgliedschaft sehen oder beenden.
-  const other = await call('GET', `/split-expenses/groups/${OTHER}/member-candidates`);
+  const other = await call('GET', `/api/v1/split-expenses/groups/${OTHER}/member-candidates`);
   assert.equal(other.status, 200);
   const users = other.body.data.filter((row) => row.source === 'user');
   assert.deepEqual(idsOf(users, 'user_id'), [ANNA, BEN, CLARA, EMIL]);
   assert.equal(users.find((row) => row.user_id === CLARA).in_group, 1);
 
-  const here = await call('GET', `/split-expenses/groups/${GROUP}/member-candidates`);
+  const here = await call('GET', `/api/v1/split-expenses/groups/${GROUP}/member-candidates`);
   assert.ok(!idsOf(here.body.data.filter((row) => row.source === 'user'), 'user_id').includes(CLARA),
     'not offered for a group she does not belong to');
 });

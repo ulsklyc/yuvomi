@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Shared expenses, backup and the system diagnostics check every request against the
+  published API description.** This is about your own API clients; the app sends nothing that
+  is refused now (from this release on it sends the payer and payee as numbers). Under
+  `/api/v1/split-expenses`, `/api/v1/backup`, `/api/v1/system` and `/api/v1/changelog`, input
+  that used to be quietly accepted, replaced or answered later is now refused with a 400:
+  - a path id that is not plain digits: `0x10`, `1e1` and `" 5"` read group, expense or
+    recurring expense 16, 10 and 5, and `7abc` or `1.5` were a 404;
+  - an unknown value where the module has a list: group `type`, `default_currency`,
+    `default_split_method`, an expense or settlement `currency` and `converted_currency`,
+    `split_method`, `category`, a recurring `frequency`, a member `role`, a guest
+    `family_role`, and the filters `status` (groups) and `category` (expenses). They were
+    replaced with a default (`general`, `equal`, the group currency, `guest`, `other`) or
+    ignored;
+  - a number, truth value, list or object in a text field (a guest `password: {}` was stored as
+    `"[object Object]"`), an amount sent as a number, and ids in a body that are neither whole
+    numbers nor digit text (`payer_id`, `payee_id`, `participants`, `splits[].user_id`,
+    `user_id`, `contact_id`, `proof_document_id`, `attachment_document_ids`);
+  - `attachment_document_ids` that is not a list on `PUT /split-expenses/expenses/{id}`:
+    `null`, a single id or text REMOVED EVERY RECEIPT of the expense. Leave the field out to
+    keep them, send `[]` to remove them;
+  - `PUT /backup/webdav/config` with a `username`, `password` or `remotePath` that is not text
+    (`username: 5` was a 500) or a `keep` that is not a whole number (`7.5` was stored as 7);
+  - queries: `limit`, `offset` and `before_id` that are not plain digits, `recurring` other than
+    `1`, and any parameter given twice. `limit` above 100 and a negative `offset` are still
+    capped, as described;
+  - a missing body on the routes that read one; `{}` sent on purpose still passes where the
+    route took it before (`PATCH /split-expenses/groups/{id}`).
+
+  What stays allowed is in the description now too: `null` or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), unknown fields, no body at the pause
+  toggle. Rules the description cannot carry stay with the routes and their sentences: an empty
+  name after trimming, amounts and their decimal places, the sums of a split, membership,
+  budget categories (`unknown_budget_category`), the WebDAV address pattern and password rule
+  (`errorCode`). `missed` keeps its reason `invalid_missed`. The check runs before the group,
+  expense or recurring expense is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of backup and diagnostics and the refusal
+  of a shared-expense guest creating a group come first: 403 stays 403, also for a bad request.
+  Text lengths count the value as sent.
 - **Replacing a moved or skipped waste pickup or a day of the shift schedule takes the whole
   entry.** This is about your own API clients; the app sends every field already. A `PUT`
   replaces what is stored, so a field left out no longer stands for a value:

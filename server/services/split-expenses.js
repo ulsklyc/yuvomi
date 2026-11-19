@@ -36,7 +36,10 @@ class SplitInputError extends Error {
 }
 
 function minorUnit(currency = 'EUR') {
-  return CURRENCY_MINOR_UNITS[String(currency).toUpperCase()] ?? 2;
+  // Nur eigene Schluessel der Tabelle (#2810): ein Wert aus einem Rumpf
+  // erreicht diesen Nachschlag, und ein Name des Prototyps ist keine Waehrung.
+  const code = String(currency).toUpperCase();
+  return Object.hasOwn(CURRENCY_MINOR_UNITS, code) ? CURRENCY_MINOR_UNITS[code] : 2;
 }
 
 function parseMoneyToMinor(value, currency = 'EUR', field = 'amount') {
@@ -170,7 +173,7 @@ const SPLIT_INPUT_FIELD = { exact: 'amount', percentage: 'percentage', shares: '
 // die prueft der Aufrufer.
 function splitSnapshot({ method, amountMinor, currency, participants, splits = [] }) {
   const participantIds = assertIntegerIds(participants, 'participants');
-  const field = SPLIT_INPUT_FIELD[method];
+  const field = Object.hasOwn(SPLIT_INPUT_FIELD, method) ? SPLIT_INPUT_FIELD[method] : undefined;
   const splitMap = splitsByUser(splits);
   const snapshot = JSON.parse(JSON.stringify({
     participants: participantIds,
