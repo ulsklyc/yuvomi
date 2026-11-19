@@ -33,7 +33,9 @@
  *            - THE OWN CALLERS: every request public/pages/waste.js,
  *              public/pages/schedule.js and the settings pages send passes,
  *              `include_archived=1`, a URL source without `ics` and the legacy
- *              digit text of ids included;
+ *              digit text of ids included; the body of every
+ *              `api.put(...overrides...)` in the two pages names every
+ *              `required` field of its schema, read from the source;
  *            - ONE SOURCE: the enums of the document are the handler's
  *              constants (server/services/waste-fields.js,
  *              server/services/schedule-fields.js).
@@ -51,6 +53,7 @@ process.env.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK = '1';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
 // @ts-expect-error express 5 ships no type declarations (TS7016)
 import express from 'express';
 
@@ -662,6 +665,74 @@ test('schedule: PUT /overrides/{dateKey} is the whole override - a partial body 
   const free = await call('PUT', route, { actor: 'alice', json: { user_id: ALICE, shift_type_id: null, note: null, field_values: {} } });
   assertStatus(free, 200);
   assert.deepEqual([free.body.data.shift_type_id, free.body.data.note], [null, null]);
+});
+
+/**
+ * Every `api.put(` call in a page source whose path names `/overrides/`, with
+ * the top-level keys of its object-literal body. A small scanner, not a parser:
+ * it balances (), {}, [] and skips over '...' and "..." strings, enough for the
+ * two pages' own calls; a body that is not an object literal yields `null`.
+ * @param {string} source
+ * @returns {Array<{ path: string, keys: string[] | null }>}
+ */
+function overridePuts(source) {
+  const calls = [];
+  for (let at = source.indexOf('api.put('); at !== -1; at = source.indexOf('api.put(', at + 1)) {
+    const start = at + 'api.put('.length;
+    let depth = 1;
+    let i = start;
+    let comma = -1;
+    for (; i < source.length && depth > 0; i++) {
+      const c = source[i];
+      if (c === "'" || c === '"') { i = source.indexOf(c, i + 1); continue; }
+      if ('({['.includes(c)) depth++;
+      else if (')}]'.includes(c)) depth--;
+      else if (c === ',' && depth === 1 && comma === -1) comma = i;
+    }
+    const path = source.slice(start, comma === -1 ? i - 1 : comma);
+    if (!path.includes('/overrides/')) continue;
+    const body = comma === -1 ? '' : source.slice(comma + 1, i - 1).trim();
+    let keys = null;
+    if (body.startsWith('{')) {
+      keys = [];
+      let d = 0;
+      for (let j = 0; j < body.length; j++) {
+        const c = body[j];
+        if ('({['.includes(c)) d++;
+        else if (')}]'.includes(c)) d--;
+        if (d === 1 && (c === '{' || c === ',')) {
+          const m = /^\s*([A-Za-z_$][\w$]*)\s*[:,}]/.exec(body.slice(j + 1));
+          if (m) keys.push(m[1]);
+        }
+      }
+    }
+    calls.push({ path, keys });
+  }
+  return calls;
+}
+
+test('the own callers: every override PUT of the two pages sends every required field of its schema', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const requiredOf = (/** @type {string} */ path) => {
+    let schema = spec.paths[path].put.requestBody.content['application/json'].schema;
+    if (schema.$ref) schema = spec.components.schemas[schema.$ref.split('/').pop()];
+    assert.ok(Array.isArray(schema.required) && schema.required.length, path);
+    return schema.required;
+  };
+  const pages = [
+    ['public/pages/waste.js', '/api/v1/waste/schedules/{id}/overrides/{originalDate}', 2],
+    ['public/pages/schedule.js', '/api/v1/schedule/overrides/{dateKey}', 1],
+  ];
+  for (const [file, path, count] of /** @type {Array<[string, string, number]>} */ (pages)) {
+    const calls = overridePuts(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'));
+    assert.equal(calls.length, count, `${file}: the override PUTs found ${JSON.stringify(calls)}`);
+    const required = requiredOf(path);
+    for (const call of calls) {
+      assert.ok(call.keys, `${file}: the body of ${call.path} is an object literal`);
+      const missing = required.filter((/** @type {string} */ key) => !call.keys?.includes(key));
+      assert.deepEqual(missing, [], `${file}: ${call.path} sends ${JSON.stringify(call.keys)}`);
+    }
+  }
 });
 
 // ════════════════════════════════════════════════════════════════════════════
