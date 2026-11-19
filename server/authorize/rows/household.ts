@@ -237,6 +237,30 @@ export function wallMeals(rows: unknown, audience: WallAudience): unknown {
   }));
 }
 
+/** The availability rows of the overview, as far as wallFamilyStatuses() reads them. */
+type FamilyStatusRow = Record<string, unknown>;
+
+/**
+ * Die Wand zeigt den Status nur lesend und ohne Notiz (#1591, Review): eine
+ * Notiz ist Freitext und die Wand steht in einem gemeinsamen Raum.
+ *
+ * ANDERS ALS wallMeals/wallPantryExpiring: nicht `displayWall(audience)`
+ * (beide Achsen), sondern `audience.display` allein. Ein gekoppeltes Display
+ * sieht die Familienkarte auch in seiner PERSOeNLICHEN Abfrage (ohne
+ * `?audience=household`) - die Notiz bleibt trotzdem zurueck, denn das
+ * Geraet haengt im gemeinsamen Raum, nicht bei einer Person. Auf der
+ * Haushaltsfassung selbst erscheint `familyStatuses` ohnehin nie (keine
+ * Zeile in HOUSEHOLD_AUDIENCE_SHOWS): die Wand zeichnet die Familienkarte
+ * nicht.
+ *
+ * Anything that is not a list (a module left out, a failed read) passes unchanged, as
+ * does every answer that is not a display account.
+ */
+export function wallFamilyStatuses(rows: unknown, audience: WallAudience): unknown {
+  if (!audience.display || !Array.isArray(rows)) return rows;
+  return rows.map(({ note: _note, ...rest }: FamilyStatusRow) => rest);
+}
+
 /**
  * Displays erhalten nur den Namen: Menge, Einheit und Ort sind interne
  * Kennzahlen und gehoeren nicht an die Wand (#1903).

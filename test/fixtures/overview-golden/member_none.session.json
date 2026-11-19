@@ -155,6 +155,15 @@
         "updated_at": "2026-03-09T09:30:01Z",
         "can_edit": false
       }
+    ],
+    "familyStatuses": [
+      {
+        "user_id": 2,
+        "state": "busy",
+        "note": "golden availability note",
+        "expires_at": "2099-01-01T00:00:00Z",
+        "updated_at": "2026-03-09T09:30:01Z"
+      }
     ]
   }
 }
