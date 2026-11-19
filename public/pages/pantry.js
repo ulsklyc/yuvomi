@@ -21,8 +21,12 @@ import {
   advancedSection,
   wireBlurValidation,
   reportFieldError,
+  reportFieldErrors,
+  constraintErrors,
   refocusAfterRender,
+  whenModalClosed,
 } from '/components/modal.js';
+import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
 import { renderKitchenTabsBar, mountKitchenSearchTrailing } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, transferMessage, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
 import { mayWritePath } from '/utils/module-access.js';
@@ -34,14 +38,17 @@ import { errorSentence } from '/utils/friendly-error.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
 // Renderer mit den Vorrats-Texten füllt.
 import { emptyStateEl as emptyStateComponentEl, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
-import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn, toggleRegion, durationToken, easingToken } from '/utils/ux.js';
+import { scheduleUndoableDelete, offerUndo, vibrate, wireScrollFade, collapseOut, expandIn, toggleRegion, durationToken, easingToken } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { todayKey } from '/utils/date.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { locationLabel } from '/utils/pantry-locations.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
-import { PANTRY_UNITS, normalizePantryQuantity, pantryUnitStep, pantryQuantityLabel } from '/utils/pantry-units.js';
+import { parseAmountInput } from '/utils/money.js';
+// The rule of a dose (#2069): a key per action, kept when the outcome is open.
+import { randomIdempotencyKey, doseOutcomeUnknown as outcomeUnknown } from '/utils/health-meds.js';
+import { PANTRY_UNITS, MAX_PANTRY_QUANTITY, normalizePantryQuantity, pantryUnitStep, pantryQuantityLabel } from '/utils/pantry-units.js';
 import {
   PANTRY_FILTERS,
   daysUntil,
@@ -2086,6 +2093,9 @@ function openItemModal(mode, item = null) {
           <select id="pantry-unit" class="form-input">${unitOptions}</select>
         </div>
       </div>
+      ${isEdit && Number(/** @type {any} */ (item)?.quantity) > 0 ? `<button type="button" class="btn btn--secondary btn--sm pantry-form__take" id="pantry-take">
+        <i data-lucide="circle-minus" class="icon-sm" aria-hidden="true"></i>${esc(t('pantry.takeAmount'))}
+      </button>` : ''}
       <div class="form-pair">
         <div class="form-group">
           <label class="form-label" for="pantry-location">${esc(t('pantry.locationLabel'))}</label>
@@ -2141,6 +2151,7 @@ function openItemModal(mode, item = null) {
         await removeItem(item);
         refocusAfterRender();
       });
+      panel.querySelector('#pantry-take')?.addEventListener('click', () => switchToTake(item));
 
       wireBlurValidation(panel);
       if (window.lucide) window.lucide.createIcons({ el: panel });
@@ -2205,6 +2216,230 @@ async function saveItem(panel, mode, item) {
     saveBtn.disabled = false;
     window.yuvomi?.showToast(errorSentence(err), 'danger');
   }
+}
+
+// --------------------------------------------------------
+// Take an amount (#1891)
+// --------------------------------------------------------
+
+/*
+ * "TAKE AN AMOUNT" STANDS IN THE ITEM DIALOG, UNDER THE QUANTITY: 30 g of
+ * butter for a roux, from a batch of 250 g, typed instead of worked out. The
+ * dialog is where an exact amount went before (the new quantity, the sum done
+ * in the head), so the action sits where the question is asked, and the row
+ * keeps its three targets: cart, minus, plus. A more button there would be a
+ * fourth (the named exception of D10 in DESIGN.md), and the fixed steps stay
+ * the fast path for "one more, one less". A product row with several batches
+ * has no dialog and no take: an amount comes from one batch, and which one is
+ * a question for #1448.
+ *
+ * The server subtracts (`POST /pantry/:id/take`), so two people taking from
+ * the same batch both count. More than there is sets the batch to 0, and the
+ * toast says so; its undo puts back what was really taken (R23, D6: a status
+ * action asks nothing first and offers the way back).
+ */
+
+/**
+ * A batch of the state by its id, or undefined. The state is filled from the
+ * API, so its rows are plain objects.
+ * @param {number} id
+ * @returns {any}
+ */
+function stateItem(id) {
+  return /** @type {any[]} */ (state.items).find((i) => i.id === id);
+}
+
+/**
+ * From the item dialog to the take dialog. The item dialog closes first, with
+ * the question its X asks when something in it was changed; the take dialog
+ * opens once the focus is back on the row, so that closing it returns there.
+ * @param {any} item
+ */
+async function switchToTake(item) {
+  if (readOnly()) return;
+  const closed = await closeSharedModal();
+  if (closed === false) return;
+  // Not a redraw of the page: the row and its focus stay as they are.
+  whenModalClosed().then(() => openTakeModal(item));
+}
+
+/**
+ * The unit after the amount field, inflected with the number typed ("2 cans").
+ * @param {string} unit
+ * @param {number} value
+ * @returns {string}
+ */
+function takeUnitText(unit, value) {
+  const key = `pantry.units.${unit}`;
+  const label = t(key, { count: Number.isFinite(value) ? value : 0 });
+  return label === key ? String(unit ?? '') : label;
+}
+
+/**
+ * The take dialog: one amount in the unit of the batch.
+ * @param {any} item
+ */
+function openTakeModal(item) {
+  if (readOnly()) return;
+  const current = withIntent(stateItem(item.id) ?? item);
+  // One Idempotency-Key per dialog (#2069, the rule of a dose): a second tap
+  // after an answer that never came sends the same key, and the server answers
+  // with the first take instead of taking a second time.
+  const attempt = { key: randomIdempotencyKey(), amount: /** @type {number | null} */ (null) };
+  const dialog = {
+    title: t('pantry.takeTitle', { name: current.name }),
+    size: 'sm',
+    content: `
+      <form id="pantry-take-form" novalidate>
+        ${formRowsHtml([formRowHtml({
+          label: t('pantry.takeLabel'),
+          labelFor: 'pantry-take-amount',
+          description: t('pantry.takeInStock', { quantity: quantityText(current) }),
+          descriptionId: 'pantry-take-stock',
+          field: true,
+          control: formCompositeHtml({
+            parts: [{
+              id: 'pantry-take-amount',
+              label: t('pantry.takeLabel'),
+              suffix: takeUnitText(current.unit, NaN),
+              // TEXT, NOT type="number" (DESIGN.md, Betragsfeld): a number
+              // field reads the BROWSER's separator, so "0,5" in a German
+              // household on an English browser became 5. parseAmountInput()
+              // reads the household region and a device's decimal comma.
+              attrs: {
+                type: 'text', inputmode: 'decimal', autocomplete: 'off', spellcheck: 'false',
+                required: true, 'aria-describedby': 'pantry-take-stock pantry-take-more',
+              },
+            }],
+          }),
+        })])}
+        <p class="form-hint form-hint--warning" id="pantry-take-more" role="status" hidden></p>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
+          <button type="submit" class="btn btn--primary" id="pantry-take-submit">${esc(t('pantry.takeSubmit'))}</button>
+        </div>
+      </form>`,
+    /** @param {HTMLElement} panel */
+    onSave(panel) {
+      const input = /** @type {HTMLInputElement | null} */ (panel.querySelector('#pantry-take-amount'));
+      const suffix = panel.querySelector('#pantry-take-amount-suffix');
+      const more = /** @type {HTMLElement | null} */ (panel.querySelector('#pantry-take-more'));
+      // More than is in stock is allowed (the batch goes to 0), but said
+      // before the tap: a warning, not a refusal (DESIGN.md, "Nachfragen ohne
+      // Sperre").
+      input?.addEventListener('input', () => {
+        const value = takeAmountOf(input) ?? NaN;
+        if (suffix) suffix.textContent = takeUnitText(current.unit, value);
+        const over = Number.isFinite(value) && value > quantityOf(current);
+        if (more) {
+          more.hidden = !over;
+          more.textContent = over ? t('pantry.takeMoreThanStock') : '';
+        }
+      });
+      panel.querySelector('#pantry-take-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitTake(panel, current, attempt);
+      });
+    },
+  };
+  openSharedModal(dialog);
+}
+
+/**
+ * The amount in the take field: a number, `null` when empty, NaN when it is
+ * not a number in the household's writing (a grouped "1.000" under de too).
+ * @param {HTMLInputElement | null} input
+ * @returns {number | null}
+ */
+function takeAmountOf(input) {
+  return parseAmountInput(input?.value ?? '');
+}
+
+/**
+ * Sends the amount; the server subtracts.
+ * @param {HTMLElement} panel
+ * @param {any} item
+ * @param {{ key: string, amount: number | null }} [attempt] the dialog's key (openTakeModal)
+ */
+async function submitTake(panel, item, attempt = { key: randomIdempotencyKey(), amount: null }) {
+  // A dialog overtaken by a change of rights: the POST would end in a 403.
+  if (readOnly()) return;
+  const form = /** @type {HTMLFormElement | null} */ (panel.querySelector('#pantry-take-form'));
+  const input = /** @type {HTMLInputElement | null} */ (panel.querySelector('#pantry-take-amount'));
+  const submit = /** @type {HTMLButtonElement | null} */ (panel.querySelector('#pantry-take-submit'));
+  if (reportFieldErrors(constraintErrors(form))) return;
+  const value = takeAmountOf(input);
+  const problem = value === null ? t('common.required')
+    : Number.isNaN(value) ? t('common.fieldNumber')
+      : normalizePantryQuantity(value, { fallback: 0 }) <= 0 ? t('common.fieldMin', { min: formatQuantity(0.01) })
+        : value > MAX_PANTRY_QUANTITY ? t('common.fieldMax', { max: formatQuantity(MAX_PANTRY_QUANTITY) })
+          : null;
+  if (problem) {
+    reportFieldError(input, problem);
+    return;
+  }
+  const amount = normalizePantryQuantity(value, { fallback: 0 });
+  // The same key only for the same request: another amount is another take.
+  if (attempt.amount !== null && attempt.amount !== amount) attempt.key = randomIdempotencyKey();
+  attempt.amount = amount;
+
+  if (submit) submit.disabled = true;
+  // Close only this dialog, not one opened while the request ran (#1997), and
+  // no receipt in the next module (R24).
+  const dialog = captureModalContext();
+  const scope = window.yuvomi?.feedbackScope?.() ?? null;
+  try {
+    const res = await api.post(`/pantry/${item.id}/take`, { amount }, { headers: { 'Idempotency-Key': attempt.key } });
+    closeSharedModal({ force: true, context: dialog });
+    const taken = normalizePantryQuantity(res.taken, { fallback: 0 });
+    applyServerQuantity(item.id, res.data);
+    const what = quantityText({ quantity: taken, unit: item.unit });
+    if (!(taken > 0)) {
+      window.yuvomi?.showToast(t('pantry.takenNothing', { name: item.name }), 'default', undefined, null, { scope });
+      return;
+    }
+    offerUndo({
+      scope,
+      // Used up is what the batch says afterwards, also when exactly all of it was taken.
+      message: Number(res.data?.quantity) <= 0
+        ? t('pantry.takenAll', { name: item.name, quantity: what })
+        : t('pantry.taken', { name: item.name, quantity: what }),
+      undo: async () => {
+        const back = await api.post(`/pantry/${item.id}/take/undo`, { amount: taken });
+        applyServerQuantity(item.id, back.data);
+      },
+      onError: (err) => window.yuvomi?.showToast(errorSentence(err), 'danger'),
+    });
+  } catch (err) {
+    if (submit) submit.disabled = false;
+    // An answer that never came (network, 5xx, still running): the take may
+    // have been booked, so a second tap keeps the key. Any other refusal
+    // booked nothing, and a new tap is a new take.
+    if (!outcomeUnknown(/** @type {any} */ (err))) attempt.key = randomIdempotencyKey();
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
+    // The batch is gone (deleted elsewhere): the list shows what is there.
+    if (/** @type {any} */ (err)?.status === 404) {
+      closeSharedModal({ force: true, context: dialog });
+      loadPantry().then(() => { renderFilters(); renderList(); }).catch(() => {});
+    }
+  }
+}
+
+/**
+ * The quantity the server answered a take or its undo with, into the state
+ * and the row: only the quantity, like a confirmed step (adjustQuantity). The
+ * row, its product's total and the live region follow as after a step.
+ * @param {number} id
+ * @param {any} data
+ */
+function applyServerQuantity(id, data) {
+  const current = stateItem(id);
+  if (!current) return;
+  current.quantity = normalizePantryQuantity(data?.quantity, { fallback: Number(current.quantity) });
+  settledAt.set(id, _pantryLoadSeq);
+  const row = liveRow(id, null);
+  if (row) refreshRowQuantity(row, withIntent(current), { stepped: true });
+  if (renderFilters().wasReset) renderList();
 }
 
 async function removeItem(item) {
@@ -2424,6 +2659,11 @@ export const __test = {
   // Lagerort-Verwaltung (test-shopping-readonly-ui.js).
   READ_SAFE_ACTIONS,
   openItemModal,
+  // #1891: take an amount, from the item dialog (test-pantry-ux.js, and the
+  // read-only lines in test-shopping-readonly-ui.js).
+  switchToTake,
+  openTakeModal,
+  submitTake,
   itemReadHtml,
   emptyStateEl,
   openLocationManager,
