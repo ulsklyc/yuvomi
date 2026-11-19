@@ -32,7 +32,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { str, oneOf, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
-import { normalizePantryUnit, normalizePantryQuantity, convertPantryQuantity } from '../../public/utils/pantry-units.js';
+import { normalizePantryUnit, normalizePantryQuantity, convertPantryQuantity, MAX_PANTRY_QUANTITY } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
 import { assignPantryProduct, productKey, writeMinimumThrough } from '../services/pantry-products.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
@@ -728,6 +728,77 @@ router.patch('/:itemId', validateRequest(), (req, res) => {
   })();
 
   res.json({ data: updated });
+});
+
+/**
+ * Moves a batch's quantity by `delta` in SQL, from the quantity stored at that
+ * moment, never from one a browser last saw (#1891): two people taking from the
+ * same batch at once both count. The result is rounded to two decimals like
+ * every quantity and stays between 0 and MAX_PANTRY_QUANTITY. The reminder is
+ * synced as on the stepper path: taking the last of a batch clears its expiry
+ * reminder, putting some back brings it back.
+ * @param {number} itemId
+ * @param {number} delta
+ * @returns {{ item: any, moved: number } | null} the batch afterwards and the
+ *   amount that really moved (less than asked when it hit 0 or the cap); null
+ *   when the batch does not exist
+ */
+function shiftQuantity(itemId, delta) {
+  return db.get().transaction(() => {
+    const before = getItem(itemId);
+    if (!before) return null;
+    db.get()
+      .prepare('UPDATE pantry_items SET quantity = MIN(?, MAX(0, ROUND(quantity + ?, 2))) WHERE id = ?')
+      .run(MAX_PANTRY_QUANTITY, delta, itemId);
+    const item = getItem(itemId);
+    syncReminder(item);
+    const moved = normalizePantryQuantity(Math.abs(Number(item.quantity) - Number(before.quantity)), { fallback: 0 });
+    return { item, moved };
+  })();
+}
+
+// --------------------------------------------------------
+// POST /api/v1/pantry/:itemId/take
+// Body: { amount } - how much was taken, in the unit of the batch (#1891)
+// Response: { data: PantryItem, taken }
+//
+// THE SERVER SUBTRACTS. The request carries the amount taken, not the new
+// quantity, so it does not depend on what the sender last saw: two takes of
+// 30 g from 250 g leave 190 g in whichever order they arrive. The fixed steps
+// of the stepper stay on PATCH with `quantity`.
+//
+// MORE THAN IS THERE GOES TO 0, it is not refused: what was taken is gone from
+// the shelf, and a refusal would leave a row that is known to be wrong. The
+// answer says how much was really taken (`taken`, less than `amount` then), the
+// app says so and its undo puts exactly that back. The schema refuses an amount
+// of 0, a negative one and one that is not a number (`validation`).
+// --------------------------------------------------------
+router.post('/:itemId/take', validateRequest(), (/** @type {any} */ req, /** @type {any} */ res) => {
+  const vId = idParam(req.params.itemId, 'itemId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+
+  const outcome = shiftQuantity(/** @type {number} */ (vId.value), -normalizePantryQuantity(req.body.amount, { fallback: 0 }));
+  if (!outcome) return res.status(404).json({ error: 'Item not found.', code: 404 });
+
+  res.json({ data: outcome.item, taken: outcome.moved });
+});
+
+// --------------------------------------------------------
+// POST /api/v1/pantry/:itemId/take/undo
+// Body: { amount } - the `taken` of a take (#1891)
+// Response: { data: PantryItem }
+//
+// Puts the amount back, added in SQL like the take subtracts, so a step or a
+// take someone made in between stays (the rule of /import-shopping/undo).
+// --------------------------------------------------------
+router.post('/:itemId/take/undo', validateRequest(), (/** @type {any} */ req, /** @type {any} */ res) => {
+  const vId = idParam(req.params.itemId, 'itemId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+
+  const outcome = shiftQuantity(/** @type {number} */ (vId.value), normalizePantryQuantity(req.body.amount, { fallback: 0 }));
+  if (!outcome) return res.status(404).json({ error: 'Item not found.', code: 404 });
+
+  res.json({ data: outcome.item });
 });
 
 // --------------------------------------------------------
