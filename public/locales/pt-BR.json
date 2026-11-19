@@ -566,6 +566,7 @@
         "swipedDoneToast": "Marcado como concluído.",
         "swipedOpenToast": "Marcado como aberto.",
         "reminderNeedsDueDate": "Defina uma data de vencimento para habilitar lembretes da tarefa.",
+        "reminderNeedsOffset": "Escolha quando o lembrete deve chegar ou desative-o.",
         "startDateLabel": "Data de início",
         "startsOn": "Começa em {{date}}",
         "showFuture": "Mostrar agendadas",

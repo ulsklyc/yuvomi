@@ -582,6 +582,7 @@
         "swipedDoneToast": "Marked as done.",
         "swipedOpenToast": "Marked as open.",
         "reminderNeedsDueDate": "Set a due date to enable task reminders.",
+        "reminderNeedsOffset": "Choose when the reminder should come, or switch it off.",
         "startDateLabel": "Start date",
         "startsOn": "Starts {{date}}",
         "showFuture": "Show scheduled",

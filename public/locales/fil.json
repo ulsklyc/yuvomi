@@ -602,6 +602,7 @@
         "bulkDeleted": "Natanggal na ang mga gawain.",
         "kanbanArchived": "Nakatago",
         "reminderNeedsDueDate": "Magtakda ng petsa ng taning para ma-enable ang mga paalala sa gawain.",
+        "reminderNeedsOffset": "Piliin kung kailan darating ang paalala, o i-off ito.",
         "startDateLabel": "Petsa ng simula",
         "startsOn": "Magsisimula {{date}}",
         "showFuture": "Ipakita ang nakaiskedyul",

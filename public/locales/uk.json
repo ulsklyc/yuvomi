@@ -658,6 +658,7 @@
         "archivedLabel": "Архівовано",
         "kanbanArchived": "Архівовано",
         "reminderNeedsDueDate": "Встановіть дату виконання, щоб увімкнути нагадування про завдання.",
+        "reminderNeedsOffset": "Виберіть, коли має прийти нагадування, або вимкніть його.",
         "startDateLabel": "Дата початку",
         "startsOn": "Починається {{date}}",
         "showFuture": "Показати заплановані",

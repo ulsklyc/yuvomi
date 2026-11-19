@@ -704,6 +704,7 @@
         "archivedLabel": "مؤرشفة منذ",
         "kanbanArchived": "مؤرشف",
         "reminderNeedsDueDate": "حدّد تاريخ استحقاق لتفعيل تذكيرات المهمة.",
+        "reminderNeedsOffset": "اختر متى يصل التذكير، أو أوقفه.",
         "startDateLabel": "تاريخ البدء",
         "startsOn": "يبدأ {{date}}",
         "showFuture": "عرض المجدولة",

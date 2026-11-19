@@ -602,6 +602,7 @@
         "bulkDeleted": "Tugas dihapus.",
         "kanbanArchived": "Diarsipkan",
         "reminderNeedsDueDate": "Tetapkan tanggal jatuh tempo untuk mengaktifkan pengingat tugas.",
+        "reminderNeedsOffset": "Pilih kapan pengingat datang, atau matikan.",
         "startDateLabel": "Tanggal mulai",
         "startsOn": "Mulai pada {{date}}",
         "showFuture": "Tampilkan yang terjadwal",

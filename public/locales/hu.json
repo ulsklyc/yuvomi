@@ -582,6 +582,7 @@
         "swipedDoneToast": "Befejezettként jelölve.",
         "swipedOpenToast": "Nyitottként jelölve.",
         "reminderNeedsDueDate": "Állítson be határidőt a feladat emlékeztetők engedélyezéséhez.",
+        "reminderNeedsOffset": "Válaszd ki, mikor érkezzen az emlékeztető, vagy kapcsold ki.",
         "startDateLabel": "Kezdő dátum",
         "startsOn": "Kezdés {{date}}",
         "showFuture": "Ütemezett megjelenítése",

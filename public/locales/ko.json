@@ -602,6 +602,7 @@
         "bulkDeleted": "할 일을 삭제했습니다.",
         "kanbanArchived": "보관됨",
         "reminderNeedsDueDate": "할 일 알림을 켜려면 마감일을 설정하세요.",
+        "reminderNeedsOffset": "알림이 언제 올지 선택하거나 알림을 끄세요.",
         "startDateLabel": "시작일",
         "startsOn": "{{date}}에 시작",
         "showFuture": "예정된 항목 표시",

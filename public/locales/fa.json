@@ -602,6 +602,7 @@
         "bulkDeleted": "کارها حذف شدند.",
         "kanbanArchived": "بایگانی‌شده",
         "reminderNeedsDueDate": "برای فعال کردن یادآور کار، یک تاریخ موعد تعیین کنید.",
+        "reminderNeedsOffset": "انتخاب کنید یادآور کی بیاید، یا آن را خاموش کنید.",
         "startDateLabel": "تاریخ شروع",
         "startsOn": "شروع در {{date}}",
         "showFuture": "نمایش برنامه‌ریزی‌شده‌ها",

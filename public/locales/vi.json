@@ -582,6 +582,7 @@
         "swipedDoneToast": "Đã đánh dấu là hoàn thành.",
         "swipedOpenToast": "Đã đánh dấu là đang mở.",
         "reminderNeedsDueDate": "Đặt ngày đến hạn để kích hoạt lời nhắc nhiệm vụ.",
+        "reminderNeedsOffset": "Chọn thời điểm lời nhắc đến, hoặc tắt nó đi.",
         "startDateLabel": "Ngày bắt đầu",
         "startsOn": "Bắt đầu từ {{date}}",
         "showFuture": "Hiển thị đã lên lịch",

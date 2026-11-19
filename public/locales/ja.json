@@ -566,6 +566,7 @@
         "archivedLabel": "アーカイブ日",
         "kanbanArchived": "アーカイブ済み",
         "reminderNeedsDueDate": "タスクのリマインダーを有効にするには期日を設定してください。",
+        "reminderNeedsOffset": "リマインダーを届けるタイミングを選ぶか、オフにしてください。",
         "startDateLabel": "開始日",
         "startsOn": "{{date}} 開始",
         "showFuture": "予定済みを表示",

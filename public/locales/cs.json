@@ -632,6 +632,7 @@
         "swipedDoneToast": "Označeno jako hotové.",
         "swipedOpenToast": "Označeno jako otevřené.",
         "reminderNeedsDueDate": "Pro aktivaci připomínek úkolu nastavte termín splnění.",
+        "reminderNeedsOffset": "Vyberte, kdy má připomínka přijít, nebo ji vypněte.",
         "startDateLabel": "Datum zahájení",
         "startsOn": "Začíná {{date}}",
         "showFuture": "Zobrazit naplánované",

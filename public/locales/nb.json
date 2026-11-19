@@ -582,6 +582,7 @@
         "swipedDoneToast": "Markert som utført.",
         "swipedOpenToast": "Markert som åpen.",
         "reminderNeedsDueDate": "Sett en frist for å aktivere påminnelser om oppgaver.",
+        "reminderNeedsOffset": "Velg når påminnelsen skal komme, eller slå den av.",
         "startDateLabel": "Startdato",
         "startsOn": "Starter {{date}}",
         "showFuture": "Vis planlagte",

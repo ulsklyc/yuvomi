@@ -445,6 +445,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen, and amounts up to four digits stay readable above their column. The number above
   a column is now always a whole amount, so a month total like €1,234.50 no longer runs into
   its neighbour; the exact amount is still shown in the visits and the report.
+- **A task reminder without a lead time says so, at the lead time.** With the reminder switched on
+  and "None" chosen as lead time, saving the task said "Set a due date to enable task reminders.",
+  even when a date was set, and the line stood at the bottom of the dialog. The message now names
+  the missing lead time and stands under that field, which the dialog moves to.
 
 ## [2.91.0] - 2026-11-15
 
