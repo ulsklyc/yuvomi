@@ -62,7 +62,7 @@ const SEVEN = Object.freeze(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
  * @param {Record<string, number>} options.ids        account ids of the matrix seed
  * @param {Record<string, Array<{ name: string, id: number }>>} options.rows  matrix rows by type
  * @param {(key: string, days: number) => string} options.shift  shiftDateKey
- * @param {{ today: string, yesterday: string, monthStart: string, inThreeDays: string, nowIso: string, oneHourAgoIso: string, inOneHourIso: string }} options.dates
+ * @param {{ today: string, yesterday: string, monthStart: string, inThreeDays: string, nowIso: string, oneHourAgoIso: string }} options.dates
  * @returns {Promise<{ helperId: number, optionsQuery: string }>}
  */
 export async function seedOverviewExtras({ db, call, adminHeaders, ids, rows, shift, dates }) {
@@ -222,11 +222,14 @@ export async function seedOverviewExtras({ db, call, adminHeaders, ids, rows, sh
   insertLink.run('golden.link.private', 'https://example.invalid/private', 'private', ids.member, 1);
 
   // ---- Availability ---------------------------------------------------------
-  // The member has an active status (#1591), not yet expired, so the
-  // dashboard's familyStatuses block has data to show.
+  // The member has an active status (#1591), so the dashboard's
+  // familyStatuses block has data to show. The route's own expiry check
+  // runs against SQLite's real clock (strftime('now')), which Node's
+  // mock.timers never touches - expires_at has to come from that same
+  // clock, not from a JS Date tied to the test's frozen FROZEN_NOW.
   db.prepare(
-    'INSERT INTO user_availability (user_id, state, note, expires_at) VALUES (?, ?, ?, ?)',
-  ).run(ids.member, 'busy', 'golden availability note', dates.inOneHourIso);
+    "INSERT INTO user_availability (user_id, state, note, expires_at) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+1 hour'))",
+  ).run(ids.member, 'busy', 'golden availability note');
 
   seedConditions({ db, ids, rows, shift, dates });
 
