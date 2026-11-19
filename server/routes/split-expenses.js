@@ -501,8 +501,13 @@ function serializeExpense(expense, prefetched, viewer) {
   const attachments = prefetched
     ? documentLinksOf(prefetched.attachments, expense.id, viewer)
     : documentLinksFor(db.get(), { ...EXPENSE_ATTACHMENTS, ownerId: expense.id, viewer });
+  // `converted_amount` in der Genauigkeit von `converted_currency`, nicht von
+  // `currency` (decorateMoney liest nur `currency`): aus 1500 JPY wurde sonst
+  // "15.00", und der Bearbeiten-Dialog, der diesen Text zurueckschickt (#2810),
+  // bekam 400 "too many decimal places for JPY".
   return {
-    ...decorateMoney(expense, ['amount_minor', 'converted_amount_minor']),
+    ...decorateMoney(expense),
+    converted_amount: minorToDecimal(expense.converted_amount_minor, expense.converted_currency ?? expense.currency),
     splits,
     attachments,
   };

@@ -62,6 +62,7 @@ const { createErrorHandler } = await import('../server/middleware/error-handler.
 const { buildOpenApiSpec } = await import('../server/openapi.js');
 const fields = await import('../server/services/split-expense-fields.js');
 const { CURRENCY_CODES } = await import('../public/utils/currency-codes.js');
+const { keptConversion } = await import('../public/utils/split-conversion.js');
 const db = dbmod.get();
 
 const SENTENCE = 'The request does not match the documented schema.';
@@ -607,6 +608,37 @@ function putCalls(source, pathPart) {
   }
   return calls;
 }
+
+// The edit dialog sends the stored conversion back while amount and currency
+// stay unchanged (public/utils/split-conversion.js). The browser's display
+// precision is not the storage precision: HUF, IDR, IRR and COP show no
+// decimals, the server keeps two; JPY keeps none. A save without a change
+// must leave conversion and ledger as they were (Codex at #2841).
+test('PUT /expenses/{id}: the dialog saving a converted expense unchanged keeps conversion and ledger, whatever the precision', async () => {
+  const ledger = (/** @type {number} */ id) => db.prepare(`SELECT user_id, counterparty_id, amount_minor, currency FROM expense_ledger_entries
+    WHERE source_type = 'expense' AND source_id = ? ORDER BY id`).all(id).map((/** @type {any} */ r) => ({ ...r }));
+  const stored = (/** @type {number} */ id) => ({ ...db.prepare('SELECT amount_minor, currency, converted_amount_minor, converted_currency, exchange_snapshot FROM expenses WHERE id = ?').get(id) });
+  for (const [currency, amount, convertedCurrency, convertedAmount] of [
+    ['HUF', '9.00', 'HUF', '9.00'],
+    ['USD', '10.00', 'HUF', '3500.50'],
+    ['USD', '10.00', 'JPY', '1500'],
+    ['JPY', '1500', 'USD', '10.25'],
+  ]) {
+    const label = `${amount} ${currency} -> ${convertedAmount} ${convertedCurrency}`;
+    const created = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, {
+      json: expenseForm({ title: label, amount, currency, converted_amount: convertedAmount, converted_currency: convertedCurrency, exchange_snapshot: { rate: 'x' } }),
+    });
+    assertPassed(created, 201, label);
+    const id = created.body.data.id;
+    const before = { row: stored(id), ledger: ledger(id) };
+    // The expense as the page holds it: a row of the group's list.
+    const listed = (await call('GET', `/split-expenses/groups/${GROUP}/expenses?limit=100`)).body.data.find((/** @type {any} */ e) => e.id === id);
+    const kept = keptConversion(listed, listed.amount, listed.currency);
+    const saved = await call('PUT', `/split-expenses/expenses/${id}`, { json: expenseForm({ title: label, amount: listed.amount, currency: listed.currency, ...kept }) });
+    assertPassed(saved, 200, label);
+    assert.deepEqual({ row: stored(id), ledger: ledger(id) }, before, `${label}: an unchanged save changed nothing`);
+  }
+});
 
 test('the own caller: the expense PUT of the page sends every required field of its schema', () => {
   const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));

@@ -18,7 +18,7 @@ import { errorSentence } from '/utils/friendly-error.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { swapContent } from '/utils/content-swap.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
-import { formatMoney, amountPlaceholder, toAmountDecimalString, amountInputProblem, amountToInput, toStoredNumber, currencyFractionDigits } from '/utils/money.js';
+import { formatMoney, amountPlaceholder, toAmountDecimalString, amountInputProblem, amountToInput, toStoredNumber } from '/utils/money.js';
 // Der Satz zu einem Grund: derselbe Baustein wie in jedem Betragsfeld (D1).
 import { amountProblemText } from '/utils/amount-field.js';
 import { todayKey } from '/utils/date.js';
@@ -33,6 +33,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { categoryPaint } from '/utils/budget-category-colors.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { amountFieldHtml } from '/utils/amount-field.js';
+import { keptConversion } from '/utils/split-conversion.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipHtml } from '/utils/filter-sheet.js';
 import { initials } from '/utils/initials.js';
 import { safeHexColor, getReadableTextColor } from '/utils/color.js';
@@ -2698,42 +2699,6 @@ function openExpenseModal(expense = null, prefill = null) {
       });
     },
   });
-}
-
-/**
- * PUT /expenses/{id} ersetzt die ganze Ausgabe (#2810): `converted_amount`,
- * `converted_currency` und `exchange_snapshot` muessen mitkommen, das
- * Formular zeigt sie aber nicht. Bis v2.93 schickte es sie nie, und jedes
- * Speichern setzte sie zurueck (Betrag, Waehrung, kein Kurs). Bleiben Betrag
- * und Waehrung unveraendert, gehen die gespeicherten Werte zurueck; aendert
- * der Dialog eines davon, passt die gespeicherte Umrechnung nicht mehr, und
- * es bleibt beim bisherigen Ergebnis: umgerechnet = eingegeben, kein Kurs.
- * Nie `undefined` - ein solcher Schluessel fiele aus dem JSON.
- * @param {any} expense die gespeicherte Ausgabe, wie die Liste sie liefert
- * @param {string} amount der Betrag des Dialogs (Dezimaltext)
- * @param {string} currency die Waehrung des Dialogs
- */
-function keptConversion(expense, amount, currency) {
-  const unchanged = currency === expense.currency && Number(amount) === Number(expense.amount);
-  if (!unchanged || !expense.converted_currency || expense.converted_amount_minor == null) {
-    return { converted_amount: null, converted_currency: currency, exchange_snapshot: null };
-  }
-  const digits = currencyFractionDigits(expense.converted_currency);
-  return {
-    converted_amount: (Number(expense.converted_amount_minor) / 10 ** digits).toFixed(digits),
-    converted_currency: expense.converted_currency,
-    exchange_snapshot: storedSnapshot(expense),
-  };
-}
-
-/**
- * Der gespeicherte Kurs als JSON-Wert (die Spalte haelt Text), oder null.
- * @param {any} expense
- */
-function storedSnapshot(expense) {
-  const stored = expense.exchange_snapshot;
-  if (typeof stored !== 'string') return stored ?? null;
-  try { return JSON.parse(stored) ?? null; } catch { return null; }
 }
 
 /**

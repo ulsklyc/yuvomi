@@ -88,6 +88,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
   and the own schedule settings answered this way already.
 
+### Fixed
+- **A shared expense converted into a currency with other decimal places reports the converted
+  amount correctly.** `converted_amount` in the expense answers was written with the decimal
+  places of `currency` instead of `converted_currency`: 1500 JPY converted from USD read
+  `"15.00"`, and sending it back was refused. `converted_amount_minor` was always right.
+
 ## [2.93.0] - 2026-11-18
 
 ### Changed
