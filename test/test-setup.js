@@ -128,16 +128,24 @@ test('GET /settings: no trailing-slash redirect despite public/settings/ directo
   assert.equal(res.headers.get('location'), null, '/settings must not emit a redirect Location');
 });
 
-test('POST /api/v1/auth/setup: 201 creates first admin', async () => {
-  const res = await fetch(`${BASE}/api/v1/auth/setup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', display_name: 'Test Admin', password: 'password123' }),
+test('POST /api/v1/auth/setup: 201 creates first admin from a form-encoded body', async () => {
+  // So ruft das YunoHost-Paket die Route (`ulsklyc/yuvomi_ynh`, scripts/install:
+  // `curl --data-urlencode username=... display_name=... password=... timezone=...`),
+  // und ein 4xx dort laesst die Einrichtungsseite offen im Netz stehen. Den
+  // JSON-Rumpf des Web-Installers haelt test:setup-language. Ein Body-Parser,
+  // der nur JSON liest, oder eine Medientyp-Pruefung vor der Route macht aus
+  // diesem Aufruf ein 400, ohne dass sonst eine Suite es merkt.
+  const body = new URLSearchParams({
+    username: 'admin',
+    display_name: 'Test Ädmin & Co',
+    password: 'password123',
+    timezone: 'Europe/Berlin',
   });
+  const res = await fetch(`${BASE}/api/v1/auth/setup`, { method: 'POST', body });
   assert.equal(res.status, 201);
   const data = await res.json();
   assert.equal(data.user.username, 'admin');
-  assert.equal(data.user.display_name, 'Test Admin');
+  assert.equal(data.user.display_name, 'Test Ädmin & Co');
   assert.equal(data.user.role, 'admin');
   assert.ok(typeof data.user.id === 'number');
   assert.ok(typeof data.user.avatar_color === 'string' && data.user.avatar_color.startsWith('#'));
