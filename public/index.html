@@ -20,9 +20,14 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="mobile-web-app-capable" content="yes" />
 
-  <!-- iOS-spezifisch -->
+  <!-- iOS-spezifisch.
+       `default` statt `black-translucent`: iOS 26 rendert die Statusleiste mit
+       einem soliden Hintergrund, den die `theme-color`-Metas oben steuern. Damit
+       zeigen die Lücken neben dem Dynamic Island eine opake Fläche statt des
+       durchscheinenden App-Inhalts, den iOS 26's Liquid-Glass-Material als Blur
+       darstellt (#2390). -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Yuvomi" />
   <meta name="description" content="Yuvomi - dein Zuhause an einem Ort" />
   <title>Yuvomi</title>
