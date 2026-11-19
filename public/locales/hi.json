@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "चैनल हटाएँ",
         "notificationChannelDeleted": "चैनल हटाया गया।",
         "notificationChannelError": "सूचना चैनल अपडेट नहीं किया जा सका।",
+        "notificationChannelErrorPrivateNetwork": "चैनल URL किसी निजी या स्थानीय नेटवर्क की ओर इशारा करता है। इसकी अनुमति देने के लिए सर्वर पर NOTIFICATION_ALLOW_PRIVATE_NETWORK=true सेट करें।",
         "notificationChannelSecretKeep": "सीक्रेट बनाए रखने के लिए खाली छोड़ें",
         "notificationChannelEmpty": "अभी कोई घर का चैनल कॉन्फ़िगर नहीं है।",
         "notificationChannelAdminOnlyHint": "केवल एडमिन घर के चैनल प्रबंधित कर सकते हैं।",

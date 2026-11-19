@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "Kanalı sil",
         "notificationChannelDeleted": "Kanal silindi.",
         "notificationChannelError": "Bildirim kanalı güncellenemedi.",
+        "notificationChannelErrorPrivateNetwork": "Kanal URL'si özel veya yerel bir ağı gösteriyor. Buna izin vermek için sunucuda NOTIFICATION_ALLOW_PRIVATE_NETWORK=true ayarlayın.",
         "notificationChannelSecretKeep": "Gizli değeri korumak için boş bırakın",
         "notificationChannelEmpty": "Henüz ev kanalı yapılandırılmadı.",
         "notificationChannelAdminOnlyHint": "Ev kanallarını yalnızca yöneticiler yönetebilir.",

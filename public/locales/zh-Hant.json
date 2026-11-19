@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "刪除頻道",
         "notificationChannelDeleted": "頻道已刪除。",
         "notificationChannelError": "無法更新通知頻道。",
+        "notificationChannelErrorPrivateNetwork": "頻道網址指向私人或本機網路。如需允許，請在伺服器上設定 NOTIFICATION_ALLOW_PRIVATE_NETWORK=true。",
         "notificationChannelSecretKeep": "留空以保留金鑰",
         "notificationChannelEmpty": "尚未配置家庭頻道。",
         "notificationChannelAdminOnlyHint": "只有管理員可以管理家庭頻道。",

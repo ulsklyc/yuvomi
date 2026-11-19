@@ -3215,6 +3215,7 @@
         "notificationChannelDelete": "Kanal löschen",
         "notificationChannelDeleted": "Kanal gelöscht.",
         "notificationChannelError": "Benachrichtigungskanal konnte nicht aktualisiert werden.",
+        "notificationChannelErrorPrivateNetwork": "Die Kanal-URL zeigt auf ein privates oder lokales Netz. Um das zu erlauben, auf dem Server NOTIFICATION_ALLOW_PRIVATE_NETWORK=true setzen.",
         "notificationChannelSecretKeep": "Leer lassen, um das Secret beizubehalten",
         "notificationChannelEmpty": "Noch keine Haushaltskanäle eingerichtet.",
         "notificationChannelAdminOnlyHint": "Nur Admins können Haushaltskanäle verwalten.",

@@ -1833,3 +1833,146 @@ test('Kanal aendern: Pruefung bleibt 400 mit Satz, Datenbank und kaputter Rumpf 
   assert.equal(failing.json.error, 'Internal server error.');
   assert.doesNotMatch(JSON.stringify(failing.json), /h_guard_missing_update|no such table/);
 });
+
+// #2837: Ein Name, der ins private Netz aufloest (Apprise hinter einem Reverse
+// Proxy im LAN), kommt beim Speichern durch - ohne DNS laesst er sich dort
+// nicht entscheiden. Erst der Kanaltest stoesst auf die Absage des Lookups, und
+// die ging als BlockedAddressError an den zentralen Fehlerhandler: 500
+// "Internal server error.", im Log "Unhandled error", in der Seite der
+// allgemeine Satz. Der Schalter, mit dem ein Admin das LAN freigibt, stand
+// nirgends. Jetzt ist es die Absage, die das Speichern schon kennt: 400, ihr
+// Satz nennt den Schalter, ihr Grund laesst die Seite ihn uebersetzen.
+/**
+ * @param {Function} buildRouter
+ * @param {{ db: any, store: any, notificationService: any }} deps
+ */
+function notificationRouteApp(buildRouter, { db, store, notificationService }) {
+  const router = buildRouter({ database: db, channelStore: store, notificationService });
+  const app = express();
+  app.use(express.json());
+  app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
+  app.use('/api/v1/notifications', router);
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
+  return app;
+}
+
+test('Kanaltest: ein Name, der ins private Netz aufloest, ist eine klare 400 mit dem Schalter, kein 500 (#2837)', async () => {
+  const { createNotificationChannelStore, PRIVATE_NETWORK_MESSAGE } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const { createNotificationService } = await import('../server/services/notifications.js');
+  const { guardedFetch } = await import('../server/services/notification-providers/guarded-fetch.js');
+  const { createGuardedLookup } = await import('../server/utils/ssrf.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  // Der Fall des Berichts, ohne Netz: der Name ist oeffentlich geschrieben,
+  // das DNS des Hauses loest ihn nach 192.168.x.x auf. Der Lookup lehnt ab,
+  // bevor eine Verbindung entsteht.
+  /** @type {any} */
+  const lanDns = (/** @type {string} */ _hostname, /** @type {object} */ _options, /** @type {Function} */ callback) => callback(null, [{ address: '192.168.1.20', family: 4 }]);
+  const real = createNotificationService();
+  const notificationService = {
+    providers: real.providers,
+    testChannel: (/** @type {any} */ args) => real.testChannel({
+      ...args,
+      fetchImpl: (/** @type {string} */ url, /** @type {any} */ options) => guardedFetch(url, { ...options, lookup: createGuardedLookup({ lookup: lanDns }) }),
+    }),
+  };
+  const app = notificationRouteApp(buildRouter, { db, store, notificationService });
+  const before = process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+  try {
+    delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    const channel = store.createChannel({ provider: 'webhook', name: 'Apprise', config: { baseUrl: 'https://apprise.home.example.com/notify/yuvomi' } });
+
+    const refused = await call(app, 'POST', `/api/v1/notifications/channels/${channel.id}/test`);
+    assert.equal(refused.status, 400, JSON.stringify(refused.json));
+    assert.deepEqual(refused.json, { error: PRIVATE_NETWORK_MESSAGE, code: 400, reason: 'notifications_private_network' });
+    assert.match(refused.json.error, /NOTIFICATION_ALLOW_PRIVATE_NETWORK=true/);
+    // Die Adresse selbst bleibt draussen, wie bei jeder Absage eines fremden Ziels.
+    assert.doesNotMatch(JSON.stringify(refused.json), /192\.168/);
+    // Am Kanal steht derselbe Satz: er sagt, was zu tun ist.
+    assert.equal(store.getChannel(channel.id).lastError, PRIVATE_NETWORK_MESSAGE);
+  } finally {
+    if (before === undefined) delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    else process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = before;
+  }
+});
+
+// Derselbe Weg ohne Injektion: echte Provider, echte Voreinstellung
+// (guardedFetch), ein privates Ziel, das der Lookup erst beim Senden sieht. Ohne
+// den Schalter die Absage und nichts kommt an; mit ihm geht der Test durch.
+test('Kanaltest ueber den echten Versand: ohne Schalter die Absage, mit ihm kommt die Nachricht an (#2837)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const { createNotificationService } = await import('../server/services/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = notificationRouteApp(buildRouter, { db, store, notificationService: createNotificationService() });
+  /** @type {string[]} */
+  const hits = [];
+  /** @type {import('node:http').RequestListener} */
+  const record = (req, res) => {
+    req.resume();
+    req.on('end', () => {
+      hits.push(String(req.url));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  };
+  const { base, close } = await startLocalServer(record);
+  const before = process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+  try {
+    const channel = await withPrivateNetworkAllowed(() => store.createChannel({
+      provider: 'webhook', name: 'Apprise', config: { baseUrl: `${base}/notify/yuvomi` },
+    }));
+    delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    const refused = await call(app, 'POST', `/api/v1/notifications/channels/${channel.id}/test`);
+    assert.equal(refused.status, 400, JSON.stringify(refused.json));
+    assert.equal(refused.json.reason, 'notifications_private_network');
+    assert.deepEqual(hits, [], 'der lokale Server darf nichts empfangen haben');
+
+    const sent = await withPrivateNetworkAllowed(() => call(app, 'POST', `/api/v1/notifications/channels/${channel.id}/test`));
+    assert.equal(sent.status, 200, JSON.stringify(sent.json));
+    assert.deepEqual(hits, ['/notify/yuvomi']);
+    assert.equal(store.getChannel(channel.id).lastError, null);
+  } finally {
+    if (before === undefined) delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    else process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = before;
+    await close();
+  }
+});
+
+// Die Absage beim Speichern nannte den Schalter schon, aber nur im englischen
+// Satz, und die Seite zeigt nie den Satz des Servers. Mit dem Grund sagt sie
+// ihn in der Sprache des Admins (#2837).
+test('Kanal speichern: ein privates Ziel traegt den Grund notifications_private_network (#2837)', async () => {
+  const { createNotificationChannelStore, PRIVATE_NETWORK_MESSAGE } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+  const lan = { provider: 'webhook', name: 'Apprise', enabled: true, config: { baseUrl: 'http://192.168.1.20:8000/notify/yuvomi' } };
+  const before = process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+  try {
+    delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    const refused = await call(app, 'POST', '/api/v1/notifications/channels', lan);
+    assert.equal(refused.status, 400, JSON.stringify(refused.json));
+    assert.deepEqual(refused.json, { error: PRIVATE_NETWORK_MESSAGE, code: 400, reason: 'notifications_private_network' });
+
+    const ok = await call(app, 'POST', '/api/v1/notifications/channels', { ...lan, config: { baseUrl: 'https://hooks.example.test/in' } });
+    assert.equal(ok.status, 201);
+    const moved = await call(app, 'PUT', `/api/v1/notifications/channels/${ok.json.data.id}`, { config: { baseUrl: 'http://localhost:8000/in' } });
+    assert.equal(moved.status, 400, JSON.stringify(moved.json));
+    assert.equal(moved.json.reason, 'notifications_private_network');
+
+    // Eine andere Absage der Eingabe bleibt ohne Grund.
+    const badScheme = await call(app, 'POST', '/api/v1/notifications/channels', { ...lan, config: { baseUrl: 'ftp://hooks.example.test/in' } });
+    assert.equal(badScheme.status, 400);
+    assert.equal(badScheme.json.reason, undefined);
+
+    const allowed = await withPrivateNetworkAllowed(() => call(app, 'POST', '/api/v1/notifications/channels', lan));
+    assert.equal(allowed.status, 201, JSON.stringify(allowed.json));
+  } finally {
+    if (before === undefined) delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    else process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = before;
+  }
+});

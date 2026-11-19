@@ -227,3 +227,89 @@ test('R23: ohne Kanal zeigt die Liste den kompakten Leerzustand', async () => {
   assert.match(html, /settings\.notificationChannelEmpty/);
   assert.doesNotMatch(html, /^<p class="form-hint">/);
 });
+
+// #2837: Ein gescheiterter Testversand sagte immer "konnte nicht aktualisiert
+// werden" - auch wenn der Server den Fall und den Schalter nannte, der ihn
+// loest. Der Fall `notifications_private_network` hat jetzt seinen Satz;
+// alles andere bleibt beim allgemeinen.
+test('ein Testversand ins private Netz nennt den Schalter, ein anderer Fehler den allgemeinen Satz (#2837)', async () => {
+  // Der Stub aus test-browser-loader.mjs; ueber eine Variable, weil tsc den
+  // Browser-Pfad nicht aufloest.
+  const apiPath = '/api.js';
+  /** @type {{ notifications: Record<string, Function> }} */
+  const { notifications } = await import(apiPath);
+  const status = { textContent: '' };
+  /** @type {Record<string, Function>} */
+  const handlers = {};
+  const container = {
+    querySelector: (/** @type {string} */ sel) => (sel === '#notification-channel-status' ? status : null),
+    addEventListener: (/** @type {string} */ type, /** @type {Function} */ fn) => { handlers[type] = fn; },
+  };
+  await __test.setupChannelControls(container, { role: 'admin' });
+  const form = { dataset: { channelId: '7' } };
+  const button = { dataset: { action: 'test' }, disabled: false, closest: () => form };
+  const clickTest = () => handlers.click({ target: { closest: (/** @type {string} */ sel) => (sel === 'button[data-action]' ? button : null) } });
+  const original = notifications.testChannel;
+  const refusal = (/** @type {number} */ statusCode, /** @type {string} */ reason = '') => Object.assign(new Error('Notification channel URL must not point to a private or local network address.'), {
+    status: statusCode, data: { error: 'Server sentence.', code: statusCode, ...(reason ? { reason } : {}) },
+  });
+  try {
+    notifications.testChannel = async () => { throw refusal(400, 'notifications_private_network'); };
+    await clickTest();
+    assert.equal(status.textContent, 'settings.notificationChannelErrorPrivateNetwork');
+    assert.equal(button.disabled, false);
+
+    notifications.testChannel = async () => { throw refusal(500); };
+    await clickTest();
+    assert.equal(status.textContent, 'settings.notificationChannelError');
+
+    notifications.testChannel = async () => ({ data: { ok: true } });
+    await clickTest();
+    assert.equal(status.textContent, 'settings.notificationChannelTestSent');
+  } finally {
+    notifications.testChannel = original;
+  }
+});
+
+// #2837, der zweite Weg: dieselbe Absage beim Speichern (eine LAN-IP, die der
+// Server ohne DNS erkennt). Auch hier sagte die Seite nur den allgemeinen Satz.
+test('ein Kanal mit privatem Ziel nennt beim Speichern den Schalter, ein anderer Fehler den allgemeinen Satz (#2837)', async () => {
+  const apiPath = '/api.js';
+  /** @type {{ notifications: Record<string, Function> }} */
+  const { notifications } = await import(apiPath);
+  const status = { textContent: '' };
+  /** @type {Record<string, Function>} */
+  const handlers = {};
+  const container = {
+    querySelector: (/** @type {string} */ sel) => (sel === '#notification-channel-status' ? status : null),
+    addEventListener: (/** @type {string} */ type, /** @type {Function} */ fn) => { handlers[type] = fn; },
+  };
+  await __test.setupChannelControls(container, { role: 'admin' });
+  // Ein neuer Webhook-Kanal (ohne id: createChannel), so wie readChannelForm ihn liest.
+  const form = {
+    dataset: {},
+    elements: {
+      provider: { value: 'webhook' }, name: { value: 'Apprise' }, enabled: { checked: true },
+      baseUrl: { value: 'http://192.168.1.20:8000/notify/yuvomi' }, webhookTemplate: { value: '' }, webhookToken: { value: '' },
+    },
+  };
+  const submit = () => handlers.submit({
+    target: { closest: (/** @type {string} */ sel) => (sel === '.notification-channel-form' ? form : null) },
+    preventDefault() {},
+  });
+  const original = notifications.createChannel;
+  const refusal = (/** @type {number} */ statusCode, /** @type {string} */ reason = '') => Object.assign(new Error('Server sentence.'), {
+    status: statusCode, data: { error: 'Server sentence.', code: statusCode, ...(reason ? { reason } : {}) },
+  });
+  try {
+    notifications.createChannel = async () => { throw refusal(400, 'notifications_private_network'); };
+    await submit();
+    assert.equal(status.textContent, 'settings.notificationChannelErrorPrivateNetwork');
+
+    notifications.createChannel = async () => { throw refusal(400); };
+    await submit();
+    assert.equal(status.textContent, 'settings.notificationChannelError');
+  } finally {
+    notifications.createChannel = original;
+  }
+});

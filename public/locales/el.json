@@ -3160,6 +3160,7 @@
         "notificationChannelDelete": "Διαγραφή καναλιού",
         "notificationChannelDeleted": "Το κανάλι διαγράφηκε.",
         "notificationChannelError": "Δεν ήταν δυνατή η ενημέρωση του καναλιού ειδοποιήσεων.",
+        "notificationChannelErrorPrivateNetwork": "Η URL του καναλιού δείχνει σε ιδιωτικό ή τοπικό δίκτυο. Για να το επιτρέψετε, ορίστε NOTIFICATION_ALLOW_PRIVATE_NETWORK=true στον διακομιστή.",
         "notificationChannelSecretKeep": "Αφήστε το κενό για να διατηρηθεί το μυστικό",
         "notificationChannelEmpty": "Δεν έχουν ρυθμιστεί ακόμη κανάλια νοικοκυριού.",
         "notificationChannelAdminOnlyHint": "Μόνο οι διαχειριστές μπορούν να διαχειρίζονται κανάλια νοικοκυριού.",

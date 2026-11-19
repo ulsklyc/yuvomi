@@ -1,7 +1,20 @@
-import { op, jsonBody, idParam, withValidationRefusal } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
+
+// #2837: a channel URL in a private or local network. Saving refuses what is
+// decided without DNS (localhost, an internal suffix, an IP literal); a test
+// refuses a host name that resolves there. Both name the switch in `error`.
+const PRIVATE_NETWORK_ON_SAVE = '`notifications_private_network` (400, the URL points to a private or local network address '
+  + 'and NOTIFICATION_ALLOW_PRIVATE_NETWORK is not set)';
+const PRIVATE_NETWORK_ON_TEST = '`notifications_private_network` (400, the channel URL resolves to a private or local network address '
+  + 'and NOTIFICATION_ALLOW_PRIVATE_NETWORK is not set; nothing was sent to the private address)';
+const CASE_REASONS = {
+  '/api/v1/notifications/channels': { post: PRIVATE_NETWORK_ON_SAVE },
+  '/api/v1/notifications/channels/{id}': { put: PRIVATE_NETWORK_ON_SAVE },
+  '/api/v1/notifications/channels/{id}/test': { post: PRIVATE_NETWORK_ON_TEST },
+};
 
 export function notificationsPaths() {
-  return {
+  return withCaseReasons('notifications', CASE_REASONS, {
     '/api/v1/notifications/providers': {
       get: op({
         summary: 'List supported notification channel providers',
@@ -76,5 +89,5 @@ export function notificationsPaths() {
     },
 
     // --- Health module ---
-  };
+  });
 }

@@ -372,6 +372,10 @@ export const CASE_MESSAGES = new Map([
   ['recipe_providers_private_network', 'settings.recipeProviderErrorPrivateNetwork'],
   ['recipe_providers_connection_failed', 'settings.recipeProviderErrorConnectionFailed'],
   ['recipe_providers_account_exists', 'settings.recipeProviderErrorAccountExists'],
+  // Benachrichtigungskanaele (#2837): ein Ziel im privaten Netz, beim Speichern
+  // oder erst beim Testversand, wenn der Name dorthin aufloest. Der Satz nennt
+  // den Schalter, wie beim Rezeptdienst.
+  ['notifications_private_network', 'settings.notificationChannelErrorPrivateNetwork'],
   // Der letzte gescheiterte Abgleich eines Kontos (#1909, Migration 255): der
   // Server speichert den Fall neben dem rohen Text, die Konto-Karte sagt den
   // Satz (server/services/recipe-providers/failure.js). Das private Netz oben

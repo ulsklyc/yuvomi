@@ -141,6 +141,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or replacing an expense without a rate stored the text `"null"`, and the expense answers
   returned `"exchange_snapshot": "null"` for it. New and replaced expenses now store no value and
   answer `null`; expenses saved before keep `"null"` until they are saved again.
+- **Testing a notification channel whose host name resolves into your LAN says which switch
+  allows it** (#2837). A webhook, Gotify or ntfy channel with a public-looking name that your
+  DNS resolves to a private address (such as `192.168.x.x`) is saved, but its test was answered
+  with a 500 `"Internal server error."` and an "Unhandled error" in the log, and the settings
+  page said only that the channel could not be updated. The test now answers 400 with
+  `reason: notifications_private_network` and the sentence the save already gave for an IP
+  literal, which names `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true`; the channel's `lastError`
+  says the same. The save carries the reason too, and the page shows both in your language.
+  Nothing changes about what is allowed: private targets still need the switch.
 
 ## [2.93.0] - 2026-11-18
 
