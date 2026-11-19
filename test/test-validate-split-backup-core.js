@@ -62,7 +62,7 @@ const { createErrorHandler } = await import('../server/middleware/error-handler.
 const { buildOpenApiSpec } = await import('../server/openapi.js');
 const fields = await import('../server/services/split-expense-fields.js');
 const { CURRENCY_CODES } = await import('../public/utils/currency-codes.js');
-const { keptConversion } = await import('../public/utils/split-conversion.js');
+const { keptConversion, exactShareBasis, conversionKept } = await import('../public/utils/split-conversion.js');
 const db = dbmod.get();
 
 const SENTENCE = 'The request does not match the documented schema.';
@@ -638,6 +638,49 @@ test('PUT /expenses/{id}: the dialog saving a converted expense unchanged keeps 
     assertPassed(saved, 200, label);
     assert.deepEqual({ row: stored(id), ledger: ledger(id) }, before, `${label}: an unchanged save changed nothing`);
   }
+});
+
+// Exact shares of a converted expense (Codex P2 at #2841): with the stored
+// conversion kept, the server adds the shares up against `converted_amount`
+// in `converted_currency`, and the stored shares come back in that currency.
+// exactShareBasis (public/utils/split-conversion.js) is what the dialog checks
+// against: what it accepts, the server accepts; the entered amount is a 400.
+test('PUT /expenses/{id}: exact shares of a kept conversion add up to the converted amount, as the dialog checks them', async () => {
+  const created = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, {
+    json: expenseForm({
+      title: 'Taxi', amount: '10.00', currency: 'USD', converted_amount: '9.00', converted_currency: 'EUR', exchange_snapshot: { rate: '0.9' },
+      split_method: 'exact', splits: [{ user_id: OWNER, amount: '5.40' }, { user_id: MEM, amount: '3.60' }],
+    }),
+  });
+  assertPassed(created, 201, 'create');
+  const id = created.body.data.id;
+  const listed = (await call('GET', `/split-expenses/groups/${GROUP}/expenses?limit=100`)).body.data.find((/** @type {any} */ e) => e.id === id);
+  // The stored shares: in the converted currency, adding up to the converted amount.
+  assert.deepEqual(listed.splits.map((/** @type {any} */ s) => [s.amount, s.currency]).sort(), [['3.60', 'EUR'], ['5.40', 'EUR']]);
+
+  const basis = exactShareBasis(listed, listed.amount, listed.currency);
+  assert.deepEqual(basis, { amount: '9.00', currency: 'EUR', from: { amount: '10.00', currency: 'USD' } });
+  const kept = keptConversion(listed, listed.amount, listed.currency);
+  const edit = (/** @type {string[]} */ [a, b]) => call('PUT', `/split-expenses/expenses/${id}`, {
+    json: expenseForm({ title: 'Taxi', amount: listed.amount, currency: listed.currency, ...kept, split_method: 'exact', splits: [{ user_id: OWNER, amount: a }, { user_id: MEM, amount: b }] }),
+  });
+  // Shares on the basis pass; shares on the entered amount are refused.
+  assert.equal(Number(basis.amount), 5 + 4);
+  assertPassed(await edit(['5.00', '4.00']), 200, 'shares adding up to the basis');
+  const entered = await edit(['6.00', '4.00']);
+  assert.equal(entered.status, 400, JSON.stringify(entered.body));
+  assert.match(entered.body.error, /Exact splits must add up/);
+
+  // A changed currency drops the conversion: the basis is the input again,
+  // and the server agrees.
+  assert.deepEqual(exactShareBasis(listed, listed.amount, 'EUR'), { amount: listed.amount, currency: 'EUR', from: null });
+  assert.deepEqual(exactShareBasis(listed, '10.50', 'USD'), { amount: '10.50', currency: 'USD', from: null });
+  assert.equal(conversionKept(listed, listed.amount, 'EUR'), false);
+  assert.equal(conversionKept(null, '10.00', 'USD'), false);
+  const dropped = keptConversion(listed, listed.amount, 'EUR');
+  assertPassed(await call('PUT', `/split-expenses/expenses/${id}`, {
+    json: expenseForm({ title: 'Taxi', amount: listed.amount, currency: 'EUR', ...dropped, split_method: 'exact', splits: [{ user_id: OWNER, amount: '6.00' }, { user_id: MEM, amount: '4.00' }] }),
+  }), 200, 'changed currency: shares on the entered amount');
 });
 
 test('the own caller: the expense PUT of the page sends every required field of its schema', () => {

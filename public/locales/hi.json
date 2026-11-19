@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "इस खाली समूह को हटाएं? खर्च वाले समूह संग्रहित करने होंगे।",
         "deleteGroupConfirmDetail": "सदस्य सूची, डिफ़ॉल्ट बँटवारा, आवर्ती खर्च और गतिविधि लॉग हमेशा के लिए चले जाते हैं। समूह बिना खर्चों और निपटानों के ही खाली गिना जाता है।",
         "splitCurrentTotal": "वर्तमान कुल: {{total}}",
+        "exactSharesConverted": "सटीक हिस्से {{currency}} में, {{amount}} से परिवर्तित।",
         "statusLabel": "स्थिति",
         "statusActive": "सक्रिय",
         "statusArchived": "संग्रहित",

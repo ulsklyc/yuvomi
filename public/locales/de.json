@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "Diese leere Gruppe löschen? Gruppen mit Ausgaben müssen archiviert werden.",
         "deleteGroupConfirmDetail": "Mitgliederliste, Standard-Aufteilung, Serienausgaben und das Aktivitätsprotokoll sind danach endgültig weg. Als leer gilt eine Gruppe schon ohne Ausgaben und Ausgleiche.",
         "splitCurrentTotal": "Aktuelle Summe: {{total}}",
+        "exactSharesConverted": "Exakte Anteile in {{currency}}, umgerechnet aus {{amount}}.",
         "statusLabel": "Status",
         "statusActive": "Aktiv",
         "statusArchived": "Archiviert",

@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "이 빈 그룹을 삭제할까요? 지출이 있는 그룹은 보관해야 합니다.",
         "deleteGroupConfirmDetail": "구성원 목록, 기본 분담 방식, 반복 지출, 활동 기록이 영구히 사라집니다. 지출과 정산이 없으면 그룹은 비어 있는 것으로 봅니다.",
         "splitCurrentTotal": "현재 합계: {{total}}",
+        "exactSharesConverted": "정확한 분담액은 {{currency}} 기준({{amount}}에서 환산).",
         "statusLabel": "상태",
         "statusActive": "활성",
         "statusArchived": "보관됨",

@@ -26,8 +26,7 @@
  * @returns {{ converted_amount: string | null, converted_currency: string, exchange_snapshot: unknown }}
  */
 export function keptConversion(expense, amount, currency) {
-  const unchanged = currency === expense?.currency && Number(amount) === Number(expense?.amount);
-  if (!unchanged || !expense.converted_currency || typeof expense.converted_amount !== 'string') {
+  if (!conversionKept(expense, amount, currency)) {
     return { converted_amount: null, converted_currency: currency, exchange_snapshot: null };
   }
   return {
@@ -35,6 +34,47 @@ export function keptConversion(expense, amount, currency) {
     converted_currency: expense.converted_currency,
     exchange_snapshot: storedSnapshot(expense),
   };
+}
+
+/**
+ * Bleibt die gespeicherte Umrechnung beim Speichern stehen? Die EINE Bedingung
+ * fuer den Payload (keptConversion) und die Pruefung im Dialog
+ * (exactShareBasis): Betrag und Waehrung unveraendert, und die Ausgabe traegt
+ * eine Umrechnung als Dezimaltext des Servers.
+ *
+ * @param {any} expense die gespeicherte Ausgabe oder null (neue Ausgabe, Serie)
+ * @param {string} amount der Betrag des Dialogs (Dezimaltext mit Punkt)
+ * @param {string} currency die Waehrung des Dialogs
+ * @returns {boolean}
+ */
+export function conversionKept(expense, amount, currency) {
+  if (!expense) return false;
+  const unchanged = currency === expense.currency && Number(amount) === Number(expense.amount);
+  return unchanged && Boolean(expense.converted_currency) && typeof expense.converted_amount === 'string';
+}
+
+/**
+ * Wogegen die exakten Anteile aufgehen muessen. Der Server rechnet sie bei
+ * behaltener Umrechnung gegen `converted_amount` in `converted_currency`
+ * (buildSplits in PUT /expenses/:id), und genau dort liegen auch die
+ * gespeicherten Anteile (expense_splits.currency). Prueft der Dialog gegen den
+ * eingegebenen Betrag, bestehen 6 + 4 bei "10 USD -> 9 EUR" im Dialog, und
+ * der Server antwortet 400. Aendert der Dialog Betrag oder Waehrung, faellt
+ * die Umrechnung weg (keptConversion), und es gilt wieder die Eingabe.
+ *
+ * `from` nennt den eingegebenen Betrag, wenn die Anteile in einer ANDEREN
+ * Waehrung stehen als die Eingabe - sonst null. Der Betrag bleibt Text des
+ * Servers, hier wird nichts zurueckgerechnet.
+ *
+ * @param {any} expense die gespeicherte Ausgabe oder null
+ * @param {string} amount der Betrag des Dialogs (Dezimaltext mit Punkt)
+ * @param {string} currency die Waehrung des Dialogs
+ * @returns {{ amount: string, currency: string, from: { amount: string, currency: string } | null }}
+ */
+export function exactShareBasis(expense, amount, currency) {
+  if (!conversionKept(expense, amount, currency)) return { amount, currency, from: null };
+  const from = expense.converted_currency === currency ? null : { amount: String(expense.amount), currency };
+  return { amount: expense.converted_amount, currency: expense.converted_currency, from };
 }
 
 /**

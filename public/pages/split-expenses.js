@@ -33,7 +33,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { categoryPaint } from '/utils/budget-category-colors.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { amountFieldHtml } from '/utils/amount-field.js';
-import { keptConversion } from '/utils/split-conversion.js';
+import { keptConversion, exactShareBasis } from '/utils/split-conversion.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipHtml } from '/utils/filter-sheet.js';
 import { initials } from '/utils/initials.js';
 import { safeHexColor, getReadableTextColor } from '/utils/color.js';
@@ -2063,19 +2063,43 @@ function defaultSplitValues(group) {
   return values;
 }
 
+/**
+ * Die gespeicherte Ausgabe hinter einem offenen Bearbeiten-Dialog (#2810).
+ * Die Serie und eine neue Ausgabe stehen hier nicht: fuer sie gilt immer die
+ * Eingabe.
+ * @type {WeakMap<object, any>}
+ */
+const editedExpenses = new WeakMap();
+
+/**
+ * Wogegen die exakten Anteile dieses Formulars aufgehen muessen: bei
+ * behaltener Umrechnung `converted_amount` in `converted_currency` wie beim
+ * Server, sonst der eingegebene Betrag (exactShareBasis, dieselbe Bedingung
+ * wie der Payload). Der Betrag kommt als Text des Servers, nichts wird hier
+ * zurueckgerechnet.
+ * @param {any} panel
+ * @param {string} currency
+ */
+function shareBasis(panel, currency) {
+  const amount = decimalString(panel.querySelector('[name="amount"]')?.value ?? '');
+  return exactShareBasis(editedExpenses.get(panel) ?? null, amount, currency);
+}
+
 function updateSplitInputs(panel) {
   const method = panel.querySelector('[name="split_method"]')?.value || 'equal';
   // Der Betrag und die Teilbeträge stehen in der gewählten Währung; Prozente
   // und Anteile sind reine Zahlen und behalten ihren festen Platzhalter.
   const currency = panel.querySelector('[name="currency"]')?.value || state.meta?.default_currency || 'EUR';
   const zero = amountPlaceholder(currency);
+  // Exakte Anteile einer behaltenen Umrechnung stehen in deren Waehrung (#2810).
+  const shareZero = amountPlaceholder(shareBasis(panel, currency).currency);
   const amountInput = panel.querySelector('[name="amount"]');
   if (amountInput) amountInput.placeholder = zero;
   panel.querySelectorAll('.split-split-value').forEach((input) => {
     input.hidden = method === 'equal';
     input.required = method !== 'equal';
     if (method === 'percentage') input.placeholder = '30';
-    else if (method === 'exact') input.placeholder = zero;
+    else if (method === 'exact') input.placeholder = shareZero;
     else if (method === 'shares') input.placeholder = '1';
     else input.placeholder = '';
   });
@@ -2183,9 +2207,15 @@ function validateSplitForm(panel, { reveal = false } = {}) {
     valid = Math.abs(total - 100) < 0.01;
     message = `${message} ${t('splitExpenses.splitCurrentTotal', { total: percentTotal(total) })}`;
   } else if (valid && method === 'exact') {
+    // Gegen dieselbe Summe wie der Server (#2810): bei behaltener Umrechnung
+    // den umgerechneten Betrag in seiner Waehrung, sonst die Eingabe.
+    const basis = shareBasis(panel, currency);
     const total = selected.reduce((sum, input) => sum + (numberValue(panel.querySelector(`[name="split_value_${input.value}"]`)?.value) || 0), 0);
-    valid = Math.abs(total - amount) < 0.01;
-    message = `${message} ${t('splitExpenses.splitCurrentTotal', { total: formatMoney(total, currency) })}`;
+    valid = Math.abs(total - Number(basis.amount)) < 0.01;
+    const converted = basis.from
+      ? ` ${t('splitExpenses.exactSharesConverted', { currency: basis.currency, amount: formatMoney(Number(basis.from.amount), basis.from.currency) })}`
+      : '';
+    message = `${message}${converted} ${t('splitExpenses.splitCurrentTotal', { total: formatMoney(total, basis.currency) })}`;
   } else if (valid && method === 'shares') {
     valid = selected.every((input) => {
       const value = numberValue(panel.querySelector(`[name="split_value_${input.value}"]`)?.value);
@@ -2618,6 +2648,7 @@ function openExpenseModal(expense = null, prefill = null) {
         }),
       });
       panel.querySelector('#split-cancel-expense')?.addEventListener('click', () => closeModal());
+      if (isEdit) editedExpenses.set(panel, expense);
       wireSplitFields(panel, '#split-expense-form');
       panel.querySelector('#split-delete-expense')?.addEventListener('click', async () => {
         if (readOnly()) return;
@@ -2662,7 +2693,8 @@ function openExpenseModal(expense = null, prefill = null) {
         data.amount = decimalString(data.amount);
         const expenseCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
         if (rejectSplitAmounts(form, expenseCurrency,
-          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null })) return;
+          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null,
+            shareCurrency: shareBasis(panel, expenseCurrency).currency })) return;
         const { participants, splits } = collectSplitPayload(form);
         // IDs als Zahl (#2810): Ziffern-Text nimmt der Server nur noch als Altform.
         const payload = { ...data, payer_id: Number(data.payer_id), participants, splits };
@@ -2711,6 +2743,9 @@ function wireSplitFields(panel, formSelector) {
   panel.querySelector('[name="split_method"]')?.addEventListener('change', () => updateSplitInputs(panel));
   panel.querySelector('[name="currency"]')?.addEventListener('change', () => updateSplitInputs(panel));
   panel.querySelector(formSelector)?.addEventListener('input', () => validateSplitForm(panel));
+  // Ein geaenderter Betrag kann die behaltene Umrechnung beenden (#2810): die
+  // Platzhalter der exakten Anteile wechseln dann beim Tippen die Waehrung.
+  panel.querySelector('[name="amount"]')?.addEventListener('input', () => updateSplitInputs(panel));
   // Der Grund fuer einen gesperrten Betrag erscheint beim Verlassen des
   // Feldes, nicht bei jedem Tastendruck (syncAmountReason).
   panel.querySelector('[name="amount"]')?.addEventListener('change', () => validateSplitForm(panel, { reveal: true }));
@@ -2734,14 +2769,17 @@ function wireSplitFields(panel, formSelector) {
  * (parseMoneyToMinor), und die Antwort kaeme englisch und ortlos zurueck. Wer
  * nichts traegt, wird abgehakt.
  *
+ * `shareCurrency`: die Waehrung der Anteile, wenn sie nicht die des Betrags ist
+ * (behaltene Umrechnung beim Bearbeiten, #2810).
+ *
  * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
  */
-function rejectSplitAmounts(form, currency, { original = null, originalCurrency = null } = {}) {
+function rejectSplitAmounts(form, currency, { original = null, originalCurrency = null, shareCurrency = currency } = {}) {
   if (rejectSplitAmount(form.querySelector('[name="amount"]'), currency, { original, originalCurrency, required: true })) return true;
   if (form.querySelector('[name="split_method"]')?.value !== 'exact') return false;
   for (const field of form.querySelectorAll('.split-split-value')) {
     if (field.hidden || field.disabled) continue;
-    if (rejectSplitAmount(field, currency, { required: true })) return true;
+    if (rejectSplitAmount(field, shareCurrency, { required: true })) return true;
   }
   return false;
 }

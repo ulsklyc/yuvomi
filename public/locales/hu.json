@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "Törli ezt az üres csoportot? A költségekkel rendelkező csoportokat archiválni kell.",
         "deleteGroupConfirmDetail": "A tagok listája, az alapértelmezett felosztás, az ismétlődő kiadások és a tevékenységnapló véglegesen elvesznek. Üresnek már a kiadások és elszámolások nélküli csoport számít.",
         "splitCurrentTotal": "Jelenlegi összeg: {{total}}",
+        "exactSharesConverted": "Pontos részek {{currency}} pénznemben, átváltva ebből: {{amount}}.",
         "statusLabel": "Állapot",
         "statusActive": "Aktív",
         "statusArchived": "Archivált",

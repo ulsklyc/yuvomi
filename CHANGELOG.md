@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `expense_date: ""` is still today. `payer_id`, `participants`, `category`, `budget_category`
   and `attachment_document_ids` stay optional and keep the stored value when left out. The edit
   dialog no longer drops the stored conversion and exchange snapshot of an expense whose amount
-  and currency it leaves unchanged.
+  and currency it leaves unchanged, and the exact shares of such a converted expense are entered
+  and checked in the converted currency, as the server adds them up.
 - **Backup answers an unexpected failure with the same sentence as the rest of the API.**
   `GET /api/v1/backup/database` said `"Database backup failed."`, `POST /api/v1/backup/trigger`
   `"Backup trigger failed."` and `PUT /api/v1/backup/webdav/config` `"Failed to save WebDAV

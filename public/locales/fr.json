@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "Supprimer ce groupe vide ? Les groupes avec dépenses doivent être archivés.",
         "deleteGroupConfirmDetail": "La liste des membres, la répartition par défaut, les dépenses récurrentes et le journal d'activité sont perdus définitivement. Un groupe est vide sans dépenses ni règlements.",
         "splitCurrentTotal": "Total actuel : {{total}}",
+        "exactSharesConverted": "Parts exactes en {{currency}}, converties depuis {{amount}}.",
         "statusLabel": "Statut",
         "statusActive": "Actif",
         "statusArchived": "Archivé",

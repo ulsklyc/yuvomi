@@ -599,3 +599,109 @@ test('#1997: Erfolg nach Dialogwechsel - jeder Speicherweg schliesst nur mit dem
     }
   }
 });
+
+/**
+ * Exakte Anteile einer umgerechneten Ausgabe (Codex P2 an #2841): bleiben Betrag
+ * und Waehrung beim Bearbeiten unveraendert, schickt der Dialog die gespeicherte
+ * Umrechnung zurueck (keptConversion), und der Server rechnet die Anteile gegen
+ * `converted_amount` in `converted_currency` (buildSplits). Die Pruefung des
+ * Dialogs muss dieselbe Summe verlangen, sonst bestehen 6 + 4 bei
+ * "10 USD -> 9 EUR" hier und scheitern dort mit 400. Aendert der Nutzer Betrag
+ * oder Waehrung, faellt die Umrechnung weg, und es gilt wieder die Eingabe -
+ * beim Tippen, nicht erst beim naechsten Oeffnen.
+ */
+// Die Helfer oben sind fuer die neue Ausgabe getypt; hier geht eine gespeicherte hinein.
+const offen = /** @type {any} */ (split.openExpenseModal);
+const oeffneMit = /** @type {any} */ (geoeffnet);
+const formularAny = /** @type {(o: any) => any} */ (formular);
+const umgerechnet = () => ({
+  id: 7, title: 'Taxi', amount: '10.00', amount_minor: 1000, currency: 'USD',
+  converted_amount: '9.00', converted_amount_minor: 900, converted_currency: 'EUR',
+  exchange_snapshot: '{"rate":"0.9"}', payer_id: 1, split_method: 'exact',
+  splits: [
+    { user_id: 1, amount: '5.40', amount_minor: 540, currency: 'EUR' },
+    { user_id: 3, amount: '3.60', amount_minor: 360, currency: 'EUR' },
+  ],
+  attachments: [],
+});
+
+test('Umgerechnete Ausgabe: exakte Anteile gelten in der umgerechneten Waehrung, wie beim Server', async () => {
+  await unter('de', async () => {
+    // Vorbelegt werden die gespeicherten Anteile - sie liegen in EUR.
+    const content = await oeffneMit(() => offen(umgerechnet()), { currency: 'USD' });
+    assert.equal(vorbelegt(content, 'split_value_1'), '5,40');
+    assert.equal(vorbelegt(content, 'split_value_3'), '3,60');
+
+    // Die Pruefung: 9 EUR gehen auf, 10 (der eingegebene Betrag) nicht.
+    for (const [a, b, gueltig] of /** @type {Array<[string, string, boolean]>} */ ([['5,40', '3,60', true], ['6,00', '4,00', false]])) {
+      const { panel, felder } = formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: a, 3: b } });
+      let ergebnis = null;
+      await oeffneMit(() => offen(umgerechnet()), { currency: 'USD', panel, dabei: () => { ergebnis = split.validateSplitForm(panel); } });
+      assert.equal(ergebnis, gueltig, `${a} + ${b}`);
+      const hinweis = felder['#split-method-hint'].textContent;
+      assert.match(hinweis, /splitExpenses\.exactSharesConverted\{"currency":"EUR","amount":"10,00\s?\$"\}/, 'der Hinweis nennt die Waehrung der Anteile');
+      assert.match(hinweis, /splitCurrentTotal\{"total":"[^"]*€"\}/, 'die laufende Summe steht in EUR');
+      assert.equal(felder['[name="split_value_1"]'].placeholder, '0,00');
+    }
+
+    // Absenden: was aufgeht, geht mit der Umrechnung an den Server; was nur
+    // den eingegebenen Betrag trifft, bleibt am Feld.
+    const gut = await speichern(() => offen(umgerechnet()),
+      formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '5,40', 3: '3,60' } }).panel, { currency: 'USD' });
+    assert.equal(gut.gesendet.length, 1, 'Positivfall');
+    assert.equal(gut.gesendet[0].daten.converted_amount, '9.00');
+    assert.equal(gut.gesendet[0].daten.converted_currency, 'EUR');
+    assert.deepEqual(gut.gesendet[0].daten.splits, [{ user_id: 1, amount: '5.40' }, { user_id: 3, amount: '3.60' }]);
+    const falsch = await speichern(() => offen(umgerechnet()),
+      formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '6,00', 3: '4,00' } }).panel, { currency: 'USD' });
+    assert.deepEqual(falsch.gesendet, [], '6 + 4 geht nicht an den Server');
+  });
+});
+
+test('Umgerechnete Ausgabe: ein geaenderter Betrag oder eine andere Waehrung schaltet beim Tippen auf die Eingabe um', async () => {
+  await unter('de', async () => {
+    const { panel, felder } = formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '6,00', 3: '4,00' } });
+    /** @type {any[]} */
+    const schritte = [];
+    await oeffneMit(() => offen(umgerechnet()), {
+      currency: 'USD', panel,
+      dabei: async () => {
+        schritte.push(split.validateSplitForm(panel));
+        // Waehrung gewechselt: die Umrechnung faellt weg, 10 EUR gelten.
+        felder['[name="currency"]'].value = 'EUR';
+        await felder['[name="currency"]'].feuere('change');
+        schritte.push(felder['#split-method-hint'].textContent, split.validateSplitForm(panel));
+        // Zurueck auf USD: die gespeicherte Umrechnung gilt wieder.
+        felder['[name="currency"]'].value = 'USD';
+        await felder['[name="currency"]'].feuere('change');
+        schritte.push(felder['#split-method-hint'].textContent);
+        // Betrag geaendert (Eingabe-Ereignis): 10,50 gilt, nicht 9.
+        felder['[name="amount"]'].value = '10,50';
+        felder['[name="split_value_1"]'].value = '6,50';
+        await panel.feuere('input');
+        schritte.push(felder['#split-method-hint'].textContent, split.validateSplitForm(panel));
+      },
+    });
+    assert.equal(schritte[0], false, '6 + 4 gegen 9 EUR');
+    assert.doesNotMatch(schritte[1], /exactSharesConverted/, 'EUR statt USD: ohne Umrechnung kein Hinweis');
+    assert.equal(schritte[2], true, 'EUR statt USD: 6 + 4 gegen 10 EUR');
+    assert.match(schritte[3], /exactSharesConverted/, 'wieder USD: die Umrechnung gilt');
+    assert.doesNotMatch(schritte[4], /exactSharesConverted/, '10,50 USD: der Hinweis geht beim Tippen');
+    assert.equal(schritte[5], true, '10,50 USD: 6,50 + 4 gegen die Eingabe');
+  });
+});
+
+test('Umgerechnete Ausgabe: neue Ausgaben und andere Aufteilungen bleiben, wie sie waren', async () => {
+  await unter('de', async () => {
+    const neu = formularAny({ amount: '10,00', currency: 'USD', method: 'exact', teilnehmer: { 1: '6,00', 3: '4,00' } });
+    let neuOk = null;
+    await oeffneMit(() => offen(null), { currency: 'USD', panel: neu.panel, dabei: () => { neuOk = split.validateSplitForm(neu.panel); } });
+    assert.equal(neuOk, true, 'neue Ausgabe: gegen die Eingabe');
+    assert.doesNotMatch(neu.felder['#split-method-hint'].textContent, /exactSharesConverted/);
+    const prozent = formularAny({ amount: '10,00', currency: 'USD', method: 'percentage', teilnehmer: { 1: '60', 3: '40' } });
+    let prozentOk = null;
+    await oeffneMit(() => offen(umgerechnet()), { currency: 'USD', panel: prozent.panel, dabei: () => { prozentOk = split.validateSplitForm(prozent.panel); } });
+    assert.equal(prozentOk, true, 'Prozent bleibt');
+    assert.doesNotMatch(prozent.felder['#split-method-hint'].textContent, /exactSharesConverted/);
+  });
+});

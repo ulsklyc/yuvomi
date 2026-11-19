@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "Hapus grup kosong ini? Grup dengan pengeluaran harus diarsipkan.",
         "deleteGroupConfirmDetail": "Daftar anggota, pembagian bawaan, pengeluaran berulang, dan log aktivitas hilang untuk selamanya. Grup sudah dianggap kosong tanpa pengeluaran dan penyelesaian.",
         "splitCurrentTotal": "Total saat ini: {{total}}",
+        "exactSharesConverted": "Bagian pasti dalam {{currency}}, dikonversi dari {{amount}}.",
         "statusLabel": "Status",
         "statusActive": "Aktif",
         "statusArchived": "Diarsipkan",

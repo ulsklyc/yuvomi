@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "Deze lege groep verwijderen? Groepen met uitgaven moeten worden gearchiveerd.",
         "deleteGroupConfirmDetail": "De ledenlijst, de standaardverdeling, terugkerende uitgaven en het activiteitenlogboek zijn definitief weg. Een groep telt al als leeg zonder uitgaven en afrekeningen.",
         "splitCurrentTotal": "Huidig totaal: {{total}}",
+        "exactSharesConverted": "Exacte aandelen in {{currency}}, omgerekend uit {{amount}}.",
         "statusLabel": "Status",
         "statusActive": "Actief",
         "statusArchived": "Gearchiveerd",

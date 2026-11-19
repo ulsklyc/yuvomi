@@ -4636,6 +4636,7 @@
         "deleteGroupConfirm": "删除这个空群组？有支出的群组必须归档。",
         "deleteGroupConfirmDetail": "成员列表、默认分摊方式、周期性支出以及活动记录都会永久消失。只要没有支出和结算，群组就算空。",
         "splitCurrentTotal": "当前合计：{{total}}",
+        "exactSharesConverted": "精确分摊以 {{currency}} 计，由 {{amount}} 换算。",
         "statusLabel": "状态",
         "statusActive": "活跃",
         "statusArchived": "已归档",
