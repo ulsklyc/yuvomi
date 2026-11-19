@@ -23,6 +23,13 @@
  *              requires `enabled`, `offset_days` and `delivery_time`; a body
  *              without them is a 400 and leaves the stored setting standing
  *              (it switched the reminder off and reset lead time and time);
+ *              PUT /waste/schedules/{id}/overrides/{originalDate} requires
+ *              `replacement_date` and `note` (an empty body skipped the
+ *              pickup, a missing note wiped the stored one) and
+ *              PUT /schedule/overrides/{dateKey} requires `shift_type_id`,
+ *              `note` and `field_values` (a missing type made the day free,
+ *              a missing note wiped it, missing values were kept); `null`
+ *              stays the explicit skip and the explicit free day;
  *            - THE OWN CALLERS: every request public/pages/waste.js,
  *              public/pages/schedule.js and the settings pages send passes,
  *              `include_archived=1`, a URL source without `ics` and the legacy
@@ -223,13 +230,11 @@ test('waste: every request the page and the settings send passes', async () => {
   // The one-off dialog sends its type along on update (ignored there).
   assertStatus(await call('PUT', `/waste/pickups/${pickup.id}`, { json: { type_id: type.id, date: '2027-03-02', note: 'Sperrmuell' } }), 200);
   assertStatus(await call('GET', `/waste/pickups/${pickup.id}`), 200);
-  // Moving and skipping an occurrence (the move dialog may send "").
-  assertStatus(await call('PUT', `/waste/schedules/${schedule.id}/overrides/2027-01-04`, { json: { replacement_date: '2027-01-05' } }), 200);
-  assertStatus(await call('PUT', `/waste/schedules/${schedule.id}/overrides/2027-01-11`, { json: { replacement_date: null } }), 200);
-  assert.equal((await call('PUT', `/waste/schedules/${schedule.id}/overrides/2027-01-18`, { json: { replacement_date: '' } })).body.reason, 'waste_override_date_invalid');
+  // Moving and skipping an occurrence, the whole override (the move dialog may send "").
+  assertStatus(await call('PUT', `/waste/schedules/${schedule.id}/overrides/2027-01-04`, { json: { replacement_date: '2027-01-05', note: null } }), 200);
+  assertStatus(await call('PUT', `/waste/schedules/${schedule.id}/overrides/2027-01-11`, { json: { replacement_date: null, note: null } }), 200);
+  assert.equal((await call('PUT', `/waste/schedules/${schedule.id}/overrides/2027-01-18`, { json: { replacement_date: '', note: null } })).body.reason, 'waste_override_date_invalid');
   assertStatus(await call('DELETE', `/waste/schedules/${schedule.id}/overrides/2027-01-04`), 204);
-  // An empty body still skips the occurrence.
-  assertStatus(await call('PUT', `/waste/schedules/${schedule.id}/overrides/2027-01-25`), 200);
   // Sources: rename, mapping edit, profile round trip, file re-import.
   assertStatus(await call('PUT', `/waste/sources/${fileSource.id}`, { json: { name: 'Kalender 2027' } }), 200);
   assertStatus(await call('PUT', `/waste/sources/${fileSource.id}/mappings/${mapping.id}`, { json: { type_ids: [type.id, otherType.id] } }), 200);
@@ -330,6 +335,30 @@ test('waste: PUT /reminder-settings/{typeId} is the whole setting - a partial or
   assert.equal(noTime.body.reason, 'waste_reminder_time_invalid');
 });
 
+test('waste: PUT /schedules/{id}/overrides/{originalDate} is the whole override - an empty or partial body is a 400 and skips nothing', async () => {
+  const route = (/** @type {string} */ day) => `/waste/schedules/${schedule.id}/overrides/${day}`;
+  const stored = (/** @type {string} */ day) => db.prepare('SELECT replacement_date, note FROM waste_schedule_overrides WHERE schedule_id = ? AND original_date = ?').get(schedule.id, day);
+  // The move dialog and the skip confirmation of public/pages/waste.js.
+  assertStatus(await call('PUT', route('2027-04-05'), { json: { replacement_date: '2027-04-06', note: null } }), 200);
+  assertStatus(await call('PUT', route('2027-04-05'), { json: { replacement_date: '2027-04-06', note: 'Feiertag' } }), 200);
+  const before = stored('2027-04-05');
+  assert.deepEqual({ ...before }, { replacement_date: '2027-04-06', note: 'Feiertag' });
+  assertValidation(await call('PUT', route('2027-04-05'), { json: {} }), 'body/replacement_date', 'required');
+  assertValidation(await call('PUT', route('2027-04-05'), { json: { note: 'Feiertag' } }), 'body/replacement_date', 'required');
+  assertValidation(await call('PUT', route('2027-04-05'), { json: { replacement_date: '2027-04-07' } }), 'body/note', 'required');
+  assertValidation(await call('PUT', route('2027-04-05'), { json: { replacement_date: null } }), 'body/note', 'required');
+  assert.equal((await call('PUT', route('2027-04-05'))).status, 400, 'no body at all');
+  assert.deepEqual(stored('2027-04-05'), before, 'no refused body touched the override (the note stays, the pickup stays moved)');
+  // An empty body used to skip the pickup: now it is refused, and nothing is stored.
+  assertValidation(await call('PUT', route('2027-04-12'), { json: {} }), 'body/replacement_date', 'required');
+  assert.equal(stored('2027-04-12'), undefined, 'no override was written');
+  const listed = (await call('GET', '/waste/occurrences?from=2027-04-12&to=2027-04-12')).body.data;
+  assert.ok(listed.some((/** @type {any} */ o) => o.type_id === type.id && o.date_key === '2027-04-12'), `the pickup still stands: ${JSON.stringify(listed)}`);
+  // `null` is the explicit skip.
+  assertStatus(await call('PUT', route('2027-04-12'), { json: { replacement_date: null, note: null } }), 200);
+  assert.deepEqual({ ...stored('2027-04-12') }, { replacement_date: null, note: null });
+});
+
 test('waste: query garbage and doubled values are a 400', async () => {
   for (const q of ['include_archived=yes', 'include_archived=TRUE', 'include_archived=1&include_archived=1']) {
     assertValidation(await call('GET', `/waste/types?${q}`), 'query/include_archived', undefined, q);
@@ -361,7 +390,7 @@ test('waste order changes: a malformed request is a 400 before the 404 and 409, 
   const pairs = [
     ['PUT', `/waste/types/${MISSING}`, { name: 5 }, { name: 'x' }, 404],
     ['PUT', `/waste/schedules/${MISSING}`, { active: 'yes' }, { active: false }, 404],
-    ['PUT', `/waste/schedules/${MISSING}/overrides/2027-01-04`, { note: true }, { replacement_date: null }, 404],
+    ['PUT', `/waste/schedules/${MISSING}/overrides/2027-01-04`, { note: true }, { replacement_date: null, note: null }, 404],
     ['PUT', `/waste/pickups/${MISSING}`, { date: 20270101 }, { date: '2027-03-01' }, 404],
     ['PUT', `/waste/sources/${MISSING}`, { name: ['x'] }, { name: 'x' }, 404],
     ['POST', `/waste/sources/${MISSING}/mapping-profile/import/preview`, { profile: 'nope' }, { profile: { mappings: [] } }, 404],
@@ -461,7 +490,7 @@ test('schedule: every request the page and the settings send passes', async () =
   assertStatus(await call('POST', '/schedule/feed/regenerate', { actor: 'alice' }), 200);
   assertStatus(await call('DELETE', '/schedule/feed', { actor: 'alice' }), 200);
   // Legacy digit text of ids.
-  assertStatus(await call('PUT', '/schedule/overrides/2027-01-12', { actor: 'alice', json: { user_id: String(ALICE), shift_type_id: String(shiftType.id) } }), 200);
+  assertStatus(await call('PUT', '/schedule/overrides/2027-01-12', { actor: 'alice', json: { user_id: String(ALICE), shift_type_id: String(shiftType.id), note: '', field_values: {} } }), 200);
 });
 
 test('schedule: garbage per field is a 400', async () => {
@@ -477,7 +506,7 @@ test('schedule: garbage per field is a 400', async () => {
     ['PUT', `/schedule/shift-types/${shiftType.id}/fields`, { fields: [{ custom_field_id: field.id, position: 0, show_in_overlay: null }] }, 'body/fields/0/show_in_overlay', 'type'],
     ['PUT', `/schedule/patterns/${alicePattern.id}/days`, { days: [{ position: [] }] }, 'body/days/0/position', 'type'],
     ['PUT', `/schedule/patterns/${alicePattern.id}/days`, { days: [{ position: 0, shift_type_id: shiftType.id, field_values: { abc: 'x' } }] }, 'body/days/0/field_values', 'propertyNames'],
-    ['PUT', '/schedule/overrides/2027-01-13', { note: 5 }, 'body/note', 'type'],
+    ['PUT', '/schedule/overrides/2027-01-13', { shift_type_id: null, note: 5, field_values: {} }, 'body/note', 'type'],
     ['PUT', '/schedule/overrides/2027-02-30x', {}, 'path/dateKey', 'pattern'],
     ['POST', '/schedule/extras', { date_key: '2027-01-14', shift_type_id: shiftType.id, reminder_offset_minutes: '15' }, 'body/reminder_offset_minutes', 'type'],
     ['PUT', '/schedule/preferences', { reminderOffsetMinutes: '' }, 'body/reminderOffsetMinutes', 'type'],
@@ -504,7 +533,7 @@ test('schedule: garbage per field is a 400', async () => {
 test('schedule rights order: the collecting writes refuse a foreign user_id before the check', async () => {
   const routes = [
     ['POST', '/schedule/patterns', { name: 5, anchor_date: 'x', cycle_length: 7 }, { name: 'x', anchor_date: '2027-01-04', cycle_length: 7 }],
-    ['PUT', '/schedule/overrides/2027-01-20', { note: 5 }, {}],
+    ['PUT', '/schedule/overrides/2027-01-20', { note: 5 }, { shift_type_id: null, note: null, field_values: {} }],
     ['POST', '/schedule/overrides/fill', { from: 'x', to: '2027-01-21' }, { from: '2027-01-20', to: '2027-01-21' }],
     ['POST', '/schedule/extras', { date_key: 'x', shift_type_id: shiftType.id }, { date_key: '2027-01-20', shift_type_id: shiftType.id }],
     ['POST', '/schedule/extras/fill', { from: 'x', to: '2027-01-21', shift_type_id: shiftType.id }, { from: '2027-01-20', to: '2027-01-21', shift_type_id: shiftType.id }],
@@ -543,7 +572,7 @@ test('schedule rights order: the collecting writes refuse a foreign user_id befo
     assertValidation(admin, 'query/user_id', 'type', route);
   }
   // The handler's own check stays behind: an admin writes for anyone.
-  assertStatus(await call('PUT', '/schedule/overrides/2027-01-22', { actor: 'admin', json: { user_id: BOB, shift_type_id: null } }), 200);
+  assertStatus(await call('PUT', '/schedule/overrides/2027-01-22', { actor: 'admin', json: { user_id: BOB, shift_type_id: null, note: null, field_values: {} } }), 200);
 });
 
 // The own id with a digit prefix is not the own id: parseInt would read
@@ -557,7 +586,7 @@ test('schedule rights order: a digit-prefix form of the own id is foreign, digit
     const query = await call('DELETE', `/schedule/overrides/2027-01-23?user_id=${encodeURIComponent(form)}`, { actor: 'alice' });
     assert.deepEqual({ status: query.status, body: query.body }, { status: 403, body: FORBIDDEN }, `query ${JSON.stringify(form)}`);
   }
-  assertStatus(await call('PUT', '/schedule/overrides/2027-01-23', { actor: 'alice', json: { user_id: String(ALICE), shift_type_id: null } }), 200, 'own digit text in the body');
+  assertStatus(await call('PUT', '/schedule/overrides/2027-01-23', { actor: 'alice', json: { user_id: String(ALICE), shift_type_id: null, note: null, field_values: {} } }), 200, 'own digit text in the body');
   assertStatus(await call('DELETE', `/schedule/overrides/2027-01-23?user_id=${ALICE}`, { actor: 'alice' }), 204, 'own digit text in the query');
 });
 
@@ -600,6 +629,39 @@ test('schedule: partial updates take null where the route clears, never where it
   const noType = await call('POST', '/schedule/extras', { actor: 'alice', json: { date_key: '2027-01-15' } });
   assertRefusedAt(noType, 'body/shift_type_id', 'required');
   assert.equal(noType.body.reason, 'schedule_shift_type_required');
+});
+
+test('schedule: PUT /overrides/{dateKey} is the whole override - a partial body is a 400, `field_values: {}` clears', async () => {
+  const route = '/schedule/overrides/2027-02-03';
+  const row = () => db.prepare('SELECT id, shift_type_id, note FROM schedule_overrides WHERE user_id = ? AND date_key = ?').get(ALICE, '2027-02-03');
+  const values = (/** @type {number} */ id) => db.prepare("SELECT custom_field_id, value FROM schedule_custom_field_values WHERE entry_type = 'override' AND entry_id = ? ORDER BY custom_field_id").all(id).map((/** @type {any} */ r) => ({ ...r }));
+  // The replace mode of the create dialog in public/pages/schedule.js.
+  const full = { user_id: ALICE, shift_type_id: shiftType.id, note: 'Spaet', field_values: { [field.id]: 'C' } };
+  const saved = await call('PUT', route, { actor: 'alice', json: full });
+  assertStatus(saved, 200);
+  assert.deepEqual(saved.body.data.field_values, { [field.id]: 'C' });
+  const before = { ...row() };
+  assert.deepEqual(values(before.id), [{ custom_field_id: field.id, value: 'C' }]);
+  for (const key of /** @type {const} */ (['shift_type_id', 'note', 'field_values'])) {
+    const { [key]: _left, ...partial } = full;
+    assertValidation(await call('PUT', route, { actor: 'alice', json: partial }), `body/${key}`, 'required', `without ${key}`);
+  }
+  assertValidation(await call('PUT', route, { actor: 'alice', json: {} }), 'body/shift_type_id', 'required');
+  assertValidation(await call('PUT', route, { actor: 'alice' }), 'body', 'required', 'no body at all');
+  assert.deepEqual({ ...row() }, before, 'no refused body touched the override (the shift stays, the note stays)');
+  assert.deepEqual(values(before.id), [{ custom_field_id: field.id, value: 'C' }], 'no refused body touched the values');
+  // user_id addresses the row; left out it is the caller.
+  const { user_id: _user, ...withoutUser } = full;
+  assertStatus(await call('PUT', route, { actor: 'alice', json: withoutUser }), 200);
+  // An explicit empty object replaces the stored values.
+  const cleared = await call('PUT', route, { actor: 'alice', json: { ...full, field_values: {} } });
+  assertStatus(cleared, 200);
+  assert.deepEqual(cleared.body.data.field_values, {});
+  assert.deepEqual(values(before.id), [], 'field_values: {} cleared the stored values');
+  // `null` is the explicit free day.
+  const free = await call('PUT', route, { actor: 'alice', json: { user_id: ALICE, shift_type_id: null, note: null, field_values: {} } });
+  assertStatus(free, 200);
+  assert.deepEqual([free.body.data.shift_type_id, free.body.data.note], [null, null]);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -645,6 +707,14 @@ test('only guard: the bounds and types the handlers no longer check are the docu
   assert.deepEqual(shape(reminder.properties.enabled), { type: 'boolean' });
   assert.deepEqual(shape(reminder.properties.offset_days), { type: 'integer', minimum: 0, maximum: 14 });
   assert.deepEqual(shape(reminder.properties.delivery_time), { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' });
+  // The two overrides: the whole representation, null stays the explicit skip / free day.
+  const wasteOverride = schemas.WasteScheduleOverrideInput;
+  assert.deepEqual([...wasteOverride.required].sort(), ['note', 'replacement_date']);
+  assert.deepEqual(wasteOverride.properties.replacement_date.type, ['string', 'null']);
+  assert.deepEqual(shape(wasteOverride.properties.note), { type: ['string', 'null'] });
+  const scheduleOverride = bodyOf('/api/v1/schedule/overrides/{dateKey}', 'put');
+  assert.deepEqual([...scheduleOverride.required].sort(), ['field_values', 'note', 'shift_type_id']);
+  assert.ok(scheduleOverride.properties.shift_type_id.anyOf.some((/** @type {any} */ s) => s.type === 'null'));
   // PUT /waste/feed/types: a list of integers or null, required.
   const feedTypes = schemas.WasteFeedTypeSelectionInput;
   assert.deepEqual(feedTypes.required, ['type_ids']);
@@ -692,7 +762,7 @@ test('only guard: the bounds and types the handlers no longer check are the docu
   assert.deepEqual(shape(prefs.weeklyHours), { type: ['integer', 'null'], minimum: 1, maximum: 168 });
   assert.deepEqual(shape(prefs.overtimeEnabled), { type: 'boolean' });
   // These routes also need a body to read from.
-  for (const [path, method] of [['/api/v1/waste/reminder-settings/{typeId}', 'put'], ['/api/v1/waste/feed/types', 'put'], ['/api/v1/schedule/shift-types/{id}/fields', 'put'], ['/api/v1/schedule/patterns', 'post'], ['/api/v1/schedule/patterns/{id}/days', 'put']]) {
+  for (const [path, method] of [['/api/v1/waste/reminder-settings/{typeId}', 'put'], ['/api/v1/waste/schedules/{id}/overrides/{originalDate}', 'put'], ['/api/v1/schedule/overrides/{dateKey}', 'put'], ['/api/v1/waste/feed/types', 'put'], ['/api/v1/schedule/shift-types/{id}/fields', 'put'], ['/api/v1/schedule/patterns', 'post'], ['/api/v1/schedule/patterns/{id}/days', 'put']]) {
     assert.equal(spec.paths[path][method].requestBody.required, true, path);
   }
 });

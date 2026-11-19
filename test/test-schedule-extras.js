@@ -74,7 +74,7 @@ async function call(method, path, { as = ALICE, body } = {}) {
 // day). This is the core scenario the whole feature exists for: on-call
 // stacked on top of a regular shift on the same date.
 test('extras merge alongside whatever the primary slot resolves, including an extra-only day with no primary shift', async () => {
-  await call('PUT', '/overrides/2027-06-01', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId } });
+  await call('PUT', '/overrides/2027-06-01', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: null, field_values: {} } });
   const onCall = await call('POST', '/extras', { as: ALICE, body: { user_id: ALICE.id, date_key: '2027-06-01', shift_type_id: typeId, note: 'On-call' } });
   assert.equal(onCall.status, 201);
 
@@ -264,7 +264,7 @@ test('#1909: the cases a user reaches carry a reason, the status and text stay',
   await expect('PUT', `/extras/${GONE}`, { note: 'x' }, 404, 'schedule_extra_shift_not_found', 'Extra shift not found.');
   await expect('DELETE', `/extras/${GONE}`, undefined, 404, 'schedule_extra_shift_not_found');
   // Die im Dialog gewaehlte Schichtart (oder ein Feld) gibt es nicht mehr.
-  await expect('PUT', '/overrides/2034-01-02', { user_id: ADMIN.id, shift_type_id: GONE }, 400, 'schedule_selected_shift_type_not_found', 'shift_type_id does not exist.');
+  await expect('PUT', '/overrides/2034-01-02', { user_id: ADMIN.id, shift_type_id: GONE, note: null, field_values: {} }, 400, 'schedule_selected_shift_type_not_found', 'shift_type_id does not exist.');
   await expect('POST', '/overrides/fill', { user_id: ADMIN.id, from: '2034-01-03', to: '2034-01-04', shift_type_id: GONE }, 400, 'schedule_selected_shift_type_not_found');
   await expect('POST', '/extras', { user_id: ADMIN.id, date_key: '2034-01-05', shift_type_id: GONE }, 400, 'schedule_selected_shift_type_not_found');
   await expect('PUT', `/shift-types/${typeId}/fields`, { fields: [{ custom_field_id: GONE, position: 0 }] }, 400, 'schedule_selected_custom_field_not_found', 'custom_field_id does not exist.');

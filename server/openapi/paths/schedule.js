@@ -382,11 +382,11 @@ function dayPaths() {
     '/api/v1/schedule/overrides/{dateKey}': {
       put: op({
         summary: 'Set a per-day override',
-        description: `A NULL shift type is an explicit day off, which is why deleting the override is the only way back to the pattern.${OWNER_NOTE}`,
+        description: `The body is the whole override: \`shift_type_id\`, \`note\` and \`field_values\` are all required (#2810); up to v2.93 a missing shift type made the day free, a missing note wiped the stored one and missing field values were kept. A NULL shift type is an explicit day off, which is why deleting the override is the only way back to the pattern. \`field_values\` replaces the stored values, \`{}\` or \`null\` clears them.${OWNER_NOTE}`,
         tag: 'Schedule',
         params: [dayKeyParam],
         stateChanging: true,
-        requestBody: body({ properties: overrideFields }, false),
+        requestBody: body({ required: ['shift_type_id', 'note', 'field_values'], properties: overrideFields }),
         responses: answers(200, 'Override set', FORBIDDEN),
       }),
       delete: op({

@@ -2476,6 +2476,10 @@ function findScheduleOrigin(occurrenceKey, occurrences = state.occurrences) {
   return { occ, scheduleId: origin.schedule_id, originalDate: origin.original_date ?? occ.date_key };
 }
 
+// PUT .../overrides/{originalDate} takes the whole override (#2810), `note`
+// included. The occurrence list carries no override note and the page never
+// writes one, so both callers send `note: null`, the same value the route
+// stored for a left-out note before.
 async function moveOccurrence(occurrenceKey) {
   const found = findScheduleOrigin(occurrenceKey);
   if (!found) return;
@@ -2503,7 +2507,7 @@ async function moveOccurrence(occurrenceKey) {
         const newDate = panel.querySelector('#wmm-date').value;
         const modalContext = captureModalContext();
         try {
-          await api.put(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, { replacement_date: newDate });
+          await api.put(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, { replacement_date: newDate, note: null });
           closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
@@ -2522,7 +2526,7 @@ async function skipOccurrence(occurrenceKey) {
   const ok = await confirmModal(t('waste.skipConfirm'), { confirmLabel: t('waste.skipAction') });
   if (!ok) return;
   try {
-    await api.put(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, { replacement_date: null });
+    await api.put(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, { replacement_date: null, note: null });
     await reloadAfterSave(() => reloadAndRender());
     refocusAfterRender();
     window.yuvomi?.showToast(scheduleSavedSentence(found.occ.type_name), 'success');

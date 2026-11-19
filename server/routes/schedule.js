@@ -367,21 +367,22 @@ router.post('/patterns', refuseForeignOwner('body'), validateRequest(), (req, re
   res.status(201).json({ data: db.get().prepare('SELECT * FROM schedule_patterns WHERE id = ?').get(result.lastInsertRowid) });
 });
 router.put('/overrides/:dateKey', refuseForeignOwner('body'), validateRequest(), (req, res) => {
-  const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: MAX_SCHEDULE_NOTE });
-  // Das Recht haelt refuseForeignOwner() davor (#2810).
+  const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body.note, 'note', { required: false, max: MAX_SCHEDULE_NOTE });
+  // Das Recht haelt refuseForeignOwner() davor (#2810). Das Schema verlangt
+  // shift_type_id, note und field_values (volle Darstellung, #2810): null ist
+  // der ausdrueckliche freie Tag bzw. keine Notiz; user_id adressiert nur die Zeile.
   const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE);
-  const fields = validateFieldValues(req.body?.field_values, typeId?.value ?? null); if (fields.error) errors.push(fields.error);
+  const fields = validateFieldValues(req.body.field_values, typeId?.value ?? null); if (fields.error) errors.push(fields.error);
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...rangeReason(errors) });
   // Upsert und replaceFieldValues() in EINER Transaktion: ohne sie stand der
   // Override schon geschrieben, bevor replaceFieldValues() ueberhaupt lief -
   // ein Wurf dazwischen (z.B. eine spaeter doch noch durchrutschende doppelte
   // Feld-Id) liess die erste Zeile committed und den Aufruf trotzdem mit einem
-  // 500er scheitern. `field_values` fehlt im Body ganz = gespeicherte Werte
-  // bleiben unangetastet (wie PUT /extras/:id); nur ein ausdruecklich
-  // mitgeschicktes Objekt, auch `{}`, ersetzt sie.
+  // 500er scheitern. `field_values` ersetzt die gespeicherten Werte immer,
+  // `{}` und `null` leeren sie (das Schema verlangt das Feld, #2810).
   const row = db.get().transaction(() => {
     const upserted = db.get().prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note RETURNING *').get(user.value, key.value, typeId?.value ?? null, note.value);
-    if (req.body?.field_values !== undefined) replaceFieldValues('override', upserted.id, fields.values);
+    replaceFieldValues('override', upserted.id, fields.values);
     return upserted;
   })();
   try { syncScheduleRemindersForUser(db.get(), user.value); }
