@@ -25,18 +25,15 @@ import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { listTypes, getOccurrences } from './waste-store.js';
-import { MIN_OFFSET_DAYS, MAX_OFFSET_DAYS } from './waste-fields.js';
 
 const log = createLogger('Waste');
 
 // A pickup rhythm is weekly/monthly, not daily like a shift - long enough to
 // comfortably cover a monthly rhythm plus the widest allowed lead time
-// (MAX_OFFSET_DAYS below), short enough that this stays "a few dozen rows,"
+// (MAX_OFFSET_DAYS in waste-fields.js, the bound the schema of the reminder
+// setting holds since #2810), short enough that this stays "a few dozen rows,"
 // not real storage (invariant #8 - every list has a measured work limit).
 const REMINDER_WINDOW_DAYS = 45;
-
-// The bounds live in waste-fields.js (#2810), read by the OpenAPI document too.
-export { MIN_OFFSET_DAYS, MAX_OFFSET_DAYS };
 
 function toNaiveUTC(isoWithZ) {
   // reminders.remind_at is naive-UTC, HH:MM (no seconds) throughout this app

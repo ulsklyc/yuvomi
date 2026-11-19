@@ -3,67 +3,52 @@
  * Purpose: read/write the CALLING USER's own reminder preferences, one row
  *          per waste type. Personal, not household-wide - the same
  *          "no admin gate, everyone edits only their own" shape as
- *          server/routes/schedule-preferences.js.
+ *          server/routes/schedule-preferences.js. A catch answers only the
+ *          typed waste errors; anything else reaches the central error
+ *          handler (#2810).
  */
 
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
-import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
-import { syncWasteRemindersForUser, MIN_OFFSET_DAYS, MAX_OFFSET_DAYS } from '../../services/waste-reminders.js';
-import { id as validateId, num, time } from '../../middleware/validate.js';
+import { syncWasteRemindersForUser } from '../../services/waste-reminders.js';
+import { id as validateId } from '../../middleware/validate.js';
 import { wasteErrorResponse, currentUserId } from './helpers.js';
-import { WasteValidationError } from '../../services/waste-store.js';
 
-const log = createLogger('Waste');
 const router = express.Router();
 
 const DEFAULT_OFFSET_DAYS = 1;
 const DEFAULT_DELIVERY_TIME = '08:00';
 
 router.get('/', validateRequest(), (req, res) => {
-  try {
-    const userId = currentUserId(req);
-    const { types, byTypeId } = store.listReminderSettingsForUser(db.get(), userId);
-    const data = types.map((type) => {
-      const setting = byTypeId.get(type.id);
-      return {
-        type_id: type.id,
-        type_name: type.name,
-        enabled: !!setting?.enabled,
-        offset_days: setting?.offset_days ?? DEFAULT_OFFSET_DAYS,
-        delivery_time: setting?.delivery_time ?? DEFAULT_DELIVERY_TIME,
-      };
-    });
-    res.json({ data });
-  } catch (err) {
-    log.error('GET /waste/reminder-settings error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  const userId = currentUserId(req);
+  const { types, byTypeId } = store.listReminderSettingsForUser(db.get(), userId);
+  const data = types.map((type) => {
+    const setting = byTypeId.get(type.id);
+    return {
+      type_id: type.id,
+      type_name: type.name,
+      enabled: !!setting?.enabled,
+      offset_days: setting?.offset_days ?? DEFAULT_OFFSET_DAYS,
+      delivery_time: setting?.delivery_time ?? DEFAULT_DELIVERY_TIME,
+    };
+  });
+  res.json({ data });
 });
 
 router.put('/:typeId', validateRequest(), (req, res) => {
+  const vTypeId = validateId(req.params.typeId, 'typeId');
+  if (vTypeId.error) return res.status(400).json({ error: vTypeId.error, code: 400 });
+  const userId = currentUserId(req);
+  // The schema of WasteReminderSettingUpdateInput (server/openapi/waste-inputs.js)
+  // requires all three and refuses before this handler runs (#2810): `enabled`
+  // a boolean, `offset_days` an integer within MIN_OFFSET_DAYS..MAX_OFFSET_DAYS
+  // (server/services/waste-fields.js), `delivery_time` HH:MM by TIME_PATTERN,
+  // so an empty time never reaches the NOT NULL column.
+  const { enabled, offset_days: offsetDays, delivery_time: deliveryTime } = req.body;
+
   try {
-    const vTypeId = validateId(req.params.typeId, 'typeId');
-    if (vTypeId.error) return res.status(400).json({ error: vTypeId.error, code: 400 });
-    const userId = currentUserId(req);
-    const body = req.body ?? {};
-
-    const enabled = !!body.enabled;
-    const vOffset = num(body.offset_days, 'offset_days', { required: false });
-    if (vOffset.error) throw new WasteValidationError([vOffset.error], 'waste_reminder_offset_invalid');
-    const offsetDays = vOffset.value ?? DEFAULT_OFFSET_DAYS;
-    if (!Number.isInteger(offsetDays) || offsetDays < MIN_OFFSET_DAYS || offsetDays > MAX_OFFSET_DAYS) {
-      throw new WasteValidationError([`offset_days must be an integer between ${MIN_OFFSET_DAYS} and ${MAX_OFFSET_DAYS}.`], 'waste_reminder_offset_invalid');
-    }
-    const vTime = time(body.delivery_time ?? DEFAULT_DELIVERY_TIME, 'delivery_time');
-    if (vTime.error) throw new WasteValidationError([vTime.error], 'waste_reminder_time_invalid');
-    // An EMPTY time passes the shared validator as "not given" (value null), and
-    // the column is NOT NULL: the emptied time field of the dialog used to end
-    // in a 500. `?? DEFAULT` above only covers a missing field, not an empty one.
-    if (!vTime.value) throw new WasteValidationError(['delivery_time must be a valid HH:MM time.'], 'waste_reminder_time_invalid');
-
     // One transaction for the setting write AND the immediate resync
     // (Phase 8's own "must update pending reminders idempotently"
     // requirement, not just the next periodic tick): syncWasteRemindersForUser
@@ -74,7 +59,7 @@ router.put('/:typeId', validateRequest(), (req, res) => {
     // safely with syncWasteRemindersForUser's own inner transaction.
     const row = db.get().transaction(() => {
       const saved = store.upsertReminderSetting(db.get(), userId, vTypeId.value, {
-        enabled, offsetDays, deliveryTime: vTime.value,
+        enabled, offsetDays, deliveryTime,
       });
       syncWasteRemindersForUser(db.get(), userId);
       return saved;
@@ -83,8 +68,7 @@ router.put('/:typeId', validateRequest(), (req, res) => {
     res.json({ data: { type_id: row.type_id, enabled: !!row.enabled, offset_days: row.offset_days, delivery_time: row.delivery_time } });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('PUT /waste/reminder-settings/:typeId error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 

@@ -26,7 +26,7 @@ import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js'
 import { validateFieldValues, replaceFieldValues, fieldValuesFor, rejectedScheduleOwner, refuseForeignOwner, RANGE_REVERSED_MESSAGE, SHIFT_TYPE_GONE_MESSAGE, rangeReason } from './schedule.js';
 import { nonMemberMessage } from '../services/household-members.js';
 import { createLogger } from '../logger.js';
-import { MAX_REMINDER_OFFSET_MINUTES, MAX_SCHEDULE_NOTE } from '../services/schedule-fields.js';
+import { MAX_SCHEDULE_NOTE } from '../services/schedule-fields.js';
 
 const router = express.Router();
 const log = createLogger('Schedule');
@@ -50,13 +50,13 @@ function resyncQuietly(userId) {
   catch (err) { log.error('Error resyncing schedule reminders after extra shift write:', err.message); }
 }
 
-// Gleiche Grenze wie schedule-preferences.js's MAX_OFFSET_MINUTES: NULL heisst
-// "kein eigener Vorlauf fuer dieses Extra" (siehe schedule-reminders.js).
+// NULL heisst "kein eigener Vorlauf fuer dieses Extra" (siehe
+// schedule-reminders.js). Eine ganze Zahl von 0 bis MAX_REMINDER_OFFSET_MINUTES
+// (services/schedule-fields.js) oder `null` haelt das Schema (#2810), dieselbe
+// Grenze wie der eigene Vorlauf in schedule-preferences.js.
+/** @param {number | null | undefined} value */
 function reminderOffset(value) {
-  if (value === undefined || value === null || value === '') return { value: null, error: null };
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < 0 || n > MAX_REMINDER_OFFSET_MINUTES) return { value: null, error: `reminder_offset_minutes must be an integer between 0 and ${MAX_REMINDER_OFFSET_MINUTES}, or null.` };
-  return { value: n, error: null };
+  return { value: value ?? null, error: null };
 }
 
 // Gleiche Begruendung wie routes/schedule.js#MAX_FILL_DAYS: /extras/fill
@@ -77,7 +77,9 @@ router.get('/', validateRequest(), (req, res) => {
 router.post('/', refuseForeignOwner('body'), validateRequest(), (req, res) => {
   const key = date(req.body?.date_key, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = id(req.body?.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: MAX_SCHEDULE_NOTE }); const offset = reminderOffset(req.body?.reminder_offset_minutes);
   const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
-  const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (fields.error) errors.push(fields.error); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId.value && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
+  const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (fields.error) errors.push(fields.error); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId.value && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE);
+  // Das Recht haelt refuseForeignOwner() davor (#2810).
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...rangeReason(errors) });
   // Anlegen und replaceFieldValues() in EINER Transaktion: sonst stand die
   // Zeile schon committed, bevor ihre Werte geschrieben waren, und ein Wurf
   // dazwischen liess einen 500er auf eine bereits vorhandene Zeile antworten -
@@ -110,8 +112,8 @@ router.post('/fill', refuseForeignOwner('body'), validateRequest(), (req, res) =
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
   else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
   if (typeId.value && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE);
-  if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
-  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
+  // Das Recht haelt refuseForeignOwner() davor (#2810).
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...rangeReason(errors) });
   const span = daysBetweenDateKeys(from.value, to.value);
   if (span === null || span + 1 > MAX_FILL_DAYS) {
     return fail(res, 400, `The range must not exceed ${MAX_FILL_DAYS} days.`);

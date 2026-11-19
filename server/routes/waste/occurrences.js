@@ -2,26 +2,20 @@
  * Module: Waste collection routes - resolved occurrences
  * Purpose: the two read-only projections every consumer (module page,
  *          Dashboard, Calendar) is meant to call into - never rebuild the
- *          resolver themselves.
+ *          resolver themselves. A catch answers only the typed waste errors;
+ *          anything else reaches the central error handler (#2810).
  */
 
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
-import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
 import { wasteErrorResponse } from './helpers.js';
 
-const log = createLogger('Waste');
 const router = express.Router();
 
 router.get('/next', validateRequest(), (req, res) => {
-  try {
-    res.json({ data: store.getNextPerType(db.get(), {}) });
-  } catch (err) {
-    log.error('GET /waste/occurrences/next error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  res.json({ data: store.getNextPerType(db.get(), {}) });
 });
 
 router.get('/', validateRequest(), (req, res) => {
@@ -31,8 +25,7 @@ router.get('/', validateRequest(), (req, res) => {
     res.json({ data: store.getOccurrences(db.get(), { from, to }) });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('GET /waste/occurrences error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 

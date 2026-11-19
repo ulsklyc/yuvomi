@@ -304,7 +304,11 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // A reason the request schema names (`x-reason`, #2810): since group 2A
     // step (b) the address checks of the recipe providers stand only there.
     // The real answer, with `fields`, measures test:recipe-provider-routes.
-    + `\n${read('../server/openapi/paths/recipeproviders.js').replace(/'x-reason': (?:\{ [a-zA-Z]+: )?'([a-z_]+)'/g, "reason: '$1'")}`;
+    + `\n${read('../server/openapi/paths/recipeproviders.js').replace(/'x-reason': (?:\{ [a-zA-Z]+: )?'([a-z_]+)'/g, "reason: '$1'")}`
+    // Since group 4 step (b) the bounds and the time of a waste reminder
+    // setting are refused by the schema only; the real answer, with `fields`,
+    // measures test:waste-schedule-answers.
+    + `\n${read('../server/openapi/waste-inputs.js').replace(/'x-reason': (?:\{ [a-zA-Z]+: )?'([a-z_]+)'/g, "reason: '$1'")}`;
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {

@@ -628,6 +628,75 @@ test('one source: the enums of the document are the handler\'s constants', () =>
   assert.equal(days.maxItems, sf.MAX_PATTERN_DAY_ROWS);
 });
 
+// Group 4 step (b) dropped the hand checks these rules cover on every input:
+// since then the schema is the only guard, so its values are pinned here as
+// literals - a wider bound, a lost `required` or a looser type in the document
+// (or in waste-fields.js / schedule-fields.js) turns this red.
+test('only guard: the bounds and types the handlers no longer check are the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schemas = spec.components.schemas;
+  const bodyOf = (/** @type {string} */ path, /** @type {string} */ method) => spec.paths[path][method].requestBody.content['application/json'].schema;
+  const pick = (/** @type {any} */ s, /** @type {string[]} */ keys) => Object.fromEntries(keys.filter((k) => k in s).map((k) => [k, s[k]]));
+  const shape = (/** @type {any} */ s) => pick(s, ['type', 'minimum', 'maximum', 'maxLength', 'maxItems', 'pattern']);
+
+  // PUT /waste/reminder-settings/{typeId}: all three required.
+  const reminder = schemas.WasteReminderSettingUpdateInput;
+  assert.deepEqual([...reminder.required].sort(), ['delivery_time', 'enabled', 'offset_days']);
+  assert.deepEqual(shape(reminder.properties.enabled), { type: 'boolean' });
+  assert.deepEqual(shape(reminder.properties.offset_days), { type: 'integer', minimum: 0, maximum: 14 });
+  assert.deepEqual(shape(reminder.properties.delivery_time), { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' });
+  // PUT /waste/feed/types: a list of integers or null, required.
+  const feedTypes = schemas.WasteFeedTypeSelectionInput;
+  assert.deepEqual(feedTypes.required, ['type_ids']);
+  assert.deepEqual(feedTypes.properties.type_ids.type, ['array', 'null']);
+  assert.deepEqual(feedTypes.properties.type_ids.items, { type: 'integer' });
+
+  // Shift types: times and color by pattern (empty allowed), icon text of at most 48.
+  for (const method of ['post', 'put']) {
+    const props = bodyOf(method === 'post' ? '/api/v1/schedule/shift-types' : '/api/v1/schedule/shift-types/{id}', method).properties;
+    for (const field of ['start_time', 'end_time']) {
+      assert.deepEqual(shape(props[field]), { type: ['string', 'null'], pattern: '^(?:(?:[01]\\d|2[0-3]):[0-5]\\d)?$' }, `${method} ${field}`);
+    }
+    assert.deepEqual(shape(props.color), { type: ['string', 'null'], pattern: '^(?:#[0-9A-Fa-f]{6})?$' }, `${method} color`);
+    assert.deepEqual(shape(props.icon), { type: ['string', 'null'], maxLength: 48 }, `${method} icon`);
+  }
+  // PUT /schedule/shift-types/{id}/fields: a required list of objects with an integer position from 0.
+  const fields = bodyOf('/api/v1/schedule/shift-types/{id}/fields', 'put');
+  assert.deepEqual(fields.required, ['fields']);
+  assert.equal(fields.properties.fields.type, 'array');
+  assert.equal(fields.properties.fields.items.type, 'object');
+  assert.deepEqual([...fields.properties.fields.items.required].sort(), ['custom_field_id', 'position']);
+  assert.deepEqual(shape(fields.properties.fields.items.properties.position), { type: 'integer', minimum: 0 });
+  assert.deepEqual(shape(fields.properties.fields.items.properties.show_in_overlay), { type: 'boolean' });
+  // Patterns: cycle_length an integer 1..366 (required on POST), is_active a boolean.
+  const postPattern = bodyOf('/api/v1/schedule/patterns', 'post');
+  assert.ok(postPattern.required.includes('cycle_length'));
+  for (const props of [postPattern.properties, bodyOf('/api/v1/schedule/patterns/{id}', 'put').properties]) {
+    assert.deepEqual(shape(props.cycle_length), { type: 'integer', minimum: 1, maximum: 366 });
+    assert.deepEqual(shape(props.is_active), { type: 'boolean' });
+  }
+  // PUT /schedule/patterns/{id}/days: a required list of at most 500 objects, position an integer from 0.
+  const days = bodyOf('/api/v1/schedule/patterns/{id}/days', 'put');
+  assert.deepEqual(days.required, ['days']);
+  assert.deepEqual(shape(days.properties.days), { type: 'array', maxItems: 500 });
+  assert.equal(days.properties.days.items.type, 'object');
+  assert.deepEqual(days.properties.days.items.required, ['position']);
+  assert.deepEqual(shape(days.properties.days.items.properties.position), { type: 'integer', minimum: 0 });
+  // Extras: reminder_offset_minutes an integer 0..1440 or null.
+  for (const [path, method] of [['/api/v1/schedule/extras', 'post'], ['/api/v1/schedule/extras/fill', 'post'], ['/api/v1/schedule/extras/{id}', 'put']]) {
+    assert.deepEqual(shape(bodyOf(path, method).properties.reminder_offset_minutes), { type: ['integer', 'null'], minimum: 0, maximum: 1440 }, path);
+  }
+  // PUT /schedule/preferences.
+  const prefs = bodyOf('/api/v1/schedule/preferences', 'put').properties;
+  assert.deepEqual(shape(prefs.reminderOffsetMinutes), { type: ['integer', 'null'], minimum: 0, maximum: 1440 });
+  assert.deepEqual(shape(prefs.weeklyHours), { type: ['integer', 'null'], minimum: 1, maximum: 168 });
+  assert.deepEqual(shape(prefs.overtimeEnabled), { type: 'boolean' });
+  // These routes also need a body to read from.
+  for (const [path, method] of [['/api/v1/waste/reminder-settings/{typeId}', 'put'], ['/api/v1/waste/feed/types', 'put'], ['/api/v1/schedule/shift-types/{id}/fields', 'put'], ['/api/v1/schedule/patterns', 'post'], ['/api/v1/schedule/patterns/{id}/days', 'put']]) {
+    assert.equal(spec.paths[path][method].requestBody.required, true, path);
+  }
+});
+
 test('one source: the export writes the profile version the document accepts', async () => {
   const exported = (await call('GET', `/waste/sources/${fileSource.id}/mapping-profile/export`)).body.data;
   assert.equal(exported.version, wf.MAPPING_PROFILE_VERSION);

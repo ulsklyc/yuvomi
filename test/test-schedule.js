@@ -2606,11 +2606,16 @@ test('an "overtime tracking" toggle exists separate from the weekly-hours number
   assert.match(settingsFn, /save\(\{ overtimeEnabled: overtimeToggle\.checked \}\)/);
 });
 
-test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separate toggle, not a repurposed sentinel (D-C)', () => {
-  const prefsRoute = readFileSync(new URL('../server/routes/schedule-preferences.js', import.meta.url), 'utf8');
-  // The lower bound is MIN_WEEKLY_HOURS (= 1, services/schedule-fields.js) since #2810.
-  assert.match(prefsRoute, /n < MIN_WEEKLY_HOURS \|\| n > MAX_WEEKLY_HOURS/, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
-  assert.match(prefsRoute, /typeof raw !== 'boolean'/, 'overtimeEnabled must be validated as a real boolean, not loosely coerced');
+test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separate toggle, not a repurposed sentinel (D-C)', async () => {
+  // Since #2810 the schema of PUT /schedule/preferences is the only check
+  // (validateRequest() refuses before the handler runs); the bounds come from
+  // services/schedule-fields.js. test-waste-schedule-answers.js sends 0 and
+  // 'false' and pins the 400.
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const props = buildOpenApiSpec(null, '0.0.0-test').paths['/api/v1/schedule/preferences'].put.requestBody.content['application/json'].schema.properties;
+  assert.equal(props.weeklyHours.minimum, 1, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
+  assert.deepEqual(props.weeklyHours.type, ['integer', 'null']);
+  assert.equal(props.overtimeEnabled.type, 'boolean', 'overtimeEnabled must be validated as a real boolean, not loosely coerced');
 });
 
 // App-weite UX-Durchsicht 2026-09-12 (Batch 4): "Schedule: hierarchy + actions".
