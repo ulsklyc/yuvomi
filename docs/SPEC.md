@@ -924,55 +924,91 @@ UNIQUE partial index on `(provider_account_id, provider_recipe_id)` where `provi
 **The rows are replaced, not updated.** Saving a recipe (`PUT /recipes/:id`) and every recipe
 provider sync delete all of a recipe's ingredient rows and insert them again, so `recipe_ingredients.id`
 is not stable across a save. Anything that wants to remember something about an ingredient has to
-anchor on `(recipe_id, name)` - see Recipe Ingredient Pantry Matches below.
+anchor on its name - see Pantry Product Matches below.
 
-### Recipe Ingredient Pantry Matches (migration v222, #1314)
-The household's own confirmed statement that one ingredient of one recipe means one row of its
-pantry. Stage 1 of #1314; it stores the match and nothing else - no quantity arithmetic, no "what
-can I cook" reading.
+### Pantry Product Matches (migration v285, #1314, #1448 step 4)
+The household's own confirmed statement that one ingredient wording means one product of its
+pantry. It stores the match and nothing else - no quantity arithmetic, no "what can I cook" reading.
+
+**For the household, not for one recipe.** The row is keyed by the wording alone: confirming
+"chopped tomatoes" once covers every recipe that names the ingredient the same way (trimmed,
+whitespace collapsed, case-insensitive), a later confirmation from any recipe replaces it, and
+clearing it clears it everywhere. The recipe a match is confirmed from must carry the ingredient
+(404 `recipes_ingredient_not_found` otherwise): that is where the household looks at it.
+
+**It names a product, not a batch.** A product outlives its last batch (Pantry Products), so using
+up or deleting a batch keeps the match; a product without batches is still matched. Deleting the
+product deletes its matches (CASCADE), and the ingredients stay in their recipes, unmatched; the undo
+toast of the stock page says how many links go with it (`match_count` on the product). When a
+batch move (a rename, a changed unit) leaves its product without batches, the product's matches move
+to the product the batch went to, in the same transaction and by the same rule as the minimum
+(`assignPantryProduct()`): renaming the only "Milch" to "Vollmilch" keeps the recipes pointing at
+the milk the household has. A merge of two products (a later step of #1448) is the same single
+`UPDATE ... SET product_id`.
 
 **Written only on confirmation.** No import, no recipe save and no name similarity ever creates a
-row here, not even when a stock row is spelled exactly like the ingredient. That is the line from
-[DECISIONS.md](DECISIONS.md) section 7: a match between two rows the household created itself stays
+row here, not even when a product is spelled exactly like the ingredient. That is the line from
+[DECISIONS.md](DECISIONS.md) section 7: a match between two things the household named itself stays
 true with nobody tending it, while a catalogue of ingredient identities would have to be kept
 correct here forever (#714). An ingredient without a row is **unknown, not missing** - the API
-reports `pantry_item_id: null` and carries no stock verdict at all.
+reports `pantry_product_id: null` and carries no stock verdict at all.
 
-**Dropped when its ingredient goes.** A save rewrites `recipe_ingredients` wholesale, which is why the
-match hangs on the normalised name and not on a row id - but it also means a renamed ingredient
-leaves its match behind, pointing at a name this recipe no longer carries. Invisible is not gone: the
-moment an ingredient normalising to the same key reappears, the read side would reattach that pantry
-row, a match nobody confirmed for it. Both writers therefore reconcile the table **inside the same
-transaction** that rewrites the ingredients - `PUT /api/v1/recipes/:id` and the provider mirror
-(`server/services/recipe-provider-sync.js`) delete this recipe's rows whose `ingredient_key` is no
-longer among its ingredients. Deleting is the only direction the mirror knows: an import never writes
-a match. Reconciling needs no pantry right, because it removes a statement about an ingredient that no
-longer exists rather than naming a pantry row; demanding one would stop a member with `pantry: none`
-from saving their own recipe.
+**Never pruned.** Until v285 a recipe save (`PUT /api/v1/recipes/:id`) and the provider mirror
+(`server/services/recipe-provider-sync.js`) deleted a recipe's matches whose ingredient it no longer
+carried, so that a wording coming back could not revive a confirmation given for another one. A
+household match belongs to no recipe, and the wording is what the household confirmed: both writers
+leave the table alone, and an ingredient renamed to a confirmed wording, or back to one, shows that
+match. A match whose wording no recipe uses any more stays, invisible: it is cleared from a recipe
+that carries the wording, so with none left only deleting its product removes it. One row per
+wording, so nothing accumulates per recipe.
 
-**Who may read it.** `pantry_item_id` and `pantry_item_name` name a row of the **pantry**, while the
-path `/recipes` belongs to the scope module `meals` - the global gate in `server/index.js` judges by
-the first path segment and never asks about `pantry`. Every read path therefore asks itself
-(`mayReadModule(req, 'pantry')`, both axes: member right and token scope) and reports both fields
-as `null` for a viewer whose pantry is `none` or whose token carries no pantry scope; the ingredient
-itself stays, unmatched. The same mixing point as the birthday import candidates
-(`server/routes/birthdays.js`, path `calendar`, content from `contacts`), closed the same way. Writing
-or clearing a match needs `mayWriteModule(req, 'pantry')`. Hiding the control in the client is a
-rendering choice, not the boundary.
+**Who may read it.** `pantry_product_id` and `pantry_product_name` (and the deprecated
+`pantry_item_id` / `pantry_item_name`) name a product of the **pantry**, while the path
+`/recipes` belongs to the scope module `meals` - the global gate in `server/index.js` judges by the
+first path segment and never asks about `pantry`. Every read path therefore asks itself
+(`mayReadModule(req, 'pantry')`, both axes: member right and token scope) and reports all four
+fields as `null` for a viewer whose pantry is `none` or whose token carries no pantry scope; the
+ingredient itself stays, unmatched. Writing or clearing a match needs `mayWriteModule(req,
+'pantry')`. Hiding the control in the client is a rendering choice, not the boundary.
+
+**The deprecated batch fields.** Until the first minor release on or after 2027-03-01 every
+ingredient also carries `pantry_item_id` / `pantry_item_name`: the batch of the matched product
+with the lowest id, `null` when there is no match or the product has no batch left. `PUT
+/recipes/:id/ingredient-match` still takes `pantryItemId` and confirms that batch's product.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| ingredient_key | TEXT | PRIMARY KEY, NOT NULL, CHECK not empty - the ingredient name trimmed, whitespace-collapsed and lowercased (`public/utils/ingredient-match-key.js`, shared by server and client), the key v222 used. **Not** a foreign key to `recipe_ingredients`: those rows are replaced on every save |
+| product_id | INTEGER | FK → Pantry Products (**CASCADE delete**), NOT NULL, indexed |
+| confirmed_by | INTEGER | nullable, FK → Users (SET NULL) - provenance only, the one who confirmed last |
+| created_at / updated_at | TEXT | NOT NULL, ISO 8601 (`updated_at` via trigger) |
+
+**Migration v285 carried the batch matches over** (#1448, point 2): a match on a batch became a match
+on that batch's product. Where one wording pointed at different products in different recipes, the
+most recently confirmed one was kept (`updated_at`; within the same second the row inserted later into
+the old table, which is not necessarily the one re-confirmed later, since a re-confirmation updated
+its row in place), and the migration log names how many matches it found and carried and how many
+wordings had a conflict. A row with an empty wording is left out. A batch without a
+product (written by an older version under `DB_ALLOW_NEWER_SCHEMA`) is looked up by its wording and
+unit among the products with a frozen copy of the key; when none exists yet the match is not
+carried and is counted in the same log line. The entry is a frozen JS step that reads only the
+tables of v222 and v253.
+
+### Recipe Ingredient Pantry Matches (migration v222, #1314) - unread since v285
+The table of stage 1 of #1314: one ingredient of one recipe meant one batch. **Nothing reads or
+writes it since v285** (#1448, step 4): its rows were carried over to Pantry Product Matches, and the
+table stays for one release so that the previous version, started again on this database, still
+finds its matches (the answer on #1448). A later migration drops it. Its cascades still run (a
+deleted recipe or batch removes its rows), and what a previous version writes into it after v285 is
+not carried over again.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
 | recipe_id | INTEGER | FK → Recipes (CASCADE delete), NOT NULL, part of the primary key |
-| ingredient_key | TEXT | NOT NULL, part of the primary key - the ingredient name trimmed, whitespace-collapsed and lowercased (`public/utils/ingredient-match-key.js`, shared by server and client). **Not** a foreign key to `recipe_ingredients.id`: that id does not survive the next save. Renaming an ingredient therefore drops its match, which is correct - it is a different ingredient now, and the row is deleted rather than orphaned (see above) |
-| pantry_item_id | INTEGER | FK → Pantry Items (**CASCADE delete**), NOT NULL |
-| confirmed_by | INTEGER | nullable, FK → Users (SET NULL) - provenance only, same reasoning as `pantry_items.created_by` after v109 |
+| ingredient_key | TEXT | NOT NULL, part of the primary key - the normalised ingredient name |
+| pantry_item_id | INTEGER | FK → Pantry Items (CASCADE delete), NOT NULL |
+| confirmed_by | INTEGER | nullable, FK → Users (SET NULL) |
 | created_at / updated_at | TEXT | NOT NULL, ISO 8601 |
-
-`ON DELETE CASCADE` on `pantry_item_id` is the exception in a schema that otherwise prefers SET NULL
-(`meals.recipe_id`, `pantry_items.location_id`, `pantry_items.created_by`). Those rows still mean
-something without their reference; this row is nothing but the reference, and a pantry row is a
-batch rather than a product, so once it is gone the statement has no subject left. Because the link
-lives in its own table, the cascade can never reach the ingredient: the recipe keeps it, unmatched.
 
 ### Recipe Provider Accounts (migration v118, v119, v134, v255)
 Connections to a self-hosted recipe provider instance ([Mealie](https://mealie.io) or [Tandoor](https://tandoor.dev))
@@ -1126,10 +1162,14 @@ them with 400 (see the Reminders section), because the run would recreate them w
 ### Pantry Products (migration v253, #1448)
 A household product above the batches. Identity is the household's own wording, not a guess
 (DECISIONS.md, section 7): a batch whose name and unit match a product joins it, a new name or unit
-creates one. A product outlives its last batch. The minimum moved here in v276 (#1448, step 3); the
-target and the preferred shop follow in later steps. A product without batches can be deleted
-(`DELETE /api/v1/pantry/products/:productId`); one that still has batches is refused with 409 and
-`reason` `pantry_product_has_batches`, so the cascade to `pantry_items` never takes stock with it.
+creates one. A product outlives its last batch. The minimum moved here in v276 (#1448, step 3), the
+confirmed recipe matches in v285 (step 4, Pantry Product Matches); the target and the preferred shop
+follow in later steps. A product without batches can be deleted
+(`DELETE /api/v1/pantry/products/:productId`), which deletes its recipe matches with it (CASCADE). The
+products in `GET /api/v1/pantry` carry `match_count`, the number of wordings confirmed for each, and the
+stock page's undo toast names them ("Toothpaste deleted, with its 3 recipe links."); the delete is sent
+only when the undo window ends, so undo keeps the links. One that still has batches is refused with 409 and `reason` `pantry_product_has_batches`, so the cascade to
+`pantry_items` never takes stock with it.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -6021,8 +6061,8 @@ Reusable recipe cards linked to meal slots.
 - **Row actions collapse on narrow rows (v1.59.0):** edit, duplicate and delete take 152 px of a 262 px row at 320 px width; below 30 rem **row** width (a container query, not a viewport breakpoint) they move into the shared overflow menu with labels, and the ingredient count drops below the title. Without this the recipe name fell to `min-content` — with `overflow-wrap: anywhere` that is the width of the widest single character: 8 px, one character per line, a 448 px tall row, one recipe per screen. Measured after: 182 px name, 69 px row height.
 - **Recipe provider mirrors (#530):** with a recipe provider account connected (Settings → Kitchen - Mealie or Tandoor), its recipes appear in the same list as native ones, carrying a source badge in the collapsed row and a thumbnail, so a mixed list is readable without opening each entry. A source filter (all / native / one entry per connected provider) sits in the header as a menu button - the same popover component the row overflow actions use - and only appears once a mirrored recipe exists. Mirrored recipes are read-only: the UI drops the edit affordance and the server returns 403, so the two cannot drift. "Duplicate" forks one into an editable native recipe. They behave like any other recipe everywhere else: meal-plan picker (grouped by source when a mirror exists), shopping-list transfer, scaling. A rename at the source updates the mirrored copy in place instead of replacing it, so its meal-plan links survive. **A Mealie mirror carries its preparation steps (#2363):** Yuvomi recipes have no steps field, so `notes` holds Mealie's description, a blank line, then one plain-text line per step (`N. Title: Text`, no Markdown, since notes render as text); empty steps are left out. Mealie's Markdown and embedded HTML become plain text on the server (`recipe-providers/markup-text.js`, #2558): tags, emphasis and entities are resolved, links keep an absolute URL in brackets, images are dropped (their path is on the Mealie server and not loadable in the browser). Mealie's `recipeServings` and Tandoor's `servings` fill `recipes.servings` when they are a whole number from 1 to 99 (#2355). Each provider plugs in behind a shared adapter interface (`server/services/recipe-providers/`), the same pattern the DMS module uses for Paperless/Papra - adding a third provider needs a new adapter, not new sync/route/frontend logic.
 - **"Planned this week" note:** every recipe that appears in the current week's meal plan carries a quiet secondary note - since R24 only while not every recipe is planned (a note on every row says nothing) - next to its ingredient count, separated by the shared midpoint divider. Derived client-side from `meals.recipe_id` over the server's current week - no schema change, and a load error simply drops the note. The recipe list finally shows its own connection to the plan; on narrow rows the note yields and the ingredient count keeps its place.
-- **Confirmed pantry matches (#1314, stage 1):** in the unfolded recipe every ingredient shows which row of the pantry it means, or "not matched", and a tap opens a picker over the household's own stock (name, location and best-before date, because one pantry row is one batch). Nothing is ever proposed: Yuvomi does not match by name, so a match exists only where somebody chose one. Unmatched reads as **unknown, never as missing** - stage 1 knows what the household pointed at and nothing about stock, and a "missing" would dress half an answer as a whole one. The match hangs on the ingredient name rather than its database row, because saving a recipe replaces every ingredient row; it therefore survives editing and reordering the ingredient list, and deleting the pantry row removes the match while leaving the recipe untouched. Writing one needs `pantry` write access on top of `meals` - members who may only read the pantry see the match and cannot change it, and members who may not see the pantry at all are not offered it.
-- REST API: `GET/POST /api/v1/recipes`, `PUT/DELETE /api/v1/recipes/:id` with ingredient sync (`meal_types` included), `POST /api/v1/recipes/:id/to-shopping-list` (needs `meals` read and `shopping` write - the one write under `/recipes` that the module gate judges as a read, because it only reads the recipe; members and token scopes alike, #1290), `PUT /api/v1/recipes/:id/ingredient-match` (`{ name, pantryItemId }`; `pantryItemId: null` clears it), `GET /api/v1/recipes/:id/provider-thumbnail` (proxy), `GET /api/v1/recipes/:id/image` (own picture, migration v192). Recipes report `source: native | mealie | tandoor`, and every ingredient carries `pantry_item_id` / `pantry_item_name` (both `null` when unmatched - and likewise for a viewer whose pantry access is `none` or whose token carries no pantry scope, since the fields name a row of another module).
+- **Confirmed pantry matches (#1314, stage 1; for the household since #1448 step 4):** in the unfolded recipe a matched ingredient shows the product of the pantry it means, and one quiet button under the list opens a picker for the open ones; tapping a match opens the picker for that ingredient. The picker lists the household's **products**, not batches (name and total, with its place, or "2 l in all · 2 places" for a product kept in several, like the product row of the pantry; a product without batches reads "0 pcs"), and the dialog says that the choice holds for every recipe with the same wording. Nothing is ever proposed: Yuvomi does not match by name, so a match exists only where somebody chose one. Unmatched reads as **unknown, never as missing** - the match says what the household pointed at and nothing about stock, and a "missing" would dress half an answer as a whole one. The match hangs on the ingredient wording rather than its database row or its recipe (Pantry Product Matches): it survives editing and reordering the ingredient list, it shows in every recipe with the same wording, and using up a batch keeps it. After a save the page updates every loaded recipe with that wording. Writing one needs `pantry` write access on top of `meals` - members who may only read the pantry see the match and cannot change it, and members who may not see the pantry at all are not offered it.
+- REST API: `GET/POST /api/v1/recipes`, `PUT/DELETE /api/v1/recipes/:id` with ingredient sync (`meal_types` included), `POST /api/v1/recipes/:id/to-shopping-list` (needs `meals` read and `shopping` write - the one write under `/recipes` that the module gate judges as a read, because it only reads the recipe; members and token scopes alike, #1290), `PUT /api/v1/recipes/:id/ingredient-match` (`{ name, pantryProductId }`, for every recipe with that wording; neither `pantryProductId` nor the deprecated `pantryItemId` clears it), `GET /api/v1/recipes/:id/provider-thumbnail` (proxy), `GET /api/v1/recipes/:id/image` (own picture, migration v192). Recipes report `source: native | mealie | tandoor`, and every ingredient carries `pantry_product_id` / `pantry_product_name` and the deprecated `pantry_item_id` / `pantry_item_name` (all `null` when unmatched - and likewise for a viewer whose pantry access is `none` or whose token carries no pantry scope, since the fields name a product of another module).
 
 ### Pantry (`/pantry`) (v1.55.0)
 

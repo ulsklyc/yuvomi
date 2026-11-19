@@ -16,6 +16,7 @@ import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { handOverToShoppingList, handoverTooLarge, handoverTooLargeAnswer } from '../services/kitchen-handover.js';
+import { assignPantryProduct } from '../services/pantry-products.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
 
@@ -47,19 +48,54 @@ function withSource(recipe) {
   };
 }
 
-/* DIE BESTAETIGTE ZUORDNUNG ZU EINER VORRATSZEILE (#1314, Stufe 1).
+/* DIE BESTAETIGTE ZUORDNUNG ZU EINEM PRODUKT DES HAUSHALTS (#1314, #1448 Teil 4).
  *
- * Sie haengt NICHT an `recipe_ingredients.id`, und das ist keine Vorsicht,
- * sondern eine Messung: PUT /:id weiter unten loescht alle Zutaten eines
- * Rezepts und legt sie neu an, der Provider-Sync ebenso. Eine ID-Verbindung
- * waere nach dem naechsten Speichern still verschwunden. Gespeichert ist
- * deshalb (recipe_id, normalisierter Name) - siehe Migration 222.
+ * Eine Zuordnung sagt "diese Schreibweise meint dieses Produkt", fuer den
+ * ganzen Haushalt: `pantry_product_matches` haengt am normalisierten
+ * Zutatennamen allein (ingredientMatchKey), nicht an einem Rezept und nicht an
+ * `recipe_ingredients.id` - PUT /:id weiter unten loescht alle Zutaten eines
+ * Rezepts und legt sie neu an, der Provider-Sync ebenso. Einmal bestaetigt,
+ * gilt sie in jedem Rezept mit derselben Schreibweise, und weil sie ein
+ * Produkt nennt und keine Charge, nimmt das Aufbrauchen einer Packung sie
+ * nicht mehr mit.
  *
  * WAS HIER NICHT PASSIERT: nichts wird geraten. Eine Zutat ohne Zeile in
- * `recipe_ingredient_pantry_matches` bekommt `pantry_item_id: null` und sonst
- * gar nichts - kein "fehlt", kein "vorhanden". Stufe 1 weiss nur, worauf der
- * Haushalt gezeigt hat; unbekannt ist nicht fehlend (docs/DECISIONS.md
- * Abschnitt 7).
+ * `pantry_product_matches` bekommt `pantry_product_id: null` und sonst gar
+ * nichts - kein "fehlt", kein "vorhanden". Unbekannt ist nicht fehlend
+ * (docs/DECISIONS.md Abschnitt 7).
+ *
+ * `pantry_item_id`/`pantry_item_name` BLEIBEN fuer die Abkuendigungsfrist
+ * (CHANGELOG, Deprecated): eine Charge des Produkts, die mit der kleinsten ID,
+ * oder null, wenn das Produkt keine Charge mehr hat. Ein Client von gestern,
+ * der daran "zugeordnet" abliest, liest es weiter.
+ */
+const NO_PANTRY_MATCH = Object.freeze({
+  pantry_product_id: null, pantry_product_name: null, pantry_item_id: null, pantry_item_name: null,
+});
+
+/**
+ * Die Zuordnungen des Haushalts, je Schreibweise mit Produkt und der Charge,
+ * die die abgekuendigten Felder tragen. Gelesen wird die ganze Tabelle: sie
+ * hat eine Zeile je bestaetigter Schreibweise, eine Zutatenliste dagegen ist
+ * unbegrenzt - und die Zahl der Bindungen einer Anweisung nicht.
+ * @param {string|null} [onlyKey] nur diese Schreibweise
+ * @returns {Map<string, { pantry_product_id: number, pantry_product_name: string, pantry_item_id: number|null, pantry_item_name: string|null }>}
+ */
+function householdMatches(onlyKey = null) {
+  const rows = db.get().prepare(`
+    SELECT m.ingredient_key, p.id AS pantry_product_id, p.name AS pantry_product_name,
+           b.id AS pantry_item_id, b.name AS pantry_item_name
+    FROM pantry_product_matches m
+    JOIN pantry_products p ON p.id = m.product_id
+    LEFT JOIN pantry_items b ON b.id = (SELECT MIN(pi.id) FROM pantry_items pi WHERE pi.product_id = p.id)
+    ${onlyKey === null ? '' : 'WHERE m.ingredient_key = ?'}
+  `).all(...(onlyKey === null ? [] : [onlyKey]));
+  return new Map(rows.map((/** @type {any} */ { ingredient_key: key, ...match }) => [key, match]));
+}
+
+/**
+ * @param {any} req
+ * @param {Array<{ recipe_id: number, name: string }>} ingredients
  */
 function attachPantryMatches(req, ingredients) {
   if (!ingredients.length) return ingredients;
@@ -67,8 +103,8 @@ function attachPantryMatches(req, ingredients) {
   // DAS RECHT AM LESEWEG, spiegelbildlich zum Schreibweg weiter unten. Der Pfad
   // haengt unter /recipes und gehoert dem Scope-Modul `meals`; der globale
   // Riegel in server/index.js urteilt am ersten Pfadsegment und fragt deshalb
-  // nie nach `pantry`. Benannt wird hier aber eine Zeile des VORRATS, mit
-  // ihrem Namen. Dieselbe Mischstelle wie die Import-Kandidaten in
+  // nie nach `pantry`. Benannt wird hier aber ein Produkt des VORRATS, mit
+  // seinem Namen. Dieselbe Mischstelle wie die Import-Kandidaten in
   // server/routes/birthdays.js (Pfad `calendar`, Inhalt aus `contacts`), und
   // derselbe Aufruf schliesst sie: `mayReadModule` prueft beide Achsen,
   // Mitgliedsrecht UND Token-Scope.
@@ -80,26 +116,10 @@ function attachPantryMatches(req, ingredients) {
   // Was zurueckbleibt, ist `null` und nicht das Weglassen der Felder: die Zutat
   // ist fuer diesen Betrachter unzugeordnet, und die Antwort behaelt ihre Form.
   if (!mayReadModule(req, 'pantry')) {
-    return ingredients.map((ing) => ({ ...ing, pantry_item_id: null, pantry_item_name: null }));
+    return ingredients.map((ing) => ({ ...ing, ...NO_PANTRY_MATCH }));
   }
-  const recipeIds = [...new Set(ingredients.map((i) => i.recipe_id))];
-  const recipeList = sqlInList(recipeIds);
-  const rows = db.get().prepare(`
-    SELECT m.recipe_id, m.ingredient_key, m.pantry_item_id, p.name AS pantry_item_name
-    FROM recipe_ingredient_pantry_matches m
-    JOIN pantry_items p ON p.id = m.pantry_item_id
-    WHERE m.recipe_id IN (${recipeList.sql})
-  `).all(recipeList.param);
-
-  const byKey = new Map(rows.map((r) => [`${r.recipe_id}\x00${r.ingredient_key}`, r]));
-  return ingredients.map((ing) => {
-    const hit = byKey.get(`${ing.recipe_id}\x00${ingredientMatchKey(ing.name)}`);
-    return {
-      ...ing,
-      pantry_item_id: hit ? hit.pantry_item_id : null,
-      pantry_item_name: hit ? hit.pantry_item_name : null,
-    };
-  });
+  const matches = householdMatches();
+  return ingredients.map((ing) => ({ ...ing, ...(matches.get(ingredientMatchKey(ing.name)) ?? NO_PANTRY_MATCH) }));
 }
 
 function loadRecipeWithIngredients(req, id) {
@@ -312,42 +332,16 @@ router.put('/:id', validateRequest(), (req, res) => {
       if (name) insertIng.run(id, name, quantity, category);
     }
 
-    // VERWAISTE ZUORDNUNGEN ABRAEUMEN, IN DERSELBEN TRANSAKTION (#1314).
-    //
-    // Die Zuordnung haengt am normalisierten Namen, nicht an
-    // `recipe_ingredients.id` - sonst waere sie nach genau diesem DELETE weg.
-    // Der Preis dafuer steht hier: wird eine Zutat umbenannt, zeigt ihre
-    // Zuordnung auf einen Namen, den dieses Rezept nicht mehr traegt. Kein FK
-    // und kein Trigger fassen das, weil die Zutatenzeile als Bezug nie
-    // existiert hat.
-    //
-    // Unsichtbar waere sie damit, aber nicht weg: taucht dieselbe Schreibweise
-    // spaeter wieder auf, haengt `attachPantryMatches` die alte Vorratszeile
-    // wieder an - eine Zuordnung, die in dieser Form nie jemand bestaetigt hat,
-    // und damit genau die geratene Aussage, die docs/DECISIONS.md Abschnitt 7
-    // ausschliesst. Der Bestaetigungsweg unten lehnt aus demselben Grund eine
-    // Zutat ab, die es im Rezept nicht gibt; hier ist die Rueckseite davon.
-    //
-    // GEMESSEN WIRD AN DER TABELLE, NICHT AM REQUEST: die Namen kommen aus dem,
-    // was gerade wirklich eingefuegt wurde (`if (name)` laesst leere aus).
-    // Geloescht wird zeilenweise ueber die wenigen vorhandenen Zuordnungen
-    // statt mit einem NOT IN ueber alle Zutaten - eine Zutatenliste ist
-    // unbegrenzt, die Zahl der Bindungen einer Anweisung nicht.
-    const vorhandeneZuordnungen = db.get().prepare(
-      'SELECT ingredient_key FROM recipe_ingredient_pantry_matches WHERE recipe_id = ?',
-    ).all(id);
-    if (vorhandeneZuordnungen.length) {
-      const gueltigeKeys = new Set(
-        db.get().prepare('SELECT name FROM recipe_ingredients WHERE recipe_id = ?').all(id)
-          .map((r) => ingredientMatchKey(r.name)),
-      );
-      const loeseZuordnung = db.get().prepare(
-        'DELETE FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?',
-      );
-      for (const row of vorhandeneZuordnungen) {
-        if (!gueltigeKeys.has(row.ingredient_key)) loeseZuordnung.run(id, row.ingredient_key);
-      }
-    }
+    // KEIN ABRAEUMEN DER ZUORDNUNGEN MEHR (#1448, Teil 4). Bis dahin hing eine
+    // Zuordnung an (Rezept, Zutat) und wurde hier geloescht, sobald das Rezept
+    // die Zutat nicht mehr trug - sonst haette eine spaeter wieder auftauchende
+    // Schreibweise eine Bestaetigung zurueckbekommen, die fuer DIESES Rezept
+    // niemand gegeben hatte. Jetzt sagt eine Zuordnung "diese Schreibweise
+    // meint dieses Produkt" fuer den ganzen Haushalt (pantry_product_matches):
+    // sie gehoert keinem Rezept, und dieselbe Schreibweise in einem anderen
+    // oder spaeteren Rezept meint genau das, was der Haushalt bestaetigt hat.
+    // Ein Speichern laesst sie deshalb stehen; geloest wird sie nur ueber
+    // PUT /:id/ingredient-match.
   });
 
   const updated = loadRecipeWithIngredients(req, id);
@@ -619,15 +613,16 @@ router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (r
 });
 
 // --------------------------------------------------------
-// Integration: Rezeptzutat → Vorratszeile (#1314, Stufe 1)
+// Integration: Rezeptzutat → Produkt im Vorrat (#1314, #1448 Teil 4)
 // --------------------------------------------------------
 
 /**
  * PUT /api/v1/recipes/:id/ingredient-match
- * Die bestaetigte Zuordnung einer Rezeptzutat zu einer Zeile im Vorrat setzen
- * oder loesen.
- * Body: { name: string, pantryItemId: number|null }
- * Response: { data: { name, ingredient_key, pantry_item_id, pantry_item_name } }
+ * Die bestaetigte Zuordnung einer Schreibweise zu einem Produkt des Haushalts
+ * setzen oder loesen, aus einem Rezept heraus.
+ * Body: { name: string, pantryProductId?: number|null, pantryItemId?: number|null }
+ * Response: { data: { name, ingredient_key, pantry_product_id, pantry_product_name,
+ *                      pantry_item_id, pantry_item_name } }
  *
  * NUR AUF BESTAETIGUNG, UND DESHALB ALS EIGENER WEG. Die Zuordnung haette auch
  * ein Feld im Rezept-PUT sein koennen - dann haette jeder Speichervorgang,
@@ -638,13 +633,19 @@ router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (r
  * Abschnitt 7 - eine geratene Zuordnung ist der gepflegte Katalog, eine
  * Ableitung nach der anderen).
  *
- * `pantryItemId: null` loest die Zuordnung. Derselbe Weg, dasselbe Recht: das
- * Loesen ist derselbe Schreibvorgang, nur rueckwaerts.
+ * FUER DEN HAUSHALT, NICHT FUER DIESES REZEPT (#1448, Teil 4). Gespeichert wird
+ * "diese Schreibweise meint dieses Produkt"; jedes Rezept mit derselben
+ * Schreibweise liest sie, und das Loesen loest sie ueberall. Das Rezept im Pfad
+ * ist der Ort, an dem der Mensch bestaetigt: die Zutat muss darin stehen.
+ *
+ * `pantryProductId` nennt das Produkt. `pantryItemId` (eine Charge) bleibt fuer
+ * die Abkuendigungsfrist und meint das Produkt dieser Charge. Beide zugleich
+ * mit einer Zahl sind ein 400; ohne beide (oder mit null) wird geloest.
  *
  * DAS RECHT. Wie bei /recipes/:id/to-shopping-list nebenan: der Pfad haengt
  * unter `/recipes` und gehoert damit dem Scope-Modul `meals` - der globale
  * Riegel in server/index.js urteilt am ersten Pfadsegment und fragt nur danach.
- * Benannt wird hier aber eine Zeile des VORRATS, und sie wird dauerhaft in ein
+ * Benannt wird hier aber ein Produkt des VORRATS, und es wird dauerhaft in ein
  * anderes Modul eingehaengt. Wer das tut, braucht das Schreibrecht des Vorrats,
  * auf beiden Achsen (Mitgliedsrecht und Token-Scope). Der Riegel
  * (requirePantryWrite) steht vor validateRequest() und vor den 404ern, damit
@@ -663,47 +664,73 @@ router.put('/:id/ingredient-match', requirePantryWrite, validateRequest(), (req,
   const key = ingredientMatchKey(vName.value);
   if (!key) return res.status(400).json({ error: 'Ingredient must not be empty.', code: 400 });
 
+  // Laut Schema je eine ganze Zahl oder null; weggelassen heisst wie null.
+  const { pantryProductId, pantryItemId } = req.body;
+  const byProduct = pantryProductId !== null && pantryProductId !== undefined;
+  const byItem = pantryItemId !== null && pantryItemId !== undefined;
+  // Was das Schema nicht sagen kann: zwei Antworten auf dieselbe Frage.
+  if (byProduct && byItem) {
+    return res.status(400).json({ error: 'Send pantryProductId or pantryItemId, not both.', code: 400 });
+  }
+
   const recipe = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(id);
   if (!recipe) return res.status(404).json({ error: 'Recipe not found.', code: 404, reason: 'recipes_recipe_not_found' });
 
-  // DIE ZUTAT MUSS ES GEBEN. Sonst stuende eine Aussage ueber etwas in der
-  // Tabelle, das in diesem Rezept nicht vorkommt - und sie bliebe dort
-  // liegen, bis zufaellig jemand eine Zutat genau so nennt.
+  // DIE ZUTAT MUSS ES GEBEN. Bestaetigt wird an einer Zutat, die der Mensch vor
+  // sich hat - nicht an einer Schreibweise, die dieses Rezept gar nicht traegt.
   const ingredients = db.get().prepare('SELECT name FROM recipe_ingredients WHERE recipe_id = ?').all(id);
   const treffer = ingredients.find((i) => ingredientMatchKey(i.name) === key);
   // Ein Grund fuer sich (#1909): das Rezept wurde inzwischen geaendert, oder
   // der Abgleich mit der Rezeptquelle hat seine Zutaten ersetzt.
   if (!treffer) return res.status(404).json({ error: 'Ingredient not found in this recipe.', code: 404, reason: 'recipes_ingredient_not_found' });
 
-  // Laut Schema eine ganze Zahl oder null; weggelassen heisst wie null: loesen.
-  const pantryItemId = req.body.pantryItemId;
-  if (pantryItemId === null || pantryItemId === undefined) {
-    db.get().prepare(
-      'DELETE FROM recipe_ingredient_pantry_matches WHERE recipe_id = ? AND ingredient_key = ?',
-    ).run(id, key);
-    return res.json({
-      data: { name: treffer.name, ingredient_key: key, pantry_item_id: null, pantry_item_name: null },
+  const answer = () => ({
+    data: { name: treffer.name, ingredient_key: key, ...(householdMatches(key).get(key) ?? NO_PANTRY_MATCH) },
+  });
+
+  if (!byProduct && !byItem) {
+    db.get().prepare('DELETE FROM pantry_product_matches WHERE ingredient_key = ?').run(key);
+    return res.json(answer());
+  }
+
+  const userId = req.authUserId || req.session.userId;
+  const confirmed = withTx(db.get(), () => {
+    let productId;
+    if (byProduct) {
+      productId = db.get().prepare('SELECT id FROM pantry_products WHERE id = ?').get(pantryProductId)?.id ?? null;
+    } else {
+      const item = db.get().prepare('SELECT id, product_id FROM pantry_items WHERE id = ?').get(pantryItemId);
+      // Eine Charge ohne Produkt schreibt nur eine aeltere Version
+      // (DB_ALLOW_NEWER_SCHEMA), bis der naechste Start sie aufnimmt: hier
+      // bekommt sie es gleich, mit derselben Regel wie jeder Schreibweg.
+      productId = !item ? null : item.product_id ?? assignPantryProduct(db.get(), item.id, { userId, syncCategory: false });
+    }
+    if (productId === null) return false;
+    // Ein erneutes Bestaetigen ERSETZT die alte Aussage (Primaerschluessel ist
+    // die Schreibweise), statt eine zweite danebenzulegen - auch wenn sie aus
+    // einem anderen Rezept kam.
+    db.get().prepare(`
+      INSERT INTO pantry_product_matches (ingredient_key, product_id, confirmed_by)
+      VALUES (?, ?, ?)
+      ON CONFLICT(ingredient_key) DO UPDATE SET
+        product_id   = excluded.product_id,
+        confirmed_by = excluded.confirmed_by
+    `).run(key, productId, userId);
+    return true;
+  });
+  // Nicht das Rezept, sondern das im Dialog GEWAEHLTE Produkt (oder die
+  // genannte Charge) fehlt (#1909): die Seite haelt den Dialog offen und bietet
+  // den aktuellen Vorrat an. Derselbe Grund fuer beide Felder, weil es dieselbe
+  // Lage ist und ein Client von gestern genau diesen Grund kennt.
+  if (!confirmed) {
+    return res.status(404).json({
+      error: byProduct ? 'Pantry product not found.' : 'Pantry item not found.',
+      code: 404,
+      reason: 'recipes_selected_pantry_item_not_found',
     });
   }
 
-  const item = db.get().prepare('SELECT id, name FROM pantry_items WHERE id = ?').get(pantryItemId);
-  // Nicht das Rezept, sondern die im Dialog GEWAEHLTE Vorratszeile fehlt
-  // (#1909): die Seite haelt den Dialog offen und bietet den aktuellen Vorrat an.
-  if (!item) return res.status(404).json({ error: 'Pantry item not found.', code: 404, reason: 'recipes_selected_pantry_item_not_found' });
-
-  // Ein erneutes Bestaetigen ERSETZT die alte Aussage (Primaerschluessel
-  // recipe_id + ingredient_key), statt eine zweite danebenzulegen.
-  db.get().prepare(`
-    INSERT INTO recipe_ingredient_pantry_matches (recipe_id, ingredient_key, pantry_item_id, confirmed_by)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(recipe_id, ingredient_key) DO UPDATE SET
-      pantry_item_id = excluded.pantry_item_id,
-      confirmed_by   = excluded.confirmed_by
-  `).run(id, key, item.id, req.authUserId || req.session.userId);
-
-  res.json({
-    data: { name: treffer.name, ingredient_key: key, pantry_item_id: item.id, pantry_item_name: item.name },
-  });
+  res.json(answer());
 });
 
 export default router;

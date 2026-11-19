@@ -56,14 +56,17 @@ function loadLocations() {
  * batches can be seen: the stock page shows it as out of stock. The batches
  * themselves stay in `data`; this list only names the products, with their
  * minimum and the sum of their batches (`total_quantity`, 0 without a batch),
- * the two numbers low and out are read from (step 3). The status itself is not
- * sent: its rule lives in public/utils/pantry-status.js and in the kitchen
- * count, and a third copy would be one more to keep equal.
+ * the two numbers low and out are read from (step 3), and `match_count`, the
+ * number of ingredient wordings the household has confirmed for it (step 4):
+ * deleting the product deletes them, and the undo toast says so. The status
+ * itself is not sent: its rule lives in public/utils/pantry-status.js and in
+ * the kitchen count, and a third copy would be one more to keep equal.
  */
 function loadProducts() {
   return db.get().prepare(`
     SELECT p.id, p.name, p.unit, p.category, p.min_quantity,
-           COUNT(pi.id) AS batch_count, ROUND(COALESCE(SUM(pi.quantity), 0), 2) AS total_quantity
+           COUNT(pi.id) AS batch_count, ROUND(COALESCE(SUM(pi.quantity), 0), 2) AS total_quantity,
+           (SELECT COUNT(*) FROM pantry_product_matches m WHERE m.product_id = p.id) AS match_count
     FROM pantry_products p
     LEFT JOIN pantry_items pi ON pi.product_id = p.id
     GROUP BY p.id
@@ -574,8 +577,10 @@ router.get('/', validateRequest(), (_req, res) => {
 // `pantry_product_has_batches`, so the ON DELETE CASCADE on
 // `pantry_items.product_id` never takes stock with it. Count and delete run in
 // one transaction: a batch written in between cannot slip under the check.
-// Nothing else points at a product: recipe matches and reminders point at
-// batches. Behind the pantry write permission like every DELETE under /pantry
+// The household's recipe matches on the product go with it (ON DELETE CASCADE
+// on `pantry_product_matches.product_id`, #1448 part 4): the ingredients stay
+// in their recipes, unmatched. Reminders point at batches, of which there are
+// none. Behind the pantry write permission like every DELETE under /pantry
 // (module gate in server/index.js).
 // Response: 204
 // --------------------------------------------------------

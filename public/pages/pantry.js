@@ -2266,8 +2266,14 @@ function removeProduct(product) {
   if (stage) collapseOut(stage).then(() => { if (!restored) stage.style.display = 'none'; });
   pendingProductDeletes.add(product.id);
 
+  // The product takes the household's recipe links with it (#1448, part 4:
+  // ON DELETE CASCADE on pantry_product_matches): the toast names them, so the
+  // undo is offered for what really goes, not only for the empty row.
+  const links = Number(product.match_count) || 0;
   scheduleUndoableDelete({
-    message: t('pantry.deleted'),
+    message: links > 0
+      ? t('pantry.productDeletedWithLinks', { name: product.name, count: links })
+      : t('pantry.deleted'),
     commit: async ({ keepalive }) => {
       await api.delete(`/pantry/products/${product.id}`, { keepalive });
       if (keepalive) return;
