@@ -2133,6 +2133,14 @@
       }
     ],
     "tasksDoneToday": 8,
-    "familyStatuses": []
+    "familyStatuses": [
+      {
+        "user_id": 2,
+        "state": "busy",
+        "note": "golden availability note",
+        "expires_at": "2026-11-29T14:38:49Z",
+        "updated_at": "2026-03-09T09:30:01Z"
+      }
+    ]
   }
 }
