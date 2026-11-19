@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Backup answers an unexpected failure with the same sentence as the rest of the API.**
+  `GET /api/v1/backup/database` said `"Database backup failed."`, `POST /api/v1/backup/trigger`
+  `"Backup trigger failed."` and `PUT /api/v1/backup/webdav/config` `"Failed to save WebDAV
+  config."` on a server-side failure; they now say `"Internal server error."` like every other
+  module. Status 500 and `code` are unchanged. Every answer that names a known cause stays as it
+  was: a download whose backup failed its integrity check (`backup_verify_failed`), a local
+  failure of the WebDAV upload (`backup_local_failed`), the 502 of the WebDAV server, the
+  `errorCode` of the WebDAV settings and the reasons of a restore. Shared expenses answered
+  this way already.
 - **Shared expenses, backup and the system diagnostics check every request against the
   published API description.** This is about your own API clients; the app sends nothing that
   is refused now (from this release on it sends the payer and payee as numbers). Under

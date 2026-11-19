@@ -292,6 +292,77 @@ test('GET /meta hands out the lists the schema holds (one source)', async () => 
   assert.deepEqual(groups.find((/** @type {any} */ p) => p.name === 'status').schema.enum, fields.GROUP_STATUSES);
 });
 
+// Group 5 step (b) dropped the hand checks these rules cover on every input:
+// the handlers read `value ?? default` and trust the type. Since then the
+// schema is the only guard, so its types, bounds and required fields are
+// pinned here as literals - a `null` let into a list field, a lost `required`,
+// a looser type or a wider bound in the document turns this red. The lists
+// themselves are pinned to their constants in the case above.
+test('only guard: the types and bounds the handlers no longer check are the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const requestOf = (/** @type {string} */ path, /** @type {string} */ method) => spec.paths[path][method].requestBody;
+  const bodyOf = (/** @type {string} */ path, /** @type {string} */ method) => requestOf(path, method).content['application/json'].schema;
+  const queryOf = (/** @type {string} */ path, /** @type {string} */ name) => spec.paths[path].get.parameters.find((/** @type {any} */ p) => p.name === name && p.in === 'query').schema;
+  const pick = (/** @type {any} */ s, /** @type {string[]} */ keys) => Object.fromEntries(keys.filter((k) => k in s).map((k) => [k, s[k]]));
+  const shape = (/** @type {any} */ s) => pick(s, ['type', 'minimum', 'maximum', 'maxLength', 'items', 'x-reason']);
+  const S = '/api/v1/split-expenses';
+
+  // Groups: type, currency and method are a string of their list, never null (`?? default`).
+  for (const [path, method] of [[`${S}/groups`, 'post'], [`${S}/groups/{id}`, 'patch']]) {
+    const props = bodyOf(path, method).properties;
+    for (const field of ['type', 'default_currency', 'default_split_method']) assert.equal(props[field].type, 'string', `${method} ${field}`);
+    assert.equal(requestOf(path, method).required, true, `${method} groups: a body`);
+  }
+  assert.deepEqual(bodyOf(`${S}/groups/{id}`, 'patch').properties.default_split_config.type, ['array', 'null']);
+  assert.equal(bodyOf(`${S}/groups/{id}`, 'patch').properties.default_split_config.items.type, 'object');
+  // Members and guests: role and family_role never null; password required text.
+  assert.equal(bodyOf(`${S}/groups/{id}/members`, 'post').properties.role.type, 'string');
+  const guest = bodyOf(`${S}/groups/{id}/guests`, 'post');
+  assert.equal(guest.properties.family_role.type, 'string');
+  assert.deepEqual(guest.properties.password, { type: 'string', description: guest.properties.password.description });
+  assert.deepEqual([...guest.required].sort(), ['display_name', 'password']);
+  // Expenses: the list fields never null (PUT category: null keeps the stored one), participants a list.
+  for (const [path, method] of [[`${S}/groups/{id}/expenses`, 'post'], [`${S}/expenses/{id}`, 'put']]) {
+    const props = bodyOf(path, method).properties;
+    for (const field of ['currency', 'converted_currency', 'split_method']) assert.equal(props[field].type, 'string', `${method} ${field}`);
+    assert.equal(props.participants.type, 'array', `${method} participants`);
+    assert.equal(requestOf(path, method).required, true, `${method} expenses: a body`);
+  }
+  assert.equal(bodyOf(`${S}/groups/{id}/expenses`, 'post').properties.category.type, 'string');
+  assert.deepEqual(bodyOf(`${S}/expenses/{id}`, 'put').properties.category.type, ['string', 'null']);
+  assert.equal(bodyOf(`${S}/groups/{id}/settlements`, 'post').properties.currency.type, 'string');
+  // Recurring: frequency required on create; on update a body is required and no list field is null.
+  const createSeries = bodyOf(`${S}/groups/{id}/recurring`, 'post');
+  assert.ok(createSeries.required.includes('frequency'));
+  assert.equal(createSeries.properties.frequency.type, 'string');
+  assert.equal(createSeries.properties.participants.type, 'array');
+  assert.equal(requestOf(`${S}/recurring/{id}`, 'put').required, true);
+  const updateSeries = bodyOf(`${S}/recurring/{id}`, 'put').properties;
+  for (const field of ['frequency', 'category', 'currency', 'split_method']) assert.equal(updateSeries[field].type, 'string', `put recurring ${field}`);
+  assert.equal(updateSeries.participants.type, 'array');
+  assert.equal(updateSeries.splits.type, 'array');
+  // missed: skip, book or null, with its reason - also at pause.
+  for (const props of [createSeries.properties, updateSeries, bodyOf(`${S}/recurring/{id}/pause`, 'post').properties]) {
+    assert.deepEqual(shape(props.missed), { type: ['string', 'null'], 'x-reason': 'invalid_missed' });
+  }
+  // Query: the list filters and cursors as text of at most 64, before_id from 1.
+  assert.equal(queryOf(`${S}/groups`, 'status').type, 'string');
+  assert.equal(queryOf(`${S}/groups/{id}/expenses`, 'category').type, 'string');
+  assert.deepEqual(queryOf(`${S}/groups/{id}/expenses`, 'budget_category'), { type: 'string' });
+  for (const name of ['before_date', 'before_at']) assert.deepEqual(queryOf(`${S}/groups/{id}/expenses`, name), { type: 'string', maxLength: 64 }, name);
+  assert.deepEqual(queryOf(`${S}/groups/{id}/activity`, 'before_at'), { type: 'string', maxLength: 64 });
+  for (const path of [`${S}/groups/{id}/expenses`, `${S}/groups/{id}/activity`]) {
+    assert.deepEqual(queryOf(path, 'before_id'), { type: 'integer', minimum: 1 }, path);
+  }
+
+  // PUT /backup/webdav/config: enabled a boolean, keep an integer from 1, the texts text or null.
+  const dav = bodyOf('/api/v1/backup/webdav/config', 'put').properties;
+  assert.deepEqual(shape(dav.enabled), { type: 'boolean' });
+  assert.deepEqual(shape(dav.keep), { type: 'integer', minimum: 1 });
+  for (const field of ['url', 'username', 'password', 'remotePath']) assert.deepEqual(dav[field].type, ['string', 'null'], field);
+  assert.equal(requestOf('/api/v1/backup/webdav/config', 'put').required, true);
+});
+
 test('groups: the own forms pass, unknown list values and wrong types are a 400 (no silent fallback)', async () => {
   assertPassed(await call('GET', '/split-expenses/dashboard'), 200);
   assertPassed(await call('GET', '/split-expenses/groups?status=active&q='), 200);

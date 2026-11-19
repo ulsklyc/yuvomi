@@ -1,13 +1,20 @@
 /**
  * Module: Split Expenses
  * Purpose: Native shared expense, settlement, recurring, and ledger API.
+ *          validateRequest() checks every request against its OpenAPI
+ *          operation first (#2810): types, the lists of
+ *          services/split-expense-fields.js and the currencies as `enum`, the
+ *          lengths as sent. The handlers keep what the schema cannot say
+ *          (trimming, calendar days, membership, split sums, budget
+ *          categories, ids of 0 and below). An unexpected error reaches the
+ *          central error handler; a catch answers only Refusal and
+ *          SplitInputError (sendWriteFailure) and the document-link cases.
  */
 
 import express from 'express';
 import crypto from 'node:crypto';
 import * as db from '../db.js';
 import { hashPassword, normalizePassword } from '../utils/password.js';
-import { createLogger } from '../logger.js';
 import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import {
@@ -29,12 +36,22 @@ import { todayKey } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import {
-  CATEGORIES, FAMILY_ROLES, FREQUENCIES, GROUP_ROLES, GROUP_TYPES, MAX_GUEST_EMAIL, MAX_GUEST_NAME, MAX_GUEST_PHONE, MISSED_MODES,
+  CATEGORIES, FREQUENCIES, GROUP_ROLES, GROUP_TYPES, MAX_GUEST_EMAIL, MAX_GUEST_NAME, MAX_GUEST_PHONE,
   SPLIT_METHODS,
 } from '../services/split-expense-fields.js';
 
-const log = createLogger('SplitExpenses');
 const router = express.Router();
+
+/**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). 0 and below
+ * pass the schema and find no row: 404 like an unknown id.
+ * @param {any} req
+ * @param {string} [name]
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
 
 const avatarColors = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D55'];
 const randomAvatarColor = () => avatarColors[Math.floor(Math.random() * avatarColors.length)];
@@ -101,7 +118,7 @@ function isSplitGuest(req) {
 /**
  * Ein Ausgaben-Gast legt keine Gruppe an. Ein Recht ohne Zeilenbezug und
  * deshalb VOR validateRequest() (#2810): ein Gast bekommt 403, auch mit einem
- * kaputten Rumpf. Die Pruefung im Handler bleibt bis Schritt (b).
+ * kaputten Rumpf. Die einzige Stelle der Regel fuer POST /groups.
  * @param {any} req
  * @param {any} res
  * @param {() => void} next
@@ -277,13 +294,13 @@ function sendRefusal(res, err) {
  * the text (`message.includes('Internal')`) and sent every message as a 400,
  * SQLite's included - its text names tables and columns. Now: a Refusal with
  * its status, the split rules' own input errors (SplitInputError) as 400 with
- * their sentence, everything else as a fixed 500 and into the log.
+ * their sentence; everything else is thrown on to the central error handler
+ * (fixed 500, log line with method and route pattern, #2810).
  */
-function sendWriteFailure(res, err, label) {
+function sendWriteFailure(res, err) {
   if (err instanceof Refusal) return sendRefusal(res, err);
   if (err?.name === 'SplitInputError') return res.status(400).json({ error: err.message, code: 400 });
-  log.error(`${label} error:`, err);
-  return res.status(500).json({ error: 'Internal server error.', code: 500 });
+  throw err;
 }
 
 /**
@@ -542,15 +559,23 @@ function replaceExpenseSplits(database, expense, splits) {
   insertExpenseLedger(database, expense, splits);
 }
 
+/**
+ * The fields of an expense (and of a series, through parseRecurringBody).
+ * `currency`, `converted_currency` and `category` come from a request whose
+ * schema allows only values of their lists (#2810): left out (or `category:
+ * null` on PUT /expenses, which keeps the stored one) means the default.
+ * `split_method` keeps its fallback: PUT /recurring/:id hands in the STORED
+ * method of the series, and `recurring_expenses.split_method` has no CHECK.
+ */
 function parseExpenseBody(body, fallbackCurrency) {
-  const currency = CURRENCY_CODES.includes(body.currency) ? body.currency : fallbackCurrency;
-  const convertedCurrency = CURRENCY_CODES.includes(body.converted_currency) ? body.converted_currency : currency;
+  const currency = body.currency ?? fallbackCurrency;
+  const convertedCurrency = body.converted_currency ?? currency;
   const amountMinor = parseMoneyToMinor(body.amount, currency);
   const convertedAmountMinor = body.converted_amount
     ? parseMoneyToMinor(body.converted_amount, convertedCurrency, 'converted_amount')
     : amountMinor;
   const method = SPLIT_METHODS.includes(body.split_method) ? body.split_method : 'equal';
-  const category = CATEGORIES.includes(body.category) ? body.category : 'general';
+  const category = body.category ?? 'general';
   const vTitle = str(body.title, 'Title', { max: MAX_TITLE });
   const vDescription = str(body.description, 'Description', { max: MAX_TEXT, required: false });
   const vDate = validateDate(body.expense_date, 'Expense date');
@@ -575,13 +600,16 @@ function parseExpenseBody(body, fallbackCurrency) {
 // ungültigem Format werden verworfen. Bewusst KEINE 100%-Pflicht - das ist eine
 // Vorbelegung, die finale Validierung passiert pro Ausgabe in buildSplits, und so
 // bleibt die Config robust, wenn sich der Mitgliederkreis später ändert.
+// Methode und Liste kommen aus einem Rumpf, den das Schema geprueft hat
+// (#2810): die Methode ist ein Wert aus SPLIT_METHODS oder fehlt, die Config
+// eine Liste von Objekten oder null.
 function normalizeSplitDefaults(body, groupId, fallbackMethod = 'equal') {
-  const method = SPLIT_METHODS.includes(body.default_split_method) ? body.default_split_method : fallbackMethod;
+  const method = body.default_split_method ?? fallbackMethod;
   if (method !== 'percentage' && method !== 'shares') return { method, config: null };
   const members = new Set(
     db.get().prepare('SELECT user_id FROM expense_group_members WHERE group_id = ?').all(groupId).map((r) => Number(r.user_id)),
   );
-  const raw = Array.isArray(body.default_split_config) ? body.default_split_config : [];
+  const raw = body.default_split_config ?? [];
   const entries = [];
   const seen = new Set();
   for (const item of raw) {
@@ -602,585 +630,521 @@ function normalizeSplitDefaults(body, groupId, fallbackMethod = 'equal') {
 }
 
 router.get('/meta', validateRequest(), (_req, res) => {
-  try {
-    res.json({ data: { group_types: GROUP_TYPES, group_roles: GROUP_ROLES, split_methods: SPLIT_METHODS, categories: CATEGORIES, currencies: CURRENCY_CODES, frequencies: FREQUENCIES, default_currency: defaultCurrency() } });
-  } catch (err) {
-    log.error('GET /meta error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: { group_types: GROUP_TYPES, group_roles: GROUP_ROLES, split_methods: SPLIT_METHODS, categories: CATEGORIES, currencies: CURRENCY_CODES, frequencies: FREQUENCIES, default_currency: defaultCurrency() } });
 });
 
 router.get('/dashboard', validateRequest(), (req, res) => {
-  try {
-    const uid = userId(req);
-    // Alle drei Abfragen tragen dasselbe Confinement: die Mitgliedschaft allein
-    // reicht nicht, ein Gast kann zusätzlich in fremden Gruppen stehen. Der
-    // Filter hängt am Gast-Status, nicht an der group_id - ein Gast ohne Gruppe
-    // sieht nichts, nicht alles.
-    const guest = splitGuestScope(req);
-    const restrictedGroupId = guest?.groupId ?? null;
-    const isGuest = guest ? 1 : 0;
-    const balances = db.get().prepare(`
-      SELECT l.currency, l.user_id, u.display_name, SUM(l.amount_minor) AS net_minor
-      FROM expense_ledger_entries l
-      JOIN expense_group_members gm ON gm.group_id = l.group_id AND gm.user_id = @uid
-      JOIN expense_groups g ON g.id = l.group_id AND g.status = 'active'
-      LEFT JOIN users u ON u.id = l.user_id
-      WHERE (@isGuest = 0 OR l.group_id = @restrictedGroupId)
-      GROUP BY l.currency, l.user_id
-    `).all({ uid, restrictedGroupId, isGuest });
-    const mine = balances.filter((row) => row.user_id === uid);
-    const totalOwed = mine.filter((row) => row.net_minor > 0).map((row) => normalizeLedgerRow({ ...row, amount_minor: row.net_minor }));
-    const totalOwing = mine.filter((row) => row.net_minor < 0).map((row) => normalizeLedgerRow({ ...row, amount_minor: -row.net_minor }));
-    const groupWhere = guest
-      ? "visible.user_id = @userId AND g.status = 'active' AND g.id = @restrictedGroupId"
-      : "visible.user_id = @userId AND g.status = 'active'";
-    // groupId === null (gelöschte Gruppe) trifft über `g.id = NULL` keine Zeile.
-    const groups = db.get().prepare(`${groupSelectWhere(groupWhere)} ORDER BY g.updated_at DESC LIMIT 6`)
-      .all({ userId: uid, restrictedGroupId });
-    const recent = db.get().prepare(`
-      SELECT e.*, g.name AS group_name, u.display_name AS payer_name
-      FROM expenses e
-      JOIN expense_groups g ON g.id = e.group_id
-      JOIN expense_group_members gm ON gm.group_id = g.id AND gm.user_id = @uid
-      LEFT JOIN users u ON u.id = e.payer_id
-      WHERE e.status = 'active'
-        AND (@isGuest = 0 OR e.group_id = @restrictedGroupId)
-      ORDER BY e.expense_date DESC, e.created_at DESC
-      LIMIT 8
-    `).all({ uid, restrictedGroupId, isGuest });
-    const recentSerialized = serializeExpenseList(recent, documentViewer(req));
-    res.json({ data: { total_owed: totalOwed, total_owing: totalOwing, groups, recent_expenses: recentSerialized } });
-  } catch (err) {
-    log.error('GET /dashboard error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const uid = userId(req);
+  // Alle drei Abfragen tragen dasselbe Confinement: die Mitgliedschaft allein
+  // reicht nicht, ein Gast kann zusätzlich in fremden Gruppen stehen. Der
+  // Filter hängt am Gast-Status, nicht an der group_id - ein Gast ohne Gruppe
+  // sieht nichts, nicht alles.
+  const guest = splitGuestScope(req);
+  const restrictedGroupId = guest?.groupId ?? null;
+  const isGuest = guest ? 1 : 0;
+  const balances = db.get().prepare(`
+    SELECT l.currency, l.user_id, u.display_name, SUM(l.amount_minor) AS net_minor
+    FROM expense_ledger_entries l
+    JOIN expense_group_members gm ON gm.group_id = l.group_id AND gm.user_id = @uid
+    JOIN expense_groups g ON g.id = l.group_id AND g.status = 'active'
+    LEFT JOIN users u ON u.id = l.user_id
+    WHERE (@isGuest = 0 OR l.group_id = @restrictedGroupId)
+    GROUP BY l.currency, l.user_id
+  `).all({ uid, restrictedGroupId, isGuest });
+  const mine = balances.filter((row) => row.user_id === uid);
+  const totalOwed = mine.filter((row) => row.net_minor > 0).map((row) => normalizeLedgerRow({ ...row, amount_minor: row.net_minor }));
+  const totalOwing = mine.filter((row) => row.net_minor < 0).map((row) => normalizeLedgerRow({ ...row, amount_minor: -row.net_minor }));
+  const groupWhere = guest
+    ? "visible.user_id = @userId AND g.status = 'active' AND g.id = @restrictedGroupId"
+    : "visible.user_id = @userId AND g.status = 'active'";
+  // groupId === null (gelöschte Gruppe) trifft über `g.id = NULL` keine Zeile.
+  const groups = db.get().prepare(`${groupSelectWhere(groupWhere)} ORDER BY g.updated_at DESC LIMIT 6`)
+    .all({ userId: uid, restrictedGroupId });
+  const recent = db.get().prepare(`
+    SELECT e.*, g.name AS group_name, u.display_name AS payer_name
+    FROM expenses e
+    JOIN expense_groups g ON g.id = e.group_id
+    JOIN expense_group_members gm ON gm.group_id = g.id AND gm.user_id = @uid
+    LEFT JOIN users u ON u.id = e.payer_id
+    WHERE e.status = 'active'
+      AND (@isGuest = 0 OR e.group_id = @restrictedGroupId)
+    ORDER BY e.expense_date DESC, e.created_at DESC
+    LIMIT 8
+  `).all({ uid, restrictedGroupId, isGuest });
+  const recentSerialized = serializeExpenseList(recent, documentViewer(req));
+  res.json({ data: { total_owed: totalOwed, total_owing: totalOwing, groups, recent_expenses: recentSerialized } });
 });
 
 router.get('/groups', validateRequest(), (req, res) => {
-  try {
-    const status = req.query.status === 'archived' ? 'archived' : 'active';
-    const query = String(req.query.q || '').trim();
-    const guest = splitGuestScope(req);
-    const rows = db.get().prepare(`
-      ${groupSelectWhere(`visible.user_id = @userId AND g.status = @status AND (@query = '' OR g.name LIKE '%' || @query || '%')${guest ? ' AND g.id = @restrictedGroupId' : ''}`)}
-      ORDER BY g.updated_at DESC
-    `).all({ userId: userId(req), status, query, restrictedGroupId: guest?.groupId ?? null });
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /groups error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const status = req.query.status ?? 'active';
+  const query = String(req.query.q || '').trim();
+  const guest = splitGuestScope(req);
+  const rows = db.get().prepare(`
+    ${groupSelectWhere(`visible.user_id = @userId AND g.status = @status AND (@query = '' OR g.name LIKE '%' || @query || '%')${guest ? ' AND g.id = @restrictedGroupId' : ''}`)}
+    ORDER BY g.updated_at DESC
+  `).all({ userId: userId(req), status, query, restrictedGroupId: guest?.groupId ?? null });
+  res.json({ data: rows });
 });
 
 router.post('/groups', refuseSplitGuest, validateRequest(), (req, res) => {
-  try {
-    if (isSplitGuest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
-    const vDescription = str(req.body.description, 'Description', { max: MAX_TEXT, required: false });
-    const errors = collectErrors([vName, vDescription]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    const type = GROUP_TYPES.includes(req.body.type) ? req.body.type : 'general';
-    const currency = CURRENCY_CODES.includes(req.body.default_currency) ? req.body.default_currency : defaultCurrency();
-    // Beim Anlegen existiert nur der Owner als Mitglied - eine pro-Mitglied-Config
-    // ist hier noch nicht sinnvoll (das Frontend bietet den Editor erst im
-    // Bearbeiten-Dialog). Nur die Methode wird direkt übernommen.
-    const defaultMethod = SPLIT_METHODS.includes(req.body.default_split_method) ? req.body.default_split_method : 'equal';
-    // Wer anlegt, wird Owner der Gruppe - dieselbe Regel wie beim Hinzufuegen
-    // (#1207): ein angemeldetes Konto, das weder Haushaltsmitglied noch Gast
-    // ist, bekommt keine neue Mitgliedschaft.
-    const staff = newNonMembers([userId(req)], { guestsAllowed: true });
-    if (staff.length) return res.status(400).json({ error: staffMessage(staff), code: 400 });
-    const result = db.transaction(() => {
-      const created = db.get().prepare(`
-        INSERT INTO expense_groups (name, description, type, default_currency, default_split_method, created_by)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(vName.value, vDescription.value, type, currency, defaultMethod, userId(req));
-      db.get().prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)')
-        .run(created.lastInsertRowid, userId(req), 'owner', userId(req));
-      activity(created.lastInsertRowid, userId(req), 'group_created', 'group', created.lastInsertRowid, { name: vName.value });
-      return created.lastInsertRowid;
-    });
-    const row = db.get().prepare(`${groupSelectWhere('g.id = @id AND visible.user_id = @userId')}`).get({ id: result, userId: userId(req) });
-    res.status(201).json({ data: row });
-  } catch (err) {
-    log.error('POST /groups error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
+  const vDescription = str(req.body.description, 'Description', { max: MAX_TEXT, required: false });
+  const errors = collectErrors([vName, vDescription]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  // Art, Waehrung und Methode sind Werte ihrer Listen oder fehlen (Schema,
+  // #2810); fehlen heisst Standard.
+  const type = req.body.type ?? 'general';
+  const currency = req.body.default_currency ?? defaultCurrency();
+  // Beim Anlegen existiert nur der Owner als Mitglied - eine pro-Mitglied-Config
+  // ist hier noch nicht sinnvoll (das Frontend bietet den Editor erst im
+  // Bearbeiten-Dialog). Nur die Methode wird direkt übernommen.
+  const defaultMethod = req.body.default_split_method ?? 'equal';
+  // Wer anlegt, wird Owner der Gruppe - dieselbe Regel wie beim Hinzufuegen
+  // (#1207): ein angemeldetes Konto, das weder Haushaltsmitglied noch Gast
+  // ist, bekommt keine neue Mitgliedschaft.
+  const staff = newNonMembers([userId(req)], { guestsAllowed: true });
+  if (staff.length) return res.status(400).json({ error: staffMessage(staff), code: 400 });
+  const result = db.transaction(() => {
+    const created = db.get().prepare(`
+      INSERT INTO expense_groups (name, description, type, default_currency, default_split_method, created_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(vName.value, vDescription.value, type, currency, defaultMethod, userId(req));
+    db.get().prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)')
+      .run(created.lastInsertRowid, userId(req), 'owner', userId(req));
+    activity(created.lastInsertRowid, userId(req), 'group_created', 'group', created.lastInsertRowid, { name: vName.value });
+    return created.lastInsertRowid;
+  });
+  const row = db.get().prepare(`${groupSelectWhere('g.id = @id AND visible.user_id = @userId')}`).get({ id: result, userId: userId(req) });
+  res.status(201).json({ data: row });
 });
 
 router.patch('/groups/:id', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    const archived = archivedRefusal(id);
-    if (archived) return sendRefusal(res, archived);
-    const vName = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_TITLE }) : { value: undefined };
-    const vDescription = req.body.description !== undefined ? str(req.body.description, 'Description', { max: MAX_TEXT, required: false }) : { value: undefined };
-    const errors = collectErrors([vName, vDescription]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    const current = db.get().prepare('SELECT * FROM expense_groups WHERE id = ?').get(id);
-    const type = GROUP_TYPES.includes(req.body.type) ? req.body.type : current.type;
-    const currency = CURRENCY_CODES.includes(req.body.default_currency) ? req.body.default_currency : current.default_currency;
-    // Standard-Aufteilung nur anfassen, wenn der Client sie mitschickt (#517).
-    let defaultMethod = current.default_split_method;
-    let defaultConfig = current.default_split_config;
-    if (req.body.default_split_method !== undefined || req.body.default_split_config !== undefined) {
-      const norm = normalizeSplitDefaults(req.body, id, current.default_split_method);
-      defaultMethod = norm.method;
-      defaultConfig = norm.config;
-    }
-    db.get().prepare(`
-      UPDATE expense_groups SET name = ?, description = ?, type = ?, default_currency = ?, default_split_method = ?, default_split_config = ? WHERE id = ?
-    `).run(vName.value ?? current.name, vDescription.value !== undefined ? vDescription.value : current.description, type, currency, defaultMethod, defaultConfig, id);
-    activity(id, userId(req), 'group_updated', 'group', id);
-    const row = db.get().prepare(`${groupSelectWhere('g.id = @id AND visible.user_id = @userId')}`).get({ id, userId: userId(req) });
-    res.json({ data: row });
-  } catch (err) {
-    log.error('PATCH /groups/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const id = pathId(req);
+  if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  const archived = archivedRefusal(id);
+  if (archived) return sendRefusal(res, archived);
+  const vName = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_TITLE }) : { value: undefined };
+  const vDescription = req.body.description !== undefined ? str(req.body.description, 'Description', { max: MAX_TEXT, required: false }) : { value: undefined };
+  const errors = collectErrors([vName, vDescription]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const current = db.get().prepare('SELECT * FROM expense_groups WHERE id = ?').get(id);
+  const type = req.body.type ?? current.type;
+  const currency = req.body.default_currency ?? current.default_currency;
+  // Standard-Aufteilung nur anfassen, wenn der Client sie mitschickt (#517).
+  let defaultMethod = current.default_split_method;
+  let defaultConfig = current.default_split_config;
+  if (req.body.default_split_method !== undefined || req.body.default_split_config !== undefined) {
+    const norm = normalizeSplitDefaults(req.body, id, current.default_split_method);
+    defaultMethod = norm.method;
+    defaultConfig = norm.config;
   }
+  db.get().prepare(`
+    UPDATE expense_groups SET name = ?, description = ?, type = ?, default_currency = ?, default_split_method = ?, default_split_config = ? WHERE id = ?
+  `).run(vName.value ?? current.name, vDescription.value !== undefined ? vDescription.value : current.description, type, currency, defaultMethod, defaultConfig, id);
+  activity(id, userId(req), 'group_updated', 'group', id);
+  const row = db.get().prepare(`${groupSelectWhere('g.id = @id AND visible.user_id = @userId')}`).get({ id, userId: userId(req) });
+  res.json({ data: row });
 });
 
 router.post('/groups/:id/archive', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    db.get().prepare("UPDATE expense_groups SET status = 'archived', archived_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(id);
-    activity(id, userId(req), 'group_archived', 'group', id);
-    res.json({ data: { ok: true } });
-  } catch (err) {
-    log.error('POST /groups/:id/archive error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const id = pathId(req);
+  if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  db.get().prepare("UPDATE expense_groups SET status = 'archived', archived_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(id);
+  activity(id, userId(req), 'group_archived', 'group', id);
+  res.json({ data: { ok: true } });
 });
 
 // Gegenstück zu /archive (#574): ohne diese Route wäre Archivieren eine
 // Einbahnstraße - archivierte Gruppen sind über ?status=archived sichtbar,
 // aber ohne Weg zurück in die aktive Liste.
 router.post('/groups/:id/unarchive', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    // Die Serien der Gruppe ruecken in derselben Transaktion hinter die Luecke
-    // (wie Fortsetzen mit `missed: "skip"`): der Lauf hat waehrend der Archivzeit
-    // nichts gebucht, und ohne das buchte er je Stunde einen Termin der Luecke
-    // nach. Pausierte Serien bleiben, wie sie sind - Fortsetzen entscheidet.
-    db.transaction(() => {
-      const database = db.get();
-      const restored = database.prepare("UPDATE expense_groups SET status = 'active', archived_at = NULL WHERE id = ? AND status = 'archived'").run(id);
-      if (restored.changes !== 1) {
-        // Schon aktiv: wie vor #1747 nur der Aktivitaetseintrag, Serien bleiben.
-        activity(id, userId(req), 'group_unarchived', 'group', id);
-        return;
-      }
-      const today = todayKey(database);
-      let total = 0;
-      const advance = database.prepare('UPDATE recurring_expenses SET next_run_date = ? WHERE id = ?');
-      for (const series of database.prepare('SELECT id, next_run_date, frequency, anchor_day FROM recurring_expenses WHERE group_id = ? AND paused_at IS NULL').all(id)) {
-        const next = nextRunNotBefore(series.next_run_date, series.frequency, today, series.anchor_day);
-        if (next.date !== series.next_run_date) advance.run(next.date, series.id);
-        total += next.skipped;
-      }
-      activity(id, userId(req), 'group_unarchived', 'group', id, total ? { skipped: total } : {});
-    });
-    res.json({ data: { ok: true } });
-  } catch (err) {
-    log.error('POST /groups/:id/unarchive error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const id = pathId(req);
+  if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  // Die Serien der Gruppe ruecken in derselben Transaktion hinter die Luecke
+  // (wie Fortsetzen mit `missed: "skip"`): der Lauf hat waehrend der Archivzeit
+  // nichts gebucht, und ohne das buchte er je Stunde einen Termin der Luecke
+  // nach. Pausierte Serien bleiben, wie sie sind - Fortsetzen entscheidet.
+  db.transaction(() => {
+    const database = db.get();
+    const restored = database.prepare("UPDATE expense_groups SET status = 'active', archived_at = NULL WHERE id = ? AND status = 'archived'").run(id);
+    if (restored.changes !== 1) {
+      // Schon aktiv: wie vor #1747 nur der Aktivitaetseintrag, Serien bleiben.
+      activity(id, userId(req), 'group_unarchived', 'group', id);
+      return;
+    }
+    const today = todayKey(database);
+    let total = 0;
+    const advance = database.prepare('UPDATE recurring_expenses SET next_run_date = ? WHERE id = ?');
+    for (const series of database.prepare('SELECT id, next_run_date, frequency, anchor_day FROM recurring_expenses WHERE group_id = ? AND paused_at IS NULL').all(id)) {
+      const next = nextRunNotBefore(series.next_run_date, series.frequency, today, series.anchor_day);
+      if (next.date !== series.next_run_date) advance.run(next.date, series.id);
+      total += next.skipped;
+    }
+    activity(id, userId(req), 'group_unarchived', 'group', id, total ? { skipped: total } : {});
+  });
+  res.json({ data: { ok: true } });
 });
 
 router.delete('/groups/:id', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    const usage = db.get().prepare(`
-      SELECT
-        (SELECT COUNT(*) FROM expenses WHERE group_id = ?) AS expenses,
-        (SELECT COUNT(*) FROM settlements WHERE group_id = ?) AS settlements
-    `).get(id, id);
-    if ((usage.expenses || 0) > 0 || (usage.settlements || 0) > 0) {
-      return res.status(409).json({ error: 'Groups with financial history must be archived instead of deleted.', code: 409 });
-    }
-    db.get().prepare('DELETE FROM expense_groups WHERE id = ?').run(id);
-    res.json({ data: { ok: true } });
-  } catch (err) {
-    log.error('DELETE /groups/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const id = pathId(req);
+  if (!requireGroupAccess(id, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  if (!canManageGroup(id, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  const usage = db.get().prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM expenses WHERE group_id = ?) AS expenses,
+      (SELECT COUNT(*) FROM settlements WHERE group_id = ?) AS settlements
+  `).get(id, id);
+  if ((usage.expenses || 0) > 0 || (usage.settlements || 0) > 0) {
+    return res.status(409).json({ error: 'Groups with financial history must be archived instead of deleted.', code: 409 });
   }
+  db.get().prepare('DELETE FROM expense_groups WHERE id = ?').run(id);
+  res.json({ data: { ok: true } });
 });
 
 router.get('/groups/:id/members', validateRequest(), (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const rows = db.get().prepare(`
-      SELECT gm.group_id, gm.user_id, gm.role, gm.joined_at, u.display_name, u.username, u.avatar_color, u.avatar_data
-      FROM expense_group_members gm
-      JOIN users u ON u.id = gm.user_id
-      WHERE gm.group_id = ?
-      ORDER BY CASE gm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, ${memberOrderSql('u')}
-    `).all(groupId);
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /groups/:id/members error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  const rows = db.get().prepare(`
+    SELECT gm.group_id, gm.user_id, gm.role, gm.joined_at, u.display_name, u.username, u.avatar_color, u.avatar_data
+    FROM expense_group_members gm
+    JOIN users u ON u.id = gm.user_id
+    WHERE gm.group_id = ?
+    ORDER BY CASE gm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, ${memberOrderSql('u')}
+  `).all(groupId);
+  res.json({ data: rows });
 });
 
 router.get('/groups/:id/member-candidates', validateRequest(), (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    if (isSplitGuest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    // Haushaltsmitglieder, dazu die Gaeste DIESER Gruppe (#1207). Ein Gast
-    // existiert fuer geteilte Ausgaben: er gehoert zu der Gruppe, fuer die er
-    // angelegt wurde, und zu jeder, in der er schon Mitglied ist. Gaeste
-    // anderer Gruppen bietet die Auswahl nicht an.
-    // DAS UNION STEHT IN EINER UNTERABFRAGE, damit die Haushaltsreihenfolge
-    // (#1644) darueber sortieren kann: direkt hinter einem UNION nimmt SQLite
-    // nur Ergebnisspalten als Sortierbegriff, keinen Ausdruck wie
-    // "sort_order IS NULL".
-    const people = db.get().prepare(`
-      SELECT * FROM (
-      SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
-             CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
-             gm.role AS group_role,
-             ${memberPositionSql('u')} AS sort_order
-      FROM users u
-      LEFT JOIN contacts c ON c.family_user_id = u.id
-      LEFT JOIN birthdays b ON b.family_user_id = u.id
-      LEFT JOIN expense_group_members gm ON gm.group_id = @groupId AND gm.user_id = u.id
-      WHERE ${householdMemberSql('u')}
-      UNION ALL
-      SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
-             CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
-             gm.role AS group_role,
-             ${memberPositionSql('u')} AS sort_order
-      FROM split_expense_guest_users g
-      JOIN users u ON u.id = g.user_id
-      LEFT JOIN contacts c ON c.family_user_id = u.id
-      LEFT JOIN birthdays b ON b.family_user_id = u.id
-      LEFT JOIN expense_group_members gm ON gm.group_id = @groupId AND gm.user_id = u.id
-      WHERE g.group_id = @groupId OR gm.user_id IS NOT NULL
-      UNION ALL
-      -- Wer schon Mitglied dieser Gruppe ist, ohne Haushaltsmitglied oder Gast
-      -- zu sein (Hauspersonal aus der Zeit vor #1207): neu hinzufuegen laesst
-      -- sich so jemand nicht mehr, aber der Editor muss die Mitgliedschaft
-      -- zeigen, damit sie sich beenden laesst.
-      SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
-             u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
-             1 AS in_group,
-             gm.role AS group_role,
-             ${memberPositionSql('u')} AS sort_order
-      FROM expense_group_members gm
-      JOIN users u ON u.id = gm.user_id
-      LEFT JOIN contacts c ON c.family_user_id = u.id
-      LEFT JOIN birthdays b ON b.family_user_id = u.id
-      WHERE gm.group_id = @groupId
-        AND NOT (${householdMemberSql('u')})
-        AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
-      )
-      ORDER BY ${memberOrderOverColumnsSql({ position: 'sort_order', name: 'display_name', id: 'user_id' })}
-    `).all({ groupId });
-    // DIE FELDER FOLGEN DEM RECHT IHRER QUELLE. Der Pfad gehoert `budget`,
-    // Telefon und E-Mail kommen aber aus `contacts`, das Geburtsdatum eines
-    // Mitglieds aus den Geburtstagen (`calendar`). Ohne das jeweilige
-    // Leserecht (Mitgliedsrecht UND Token-Scope) bleiben die Felder null. Freie
-    // Kontakte bietet die Auswahl nur mit dem SCHREIBRECHT auf `contacts` an:
-    // hinzufuegen verknuepft sie mit einem Konto (POST /groups/:id/members),
-    // ohne das Recht endete die Wahl im 403. Die Route selbst bleibt offen:
-    // die Auswahl braucht nur Name und ID der Haushaltsmitglieder.
-    const readsContacts = mayReadModule(req, 'contacts');
-    const readsBirthdays = mayReadModule(req, 'calendar');
-    const visiblePeople = people.map((row) => ({
-      ...row,
-      phone: readsContacts ? row.phone : null,
-      email: readsContacts ? row.email : null,
-      birth_date: readsBirthdays ? row.birth_date : null,
-      // Nur Tag und Monat bekannt (#2095): birth_date traegt dann 2000.
-      birth_year_unknown: readsBirthdays && row.birth_year_unknown === 1,
-    }));
-    const contacts = mayWriteModule(req, 'contacts') ? db.get().prepare(`
-      SELECT 'contact' AS source, NULL AS user_id, c.id AS contact_id, c.name AS display_name,
-             NULL AS username, '#2563EB' AS avatar_color, 'other' AS family_role,
-             c.phone, c.email, c.birthday AS birth_date, c.birthday_year_unknown AS birth_year_unknown,
-             0 AS in_group, NULL AS group_role
-      FROM contacts c
-      WHERE c.family_user_id IS NULL
-      ORDER BY c.name COLLATE NOCASE ASC
-    `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 })) : [];
-    res.json({ data: [...visiblePeople, ...contacts] });
-  } catch (err) {
-    log.error('GET /groups/:id/member-candidates error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  if (isSplitGuest(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  // Haushaltsmitglieder, dazu die Gaeste DIESER Gruppe (#1207). Ein Gast
+  // existiert fuer geteilte Ausgaben: er gehoert zu der Gruppe, fuer die er
+  // angelegt wurde, und zu jeder, in der er schon Mitglied ist. Gaeste
+  // anderer Gruppen bietet die Auswahl nicht an.
+  // DAS UNION STEHT IN EINER UNTERABFRAGE, damit die Haushaltsreihenfolge
+  // (#1644) darueber sortieren kann: direkt hinter einem UNION nimmt SQLite
+  // nur Ergebnisspalten als Sortierbegriff, keinen Ausdruck wie
+  // "sort_order IS NULL".
+  const people = db.get().prepare(`
+    SELECT * FROM (
+    SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
+           u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
+           CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
+           gm.role AS group_role,
+           ${memberPositionSql('u')} AS sort_order
+    FROM users u
+    LEFT JOIN contacts c ON c.family_user_id = u.id
+    LEFT JOIN birthdays b ON b.family_user_id = u.id
+    LEFT JOIN expense_group_members gm ON gm.group_id = @groupId AND gm.user_id = u.id
+    WHERE ${householdMemberSql('u')}
+    UNION ALL
+    SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
+           u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
+           CASE WHEN gm.user_id IS NULL THEN 0 ELSE 1 END AS in_group,
+           gm.role AS group_role,
+           ${memberPositionSql('u')} AS sort_order
+    FROM split_expense_guest_users g
+    JOIN users u ON u.id = g.user_id
+    LEFT JOIN contacts c ON c.family_user_id = u.id
+    LEFT JOIN birthdays b ON b.family_user_id = u.id
+    LEFT JOIN expense_group_members gm ON gm.group_id = @groupId AND gm.user_id = u.id
+    WHERE g.group_id = @groupId OR gm.user_id IS NOT NULL
+    UNION ALL
+    -- Wer schon Mitglied dieser Gruppe ist, ohne Haushaltsmitglied oder Gast
+    -- zu sein (Hauspersonal aus der Zeit vor #1207): neu hinzufuegen laesst
+    -- sich so jemand nicht mehr, aber der Editor muss die Mitgliedschaft
+    -- zeigen, damit sie sich beenden laesst.
+    SELECT 'user' AS source, u.id AS user_id, NULL AS contact_id, u.display_name, u.username,
+           u.avatar_color, u.family_role, c.phone, c.email, b.birth_date, b.year_unknown AS birth_year_unknown,
+           1 AS in_group,
+           gm.role AS group_role,
+           ${memberPositionSql('u')} AS sort_order
+    FROM expense_group_members gm
+    JOIN users u ON u.id = gm.user_id
+    LEFT JOIN contacts c ON c.family_user_id = u.id
+    LEFT JOIN birthdays b ON b.family_user_id = u.id
+    WHERE gm.group_id = @groupId
+      AND NOT (${householdMemberSql('u')})
+      AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
+    )
+    ORDER BY ${memberOrderOverColumnsSql({ position: 'sort_order', name: 'display_name', id: 'user_id' })}
+  `).all({ groupId });
+  // DIE FELDER FOLGEN DEM RECHT IHRER QUELLE. Der Pfad gehoert `budget`,
+  // Telefon und E-Mail kommen aber aus `contacts`, das Geburtsdatum eines
+  // Mitglieds aus den Geburtstagen (`calendar`). Ohne das jeweilige
+  // Leserecht (Mitgliedsrecht UND Token-Scope) bleiben die Felder null. Freie
+  // Kontakte bietet die Auswahl nur mit dem SCHREIBRECHT auf `contacts` an:
+  // hinzufuegen verknuepft sie mit einem Konto (POST /groups/:id/members),
+  // ohne das Recht endete die Wahl im 403. Die Route selbst bleibt offen:
+  // die Auswahl braucht nur Name und ID der Haushaltsmitglieder.
+  const readsContacts = mayReadModule(req, 'contacts');
+  const readsBirthdays = mayReadModule(req, 'calendar');
+  const visiblePeople = people.map((row) => ({
+    ...row,
+    phone: readsContacts ? row.phone : null,
+    email: readsContacts ? row.email : null,
+    birth_date: readsBirthdays ? row.birth_date : null,
+    // Nur Tag und Monat bekannt (#2095): birth_date traegt dann 2000.
+    birth_year_unknown: readsBirthdays && row.birth_year_unknown === 1,
+  }));
+  const contacts = mayWriteModule(req, 'contacts') ? db.get().prepare(`
+    SELECT 'contact' AS source, NULL AS user_id, c.id AS contact_id, c.name AS display_name,
+           NULL AS username, '#2563EB' AS avatar_color, 'other' AS family_role,
+           c.phone, c.email, c.birthday AS birth_date, c.birthday_year_unknown AS birth_year_unknown,
+           0 AS in_group, NULL AS group_role
+    FROM contacts c
+    WHERE c.family_user_id IS NULL
+    ORDER BY c.name COLLATE NOCASE ASC
+  `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 })) : [];
+  res.json({ data: [...visiblePeople, ...contacts] });
 });
 
 router.post('/groups/:id/members', validateRequest(), async (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    // Vorab, vor Body-Pruefung und Hash; die Pruefung in der Transaktion bleibt.
-    const archivedEarly = archivedRefusal(groupId);
-    if (archivedEarly) return sendRefusal(res, archivedEarly);
-    const vUserId = req.body.user_id ? validateId(req.body.user_id, 'user_id') : { value: null, error: null };
-    const vContactId = req.body.contact_id ? validateId(req.body.contact_id, 'contact_id') : { value: null, error: null };
-    if (vUserId.error || vContactId.error) return res.status(400).json({ error: vUserId.error || vContactId.error, code: 400 });
-    if (!vUserId.value && !vContactId.value) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
-    const role = GROUP_ROLES.includes(req.body.role) && req.body.role !== 'owner' ? req.body.role : 'guest';
-    // Ein Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (beide
-    // Achsen) dieselbe Antwort wie fuer eine unbekannte ID, und die Route
-    // schreibt nichts - der Gast truege Name, Telefon und E-Mail des Kontakts.
-    // Ein schon verknuepfter Kontakt wird nur gelesen; ein freier wird
-    // BESCHRIEBEN (weiter unten, `mayWriteModule`).
-    if (vContactId.value && !mayReadModule(req, 'contacts')) {
-      return res.status(404).json({ error: 'Contact not found.', code: 404 });
-    }
-
-    // KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN. Der Passwort-Hash eines neuen
-    // Gastes ist der einzige asynchrone Schritt und laeuft deshalb ZUERST. Die
-    // Vorabfrage spart ihn nur, wenn der Kontakt fehlt oder schon einen Nutzer
-    // hat. Alles, worauf danach geschrieben wird - Gruppe, Verwalterrecht,
-    // Kontakt, Mitgliedschaft -, liest die Transaktion neu: eine Gruppe, die
-    // waehrend des Hashes verschwand, hinterlaesst sonst einen Gast ohne
-    // Gruppe, und zwei gleichzeitige Anfragen legen zwei Gaeste an.
-    let passwordHash = null;
-    if (vContactId.value) {
-      const known = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(vContactId.value);
-      if (!known) return res.status(404).json({ error: 'Contact not found.', code: 404 });
-      if (!known.family_user_id) {
-        // Ein freier Kontakt bekommt ein Konto: `userFromContact()` setzt
-        // `family_user_id` und schreibt Name, Telefon und E-Mail ueber
-        // `syncGuestArtifacts()`; ab da spiegelt das Konto den Kontakt. Das
-        // ist ein Schreibvorgang in `contacts` und braucht dessen Schreibrecht
-        // (beide Achsen) - vor dem Hash, damit nichts angefangen wird.
-        if (!mayWriteModule(req, 'contacts')) {
-          return res.status(403).json({ error: 'Write access to contacts is required to add a contact without an account.', code: 403, reason: 'cross_module_access' });
-        }
-        passwordHash = await randomGuestPasswordHash();
-      }
-    }
-
-    let memberUserId;
-    try {
-      memberUserId = db.transaction(() => {
-        assertManagesGroup(groupId, req);
-        const uid = vContactId.value
-          ? userFromContact(db.get(), vContactId.value, userId(req), groupId, passwordHash, {
-            checkEmails: !isAdminRequest(req),
-          })
-          : vUserId.value;
-        const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(uid);
-        if (!exists) throw new Refusal(404, 'User not found.');
-        // Mitglieder und Gaeste, aber kein Hauspersonal (#1207). Eine bestehende
-        // Mitgliedschaft bleibt gueltig und laesst sich weiter aendern.
-        const already = db.get().prepare('SELECT 1 FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, uid);
-        const staff = newNonMembers([uid], { stored: already ? [uid] : [], guestsAllowed: true });
-        if (staff.length) throw new Refusal(400, staffMessage(staff));
-        db.get().prepare(`
-          INSERT INTO expense_group_members (group_id, user_id, role, invited_by)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT(group_id, user_id) DO UPDATE SET role = excluded.role
-        `).run(groupId, uid, role, userId(req));
-        activity(groupId, userId(req), 'member_added', 'member', uid, { role });
-        return uid;
-      });
-    } catch (err) {
-      if (err instanceof Refusal) return sendRefusal(res, err);
-      throw err;
-    }
-    res.status(201).json({ data: { group_id: groupId, user_id: memberUserId, role } });
-  } catch (err) {
-    log.error('POST /groups/:id/members error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  // Vorab, vor Body-Pruefung und Hash; die Pruefung in der Transaktion bleibt.
+  const archivedEarly = archivedRefusal(groupId);
+  if (archivedEarly) return sendRefusal(res, archivedEarly);
+  const vUserId = req.body.user_id ? validateId(req.body.user_id, 'user_id') : { value: null, error: null };
+  const vContactId = req.body.contact_id ? validateId(req.body.contact_id, 'contact_id') : { value: null, error: null };
+  if (vUserId.error || vContactId.error) return res.status(400).json({ error: vUserId.error || vContactId.error, code: 400 });
+  if (!vUserId.value && !vContactId.value) return res.status(400).json({ error: 'user_id or contact_id is required.', code: 400 });
+  // Ein Wert aus GROUP_ROLES oder nichts (Schema, #2810); `owner` vergibt nur das Anlegen.
+  const role = req.body.role === undefined || req.body.role === 'owner' ? 'guest' : req.body.role;
+  // Ein Kontakt ist Quelldatum aus `contacts`: ohne dessen Leserecht (beide
+  // Achsen) dieselbe Antwort wie fuer eine unbekannte ID, und die Route
+  // schreibt nichts - der Gast truege Name, Telefon und E-Mail des Kontakts.
+  // Ein schon verknuepfter Kontakt wird nur gelesen; ein freier wird
+  // BESCHRIEBEN (weiter unten, `mayWriteModule`).
+  if (vContactId.value && !mayReadModule(req, 'contacts')) {
+    return res.status(404).json({ error: 'Contact not found.', code: 404 });
   }
+
+  // KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN. Der Passwort-Hash eines neuen
+  // Gastes ist der einzige asynchrone Schritt und laeuft deshalb ZUERST. Die
+  // Vorabfrage spart ihn nur, wenn der Kontakt fehlt oder schon einen Nutzer
+  // hat. Alles, worauf danach geschrieben wird - Gruppe, Verwalterrecht,
+  // Kontakt, Mitgliedschaft -, liest die Transaktion neu: eine Gruppe, die
+  // waehrend des Hashes verschwand, hinterlaesst sonst einen Gast ohne
+  // Gruppe, und zwei gleichzeitige Anfragen legen zwei Gaeste an.
+  let passwordHash = null;
+  if (vContactId.value) {
+    const known = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(vContactId.value);
+    if (!known) return res.status(404).json({ error: 'Contact not found.', code: 404 });
+    if (!known.family_user_id) {
+      // Ein freier Kontakt bekommt ein Konto: `userFromContact()` setzt
+      // `family_user_id` und schreibt Name, Telefon und E-Mail ueber
+      // `syncGuestArtifacts()`; ab da spiegelt das Konto den Kontakt. Das
+      // ist ein Schreibvorgang in `contacts` und braucht dessen Schreibrecht
+      // (beide Achsen) - vor dem Hash, damit nichts angefangen wird.
+      if (!mayWriteModule(req, 'contacts')) {
+        return res.status(403).json({ error: 'Write access to contacts is required to add a contact without an account.', code: 403, reason: 'cross_module_access' });
+      }
+      passwordHash = await randomGuestPasswordHash();
+    }
+  }
+
+  let memberUserId;
+  try {
+    memberUserId = db.transaction(() => {
+      assertManagesGroup(groupId, req);
+      const uid = vContactId.value
+        ? userFromContact(db.get(), vContactId.value, userId(req), groupId, passwordHash, {
+          checkEmails: !isAdminRequest(req),
+        })
+        : vUserId.value;
+      const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(uid);
+      if (!exists) throw new Refusal(404, 'User not found.');
+      // Mitglieder und Gaeste, aber kein Hauspersonal (#1207). Eine bestehende
+      // Mitgliedschaft bleibt gueltig und laesst sich weiter aendern.
+      const already = db.get().prepare('SELECT 1 FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, uid);
+      const staff = newNonMembers([uid], { stored: already ? [uid] : [], guestsAllowed: true });
+      if (staff.length) throw new Refusal(400, staffMessage(staff));
+      db.get().prepare(`
+        INSERT INTO expense_group_members (group_id, user_id, role, invited_by)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(group_id, user_id) DO UPDATE SET role = excluded.role
+      `).run(groupId, uid, role, userId(req));
+      activity(groupId, userId(req), 'member_added', 'member', uid, { role });
+      return uid;
+    });
+  } catch (err) {
+    if (err instanceof Refusal) return sendRefusal(res, err);
+    throw err;
+  }
+  res.status(201).json({ data: { group_id: groupId, user_id: memberUserId, role } });
 });
 
 router.delete('/groups/:id/members/:userId', validateRequest(), (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    const memberUserId = Number(req.params.userId);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    const archived = archivedRefusal(groupId);
-    if (archived) return sendRefusal(res, archived);
-    const target = db.get().prepare('SELECT role FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, memberUserId);
-    if (!target) return res.status(404).json({ error: 'Member not found.', code: 404 });
-    if (target.role === 'owner') return res.status(400).json({ error: 'Group owner cannot be removed.', code: 400 });
-    db.get().prepare('DELETE FROM expense_group_members WHERE group_id = ? AND user_id = ?').run(groupId, memberUserId);
-    activity(groupId, userId(req), 'member_removed', 'member', memberUserId);
-    res.json({ data: { ok: true } });
-  } catch (err) {
-    log.error('DELETE /groups/:id/members/:userId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const groupId = pathId(req);
+  const memberUserId = pathId(req, 'userId');
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  const archived = archivedRefusal(groupId);
+  if (archived) return sendRefusal(res, archived);
+  const target = db.get().prepare('SELECT role FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, memberUserId);
+  if (!target) return res.status(404).json({ error: 'Member not found.', code: 404 });
+  if (target.role === 'owner') return res.status(400).json({ error: 'Group owner cannot be removed.', code: 400 });
+  db.get().prepare('DELETE FROM expense_group_members WHERE group_id = ? AND user_id = ?').run(groupId, memberUserId);
+  activity(groupId, userId(req), 'member_removed', 'member', memberUserId);
+  res.json({ data: { ok: true } });
 });
 
 router.post('/groups/:id/guests', validateRequest(), async (req, res) => {
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  // Vorab, vor Body-Pruefung und Hash; die Pruefung in der Transaktion bleibt.
+  const archivedEarly = archivedRefusal(groupId);
+  if (archivedEarly) return sendRefusal(res, archivedEarly);
+
+  const vDisplayName = str(req.body.display_name, 'Display name', { max: MAX_GUEST_NAME });
+  const vPhone = str(req.body.phone, 'Phone', { max: MAX_GUEST_PHONE, required: false });
+  const vEmail = str(req.body.email, 'Email', { max: MAX_GUEST_EMAIL, required: false });
+  const vBirthDate = validateDate(req.body.birth_date, 'Birth date');
+  const errors = collectErrors([vDisplayName, vPhone, vEmail, vBirthDate]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  // `password` ist Pflicht und Text, `family_role` ein Wert aus FAMILY_ROLES
+  // oder nichts (Schema, #2810). Die Laenge zaehlt die Route: nach
+  // normalizePassword() und in UTF-16-Einheiten, nicht wie Ajv.
+  const password = req.body.password;
+  if (normalizePassword(password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
+  const familyRole = req.body.family_role ?? 'other';
+  const requestedUsername = req.body.username && /^[a-zA-Z0-9._-]{3,64}$/.test(req.body.username)
+    ? String(req.body.username)
+    : null;
+
+  // KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN (wie POST /members): erst der
+  // Hash, dann in EINER synchronen Transaktion Gruppe und Verwalterrecht neu
+  // pruefen, den Benutzernamen pruefen bzw. vergeben und anlegen. Stand die
+  // Namenspruefung vor dem Hash, endeten zwei gleichzeitige Anfragen mit
+  // demselben Namen im 500 statt im 409, und eine waehrend des Hashes
+  // geloeschte Gruppe liess einen Gast ohne Gruppe zurueck.
+  const hash = await hashPassword(password);
+
+  let createdUserId;
   try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    // Vorab, vor Body-Pruefung und Hash; die Pruefung in der Transaktion bleibt.
-    const archivedEarly = archivedRefusal(groupId);
-    if (archivedEarly) return sendRefusal(res, archivedEarly);
-
-    const vDisplayName = str(req.body.display_name, 'Display name', { max: MAX_GUEST_NAME });
-    const vPhone = str(req.body.phone, 'Phone', { max: MAX_GUEST_PHONE, required: false });
-    const vEmail = str(req.body.email, 'Email', { max: MAX_GUEST_EMAIL, required: false });
-    const vBirthDate = validateDate(req.body.birth_date, 'Birth date');
-    const errors = collectErrors([vDisplayName, vPhone, vEmail, vBirthDate]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    const password = String(req.body.password || '');
-    if (normalizePassword(password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
-    const familyRole = FAMILY_ROLES.includes(req.body.family_role) ? req.body.family_role : 'other';
-    const requestedUsername = req.body.username && /^[a-zA-Z0-9._-]{3,64}$/.test(req.body.username)
-      ? String(req.body.username)
-      : null;
-
-    // KEIN YIELD ZWISCHEN LESEN UND SCHREIBEN (wie POST /members): erst der
-    // Hash, dann in EINER synchronen Transaktion Gruppe und Verwalterrecht neu
-    // pruefen, den Benutzernamen pruefen bzw. vergeben und anlegen. Stand die
-    // Namenspruefung vor dem Hash, endeten zwei gleichzeitige Anfragen mit
-    // demselben Namen im 500 statt im 409, und eine waehrend des Hashes
-    // geloeschte Gruppe liess einen Gast ohne Gruppe zurueck.
-    const hash = await hashPassword(password);
-
-    let createdUserId;
-    try {
-      createdUserId = db.transaction(() => {
-        assertManagesGroup(groupId, req);
-        const username = requestedUsername ?? uniqueUsername(vDisplayName.value);
-        const exists = db.get().prepare('SELECT 1 FROM users WHERE username = ?').get(username);
-        if (exists) throw new Refusal(409, 'Username is already taken.');
-        // Die Adresse des Gastes steht an einem verknuepften Kontakt. Traegt sie
-        // schon ein anderes Konto, legt ein Mitglied den Gast nicht an
-        // (GHSA-6pmj-w42g-g6qv); ein Admin darf es.
-        if (!isAdminRequest(req) && emailsTakenByOtherAccounts(db.get(), { after: [vEmail.value] }).length) {
-          throw new Refusal(409, EMAIL_IN_USE_MESSAGE, 'email_in_use');
-        }
-        const created = db.get().prepare(`
-          INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
-          VALUES (?, ?, ?, ?, 'member', ?)
-        `).run(username, vDisplayName.value, hash, randomAvatarColor(), familyRole);
-        syncGuestArtifacts(db.get(), created.lastInsertRowid, {
-          displayName: vDisplayName.value,
-          phone: vPhone.value,
-          email: vEmail.value,
-          birthDate: vBirthDate.value,
-          actorUserId: userId(req),
-        });
-        db.get().prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)')
-          .run(groupId, created.lastInsertRowid, 'guest', userId(req));
-        db.get().prepare('INSERT OR IGNORE INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)')
-          .run(created.lastInsertRowid, groupId, userId(req));
-        activity(groupId, userId(req), 'guest_created', 'member', created.lastInsertRowid, { display_name: vDisplayName.value });
-        return created.lastInsertRowid;
+    createdUserId = db.transaction(() => {
+      assertManagesGroup(groupId, req);
+      const username = requestedUsername ?? uniqueUsername(vDisplayName.value);
+      const exists = db.get().prepare('SELECT 1 FROM users WHERE username = ?').get(username);
+      if (exists) throw new Refusal(409, 'Username is already taken.');
+      // Die Adresse des Gastes steht an einem verknuepften Kontakt. Traegt sie
+      // schon ein anderes Konto, legt ein Mitglied den Gast nicht an
+      // (GHSA-6pmj-w42g-g6qv); ein Admin darf es.
+      if (!isAdminRequest(req) && emailsTakenByOtherAccounts(db.get(), { after: [vEmail.value] }).length) {
+        throw new Refusal(409, EMAIL_IN_USE_MESSAGE, 'email_in_use');
+      }
+      const created = db.get().prepare(`
+        INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
+        VALUES (?, ?, ?, ?, 'member', ?)
+      `).run(username, vDisplayName.value, hash, randomAvatarColor(), familyRole);
+      syncGuestArtifacts(db.get(), created.lastInsertRowid, {
+        displayName: vDisplayName.value,
+        phone: vPhone.value,
+        email: vEmail.value,
+        birthDate: vBirthDate.value,
+        actorUserId: userId(req),
       });
-    } catch (err) {
-      if (err instanceof Refusal) return sendRefusal(res, err);
-      throw err;
-    }
-
-    const user = db.get().prepare(`
-      SELECT u.id, u.username, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
-             c.phone, c.email, b.birth_date, u.created_at
-      FROM users u
-      LEFT JOIN contacts c ON c.family_user_id = u.id
-      LEFT JOIN birthdays b ON b.family_user_id = u.id
-      WHERE u.id = ?
-    `).get(createdUserId);
-    res.status(201).json({ data: user });
+      db.get().prepare('INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)')
+        .run(groupId, created.lastInsertRowid, 'guest', userId(req));
+      db.get().prepare('INSERT OR IGNORE INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)')
+        .run(created.lastInsertRowid, groupId, userId(req));
+      activity(groupId, userId(req), 'guest_created', 'member', created.lastInsertRowid, { display_name: vDisplayName.value });
+      return created.lastInsertRowid;
+    });
   } catch (err) {
-    log.error('POST /groups/:id/guests error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (err instanceof Refusal) return sendRefusal(res, err);
+    throw err;
   }
+
+  const user = db.get().prepare(`
+    SELECT u.id, u.username, u.display_name, u.avatar_color, u.avatar_data, u.family_role,
+           c.phone, c.email, b.birth_date, u.created_at
+    FROM users u
+    LEFT JOIN contacts c ON c.family_user_id = u.id
+    LEFT JOIN birthdays b ON b.family_user_id = u.id
+    WHERE u.id = ?
+  `).get(createdUserId);
+  res.status(201).json({ data: user });
 });
 
 /**
  * Cursor der Ausgabenliste (#2108): die Sortierschluessel der letzten Zeile
  * (`expense_date`, `created_at`, `id`), wie sie `pagination.next_cursor`
  * liefert. Nur alle drei zusammen - ein halber Cursor ist 400, wie beim Verlauf.
+ * Form und Laenge der Teile prueft das Schema (#2810): `before_date` und
+ * `before_at` Text bis MAX_CURSOR_TEXT, `before_id` Dezimalziffern ab 1.
  */
 function expenseCursor(query) {
   const given = ['before_date', 'before_at', 'before_id'].filter((k) => query[k] != null && query[k] !== '');
   if (!given.length) return { cursor: null };
-  const beforeId = Number(query.before_id);
-  const text = (v) => typeof v === 'string' && v.length <= 64;
-  if (given.length < 3 || !text(query.before_date) || !text(query.before_at) || !Number.isInteger(beforeId) || beforeId < 1) {
+  if (given.length < 3) {
     return { error: 'before_date, before_at and before_id belong together: take all three from pagination.next_cursor.' };
   }
-  return { cursor: { beforeDate: query.before_date, beforeAt: query.before_at, beforeId } };
+  return { cursor: { beforeDate: query.before_date, beforeAt: query.before_at, beforeId: Number(query.before_id) } };
 }
 
 router.get('/groups/:id/expenses', validateRequest(), (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
-    const offset = Math.max(Number(req.query.offset) || 0, 0);
-    const { cursor, error } = expenseCursor(req.query);
-    if (error) return res.status(400).json({ error, code: 400 });
-    if (cursor && offset) return res.status(400).json({ error: 'Use either a cursor or offset, not both.', code: 400 });
-    // Hinter dem Cursor statt hinter einer Zeilenzahl: loescht jemand zwischen
-    // zwei Seiten eine Ausgabe weiter oben, ueberspringt `offset` eine
-    // ungesehene, der Cursor nicht.
-    const keyset = cursor
-      ? `AND (e.expense_date < @beforeDate OR (e.expense_date = @beforeDate
-          AND (e.created_at < @beforeAt OR (e.created_at = @beforeAt AND e.id < @beforeId))))`
-      : '';
-    const search = String(req.query.q || '').trim();
-    const category = CATEGORIES.includes(req.query.category) ? req.query.category : null;
-    // Der Filter der App (R24, E12): ein Budget-Schluessel oder "none" fuer
-    // Ausgaben ohne Kategorie. Ein unbekannter Schluessel filtert nicht still
-    // auf nichts, er wird ignoriert wie ein unbekanntes `category`.
-    const rawBudget = typeof req.query.budget_category === 'string' ? req.query.budget_category : '';
-    const budgetCategory = rawBudget === 'none' ? 'none'
-      : (rawBudget && db.get().prepare('SELECT 1 FROM budget_categories WHERE key = ?').get(rawBudget) ? rawBudget : null);
-    const recurringOnly = req.query.recurring === '1';
-    const rows = db.get().prepare(`
-      SELECT e.*, u.display_name AS payer_name
-      FROM expenses e
-      LEFT JOIN users u ON u.id = e.payer_id
-      WHERE e.group_id = @groupId AND e.status = 'active'
-        AND (@search = '' OR e.title LIKE '%' || @search || '%' OR e.description LIKE '%' || @search || '%')
-        AND (@category IS NULL OR e.category = @category)
-        AND (@budgetCategory IS NULL OR (@budgetCategory = 'none' AND e.budget_category IS NULL) OR e.budget_category = @budgetCategory)
-        AND (@recurringOnly = 0 OR e.recurring_rule_id IS NOT NULL)
-        ${keyset}
-      ORDER BY e.expense_date DESC, e.created_at DESC, e.id DESC
-      LIMIT @fetch OFFSET @offset
-    `).all({ groupId, search, category, budgetCategory, recurringOnly: recurringOnly ? 1 : 0, fetch: limit + 1, offset, ...(cursor || {}) });
-    // `created_at` ist sekundengenau: Ausgaben derselben Sekunde (eine Serie,
-    // die nachholt) haetten ohne `id` keine feste Reihenfolge, und Offset-Seiten
-    // koennten eine doppeln oder auslassen (#2108). Eine Zeile mehr gelesen
-    // macht `has_more` genau - bei genau `limit` Ausgaben keine leere Extraseite.
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
-    const last = page[page.length - 1];
-    const nextCursor = hasMore && last ? { before_date: last.expense_date, before_at: last.created_at, before_id: last.id } : null;
-    const pagination = cursor
-      ? { limit, has_more: hasMore, next_cursor: nextCursor }
-      : { limit, offset, has_more: hasMore, next_cursor: nextCursor };
-    res.json({ data: serializeExpenseList(page, documentViewer(req)), pagination });
-  } catch (err) {
-    log.error('GET /groups/:id/expenses error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const { cursor, error } = expenseCursor(req.query);
+  if (error) return res.status(400).json({ error, code: 400 });
+  if (cursor && offset) return res.status(400).json({ error: 'Use either a cursor or offset, not both.', code: 400 });
+  // Hinter dem Cursor statt hinter einer Zeilenzahl: loescht jemand zwischen
+  // zwei Seiten eine Ausgabe weiter oben, ueberspringt `offset` eine
+  // ungesehene, der Cursor nicht.
+  const keyset = cursor
+    ? `AND (e.expense_date < @beforeDate OR (e.expense_date = @beforeDate
+        AND (e.created_at < @beforeAt OR (e.created_at = @beforeAt AND e.id < @beforeId))))`
+    : '';
+  const search = String(req.query.q || '').trim();
+  // Ein Wert aus CATEGORIES oder nichts (Schema, #2810).
+  const category = req.query.category ?? null;
+  // Der Filter der App (R24, E12): ein Budget-Schluessel oder "none" fuer
+  // Ausgaben ohne Kategorie. Ein unbekannter Schluessel filtert nicht still
+  // auf nichts, er wird ignoriert. Einmal und als Text (Schema).
+  const rawBudget = req.query.budget_category ?? '';
+  const budgetCategory = rawBudget === 'none' ? 'none'
+    : (rawBudget && db.get().prepare('SELECT 1 FROM budget_categories WHERE key = ?').get(rawBudget) ? rawBudget : null);
+  const recurringOnly = req.query.recurring === '1';
+  const rows = db.get().prepare(`
+    SELECT e.*, u.display_name AS payer_name
+    FROM expenses e
+    LEFT JOIN users u ON u.id = e.payer_id
+    WHERE e.group_id = @groupId AND e.status = 'active'
+      AND (@search = '' OR e.title LIKE '%' || @search || '%' OR e.description LIKE '%' || @search || '%')
+      AND (@category IS NULL OR e.category = @category)
+      AND (@budgetCategory IS NULL OR (@budgetCategory = 'none' AND e.budget_category IS NULL) OR e.budget_category = @budgetCategory)
+      AND (@recurringOnly = 0 OR e.recurring_rule_id IS NOT NULL)
+      ${keyset}
+    ORDER BY e.expense_date DESC, e.created_at DESC, e.id DESC
+    LIMIT @fetch OFFSET @offset
+  `).all({ groupId, search, category, budgetCategory, recurringOnly: recurringOnly ? 1 : 0, fetch: limit + 1, offset, ...(cursor || {}) });
+  // `created_at` ist sekundengenau: Ausgaben derselben Sekunde (eine Serie,
+  // die nachholt) haetten ohne `id` keine feste Reihenfolge, und Offset-Seiten
+  // koennten eine doppeln oder auslassen (#2108). Eine Zeile mehr gelesen
+  // macht `has_more` genau - bei genau `limit` Ausgaben keine leere Extraseite.
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last ? { before_date: last.expense_date, before_at: last.created_at, before_id: last.id } : null;
+  const pagination = cursor
+    ? { limit, has_more: hasMore, next_cursor: nextCursor }
+    : { limit, offset, has_more: hasMore, next_cursor: nextCursor };
+  res.json({ data: serializeExpenseList(page, documentViewer(req)), pagination });
 });
 
 router.post('/groups/:id/expenses', validateRequest(), (req, res) => {
   try {
-    const groupId = Number(req.params.id);
+    const groupId = pathId(req);
     const group = requireGroupAccess(groupId, req);
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const archived = archivedRefusal(groupId);
@@ -1188,7 +1152,8 @@ router.post('/groups/:id/expenses', validateRequest(), (req, res) => {
     const parsed = parseExpenseBody(req.body, group.default_currency);
     const budgetCategory = parseBudgetCategory(req.body.budget_category);
     const payerId = Number(req.body.payer_id || userId(req));
-    const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
+    // Eine Liste oder nichts (Schema, #2810).
+    const participants = req.body.participants ?? [payerId];
     const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
     if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({
@@ -1222,13 +1187,13 @@ router.post('/groups/:id/expenses', validateRequest(), (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    sendWriteFailure(res, err, 'POST /groups/:id/expenses');
+    sendWriteFailure(res, err);
   }
 });
 
 router.put('/expenses/:id', validateRequest(), (req, res) => {
   try {
-    const existing = loadExpense(Number(req.params.id), req);
+    const existing = loadExpense(pathId(req), req);
     if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
     if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     const archived = archivedRefusal(existing.group_id);
@@ -1240,7 +1205,7 @@ router.put('/expenses/:id', validateRequest(), (req, res) => {
     if (req.body.category === undefined || req.body.category === null) parsed.category = existing.category;
     const budgetCategory = parseBudgetCategory(req.body.budget_category, existing.budget_category ?? null);
     const payerId = Number(req.body.payer_id || existing.payer_id);
-    const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
+    const participants = req.body.participants ?? db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
     const refusal = membershipRefusal(db.get(), existing.group_id, payerId, participants);
     if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({ method: parsed.method, amountMinor: parsed.convertedAmountMinor, currency: parsed.convertedCurrency, participants, splits: req.body.splits });
@@ -1270,7 +1235,7 @@ router.put('/expenses/:id', validateRequest(), (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    sendWriteFailure(res, err, 'PUT /expenses/:id');
+    sendWriteFailure(res, err);
   }
 });
 
@@ -1296,63 +1261,53 @@ router.put('/expenses/:id', validateRequest(), (req, res) => {
  * stimmt, nur der Verlauf fehlt dort.
  */
 router.delete('/expenses/:id', validateRequest(), (req, res) => {
-  try {
-    const existing = loadExpense(Number(req.params.id), req);
-    if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
-    if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    const archived = archivedRefusal(existing.group_id);
-    if (archived) return sendRefusal(res, archived);
-    db.transaction(() => {
-      db.get().prepare("UPDATE expenses SET status = 'deleted', deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(existing.id);
-      const booked = db.get().prepare(`
-        SELECT group_id, user_id, counterparty_id, amount_minor, currency, memo, created_by
-        FROM expense_ledger_entries
-        WHERE source_type = 'expense' AND source_id = ?
-        ORDER BY id ASC
-      `).all(existing.id);
-      const insert = db.get().prepare(`
-        INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
-        VALUES (?, 'expense_reversal', ?, ?, ?, ?, ?, ?, ?)
-      `);
-      // `created_by` kommt aus der Originalzeile, nicht von der loeschenden
-      // Person: beide Zeilen haengen per ON DELETE CASCADE an diesem Konto und
-      // fallen so nur gemeinsam. Mit dem Konto der loeschenden Person
-      // verschwaende sonst nur die Gegenbuchung, und die geloeschte Ausgabe
-      // zaehlte still wieder im Saldo; mit dem Konto der anlegenden Person
-      // fielen Ausgabe und Buchung, und die Gegenbuchung bliebe als Waise
-      // stehen. Wer geloescht hat, steht in `expense_deleted`
-      // (expense_activity.actor_id). Seit #1381 deaktiviert das Entfernen
-      // eines Kontos mit solchen Zeilen es nur noch; die Kaskade steht aber
-      // weiter im Schema, und die Regel haelt das Paar auch dort zusammen.
-      for (const row of booked) {
-        insert.run(row.group_id, existing.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, row.memo, row.created_by);
-      }
-      // Der Betrag, unter dem die Ausgabe in der Liste stand (eingegeben, in
-      // seiner Waehrung); das Ledger fuehrt den umgerechneten.
-      activity(existing.group_id, userId(req), 'expense_deleted', 'expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
-    });
-    res.json({ data: { ok: true } });
-  } catch (err) {
-    log.error('DELETE /expenses/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const existing = loadExpense(pathId(req), req);
+  if (!existing) return res.status(404).json({ error: 'Expense not found.', code: 404 });
+  if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  const archived = archivedRefusal(existing.group_id);
+  if (archived) return sendRefusal(res, archived);
+  db.transaction(() => {
+    db.get().prepare("UPDATE expenses SET status = 'deleted', deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(existing.id);
+    const booked = db.get().prepare(`
+      SELECT group_id, user_id, counterparty_id, amount_minor, currency, memo, created_by
+      FROM expense_ledger_entries
+      WHERE source_type = 'expense' AND source_id = ?
+      ORDER BY id ASC
+    `).all(existing.id);
+    const insert = db.get().prepare(`
+      INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+      VALUES (?, 'expense_reversal', ?, ?, ?, ?, ?, ?, ?)
+    `);
+    // `created_by` kommt aus der Originalzeile, nicht von der loeschenden
+    // Person: beide Zeilen haengen per ON DELETE CASCADE an diesem Konto und
+    // fallen so nur gemeinsam. Mit dem Konto der loeschenden Person
+    // verschwaende sonst nur die Gegenbuchung, und die geloeschte Ausgabe
+    // zaehlte still wieder im Saldo; mit dem Konto der anlegenden Person
+    // fielen Ausgabe und Buchung, und die Gegenbuchung bliebe als Waise
+    // stehen. Wer geloescht hat, steht in `expense_deleted`
+    // (expense_activity.actor_id). Seit #1381 deaktiviert das Entfernen
+    // eines Kontos mit solchen Zeilen es nur noch; die Kaskade steht aber
+    // weiter im Schema, und die Regel haelt das Paar auch dort zusammen.
+    for (const row of booked) {
+      insert.run(row.group_id, existing.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, row.memo, row.created_by);
+    }
+    // Der Betrag, unter dem die Ausgabe in der Liste stand (eingegeben, in
+    // seiner Waehrung); das Ledger fuehrt den umgerechneten.
+    activity(existing.group_id, userId(req), 'expense_deleted', 'expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
+  });
+  res.json({ data: { ok: true } });
 });
 
 router.post('/expenses/:id/comments', validateRequest(), (req, res) => {
-  try {
-    const expense = loadExpense(Number(req.params.id), req);
-    if (!expense) return res.status(404).json({ error: 'Expense not found.', code: 404 });
-    const archived = archivedRefusal(expense.group_id);
-    if (archived) return sendRefusal(res, archived);
-    const vComment = str(req.body.comment, 'Comment', { max: MAX_TEXT });
-    if (vComment.error) return res.status(400).json({ error: vComment.error, code: 400 });
-    const result = db.get().prepare('INSERT INTO expense_comments (expense_id, user_id, comment) VALUES (?, ?, ?)').run(expense.id, userId(req), vComment.value);
-    activity(expense.group_id, userId(req), 'comment_added', 'expense', expense.id, { title: expense.title });
-    res.status(201).json({ data: { id: result.lastInsertRowid, expense_id: expense.id, user_id: userId(req), comment: vComment.value } });
-  } catch (err) {
-    log.error('POST /expenses/:id/comments error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const expense = loadExpense(pathId(req), req);
+  if (!expense) return res.status(404).json({ error: 'Expense not found.', code: 404 });
+  const archived = archivedRefusal(expense.group_id);
+  if (archived) return sendRefusal(res, archived);
+  const vComment = str(req.body.comment, 'Comment', { max: MAX_TEXT });
+  if (vComment.error) return res.status(400).json({ error: vComment.error, code: 400 });
+  const result = db.get().prepare('INSERT INTO expense_comments (expense_id, user_id, comment) VALUES (?, ?, ?)').run(expense.id, userId(req), vComment.value);
+  activity(expense.group_id, userId(req), 'comment_added', 'expense', expense.id, { title: expense.title });
+  res.status(201).json({ data: { id: result.lastInsertRowid, expense_id: expense.id, user_id: userId(req), comment: vComment.value } });
 });
 
 /**
@@ -1428,30 +1383,25 @@ function groupBudgetCategoryTotals(groupId) {
 }
 
 router.get('/groups/:id/balances', validateRequest(), (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    // Dieselbe Saldenquelle wie die Kennzahl auf dem Dashboard
-    // (openBalancesForUser) - ein Fix an den Salden heilt beide.
-    const rows = groupBalanceRows(db.get(), groupId, memberOrderSql('u'));
-    res.json({
-      data: {
-        balances: rows.map((row) => ({ ...row, net: minorToDecimal(row.net_minor, row.currency) })),
-        simplified_debts: simplifyDebts(rows),
-        member_totals: groupMemberTotals(groupId),
-        category_totals: groupCategoryTotals(groupId),
-        budget_category_totals: groupBudgetCategoryTotals(groupId),
-      },
-    });
-  } catch (err) {
-    log.error('GET /groups/:id/balances error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  // Dieselbe Saldenquelle wie die Kennzahl auf dem Dashboard
+  // (openBalancesForUser) - ein Fix an den Salden heilt beide.
+  const rows = groupBalanceRows(db.get(), groupId, memberOrderSql('u'));
+  res.json({
+    data: {
+      balances: rows.map((row) => ({ ...row, net: minorToDecimal(row.net_minor, row.currency) })),
+      simplified_debts: simplifyDebts(rows),
+      member_totals: groupMemberTotals(groupId),
+      category_totals: groupCategoryTotals(groupId),
+      budget_category_totals: groupBudgetCategoryTotals(groupId),
+    },
+  });
 });
 
 router.post('/groups/:id/settlements', validateRequest(), (req, res) => {
   try {
-    const groupId = Number(req.params.id);
+    const groupId = pathId(req);
     const group = requireGroupAccess(groupId, req);
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const archived = archivedRefusal(groupId);
@@ -1460,7 +1410,8 @@ router.post('/groups/:id/settlements', validateRequest(), (req, res) => {
     const payeeId = Number(req.body.payee_id);
     if (!memberRole(groupId, payerId) || !memberRole(groupId, payeeId)) return res.status(400).json({ error: 'Settlement users must be group members.', code: 400 });
     if (payerId === payeeId) return res.status(400).json({ error: 'Settlement needs two different users.', code: 400 });
-    const currency = CURRENCY_CODES.includes(req.body.currency) ? req.body.currency : group.default_currency;
+    // Ein Wert aus CURRENCY_CODES oder nichts (Schema, #2810).
+    const currency = req.body.currency ?? group.default_currency;
     const amountMinor = parseMoneyToMinor(req.body.amount, currency);
     const vNotes = str(req.body.notes, 'Notes', { max: MAX_TEXT, required: false });
     if (vNotes.error) return res.status(400).json({ error: vNotes.error, code: 400 });
@@ -1489,7 +1440,7 @@ router.post('/groups/:id/settlements', validateRequest(), (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    sendWriteFailure(res, err, 'POST /groups/:id/settlements');
+    sendWriteFailure(res, err);
   }
 });
 
@@ -1505,49 +1456,44 @@ router.post('/groups/:id/settlements', validateRequest(), (req, res) => {
  * Korrigieren heisst: stornieren und neu eintragen.
  */
 router.post('/groups/:id/settlements/:settlementId/reverse', validateRequest(), (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const settlement = db.get().prepare('SELECT * FROM settlements WHERE id = ? AND group_id = ?').get(Number(req.params.settlementId), groupId);
-    if (!settlement) return res.status(404).json({ error: 'Settlement not found.', code: 404 });
-    if (!mayChangeGroupRecord(settlement, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    const archived = archivedRefusal(groupId);
-    if (archived) return sendRefusal(res, archived);
-    const outcome = db.transaction(() => {
-      if (settlementReversal(db.get(), settlement.id)) return 'already_reversed';
-      const booked = db.get().prepare(`
-        SELECT user_id, counterparty_id, amount_minor, currency, created_by
-        FROM expense_ledger_entries
-        WHERE source_type = 'settlement' AND source_id = ?
-        ORDER BY id ASC
-      `).all(settlement.id);
-      if (!booked.length) return 'nothing_booked';
-      const insert = db.get().prepare(`
-        INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
-        VALUES (?, 'settlement_reversal', ?, ?, ?, ?, ?, ?, ?)
-      `);
-      // `created_by` kommt aus der Originalzeile, nicht von der stornierenden
-      // Person: beide Zeilen haengen per ON DELETE CASCADE an diesem Konto und
-      // fallen so nur gemeinsam. Mit dem Konto der stornierenden Person
-      // verschwaende sonst nur die Gegenbuchung, und die stornierte Zahlung
-      // zaehlte still wieder im Saldo. Wer storniert hat, steht in
-      // `payment_reversed` (expense_activity.actor_id).
-      for (const row of booked) {
-        insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', row.created_by);
-      }
-      activity(groupId, userId(req), 'payment_reversed', 'settlement', settlement.id, {
-        amount: minorToDecimal(settlement.amount_minor, settlement.currency),
-        currency: settlement.currency,
-      });
-      return 'reversed';
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  const settlement = db.get().prepare('SELECT * FROM settlements WHERE id = ? AND group_id = ?').get(pathId(req, 'settlementId'), groupId);
+  if (!settlement) return res.status(404).json({ error: 'Settlement not found.', code: 404 });
+  if (!mayChangeGroupRecord(settlement, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  const archived = archivedRefusal(groupId);
+  if (archived) return sendRefusal(res, archived);
+  const outcome = db.transaction(() => {
+    if (settlementReversal(db.get(), settlement.id)) return 'already_reversed';
+    const booked = db.get().prepare(`
+      SELECT user_id, counterparty_id, amount_minor, currency, created_by
+      FROM expense_ledger_entries
+      WHERE source_type = 'settlement' AND source_id = ?
+      ORDER BY id ASC
+    `).all(settlement.id);
+    if (!booked.length) return 'nothing_booked';
+    const insert = db.get().prepare(`
+      INSERT INTO expense_ledger_entries (group_id, source_type, source_id, user_id, counterparty_id, amount_minor, currency, memo, created_by)
+      VALUES (?, 'settlement_reversal', ?, ?, ?, ?, ?, ?, ?)
+    `);
+    // `created_by` kommt aus der Originalzeile, nicht von der stornierenden
+    // Person: beide Zeilen haengen per ON DELETE CASCADE an diesem Konto und
+    // fallen so nur gemeinsam. Mit dem Konto der stornierenden Person
+    // verschwaende sonst nur die Gegenbuchung, und die stornierte Zahlung
+    // zaehlte still wieder im Saldo. Wer storniert hat, steht in
+    // `payment_reversed` (expense_activity.actor_id).
+    for (const row of booked) {
+      insert.run(groupId, settlement.id, row.user_id, row.counterparty_id, -row.amount_minor, row.currency, 'Settlement reversal', row.created_by);
+    }
+    activity(groupId, userId(req), 'payment_reversed', 'settlement', settlement.id, {
+      amount: minorToDecimal(settlement.amount_minor, settlement.currency),
+      currency: settlement.currency,
     });
-    if (outcome === 'already_reversed') return res.status(409).json({ error: 'Settlement is already reversed.', code: 409 });
-    if (outcome === 'nothing_booked') return res.status(409).json({ error: 'Settlement has no ledger entries to reverse.', code: 409 });
-    res.json({ data: { ...settlementForViewer(settlement, req), ...settlementReversal(db.get(), settlement.id) } });
-  } catch (err) {
-    log.error('POST /groups/:id/settlements/:settlementId/reverse error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+    return 'reversed';
+  });
+  if (outcome === 'already_reversed') return res.status(409).json({ error: 'Settlement is already reversed.', code: 409 });
+  if (outcome === 'nothing_booked') return res.status(409).json({ error: 'Settlement has no ledger entries to reverse.', code: 409 });
+  res.json({ data: { ...settlementForViewer(settlement, req), ...settlementReversal(db.get(), settlement.id) } });
 });
 
 /**
@@ -1571,66 +1517,61 @@ router.post('/groups/:id/settlements/:settlementId/reverse', validateRequest(), 
  *
  * Beides zugleich ist 400: welche Seite gemeint waere, laesst sich nicht sagen.
  * Eine Zeile mehr als angefragt beantwortet `has_more` genau statt geschaetzt.
+ * Form und Laenge der beiden Teile prueft das Schema (#2810): `before_at` Text
+ * bis MAX_CURSOR_TEXT, `before_id` Dezimalziffern ab 1.
  */
 function activityCursor(query) {
   const hasAt = query.before_at != null && query.before_at !== '';
   const hasId = query.before_id != null && query.before_id !== '';
   if (!hasAt && !hasId) return { cursor: null };
-  const beforeId = Number(query.before_id);
-  if (!hasAt || !hasId || typeof query.before_at !== 'string' || query.before_at.length > 64
-      || !Number.isInteger(beforeId) || beforeId < 1) {
+  if (!hasAt || !hasId) {
     return { error: 'before_at and before_id belong together: take both from pagination.next_cursor.' };
   }
-  return { cursor: { beforeAt: query.before_at, beforeId } };
+  return { cursor: { beforeAt: query.before_at, beforeId: Number(query.before_id) } };
 }
 
 // Typen, deren Metadaten einen Betrag in Minor-Units festhalten.
 const AMOUNT_SNAPSHOT_ACTIVITY = new Set(['ledger_restored', 'ledger_removed', 'expense_created', 'expense_edited', 'expense_deleted', 'recurring_edited', 'recurring_deleted']);
 
 router.get('/groups/:id/activity', validateRequest(), (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
-    const offset = Math.max(Number(req.query.offset) || 0, 0);
-    const { cursor, error } = activityCursor(req.query);
-    if (error) return res.status(400).json({ error, code: 400 });
-    if (cursor && offset) return res.status(400).json({ error: 'Use either a cursor or offset, not both.', code: 400 });
-    const keyset = cursor ? 'AND (a.created_at < @beforeAt OR (a.created_at = @beforeAt AND a.id > @beforeId))' : '';
-    const fetched = db.get().prepare(`
-      SELECT a.*, u.display_name AS actor_name, u.avatar_color AS actor_color
-      FROM expense_activity a
-      LEFT JOIN users u ON u.id = a.actor_id
-      WHERE a.group_id = @groupId ${keyset}
-      ORDER BY a.created_at DESC, a.id ASC
-      LIMIT @size OFFSET @offset
-    `).all({ groupId, size: limit + 1, offset, ...(cursor || {}) });
-    const hasMore = fetched.length > limit;
-    const rows = fetched.slice(0, limit).map((row) => {
-      const metadata = row.metadata ? JSON.parse(row.metadata) : null;
-      // 'ledger_restored' (Migration v226) und 'ledger_removed' (v227)
-      // speichern den Betrag in Minor-Units: eingefrorenes SQL kennt die
-      // Nachkommastellen je Waehrung nicht. Hier bekommt er dieselbe
-      // Dezimalform wie payment_registered (`amount`). Dasselbe gilt fuer den
-      // Betrag, den expense_created/_edited/_deleted festhalten (#1607);
-      // Eintraege von vor dem Snapshot tragen keinen und bleiben, wie sie sind.
-      if (AMOUNT_SNAPSHOT_ACTIVITY.has(row.type) && Number.isInteger(metadata?.amount_minor) && metadata.currency) {
-        return { ...row, metadata: decorateMoney(metadata) };
-      }
-      return { ...row, metadata };
-    });
-    attachSettlementState(rows, groupId, req);
-    attachExpenseState(rows, groupId);
-    const last = rows[rows.length - 1];
-    const nextCursor = hasMore && last ? { before_at: last.created_at, before_id: last.id } : null;
-    const pagination = cursor
-      ? { limit, has_more: hasMore, next_cursor: nextCursor }
-      : { limit, offset, has_more: hasMore, next_cursor: nextCursor };
-    res.json({ data: rows, pagination });
-  } catch (err) {
-    log.error('GET /groups/:id/activity error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const { cursor, error } = activityCursor(req.query);
+  if (error) return res.status(400).json({ error, code: 400 });
+  if (cursor && offset) return res.status(400).json({ error: 'Use either a cursor or offset, not both.', code: 400 });
+  const keyset = cursor ? 'AND (a.created_at < @beforeAt OR (a.created_at = @beforeAt AND a.id > @beforeId))' : '';
+  const fetched = db.get().prepare(`
+    SELECT a.*, u.display_name AS actor_name, u.avatar_color AS actor_color
+    FROM expense_activity a
+    LEFT JOIN users u ON u.id = a.actor_id
+    WHERE a.group_id = @groupId ${keyset}
+    ORDER BY a.created_at DESC, a.id ASC
+    LIMIT @size OFFSET @offset
+  `).all({ groupId, size: limit + 1, offset, ...(cursor || {}) });
+  const hasMore = fetched.length > limit;
+  const rows = fetched.slice(0, limit).map((row) => {
+    const metadata = row.metadata ? JSON.parse(row.metadata) : null;
+    // 'ledger_restored' (Migration v226) und 'ledger_removed' (v227)
+    // speichern den Betrag in Minor-Units: eingefrorenes SQL kennt die
+    // Nachkommastellen je Waehrung nicht. Hier bekommt er dieselbe
+    // Dezimalform wie payment_registered (`amount`). Dasselbe gilt fuer den
+    // Betrag, den expense_created/_edited/_deleted festhalten (#1607);
+    // Eintraege von vor dem Snapshot tragen keinen und bleiben, wie sie sind.
+    if (AMOUNT_SNAPSHOT_ACTIVITY.has(row.type) && Number.isInteger(metadata?.amount_minor) && metadata.currency) {
+      return { ...row, metadata: decorateMoney(metadata) };
+    }
+    return { ...row, metadata };
+  });
+  attachSettlementState(rows, groupId, req);
+  attachExpenseState(rows, groupId);
+  const last = rows[rows.length - 1];
+  const nextCursor = hasMore && last ? { before_at: last.created_at, before_id: last.id } : null;
+  const pagination = cursor
+    ? { limit, has_more: hasMore, next_cursor: nextCursor }
+    : { limit, offset, has_more: hasMore, next_cursor: nextCursor };
+  res.json({ data: rows, pagination });
 });
 
 /**
@@ -1782,13 +1723,17 @@ function recurringResponse(id, req) {
  * Betrag und Datum wie bei einer Ausgabe, der Rhythmus, die Mitgliedschaft von
  * Zahler und Beteiligten, und die Aufteilung durch `splitSnapshot`. Was hier
  * nicht wirft, bucht der Lauf mit denselben Werten.
+ *
+ * Der Rhythmus ist ein Wert aus FREQUENCIES: beim Anlegen Pflicht im Schema,
+ * beim Bearbeiten der geschickte (Schema) oder der gespeicherte (CHECK der
+ * Spalte) (#2810). `participants` ist eine Liste (Schema bzw.
+ * storedSplitInput) oder fehlt.
  */
 function parseRecurringBody(body, groupId, fallbackCurrency, fallbackPayerId) {
   const parsed = parseExpenseBody({ ...body, expense_date: body.next_run_date }, fallbackCurrency);
-  const frequency = FREQUENCIES.includes(body.frequency) ? body.frequency : null;
-  if (!frequency) throw new Refusal(400, 'Invalid frequency.');
+  const frequency = body.frequency;
   const payerId = Number(body.payer_id || fallbackPayerId);
-  const participants = Array.isArray(body.participants) ? body.participants : [payerId];
+  const participants = body.participants ?? [payerId];
   const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
   if (refusal) throw new Refusal(400, refusal);
   // Dieselbe Pruefung wie bei einer Ausgabe, hier VOR dem ersten Termin: der
@@ -1808,13 +1753,11 @@ function parseRecurringBody(body, groupId, fallbackCurrency, fallbackPayerId) {
  * `missed` aus dem Aufruf, oder null, wenn er es nicht nennt. Beim Anlegen und
  * Verlegen (#1748) laesst null das Datum stehen wie vor der Frage: der Lauf
  * bucht dann je Lauf einen versaeumten Termin nach, und ein Client, der die
- * Frage nicht kennt, verhaelt sich wie bisher.
+ * Frage nicht kennt, verhaelt sich wie bisher. Jeden anderen Wert weist das
+ * Schema ab (`invalid_missed`, #2810).
  */
 function parseMissed(body) {
-  const missed = body?.missed;
-  if (missed === undefined || missed === null) return null;
-  if (!MISSED_MODES.includes(missed)) throw new Refusal(400, 'missed must be "skip" or "book".', 'invalid_missed');
-  return missed;
+  return body.missed ?? null;
 }
 
 /**
@@ -1836,23 +1779,18 @@ function loadRecurring(id, req) {
 }
 
 router.get('/groups/:id/recurring', validateRequest(), (req, res) => {
-  try {
-    const groupId = Number(req.params.id);
-    if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
-    const manages = canManageGroup(groupId, req);
-    const today = todayKey(db.get());
-    const rows = db.get().prepare(`${RECURRING_SELECT} WHERE r.group_id = ? ORDER BY r.paused_at IS NOT NULL ASC, r.next_run_date ASC, r.id ASC`).all(groupId)
-      .map((row) => recurringForViewer(row, req, manages, today));
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /groups/:id/recurring error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const groupId = pathId(req);
+  if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
+  const manages = canManageGroup(groupId, req);
+  const today = todayKey(db.get());
+  const rows = db.get().prepare(`${RECURRING_SELECT} WHERE r.group_id = ? ORDER BY r.paused_at IS NOT NULL ASC, r.next_run_date ASC, r.id ASC`).all(groupId)
+    .map((row) => recurringForViewer(row, req, manages, today));
+  res.json({ data: rows });
 });
 
 router.post('/groups/:id/recurring', validateRequest(), (req, res) => {
   try {
-    const groupId = Number(req.params.id);
+    const groupId = pathId(req);
     const group = requireGroupAccess(groupId, req);
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const archived = archivedRefusal(groupId);
@@ -1877,7 +1815,7 @@ router.post('/groups/:id/recurring', validateRequest(), (req, res) => {
     activity(groupId, userId(req), 'recurring_created', 'recurring_expense', result.lastInsertRowid, { title: parsed.title, frequency });
     res.status(201).json({ data: recurringResponse(result.lastInsertRowid, req) });
   } catch (err) {
-    sendWriteFailure(res, err, 'POST /groups/:id/recurring');
+    sendWriteFailure(res, err);
   }
 });
 
@@ -1930,8 +1868,10 @@ router.post('/groups/:id/recurring', validateRequest(), (req, res) => {
  */
 router.put('/recurring/:id', validateRequest(), (req, res) => {
   try {
-    const id = Number(req.params.id);
-    const sent = req.body && typeof req.body === 'object' ? req.body : {};
+    const id = pathId(req);
+    // Ein Objekt, Pflicht (Schema, #2810); jedes Feld ein Wert seiner Liste
+    // bzw. seines Typs oder nicht da.
+    const sent = req.body;
     const given = (key) => sent[key] !== undefined;
     const missed = parseMissed(sent);
     db.transaction(() => {
@@ -1952,13 +1892,13 @@ router.put('/recurring/:id', validateRequest(), (req, res) => {
         payer_id: sent.payer_id,
         frequency: sent.frequency || existing.frequency,
         next_run_date: sent.next_run_date || existing.next_run_date,
-        participants: Array.isArray(sent.participants) ? sent.participants : (stored.participants ?? undefined),
-        splits: Array.isArray(sent.splits) ? sent.splits : stored.splits,
+        participants: sent.participants ?? stored.participants ?? undefined,
+        splits: sent.splits ?? stored.splits,
       };
       const { parsed, frequency, payerId, snapshot } = parseRecurringBody(body, existing.group_id, existing.currency, existing.payer_id);
-      // Die Kategorie laeuft nicht durch die Rueckfall-Regel des Parsers
-      // ("unbekannt = general"), wenn der Aufruf sie gar nicht nennt.
-      const category = given('category') && sent.category !== null ? (CATEGORIES.includes(sent.category) ? sent.category : 'general') : existing.category;
+      // Die Kategorie laeuft nicht durch den Standard des Parsers (`general`),
+      // wenn der Aufruf sie gar nicht nennt.
+      const category = sent.category ?? existing.category;
       const budgetCategory = parseBudgetCategory(sent.budget_category, existing.budget_category ?? null);
       const dateMoved = parsed.expenseDate !== existing.next_run_date;
       if (dateMoved) {
@@ -1983,7 +1923,7 @@ router.put('/recurring/:id', validateRequest(), (req, res) => {
     });
     res.json({ data: recurringResponse(id, req) });
   } catch (err) {
-    sendWriteFailure(res, err, 'PUT /recurring/:id');
+    sendWriteFailure(res, err);
   }
 });
 
@@ -1997,108 +1937,92 @@ router.put('/recurring/:id', validateRequest(), (req, res) => {
  * Zeile gibt es danach nicht mehr.
  */
 router.delete('/recurring/:id', validateRequest(), (req, res) => {
-  try {
-    const existing = loadRecurring(Number(req.params.id), req);
-    if (!existing) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
-    if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    const archived = archivedRefusal(existing.group_id);
-    if (archived) return sendRefusal(res, archived);
-    db.transaction(() => {
-      db.get().prepare('DELETE FROM recurring_expenses WHERE id = ?').run(existing.id);
-      activity(existing.group_id, userId(req), 'recurring_deleted', 'recurring_expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
-    });
-    res.json({ data: { ok: true } });
-  } catch (err) {
-    log.error('DELETE /recurring/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const existing = loadRecurring(pathId(req), req);
+  if (!existing) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
+  if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  const archived = archivedRefusal(existing.group_id);
+  if (archived) return sendRefusal(res, archived);
+  db.transaction(() => {
+    db.get().prepare('DELETE FROM recurring_expenses WHERE id = ?').run(existing.id);
+    activity(existing.group_id, userId(req), 'recurring_deleted', 'recurring_expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
+  });
+  res.json({ data: { ok: true } });
 });
 
 router.post('/recurring/:id/pause', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const row = loadRecurring(id, req);
-    if (!row) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
-    if (!mayChangeGroupRecord(row, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    const archived = archivedRefusal(row.group_id);
-    if (archived) return sendRefusal(res, archived);
-    const missed = req.body?.missed ?? 'skip';
-    if (!MISSED_MODES.includes(missed)) {
-      return res.status(400).json({ error: 'missed must be "skip" or "book".', code: 400, reason: 'invalid_missed' });
+  const id = pathId(req);
+  const row = loadRecurring(id, req);
+  if (!row) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
+  if (!mayChangeGroupRecord(row, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  const archived = archivedRefusal(row.group_id);
+  if (archived) return sendRefusal(res, archived);
+  // `skip`, `book`, null oder nichts; jeden anderen Wert weist das Schema ab
+  // (`invalid_missed`, #2810).
+  const missed = req.body?.missed ?? 'skip';
+  // Lesen und Schreiben in EINER Transaktion: ob pausiert oder fortgesetzt
+  // wird und von welchem Termin aus gezaehlt wird, entscheidet die Zeile, die
+  // hier gelesen wird, nicht die von vor der Rechtepruefung.
+  const database = db.get();
+  const updated = database.transaction(() => {
+    const current = database.prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
+    if (!current) return null;
+    if (!current.paused_at) {
+      database.prepare("UPDATE recurring_expenses SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(id);
+      activity(current.group_id, userId(req), 'recurring_paused', 'recurring_expense', id);
+    } else {
+      // Fortsetzen ueberspringt, was waehrend der Pause faellig gewesen
+      // waere (#1647). Bliebe `next_run_date` stehen, buchte der stuendliche
+      // Lauf je Lauf einen versaeumten Termin mit Originaldatum nach: sechs
+      // Monate Pause wurden sechs Ausgaben in sechs Stunden. `missed: "book"`
+      // behaelt genau das. "Heute" ist der Tag des Haushalts, derselbe, an
+      // dem der Lauf Faelligkeit misst.
+      const next = missed === 'book'
+        ? { date: current.next_run_date, skipped: 0 }
+        : nextRunNotBefore(current.next_run_date, current.frequency, todayKey(database), current.anchor_day);
+      database.prepare('UPDATE recurring_expenses SET paused_at = NULL, next_run_date = ? WHERE id = ?').run(next.date, id);
+      activity(current.group_id, userId(req), 'recurring_resumed', 'recurring_expense', id, next.skipped ? { skipped: next.skipped } : {});
     }
-    // Lesen und Schreiben in EINER Transaktion: ob pausiert oder fortgesetzt
-    // wird und von welchem Termin aus gezaehlt wird, entscheidet die Zeile, die
-    // hier gelesen wird, nicht die von vor der Rechtepruefung.
-    const database = db.get();
-    const updated = database.transaction(() => {
-      const current = database.prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
-      if (!current) return null;
-      if (!current.paused_at) {
-        database.prepare("UPDATE recurring_expenses SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(id);
-        activity(current.group_id, userId(req), 'recurring_paused', 'recurring_expense', id);
-      } else {
-        // Fortsetzen ueberspringt, was waehrend der Pause faellig gewesen
-        // waere (#1647). Bliebe `next_run_date` stehen, buchte der stuendliche
-        // Lauf je Lauf einen versaeumten Termin mit Originaldatum nach: sechs
-        // Monate Pause wurden sechs Ausgaben in sechs Stunden. `missed: "book"`
-        // behaelt genau das. "Heute" ist der Tag des Haushalts, derselbe, an
-        // dem der Lauf Faelligkeit misst.
-        const next = missed === 'book'
-          ? { date: current.next_run_date, skipped: 0 }
-          : nextRunNotBefore(current.next_run_date, current.frequency, todayKey(database), current.anchor_day);
-        database.prepare('UPDATE recurring_expenses SET paused_at = NULL, next_run_date = ? WHERE id = ?').run(next.date, id);
-        activity(current.group_id, userId(req), 'recurring_resumed', 'recurring_expense', id, next.skipped ? { skipped: next.skipped } : {});
-      }
-      return true;
-    })();
-    if (!updated) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
-    res.json({ data: recurringResponse(id, req) });
-  } catch (err) {
-    log.error('POST /recurring/:id/pause error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+    return true;
+  })();
+  if (!updated) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
+  res.json({ data: recurringResponse(id, req) });
 });
 
 router.get('/search', validateRequest(), (req, res) => {
-  try {
-    const q = String(req.query.q || '').trim();
-    const uid = userId(req);
-    const guest = splitGuestScope(req);
-    const restrictedGroupId = guest?.groupId ?? null;
-    // Der Filter hängt am Gast-Status, nicht an der group_id: ein Gast ohne
-    // Gruppe darf keine Treffer bekommen, nicht alle.
-    const isGuest = guest ? 1 : 0;
-    const groups = db.get().prepare(`
-      ${groupSelectWhere(`visible.user_id = @userId AND g.status = 'active' AND (@q = '' OR g.name LIKE '%' || @q || '%')${guest ? ' AND g.id = @restrictedGroupId' : ''}`)}
-      ORDER BY g.updated_at DESC LIMIT 10
-    `).all({ userId: uid, q, restrictedGroupId });
-    const expenses = db.get().prepare(`
-      SELECT e.*, g.name AS group_name, u.display_name AS payer_name
-      FROM expenses e
-      JOIN expense_groups g ON g.id = e.group_id
-      JOIN expense_group_members gm ON gm.group_id = g.id AND gm.user_id = @uid
-      LEFT JOIN users u ON u.id = e.payer_id
-      WHERE e.status = 'active' AND (@q = '' OR e.title LIKE '%' || @q || '%' OR e.description LIKE '%' || @q || '%')
-        AND (@isGuest = 0 OR g.id = @restrictedGroupId)
-      ORDER BY e.expense_date DESC LIMIT 10
-    `).all({ uid, q, restrictedGroupId, isGuest });
-    const expensesSerialized = serializeExpenseList(expenses, documentViewer(req));
-    const people = db.get().prepare(`
-      SELECT DISTINCT u.id, u.display_name, u.username, u.avatar_color
-      FROM users u
-      JOIN expense_group_members gm ON gm.user_id = u.id
-      JOIN expense_group_members mine ON mine.group_id = gm.group_id AND mine.user_id = @uid
-      WHERE (@q = '' OR u.display_name LIKE '%' || @q || '%' OR u.username LIKE '%' || @q || '%')
-        AND (@isGuest = 0 OR gm.group_id = @restrictedGroupId)
-        -- Ehemalige bleiben in Buchungen und Salden stehen, die Suche bietet sie nicht an (#1381).
-        AND ${activeAccountSql('u')}
-      ORDER BY ${memberOrderSql('u')} LIMIT 10
-    `).all({ uid, q, restrictedGroupId, isGuest });
-    res.json({ data: { groups, expenses: expensesSerialized, people } });
-  } catch (err) {
-    log.error('GET /search error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const q = String(req.query.q || '').trim();
+  const uid = userId(req);
+  const guest = splitGuestScope(req);
+  const restrictedGroupId = guest?.groupId ?? null;
+  // Der Filter hängt am Gast-Status, nicht an der group_id: ein Gast ohne
+  // Gruppe darf keine Treffer bekommen, nicht alle.
+  const isGuest = guest ? 1 : 0;
+  const groups = db.get().prepare(`
+    ${groupSelectWhere(`visible.user_id = @userId AND g.status = 'active' AND (@q = '' OR g.name LIKE '%' || @q || '%')${guest ? ' AND g.id = @restrictedGroupId' : ''}`)}
+    ORDER BY g.updated_at DESC LIMIT 10
+  `).all({ userId: uid, q, restrictedGroupId });
+  const expenses = db.get().prepare(`
+    SELECT e.*, g.name AS group_name, u.display_name AS payer_name
+    FROM expenses e
+    JOIN expense_groups g ON g.id = e.group_id
+    JOIN expense_group_members gm ON gm.group_id = g.id AND gm.user_id = @uid
+    LEFT JOIN users u ON u.id = e.payer_id
+    WHERE e.status = 'active' AND (@q = '' OR e.title LIKE '%' || @q || '%' OR e.description LIKE '%' || @q || '%')
+      AND (@isGuest = 0 OR g.id = @restrictedGroupId)
+    ORDER BY e.expense_date DESC LIMIT 10
+  `).all({ uid, q, restrictedGroupId, isGuest });
+  const expensesSerialized = serializeExpenseList(expenses, documentViewer(req));
+  const people = db.get().prepare(`
+    SELECT DISTINCT u.id, u.display_name, u.username, u.avatar_color
+    FROM users u
+    JOIN expense_group_members gm ON gm.user_id = u.id
+    JOIN expense_group_members mine ON mine.group_id = gm.group_id AND mine.user_id = @uid
+    WHERE (@q = '' OR u.display_name LIKE '%' || @q || '%' OR u.username LIKE '%' || @q || '%')
+      AND (@isGuest = 0 OR gm.group_id = @restrictedGroupId)
+      -- Ehemalige bleiben in Buchungen und Salden stehen, die Suche bietet sie nicht an (#1381).
+      AND ${activeAccountSql('u')}
+    ORDER BY ${memberOrderSql('u')} LIMIT 10
+  `).all({ uid, q, restrictedGroupId, isGuest });
+  res.json({ data: { groups, expenses: expensesSerialized, people } });
 });
 
 export default router;

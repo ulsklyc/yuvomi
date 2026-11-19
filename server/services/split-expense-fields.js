@@ -1,8 +1,10 @@
 /**
  * Modul: Geteilte Ausgaben - Wertelisten und Grenzen der Eingabefelder (#2810)
  * Zweck: EINE Quelle fuer zwei Leser, die nie auseinanderlaufen duerfen:
- *          - die Handpruefung in server/routes/split-expenses.js, die mit diesen
- *            Listen weiter prueft (und `GET /meta` sie ausliefert);
+ *          - server/routes/split-expenses.js, dessen `GET /meta` sie ausliefert
+ *            (seit #2810 Schritt b prueft der Handler keine dieser Listen mehr
+ *            selbst, ausser SPLIT_METHODS fuer die gespeicherte Methode einer
+ *            Serie);
  *          - das OpenAPI-Dokument (server/openapi/paths/splitexpenses.js), dessen
  *            Schemata validateRequest() vor dem Handler prueft.
  *        Die Waehrungen stehen in public/utils/currency-codes.js (eine Liste
