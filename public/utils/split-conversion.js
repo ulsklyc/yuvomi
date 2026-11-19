@@ -23,7 +23,7 @@
  * @param {any} expense die gespeicherte Ausgabe, wie die Liste sie liefert
  * @param {string} amount der Betrag des Dialogs (Dezimaltext mit Punkt)
  * @param {string} currency die Waehrung des Dialogs
- * @returns {{ converted_amount: string | null, converted_currency: string, exchange_snapshot: unknown }}
+ * @returns {{ converted_amount: string | null, converted_currency: string, exchange_snapshot: Record<string, unknown> | null }}
  */
 export function keptConversion(expense, amount, currency) {
   if (!conversionKept(expense, amount, currency)) {
@@ -88,12 +88,18 @@ export function exactShareBasis(expense, amount, currency) {
 }
 
 /**
- * Der gespeicherte Kurs als JSON-Wert (die Spalte haelt Text), oder null.
+ * Der gespeicherte Kurs als Objekt (die Spalte haelt Text), oder null. Das
+ * Schema nimmt seit v2.94 nur ein Objekt oder null an (#2810); bis v2.93
+ * speicherte es jeden JSON-Wert, den ein fremder Client schickte. Eine solche
+ * Bestandszeile (Text, Zahl, Liste, `true`) geht als null zurueck, sonst
+ * antwortete jedes Speichern im Dialog 400.
  * @param {any} expense
- * @returns {unknown}
+ * @returns {Record<string, unknown> | null}
  */
 function storedSnapshot(expense) {
-  const stored = expense?.exchange_snapshot;
-  if (typeof stored !== 'string') return stored ?? null;
-  try { return JSON.parse(stored) ?? null; } catch { return null; }
+  let value = expense?.exchange_snapshot ?? null;
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { return null; }
+  }
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : null;
 }

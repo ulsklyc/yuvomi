@@ -564,8 +564,9 @@ test('PUT /expenses/{id} is the whole expense - a left-out required field is a 4
 });
 
 // Without a rate the column holds SQL NULL, not the text "null" (#2810): POST
-// and PUT wrote JSON.stringify(null). `false`, `0` and `""` are JSON the schema
-// accepts; they keep the old answer ("null") until that is decided on its own.
+// and PUT wrote JSON.stringify(null). A rate is an object or none: `false`,
+// `0` and `""` (up to v2.93 stored as "null") are a 400 of the schema, before
+// the 404 of a missing expense.
 test('exchange_snapshot: none sent or null is stored as SQL NULL, on POST and PUT', async () => {
   const snapshotOf = (/** @type {number} */ id) => db.prepare('SELECT exchange_snapshot, exchange_snapshot IS NULL AS missing FROM expenses WHERE id = ?').get(id);
   const created = [];
@@ -584,11 +585,20 @@ test('exchange_snapshot: none sent or null is stored as SQL NULL, on POST and PU
   assertPassed(cleared, 200, 'PUT null');
   assert.deepEqual({ ...snapshotOf(withRate.body.data.id) }, { exchange_snapshot: null, missing: 1 }, 'PUT null: SQL NULL');
   assert.equal(cleared.body.data.exchange_snapshot, null);
-  // Unchanged: falsy JSON other than null keeps the text "null".
+  // An object goes through PUT and is stored as sent.
+  const rate = await call('PUT', `/split-expenses/expenses/${created[0]}`, { json: expenseEdit({ title: 'Ohne Kurs left out', exchange_snapshot: { rate: '0.8', source: 'manual' } }) });
+  assertPassed(rate, 200, 'PUT object');
+  assert.equal(snapshotOf(created[0]).exchange_snapshot, '{"rate":"0.8","source":"manual"}');
+  // Falsy JSON other than null is refused, on POST and PUT, and nothing is written.
   for (const value of [false, 0, '']) {
-    const answer = await call('PUT', `/split-expenses/expenses/${created[0]}`, { json: expenseEdit({ title: 'Ohne Kurs left out', exchange_snapshot: value }) });
-    assertPassed(answer, 200, `PUT ${JSON.stringify(value)}`);
-    assert.equal(snapshotOf(created[0]).exchange_snapshot, 'null', `PUT ${JSON.stringify(value)}: as before`);
+    const label = JSON.stringify(value);
+    const posted = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, { json: expenseForm({ title: `Kurs ${label}`, exchange_snapshot: value }) });
+    assertRefusedAt(posted, 'body/exchange_snapshot', 'type', `POST ${label}`);
+    const put = await call('PUT', `/split-expenses/expenses/${created[0]}`, { json: expenseEdit({ title: 'Ohne Kurs left out', exchange_snapshot: value }) });
+    assertRefusedAt(put, 'body/exchange_snapshot', 'type', `PUT ${label}`);
+    assert.equal(snapshotOf(created[0]).exchange_snapshot, '{"rate":"0.8","source":"manual"}', `PUT ${label}: the stored rate stays`);
+    // The 400 comes before the 404 of a missing expense.
+    assertRefusedAt(await call('PUT', '/split-expenses/expenses/999999', { json: expenseEdit({ exchange_snapshot: value }) }), 'body/exchange_snapshot', 'type', `PUT missing ${label}`);
   }
 });
 
@@ -666,6 +676,27 @@ test('PUT /expenses/{id}: the dialog saving a converted expense unchanged keeps 
     const saved = await call('PUT', `/split-expenses/expenses/${id}`, { json: expenseForm({ title: label, amount: listed.amount, currency: listed.currency, ...kept }) });
     assertPassed(saved, 200, label);
     assert.deepEqual({ row: stored(id), ledger: ledger(id) }, before, `${label}: an unchanged save changed nothing`);
+  }
+});
+
+// Up to v2.93 the schema stored any JSON a client sent as the rate; since then
+// it takes an object or null (#2810). A stored row with another value must not
+// turn every save of the edit dialog into a 400: keptConversion sends it back
+// as null, an object goes back as stored.
+test('PUT /expenses/{id}: the dialog saves a converted expense whose stored rate is no object', async () => {
+  const created = await call('POST', `/split-expenses/groups/${GROUP}/expenses`, {
+    json: expenseForm({ title: 'Alter Kurs', amount: '10.00', currency: 'USD', converted_amount: '9.00', converted_currency: 'EUR', exchange_snapshot: { rate: '0.9' } }),
+  });
+  assertPassed(created, 201, 'created');
+  const id = created.body.data.id;
+  for (const [stored, sent] of /** @type {Array<[string, unknown]>} */ ([
+    ['[1,2]', null], ['"0.9"', null], ['0.9', null], ['true', null], ['null', null], ['{nicht json', null], ['{"rate":"0.9"}', { rate: '0.9' }],
+  ])) {
+    db.prepare('UPDATE expenses SET exchange_snapshot = ? WHERE id = ?').run(stored, id);
+    const listed = (await call('GET', `/split-expenses/groups/${GROUP}/expenses?limit=100`)).body.data.find((/** @type {any} */ e) => e.id === id);
+    const kept = keptConversion(listed, listed.amount, listed.currency);
+    assert.deepEqual(kept.exchange_snapshot, sent, stored);
+    assertPassed(await call('PUT', `/split-expenses/expenses/${id}`, { json: expenseForm({ title: 'Alter Kurs', amount: listed.amount, currency: listed.currency, ...kept }) }), 200, stored);
   }
 });
 

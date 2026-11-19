@@ -177,14 +177,15 @@ function expenseSnapshot(title, amountMinor, currency) {
 /**
  * Der Kurs einer Ausgabe fuer die Spalte `exchange_snapshot` (Text). Fehlt er
  * oder ist er `null`, steht SQL NULL in der Zeile (#2810): bis v2.93 schrieben
- * POST und PUT `JSON.stringify(null)`, also den Text "null". `false`, `0` und
- * `""` nimmt das Schema als JSON an; sie behalten das bisherige "null".
+ * POST und PUT `JSON.stringify(null)`, also den Text "null". Jeder andere Wert
+ * ist ein Objekt - `false`, `0`, `""` und alle uebrigen Nicht-Objekte weist das
+ * Schema mit 400 ab (bis v2.93 wurden die drei falsy Werte zu "null").
+ * Bestandszeilen mit "null" bleiben, wie sie sind.
  * @param {unknown} value
  * @returns {string | null}
  */
 function storedSnapshot(value) {
-  if (value == null) return null;
-  return JSON.stringify(value || null);
+  return value == null ? null : JSON.stringify(value);
 }
 
 function groupSelectWhere(where) {

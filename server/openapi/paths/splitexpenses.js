@@ -319,9 +319,10 @@ function expenseProperties({ update = false } = {}) {
       ? `The currency the splits and the ledger are kept in. ${wasReset('replaced it with `currency`')}`
       : 'The currency the splits and the ledger are kept in. Without it: `currency`.'),
     exchange_snapshot: {
+      type: ['object', 'null'],
       description: update
-        ? `Any JSON the client wants kept with the expense (exchange rate and source); stored as sent, \`null\` for none. ${wasReset('cleared the stored one')}`
-        : 'Any JSON the client wants kept with the expense (exchange rate and source); stored as sent.',
+        ? `An object the client wants kept with the expense (exchange rate and source); stored as sent, \`null\` for none. Any other JSON value (\`false\`, \`0\`, \`""\`, a string, a number, an array) is refused since v2.94 (#2810); up to v2.93 it was stored as sent, and \`false\`, \`0\` and \`""\` as none. ${wasReset('cleared the stored one')}`
+        : 'An object the client wants kept with the expense (exchange rate and source); stored as sent. `null` or left out: none. Any other JSON value (`false`, `0`, `""`, a string, a number, an array) is refused since v2.94 (#2810); up to v2.93 it was stored as sent, and `false`, `0` and `""` as none.',
     },
     payer_id: bodyId(update ? 'Who paid; left out: the stored payer.' : 'Who paid; left out: the caller.'),
     split_method: oneOf(SPLIT_METHODS, update ? `How the amount is split. ${wasReset('split it `equal`')}` : 'How the amount is split; left out: `equal`.'),
