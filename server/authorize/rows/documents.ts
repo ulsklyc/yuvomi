@@ -57,12 +57,21 @@ export function documentVisibleSql(alias: string = 'd', param: string = 'userId'
  * builds.
  */
 export function documentVisibleWhere(alias: string, viewer: string): string {
+  return delegatedDocumentWhere(alias, viewer, 'family_document_access', 'document_id');
+}
+
+/** Saved views delegate the same audience as a linked document. */
+export function paperlessFolderVisibleWhere(alias: string, viewer: string): string {
+  return delegatedDocumentWhere(alias, viewer, 'paperless_view_folder_access', 'folder_id');
+}
+
+function delegatedDocumentWhere(alias: string, viewer: string, table: string, key: string): string {
   return `(
     ${alias}.created_by = ${viewer}
     OR ${alias}.visibility = 'family'
     OR EXISTS (
-      SELECT 1 FROM family_document_access a
-      WHERE a.document_id = ${alias}.id AND a.user_id = ${viewer}
+      SELECT 1 FROM ${table} a
+      WHERE a.${key} = ${alias}.id AND a.user_id = ${viewer}
     )
   )`;
 }
@@ -293,4 +302,25 @@ export function documentClonePredicate(
 
 function documentSeenBy(database: Database, documentId: number, userId: number): boolean {
   return filterVisibleDocumentIds(database, [documentId], userId).length > 0;
+}
+
+/** A folder audience, already validated by the route. */
+type FolderAudience = { visibility: string; allowed_member_ids: number[]; created_by?: number | null };
+
+/** Only restricted audiences carry individual grants. */
+export function paperlessFolderMembers(visibility: string, memberIds: unknown): unknown {
+  return visibility === 'restricted' ? memberIds : [];
+}
+
+/** Consent is required only when an update makes the delegation wider. */
+export function paperlessFolderAudienceWidens(after: FolderAudience, before: FolderAudience): boolean {
+  return before.visibility !== 'family' && (
+    after.visibility === 'family' || (after.visibility === 'restricted'
+      && after.allowed_member_ids.some((id) => id !== before.created_by && !before.allowed_member_ids.includes(id)))
+  );
+}
+
+/** Validate the persisted folder audience vocabulary. */
+export function paperlessFolderVisibilityValid(value: unknown): boolean {
+  return ['private', 'restricted', 'family'].includes(String(value));
 }

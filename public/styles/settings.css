@@ -4279,3 +4279,12 @@
 .settings-page:not(.settings-page--leaf) .settings-shell__skip {
   display: none;
 }
+
+/* The tag catalogue uses the same grouped rows as the other settings. */
+.live-folder-settings__tags {
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.live-folder-settings__tags .toggle-row {
+  width: 100%;
+}

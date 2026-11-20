@@ -165,6 +165,10 @@ export const TABLE_OWNERS: Readonly<Record<string, Owner>> = Object.freeze({
   pantry_items: 'pantry',
   pantry_locations: 'pantry',
   pantry_products: 'pantry',
+  paperless_live_settings: 'documents',
+  paperless_user_tokens: 'documents',
+  paperless_view_folder_access: 'documents',
+  paperless_view_folders: 'documents',
   password_resets: 'auth',
   push_subscriptions: 'delivery',
   quick_links: 'dashboard', // server/scopes.js gates its route under the dashboard key

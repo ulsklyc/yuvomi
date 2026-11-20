@@ -1321,11 +1321,13 @@ async function originalMitMarker(key, note) {
   return original;
 }
 
-/** Marker der Datenbank, `null` wenn es die Tabelle nicht gibt (frische Instanz). */
+/** Marker der Datenbank, `null` wenn Tabelle oder Markerzeile fehlen. */
 function marker(mod) {
   const hatTabelle = mod.get()
     .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'marker_1282'").get().c;
-  return hatTabelle ? mod.get().prepare('SELECT note FROM marker_1282').get()?.note : null;
+  // Ein Checkpoint kann bereits die Tabelle, aber noch nicht die Markerzeile
+  // enthalten. Beide leeren Zustaende bedeuten: Der Marker lag nur im Journal.
+  return hatTabelle ? (mod.get().prepare('SELECT note FROM marker_1282').get()?.note ?? null) : null;
 }
 
 function istFrischeInstanz(mod, dbPath, key, fall) {

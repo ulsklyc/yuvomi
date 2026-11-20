@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Live folders can use local tag-filter views.** Create further views from selected Paperless tags, matching all or any of them, without creating a saved view in Paperless. Administrators can also choose which metadata fields appear beside document titles in the Live-folder overview.
+- **Live-folder settings centrally control available tags and DMS authentication.** Administrators can choose allowed tags per Paperless connection and use either the shared connection token or personal tokens. Users save and remove their own write-only tokens in Documents settings. Personal mode never falls back to the shared token, and existing folder visibility still applies. Tags outside the allowed selection are preserved when editing Live-folder documents.
+- **Saved Paperless views can be opened as live document folders.** Connect a
+  view in Documents, keep it private or explicitly share its current and future
+  matches with selected members or the family. Source filters, ordering and pagination are read on
+  demand; preview and download recheck membership. Disconnecting only removes
+  the binding. Migration 283 adds the folder and member-access tables.
+- **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
+
 ### Changed
 - **Health checks every request against the published API description.** This is about your
   own API clients; the app sends nothing that is refused now (from this release on it sends the
@@ -127,6 +137,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the own schedule settings answered this way already.
 
 ### Fixed
+- **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
+- **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
 - **A shared expense converted into a currency with other decimal places reports the converted
   amount correctly.** `converted_amount` in the expense answers was written with the decimal
   places of `currency` instead of `converted_currency`: 1500 JPY converted from USD read
