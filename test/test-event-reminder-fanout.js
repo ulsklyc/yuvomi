@@ -24,6 +24,7 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { setEventAssignments } = await import('../server/routes/calendar/helpers.js');
 const { fanOutEventReminders } = await import('../server/services/event-reminder-fanout.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
@@ -48,9 +49,12 @@ app.use((req, _res, next) => {
   req.session    = { userId: actingUser, role: 'member' };
   next();
 });
-app.use('/', remindersRouter);
+// At its real prefix, with the central error handler: validateRequest() finds
+// its operation by the mount (#2810).
+app.use('/api/v1/reminders', remindersRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server  = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/reminders`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {

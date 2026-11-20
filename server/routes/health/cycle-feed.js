@@ -15,6 +15,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import { viewerId, log } from './helpers.js';
 import * as cycleIcs from '../../services/cycle-ics.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ function feedUrl(req, token) {
 }
 
 // GET /api/v1/health/cycle/feed → eigener Feed-Status
-router.get('/cycle/feed', (req, res) => {
+router.get('/cycle/feed', validateRequest(), (req, res) => {
   try {
     const token = cycleIcs.getFeedToken(db.get(), viewerId(req));
     if (!token) return res.json({ data: null });
@@ -37,7 +38,7 @@ router.get('/cycle/feed', (req, res) => {
 });
 
 // POST /api/v1/health/cycle/feed/regenerate → eigenen Token neu erzeugen
-router.post('/cycle/feed/regenerate', (req, res) => {
+router.post('/cycle/feed/regenerate', validateRequest(), (req, res) => {
   try {
     const token = cycleIcs.regenerateFeedToken(db.get(), viewerId(req));
     res.json({ data: { token, url: feedUrl(req, token) } });
@@ -48,7 +49,7 @@ router.post('/cycle/feed/regenerate', (req, res) => {
 });
 
 // DELETE /api/v1/health/cycle/feed → eigenen Feed deaktivieren
-router.delete('/cycle/feed', (req, res) => {
+router.delete('/cycle/feed', validateRequest(), (req, res) => {
   try {
     cycleIcs.clearFeedToken(db.get(), viewerId(req));
     res.json({ data: { token: null } });

@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 
 export function quickLinksPaths() {
   return withCaseReasons('quick-links', CASE_REASONS, {
@@ -9,41 +9,41 @@ export function quickLinksPaths() {
         description: 'Returns the tiles visible to the calling member. A private tile belongs to '
           + 'whoever created it and is not listed for anyone else.',
       }),
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Create a quick link',
         tag: 'Quick links',
         stateChanging: true,
-        requestBody: jsonBody(null),
-        description: 'Body: { name, url, icon_data?, icon_name?, color?, visibility? }. A tile shows '
+        requestBody: jsonBody('#/components/schemas/QuickLinkCreateInput'),
+        description: 'A tile shows '
           + 'one of three faces: an uploaded image (`icon_data`), a built-in Lucide symbol '
           + '(`icon_name`), or the first letter of its name on `color`.',
-      }),
+      })),
     },
     '/api/v1/quick-links/order': {
-      put: op({
+      put: withValidationRefusal(op({
         summary: 'Set the order of quick links',
         tag: 'Quick links',
         stateChanging: true,
-        requestBody: jsonBody(null),
-        description: 'Body: { ids }, the complete new order. Only ids the caller can actually see '
+        requestBody: jsonBody('#/components/schemas/QuickLinkOrderInput'),
+        description: 'The complete new order. Only ids the caller can actually see '
           + 'count: slipping someone else\'s private tile into the list does not move it, because it '
           + 'is not there for the caller, and an ordering is not a way to change that.',
-      }),
+      })),
     },
     '/api/v1/quick-links/{id}': {
-      put: op({
+      put: withValidationRefusal(op({
         summary: 'Update a quick link',
         tag: 'Quick links',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody(null),
-      }),
-      delete: op({
+        requestBody: jsonBody('#/components/schemas/QuickLinkUpdateInput'),
+      })),
+      delete: withValidationRefusal(op({
         summary: 'Delete a quick link',
         tag: 'Quick links',
         params: [idParam()],
         stateChanging: true,
-      }),
+      })),
     },
   });
 }

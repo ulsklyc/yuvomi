@@ -2260,8 +2260,10 @@ test('R24 S10-F4: schmal ein Mehr-Menue statt einer zweiten Knopfzeile, breit bl
   for (const action of ['viewer-open-tab', 'viewer-edit', 'viewer-share', 'viewer-download']) {
     assert.match(viewer, new RegExp(`action: '${action}'`), `${action} steht im Menue`);
   }
-  assert.match(viewer, /'viewer-download': '\[data-viewer-download\]'/, 'der Eintrag loest den Knopf der Leiste aus');
-  assert.match(viewer, /target\.click\(\);/, 'synchron im Tipp (Teilen, Herunterladen)');
+  assert.match(viewer, /bindViewerMenu\(panel\)/, 'der Betrachter bindet das Menue');
+  const menu = fnBody('bindViewerMenu', 'openDocumentViewer');
+  assert.match(menu, /'viewer-download': '\[data-viewer-download\]'/, 'der Eintrag loest den Knopf der Leiste aus');
+  assert.match(menu, /target\.click\(\);/, 'synchron im Tipp (Teilen, Herunterladen)');
   const css = readFileSync(new URL('../public/styles/documents.css', import.meta.url), 'utf8');
   const rules = [...eachRule(css)];
   const narrow = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));

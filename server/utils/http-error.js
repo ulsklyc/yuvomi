@@ -12,19 +12,26 @@
  *          logs the cause's message, so a cause must not carry a secret (an
  *          upstream error that quotes a URL with a token, a password): wrap
  *          such an error in one of our own first.
+ *
+ *          `fields` names what a request got wrong, one `{ path, rule, reason? }`
+ *          per place (server/api/validate-request.ts): place plus pointer, the
+ *          schema keyword and the reason its schema names (`x-reason`), never a
+ *          value of the request. The handler sends it only when it is a
+ *          non-empty array.
  */
 
 export class HttpError extends Error {
   /**
    * @param {number} status HTTP status, 4xx to reach the client
    * @param {string} message our own sentence for the client
-   * @param {{ reason?: string, cause?: unknown }} [options]
+   * @param {{ reason?: string, cause?: unknown, fields?: { path: string, rule: string, reason?: string }[] }} [options]
    */
-  constructor(status, message, { reason, cause } = {}) {
+  constructor(status, message, { reason, cause, fields } = {}) {
     super(message, cause === undefined ? undefined : { cause });
     this.name = 'HttpError';
     this.status = status;
     this.expose = Number.isInteger(status) && status >= 400 && status <= 499;
     if (reason !== undefined) this.reason = reason;
+    if (fields !== undefined) this.fields = fields;
   }
 }

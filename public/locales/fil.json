@@ -4733,6 +4733,7 @@
         "deleteGroupConfirm": "Tanggalin ang walang lamang grupong ito? Dapat i-archive ang mga grupong may gastos.",
         "deleteGroupConfirmDetail": "Tuluyan nang mawawala ang listahan ng miyembro, ang default na paghahati, ang mga paulit-ulit na gastos at ang talaan ng aktibidad. Itinuturing na walang laman ang isang grupo kapag wala itong gastos at pag-aayos.",
         "splitCurrentTotal": "Kasalukuyang kabuuan: {{total}}",
+        "exactSharesConverted": "Eksaktong bahagi sa {{currency}}, na-convert mula sa {{amount}}.",
         "statusLabel": "Katayuan",
         "statusActive": "Aktibo",
         "statusArchived": "Naka-archive",

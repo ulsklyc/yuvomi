@@ -4733,6 +4733,7 @@
         "deleteGroupConfirm": "Bu boş grup silinsin mi? Gideri olan gruplar arşivlenmelidir.",
         "deleteGroupConfirmDetail": "Üye listesi, varsayılan paylaşım, yinelenen giderler ve etkinlik günlüğü kalıcı olarak kaybolur. Bir grup, gider ve ödeşme yoksa boş sayılır.",
         "splitCurrentTotal": "Geçerli toplam: {{total}}",
+        "exactSharesConverted": "Kesin paylar {{currency}} cinsinden, {{amount}} tutarından çevrildi.",
         "statusLabel": "Durum",
         "statusActive": "Aktif",
         "statusArchived": "Arşivlenmiş",

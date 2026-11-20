@@ -29,7 +29,7 @@ test('fasting clients receive concrete lifecycle schemas, revision transports an
   assert.deepEqual(create.required, ['start_tzid']);
   assert.equal(create.properties.goal_minutes.multipleOf, 60);
   assert.equal(create.properties.goal_minutes.maximum, 20160);
-  assert.equal(create.properties.end_at.nullable, true);
+  assert.deepEqual(create.properties.end_at.type, ['string', 'null']);
   assert.equal(create.properties.note.maxLength, 2000);
   assert.deepEqual(schema('fasting/{id}', 'patch').required, ['expected_revision']);
   assert.deepEqual(schema('fasting/{id}/finish', 'post').required, ['expected_revision']);

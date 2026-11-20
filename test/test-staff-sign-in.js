@@ -65,7 +65,9 @@ const ADMIN = Number(database.prepare(`
 
 const app = express();
 app.use(express.json());
-app.use('/as-admin/housekeeping', (req, _res, next) => {
+// The admin stub stands in front of the real prefix: validateRequest() finds
+// its operation by the mount (#2810).
+app.use('/api/v1/housekeeping', (req, _res, next) => {
   req.authUserId = ADMIN;
   req.authRole = 'admin';
   req.session = { userId: ADMIN, role: 'admin' };
@@ -100,7 +102,7 @@ const userRow = (username) => database.prepare('SELECT * FROM users WHERE userna
 
 /** Legt ein Personal-Konto ueber die echte Route an, wie der Admin es tut. */
 async function createStaff(username, { email } = {}) {
-  const res = await fetch(`${base}/as-admin/housekeeping/worker`, {
+  const res = await fetch(`${base}/api/v1/housekeeping/worker`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ display_name: `Hilfe ${username}`, username, daily_rate: 50, ...(email ? { email } : {}) }),

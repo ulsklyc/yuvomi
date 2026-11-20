@@ -64,17 +64,23 @@ const ADMIN = seedUser('admin', 'admin');
 let actor = { id: ADMIN, role: 'admin' };
 
 const { BODY_LIMIT } = await import('../server/utils/upload-limit.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 const app = express();
 // The same body limit server/index.js mounts: a file just over the upload
 // limit still reaches the route, which is what names the reason.
 app.use(express.json({ limit: BODY_LIMIT }));
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.session = { userId: actor.id, role: actor.role };
   next();
 });
 app.use('/api/v1/waste', wasteRouter);
+// The central error handler of server/index.js: validateRequest() hands its
+// 400 there (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}/api/v1`;
@@ -211,7 +217,7 @@ test('PUT /waste/schedules/:id: pause (active:false) then reactivate', async () 
 test('DELETE /waste/schedules/:id: cascades its overrides, leaves the type alone', async () => {
   const type = await createType();
   const schedule = await createWeeklySchedule(type.id);
-  await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: '2026-01-06' } });
+  await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: '2026-01-06', note: null } });
 
   const del = await call('DELETE', `/waste/schedules/${schedule.id}`);
   assert.equal(del.status, 204);
@@ -227,7 +233,7 @@ test('DELETE /waste/schedules/:id: cascades its overrides, leaves the type alone
 test('PUT .../overrides/:originalDate: 400 when original_date is not a real calculated occurrence', async () => {
   const type = await createType();
   const schedule = await createWeeklySchedule(type.id); // Mondays only
-  const r = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-07' } });
+  const r = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-07', note: null } });
   assert.equal(r.status, 400);
 });
 
@@ -235,7 +241,7 @@ test('PUT then DELETE .../overrides/:originalDate: move, then restore', async ()
   const type = await createType();
   const schedule = await createWeeklySchedule(type.id);
 
-  const moved = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: '2026-01-07' } });
+  const moved = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: '2026-01-07', note: null } });
   assert.equal(moved.status, 200);
   assert.equal(moved.body.data.replacement_date, '2026-01-07');
 
@@ -249,7 +255,7 @@ test('PUT then DELETE .../overrides/:originalDate: move, then restore', async ()
 test('PUT .../overrides/:originalDate with replacement_date: null skips the occurrence', async () => {
   const type = await createType();
   const schedule = await createWeeklySchedule(type.id);
-  const skipped = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: null } });
+  const skipped = await call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: null, note: null } });
   assert.equal(skipped.status, 200);
   assert.equal(skipped.body.data.replacement_date, null);
 });
@@ -501,7 +507,8 @@ test('PUT /waste/reminder-settings/:typeId: rejects offset_days outside the boun
 });
 
 test('PUT /waste/reminder-settings/:typeId: 404 for a type that does not exist', async () => {
-  const r = await call('PUT', '/waste/reminder-settings/999999', { body: { enabled: true } });
+  // The whole setting (#2810): a body without lead time and time is a 400 before the lookup.
+  const r = await call('PUT', '/waste/reminder-settings/999999', { body: { enabled: true, offset_days: 1, delivery_time: '08:00' } });
   assert.equal(r.status, 404);
 });
 
@@ -780,7 +787,8 @@ async function expectReason(response, status, reason) {
   assert.equal(r.body.code, status);
   assert.equal(typeof r.body.error, 'string', 'the English sentence stays for API consumers');
   assert.ok(r.body.error.length > 0);
-  seenReasons.add(reason);
+  // `validation` is the reason of the schema check (#2810), not one of the module.
+  if (reason !== 'validation') seenReasons.add(reason);
 }
 
 const monthly = (typeId, overrides = {}) => ({
@@ -791,7 +799,7 @@ test('reason waste_type_not_found: a type that is gone, on every route that name
   await expectReason(call('GET', `/waste/types/${MISSING}`), 404, 'waste_type_not_found');
   await expectReason(call('PUT', `/waste/types/${MISSING}`, { body: { name: 'x' } }), 404, 'waste_type_not_found');
   await expectReason(call('DELETE', `/waste/types/${MISSING}`), 404, 'waste_type_not_found');
-  await expectReason(call('PUT', `/waste/reminder-settings/${MISSING}`, { body: { enabled: true } }), 404, 'waste_type_not_found');
+  await expectReason(call('PUT', `/waste/reminder-settings/${MISSING}`, { body: { enabled: true, offset_days: 1, delivery_time: '08:00' } }), 404, 'waste_type_not_found');
 });
 
 // The CHOSEN type is gone - not the thing the request is about. Its own reason,
@@ -817,7 +825,7 @@ test('reason waste_schedule_not_found: get, update, delete and an override on a 
   await expectReason(call('GET', `/waste/schedules/${MISSING}`), 404, 'waste_schedule_not_found');
   await expectReason(call('PUT', `/waste/schedules/${MISSING}`, { body: { active: false } }), 404, 'waste_schedule_not_found');
   await expectReason(call('DELETE', `/waste/schedules/${MISSING}`), 404, 'waste_schedule_not_found');
-  await expectReason(call('PUT', `/waste/schedules/${MISSING}/overrides/2026-01-05`, { body: { replacement_date: null } }), 404, 'waste_schedule_not_found');
+  await expectReason(call('PUT', `/waste/schedules/${MISSING}/overrides/2026-01-05`, { body: { replacement_date: null, note: null } }), 404, 'waste_schedule_not_found');
 });
 
 test('reason waste_pickup_not_found: get, update and delete of a pickup that is gone', async () => {
@@ -834,10 +842,10 @@ test('reason waste_source_not_found: every source route on a source that is gone
     ['POST', `/waste/sources/${MISSING}/refresh`, {}],
     ['GET', `/waste/sources/${MISSING}/mapping-profile/export`],
     ['POST', `/waste/sources/${MISSING}/mapping-profile/import/preview`, { profile: { mappings: [] } }],
-    ['POST', `/waste/sources/${MISSING}/mapping-profile/import/commit`, { profile: { mappings: [] } }],
+    ['POST', `/waste/sources/${MISSING}/mapping-profile/import/commit`, { profile: { mappings: [] }, profile_digest: 'x' }],
     ['PUT', `/waste/sources/${MISSING}/mappings/1`, { ignored: true }],
     ['POST', `/waste/sources/${MISSING}/reimport/preview`, { ics: icsFixture('2026-10-03') }],
-    ['POST', `/waste/sources/${MISSING}/reimport/commit`, { ics: icsFixture('2026-10-03') }],
+    ['POST', `/waste/sources/${MISSING}/reimport/commit`, { ics: icsFixture('2026-10-03'), expected_version: 1 }],
   ]) {
     await expectReason(call(method, path, { body }), 404, 'waste_source_not_found');
   }
@@ -853,7 +861,7 @@ test('reason waste_override_not_found and waste_occurrence_not_found: restoring 
   const schedule = await createWeeklySchedule(type.id);
   await expectReason(call('DELETE', `/waste/schedules/${schedule.id}/overrides/2026-01-05`), 404, 'waste_override_not_found');
   // 2026-01-06 is a Tuesday; the schedule runs on Mondays.
-  await expectReason(call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-08' } }), 400, 'waste_occurrence_not_found');
+  await expectReason(call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-06`, { body: { replacement_date: '2026-01-08', note: null } }), 400, 'waste_occurrence_not_found');
 });
 
 test('reason waste_type_in_use and waste_pickup_exists: the two conflicts', async () => {
@@ -896,12 +904,14 @@ test('a validation only an API caller triggers carries no reason, and does not h
     body: { type_id: type.id, recurrence_kind: 'yearly', anchor_date: '2026-01-05', interval: 1 },
   });
   assert.equal(apiOnly.status, 400);
-  assert.equal('reason' in apiOnly.body, false, JSON.stringify(apiOnly.body));
+  // An unknown kind is outside the schema since #2810: the 400 of the check, `reason: validation`.
+  assert.equal(apiOnly.body.reason, 'validation', JSON.stringify(apiOnly.body));
 
   // Two problems at once: the response carries every sentence and the reason of
   // the first problem that has one.
   const both = await call('POST', '/waste/schedules', {
-    body: { type_id: type.id, recurrence_kind: 'weekly', anchor_date: '2026-01-05', interval: 1, weekdays: [], valid_until: 'someday' },
+    // A day that does not exist: the shape passes the schema, the route refuses it (#2810).
+    body: { type_id: type.id, recurrence_kind: 'weekly', anchor_date: '2026-01-05', interval: 1, weekdays: [], valid_until: '2026-02-31' },
   });
   assert.equal(both.status, 400);
   assert.equal(both.body.reason, 'waste_schedule_weekdays_required');
@@ -910,7 +920,7 @@ test('a validation only an API caller triggers carries no reason, and does not h
 
   const typeName = await call('POST', '/waste/types', { body: {} });
   assert.equal(typeName.status, 400);
-  assert.equal('reason' in typeName.body, false);
+  assert.equal(typeName.body.reason, 'validation', 'a missing name is outside the schema since #2810');
 });
 
 test('reasons waste_pickup_date_invalid, waste_override_date_invalid, waste_override_same_date: an empty or unchanged date', async () => {
@@ -920,7 +930,7 @@ test('reasons waste_pickup_date_invalid, waste_override_date_invalid, waste_over
   await expectReason(call('PUT', `/waste/pickups/${pickup.body.data.id}`, { body: { date: '' } }), 400, 'waste_pickup_date_invalid');
 
   const schedule = await createWeeklySchedule(type.id);
-  const override = (replacement) => call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: replacement } });
+  const override = (replacement) => call('PUT', `/waste/schedules/${schedule.id}/overrides/2026-01-05`, { body: { replacement_date: replacement, note: null } });
   await expectReason(override(''), 400, 'waste_override_date_invalid');
   await expectReason(override('2026-01-05'), 400, 'waste_override_same_date');
 });
@@ -929,7 +939,8 @@ test('reasons waste_reminder_offset_invalid and waste_reminder_time_invalid: the
   const type = await createType();
   const put = (body) => call('PUT', `/waste/reminder-settings/${type.id}`, { body });
   await expectReason(put({ enabled: true, offset_days: 99, delivery_time: '08:00' }), 400, 'waste_reminder_offset_invalid');
-  await expectReason(put({ enabled: true, offset_days: 'soon', delivery_time: '08:00' }), 400, 'waste_reminder_offset_invalid');
+  // Text in the number field is outside the schema since #2810 (the dialog sends a number).
+  await expectReason(put({ enabled: true, offset_days: 'soon', delivery_time: '08:00' }), 400, 'validation');
   await expectReason(put({ enabled: true, offset_days: 1, delivery_time: '25:00' }), 400, 'waste_reminder_time_invalid');
   // The emptied time field of the dialog: this was a 500 (NOT NULL constraint).
   await expectReason(put({ enabled: true, offset_days: 1, delivery_time: '' }), 400, 'waste_reminder_time_invalid');
@@ -988,15 +999,16 @@ test('reasons of the import limits: an empty or oversized file, too many entries
 });
 
 test('an import refusal only an API caller triggers carries no reason and no params', async () => {
-  for (const body of [
-    { ics: icsFixture('2026-10-11') },                          // no name
-    { ics: icsFixture('2026-10-11'), name: 'x', mappings: [] }, // no decision for the label
-  ]) {
-    const r = await call('POST', '/waste/import/commit', { body });
-    assert.equal(r.status, 400, JSON.stringify(r.body));
-    assert.equal('reason' in r.body, false, JSON.stringify(r.body));
-    assert.equal('params' in r.body, false, JSON.stringify(r.body));
-  }
+  // No name: outside the schema since #2810, the 400 of the check.
+  const noName = await call('POST', '/waste/import/commit', { body: { ics: icsFixture('2026-10-11') } });
+  assert.equal(noName.status, 400, JSON.stringify(noName.body));
+  assert.equal(noName.body.reason, 'validation', JSON.stringify(noName.body));
+  assert.equal('params' in noName.body, false, JSON.stringify(noName.body));
+  // No decision for the label: the route's own 400, without a reason.
+  const r = await call('POST', '/waste/import/commit', { body: { ics: icsFixture('2026-10-11'), name: 'x', mappings: [] } });
+  assert.equal(r.status, 400, JSON.stringify(r.body));
+  assert.equal('reason' in r.body, false, JSON.stringify(r.body));
+  assert.equal('params' in r.body, false, JSON.stringify(r.body));
 });
 
 test('reasons preview_changed and source_changed: the two refusals of a stale preview', async () => {
@@ -1021,7 +1033,7 @@ test('reasons waste_profile_invalid and waste_profile_changed: a file that is no
   await expectReason(preview({ mappings: [{ pattern: ' ', type_name: 'x' }] }), 400, 'waste_profile_invalid');
 
   const commit = (body) => call('POST', `/waste/sources/${source.id}/mapping-profile/import/commit`, { body });
-  await expectReason(commit({ profile: [] }), 400, 'waste_profile_invalid');
+  await expectReason(commit({ profile: [], profile_digest: 'x' }), 400, 'waste_profile_invalid');
   await expectReason(commit({ profile: { mappings: [] }, profile_digest: 'not the digest of this profile' }), 409, 'waste_profile_changed');
 });
 
@@ -1040,15 +1052,19 @@ test('reasons of the URL source dialog: an address that is none, one without htt
   await expectReason(post({ url: 'not an address' }), 400, 'waste_source_url_invalid');
   await expectReason(post({ url: 'ftp://example.org/a.ics' }), 400, 'waste_source_url_invalid');
   await expectReason(post({ url: 'http://example.org/a.ics' }), 400, 'waste_source_url_not_https');
-  for (const interval of [MIN_REFRESH_INTERVAL_MINUTES - 1, MAX_REFRESH_INTERVAL_MINUTES + 1, 90.5, 'often']) {
+  for (const interval of [MIN_REFRESH_INTERVAL_MINUTES - 1, MAX_REFRESH_INTERVAL_MINUTES + 1]) {
     await expectReasonWithParams(post({ url: 'https://example.org/a.ics', refresh_interval_minutes: interval }), 400, 'waste_source_interval_invalid', bounds);
+  }
+  // Not a whole number: outside the schema since #2810 (the dialog sends a number).
+  for (const interval of [90.5, 'often']) {
+    await expectReason(post({ url: 'https://example.org/a.ics', refresh_interval_minutes: interval }), 400, 'validation');
   }
   assert.equal(await sourceCount(), before, 'a refused dialog creates nothing, and none of these reached the network');
 
   // No name: only an API caller gets here (the dialog fills one in).
   const unnamed = await call('POST', '/waste/sources', { body: { url: 'https://example.org/a.ics' } });
   assert.equal(unnamed.status, 400);
-  assert.equal('reason' in unnamed.body, false);
+  assert.equal(unnamed.body.reason, 'validation', 'a missing name is outside the schema since #2810');
 });
 
 test('reason waste_source_not_url: a manual refresh of a source that came from a file', async () => {
@@ -1103,7 +1119,8 @@ test('reasons of a failed fetch: one per class - the status of the other side, t
     assert.equal('reason' in created.body.data, false, 'a fetch that worked names no failure');
     const id = created.body.data.source.id;
     const refresh = () => withPrivateNetwork(() => call('POST', `/waste/sources/${id}/refresh`, { body: {} }));
-    const reimport = (step) => withPrivateNetwork(() => call('POST', `/waste/sources/${id}/reimport/${step}`, { body: {} }));
+    // The commit names a version (required since #2810); the failed fetch answers before it is compared.
+    const reimport = (step) => withPrivateNetwork(() => call('POST', `/waste/sources/${id}/reimport/${step}`, { body: step === 'commit' ? { expected_version: 0 } : {} }));
 
     // The other side answers, but not with a calendar.
     for (const status of [404, 503]) {
@@ -1294,6 +1311,24 @@ test('every waste_* reason the server source carries is answered by a real route
   const codes = [...importer.matchAll(/new WasteImportError\([^\n]*?,\s*'([a-z_]+)'\s*[,)]/g)].map((m) => m[1]);
   assert.equal(codes.length, 6, `the scan reads the import refusals (found ${codes.join(', ')})`);
   for (const code of codes) inSource.add(`waste_import_${code}`);
+  // A refusal the schema of the operation makes names its reason through
+  // `x-reason` in the OpenAPI document (#2810): since group 4 step (b) the
+  // bounds and the time of a reminder setting are refused there only.
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const spec = buildOpenApiSpec(null, '0.0.0-test');
+  const fromDocument = new Set();
+  const walk = (/** @type {unknown} */ node) => {
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'x-reason' && value && typeof value === 'object') {
+        for (const reason of Object.values(value)) if (typeof reason === 'string' && reason.startsWith('waste_')) fromDocument.add(reason);
+      } else walk(value);
+    }
+  };
+  walk(Object.fromEntries(Object.entries(spec.paths).filter(([path]) => path.startsWith('/api/v1/waste'))));
+  walk(Object.fromEntries(Object.entries(spec.components.schemas).filter(([name]) => name.startsWith('Waste'))));
+  assert.ok(fromDocument.has('waste_reminder_offset_invalid'), `the scan reads the document's reasons (found ${[...fromDocument].join(', ')})`);
+  for (const reason of fromDocument) inSource.add(reason);
   assert.ok(inSource.size >= 20, `the scan reads reasons at all (found ${inSource.size})`);
   assert.deepEqual([...seenReasons].sort(), [...inSource].sort(),
     'a reason in the server source has no case above that sees it in a real answer - or a case sees one the scan misses');

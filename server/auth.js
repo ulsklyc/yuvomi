@@ -67,6 +67,7 @@ import { actorForAccount, authorize } from './authorize/index.ts';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
 import * as twoFactor from './services/two-factor.js';
 import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
+import { MAX_AVATAR_DATA_LENGTH } from './utils/avatar-limits.js';
 
 const log = createLogger('Auth');
 const router = express.Router();
@@ -86,7 +87,6 @@ const DEVICE_IDLE_DAYS = Math.round(SESSION_MAX_AGE_MS / (24 * 60 * 60 * 1000));
 const FAMILY_ROLES = ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'];
 // Platzhalter-Hash für den Timing-Attack-Schutz beim Login unbekannter Benutzer.
 const DUMMY_PASSWORD_HASH = '$2b$12$invalidhashfortimingprotection000000000000000000000';
-const MAX_AVATAR_DATA_LENGTH = 768 * 1024;
 /**
  * WIEVIELE MENSCHEN IM HAUSHALT LEBEN, und warum der Server das sagt.
  *

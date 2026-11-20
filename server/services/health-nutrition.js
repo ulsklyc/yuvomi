@@ -16,27 +16,12 @@
  */
 
 import { canWriteFor, careAwareClause, OPEN_ALL } from '../authorize/index.ts';
+import { MEAL_TYPES, NUTRIENT_KEYS } from './health-fields.js';
 
-/**
- * Die acht Naehrwerte in ihrer kanonischen Reihenfolge: Energie, Fett, davon
- * gesaettigte Fettsaeuren, Kohlenhydrate, davon Zucker, Eiweiss, Salz,
- * Ballaststoffe. Das ist die Reihenfolge der EU-Naehrwerttabelle auf der
- * Packung, und sie gilt fuer Formular, CSV-Kopfzeile und Anzeige gleichermassen
- * - wer sie hier aendert, aendert sie ueberall.
- */
-export const NUTRIENT_KEYS = Object.freeze([
-  'energy_kcal',
-  'fat_g',
-  'saturated_fat_g',
-  'carbs_g',
-  'sugar_g',
-  'protein_g',
-  'salt_g',
-  'fiber_g',
-]);
-
-/** Die Mahlzeitenarten, die ein Eintrag optional tragen darf. */
-export const MEAL_TYPES = Object.freeze(['breakfast', 'lunch', 'dinner', 'snack']);
+// Die acht Naehrwerte in der Reihenfolge der EU-Naehrwerttabelle und die
+// Mahlzeitenarten: EINE Quelle mit dem OpenAPI-Dokument (#2810),
+// server/services/health-fields.js. Hier weiter exportiert fuer die Leser.
+export { MEAL_TYPES, NUTRIENT_KEYS };
 
 /**
  * Das Tagesziel einer Person, oder `null`.

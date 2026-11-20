@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Live folders can use local tag-filter views.** Create further views from selected Paperless tags, matching all or any of them, without creating a saved view in Paperless. Administrators can also choose which metadata fields appear beside document titles in the Live-folder overview.
 - **Live-folder settings centrally control available tags and DMS authentication.** Administrators can choose allowed tags per Paperless connection and use either the shared connection token or personal tokens. Users save and remove their own write-only tokens in Documents settings. Personal mode never falls back to the shared token, and existing folder visibility still applies. Tags outside the allowed selection are preserved when editing Live-folder documents.
 - **Saved Paperless views can be opened as live document folders.** Connect a
   view in Documents, keep it private or explicitly share its current and future
@@ -16,10 +17,469 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the binding. Migration 283 adds the folder and member-access tables.
 - **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
 
+### Changed
+- **Health checks every request against the published API description.** This is about your
+  own API clients; the app sends nothing that is refused now (from this release on it sends the
+  type of a preventive-care record as a number). Under `/api/v1/health`, input that used to be
+  quietly accepted, replaced or answered later is now refused with a 400:
+  - a path id that is not plain digits: `7abc`, `1e2`, `1.5` and `" 5"` reached row 7, 1, 1 and
+    5, and on fasting records `0x10` reached record 16;
+  - a number sent as text, a truth value or a list in a number field: `"0x10"`, `" "`, `[]` and
+    `true` were stored as 16, 0, 0 and 1 (vital values, stock and doses, lab values, activity
+    numbers, nutrients, cycle settings);
+  - an unknown value where the module has a list: visibility, dose status, lab flag, cycle flow
+    and the day log choices, basal temperature unit, contraception, preventive-care kind, meal
+    type, the areas of the visibility defaults; `active` and `prn` of a new medication or
+    schedule that are not `true`/`false`/`1`/`0` became the default;
+  - a number, list or object in a text field (stored as text, `{}` as `"[object Object]"`), ids
+    in a body that are neither whole numbers nor digit text (`user_id`, `schedule_id`,
+    `type_id`, `notify_partner_user_id`), `symptoms` that is neither a list nor text (it cleared
+    the day's symptoms) and `results` of a lab report that is not a list (dropped);
+  - `caregiver_ids` with an entry that is not an id: `["abc"]` WITHDREW ALL CARE for the person;
+  - `PATCH /health/fasting/{id}` with `visibility: null`, which made a shared fast private;
+    fasting `goal_minutes`, `rating` and `expected_revision` sent as text;
+  - queries: `user_id` that is not plain digits or `0` (read as "everybody visible"), `active`
+    other than `1`, `0`, `true`, `false`, export dates that are not a day (ignored), an unknown
+    `meal_type`, and any parameter given twice;
+  - a missing body on the routes that read one; `{}` sent on purpose still passes where the
+    route took it before. `POST /health/logs/{id}/skip` reads no body.
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404 or 409; a
+  valid one meets those as before. The fasting capability and the admin check of caregivers and
+  preventive-care types come first: 403 stays 403, also for a bad request. Rules the
+  description cannot carry stay with the routes: vital limits and units, the order of start and
+  end, the CSV import rows, revisions and overlaps of fasts. A basal temperature unit named like
+  a built-in property (`constructor`) no longer passes the range check.
+- **Editing a shared expense takes the whole expense.** This is about your own API clients; the
+  app sends every field now. `PUT /split-expenses/expenses/{id}` without `description`,
+  `currency`, `converted_amount`, `converted_currency`, `exchange_snapshot`, `split_method` or
+  `expense_date` cleared the stored note and exchange snapshot, read the amount in the converted
+  currency, set the converted amount and currency back to the amount and currency, split the
+  amount equally and moved the expense to today. All seven are required now besides `title` and
+  `amount`; `null` still clears the note and the snapshot and stands for the amount, and
+  `expense_date: ""` is still today. `payer_id`, `participants`, `category`, `budget_category`
+  and `attachment_document_ids` stay optional and keep the stored value when left out. The edit
+  dialog no longer drops the stored conversion and exchange snapshot of an expense whose amount
+  and currency it leaves unchanged, and the exact shares of such a converted expense are entered
+  and checked in the converted currency, as the server adds them up.
+- **An exchange snapshot is an object or `null`.** This is about your own API clients: on
+  `POST /split-expenses/groups/{id}/expenses` and `PUT /split-expenses/expenses/{id}`,
+  `exchange_snapshot` sent as `false`, `0`, `""` or any other value that is not an object is now
+  refused with a 400, where `false`, `0` and `""` were stored as no snapshot and other values as
+  sent.
+- **Backup answers an unexpected failure with the same sentence as the rest of the API.**
+  `GET /api/v1/backup/database` said `"Database backup failed."`, `POST /api/v1/backup/trigger`
+  `"Backup trigger failed."` and `PUT /api/v1/backup/webdav/config` `"Failed to save WebDAV
+  config."` on a server-side failure; they now say `"Internal server error."` like every other
+  module. Status 500 and `code` are unchanged. Every answer that names a known cause stays as it
+  was: a download whose backup failed its integrity check (`backup_verify_failed`), a local
+  failure of the WebDAV upload (`backup_local_failed`), the 502 of the WebDAV server, the
+  `errorCode` of the WebDAV settings and the reasons of a restore. Shared expenses answered
+  this way already.
+- **Shared expenses, backup and the system diagnostics check every request against the
+  published API description.** This is about your own API clients; the app sends nothing that
+  is refused now (from this release on it sends the payer and payee as numbers). Under
+  `/api/v1/split-expenses`, `/api/v1/backup`, `/api/v1/system` and `/api/v1/changelog`, input
+  that used to be quietly accepted, replaced or answered later is now refused with a 400:
+  - a path id that is not plain digits: `0x10`, `1e1` and `" 5"` read group, expense or
+    recurring expense 16, 10 and 5, and `7abc` or `1.5` were a 404;
+  - an unknown value where the module has a list: group `type`, `default_currency`,
+    `default_split_method`, an expense or settlement `currency` and `converted_currency`,
+    `split_method`, `category`, a recurring `frequency`, a member `role`, a guest
+    `family_role`, and the filters `status` (groups) and `category` (expenses). They were
+    replaced with a default (`general`, `equal`, the group currency, `guest`, `other`) or
+    ignored;
+  - a number, truth value, list or object in a text field (a guest `password: {}` was stored as
+    `"[object Object]"`), an amount sent as a number, and ids in a body that are neither whole
+    numbers nor digit text (`payer_id`, `payee_id`, `participants`, `splits[].user_id`,
+    `user_id`, `contact_id`, `proof_document_id`, `attachment_document_ids`);
+  - `attachment_document_ids` that is not a list on `PUT /split-expenses/expenses/{id}`:
+    `null`, a single id or text REMOVED EVERY RECEIPT of the expense. Leave the field out to
+    keep them, send `[]` to remove them;
+  - `PUT /backup/webdav/config` with a `username`, `password` or `remotePath` that is not text
+    (`username: 5` was a 500) or a `keep` that is not a whole number (`7.5` was stored as 7);
+  - queries: `limit`, `offset` and `before_id` that are not plain digits, `recurring` other than
+    `1`, and any parameter given twice. `limit` above 100 and a negative `offset` are still
+    capped, as described;
+  - a missing body on the routes that read one; `{}` sent on purpose still passes where the
+    route took it before (`PATCH /split-expenses/groups/{id}`).
+
+  What stays allowed is in the description now too: `null` or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), unknown fields, no body at the pause
+  toggle. Rules the description cannot carry stay with the routes and their sentences: an empty
+  name after trimming, amounts and their decimal places, the sums of a split, membership,
+  budget categories (`unknown_budget_category`), the WebDAV address pattern and password rule
+  (`errorCode`). `missed` keeps its reason `invalid_missed`. The check runs before the group,
+  expense or recurring expense is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of backup and diagnostics and the refusal
+  of a shared-expense guest creating a group come first: 403 stays 403, also for a bad request.
+  Text lengths count the value as sent.
+- **Replacing a moved or skipped waste pickup or a day of the shift schedule takes the whole
+  entry.** This is about your own API clients; the app sends every field already. A `PUT`
+  replaces what is stored, so a field left out no longer stands for a value:
+  - `PUT /waste/schedules/{id}/overrides/{originalDate}` without `replacement_date` and `note`:
+    an empty body skipped the pickup, and a missing note wiped the stored one. Both are required
+    now; `replacement_date: null` skips the pickup;
+  - `PUT /schedule/overrides/{dateKey}` without `shift_type_id`, `note` and `field_values`: a
+    missing shift type made the day free, a missing note wiped the stored one, and missing field
+    values kept the stored ones while everything else was replaced. All three are required now;
+    `shift_type_id: null` is the free day, and `field_values: {}` clears the values. `user_id`
+    stays optional and defaults to you.
+- **Waste collection and the shift schedule answer an unexpected failure with the same sentence
+  as the rest of the API.** The routes under `/api/v1/waste` (types, schedules and their
+  overrides, one-off pickups, occurrences, import sources, file import, reminder settings) said
+  `"Internal error"` on a server-side failure, `DELETE /api/v1/schedule/shift-types/{id}` said
+  `"Internal error."` and `GET /api/v1/schedule/entries` said `"Schedule entries could not be
+  resolved."`; they now say `"Internal server error."` like every other module. Status 500 and
+  `code` are unchanged. Every answer that names a known cause stays as it was: a refused input,
+  a missing record or a conflict of waste collection, the 502 of a subscribed address without
+  calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
+  and the own schedule settings answered this way already.
 
 ### Fixed
 - **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
 - **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+- **A shared expense converted into a currency with other decimal places reports the converted
+  amount correctly.** `converted_amount` in the expense answers was written with the decimal
+  places of `currency` instead of `converted_currency`: 1500 JPY converted from USD read
+  `"15.00"`, and sending it back was refused. `converted_amount_minor` was always right.
+- **Exact shares of an expense converted into COP, HUF, IDR or IRR can be saved again.** The
+  converted amount keeps two decimal places (for example 3581.47 HUF), but the share fields
+  allowed none for these currencies, so the shares could never add up to it. They now accept
+  the decimal places the converted amount is stored with.
+- **The running total under exact shares of such an expense shows the stored decimal places.**
+  It showed 3,581 HUF while the shares had to add up to 3,581.47 HUF; it now shows 3,581.47 HUF.
+- **A shared expense saved without an exchange rate answers `exchange_snapshot: null`.** Creating
+  or replacing an expense without a rate stored the text `"null"`, and the expense answers
+  returned `"exchange_snapshot": "null"` for it. New and replaced expenses now store no value and
+  answer `null`; expenses saved before keep `"null"` until they are saved again.
+
+## [2.93.0] - 2026-11-18
+
+### Changed
+- **The inventory checks every request against the published API description.** This is about
+  your own API clients; the app sends nothing that is refused now (it sends location ids as
+  numbers from this release on, also in the order of locations and child locations). Under
+  `/api/v1/inventory`, input that used to be quietly accepted, reinterpreted or answered later
+  is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`DELETE /inventory/items/12abc` deleted item 12), a number, truth value, list or object in
+    a text field (it was stored as text), and a number written as text, a truth value or a
+    list in a number field (`"12.5"`, `true` and `[5]` were read as numbers);
+  - items: a `condition`, `status` or `odometer_unit` outside its list, and `false` or `0` for
+    them (they meant the default; null, `""` or leaving it out still do), a day that is not
+    `YYYY-MM-DD` or is a list, a location id that is neither a whole number nor digit text,
+    `warranty_months` outside 0 to 600, an odometer reading that is not a whole number - also
+    for a category without one, where it was dropped silently - and a price that is not a
+    number, also from an account without the price right (it was ignored);
+  - `tracked_dates` and `attachment_document_ids` that are not a list: on a replace, null,
+    text or an object REMOVED all tracked dates with their reminders, or all document links.
+    Leaving the field out still leaves them as they are, and `[]` still clears them. Tracked
+    date rows that are not objects, without label or day, or with numbers outside their range;
+  - linking a booking: `entry_id` as text or left out, a `role` outside its list,
+    `amount_share` as text or below zero; completing a tracked date and the service log: a day
+    that is not `YYYY-MM-DD`, an odometer reading as text or below zero;
+  - the list: `status` outside its list, `location_id` that is not plain digits, and a filter
+    given twice (they were ignored or read as the first);
+  - the order of locations, child locations and categories with entries that are not ids or
+    keys (`[{}]` and `[true]` were a 500, other entries were skipped or stored), and an order
+    of child locations without `order` (it was a silent no-op; `[]` still is).
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for a location id (older app versions send it), a currency in
+  any case, unknown fields. A `PUT` replaces the whole item, as before: left-out fields are
+  cleared or take their default, only the name is required, and `tracked_dates` and
+  `attachment_document_ids` stay untouched when left out. Rules the description cannot carry
+  stay with the routes and their sentences: an empty name after trimming, a day that does not
+  exist, a category or location that does not exist (`inventory_selected_location_not_found`
+  as before, for a number and for digit text), the photo content, the odometer that must not
+  fall below the current reading. The check runs before the entry is looked up, so a bad
+  request for a missing entry is a 400, not a 404 or 409, and an account that may change only
+  its own items gets 400 for a bad request on someone else's item and, as before, 403
+  `not_owner` for a valid one. Text lengths count the value as sent.
+- **Housekeeping and rewards check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that is refused now (it sends the
+  housekeeper id as a number from this release on). Under `/api/v1/housekeeping` and
+  `/api/v1/rewards`, input that used to be quietly accepted, reinterpreted or answered later
+  is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `1.9`, `0x10` or ` 1`
+    (they were read as numbers), a number, truth value, list or object in a text field (it was
+    stored as text), and a number written as text, a truth value or a list in a number field
+    (`"60"`, `true` and `[5]` were read as numbers) - for amounts also from an account without
+    the amounts right, where they were ignored;
+  - `PUT /rewards/participants/{userId}` without `enabled`, or with anything but `true` or
+    `false` (`"true"`, `1`, `null`): it SWITCHED THE PARTICIPATION OFF. `enabled` is required
+    now. `PATCH /rewards/catalog/{id}` with `is_active` that is not `true` or `false`: it
+    switched the reward off;
+  - lists: `payment_schedule` and `rate_type` of a housekeeper, `action` of a redemption
+    decision (missing or unknown, it was 400 only after the request was looked up), `kind` of a
+    request, `frequency` of a pocket money plan and `direction` of a money entry outside their
+    values; `birth_year_unknown` as `0`, `1` or null;
+  - ids in a body (housekeeper, receipt, person, reward) that are neither whole numbers nor
+    digit text, and `null` for a person or reward in rewards; whole numbers outside the
+    route's own bounds (a reward's cost and quantity, a bonus, a plan's anchor day, a task
+    frequency below 1);
+  - queries: `?month=` outside 01 to 12 or before the year 1001 (`2026-13` was a 500),
+    `worker_id`, `user_id`, `limit` and `timezone_offset_minutes` that are not plain digits
+    (`?user_id=abc` listed everybody), `local_date` that is not `YYYY-MM-DD`, `status`, `kind`
+    and `all` outside their values, and any filter given twice.
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), unknown fields, a body on the routes
+  that read none. Rules the description cannot carry stay with the routes and their sentences:
+  an empty name after trimming, the username rule (`housekeeping_username_invalid`), a day that
+  does not exist, amounts below zero, the money amount and currency of an account. Texts the
+  rewards routes cut (`icon`, `note`, `reason`) are still cut, not refused. The check runs
+  before the entry is looked up, so a bad request is a 400, not a 404, 403 or 409; a valid one
+  meets those as before. The admin check of `POST /housekeeping/worker` and of the rewards
+  admin routes, and the shopping right of `POST /housekeeping/supply-requests`, come first:
+  403 stays 403, also for a bad request. Text lengths count the value as sent.
+- **Waste collection and the shift schedule check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused
+  now. Under `/api/v1/waste` and `/api/v1/schedule`, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `1.5` or `1e3` (they were
+    read as 12, 1 and 1), a number, truth value, list or object in a text field, and a number
+    written as text, a truth value or a list in a number field (`"7"` for a cycle length, `""`
+    or `false` for `reminderOffsetMinutes`, which meant 0 minutes);
+  - `PUT /waste/reminder-settings/{typeId}` without `enabled`, `offset_days` and
+    `delivery_time`: a body without `enabled` SWITCHED THE REMINDER OFF, and a missing lead
+    time or time was reset to 1 day and 08:00. All three are required now;
+  - switches that are not `true` or `false` (`active`, `archived`, `ignored`, `enabled`,
+    `is_active`, `overtimeEnabled`): `active: "false"` kept a waste schedule running;
+  - garbage that was a 500: `type_id: true` or `{}` for a waste schedule or pickup, a `note`
+    that is not text on a moved or skipped pickup, `mappings: [null]` on an import commit, and
+    `color: ""` for a waste type;
+  - lists: a `recurrence_kind` or weekday code outside its values, weekdays as comma text
+    (`"MO,TH"`; send a list), a mapping profile `version`
+    other than 1, `include_archived` and `include_inactive` other than `1`, `true`, `0` or
+    `false`;
+  - ids in a body that are neither whole numbers nor digit text (`user_id`, `shift_type_id`,
+    `custom_field_id`, the type of a schedule or pickup); bounds the routes have on every
+    value (cycle length 1-366, at most 500 cycle days, reminder minutes 0-1440, weekly hours
+    1-168, waste reminder lead time 0-14 days);
+  - queries: `type_id`, `user_id`, `from` and `to` that are not plain digits or `YYYY-MM-DD`
+    (`?type_id=abc` listed every schedule, `?user_id=3abc` read 3), and any filter given twice;
+  - missing fields that were answered later: `profile_digest` of a mapping profile commit and
+    `expected_version` of a re-import commit (a 409 before), and a day in the path of a waste
+    override that is not `YYYY-MM-DD` (a 404 before).
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), weekdays as a list or one code,
+  unknown fields, an empty body where every field is optional (skipping a pickup
+  date), a URL source without `ics`. Rules the description cannot carry stay with the routes
+  and their reasons: an empty name after trimming, a day that does not exist, the anchor day of
+  a schedule, the interval bound per kind, a type, shift type or member that does not exist,
+  the refresh interval of a URL source (with its bounds as `params`). The check runs before the
+  entry is looked up, so a bad request is a 400, not a 404, 403 or 409; a valid one meets those
+  as before. A member who names someone else in `user_id` of a pattern, override, extra shift
+  or their range variants gets 403 first, also for a bad request, now with the plain sentence
+  `Forbidden.`. Text lengths count the value as sent.
+- **A path id beyond the safe integer range is refused with a 400.** This is about your own
+  API clients; the app never sends such an id. On the routes that check requests against the
+  API description (notes, birthdays, quick links, reminders, notification channels,
+  permissions, displays, profile pictures, recipes, recipe providers, pantry, inventory,
+  housekeeping, rewards, waste collection, shift schedule), a
+  path id above 9007199254740991 is now a 400 with the rule `maximum`, and a run of digits too
+  long to be a number at all (hundreds of digits) a 400 with the rule `type`. Before, such an id
+  answered 404 or 400 depending on the route. 9007199254740991 itself, `0` and a negative id
+  are answered by the route as before. The API description gives every numeric path id this
+  upper bound.
+
+## [2.92.0] - 2026-11-18
+
+### Changed
+- **Notes, birthdays and quick links check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that changes. Under
+  `/api/v1/notes`, `/api/v1/birthdays` and `/api/v1/quick-links`, input that used to be
+  quietly accepted or reinterpreted is now refused with a 400:
+  - a path id that is not plain digits, such as `12abc` (it was read as 12);
+  - `pinned` as `"false"`, `5` or `"x"`, and `pinned: null` on a note update;
+  - a number in a text field, such as `"title": 5` (it was stored as text);
+  - an id written as text in `category_ids` and `contact_id`, and anything but whole numbers
+    in `contact_ids` (birthday import) and `ids` (quick link order). Note category reordering
+    still takes digit strings, because the app sends them;
+  - a list instead of an object as the body;
+  - a quick link `visibility` other than `all`, `private` or null (it became `all` or was
+    ignored);
+  - an empty `name` when updating a birthday or a quick link.
+
+  Such a refusal reads `{ "error": "The request does not match the documented schema.",
+  "code": 400, "reason": "validation", "fields": [{ "path": "body/title", "rule": "type" }] }`.
+  `fields` names the place and the JSON Schema rule, never the value you sent. Input that was
+  already refused before can now get this form instead of the old sentence. The check runs
+  before the entry is looked up, so a bad request for a missing or locked entry is now a 400,
+  not a 404 or 403, and a missing body where one is required is a 400. Text lengths count the
+  value as sent, before surrounding spaces are trimmed. Unknown fields are still ignored, and
+  what stays allowed is in the description too: null or `""` for "no value", the note
+  visibilities `family` and `shared`, `year_unknown: null`, a pin toggle without a body, and
+  reminder fields as text or number.
+- **Birthdays answer an unexpected failure with the same sentence as the rest of the API.** The
+  seven routes under `/api/v1/birthdays` (list, upcoming, create, import candidates, import,
+  update, delete) said `"Internal error."` on a server-side failure; they now say
+  `"Internal server error."` like every other module. Status 500 and `code` are unchanged.
+- **Reminders, notification channels, modules, permissions, e-mail and weather check every
+  request against the published API description.** This is about your own API clients; the app
+  sends nothing that is refused now (a task reminder now goes out with its id as a number).
+  Under these six prefixes, input that used to be quietly accepted or reinterpreted is now
+  refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (it was read as another number or looked up as 12), and a query value given twice where
+    one is expected (`audience`, `admin`, `city`, `lang`, `entity_id`);
+  - `/api/v1/reminders`: `entity_id` as `1abc` or `1.9` (it was read as 1), an unknown
+    `entity_type`, `remind_at` as a list, and a time the route never read - a lowercase `t`
+    or `z`, a space instead of `T`, an offset of hours only (`+02`). A body that is not an
+    object or a `remind_ats` that is not a list is refused before the entry is looked up;
+  - `/api/v1/notifications`: a provider that is not exactly `gotify`, `ntfy`, `webhook` or
+    `email` (`" NTFY "` was accepted), a number as `name`, `enabled` as `"false"` (it switched
+    the channel ON), `config` or `secrets` as null, and `clearSecrets` that is not a list of
+    names (a number was a 500). A `provider` sent with an update must be a known one, too;
+  - `/api/v1/modules`: `overwrite` as `true` or `yes` on a ZIP install (`true` replaced, `yes`
+    was ignored), `overwrite: "1"` on a GitHub install, a `path` over 500 characters as sent,
+    `ref` or `path` that is not text, and an asset address without a file path (it was a 404);
+  - `/api/v1/permissions`: no body, a list as the body and `capabilities: null` (all three
+    answered 200 and REMOVED the stored rights), a map that is not an object, an access level
+    other than `none`, `read`, `write` (modules) or `none`, `allow` (widgets, capabilities),
+    and a member id such as `12abc` or `1.5`;
+  - `/api/v1/email`: a missing body on `PUT /config` (it was a 200 that saved nothing), `port`
+    as text, a truth value, a list or `""` (`"587"` was stored as text), a number or truth
+    value as `host`, `user`, `fromName`, `fromAddress` or `pass`, `clearPassword: "true"`, a
+    `secure` that is not one of its three values, and `to: null` or a number on `POST /test`;
+  - `/api/v1/weather`: a place name given twice, and an icon code other than 2 to 4 letters or
+    digits.
+
+  What stays allowed is in the description now too: `entity_id` as digit text on
+  `POST /reminders`, every time form the reminder routes read (a date alone, no seconds, a
+  fraction, `Z`, `+02:00` or `+0200`), up to five reminders counted after conversion, a
+  partial channel update, null to clear an e-mail field, any `lang` on the weather routes
+  (`de-AT`, an unknown code falls back), `admin` and `audience` as any text. A refusal's
+  `reason` can now be the route's own documented reason instead of `validation`, and an entry
+  in `fields` can carry it as `reason`: `bad_url` (GitHub URL missing, not text or too long),
+  `email_port_invalid`, `email_from_invalid` (a sender that is neither text nor null) and
+  `name_too_short` (a place name that is missing, empty or given twice) keep the reason they
+  had. The check runs after the admin, session and rate-limit checks, so a member still gets
+  403, and before the entry is looked up, so a bad request for a missing channel, member or
+  reminder target is now a 400, not a 404.
+- **Family, profile pictures, search, kitchen, screensaver and wall displays check every request
+  against the published API description.** This is about your own API clients; the app sends
+  nothing that is refused now. Under these prefixes, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`5.0` and `1e2` were read as 5 and 100), and a query value given twice where one is
+    expected (`q` on `/api/v1/search` searched for `a,b`, `today` on `/api/v1/kitchen/summary`);
+  - `/api/v1/family/members/reorder`: the order is checked before the members are looked up.
+    It keeps its reasons `invalid_order` and `duplicate_member`, now with `fields`. A member who
+    is not an administrator gets 403 for any body, as before;
+  - `/api/v1/people/{id}/avatar`: a missing `v`, one that is not 32 lowercase hex characters,
+    or one given twice (it was a 404). A well-formed key that does not match is still a 404;
+  - `/api/v1/kitchen/summary`: `today` that is neither `YYYY-MM-DD` nor empty (it fell back
+    to the household day). An empty or missing `today` still means the household day;
+  - `/api/v1/screensaver`: no body or a list on `PUT /config` (it was a 200 that saved
+    nothing), `url` or `albumId` that is not text (they were read through `String()`, so a
+    list with one URL was stored), a `url` over 2048 or an `apiKey` over 1000 characters as
+    sent, an `apiKey` that is not text (it was ignored), `clearApiKey: "true"`, and a photo id
+    that is not a UUID - also when Immich is not set up (that was a 404). `url`, `albumId` and
+    the key length keep `immich_url_invalid`, `immich_album_id_invalid` and
+    `immich_api_key_invalid`, and a refused body stores no field at all;
+  - `/api/v1/displays`: a `display_name` that is a number, a truth value, a list (they were
+    stored as text) or empty, or longer than 128 characters as sent; `show_screensaver` as
+    text; on `POST /displays/pair` a missing `code`, a `code` or `label` that is not text and a
+    `label` over 120 characters (it was cut). A refused pairing counts against the rate limit
+    like any attempt and leaves a signed-in session in place.
+
+  What stays allowed is in the description now too: `q` of any length, an empty `today`, a
+  day of the right shape that does not exist (compared as text, as before), `""` to clear the
+  Immich URL and album, a photo id in either letter case, `label: null` or `""`. Rules the
+  description cannot carry stay with the routes and their sentences: a member order that is
+  incomplete or names someone outside the household, the Immich URL scheme and album UUID
+  after trimming, a display name of spaces only, equal night hours. The check runs after the
+  admin check and the pairing rate limit, so a member still gets 403.
+- **Recipes, recipe providers and the pantry check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now
+  (it sends storage location ids as numbers from this release on). Under `/api/v1/recipes`,
+  `/api/v1/recipe-providers` and `/api/v1/pantry`, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`DELETE /recipes/42abc` deleted recipe 42, and `0x1e` or `31.0` deleted provider account
+    30 or 31), a query value given twice, a number, truth value, list or object in a text
+    field (it was stored as text), and a number written as text (`"5"`, `true` and `[5]` were
+    read as numbers);
+  - `/api/v1/recipes`: `ingredients` that is null, not a list, or holds entries that are not
+    objects (null emptied the list, odd entries were skipped), `servings` outside 1 to 99 or as
+    text or `""`, `meal_types` that is neither a list of texts, a text nor null, `listId` and
+    `ingredientIds` of the transfer to a shopping list as text, and `pantryItemId: ""` on an
+    ingredient match (it cleared the match; `null` or leaving it out still does);
+  - `/api/v1/recipe-providers` (admin only): a `provider` other than `mealie` or `tandoor`
+    (an unknown one was stored as `mealie`; left out it still is), `enabled` that is not a
+    real truth value (`"false"` switched an account ON, `null` and `0` OFF), and a `PATCH`
+    without a body. A base or external address that does not start with `http://` or
+    `https://` keeps its reason `recipe_providers_url_invalid` or
+    `recipe_providers_external_url_invalid`, now with `fields`;
+  - `/api/v1/pantry`: a `unit` outside the unit list (it became `pcs`, and on `PATCH` it
+    overwrote the stored unit), a quantity or minimum as text or below zero, `min_quantity: ""`
+    (use null to clear), `expires_on` that is not `YYYY-MM-DD`, empty or null, a storage
+    location id that is neither a whole number nor digit text, a `PATCH` without a body,
+    `items` or `changes` that is not a list (null or text took over or undid nothing), an
+    `order` of storage locations with entries that are not ids (`[{}]` and `[true]` were a
+    500, other entries were skipped), and undo entries that are not the shape the take-over
+    answered with.
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, `meal_types` as comma text, unknown recipe meal types (dropped), an
+  address in upper case or with leading spaces, `""` for no external address, digit text for a
+  storage location id (older app versions send it), null to keep a pantry item's unit or
+  category on a change, `{}` on a partial update and on the provider test and sync. A `PUT`
+  replaces the whole recipe or pantry item, as before: left-out fields are cleared, and only
+  the name is required. Rules the description cannot carry stay with the routes and their
+  sentences: an empty name after trimming, a day that does not exist, a category or storage
+  location that does not exist, the image content, a provider address in a private network.
+  The admin check of the providers and the second module right of the recipe transfer, the
+  ingredient match and the shopping-list take-over run first, so a caller without them still
+  gets 403 for any body; the check then runs before the entry is looked up, so a bad request
+  for a missing entry is a 400, not a 404 or 409. Text lengths count the value as sent.
+- **Reminders, notification channels, modules and e-mail answer an unexpected failure with the
+  same sentence as the rest of the API.** Their routes said `"Internal error."` (reminders,
+  notification channels including a failed channel test, e-mail) or `"Module install failed."`,
+  `"Module delete failed."`, `"Module install info failed."`, `"Module list failed."`,
+  `"Module update failed."` and `"Module asset failed."` (modules) on a server-side failure;
+  they now say `"Internal server error."` like every other module. Status 500 and `code` are
+  unchanged, a failed channel test still stores its error on the channel, and every answer
+  that names a known cause (a refused input, `busy`, `not_writable`, an install refusal with
+  its `reason`) stays as it was. Permissions and weather answered this way already.
+- **Recipes answer an unexpected failure with the same sentence as the rest of the API.** The
+  recipe routes (list, create, update, delete, own image, transfer to the shopping list,
+  ingredient match) said `"Internal error"` on a server-side failure; they now say
+  `"Internal server error."` like every other module. Status 500 and `code` are unchanged. The
+  image proxy of imported recipes keeps its own answers (`404`, `502`). Recipe providers and the
+  pantry answered this way already.
+
+### Fixed
+- **The calendar search no longer loses upcoming events behind old ones.** With more than 100
+  matching events it kept the oldest, so an old series or a year of past events pushed the
+  upcoming ones out of the result. It now keeps upcoming events and series first, then past
+  events from the newest - like the global search. The order of the result is unchanged.
+- **Search and the overview show rows that tie in the same order on every load.** Lists that
+  sort by date or title had no unique last sort key, so entries with the same date or the same
+  title could swap places between two loads, and the global search could drop exactly the newest
+  of several past events with the same start when it cut its candidates. Ties now follow the
+  direction of the list: newest first breaks them with the newer entry, all others with the
+  older; two recipes with the same title stand in the order they were created.
+- **Confirming which pantry row a recipe ingredient means names the ingredient in English.**
+  `PUT /api/v1/recipes/{id}/ingredient-match` with an empty, blank or too long `name` answered
+  `"Zutat is required."`, `"Zutat must not be empty."` or `"Zutat may be at most 200 characters
+  long."` - a German word in an English message. It now says `"Ingredient ..."`. Status and
+  `code` are unchanged.
+- **Taking checked shopping items into the pantry no longer fails with a server error when a
+  storage location was deleted meanwhile.** If one of the chosen locations no longer exists -
+  for example removed in another session while the dialog was open - the take-over now answers
+  400 `Location not found.` like adding a pantry item does, and nothing is taken over. Before,
+  the whole take-over ended as a 500.
+- **The API description marks every value that may be null in the OpenAPI 3.1 way.** 36 places - the
+  fasting and nutrition bodies, the household setup, the waste calendar feed - said so with the
+  OpenAPI 3.0 keyword `nullable`, which a 3.1 client generator ignores, so a generated client treated
+  them as never null. They now carry `null` in their type. Four sample values moved from `example` to
+  `examples`, and two "one of these fields" rules are spelled so that a strict JSON Schema validator
+  accepts them. The API itself did not change.
 
 ## [2.91.1] - 2026-11-17
 

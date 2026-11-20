@@ -20,11 +20,15 @@ import {
 
 const dbmod = await import('../server/db.js');
 const { default: locationsRouter } = await import('../server/routes/inventory/locations.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 const db = dbmod.get();
 
 const app = express();
 app.use(express.json());
-app.use('/locations', locationsRouter);
+app.use(defaultEmptyBody);
+// At its real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/locations(\/|\?|$)/.test(req.url)) req.url = `/api/v1/inventory${req.url}`; next(); });
+app.use('/api/v1/inventory/locations', locationsRouter);
 // Wie server/index.js: der zentrale Fehlerhandler steht hinter dem Router.
 const handlerLog = recordingLog();
 app.use(createErrorHandler(handlerLog));

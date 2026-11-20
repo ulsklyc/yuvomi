@@ -14,6 +14,9 @@ import {
   resolveOwner,
 } from './helpers.js';
 import { careAwareClause, readableClause, writableChild, writableClause } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
+// Eine Liste fuer Route und OpenAPI-Dokument (#2810).
+import { LAB_FLAGS } from '../../services/health-fields.js';
 
 const router = express.Router();
 
@@ -33,7 +36,7 @@ function reportWritable(reportId, viewer) {
 }
 
 // GET /labs?user_id=&from=&to=
-router.get('/labs', (req, res) => {
+router.get('/labs', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -54,7 +57,7 @@ router.get('/labs', (req, res) => {
 });
 
 // GET /labs/:id
-router.get('/labs/:id', (req, res) => {
+router.get('/labs/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -76,7 +79,7 @@ function validateResult(raw) {
   const unit    = v.str(raw.unit, 'unit', { max: MAX_UNIT, required: false });
   const refLow  = v.num(raw.ref_low, 'ref_low');
   const refHigh = v.num(raw.ref_high, 'ref_high');
-  const flag    = v.oneOf(raw.flag, ['low', 'normal', 'high'], 'flag');
+  const flag    = v.oneOf(raw.flag, LAB_FLAGS, 'flag');
 
   const errors = v.collectErrors([analyte, value, unit, refLow, refHigh, flag]);
   if (errors.length) return { row: null, error: errors.join(' ') };
@@ -95,7 +98,7 @@ function validateResult(raw) {
 }
 
 // POST /labs  (body: report_date, lab_name?, note?, visibility?, results?[])
-router.post('/labs', (req, res) => {
+router.post('/labs', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
@@ -148,7 +151,7 @@ router.post('/labs', (req, res) => {
 });
 
 // PATCH /labs/:id  (Kopf-Felder; Analyten via nested endpoints)
-router.patch('/labs/:id', (req, res) => {
+router.patch('/labs/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -178,7 +181,7 @@ router.patch('/labs/:id', (req, res) => {
 });
 
 // DELETE /labs/:id
-router.delete('/labs/:id', (req, res) => {
+router.delete('/labs/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -196,7 +199,7 @@ router.delete('/labs/:id', (req, res) => {
 });
 
 // POST /labs/:id/results
-router.post('/labs/:id/results', (req, res) => {
+router.post('/labs/:id/results', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const reportId = parseInt(req.params.id, 10);
@@ -231,7 +234,7 @@ router.post('/labs/:id/results', (req, res) => {
 // Einheitenkorrektur verloren (der Dialog hat kein Flag-Feld).
 // Ein vorhandener Messwert laesst sich nicht leeren (null/''): das waere
 // Datenverlust ueber einen Teil-Update. Ein Analyt ohne Wert bleibt ohne.
-router.patch('/results/:id', (req, res) => {
+router.patch('/results/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -275,7 +278,7 @@ router.patch('/results/:id', (req, res) => {
 });
 
 // DELETE /results/:id
-router.delete('/results/:id', (req, res) => {
+router.delete('/results/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);

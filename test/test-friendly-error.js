@@ -300,7 +300,15 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // A WebDAV backup route failed on this server (#2622); the real answer
     // measures test:backup-routes.
     '../server/routes/backup.js',
-  ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
+  ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'")
+    // A reason the request schema names (`x-reason`, #2810): since group 2A
+    // step (b) the address checks of the recipe providers stand only there.
+    // The real answer, with `fields`, measures test:recipe-provider-routes.
+    + `\n${read('../server/openapi/paths/recipeproviders.js').replace(/'x-reason': (?:\{ [a-zA-Z]+: )?'([a-z_]+)'/g, "reason: '$1'")}`
+    // Since group 4 step (b) the bounds and the time of a waste reminder
+    // setting are refused by the schema only; the real answer, with `fields`,
+    // measures test:waste-schedule-answers.
+    + `\n${read('../server/openapi/waste-inputs.js').replace(/'x-reason': (?:\{ [a-zA-Z]+: )?'([a-z_]+)'/g, "reason: '$1'")}`;
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
@@ -429,7 +437,8 @@ test('ein Fall, bei dem die Seite selbst nachlaedt, sagt in jeder Sprache nur, w
 // Sprache und in westlichen Ziffern.
 test('die Grenzen in den Abfuhr-Saetzen sind die des Servers', async () => {
   const { WEEKLY_INTERVAL_MAX, MONTHLY_INTERVAL_MAX } = await import('../server/services/waste-domain.js');
-  const reminders = readFileSync(new URL('../server/services/waste-reminders.js', import.meta.url), 'utf8');
+  // The bounds live in waste-fields.js since #2810 (read by the handler and the OpenAPI document).
+  const reminders = readFileSync(new URL('../server/services/waste-fields.js', import.meta.url), 'utf8');
   const bound = (name) => Number(reminders.match(new RegExp(`export const ${name} = (\\d+);`))[1]);
   const dir = new URL('../public/locales/', import.meta.url);
   const files = readdirSync(dir).filter((name) => name.endsWith('.json'));

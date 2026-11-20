@@ -30,6 +30,8 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { default: rewardsRouter } = await import('../server/routes/rewards.js');
 const { getBalance, isEnrolled, postLedger } = await import('../server/services/rewards.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 // ── Nutzer (IDs deterministisch ab 1: eigener Prozess je Testdatei) ──────────────
@@ -51,7 +53,11 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', rewardsRouter);
+app.use(defaultEmptyBody);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810);
+// call() keeps the short paths of this suite.
+app.use('/api/v1/rewards', rewardsRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -61,7 +67,7 @@ async function call(method, route, { actor: a = ADMIN, body } = {}) {
   const headers = {};
   let payload;
   if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-  const res = await fetch(`${baseUrl}${route}`, { method, headers, body: payload });
+  const res = await fetch(`${baseUrl}/api/v1/rewards${route}`, { method, headers, body: payload });
   const ct = res.headers.get('content-type') || '';
   let json = null;
   if (ct.includes('application/json')) { try { json = await res.json(); } catch { /* leer */ } }
@@ -409,8 +415,8 @@ test('GET /redemptions — Status-Filter + Namens-Joins', async () => {
   assert.ok(pending.body.data.every((r) => r.status === 'pending'));
   const mine = pending.body.data.find((r) => r.id === id);
   assert.ok(mine && mine.user_name, 'user_name-Join vorhanden');
-  // ungültiger Status-Query wird ignoriert (kein Filter) -> liefert Liste
-  assert.equal((await call('GET', '/redemptions?status=bogus', { actor: ADMIN })).status, 200);
+  // Ein Status ausserhalb der Liste ist seit #2810 ein 400 (vorher still kein Filter).
+  assert.equal((await call('GET', '/redemptions?status=bogus', { actor: ADMIN })).status, 400);
 });
 
 test('GET /redemptions — wer nicht entscheidet, sieht nur seine eigenen', async () => {

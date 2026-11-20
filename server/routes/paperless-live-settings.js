@@ -1,5 +1,6 @@
 /** Household Live-folder policy; users can manage only their own DMS token. */
 import express from '../utils/http-router.ts';
+import { validateRequest } from '../api/validate-request.ts';
 import { PaperlessHttpError, paperlessStatus } from '../services/dms/paperless-errors.js';
 import { paperlessErrorHandler } from '../middleware/paperless-errors.js';
 import { actorFromRequest } from '../authorize/index.ts';
@@ -44,7 +45,7 @@ function personalActor(req) {
 
 router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
-router.get('/live-settings', (req, res) => {
+router.get('/live-settings', validateRequest(), (req, res) => {
   
     const rows = db.get().prepare("SELECT id, name FROM dms_accounts WHERE provider = 'paperless' ORDER BY name COLLATE NOCASE").all();
     const canManage = isAdminRequest(req) && mayWriteModule(req, 'documents');
@@ -56,7 +57,7 @@ router.get('/live-settings', (req, res) => {
   
 });
 
-router.put('/live-settings/:id', requireAdmin, (req, res) => {
+router.put('/live-settings/:id', requireAdmin, validateRequest(), (req, res) => {
   
     if (!mayWriteModule(req, 'documents')) throw problem(403, 'Permission denied.');
     const source = account(req);
@@ -82,7 +83,7 @@ router.put('/live-settings/:id', requireAdmin, (req, res) => {
   
 });
 
-router.get('/live-settings/:id/tags', requireAdmin, refuseWhileRestoring, async (req, res) => {
+router.get('/live-settings/:id/tags', requireAdmin, validateRequest(), refuseWhileRestoring, async (req, res) => {
   
     if (!mayWriteModule(req, 'documents')) throw problem(403, 'Permission denied.');
     const source = account(req);
@@ -100,7 +101,7 @@ router.get('/live-settings/:id/tags', requireAdmin, refuseWhileRestoring, async 
   
 });
 
-router.put('/live-settings/:id/token', (req, res) => {
+router.put('/live-settings/:id/token', validateRequest(), (req, res) => {
   
     const userId = personalActor(req), source = account(req);
     const token = req.body?.api_token;
@@ -114,7 +115,7 @@ router.put('/live-settings/:id/token', (req, res) => {
   
 });
 
-router.delete('/live-settings/:id/token', (req, res) => {
+router.delete('/live-settings/:id/token', validateRequest(), (req, res) => {
   
     const userId = personalActor(req), source = account(req);
     db.get().prepare('DELETE FROM paperless_user_tokens WHERE account_id = ? AND user_id = ?').run(source.id, userId);

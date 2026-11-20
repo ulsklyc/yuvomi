@@ -4733,6 +4733,7 @@
         "deleteGroupConfirm": "Delete this empty group? Groups with expenses must be archived.",
         "deleteGroupConfirmDetail": "The member list, the default split, recurring expenses and the activity log are gone for good. A group counts as empty without expenses and settlements.",
         "splitCurrentTotal": "Current total: {{total}}",
+        "exactSharesConverted": "Exact shares in {{currency}}, converted from {{amount}}.",
         "statusLabel": "Status",
         "statusActive": "Active",
         "statusArchived": "Archived",

@@ -1,73 +1,157 @@
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '../../public/utils/note-category-name.js';
+import { MAX_QUICK_LINK_URL_LENGTH } from '../../public/utils/quick-link-url.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { DATETIME_PATTERN } from '../utils/datetime-pattern.js';
+import { ORIGIN_MODULE } from '../services/reminder-origins.js';
+import { wasteInputSchemas } from './waste-inputs.js';
+
+/**
+ * A reminder time as the handlers accept it (`datetime()` in
+ * server/middleware/validate.js reads the same pattern): no `format:
+ * date-time`, which needs seconds and a zone the app does not send.
+ */
+// Create and update of a notification channel share their fields (#2810); the
+// update requires none of them. No e-mail `pattern` here: the address check
+// stays in server/services/notification-channels.js (CodeQL ReDoS history).
+const notificationChannelInputProperties = {
+  provider: { type: 'string', enum: ['gotify', 'ntfy', 'webhook', 'email'] },
+  name: { type: 'string' },
+  enabled: { type: 'boolean' },
+  config: {
+    type: 'object',
+    description: 'Provider config. Gotify uses baseUrl and priority. ntfy uses baseUrl, topic, priority, and authType. A webhook uses baseUrl and payloadTemplate, e-mail toAddress. On update it is merged over the stored config.',
+    additionalProperties: true,
+  },
+  secrets: {
+    type: 'object',
+    description: 'Write-only provider credentials. Omit fields to keep stored secrets on update.',
+    additionalProperties: true,
+  },
+  clearSecrets: {
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Explicit secret field names to clear.',
+  },
+};
+
+const reminderTime = {
+  type: 'string',
+  pattern: DATETIME_PATTERN,
+  description: '`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`, optional `:SS` and fraction, optional `Z` or offset (`+02:00`, `+0200`). Without `Z` or offset it is UTC.',
+};
+
+// THE REQUEST SCHEMAS OF NOTES, BIRTHDAYS AND QUICK LINKS ARE CHECKED (#2810):
+// validateRequest() runs them before every handler of these three modules, so
+// they describe what the routes really accept - the tolerance the routes lived
+// with is in the schema (null and "" as "no value", the visibility aliases),
+// garbage is not (a number in a text field, an id written as text). Lengths
+// count the raw value, the handlers count after trim; both apply.
+
+/** A hex colour, or null / "" for "no colour" (the handlers read both as unset). */
+const optionalHexColor = { type: ['string', 'null'], pattern: '^(#[0-9A-Fa-f]{6})?$' };
+
+const noteFlag = {
+  oneOf: [
+    { type: 'integer', enum: [0, 1] },
+    { type: 'boolean' },
+  ],
+};
 
 const noteInputProperties = {
-  title: { type: ['string', 'null'] },
-  content: { type: 'string' },
-  color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
-  pinned: {
-    oneOf: [
-      { type: 'integer', enum: [0, 1] },
-      { type: 'boolean' },
-    ],
-  },
-  category_ids: { type: 'array', maxItems: 50, uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+  title: { type: ['string', 'null'], maxLength: MAX_TITLE, description: 'null or "" for no title.' },
+  content: { type: 'string', maxLength: MAX_TEXT },
+  color: { ...optionalHexColor, description: 'A hex colour `#RRGGBB`; null or "" means the default `#FFEB3B` on create and "unchanged" on update.' },
+  pinned: noteFlag,
+  // No uniqueItems: the route drops repeated ids.
+  category_ids: { type: 'array', maxItems: 50, items: { type: 'integer', minimum: 1 } },
   visibility: {
     type: 'string',
-    enum: ['all', 'private'],
-    description: '`private`: only the creator sees the note, administrators included. Only the creator can change it.',
+    enum: ['all', 'private', 'family', 'shared'],
+    description: '`private`: only the creator sees the note, administrators included. Only the creator can change it. `family` and `shared` are the open level of other modules and are stored as `all` (DECISIONS 5).',
   },
   locked: {
-    oneOf: [
-      { type: 'integer', enum: [0, 1] },
-      { type: 'boolean' },
-    ],
+    ...noteFlag,
     description: 'Locked notes can only be changed by their creator and administrators - ticking checklist items included. Only they can set or lift the lock.',
   },
+};
+
+const noteCreateProperties = {
+  ...noteInputProperties,
+  // A missing or null `pinned` is not pinned.
+  pinned: { oneOf: [...noteFlag.oneOf, { type: 'null' }] },
+};
+
+const noteUpdateProperties = {
+  ...noteInputProperties,
+  // null leaves the stored text as it is.
+  content: { type: ['string', 'null'], maxLength: MAX_TEXT },
 };
 
 // Die Erinnerungsfelder spiegeln `validateReminder()` in
 // server/routes/birthdays.js; die Obergrenze ist 999 Wochen in Minuten.
 const BIRTHDAY_REMINDER_MAX_MINUTES = 999 * 10080;
 
+// WEIT mit Absicht (#2810): ein Wert, der genau dem gespeicherten entspricht,
+// geht unveraendert durch, auch ausserhalb der Regeln - das kann nur der
+// Handler pruefen, er kennt den Bestand. Das Frontend schickt Text.
+const reminderValue = { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }] };
+
 const birthdayInputProperties = {
-  name: { type: 'string', maxLength: 200 },
-  birth_date: { type: 'string', format: 'date', description: 'The birth date. With `year_unknown` its year is a placeholder: the server stores 2000 (a leap year, so 29 February stays valid) whatever year is sent.' },
+  name: { type: 'string', minLength: 1, maxLength: MAX_TITLE },
+  // Kein `format: date`: mit `year_unknown` ersetzt der Handler das Jahr, bevor
+  // er den Kalender prueft (ein 29.02. eines Gemeinjahres ist dann gueltig).
+  birth_date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: 'The birth date `YYYY-MM-DD`. With `year_unknown` its year is a placeholder: the server stores 2000 (a leap year, so 29 February stays valid) whatever year is sent.' },
   year_unknown: {
-    description: 'The year of birth is unknown (#2095): only day and month of `birth_date` count, and `next_age` is null. Responses carry it as 0 or 1. Omitted on update, the stored value stays; turning it off needs a `birth_date` with its real year in the same request.',
+    description: 'The year of birth is unknown (#2095): only day and month of `birth_date` count, and `next_age` is null. Responses carry it as 0 or 1; null counts as false. Omitted on update, the stored value stays; turning it off needs a `birth_date` with its real year in the same request.',
     oneOf: [
       { type: 'boolean' },
       { type: 'integer', enum: [0, 1] },
+      { type: 'null' },
     ],
   },
-  name_day: { type: ['string', 'null'], pattern: '^\\d{2}-\\d{2}$', description: 'Month and day (`MM-DD`), or null to clear it.' },
-  notes: { type: ['string', 'null'], maxLength: 5000 },
+  name_day: { type: ['string', 'null'], pattern: '^\\s*(\\d{2}-\\d{2}\\s*)?$', description: 'Month and day (`MM-DD`), or null or "" to clear it.' },
+  notes: { type: ['string', 'null'], maxLength: MAX_TEXT },
   photo_data: { type: ['string', 'null'], description: 'A base64 image data URL (png, jpeg, webp, gif), or null to remove it.' },
   reminder_offset: {
-    description: 'Lead time before 12:00 on the birthday in the household time zone. Whole minutes as a number or digit string (`"1440"` = one day before), `"custom"` to use `reminder_custom_amount` and `reminder_custom_unit`, `""` for no reminder and no calendar event, or null for the day itself. On update, a value equal to the one already stored is accepted unchanged even if it lies outside these rules, so older records stay editable.',
-    oneOf: [
-      { type: 'null' },
-      { type: 'string', enum: ['', 'custom'] },
-      { type: 'string', pattern: '^\\d{1,9}$' },
-      { type: 'integer', minimum: 0, maximum: BIRTHDAY_REMINDER_MAX_MINUTES },
-    ],
+    ...reminderValue,
+    description: `Lead time before 12:00 on the birthday in the household time zone. Whole minutes from 0 to ${BIRTHDAY_REMINDER_MAX_MINUTES} as a number or digit string (\`"1440"\` = one day before), \`"custom"\` to use \`reminder_custom_amount\` and \`reminder_custom_unit\`, \`""\` for no reminder and no calendar event, or null for the day itself. On update, a value equal to the one already stored is accepted unchanged even if it lies outside these rules, so older records stay editable; the route checks the rules and answers 400.`,
   },
   reminder_custom_amount: {
-    description: 'Amount for a custom lead time, 1-999. Empty or null means unset (counted as 1).',
-    oneOf: [
-      { type: 'null' },
-      { type: 'integer', minimum: 1, maximum: 999 },
-      { type: 'string', pattern: '^([1-9]\\d{0,2})?$' },
-    ],
+    ...reminderValue,
+    description: 'Amount for a custom lead time, a whole number 1-999 as a number or digit string. Empty or null means unset (counted as 1). The stored value is accepted unchanged on update.',
   },
   reminder_custom_unit: {
-    description: 'Unit for a custom lead time. Empty or null means unset (counted as days).',
     type: ['string', 'null'],
-    enum: ['minutes', 'hours', 'days', 'weeks', '', null],
+    description: 'Unit for a custom lead time: `minutes`, `hours`, `days` or `weeks`. Empty or null means unset (counted as days). The stored value is accepted unchanged on update.',
   },
   contact_id: {
-    type: ['integer', 'null'],
-    minimum: 1,
-    description: 'Links the birthday to a contact of the household (Critique R22, D7), or null to unlink it. Linking needs read access to the `contacts` module as well (for API tokens `contacts:read`), otherwise 403. A contact can carry one birthday: one already linked elsewhere is refused with 409. Birthdays of household members cannot be linked. Linking does not copy or follow the contact\'s date. Omitted on update, the link stays; the value already stored is accepted unchanged.',
+    anyOf: [
+      { type: 'integer', minimum: 1 },
+      { type: 'null' },
+      { type: 'string', maxLength: 0 },
+    ],
+    description: 'Links the birthday to a contact of the household (Critique R22, D7), or null (or "") to unlink it. Linking needs read access to the `contacts` module as well (for API tokens `contacts:read`), otherwise 403. A contact can carry one birthday: one already linked elsewhere is refused with 409. Birthdays of household members cannot be linked. Linking does not copy or follow the contact\'s date. Omitted on update, the link stays; the value already stored is accepted unchanged.',
+  },
+};
+
+const birthdayUpdateProperties = {
+  ...birthdayInputProperties,
+  // null leaves name and date as they are; "" leaves the date as well.
+  name: { type: ['string', 'null'], minLength: 1, maxLength: MAX_TITLE },
+  birth_date: { ...birthdayInputProperties.birth_date, type: ['string', 'null'], pattern: '^(\\d{4}-\\d{2}-\\d{2})?$' },
+};
+
+const quickLinkInputProperties = {
+  name: { type: 'string', minLength: 1, maxLength: MAX_SHORT },
+  // Kein `format: uri`: der Handler ergaenzt `https://` (`192.168.1.5:8096`).
+  url: { type: 'string', minLength: 1, maxLength: MAX_QUICK_LINK_URL_LENGTH, description: 'An http(s) address; without a scheme `https://` is added. Stored normalized.' },
+  icon_data: { type: ['string', 'null'], description: 'An uploaded image as a base64 data URL (png, jpeg, webp), or null / "" for none.' },
+  icon_name: { type: ['string', 'null'], description: 'A built-in Lucide symbol (lowercase letters, digits and hyphens), or null / "" for none.' },
+  color: { ...optionalHexColor, description: 'A hex colour `#RRGGBB` for the letter face, or null / "" for none.' },
+  visibility: {
+    type: ['string', 'null'],
+    enum: ['all', 'private', null],
+    description: '`private`: only the creator sees the tile. null or omitted: `all` on create, unchanged on update.',
   },
 };
 
@@ -357,7 +441,7 @@ export const schemas = {
             },
             assignee_user_id: { type: 'integer', minimum: 1, description: 'One person, the short form of `assignee_user_ids`.' },
           },
-          oneOf: [{ required: ['ics'] }, { required: ['url'] }],
+          oneOf: [{ properties: { ics: { type: 'string' } }, required: ['ics'] }, { properties: { url: { type: 'string' } }, required: ['url'] }],
         },
         LocalCalendarCreateInput: {
           type: 'object', required: ['name'],
@@ -392,6 +476,19 @@ export const schemas = {
               description: 'Only next to a `reason` whose cause carries a number (waste import and URL sources): the limit or status itself, e.g. `{ "limit_mb": 5 }`, so a client can put it into its own sentence instead of parsing `error`.',
             },
             storage_code: { $ref: '#/components/schemas/DocumentStorageErrorCode' },
+            fields: {
+              type: 'array',
+              description: 'Only on a refusal against the schema of the operation: what the request got wrong, at most ten entries. The `reason` beside it is the first entry\'s own `reason`, or `"validation"` when that entry has none. Never carries a value of the request.',
+              items: {
+                type: 'object',
+                required: ['path', 'rule'],
+                properties: {
+                  path: { type: 'string', description: 'Place and pointer, e.g. `body/title`, `query/limit`, `path/id`; for a missing property its name is appended. Cut to 120 characters.' },
+                  rule: { type: 'string', description: 'The JSON Schema keyword that failed, e.g. `type`, `required`, `maxLength`, `enum`, `format`.' },
+                  reason: { type: 'string', description: 'The documented `reason` of the operation for this rule, when its schema names one (annotation `x-reason`); absent otherwise.' },
+                },
+              },
+            },
           },
         },
         CalendarOverrideOrphanConflict: {
@@ -445,11 +542,11 @@ export const schemas = {
         NoteCreateInput: {
           type: 'object',
           required: ['content'],
-          properties: noteInputProperties,
+          properties: noteCreateProperties,
         },
         NoteUpdateInput: {
           type: 'object',
-          properties: noteInputProperties,
+          properties: noteUpdateProperties,
         },
         BirthdayCreateInput: {
           type: 'object',
@@ -458,7 +555,67 @@ export const schemas = {
         },
         BirthdayUpdateInput: {
           type: 'object',
-          properties: birthdayInputProperties,
+          properties: birthdayUpdateProperties,
+        },
+        BirthdayImportInput: {
+          type: 'object',
+          required: ['contact_ids'],
+          properties: {
+            contact_ids: { type: 'array', minItems: 1, maxItems: 500, items: { type: 'integer' }, description: 'The contacts to import, at most 500 per request.' },
+          },
+        },
+        QuickLinkCreateInput: {
+          type: 'object',
+          required: ['name', 'url'],
+          properties: quickLinkInputProperties,
+        },
+        QuickLinkUpdateInput: {
+          type: 'object',
+          properties: quickLinkInputProperties,
+        },
+        QuickLinkOrderInput: {
+          type: 'object',
+          required: ['ids'],
+          properties: {
+            ids: { type: 'array', items: { type: 'integer' }, description: 'The complete new order. Ids the caller cannot see are ignored.' },
+          },
+        },
+        ReminderCreateInput: {
+          type: 'object',
+          required: ['entity_type', 'entity_id', 'remind_at'],
+          properties: {
+            entity_type: {
+              type: 'string',
+              enum: Object.keys(ORIGIN_MODULE),
+              description: 'The origin of the entity. Only `task`, `event`, `subscription`, `inventory_item` and `inventory_tracked_date` can be set by hand; the others are rebuilt by their module and answer 400 with a sentence that says so.',
+            },
+            entity_id: {
+              // Digit text too: service workers of older app versions send the id as text.
+              anyOf: [{ type: 'integer' }, { type: 'string', pattern: '^[0-9]+$' }],
+              description: 'The id of the entity, a positive whole number, as a number or as digit text.',
+            },
+            remind_at: reminderTime,
+          },
+        },
+        ReminderSetInput: {
+          type: 'object',
+          required: ['remind_ats'],
+          properties: {
+            remind_ats: {
+              type: 'array',
+              items: reminderTime,
+              description: 'The complete new set; an empty list removes every reminder of the entity. At most 5 different instants after conversion to UTC, repeated entries count once.',
+            },
+          },
+        },
+        PermissionsInput: {
+          type: 'object',
+          description: 'The keys are the ids of the permission catalog (`GET /api/v1/permissions/catalog`); an unknown key answers 400.',
+          properties: {
+            modules: { type: 'object', additionalProperties: { type: 'string', enum: ['none', 'read', 'write'] }, description: 'Module key -> access level.' },
+            widgets: { type: 'object', additionalProperties: { type: 'string', enum: ['none', 'allow'] }, description: 'Widget id -> `none` or `allow`.' },
+            capabilities: { type: 'object', additionalProperties: { type: 'string', enum: ['none', 'allow'] }, description: 'Capability key -> `none` or `allow`. Present (even empty), it replaces the capability rows.' },
+          },
         },
         NoteCategoryInput: {
           type: 'object',
@@ -479,7 +636,15 @@ export const schemas = {
           type: 'object',
           required: ['order'],
           properties: {
-            order: { type: 'array', maxItems: 100, uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+            // Ziffern-Text auch: die geteilte Kategorie-Verwaltung
+            // (public/components/category-manager.js) schickt ihre Schluessel als Text.
+            order: {
+              type: 'array',
+              maxItems: 100,
+              uniqueItems: true,
+              items: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' }] },
+              description: 'Category ids as numbers or digit strings.',
+            },
           },
         },
         NoteResponse: {
@@ -530,27 +695,14 @@ export const schemas = {
         },
         NotificationChannelInput: {
           type: 'object',
+          description: 'A new household channel. `name` must not be empty after trimming; the checks of `config` depend on the provider.',
           required: ['provider', 'name', 'config'],
-          properties: {
-            provider: { type: 'string', enum: ['gotify', 'ntfy', 'webhook', 'email'] },
-            name: { type: 'string' },
-            enabled: { type: 'boolean' },
-            config: {
-              type: 'object',
-              description: 'Provider config. Gotify uses baseUrl and priority. ntfy uses baseUrl, topic, priority, and authType.',
-              additionalProperties: true,
-            },
-            secrets: {
-              type: 'object',
-              description: 'Write-only provider credentials. Omit fields to keep stored secrets on update.',
-              additionalProperties: true,
-            },
-            clearSecrets: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Explicit secret field names to clear.',
-            },
-          },
+          properties: notificationChannelInputProperties,
+        },
+        NotificationChannelUpdateInput: {
+          type: 'object',
+          description: 'A partial update: what is left out keeps its stored value. The provider of a channel never changes: a `provider` sent here must be a known one, and it is not read.',
+          properties: notificationChannelInputProperties,
         },
         NotificationChannelResponse: {
           type: 'object',
@@ -1359,7 +1511,7 @@ export const schemas = {
         HealthResponse: {
           type: 'object',
           properties: {
-            status: { type: 'string', example: 'ok' },
+            status: { type: 'string', examples: ['ok'] },
             timestamp: { type: 'string', format: 'date-time' },
           },
           required: ['status', 'timestamp'],
@@ -1391,8 +1543,8 @@ export const schemas = {
             version: { type: 'string', description: 'The application version.' },
             build_revision: { type: ['string', 'null'], description: 'The revision the image was built from (`APP_BUILD_REVISION`), or `null`.' },
             node: { type: 'string', description: 'The Node.js version, as in `process.version`.' },
-            platform: { type: 'string', example: 'linux' },
-            arch: { type: 'string', example: 'x64' },
+            platform: { type: 'string', examples: ['linux'] },
+            arch: { type: 'string', examples: ['x64'] },
             sqlite: {
               type: 'object',
               additionalProperties: false,
@@ -1814,15 +1966,54 @@ export const schemas = {
           },
           required: ['id', 'display_name', 'avatar_color', 'family_role'],
         },
+        // Checked by validateRequest() (#2810) with the route's own reasons:
+        // the shape is `invalid_order`, a repeated id `duplicate_member`. Ajv
+        // checks `items` before `uniqueItems`, as memberOrderProblem() checks
+        // the shape before the repeats, so `[1, 1, "x"]` is `invalid_order` on
+        // both sides. Who the ids are (not_a_household_member,
+        // incomplete_order) stays the handler's: it reads the database.
+        // Checked by validateRequest() (#2810). Only what agrees with the route:
+        // a field that is not text answered `immich_url_invalid` /
+        // `immich_album_id_invalid` there too (it was read through String());
+        // the URL scheme, the album UUID and the length after trimming stay the
+        // route's, it trims and lets `""` clear a value. An API key over 1000
+        // characters is `immich_api_key_invalid` on both sides (Ajv counts code
+        // points, the route UTF-16 units, so the route keeps its own check).
+        ScreensaverConfigInput: {
+          type: 'object',
+          description: 'Only the fields that are sent change. A field set by an environment variable is not read.',
+          properties: {
+            url: {
+              type: 'string',
+              maxLength: 2048,
+              'x-reason': 'immich_url_invalid',
+              description: 'The Immich server, `http://` or `https://`, at most 2048 characters. `""` clears it.',
+            },
+            albumId: {
+              type: 'string',
+              'x-reason': 'immich_album_id_invalid',
+              description: 'The album to show, a UUID. `""` shows the whole library.',
+            },
+            apiKey: {
+              type: 'string',
+              maxLength: 1000,
+              'x-reason': { maxLength: 'immich_api_key_invalid' },
+              description: 'Write-only. At most 1000 characters; `""` keeps the stored key.',
+            },
+            clearApiKey: { type: 'boolean', description: '`true` removes the stored API key when no new one is sent.' },
+          },
+        },
         FamilyMemberReorderInput: {
           type: 'object',
+          'x-reason': 'invalid_order',
           required: ['order'],
           properties: {
             order: {
               type: 'array',
               minItems: 1,
               uniqueItems: true,
-              items: { type: 'integer', minimum: 1 },
+              'x-reason': { uniqueItems: 'duplicate_member', default: 'invalid_order' },
+              items: { type: 'integer', minimum: 1, 'x-reason': 'invalid_order' },
               description: 'The ids of all household members, in the wanted order.',
             },
           },
@@ -1887,16 +2078,14 @@ export const schemas = {
             display_name: { type: 'string' },
             password: { type: 'string' },
             language: {
-              type: 'string',
-              nullable: true,
+              type: ['string', 'null'],
               description: 'Optional. Language code of a supported app locale (e.g. `de`, `pt`, `fil`). '
                 + 'Sets the household data language (the language of server-generated titles such as birthday events), '
                 + 'unless the automatic choice already yields it. Region, currency and date format are not derived from it. '
                 + 'Unsupported values are rejected with 400; omitted, null or empty keeps the previous behaviour.',
             },
             timezone: {
-              type: 'string',
-              nullable: true,
+              type: ['string', 'null'],
               description: 'Optional. IANA time zone of the household (e.g. `Europe/Berlin`). '
                 + 'Unknown zones are rejected with 400; omitted, null or empty keeps the fallback to TZ, the system zone and UTC.',
             },
@@ -2791,7 +2980,7 @@ export const schemas = {
             server: {
               type: 'string',
               description: 'The http(s) origin of this page, without a path. It goes into the link a client opens, and may take up to 170 characters once percent-encoded, so that the link still fits a QR code.',
-              example: 'https://yuvomi.example.org',
+              examples: ['https://yuvomi.example.org'],
             },
           },
           required: ['server'],
@@ -3125,8 +3314,11 @@ export const schemas = {
         },
         ModuleInstallGithubRequest: {
           type: 'object',
+          // The route answered `bad_url` for a missing body, a body that is no
+          // object and a missing or non-text `url` before (#2810); it still does.
+          'x-reason': { type: 'bad_url', required: 'bad_url' },
           properties: {
-            url: { type: 'string', maxLength: 2000, description: 'GitHub URL or `owner/repo`.' },
+            url: { type: 'string', maxLength: 2000, 'x-reason': 'bad_url', description: 'GitHub URL or `owner/repo`. An empty or malformed one answers 400 `bad_url` as well.' },
             ref: { type: 'string', maxLength: 200, description: 'Branch, tag or commit; overrides the ref from the URL.' },
             path: { type: 'string', maxLength: 500, description: 'Folder inside the repository that holds module.json. Overrides the folder of a tree URL; an empty string selects the repository root.' },
             overwrite: { type: 'boolean', description: 'Replace an installed module with the same id.' },
@@ -3179,6 +3371,7 @@ export const schemas = {
               },
             },
             resetAt: { type: 'string', format: 'date-time', description: 'With `rate_limited` from GitHub, when GitHub names a time: when to try again (from `retry-after` for its secondary limit, otherwise from `x-ratelimit-reset`). Left out when GitHub names none.' },
+            fields: { $ref: '#/components/schemas/ApiError/properties/fields' },
           },
           required: ['error', 'code'],
         },
@@ -3211,16 +3404,6 @@ export const schemas = {
             updated_at: { type: 'string' },
           },
         },
-        WasteTypeInput: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', maxLength: 100 },
-            icon: { type: 'string', maxLength: 60 },
-            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
-            archived: { type: 'boolean' },
-            sort_order: { type: 'integer' },
-          },
-        },
         WasteSchedule: {
           type: 'object',
           required: ['id', 'type_id', 'recurrence_kind', 'anchor_date', 'interval', 'active'],
@@ -3245,28 +3428,6 @@ export const schemas = {
             updated_at: { type: 'string' },
           },
         },
-        WasteScheduleInput: {
-          type: 'object',
-          properties: {
-            type_id: { type: 'integer' },
-            recurrence_kind: { type: 'string', enum: ['weekly', 'monthly_fixed_day', 'monthly_ordinal_weekday'] },
-            anchor_date: { type: 'string', format: 'date' },
-            interval: { type: 'integer', minimum: 1 },
-            weekdays: {
-              description: 'weekly: an array of BYDAY codes, e.g. ["MO","TH"]. monthly_ordinal_weekday: a single code string, e.g. "MO".',
-              oneOf: [
-                { type: 'array', items: { type: 'string', enum: ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] } },
-                { type: 'string', enum: ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] },
-              ],
-            },
-            month_day: {
-              type: 'integer',
-              description: 'monthly_fixed_day: 1-31 or -1. monthly_ordinal_weekday: the ordinal position, -1 (last) or 1-4 (nth).',
-            },
-            valid_until: { type: ['string', 'null'], format: 'date' },
-            active: { type: 'boolean' },
-          },
-        },
         WasteScheduleOverride: {
           type: 'object',
           required: ['id', 'schedule_id', 'original_date'],
@@ -3280,13 +3441,6 @@ export const schemas = {
             updated_at: { type: 'string' },
           },
         },
-        WasteScheduleOverrideInput: {
-          type: 'object',
-          properties: {
-            replacement_date: { type: ['string', 'null'], format: 'date', description: 'A date to move this occurrence to, or null to skip it.' },
-            note: { type: ['string', 'null'] },
-          },
-        },
         WasteOneOffPickup: {
           type: 'object',
           required: ['id', 'type_id', 'date'],
@@ -3298,14 +3452,6 @@ export const schemas = {
             created_by: { type: ['integer', 'null'] },
             created_at: { type: 'string' },
             updated_at: { type: 'string' },
-          },
-        },
-        WasteOneOffPickupInput: {
-          type: 'object',
-          properties: {
-            type_id: { type: 'integer' },
-            date: { type: 'string', format: 'date' },
-            note: { type: ['string', 'null'] },
           },
         },
         WasteOccurrenceOrigin: {
@@ -3426,9 +3572,6 @@ export const schemas = {
             { type: 'object', properties: { mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteSourceMapping' } } } },
           ],
         },
-        WasteSourceRenameInput: {
-          type: 'object', required: ['name'], properties: { name: { type: 'string', maxLength: 150 } },
-        },
         WasteSourceMapping: {
           type: 'object',
           required: ['id', 'source_id', 'original_label', 'normalized_label', 'ignored'],
@@ -3440,15 +3583,6 @@ export const schemas = {
             type_ids: { type: 'array', items: { type: 'integer' }, description: 'Every type this label maps to, ascending; one pickup per type is created for each of its entries. Empty when the label is ignored.' },
             type_id: { type: ['integer', 'null'], deprecated: true, description: 'The lowest of type_ids, or null. Kept for callers from before a label could map to several types; read type_ids instead.' },
             ignored: { type: 'boolean', description: 'True exactly when type_ids is empty.' },
-          },
-        },
-        WasteSourceMappingUpdateInput: {
-          type: 'object',
-          description: 'Either ignored: true, or the label\'s full new type set as type_ids (or a single type_id) - never both, and never type_id together with type_ids.',
-          properties: {
-            type_ids: { type: 'array', items: { type: 'integer' }, minItems: 1, description: 'Replaces the label\'s whole type set.' },
-            type_id: { type: 'integer', description: 'Shorthand for type_ids with one entry.' },
-            ignored: { type: 'boolean', default: false },
           },
         },
         WasteImportDiagnostic: {
@@ -3495,36 +3629,8 @@ export const schemas = {
             labels: { type: 'array', items: { $ref: '#/components/schemas/WasteImportLabel' } },
           },
         },
-        WasteImportPreviewInput: {
-          type: 'object', required: ['ics'],
-          properties: { ics: { type: 'string', description: 'The raw ICS file text.' } },
-        },
         WasteImportPreviewResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteImportPreview' } },
-        },
-        WasteImportMappingDecision: {
-          type: 'object',
-          required: ['normalized_label'],
-          description: 'Either ignored: true, or at least one type: existing ones as type_ids (or a single type_id), a new_type to create inline, or both together. One decision is required per distinct label reported by the preview; each entry of a label becomes one pickup per type.',
-          properties: {
-            normalized_label: { type: 'string' },
-            type_ids: { type: 'array', items: { type: 'integer' } },
-            type_id: { type: 'integer', description: 'Shorthand for type_ids with one entry; not together with type_ids.' },
-            new_type: { $ref: '#/components/schemas/WasteTypeInput' },
-            ignored: { type: 'boolean' },
-          },
-        },
-        WasteImportCommitInput: {
-          type: 'object',
-          required: ['ics', 'mappings'],
-          properties: {
-            ics: { type: 'string', description: 'The raw ICS file text (re-parsed on commit; never trusts a client-supplied candidate list).' },
-            name: { type: 'string', maxLength: 150, description: 'Required for a fresh import (POST /import/commit); defaults to the existing name on a re-import.' },
-            mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteImportMappingDecision' } },
-            skip_event_keys: { type: 'array', items: { type: 'string' }, description: 'Blocking-diagnostic event_key values explicitly acknowledged and excluded.' },
-            preview_digest: { type: 'string', description: 'The digest returned by the matching preview; a mismatch (the parsed content actually changed since that preview) is refused with 409.' },
-            expected_version: { type: 'integer', description: 'Required on a re-import commit; the source\'s version as last seen in a preview (409 on mismatch).' },
-          },
         },
         WasteImportDiff: {
           type: 'object',
@@ -3550,15 +3656,6 @@ export const schemas = {
         },
         WasteSourceMappingResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteSourceMapping' } },
-        },
-        WasteUrlSourceCreateInput: {
-          type: 'object',
-          required: ['name', 'url'],
-          properties: {
-            name: { type: 'string', maxLength: 150 },
-            url: { type: 'string', description: 'https:// only by default; http:// is accepted only under the operator opt-in WASTE_SOURCE_ALLOW_PRIVATE_NETWORK.' },
-            refresh_interval_minutes: { type: 'integer', default: 1440, description: 'Bounded 60-43200 (hourly to monthly).' },
-          },
         },
         WasteUrlSourceRefreshResult: {
           type: 'object',
@@ -3600,41 +3697,22 @@ export const schemas = {
         WasteReminderSettingsListResponse: {
           type: 'object', required: ['data'], properties: { data: { type: 'array', items: { $ref: '#/components/schemas/WasteReminderSetting' } } },
         },
-        WasteReminderSettingUpdateInput: {
-          type: 'object',
-          properties: {
-            enabled: { type: 'boolean', default: false },
-            offset_days: { type: 'integer', default: 1 },
-            delivery_time: { type: 'string', default: '08:00' },
-          },
-        },
         WasteReminderSettingResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteReminderSetting' } },
         },
         WasteFeedStatus: {
-          type: 'object',
-          nullable: true,
+          type: ['object', 'null'],
           properties: {
             token: { type: 'string' },
             url: { type: 'string', description: 'Public, unauthenticated .ics URL. Rotates when regenerated.' },
             type_ids: {
-              type: 'array', items: { type: 'integer' }, nullable: true,
+              type: ['array', 'null'], items: { type: 'integer' },
               description: 'Optional type selection. null (default) means every active type.',
             },
           },
         },
         WasteFeedStatusResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteFeedStatus' } },
-        },
-        WasteFeedTypeSelectionInput: {
-          type: 'object',
-          required: ['type_ids'],
-          properties: {
-            type_ids: {
-              type: 'array', items: { type: 'integer' }, nullable: true,
-              description: 'Waste type ids to include, or null to include every active type again.',
-            },
-          },
         },
         WasteMappingProfileEntry: {
           type: 'object',
@@ -3656,18 +3734,15 @@ export const schemas = {
         WasteMappingProfileExportResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfile' } },
         },
-        WasteMappingProfileImportPreviewInput: {
-          type: 'object', required: ['profile'], properties: { profile: { $ref: '#/components/schemas/WasteMappingProfile' } },
-        },
         WasteMappingProfilePreviewEntry: {
           type: 'object',
           required: ['pattern', 'type_name', 'status'],
           properties: {
             pattern: { type: 'string' },
             type_name: { type: 'string' },
-            mapping_id: { type: 'integer', nullable: true },
-            original_label: { type: 'string', nullable: true },
-            resolved_type_id: { type: 'integer', nullable: true },
+            mapping_id: { type: ['integer', 'null'] },
+            original_label: { type: ['string', 'null'] },
+            resolved_type_id: { type: ['integer', 'null'] },
             status: {
               type: 'string',
               enum: ['applicable', 'unchanged', 'unmatched_pattern', 'unmatched_type', 'ambiguous_type'],
@@ -3688,14 +3763,6 @@ export const schemas = {
         WasteMappingProfileImportPreviewResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfilePreview' } },
         },
-        WasteMappingProfileImportCommitInput: {
-          type: 'object',
-          required: ['profile', 'profile_digest'],
-          properties: {
-            profile: { $ref: '#/components/schemas/WasteMappingProfile' },
-            profile_digest: { type: 'string' },
-          },
-        },
         WasteMappingProfileImportCommitResult: {
           type: 'object',
           required: ['applied_count', 'entries'],
@@ -3707,4 +3774,6 @@ export const schemas = {
         WasteMappingProfileImportCommitResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfileImportCommitResult' } },
         },
+        // Die Anfrage-Schemata der Abfuhr (#2810) stehen in waste-inputs.js.
+        ...wasteInputSchemas(),
 };

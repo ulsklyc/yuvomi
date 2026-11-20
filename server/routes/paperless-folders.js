@@ -1,5 +1,6 @@
 /** Virtual folders with scoped media and tags. No local file copies. */
 import express from '../utils/http-router.ts';
+import { validateRequest } from '../api/validate-request.ts';
 import { createLogger } from '../logger.js';
 import { PaperlessHttpError, paperlessStatus } from '../services/dms/paperless-errors.js';
 import { paperlessErrorHandler } from '../middleware/paperless-errors.js';
@@ -113,7 +114,7 @@ router.use((_req, res, next) => {
 
 // Hold the DB identity across remote awaits: a concurrent restore must wait
 // for these responses, just as it waits for the core document media routes.
-router.get('/saved-views', requireAdmin, refuseWhileRestoring, async (req, res) => {
+router.get('/saved-views', requireAdmin, validateRequest(), refuseWhileRestoring, async (req, res) => {
   
     const accountId = positiveId(req.query.account_id);
     const page = positiveId(req.query.page ?? 1);
@@ -127,7 +128,7 @@ router.get('/saved-views', requireAdmin, refuseWhileRestoring, async (req, res) 
 });
 
 // Filter creation always uses the same credentials as Live-folder reads.
-router.get('/filter-tags', requireAdmin, refuseWhileRestoring, async (req, res) => {
+router.get('/filter-tags', requireAdmin, validateRequest(), refuseWhileRestoring, async (req, res) => {
   const accountId = positiveId(req.query.account_id), page = positiveId(req.query.page ?? 1);
   if (!accountId || !page || page > 100000) throw problem(400, 'paperless_folder_invalid');
   const source = liveAccount(accountId, actor(req));
@@ -136,7 +137,7 @@ router.get('/filter-tags', requireAdmin, refuseWhileRestoring, async (req, res) 
   res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more } });
 });
 
-router.get('/folders', (req, res) => {
+router.get('/folders', validateRequest(), (req, res) => {
   
     const rows = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders f
       WHERE ${visibleWhere('paperless_folders', 'f', '@userId')} ORDER BY name COLLATE NOCASE, id`).all({ userId: actor(req) });
@@ -144,7 +145,7 @@ router.get('/folders', (req, res) => {
   
 });
 
-router.post('/folders', requireAdmin, async (req, res) => {
+router.post('/folders', requireAdmin, validateRequest(), async (req, res) => {
   
     const body = req.body || {};
     const values = fields({ visibility: 'private', ...body });
@@ -175,7 +176,7 @@ router.post('/folders', requireAdmin, async (req, res) => {
   
 });
 
-router.put('/folders/:id', requireAdmin, (req, res) => {
+router.put('/folders/:id', requireAdmin, validateRequest(), (req, res) => {
   
     const before = visibleFolder(req, req.params.id);
     if (before.created_by !== actor(req)) throw problem(403, 'Permission denied.');
@@ -195,7 +196,7 @@ router.put('/folders/:id', requireAdmin, (req, res) => {
   
 });
 
-router.delete('/folders/:id', requireAdmin, (req, res) => {
+router.delete('/folders/:id', requireAdmin, validateRequest(), (req, res) => {
   
     const folder = visibleFolder(req, req.params.id);
     if (folder.created_by !== actor(req)) throw problem(403, 'Permission denied.');
@@ -204,7 +205,7 @@ router.delete('/folders/:id', requireAdmin, (req, res) => {
   
 });
 
-router.get('/folders/:id/documents', refuseWhileRestoring, async (req, res) => {
+router.get('/folders/:id/documents', validateRequest(), refuseWhileRestoring, async (req, res) => {
   
     const folder = visibleFolder(req, req.params.id);
     const page = positiveId(req.query.page ?? 1);
@@ -217,7 +218,7 @@ router.get('/folders/:id/documents', refuseWhileRestoring, async (req, res) => {
   
 });
 
-router.get('/folders/:id/documents/:documentId/:action', refuseWhileRestoring, async (req, res) => {
+router.get('/folders/:id/documents/:documentId/:action', validateRequest(), refuseWhileRestoring, async (req, res) => {
   
     const { documentId, action } = req.params;
     if (!positiveId(documentId) || !['preview', 'download', 'thumbnail'].includes(action)) {

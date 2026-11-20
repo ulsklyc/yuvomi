@@ -12,7 +12,6 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import { createLogger } from '../../logger.js';
 import { mayChangeRecord, requestHasCapability, sendNotOwner } from '../../authorize/index.ts';
 import {
   str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT,
@@ -23,7 +22,7 @@ import {
 } from '../../services/document-links.js';
 import { sendDocumentDeletionConflict } from '../../services/document-deletion-lock.js';
 import {
-  ROLES, visibleEntry, linkabilityError, entryHasLinks, linkEntry, unlinkEntry, budgetViewer,
+  visibleEntry, linkabilityError, entryHasLinks, linkEntry, unlinkEntry, budgetViewer,
   loadLinkedEntriesForItems, loadLinkedEntries, computeTotal,
 } from './entry-links.js';
 import { warrantyEndDate, reminderDateForWarranty } from '../../services/inventory-deadlines.js';
@@ -36,15 +35,18 @@ import {
   validateServiceLogInput, validateCompletionInput, odometerBaselineExcluding, loadServiceLog, createServiceLogEntry,
   updateServiceLogEntry, deleteServiceLogEntry, completeTrackedDate, loadHistory,
 } from './service-log.js';
+import { MAX_PHOTO_LENGTH } from './fields.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
-const log = createLogger('Inventory');
 const router = express.Router();
 
-const CONDITIONS = ['new', 'good', 'fair', 'poor'];
-const STATUSES = ['active', 'sold', 'disposed', 'lost'];
-const ODOMETER_UNITS = ['km', 'mi'];
+// Kein log-und-500-catch je Route: ein unerwarteter Fehler (SQLite) geht an den
+// zentralen Fehlerhandler (server/middleware/error-handler.js), der ihn mit
+// Methode und Routenmuster loggt und 500 mit dem festen Satz antwortet. Nur
+// POST und PUT fangen die zwei Dokument-Faelle mit eigener Antwort (409
+// Loeschsperre, 403 Verknuepfung ohne Recht) und werfen den Rest weiter.
+
 const CURRENCY_RE = /^[A-Z]{3}$/;
-const MAX_PHOTO_LENGTH = 6_990_507; // ~5 MB raw image in base64, same cap as birthdays.js
 const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 const DOCS = { table: 'inventory_item_documents', ownerColumn: 'item_id' };
 
@@ -216,6 +218,16 @@ function loadItems({ category, locationId, status, q } = {}, budget, viewer) {
  * identisch). Ein weggelassenes Feld wird NULL/Default - kein Feld behaelt den
  * Altwert (siehe die erste, einfachere Inventar-Version dieses Projekts, wo genau
  * diese Inkonsistenz per Review-Fund korrigiert werden musste).
+ *
+ * Typ, Werteliste und Grenzen prueft vorher das Schema der Operation
+ * (validateRequest(), server/openapi/paths/inventory.js, #2810): `condition`,
+ * `status` und `odometer_unit` sind Werte ihrer Liste (aus fields.js) oder
+ * `null`/`""`, `warranty_months` eine ganze Zahl 0..600, `odometer` eine ganze
+ * Zahl, `location_id` eine ganze Zahl, Ziffern-Text oder `null`. Hier bleibt,
+ * was das Schema nicht sagen kann: Leere und Laenge nach dem Trimmen, der
+ * Kalendertag, die Kategorie aus der Tabelle, der Ort, Preis und Waehrung (sie
+ * koennen aus der Buchung oder der gespeicherten Zeile kommen), der Bildinhalt
+ * und der Kilometerstand nur fuer eine Kategorie mit `tracks_odometer`.
  */
 function validateItemFields(body) {
   const values = {};
@@ -243,7 +255,7 @@ function validateItemFields(body) {
   results.push(vCategory);
   values.category = vCategory.value ?? 'other';
 
-  if (body.location_id === null || body.location_id === '' || body.location_id === undefined) {
+  if (body.location_id == null) {
     values.location_id = null;
   } else {
     const vLoc = idParam(body.location_id, 'location_id');
@@ -293,16 +305,7 @@ function validateItemFields(body) {
   results.push(vAccount);
   values.account_username = vAccount.value;
 
-  if (body.warranty_months === null || body.warranty_months === '' || body.warranty_months === undefined) {
-    values.warranty_months = null;
-  } else {
-    const vWarranty = num(body.warranty_months, 'warranty_months');
-    results.push(vWarranty);
-    if (vWarranty.value !== null && (!Number.isInteger(vWarranty.value) || vWarranty.value < 0 || vWarranty.value > 600)) {
-      results.push({ error: 'warranty_months must be a whole number from 0 to 600.' });
-    }
-    values.warranty_months = vWarranty.value;
-  }
+  values.warranty_months = body.warranty_months ?? null;
 
   // Manuelle Kilometerstand-Ablesung - bewusst auf Kategorien begrenzt, die
   // tracks_odometer tragen (per Voreinstellung nur "Fahrzeuge", Nutzer-
@@ -317,26 +320,16 @@ function validateItemFields(body) {
     values.odometer_unit = null;
     values.odometer_on = null;
   } else {
-    if (body.odometer === null || body.odometer === '' || body.odometer === undefined) {
-      values.odometer = null;
-    } else {
-      const vOdometer = num(body.odometer, 'odometer');
-      results.push(vOdometer);
-      if (vOdometer.value !== null && (!Number.isInteger(vOdometer.value) || vOdometer.value < 0)) {
-        results.push({ error: 'odometer must be a whole number of at least 0.' });
-      }
-      values.odometer = vOdometer.value;
+    // Das Schema hat fuer `odometer` keine Untergrenze: es prueft fuer jede
+    // Kategorie, die Grenze gilt nur fuer eine mit Kilometerstand.
+    values.odometer = body.odometer ?? null;
+    if (values.odometer !== null && values.odometer < 0) {
+      results.push({ error: 'odometer must be a whole number of at least 0.' });
     }
 
-    if (body.odometer_unit === null || body.odometer_unit === '' || body.odometer_unit === undefined) {
-      // Ohne explizite Einheit, aber mit Zahl: 'km' als Standard, damit kein
-      // Wert ohne Einheit dasteht - dasselbe Muster wie currency weiter oben.
-      values.odometer_unit = values.odometer != null ? 'km' : null;
-    } else {
-      const vUnit = oneOf(body.odometer_unit, ODOMETER_UNITS, 'odometer_unit');
-      results.push(vUnit);
-      values.odometer_unit = vUnit.value;
-    }
+    // Ohne explizite Einheit, aber mit Zahl: 'km' als Standard, damit kein
+    // Wert ohne Einheit dasteht - dasselbe Muster wie currency weiter oben.
+    values.odometer_unit = body.odometer_unit || (values.odometer != null ? 'km' : null);
 
     const vOdometerOn = date(body.odometer_on, 'odometer_on');
     results.push(vOdometerOn);
@@ -349,13 +342,8 @@ function validateItemFields(body) {
     values.odometer_on = vOdometerOn.value ?? (values.odometer != null ? todayKey(db.get(), new Date()) : null);
   }
 
-  const vCondition = oneOf(body.condition || 'good', CONDITIONS, 'condition');
-  results.push(vCondition);
-  values.condition = vCondition.value ?? 'good';
-
-  const vStatus = oneOf(body.status || 'active', STATUSES, 'status');
-  results.push(vStatus);
-  values.status = vStatus.value ?? 'active';
+  values.condition = body.condition || 'good';
+  values.status = body.status || 'active';
 
   const vNotes = str(body.notes, 'notes', { max: MAX_TEXT, required: false });
   results.push(vNotes);
@@ -379,47 +367,39 @@ function validateItemFields(body) {
 // --------------------------------------------------------
 // GET /api/v1/inventory/items   Query: ?category=&location_id=&status=&q=
 // --------------------------------------------------------
-router.get('/', (req, res) => {
-  try {
-    const category = typeof req.query.category === 'string' && req.query.category ? req.query.category : undefined;
-    let locationId;
-    if (req.query.location_id !== undefined) {
-      const n = parseInt(req.query.location_id, 10);
-      if (!n || n < 1) return res.status(400).json({ error: 'location_id must be a positive number.', code: 400 });
-      locationId = n;
-    }
-    const status = typeof req.query.status === 'string' && STATUSES.includes(req.query.status) ? req.query.status : undefined;
-    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : undefined;
-
-    const prices = viewsPrices(req);
-    const items = loadItems({ category, locationId, status, q }, budgetViewer(req), documentViewer(req));
-    res.json({ data: prices ? items : items.map(withoutPrices) });
-  } catch (err) {
-    log.error('GET / error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+router.get('/', validateRequest(), (req, res) => {
+  // Das Schema weist einen doppelten Filter, einen Status ausserhalb der Liste
+  // und eine leere oder nicht dezimale location_id ab; 0 und kleiner bleiben hier.
+  const category = req.query.category || undefined;
+  let locationId;
+  if (req.query.location_id !== undefined) {
+    const n = parseInt(req.query.location_id, 10);
+    if (!n || n < 1) return res.status(400).json({ error: 'location_id must be a positive number.', code: 400 });
+    locationId = n;
   }
+  const status = req.query.status;
+  const q = req.query.q?.trim().slice(0, 100);
+
+  const prices = viewsPrices(req);
+  const items = loadItems({ category, locationId, status, q }, budgetViewer(req), documentViewer(req));
+  res.json({ data: prices ? items : items.map(withoutPrices) });
 });
 
 // --------------------------------------------------------
 // GET /api/v1/inventory/items/:id
 // --------------------------------------------------------
-router.get('/:id', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const item = loadItem(vId.value, budgetViewer(req), documentViewer(req));
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    res.json({ data: presentItem(item, req) });
-  } catch (err) {
-    log.error('GET /:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/:id', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const item = loadItem(vId.value, budgetViewer(req), documentViewer(req));
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  res.json({ data: presentItem(item, req) });
 });
 
 // --------------------------------------------------------
 // POST /api/v1/inventory/items
 // --------------------------------------------------------
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const userId = req.authUserId || req.session.userId;
 
@@ -430,7 +410,7 @@ router.post('/', (req, res) => {
     let effectiveBody = req.body;
     let entry = null;
     const rawEntryId = req.body.entry_id;
-    if (rawEntryId !== undefined && rawEntryId !== null && rawEntryId !== '') {
+    if (rawEntryId != null) {
       const vEntryId = idParam(rawEntryId, 'entry_id');
       if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
       entry = visibleEntry(vEntryId.value, budgetViewer(req));
@@ -438,8 +418,7 @@ router.post('/', (req, res) => {
       const linkError = linkabilityError(entry);
       if (linkError) return res.status(linkError.code).json({ error: linkError.error, code: linkError.code });
 
-      const priceOmitted = req.body.purchase_price === undefined || req.body.purchase_price === null || req.body.purchase_price === '';
-      if (priceOmitted && !entryHasLinks(entry.id)) {
+      if (req.body.purchase_price == null && !entryHasLinks(entry.id)) {
         effectiveBody = { ...req.body, purchase_price: Math.abs(entry.amount) };
       }
     }
@@ -500,15 +479,14 @@ router.post('/', (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    log.error('POST / error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 // --------------------------------------------------------
 // PUT /api/v1/inventory/items/:id   Volles Replace, siehe Kommentar oben.
 // --------------------------------------------------------
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const vId = idParam(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -580,137 +558,102 @@ router.put('/:id', (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    log.error('PUT /:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 // --------------------------------------------------------
 // POST /api/v1/inventory/items/:id/entries   Body: { entry_id, role?, amount_share? }
 // --------------------------------------------------------
-router.post('/:id/entries', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    if (refuseForeignItem(req, res, item)) return;
+router.post('/:id/entries', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  if (refuseForeignItem(req, res, item)) return;
 
-    const vEntryId = idParam(req.body.entry_id, 'entry_id');
-    if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
+  const vEntryId = idParam(req.body.entry_id, 'entry_id');
+  if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
 
-    const vRole = oneOf(req.body.role || 'purchase', ROLES, 'role');
-    if (vRole.error) return res.status(400).json({ error: vRole.error, code: 400 });
+  // Rolle aus ihrer Liste und Anteil als Zahl ab 0 prueft das Schema (#2810).
+  const role = req.body.role || 'purchase';
+  const amountShare = req.body.amount_share ?? null;
 
-    let amountShare = null;
-    if (req.body.amount_share !== undefined && req.body.amount_share !== null && req.body.amount_share !== '') {
-      const vShare = num(req.body.amount_share, 'amount_share');
-      if (vShare.error) return res.status(400).json({ error: vShare.error, code: 400 });
-      if (vShare.value !== null && vShare.value < 0) {
-        return res.status(400).json({ error: 'amount_share must not be negative.', code: 400 });
-      }
-      amountShare = vShare.value;
-    }
+  const result = linkEntry({ itemId: item.id, entryId: vEntryId.value, role, amountShare, viewer: budgetViewer(req) });
+  if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
 
-    const result = linkEntry({ itemId: item.id, entryId: vEntryId.value, role: vRole.value, amountShare, viewer: budgetViewer(req) });
-    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
-
-    res.status(201).json({ data: presentItem(loadItem(item.id, budgetViewer(req), documentViewer(req)), req) });
-  } catch (err) {
-    log.error('POST /:id/entries error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.status(201).json({ data: presentItem(loadItem(item.id, budgetViewer(req), documentViewer(req)), req) });
 });
 
 // --------------------------------------------------------
 // DELETE /api/v1/inventory/items/:id/entries/:entryId
 // Entfernt ALLE Verknuepfungen zwischen Gegenstand und Buchung (rollenunabhaengig).
 // --------------------------------------------------------
-router.delete('/:id/entries/:entryId', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    if (refuseForeignItem(req, res, item)) return;
+router.delete('/:id/entries/:entryId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  if (refuseForeignItem(req, res, item)) return;
 
-    const vEntryId = idParam(req.params.entryId, 'entryId');
-    if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
+  const vEntryId = idParam(req.params.entryId, 'entryId');
+  if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
 
-    const result = unlinkEntry({ itemId: item.id, entryId: vEntryId.value, viewer: budgetViewer(req) });
-    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
+  const result = unlinkEntry({ itemId: item.id, entryId: vEntryId.value, viewer: budgetViewer(req) });
+  if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
 
-    res.json({ data: presentItem(loadItem(item.id, budgetViewer(req), documentViewer(req)), req) });
-  } catch (err) {
-    log.error('DELETE /:id/entries/:entryId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: presentItem(loadItem(item.id, budgetViewer(req), documentViewer(req)), req) });
 });
 
 // --------------------------------------------------------
 // POST /api/v1/inventory/items/:id/dates/:dateId/complete
 // Body: { performed_on, odometer?, vendor?, note? }
 // --------------------------------------------------------
-router.post('/:id/dates/:dateId/complete', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const vDateId = idParam(req.params.dateId, 'dateId');
-    if (vDateId.error) return res.status(400).json({ error: vDateId.error, code: 400 });
+router.post('/:id/dates/:dateId/complete', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const vDateId = idParam(req.params.dateId, 'dateId');
+  if (vDateId.error) return res.status(400).json({ error: vDateId.error, code: 400 });
 
-    const item = db.get().prepare('SELECT id, created_by, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    if (refuseForeignItem(req, res, item)) return;
+  const item = db.get().prepare('SELECT id, created_by, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  if (refuseForeignItem(req, res, item)) return;
 
-    const { value, errors } = validateCompletionInput(req.body, item);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const { value, errors } = validateCompletionInput(req.body, item);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const userId = req.authUserId || req.session.userId;
-    const result = completeTrackedDate({ item, dateId: vDateId.value, values: value, userId });
-    if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
+  const userId = req.authUserId || req.session.userId;
+  const result = completeTrackedDate({ item, dateId: vDateId.value, values: value, userId });
+  if (result.error) return res.status(result.code).json({ error: result.error, code: result.code, ...(result.reason ? { reason: result.reason } : {}) });
 
-    res.status(201).json({ data: presentItem(loadItem(item.id, budgetViewer(req), documentViewer(req)), req) });
-  } catch (err) {
-    log.error('POST /:id/dates/:dateId/complete error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.status(201).json({ data: presentItem(loadItem(item.id, budgetViewer(req), documentViewer(req)), req) });
 });
 
 // --------------------------------------------------------
 // GET|POST /api/v1/inventory/items/:id/service-log
 // --------------------------------------------------------
-router.get('/:id/service-log', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+router.get('/:id/service-log', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
-    res.json({ data: loadServiceLog(item.id) });
-  } catch (err) {
-    log.error('GET /:id/service-log error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: loadServiceLog(item.id) });
 });
 
-router.post('/:id/service-log', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const item = db.get().prepare('SELECT id, created_by, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    if (refuseForeignItem(req, res, item)) return;
+router.post('/:id/service-log', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const item = db.get().prepare('SELECT id, created_by, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  if (refuseForeignItem(req, res, item)) return;
 
-    const { value, errors } = validateServiceLogInput(req.body, item);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const { value, errors } = validateServiceLogInput(req.body, item);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const userId = req.authUserId || req.session.userId;
-    const entry = createServiceLogEntry({ itemId: item.id, values: value, userId });
-    res.status(201).json({ data: entry });
-  } catch (err) {
-    log.error('POST /:id/service-log error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const userId = req.authUserId || req.session.userId;
+  const entry = createServiceLogEntry({ itemId: item.id, values: value, userId });
+  res.status(201).json({ data: entry });
 });
 
 // --------------------------------------------------------
@@ -720,48 +663,38 @@ router.post('/:id/service-log', (req, res) => {
 // Teil-Update. Kein bestehender Aufrufer haengt daran: die App ruft bisher
 // nur /complete und /history auf, dieser Weg ist reine /api/v1-Oberflaeche.
 // --------------------------------------------------------
-router.put('/:id/service-log/:logId', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const vLogId = idParam(req.params.logId, 'logId');
-    if (vLogId.error) return res.status(400).json({ error: vLogId.error, code: 400 });
-    const item = db.get().prepare('SELECT id, created_by, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    if (refuseForeignItem(req, res, item)) return;
+router.put('/:id/service-log/:logId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const vLogId = idParam(req.params.logId, 'logId');
+  if (vLogId.error) return res.status(400).json({ error: vLogId.error, code: 400 });
+  const item = db.get().prepare('SELECT id, created_by, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  if (refuseForeignItem(req, res, item)) return;
 
-    // Die bearbeitete Zeile darf den Tippfehler-Schutz nicht gegen ihren
-    // eigenen alten Wert pruefen (Review #1257).
-    const baseline = odometerBaselineExcluding(item, item.id, vLogId.value);
-    const { value, errors } = validateServiceLogInput(req.body, baseline);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  // Die bearbeitete Zeile darf den Tippfehler-Schutz nicht gegen ihren
+  // eigenen alten Wert pruefen (Review #1257).
+  const baseline = odometerBaselineExcluding(item, item.id, vLogId.value);
+  const { value, errors } = validateServiceLogInput(req.body, baseline);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const updated = updateServiceLogEntry({ itemId: item.id, logId: vLogId.value, values: value });
-    if (!updated) return res.status(404).json({ error: 'Service log entry not found.', code: 404 });
-    res.json({ data: updated });
-  } catch (err) {
-    log.error('PUT /:id/service-log/:logId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const updated = updateServiceLogEntry({ itemId: item.id, logId: vLogId.value, values: value });
+  if (!updated) return res.status(404).json({ error: 'Service log entry not found.', code: 404 });
+  res.json({ data: updated });
 });
 
-router.delete('/:id/service-log/:logId', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const vLogId = idParam(req.params.logId, 'logId');
-    if (vLogId.error) return res.status(400).json({ error: vLogId.error, code: 400 });
-    const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    if (refuseForeignItem(req, res, item)) return;
+router.delete('/:id/service-log/:logId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const vLogId = idParam(req.params.logId, 'logId');
+  if (vLogId.error) return res.status(400).json({ error: vLogId.error, code: 400 });
+  const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  if (refuseForeignItem(req, res, item)) return;
 
-    const deleted = deleteServiceLogEntry({ itemId: item.id, logId: vLogId.value });
-    if (deleted.changes === 0) return res.status(404).json({ error: 'Service log entry not found.', code: 404 });
-    res.status(204).end();
-  } catch (err) {
-    log.error('DELETE /:id/service-log/:logId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const deleted = deleteServiceLogEntry({ itemId: item.id, logId: vLogId.value });
+  if (deleted.changes === 0) return res.status(404).json({ error: 'Service log entry not found.', code: 404 });
+  res.status(204).end();
 });
 
 // --------------------------------------------------------
@@ -769,43 +702,33 @@ router.delete('/:id/service-log/:logId', (req, res) => {
 // Read-only aggregation: service log + linked maintenance/accessory bookings
 // + linked documents, merged into one dated timeline (DECISIONS #6).
 // --------------------------------------------------------
-router.get('/:id/history', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+router.get('/:id/history', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
 
-    res.json({ data: loadHistory(item.id, budgetViewer(req), documentViewer(req)) });
-  } catch (err) {
-    log.error('GET /:id/history error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: loadHistory(item.id, budgetViewer(req), documentViewer(req)) });
 });
 
 // --------------------------------------------------------
 // DELETE /api/v1/inventory/items/:id
 // --------------------------------------------------------
-router.delete('/:id', (req, res) => {
-  try {
-    const vId = idParam(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    if (refuseForeignItem(req, res, item)) return;
+router.delete('/:id', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  if (refuseForeignItem(req, res, item)) return;
 
-    const deleted = db.get().transaction(() => {
-      db.get().prepare("DELETE FROM reminders WHERE entity_type = 'inventory_item' AND entity_id = ?").run(vId.value);
-      removeTrackedDateReminders(vId.value);
-      return db.get().prepare('DELETE FROM inventory_items WHERE id = ?').run(vId.value);
-    })();
+  const deleted = db.get().transaction(() => {
+    db.get().prepare("DELETE FROM reminders WHERE entity_type = 'inventory_item' AND entity_id = ?").run(vId.value);
+    removeTrackedDateReminders(vId.value);
+    return db.get().prepare('DELETE FROM inventory_items WHERE id = ?').run(vId.value);
+  })();
 
-    if (deleted.changes === 0) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
-    res.status(204).end();
-  } catch (err) {
-    log.error('DELETE /:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  if (deleted.changes === 0) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
+  res.status(204).end();
 });
 
 export default router;

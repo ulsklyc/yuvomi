@@ -9,6 +9,7 @@
 import express from 'express';
 import { readFileSync } from 'node:fs';
 import { createLogger } from '../logger.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Changelog');
 
@@ -284,7 +285,7 @@ export function buildRouter({
     return cachedLocal || null;
   }
 
-  router.get('/', async (_req, res) => {
+  router.get('/', validateRequest(), async (_req, res) => {
     const age = now() - cachedAt;
     if (cachedPayload && age >= 0 && age < CACHE_TTL_MS) {
       return res.json({ data: cachedPayload });

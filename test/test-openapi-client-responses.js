@@ -347,7 +347,7 @@ async function call(method, template, { params = {}, query = '', body, headers =
       await seed('POST', '/rewards/bonus', { user_id: child.id, delta: 20, reason: 'Geholfen' });
 
       const { data: shift } = await seed('POST', '/schedule/shift-types', { name: 'Frueh', short_code: 'F', start_time: '06:00', end_time: '14:00', icon: 'sun' });
-      await seed('PUT', `/schedule/overrides/${today}`, { shift_type_id: shift.id });
+      await seed('PUT', `/schedule/overrides/${today}`, { shift_type_id: shift.id, note: null, field_values: {} });
       const { data: wasteType } = await seed('POST', '/waste/types', { name: 'Papier', color: '#3366CC', icon: 'recycle' });
       await seed('POST', '/waste/pickups', { type_id: wasteType.id, date: today });
 

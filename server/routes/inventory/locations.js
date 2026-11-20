@@ -18,6 +18,7 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { str, MAX_SHORT } from '../../middleware/validate.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
@@ -43,14 +44,14 @@ function loadTree() {
 // --------------------------------------------------------
 // GET /api/v1/inventory/locations
 // --------------------------------------------------------
-router.get('/', (_req, res) => {
+router.get('/', validateRequest(), (_req, res) => {
   res.json({ data: loadTree() });
 });
 
 // --------------------------------------------------------
 // POST /api/v1/inventory/locations   Body: { name, icon? }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
   if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
@@ -78,7 +79,7 @@ router.post('/', (req, res) => {
 // --------------------------------------------------------
 // PUT /api/v1/inventory/locations/:id   Body: { name?, icon? }
 // --------------------------------------------------------
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   const loc = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ?').get(req.params.id);
   if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
 
@@ -103,7 +104,7 @@ router.put('/:id', (req, res) => {
 // DELETE /api/v1/inventory/locations/:id
 // Nie blockiert. Response: { ok: true, orphanedItems, orphanedChildren }
 // --------------------------------------------------------
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   const loc = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ?').get(req.params.id);
   if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
 
@@ -118,9 +119,9 @@ router.delete('/:id', (req, res) => {
 // --------------------------------------------------------
 // PATCH /api/v1/inventory/locations/reorder   Body: { order: number[] }  (Top-Ebene)
 // --------------------------------------------------------
-router.patch('/reorder', (req, res) => {
-  const order = Array.isArray(req.body.order) ? req.body.order : [];
-  if (!order.length) return res.status(400).json({ error: 'order must be a non-empty array of IDs.', code: 400 });
+router.patch('/reorder', validateRequest(), (req, res) => {
+  // Eine nicht leere Liste von Ids (ganze Zahl oder Ziffern-Text) prueft das Schema.
+  const { order } = req.body;
   const update = db.get().prepare('UPDATE inventory_locations SET sort_order = ? WHERE id = ? AND parent_id IS NULL');
   db.get().transaction(() => { order.forEach((id, i) => update.run(i, id)); })();
   res.json({ data: loadTree() });
@@ -130,7 +131,7 @@ router.patch('/reorder', (req, res) => {
 // POST /api/v1/inventory/locations/:parentId/subcategories   Body: { name, icon? }
 // (Pfadname "subcategories" ist in der geteilten Komponente fest verdrahtet.)
 // --------------------------------------------------------
-router.post('/:parentId/subcategories', (req, res) => {
+router.post('/:parentId/subcategories', validateRequest(), (req, res) => {
   const parent = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ? AND parent_id IS NULL').get(req.params.parentId);
   if (!parent) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
 
@@ -161,7 +162,7 @@ router.post('/:parentId/subcategories', (req, res) => {
 // --------------------------------------------------------
 // PUT /api/v1/inventory/locations/:parentId/subcategories/:id
 // --------------------------------------------------------
-router.put('/:parentId/subcategories/:id', (req, res) => {
+router.put('/:parentId/subcategories/:id', validateRequest(), (req, res) => {
   const loc = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ? AND parent_id = ?')
     .get(req.params.id, req.params.parentId);
   if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
@@ -185,7 +186,7 @@ router.put('/:parentId/subcategories/:id', (req, res) => {
 // --------------------------------------------------------
 // DELETE /api/v1/inventory/locations/:parentId/subcategories/:id
 // --------------------------------------------------------
-router.delete('/:parentId/subcategories/:id', (req, res) => {
+router.delete('/:parentId/subcategories/:id', validateRequest(), (req, res) => {
   const loc = db.get().prepare('SELECT * FROM inventory_locations WHERE id = ? AND parent_id = ?')
     .get(req.params.id, req.params.parentId);
   if (!loc) return res.status(404).json({ error: 'Location not found.', code: 404, reason: 'inventory_location_not_found' });
@@ -199,8 +200,9 @@ router.delete('/:parentId/subcategories/:id', (req, res) => {
 // --------------------------------------------------------
 // PATCH /api/v1/inventory/locations/:parentId/subcategories/reorder   Body: { order: number[] }
 // --------------------------------------------------------
-router.patch('/:parentId/subcategories/reorder', (req, res) => {
-  const order = Array.isArray(req.body.order) ? req.body.order : [];
+router.patch('/:parentId/subcategories/reorder', validateRequest(), (req, res) => {
+  // Eine Liste von Ids prueft das Schema; `[]` aendert nichts.
+  const { order } = req.body;
   const update = db.get().prepare('UPDATE inventory_locations SET sort_order = ? WHERE id = ? AND parent_id = ?');
   db.get().transaction(() => {
     order.forEach((id, i) => update.run(i, id, req.params.parentId));

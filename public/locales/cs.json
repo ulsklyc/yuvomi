@@ -4280,6 +4280,7 @@
         "deleteGroupConfirm": "Smazat tuto prázdnou skupinu? Skupiny s výdaji musí být archivovány.",
         "deleteGroupConfirmDetail": "Seznam členů, výchozí rozdělení, opakované výdaje i protokol aktivit jsou nenávratně pryč. Za prázdnou se skupina považuje už bez výdajů a vyrovnání.",
         "splitCurrentTotal": "Aktuální součet: {{total}}",
+        "exactSharesConverted": "Přesné podíly v {{currency}}, přepočteno z {{amount}}.",
         "statusLabel": "Stav",
         "statusActive": "Aktivní",
         "statusArchived": "Archivováno",

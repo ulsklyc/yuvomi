@@ -342,7 +342,8 @@ test('malformed pages and IDs fail rather than falling back to an unfiltered req
   for (const page of ['0', '-1', '1.5', 'abc', '100001']) {
     assert.equal((await call('GET', `/folders/${folder.id}/documents?page=${page}`)).status, 400);
   }
-  assert.equal((await call('GET', `/folders/${folder.id}/documents/1e2/download`)).status, 404);
+  assert.equal((await call('GET', `/folders/${folder.id}/documents/1e2/download`)).status, 400);
+  assert.equal(mediaCalls, 0);
 });
 
 test('Paperless failures are sanitized; unsupported rules return 422', async () => {
@@ -570,4 +571,22 @@ test('tag adapter intersects both match modes and document ID without querying s
   assert.equal(calls[1].searchParams.get('page_size'), '1');
   await assert.rejects(source.listTagDocuments({ match: 'all', tag_ids: [] }), PaperlessViewError);
   assert.equal(calls.length, 2);
+});
+
+// The schema check must run before any source request or local write.
+test('OpenAPI refuses invalid folder sources before contacting Paperless', async () => {
+  let sourceCalls = 0;
+  adapter.getSavedView = async () => { sourceCalls++; return { id: 5, filter_rules: [] }; };
+  adapter.getTags = async () => { sourceCalls++; return [{ id: 7, name: 'House' }]; };
+  for (const source of [{}, { view_id: '5' }, { view_id: true },
+    { view_id: 5, tag_filter: { match: 'all', tag_ids: [7] } },
+    { tag_filter: { match: 'all', tag_ids: [] } },
+    { tag_filter: { match: 'any', tag_ids: ['7'] } }]) {
+    const result = await call('POST', '/folders', { name: 'Invalid source', account_id: accountId, ...source });
+    assert.equal(result.status, 400);
+    assert.equal(result.body.reason, 'validation');
+    assert.ok(result.body.fields.some((/** @type {{path: string}} */ field) => field.path.startsWith('body')));
+  }
+  assert.equal(sourceCalls, 0);
+  assert.equal(database.prepare('SELECT count(*) AS n FROM paperless_view_folders').get().n, 0);
 });

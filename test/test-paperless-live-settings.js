@@ -22,7 +22,7 @@ _setTestDatabase(database);
 const user = (/** @type {string} */ name, /** @type {string} */ role) => database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'test', ?)")
   .run(name, name, role).lastInsertRowid;
 const owner = user('live-admin', 'admin'), reader = user('live-reader', 'member'), other = user('live-other', 'member');
-const root = '/documents/dms/paperless';
+const root = '/api/v1/documents/dms/paperless';
 /** @type {{id: number, role: string, cookieSession?: {userId?: number, role?: string}, access?: Record<string, 'none' | 'read'> | null, method?: string}} */
 let identity;
 /** @type {number} */
@@ -42,7 +42,7 @@ app.use(express.json());
 app.use((req, res, next) => {
   req.authUserId = identity.id; req.authRole = identity.role; req.authMethod = identity.method || 'session';
   req.session = { userId: identity.id, role: identity.role };
-  const requirement = sessionModuleAccessRequirement(req.path, req.method);
+  const requirement = sessionModuleAccessRequirement(req.path.slice('/api/v1'.length), req.method);
   if (moduleAccessVerdict(identity.access, requirement.moduleKey, requirement.access) !== 'allow') return res.sendStatus(403);
   resolveRequestModuleAccess(database, req);
   req.sessionModuleAccess = identity.access;
@@ -333,4 +333,22 @@ test('catalogue permission failures explain that the DMS tag names are unavailab
   assert.equal(result.status, 502);
   assert.equal(result.body.reason, 'paperless_tag_names_unavailable');
   assert.ok(!JSON.stringify(result.body).includes('PRIVATE_UPSTREAM_BODY'));
+});
+
+test('OpenAPI refuses malformed policy and credential bodies without changing either', async () => {
+  for (const body of [{ token_mode: 'shared', allowed_tag_ids: null, expected_revision: '0' },
+    { token_mode: true, allowed_tag_ids: null, expected_revision: 0 },
+    { token_mode: 'shared', allowed_tag_ids: ['7'], expected_revision: 0 }]) {
+    const result = await call('PUT', `/live-settings/${accountId}`, body);
+    assert.equal(result.status, 400);
+    assert.equal(result.body.reason, 'validation');
+    assert.ok(result.body.fields.length > 0);
+  }
+  const result = await token(['PRIVATE_TOKEN']);
+  assert.equal(result.status, 400);
+  assert.equal(result.body.reason, 'validation');
+  assert.ok(!JSON.stringify(result.body).includes('PRIVATE_TOKEN'));
+  const state = (await call('GET', '/live-settings')).body.data[0];
+  assert.equal(state.revision, 0);
+  assert.equal(state.has_personal_token, false);
 });

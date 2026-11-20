@@ -221,7 +221,8 @@ test('ein neues Bild bekommt eine neue Adresse und ein neues ETag', async () => 
 });
 
 test('ohne Bild 404, ungueltige id 400, ohne Anmeldung 401', async () => {
-  const none = await fetch(`${BASE}/api/v1/people/${NO_AVATAR}/avatar`, { headers: { Cookie: adminSession.cookie } });
+  // A well-formed key: without one the request is refused before the row (#2810).
+  const none = await fetch(`${BASE}/api/v1/people/${NO_AVATAR}/avatar?v=${'a'.repeat(32)}`, { headers: { Cookie: adminSession.cookie } });
   assert.equal(none.status, 404);
   const bad = await fetch(`${BASE}/api/v1/people/abc/avatar`, { headers: { Cookie: adminSession.cookie } });
   assert.equal(bad.status, 400);
@@ -305,8 +306,10 @@ test('ohne den Schluessel aus der Zeile gibt die Route kein Bild heraus', async 
   `).run().lastInsertRowid;
   db.prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(AVATAR, hidden);
   const headers = { Cookie: adminSession.cookie };
-  assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar`, { headers })).status, 404, 'ohne Schluessel');
-  assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar?v=1`, { headers })).status, 404, 'geratene Version');
+  // Seit #2810 ein 400 vor dem Lesen der Zeile (validateRequest(), das Muster
+  // des Schluessels): es nennt nur das Feld, nie, ob die Person ein Bild hat.
+  assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar`, { headers })).status, 400, 'ohne Schluessel');
+  assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar?v=1`, { headers })).status, 400, 'geratene Version');
   assert.equal((await fetch(`${BASE}/api/v1/people/${hidden}/avatar?v=${'a'.repeat(32)}`, { headers })).status, 404, 'falscher Schluessel');
   assert.equal((await fetch(`${BASE}${keyedUrl(hidden)}`, { headers })).status, 200, 'mit dem Schluessel aus der Zeile');
 });

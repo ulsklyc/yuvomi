@@ -965,7 +965,7 @@ const REASONS_PASSED_THROUGH = new Map([
   // Testmail. Beides reist an einer festen 400 bzw. in einer 200, nie an 403.
   ['routes/email.js: refusal.reason', { sites: 1, at403: [], why: 'emailConfigRefusal: feste 400' }],
   ['services/email.js: smtpFailureReason(err)', { sites: 1, at403: [], why: 'sendTest: in der 200-Antwort von POST /email/test' }],
-  ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 daneben sendet refuseAdmin' }],
+  ['routes/family.js: problem.reason', { sites: 1, at403: [], why: 'memberOrderProblem: feste 400; die 403 sendet requireAdmin vor der Route' }],
   // parseDataUrl (#1909): der Fall einer gewaehlten Datei (Typ, Inhalt, leer).
   ['routes/documents.js: parsed.reason', { sites: 1, at403: [], why: 'parseDataUrl: feste 400' }],
   // problemBody (#1909): der Grund einer Abo-Pruefung, nur bei genau einem Befund.
@@ -1024,7 +1024,12 @@ const REASONS_PASSED_THROUGH = new Map([
   // Restores und der Grund einer 4xx mit `expose` (HttpError). Heute wirft
   // keine Stelle eine HttpError mit 403; wer es tut, traegt den Grund hier ein.
   ['middleware/error-handler.js: err.reason', { sites: 2, at403: [], why: 'feste 503 (Restore) und die 4xx einer HttpError, heute keine 403' }],
-  ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
+  // validateRequest() (#2810): der Grund einer Schema-Absage kommt aus der
+  // Annotation `x-reason` am verletzten Schema-Knoten, sonst `validation`; der
+  // Status ist immer 400. Die zweite Stelle ist der Typ eines Parameters.
+  ["api/validate-request.ts: unique[0]?.reason ?? 'validation'", { sites: 1, at403: [], why: 'refusal(): feste 400' }],
+  ['api/validate-request.ts: string | undefined', { sites: 1, at403: [], why: 'keine Antwort; Parametertyp von withReason()' }],
+  ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON',{ sites: 1, at403: [], why: '503 oder 409' }],
   ['routes/weather.js: WEATHER_REASON.NOT_CONFIGURED', { sites: 1, at403: [], why: 'Antwort 200 ohne Daten' }],
   ['routes/weather.js: WEATHER_REASON.UPSTREAM_ERROR', { sites: 5, at403: [], why: 'Antwort 200 ohne Daten (Wetter 3x, Ortssuche 2x)' }],
   ['routes/rewards.js: item.name', { sites: 1, at403: [], why: 'Buchungstext im Punktekonto, keine Antwort' }],
@@ -1293,8 +1298,8 @@ test('auth.setup: schickt timezone mit, und laesst das Feld ohne Angabe weg', as
 
 test('OpenAPI beschreibt language und timezone als optionale Setup-Felder', () => {
   const schema = openApi.components.schemas.SetupRequest;
-  assert.equal(schema.properties.language?.type, 'string');
-  assert.equal(schema.properties.timezone?.type, 'string');
+  assert.deepEqual(schema.properties.language?.type, ['string', 'null']);
+  assert.deepEqual(schema.properties.timezone?.type, ['string', 'null']);
   assert.deepEqual(schema.required, ['username', 'display_name', 'password']);
   assert.ok(openApi.paths['/api/v1/auth/setup'].post.responses[400]);
 });

@@ -33,6 +33,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { categoryPaint } from '/utils/budget-category-colors.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { amountFieldHtml } from '/utils/amount-field.js';
+import { keptConversion, exactShareBasis } from '/utils/split-conversion.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipHtml } from '/utils/filter-sheet.js';
 import { initials } from '/utils/initials.js';
 import { safeHexColor, getReadableTextColor } from '/utils/color.js';
@@ -2062,19 +2063,45 @@ function defaultSplitValues(group) {
   return values;
 }
 
+/**
+ * Die gespeicherte Ausgabe hinter einem offenen Bearbeiten-Dialog (#2810).
+ * Die Serie und eine neue Ausgabe stehen hier nicht: fuer sie gilt immer die
+ * Eingabe.
+ * @type {WeakMap<object, any>}
+ */
+const editedExpenses = new WeakMap();
+
+/**
+ * Wogegen die exakten Anteile dieses Formulars aufgehen muessen: bei
+ * behaltener Umrechnung `converted_amount` in `converted_currency` wie beim
+ * Server, sonst der eingegebene Betrag (exactShareBasis, dieselbe Bedingung
+ * wie der Payload). Der Betrag kommt als Text des Servers, nichts wird hier
+ * zurueckgerechnet.
+ * @param {any} panel
+ * @param {string} currency
+ */
+function shareBasis(panel, currency) {
+  const amount = decimalString(panel.querySelector('[name="amount"]')?.value ?? '');
+  return exactShareBasis(editedExpenses.get(panel) ?? null, amount, currency);
+}
+
 function updateSplitInputs(panel) {
   const method = panel.querySelector('[name="split_method"]')?.value || 'equal';
   // Der Betrag und die Teilbeträge stehen in der gewählten Währung; Prozente
   // und Anteile sind reine Zahlen und behalten ihren festen Platzhalter.
   const currency = panel.querySelector('[name="currency"]')?.value || state.meta?.default_currency || 'EUR';
   const zero = amountPlaceholder(currency);
+  // Exakte Anteile einer behaltenen Umrechnung stehen in deren Waehrung und mit
+  // den Stellen, die der Server dafuer fuehrt (#2810).
+  const basis = shareBasis(panel, currency);
+  const shareZero = amountPlaceholder(basis.currency, { digits: basis.digits });
   const amountInput = panel.querySelector('[name="amount"]');
   if (amountInput) amountInput.placeholder = zero;
   panel.querySelectorAll('.split-split-value').forEach((input) => {
     input.hidden = method === 'equal';
     input.required = method !== 'equal';
     if (method === 'percentage') input.placeholder = '30';
-    else if (method === 'exact') input.placeholder = zero;
+    else if (method === 'exact') input.placeholder = shareZero;
     else if (method === 'shares') input.placeholder = '1';
     else input.placeholder = '';
   });
@@ -2116,13 +2143,19 @@ const decimalString = toAmountDecimalString;
  * `original` und `originalCurrency` tragen den Bestandsschutz (siehe
  * amountInputProblem): er endet, sobald die Währung gewechselt wurde.
  *
+ * `digits`: die Stellen, die der Server fuer diesen Betrag fuehrt, wenn sie
+ * nicht die der Waehrung sind (exactShareBasis) - sonst null.
+ *
+ * @param {any} input
+ * @param {string} currency
+ * @param {{ original?: any, originalCurrency?: string | null, required?: boolean, digits?: number | null }} [options]
  * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
  */
-function rejectSplitAmount(input, currency, { original = null, originalCurrency = null, required = false } = {}) {
+function rejectSplitAmount(input, currency, { original = null, originalCurrency = null, required = false, digits = null } = {}) {
   if (input == null) return false;
-  const problem = amountInputProblem(input.value, currency, { original, originalCurrency, required, decimalComma: true });
+  const problem = amountInputProblem(input.value, currency, { original, originalCurrency, required, decimalComma: true, digits });
   if (!problem) return false;
-  reportFieldError(input, amountProblemText(problem, currency));
+  reportFieldError(input, amountProblemText(problem, currency, { digits: digits ?? undefined }));
   return true;
 }
 
@@ -2182,9 +2215,17 @@ function validateSplitForm(panel, { reveal = false } = {}) {
     valid = Math.abs(total - 100) < 0.01;
     message = `${message} ${t('splitExpenses.splitCurrentTotal', { total: percentTotal(total) })}`;
   } else if (valid && method === 'exact') {
+    // Gegen dieselbe Summe wie der Server (#2810): bei behaltener Umrechnung
+    // den umgerechneten Betrag in seiner Waehrung, sonst die Eingabe.
+    const basis = shareBasis(panel, currency);
     const total = selected.reduce((sum, input) => sum + (numberValue(panel.querySelector(`[name="split_value_${input.value}"]`)?.value) || 0), 0);
-    valid = Math.abs(total - amount) < 0.01;
-    message = `${message} ${t('splitExpenses.splitCurrentTotal', { total: formatMoney(total, currency) })}`;
+    valid = Math.abs(total - Number(basis.amount)) < 0.01;
+    const converted = basis.from
+      ? ` ${t('splitExpenses.exactSharesConverted', { currency: basis.currency, amount: formatMoney(Number(basis.from.amount), basis.from.currency) })}`
+      : '';
+    // Die Summe mit den Stellen, die der Server fuer die Anteile fuehrt (#2810):
+    // "3.581,47 HUF", nicht die CLDR-Anzeige "3.581 HUF".
+    message = `${message}${converted} ${t('splitExpenses.splitCurrentTotal', { total: formatMoney(total, basis.currency, { digits: basis.digits }) })}`;
   } else if (valid && method === 'shares') {
     valid = selected.every((input) => {
       const value = numberValue(panel.querySelector(`[name="split_value_${input.value}"]`)?.value);
@@ -2617,6 +2658,7 @@ function openExpenseModal(expense = null, prefill = null) {
         }),
       });
       panel.querySelector('#split-cancel-expense')?.addEventListener('click', () => closeModal());
+      if (isEdit) editedExpenses.set(panel, expense);
       wireSplitFields(panel, '#split-expense-form');
       panel.querySelector('#split-delete-expense')?.addEventListener('click', async () => {
         if (readOnly()) return;
@@ -2661,15 +2703,33 @@ function openExpenseModal(expense = null, prefill = null) {
         data.amount = decimalString(data.amount);
         const expenseCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
         if (rejectSplitAmounts(form, expenseCurrency,
-          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null })) return;
+          { original: isEdit ? expense.amount : null, originalCurrency: isEdit ? expense.currency : null,
+            shareBasis: shareBasis(panel, expenseCurrency) })) return;
         const { participants, splits } = collectSplitPayload(form);
-        const payload = { ...data, participants, splits };
+        // IDs als Zahl (#2810): Ziffern-Text nimmt der Server nur noch als Altform.
+        const payload = { ...data, payer_id: Number(data.payer_id), participants, splits };
         const dialog = captureModalContext();
         // commit() lädt wartende Dateien erst jetzt hoch: ein abgebrochenes
         // Formular hinterlässt keine verwaiste Datei im Dokumente-Modul.
         if (receipts) payload.attachment_document_ids = await receipts.commit();
-        if (isEdit) await api.put(`/split-expenses/expenses/${expense.id}`, payload);
-        else await api.post(`/split-expenses/groups/${state.activeGroupId}/expenses`, payload);
+        if (isEdit) {
+          // Die ganze Ausgabe (#2810): jedes Pflichtfeld des Schemas steht hier
+          // als eigener Schluessel, nie `undefined` (test:validate-split-backup-core
+          // liest diesen Aufruf gegen `required`).
+          const kept = keptConversion(expense, data.amount, expenseCurrency);
+          await api.put(`/split-expenses/expenses/${expense.id}`, {
+            ...payload,
+            title: data.title,
+            amount: data.amount,
+            description: data.description ?? null,
+            currency: expenseCurrency,
+            converted_amount: kept.converted_amount,
+            converted_currency: kept.converted_currency,
+            exchange_snapshot: kept.exchange_snapshot,
+            split_method: data.split_method || 'equal',
+            expense_date: data.expense_date ?? '',
+          });
+        } else await api.post(`/split-expenses/groups/${state.activeGroupId}/expenses`, payload);
         // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
         // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
         const ownDialog = isOwnModalOpen(dialog);
@@ -2693,6 +2753,9 @@ function wireSplitFields(panel, formSelector) {
   panel.querySelector('[name="split_method"]')?.addEventListener('change', () => updateSplitInputs(panel));
   panel.querySelector('[name="currency"]')?.addEventListener('change', () => updateSplitInputs(panel));
   panel.querySelector(formSelector)?.addEventListener('input', () => validateSplitForm(panel));
+  // Ein geaenderter Betrag kann die behaltene Umrechnung beenden (#2810): die
+  // Platzhalter der exakten Anteile wechseln dann beim Tippen die Waehrung.
+  panel.querySelector('[name="amount"]')?.addEventListener('input', () => updateSplitInputs(panel));
   // Der Grund fuer einen gesperrten Betrag erscheint beim Verlassen des
   // Feldes, nicht bei jedem Tastendruck (syncAmountReason).
   panel.querySelector('[name="amount"]')?.addEventListener('change', () => validateSplitForm(panel, { reveal: true }));
@@ -2716,14 +2779,20 @@ function wireSplitFields(panel, formSelector) {
  * (parseMoneyToMinor), und die Antwort kaeme englisch und ortlos zurueck. Wer
  * nichts traegt, wird abgehakt.
  *
+ * `shareBasis`: Waehrung und Stellen der Anteile, wenn sie nicht die des
+ * Betrags sind (behaltene Umrechnung beim Bearbeiten, #2810; exactShareBasis).
+ *
+ * @param {any} form
+ * @param {string} currency
+ * @param {{ original?: any, originalCurrency?: string | null, shareBasis?: { currency: string, digits: number | null } | null }} [options]
  * @returns {boolean} true, wenn abgewiesen wurde (der Aufrufer bricht dann ab)
  */
-function rejectSplitAmounts(form, currency, { original = null, originalCurrency = null } = {}) {
+function rejectSplitAmounts(form, currency, { original = null, originalCurrency = null, shareBasis = null } = {}) {
   if (rejectSplitAmount(form.querySelector('[name="amount"]'), currency, { original, originalCurrency, required: true })) return true;
   if (form.querySelector('[name="split_method"]')?.value !== 'exact') return false;
   for (const field of form.querySelectorAll('.split-split-value')) {
     if (field.hidden || field.disabled) continue;
-    if (rejectSplitAmount(field, currency, { required: true })) return true;
+    if (rejectSplitAmount(field, shareBasis?.currency ?? currency, { required: true, digits: shareBasis?.digits ?? null })) return true;
   }
   return false;
 }
@@ -3001,7 +3070,7 @@ function readRecurringForm(form) {
     title: String(data.title ?? ''),
     amount: decimalString(data.amount),
     currency: data.currency,
-    payer_id: data.payer_id,
+    payer_id: Number(data.payer_id),
     frequency: data.frequency,
     next_run_date: data.next_run_date,
     split_method: data.split_method || 'equal',
@@ -3140,7 +3209,9 @@ function openSettlementModal() {
         const dialog = captureModalContext();
         const proofIds = proof ? await proof.commit() : [];
         if (proofIds.length) data.proof_document_id = proofIds[0];
-        await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`, data);
+        // IDs als Zahl (#2810): Ziffern-Text nimmt der Server nur noch als Altform.
+        await api.post(`/split-expenses/groups/${state.activeGroupId}/settlements`,
+          { ...data, payer_id: Number(data.payer_id), payee_id: Number(data.payee_id) });
         // Nur diesen Dialog schliessen, nicht einen, der waehrend der Anfrage
         // aufgegangen ist; den Fokus nur zurueck, wenn er es war (#1997).
         const ownDialog = isOwnModalOpen(dialog);

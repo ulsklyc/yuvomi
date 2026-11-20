@@ -4733,6 +4733,7 @@
         "deleteGroupConfirm": "この空のグループを削除しますか？費用があるグループはアーカイブしてください。",
         "deleteGroupConfirmDetail": "メンバー一覧、既定の分担方法、定期支出、そして操作履歴は完全に失われます。支出と精算がなければグループは空とみなされます。",
         "splitCurrentTotal": "現在の合計: {{total}}",
+        "exactSharesConverted": "正確な負担額は{{currency}}建て（{{amount}}から換算）。",
         "statusLabel": "ステータス",
         "statusActive": "有効",
         "statusArchived": "アーカイブ済み",

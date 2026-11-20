@@ -26,12 +26,16 @@ import {
   resolveOwner,
 } from './helpers.js';
 import { careAwareClause, readableRows, writableClause } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
+import {
+  MAX_ICON, MAX_INTERVAL_MONTHS, MAX_OFFSET_DAYS, PREVENTION_KINDS,
+} from '../../services/health-fields.js';
 
 const router = express.Router();
 
-const KINDS = ['vaccination', 'checkup'];
-const MAX_MONTHS = 600;
-const MAX_OFFSET_DAYS = 365;
+// Eine Quelle mit dem OpenAPI-Dokument (#2810): server/services/health-fields.js.
+const KINDS = PREVENTION_KINDS;
+const MAX_MONTHS = MAX_INTERVAL_MONTHS;
 
 // --------------------------------------------------------
 // Validierungs-Helfer
@@ -66,7 +70,7 @@ function vOffsetDays(value) {
 // --------------------------------------------------------
 
 // GET /prevention/types - allen Mitgliedern zugänglich (Lesen)
-router.get('/prevention/types', (req, res) => {
+router.get('/prevention/types', validateRequest(), (req, res) => {
   try {
     const rows = db.get().prepare(
       'SELECT * FROM health_prevention_types ORDER BY sort_order ASC, id ASC'
@@ -78,13 +82,13 @@ router.get('/prevention/types', (req, res) => {
   }
 });
 
-router.post('/prevention/types', requireAdmin, (req, res) => {
+router.post('/prevention/types', requireAdmin, validateRequest(), (req, res) => {
   try {
     const b = req.body || {};
     const name = v.str(b.name, 'name', { max: v.MAX_TITLE });
     const kind = v.oneOf(b.kind, KINDS, 'kind');
     const defaultIntervalMonths = vIntervalMonths(b.default_interval_months);
-    const icon = v.str(b.icon, 'icon', { max: 50, required: false });
+    const icon = v.str(b.icon, 'icon', { max: MAX_ICON, required: false });
     const sortOrder = v.num(b.sort_order, 'sort_order');
 
     const errors = v.collectErrors([name, defaultIntervalMonths, icon, sortOrder]);
@@ -107,7 +111,7 @@ router.post('/prevention/types', requireAdmin, (req, res) => {
   }
 });
 
-router.patch('/prevention/types/:id', requireAdmin, (req, res) => {
+router.patch('/prevention/types/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
@@ -128,7 +132,7 @@ router.patch('/prevention/types/:id', requireAdmin, (req, res) => {
     if (b.default_interval_months !== undefined) {
       const r = vIntervalMonths(b.default_interval_months); checks.push(r); if (!r.error) fields.default_interval_months = r.value;
     }
-    if (b.icon !== undefined) { const r = v.str(b.icon, 'icon', { max: 50, required: false }); checks.push(r); if (!r.error) fields.icon = r.value || 'syringe'; }
+    if (b.icon !== undefined) { const r = v.str(b.icon, 'icon', { max: MAX_ICON, required: false }); checks.push(r); if (!r.error) fields.icon = r.value || 'syringe'; }
     if (b.sort_order !== undefined) { const r = v.num(b.sort_order, 'sort_order'); checks.push(r); if (!r.error) fields.sort_order = r.value ?? 0; }
 
     const errors = v.collectErrors(checks);
@@ -143,7 +147,7 @@ router.patch('/prevention/types/:id', requireAdmin, (req, res) => {
 });
 
 // DELETE /prevention/types/:id - die Historie bleibt (SET NULL + name-Momentaufnahme).
-router.delete('/prevention/types/:id', requireAdmin, (req, res) => {
+router.delete('/prevention/types/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
@@ -191,7 +195,7 @@ function unknownSelectedType(res) {
 // --------------------------------------------------------
 
 // GET /prevention/records?user_id=&type_id=&from=&to=
-router.get('/prevention/records', (req, res) => {
+router.get('/prevention/records', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -212,7 +216,7 @@ router.get('/prevention/records', (req, res) => {
 });
 
 // POST /prevention/records
-router.post('/prevention/records', (req, res) => {
+router.post('/prevention/records', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
@@ -273,7 +277,7 @@ router.post('/prevention/records', (req, res) => {
 });
 
 // PATCH /prevention/records/:id
-router.patch('/prevention/records/:id', (req, res) => {
+router.patch('/prevention/records/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -324,7 +328,7 @@ router.patch('/prevention/records/:id', (req, res) => {
 });
 
 // DELETE /prevention/records/:id
-router.delete('/prevention/records/:id', (req, res) => {
+router.delete('/prevention/records/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -357,7 +361,7 @@ router.delete('/prevention/records/:id', (req, res) => {
 // --------------------------------------------------------
 // GET /prevention/due?user_id= - die abgeleitete Liste
 // --------------------------------------------------------
-router.get('/prevention/due', (req, res) => {
+router.get('/prevention/due', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : viewer;

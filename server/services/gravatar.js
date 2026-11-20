@@ -35,7 +35,7 @@ import { emailMatchKey } from '../utils/email-match.js';
 export const DEFAULT_GRAVATAR_SIZE = 256;
 // 512 KiB. Ein 256px-Avatar liegt weit darunter; die Grenze ist eine
 // Prozessgrenze gegen einen Spiegel, der etwas anderes liefert. Als data-URL
-// (Base64, Faktor 4/3) bleibt sie unter MAX_AVATAR_DATA_LENGTH in server/auth.js,
+// (Base64, Faktor 4/3) bleibt sie unter MAX_AVATAR_DATA_LENGTH (server/utils/avatar-limits.js),
 // sonst lehnte normalizeAvatarData() ab, was hier gerade durchgelassen wurde.
 export const MAX_GRAVATAR_BYTES = 512 * 1024;
 const REQUEST_TIMEOUT_MS = 8000;

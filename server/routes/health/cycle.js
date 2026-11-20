@@ -34,36 +34,52 @@ import { syncCycleRemindersForUser, isEligibleCyclePartner, eligibleCyclePartner
 // Kopien (CERVIX_MUCUS_VALUES/TEST_RESULT_VALUES/INTIMACY_VALUES,
 // CONTRACEPTION_VALUES), die sonst auseinanderlaufen koennten.
 import {
-  normalizeSymptomEntries, MOOD_VALUES,
+  normalizeSymptomEntries, MOOD_VALUES, FLOW_VALUES, BASAL_TEMP_UNITS,
   CERVIX_MUCUS_VALUES, TEST_RESULT_VALUES, INTIMACY_VALUES, CONTRACEPTION_VALUES,
 } from '../../../public/utils/health-cycle.js';
+import { CYCLE_SETTING_RANGES, MAX_SYMPTOMS_COUNT } from '../../services/health-fields.js';
 import {
-  log, VISIBILITIES, FLOW_LEVELS,
+  log, VISIBILITIES,
   viewerId, toBit, applyUpdate, badRequest,
   exportFilename, sendCsv, exportRange,
 } from './helpers.js';
 import { visibilityClause } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
-// Deckel auf die ANZAHL Symptome je Tag, nicht mehr auf die Zeichenlaenge der
-// (seit Migration 178 nur noch historischen) Komma-Spalte - die Symptom-Liste
-// waechst mit SYMPTOM_TYPES (aktuell 20), 40 laesst reichlich Raum, auch fuer
-// spaeter erweiterte Presets, ohne eine Endlos-Liste durchzulassen.
-const MAX_SYMPTOMS_COUNT = 40;
+// Deckel auf die ANZAHL Symptome je Tag (MAX_SYMPTOMS_COUNT, health-fields.js),
+// nicht mehr auf die Zeichenlaenge der (seit Migration 178 nur noch
+// historischen) Komma-Spalte - die Symptom-Liste waechst mit SYMPTOM_TYPES
+// (aktuell 20), 40 laesst reichlich Raum, auch fuer spaeter erweiterte
+// Presets, ohne eine Endlos-Liste durchzulassen.
 
 // Enger als health_vitals.unit (Liste je Metrik, utils/vital-units.js): fuer eine
 // Basaltemperatur macht nur eine von zwei Einheiten Sinn - und detectTemperatureShift()
 // muss beide zuverlaessig in Celsius umrechnen koennen, ein freies Textfeld
 // waere dafuer die falsche Grundlage. Plausibilitaets-Grenzen sind grosszuegige
 // Koerpertemperatur-Baender, keine medizinische Norm.
-const BASAL_TEMP_RANGE = { c: [34, 42], f: [93, 108] };
+//
+// Die Einheiten selbst stehen in BASAL_TEMP_UNITS (health-cycle.js), derselben
+// Liste wie das Select des Tages-Logs und das OpenAPI-Dokument (#2810); jede
+// muss hier ihren Bereich haben.
+const BASAL_TEMP_RANGE = Object.freeze({ c: [34, 42], f: [93, 108] });
+if (BASAL_TEMP_UNITS.some((unit) => !Object.hasOwn(BASAL_TEMP_RANGE, unit))) {
+  throw new Error('cycle: every unit of BASAL_TEMP_UNITS needs a range in BASAL_TEMP_RANGE');
+}
 
-/** Validiert (basal_temp, basal_temp_unit) zusammen - beide oder keins. */
-function validateBasalTemp(rawTemp, rawUnit) {
+/**
+ * Validiert (basal_temp, basal_temp_unit) zusammen - beide oder keins.
+ *
+ * Der Nachschlag fragt nur EIGENE Schluessel (#2810): `BASAL_TEMP_RANGE[unit]`
+ * fand fuer `constructor` oder `__proto__` geerbte Eigenschaften, deren `[0]`
+ * und `[1]` undefined sind - kein Vergleich griff, und jede Zahl wurde mit der
+ * Einheit `constructor` gespeichert.
+ */
+export function validateBasalTemp(rawTemp, rawUnit) {
   if (rawTemp === undefined || rawTemp === null || rawTemp === '') return { temp: null, unit: null, error: null };
   const unit = String(rawUnit || '').toLowerCase();
-  const range = BASAL_TEMP_RANGE[unit];
+  const range = Object.hasOwn(BASAL_TEMP_RANGE, unit) ? BASAL_TEMP_RANGE[unit] : null;
   if (!range) return { temp: null, unit: null, error: 'basal_temp_unit must be "c" or "f" when basal_temp is set.' };
   const n = Number(rawTemp);
   if (!Number.isFinite(n) || n < range[0] || n > range[1]) {
@@ -175,7 +191,7 @@ function replaceFeelings(database, dayLogId, keys) {
 // ---- Perioden-Episoden ----
 
 // GET /cycle/periods?user_id=&from=&to=
-router.get('/cycle/periods', (req, res) => {
+router.get('/cycle/periods', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -193,7 +209,7 @@ router.get('/cycle/periods', (req, res) => {
 });
 
 // POST /cycle/periods
-router.post('/cycle/periods', (req, res) => {
+router.post('/cycle/periods', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
@@ -230,7 +246,7 @@ router.post('/cycle/periods', (req, res) => {
 });
 
 // PATCH /cycle/periods/:id
-router.patch('/cycle/periods/:id', (req, res) => {
+router.patch('/cycle/periods/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -263,7 +279,7 @@ router.patch('/cycle/periods/:id', (req, res) => {
 });
 
 // DELETE /cycle/periods/:id
-router.delete('/cycle/periods/:id', (req, res) => {
+router.delete('/cycle/periods/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -283,7 +299,7 @@ router.delete('/cycle/periods/:id', (req, res) => {
 // ---- Tages-Logs (Upsert je Person/Tag) ----
 
 // GET /cycle/logs?user_id=&from=&to=
-router.get('/cycle/logs', (req, res) => {
+router.get('/cycle/logs', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -327,12 +343,12 @@ router.get('/cycle/logs', (req, res) => {
 });
 
 // POST /cycle/logs  (Upsert: ein Eintrag je user_id + log_date)
-router.post('/cycle/logs', (req, res) => {
+router.post('/cycle/logs', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
     const logDate       = v.date(b.log_date, 'log_date', true);
-    const flow          = v.oneOf(b.flow, FLOW_LEVELS, 'flow');
+    const flow          = v.oneOf(b.flow, [...FLOW_VALUES], 'flow');
     const note          = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
     const visibility    = v.oneOf(b.visibility, VISIBILITIES, 'visibility');
     const symptoms      = normalizeSymptomEntries(b.symptoms);
@@ -416,7 +432,7 @@ router.post('/cycle/logs', (req, res) => {
 });
 
 // DELETE /cycle/logs/:id
-router.delete('/cycle/logs/:id', (req, res) => {
+router.delete('/cycle/logs/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -461,7 +477,7 @@ function defaultCycleSettings(userId) {
 // Sync (isEligibleCyclePartner()/eligibleCyclePartners() in cycle-reminders.js,
 // EINE Regel statt einer zweiten Abschrift). Ohne dieses Feld muesste das
 // Frontend raten, wer eine Meldung tatsaechlich bekaeme.
-router.get('/cycle/settings', (req, res) => {
+router.get('/cycle/settings', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const database = db.get();
@@ -474,7 +490,7 @@ router.get('/cycle/settings', (req, res) => {
 });
 
 // PUT /cycle/settings
-router.put('/cycle/settings', (req, res) => {
+router.put('/cycle/settings', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
@@ -485,9 +501,12 @@ router.put('/cycle/settings', (req, res) => {
       if (!Number.isInteger(n) || n < lo || n > hi) return { value: null, error: `${field} must be an integer between ${lo} and ${hi}.` };
       return { value: n, error: null };
     };
-    const cycleLen  = intInRange(b.cycle_length_avg, 'cycle_length_avg', 15, 60);
-    const periodLen = intInRange(b.period_length_avg, 'period_length_avg', 1, 15);
-    const luteal    = intInRange(b.luteal_length, 'luteal_length', 8, 18);
+    // Die Bereiche stehen in CYCLE_SETTING_RANGES (health-fields.js), eine
+    // Quelle mit dem OpenAPI-Dokument (#2810).
+    const ranged = (/** @type {string} */ field) => intInRange(b[field], field, CYCLE_SETTING_RANGES[field][0], CYCLE_SETTING_RANGES[field][1]);
+    const cycleLen  = ranged('cycle_length_avg');
+    const periodLen = ranged('period_length_avg');
+    const luteal    = ranged('luteal_length');
     const track     = toBit(b.track_fertility);
     const pregnancy = toBit(b.pregnancy_mode);
     const dueDate   = v.date(b.pregnancy_due_date, 'pregnancy_due_date');
@@ -495,12 +514,12 @@ router.put('/cycle/settings', (req, res) => {
     // NULL = aus (Standard); sonst der Vorlauf in Tagen vor dem vorhergesagten
     // Periodenbeginn. Obergrenze wie luteal_length: mehr Vorlauf als eine
     // typische Lutealphase waere keine Vorwarnung mehr, sondern Dauerlaerm.
-    const remindDaysBefore = intInRange(b.remind_period_days_before, 'remind_period_days_before', 0, 14);
+    const remindDaysBefore = ranged('remind_period_days_before');
     const remindLogDaily   = toBit(b.remind_log_daily);
     const contraception    = v.oneOf(b.contraception, CONTRACEPTION_VALUES, 'contraception');
     const perimenopause    = toBit(b.perimenopause_mode);
     const showPms          = toBit(b.show_pms);
-    const partnerDaysBefore = intInRange(b.notify_partner_days_before, 'notify_partner_days_before', 0, 14);
+    const partnerDaysBefore = ranged('notify_partner_days_before');
 
     // notify_partner_user_id: muss in der eligible_partners-Menge stehen, die
     // GET /cycle/settings dem Frontend liefert - derselbe Praedikat
@@ -604,7 +623,7 @@ router.put('/cycle/settings', (req, res) => {
 // Tageslogs) auf eine Sichtbarkeit. Betrifft ausschließlich user_id = viewer;
 // fremde Einträge bleiben unberührt. Ein Transaktions-Wrapper hält Perioden und
 // Logs konsistent (entweder beide oder keine).
-router.patch('/cycle/visibility', (req, res) => {
+router.patch('/cycle/visibility', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const vis = v.oneOf(req.body?.visibility, VISIBILITIES, 'visibility');
@@ -624,7 +643,7 @@ router.patch('/cycle/visibility', (req, res) => {
 });
 
 // GET /export/cycle?user_id=&from=&to=  (Perioden-Historie als CSV, chronologisch)
-router.get('/export/cycle', (req, res) => {
+router.get('/export/cycle', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -722,7 +741,7 @@ function normalizeImportDate(raw) {
 // zum bestehenden Import-Grundsatz dieser App (siehe z. B. den ICS-Import,
 // calendar/subscriptions.js): entweder der Nutzer bekommt genau das, was die
 // Datei versprach, oder gar nichts, nie eine stille Teilmenge.
-router.post('/cycle/import', (req, res) => {
+router.post('/cycle/import', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const csv = req.body?.csv;

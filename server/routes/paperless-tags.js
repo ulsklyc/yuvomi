@@ -1,5 +1,6 @@
 /** Live Paperless tags, scoped to a visible link or current saved-view member. */
 import express from '../utils/http-router.ts';
+import { validateRequest } from '../api/validate-request.ts';
 import { PaperlessHttpError, paperlessStatus } from '../services/dms/paperless-errors.js';
 import { paperlessErrorHandler } from '../middleware/paperless-errors.js';
 import * as db from '../db.js';
@@ -95,7 +96,7 @@ async function inView(adapter, context) {
 router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 // The global tag catalogue is account-wide, so only administrators may browse it.
-router.get('/tags', requireAdmin, refuseWhileRestoring, async (req, res) => {
+router.get('/tags', requireAdmin, validateRequest(), refuseWhileRestoring, async (req, res) => {
   
     if (!writable(req)) throw problem(403, 'Permission denied.');
     const accountId = positiveId(req.query.account_id);
@@ -168,9 +169,9 @@ async function writeTags(req, res) {
       res.json({ data: { tag_ids: ids(updated.tags) } });
     
 }
-router.get('/folders/:id/documents/:documentId/tags', refuseWhileRestoring, readTags);
-router.put('/folders/:id/documents/:documentId/tags', refuseWhileRestoring, writeTags);
-router.get('/documents/:id/tags', refuseWhileRestoring, readTags);
-router.put('/documents/:id/tags', refuseWhileRestoring, writeTags);
+router.get('/folders/:id/documents/:documentId/tags', validateRequest(), refuseWhileRestoring, readTags);
+router.put('/folders/:id/documents/:documentId/tags', validateRequest(), refuseWhileRestoring, writeTags);
+router.get('/documents/:id/tags', validateRequest(), refuseWhileRestoring, readTags);
+router.put('/documents/:id/tags', validateRequest(), refuseWhileRestoring, writeTags);
 router.use(paperlessErrorHandler);
 export default router;

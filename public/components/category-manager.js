@@ -8,7 +8,7 @@
  *   - configure({ basePath, groups, groupField, supportsSubcategories, labelResolver, titleKey, hintKey,
  *                 addMaxLength, localizedLabels,
  *                 deleteConfirmKey, deleteDetailKey, subDeleteDetailKey, errorFallbackKey,
- *                 alreadyDeletedReason,
+ *                 alreadyDeletedReason, numericKeys,
  *                 addedKey, renamedKey, deletedKey, deleteNamedKey })
  *   - Lädt via api.get(basePath); mutiert über post/put/patch/delete relativ zu basePath
  *   - `localizedLabels: true` haengt der Listenanfrage `?lang=<Oberflaechensprache>` an -
@@ -29,6 +29,11 @@
  *     wer etwas anderes verwaltet, nennt sie selbst (#1929, heute die Laeden des
  *     Einkaufs). Ohne sie bleibt der bisherige `category.*`-Text. Unterzeilen
  *     behalten ihre eigenen Texte
+ *   - `numericKeys: true` schickt die Reihenfolge (`PATCH basePath/reorder` und
+ *     die der Unterzeilen, `.../subcategories/reorder`) als Zahlen statt als
+ *     Text der Schluessel (#2810). Nur fuer Verwalter, deren Schluessel sicher
+ *     Ziffern-IDs sind (heute die Lagerorte des Vorrats und des Inventars); ohne
+ *     die Option bleibt es Text, wie die anderen Routen es lesen
  *   - Räumt Listener in disconnectedCallback() auf
  *
  * VERTRAG FUER AUFRUFER: die Auffrischung gehoert in den Ereignis-Handler, nicht
@@ -158,6 +163,8 @@ class CategoryManagerElement extends HTMLElement {
     // Zeile gibt es nicht mehr". Ohne ihn bleibt jedes gescheiterte Loeschen
     // ein Fehler.
     this._alreadyDeletedReason = null;
+    // Siehe `_persistOrder`: die Reihenfolge als Zahlen statt als Schluesseltext.
+    this._numericKeys = false;
     // OPT-IN: nur wer eine Palette mitgibt, bekommt die Farbwahl. Fuenf der
     // sechs Aufrufer zeigen ihre Kategorien nirgends als farbige Marke - dort
     // waere ein Farbknopf eine Einstellung ohne Wirkung.
@@ -205,6 +212,7 @@ class CategoryManagerElement extends HTMLElement {
     if (typeof opts.alreadyDeletedReason === 'string' && opts.alreadyDeletedReason) {
       this._alreadyDeletedReason = opts.alreadyDeletedReason;
     }
+    this._numericKeys = opts.numericKeys === true;
     holdUntilStyled(this, CATEGORY_MANAGER_STYLE);
     this._renderShell();
     this._load();
@@ -969,7 +977,9 @@ class CategoryManagerElement extends HTMLElement {
   async _persistOrder(groupKey, orderedKeys, movedKey, { rollbackRender = false, focusKey = null, focusDir = null, fromHandle = false } = {}) {
     this._reorderBusy = true;
     try {
-      const body = { order: orderedKeys };
+      // Drag- und Button-Pfad laufen beide hier durch: die Schluessel sind Text
+      // (dataset.key, _keyOf), eine id-gefuehrte Route bekommt Zahlen (#2810).
+      const body = { order: this._numericKeys ? orderedKeys.map(Number) : orderedKeys };
       if (groupKey) body[this._groupField] = groupKey;
       const res = await api.patch(`${this._basePath}/reorder`, body);
       if (Array.isArray(res?.data)) this._cats = res.data;
@@ -1112,7 +1122,8 @@ class CategoryManagerElement extends HTMLElement {
     try {
       const res = await api.patch(
         `${this._basePath}/${encodeURIComponent(parent)}/subcategories/reorder`,
-        { order: orderedSubKeys }
+        // Wie _persistOrder: eine id-gefuehrte Route bekommt Zahlen (#2810).
+        { order: this._numericKeys ? orderedSubKeys.map(Number) : orderedSubKeys }
       );
       if (Array.isArray(res?.data)) this._cats = res.data;
       else await this._fetch();

@@ -14,6 +14,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import { str, MAX_SHORT } from '../../middleware/validate.js';
 import { uniqueKey } from './helpers.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
@@ -30,14 +31,14 @@ function loadCategories() {
 // --------------------------------------------------------
 // GET /api/v1/inventory/categories
 // --------------------------------------------------------
-router.get('/', (_req, res) => {
+router.get('/', validateRequest(), (_req, res) => {
   res.json({ data: loadCategories() });
 });
 
 // --------------------------------------------------------
 // POST /api/v1/inventory/categories   Body: { name, icon? }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
   if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
@@ -60,7 +61,7 @@ router.post('/', (req, res) => {
 // --------------------------------------------------------
 // PUT /api/v1/inventory/categories/:key   Body: { name?, icon? }
 // --------------------------------------------------------
-router.put('/:key', (req, res) => {
+router.put('/:key', validateRequest(), (req, res) => {
   const cat = db.get().prepare('SELECT * FROM inventory_categories WHERE key = ?').get(req.params.key);
   if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'inventory_category_not_found' });
 
@@ -88,7 +89,7 @@ router.put('/:key', (req, res) => {
 // 'other' ist geschuetzt. Betroffene Gegenstaende fallen auf 'other' zurueck.
 // Response: { ok: true, reassigned: number }
 // --------------------------------------------------------
-router.delete('/:key', (req, res) => {
+router.delete('/:key', validateRequest(), (req, res) => {
   if (req.params.key === PROTECTED_KEY) {
     return res.status(400).json({ error: "The 'other' category cannot be deleted.", code: 400 });
   }
@@ -109,9 +110,9 @@ router.delete('/:key', (req, res) => {
 // --------------------------------------------------------
 // PATCH /api/v1/inventory/categories/reorder   Body: { order: string[] }  (Keys)
 // --------------------------------------------------------
-router.patch('/reorder', (req, res) => {
-  const order = Array.isArray(req.body.order) ? req.body.order : [];
-  if (!order.length) return res.status(400).json({ error: 'order must be a non-empty array of keys.', code: 400 });
+router.patch('/reorder', validateRequest(), (req, res) => {
+  // Eine nicht leere Liste von Key-Texten prueft das Schema.
+  const { order } = req.body;
 
   // Jeder Key muss existieren, sonst liefert stmt.get(key) weiter unten
   // undefined -> null in der JSON-Antwort (stale Client, Tippfehler, Race mit

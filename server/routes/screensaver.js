@@ -4,6 +4,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { SCREENSAVER_PHOTO_ID } from '../display-scopes.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const router = express.Router();
 const log = createLogger('Screensaver');
@@ -49,7 +50,12 @@ async function immichFetch(url, options = {}) {
 // einen `reason`; die Einstellungsseite sagt dazu ihren Satz
 // (utils/friendly-error.js, settings/pages/admin-immich.js). `error` bleibt
 // englisch fuer API-Clients und Logs.
-router.get('/config', requireAdmin, (_req, res) => {
+//
+// validateRequest() (#2810) steht hinter requireAdmin: ein Mitglied bekommt 403,
+// nie ein 400, das Felder nennt. Was das Schema der Konfiguration abweist
+// (kein Rumpf, ein Nicht-Text in url/albumId/apiKey, ein zu langer Schluessel),
+// traegt denselben `reason` wie die Pruefung hier, wo sie dieselbe Regel ist.
+router.get('/config', requireAdmin, validateRequest(), (_req, res) => {
   const cfg = config();
   res.json({ data: {
     url: cfg.baseUrl,
@@ -64,7 +70,7 @@ router.get('/config', requireAdmin, (_req, res) => {
   } });
 });
 
-router.put('/config', requireAdmin, (req, res) => {
+router.put('/config', requireAdmin, validateRequest(), (req, res) => {
   const body = req.body || {};
   if (body.url !== undefined && !process.env.IMMICH_URL) {
     // Schluss-Slashes ohne Regex trimmen: /\/+$/ ist auf einer Nutzereingabe
@@ -100,7 +106,7 @@ router.put('/config', requireAdmin, (req, res) => {
   res.json({ data: { enabled: cfg.enabled, apiKeySet: Boolean(cfg.apiKey) } });
 });
 
-router.post('/test', requireAdmin, async (_req, res) => {
+router.post('/test', requireAdmin, validateRequest(), async (_req, res) => {
   const cfg = config();
   if (!cfg.enabled) {
     return res.status(400).json({ error: 'Immich is not configured.', code: 400, reason: 'immich_not_configured' });
@@ -130,7 +136,7 @@ router.post('/test', requireAdmin, async (_req, res) => {
   }
 });
 
-router.get('/photos', async (_req, res) => {
+router.get('/photos', validateRequest(), async (_req, res) => {
   const cfg = config();
   if (!cfg.enabled) return res.json({ data: { enabled: false, photos: [] } });
 
@@ -159,10 +165,13 @@ router.get('/photos', async (_req, res) => {
   }
 });
 
-router.get('/photos/:id', async (req, res) => {
+// Die Kennung ist eine UUID (#2810): eine andere Form ist ein 400 vor dem 404
+// "nicht eingerichtet" (validateRequest(), dasselbe Muster wie UUID_RE, aus
+// SCREENSAVER_PHOTO_ID_PATTERN). Das Schema ist der einzige Riegel, bevor die
+// Kennung in den Immich-Pfad geht; ein eigener Pruefer hier waere unerreichbar.
+router.get('/photos/:id', validateRequest(), async (req, res) => {
   const cfg = config();
   if (!cfg.enabled) return res.status(404).end();
-  if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid asset ID.', code: 400 });
 
   try {
     // Preview avoids Immich's fullsize redirect, which would additionally require

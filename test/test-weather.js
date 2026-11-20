@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
 
 const BASE_ENV_KEYS = ['OPENWEATHER_API_KEY', 'OPENWEATHER_CITY', 'OPENWEATHER_LANG', 'WEATHER_LAT', 'WEATHER_LON', 'WEATHER_CITY', 'WEATHER_UNITS'];
 
@@ -20,14 +21,17 @@ async function startApp({ env = {}, db = {}, fetchFn, userId, logger } = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { if (userId) req.authUserId = userId; next(); });
-  app.use('/', router);
+  // At its real prefix, with the central error handler: validateRequest() finds
+  // its operation by the mount and hands its 400 on (#2810).
+  app.use('/api/v1/weather', router);
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 
   const server = await new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
   });
   const { port } = server.address();
   return {
-    baseUrl: `http://127.0.0.1:${port}`,
+    baseUrl: `http://127.0.0.1:${port}/api/v1/weather`,
     close: () => new Promise((r) => server.close(r)),
   };
 }

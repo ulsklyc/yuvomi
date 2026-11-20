@@ -4733,6 +4733,7 @@
         "deleteGroupConfirm": "¿Eliminar este grupo vacío? Los grupos con gastos deben archivarse.",
         "deleteGroupConfirmDetail": "La lista de miembros, el reparto predeterminado, los gastos recurrentes y el registro de actividad se pierden definitivamente. Un grupo cuenta como vacío sin gastos ni liquidaciones.",
         "splitCurrentTotal": "Total actual: {{total}}",
+        "exactSharesConverted": "Partes exactas en {{currency}}, convertidas de {{amount}}.",
         "statusLabel": "Estado",
         "statusActive": "Activo",
         "statusArchived": "Archivado",

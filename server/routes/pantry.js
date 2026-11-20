@@ -21,19 +21,24 @@
  * (writeMinimumThrough), for the deprecation window named in the CHANGELOG:
  * refusing it would break a client that worked yesterday. The batch's own
  * column is still written as before, but nothing reads it any more.
+ *
+ * validateRequest() checks every request against its schema in
+ * server/openapi/paths/pantry.js before the handler runs (#2810); the handlers
+ * check only what the schema cannot say (empty or too long after trimming,
+ * calendar day, category table, location and item in the database). Unexpected
+ * errors go to the central error handler.
  */
 
 import express from 'express';
 import * as db from '../db.js';
-import { createLogger } from '../logger.js';
-import { str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
+import { str, oneOf, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { normalizePantryUnit, normalizePantryQuantity, convertPantryQuantity } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
 import { assignPantryProduct, productKey, writeMinimumThrough } from '../services/pantry-products.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
 import { mayReadModule } from '../authorize/index.ts';
+import { validateRequest } from '../api/validate-request.ts';
 
-const log = createLogger('Pantry');
 const router = express.Router();
 
 // --------------------------------------------------------
@@ -136,18 +141,13 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
     values.name = vName.value;
   }
 
+  // `quantity` und `min_quantity` sind laut Schema endliche Zahlen ab 0 (#2810):
+  // Text, null, Wahrheitswert und negative Werte weist validateRequest() ab.
   if (!partial || body.quantity !== undefined) {
-    const vQty = num(body.quantity, 'quantity');
-    results.push(vQty);
-    if (vQty.value !== null && vQty.value < 0) {
-      results.push({ error: 'quantity must not be negative.' });
-    }
-    // null/leer explizit abfangen: normalizePantryQuantity(null) wäre 0, und
-    // "Artikel ohne Mengenangabe" heißt 1 Stück, nicht "leer".
+    // Weggelassen (nur bei POST/PUT): "Artikel ohne Mengenangabe" heißt
+    // 1 Stück, nicht "leer".
     const fallbackQty = partial ? Number(current?.quantity ?? 1) : 1;
-    values.quantity = vQty.value === null
-      ? normalizePantryQuantity(fallbackQty, { fallback: 1 })
-      : normalizePantryQuantity(vQty.value, { fallback: 1 });
+    values.quantity = normalizePantryQuantity(body.quantity ?? fallbackQty, { fallback: 1 });
   }
 
   // Einheit normalisiert statt validiert - siehe pantry-units.js.
@@ -189,16 +189,7 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
   // of clearing it for every batch (an older client's PUT without the field, a
   // new batch of a product that has one). Sent as null or '', it clears.
   if (body.min_quantity !== undefined) {
-    if (body.min_quantity === null || body.min_quantity === '' || body.min_quantity === undefined) {
-      values.min_quantity = null;
-    } else {
-      const vMin = num(body.min_quantity, 'min_quantity');
-      results.push(vMin);
-      if (vMin.value !== null && vMin.value < 0) {
-        results.push({ error: 'min_quantity must not be negative.' });
-      }
-      values.min_quantity = vMin.value === null ? null : normalizePantryQuantity(vMin.value, { fallback: 0 });
-    }
+    values.min_quantity = body.min_quantity === null ? null : normalizePantryQuantity(body.min_quantity, { fallback: 0 });
   }
 
   if (!partial || body.notes !== undefined) {
@@ -215,13 +206,8 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
 // Alle Lagerorte in Sortierreihenfolge.
 // Response: { data: PantryLocation[] }
 // --------------------------------------------------------
-router.get('/locations', (_req, res) => {
-  try {
-    res.json({ data: loadLocations() });
-  } catch (err) {
-    log.error('GET /locations error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/locations', validateRequest(), (_req, res) => {
+  res.json({ data: loadLocations() });
 });
 
 // --------------------------------------------------------
@@ -229,34 +215,29 @@ router.get('/locations', (_req, res) => {
 // Body: { name, icon? }
 // Response: { data: PantryLocation }
 // --------------------------------------------------------
-router.post('/locations', (req, res) => {
-  try {
-    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+router.post('/locations', validateRequest(), (req, res) => {
+  const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+  if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
-    const existing = db.get()
-      .prepare('SELECT id FROM pantry_locations WHERE name = ? COLLATE NOCASE')
-      .get(vName.value);
-    if (existing) return res.status(409).json({ error: 'Storage location already exists.', code: 409, reason: 'pantry_location_exists' });
+  const existing = db.get()
+    .prepare('SELECT id FROM pantry_locations WHERE name = ? COLLATE NOCASE')
+    .get(vName.value);
+  if (existing) return res.status(409).json({ error: 'Storage location already exists.', code: 409, reason: 'pantry_location_exists' });
 
-    const vIcon = str(req.body.icon, 'icon', { max: MAX_SHORT, required: false });
-    if (vIcon.error) return res.status(400).json({ error: vIcon.error, code: 400 });
+  const vIcon = str(req.body.icon, 'icon', { max: MAX_SHORT, required: false });
+  if (vIcon.error) return res.status(400).json({ error: vIcon.error, code: 400 });
 
-    const maxOrder = db.get()
-      .prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM pantry_locations')
-      .get().m;
+  const maxOrder = db.get()
+    .prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM pantry_locations')
+    .get().m;
 
-    const result = db.get()
-      .prepare('INSERT INTO pantry_locations (name, icon, sort_order) VALUES (?, ?, ?)')
-      .run(vName.value, vIcon.value ?? 'package', maxOrder + 1);
+  const result = db.get()
+    .prepare('INSERT INTO pantry_locations (name, icon, sort_order) VALUES (?, ?, ?)')
+    .run(vName.value, vIcon.value ?? 'package', maxOrder + 1);
 
-    res.status(201).json({
-      data: db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(result.lastInsertRowid),
-    });
-  } catch (err) {
-    log.error('POST /locations error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.status(201).json({
+    data: db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(result.lastInsertRowid),
+  });
 });
 
 // --------------------------------------------------------
@@ -264,22 +245,15 @@ router.post('/locations', (req, res) => {
 // Body: { order: number[] }  (IDs in gewünschter Reihenfolge)
 // Response: { data: PantryLocation[] }
 // --------------------------------------------------------
-router.patch('/locations/reorder', (req, res) => {
-  try {
-    const { order } = req.body;
-    if (!Array.isArray(order) || order.length === 0)
-      return res.status(400).json({ error: 'order must be a non-empty array of IDs.', code: 400 });
+router.patch('/locations/reorder', validateRequest(), (req, res) => {
+  // Laut Schema eine nicht leere Liste von IDs (ganze Zahl oder Ziffern-Text, #2810).
+  const { order } = req.body;
+  const update = db.get().prepare('UPDATE pantry_locations SET sort_order = ? WHERE id = ?');
+  db.get().transaction(() => {
+    order.forEach((locId, idx) => update.run(idx, locId));
+  })();
 
-    const update = db.get().prepare('UPDATE pantry_locations SET sort_order = ? WHERE id = ?');
-    db.get().transaction(() => {
-      order.forEach((locId, idx) => update.run(idx, locId));
-    })();
-
-    res.json({ data: loadLocations() });
-  } catch (err) {
-    log.error('PATCH /locations/reorder error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: loadLocations() });
 });
 
 // --------------------------------------------------------
@@ -287,33 +261,28 @@ router.patch('/locations/reorder', (req, res) => {
 // Body: { name?, icon? }
 // Response: { data: PantryLocation }
 // --------------------------------------------------------
-router.put('/locations/:locId', (req, res) => {
-  try {
-    const vId = idParam(req.params.locId, 'locId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+router.put('/locations/:locId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.locId, 'locId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
-    const loc = db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(vId.value);
-    if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404, reason: 'pantry_location_not_found' });
+  const loc = db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(vId.value);
+  if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404, reason: 'pantry_location_not_found' });
 
-    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
-    const vIcon = str(req.body.icon, 'icon', { max: MAX_SHORT, required: false });
-    const errors = collectErrors([vName, vIcon]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+  const vIcon = str(req.body.icon, 'icon', { max: MAX_SHORT, required: false });
+  const errors = collectErrors([vName, vIcon]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const conflict = db.get()
-      .prepare('SELECT id FROM pantry_locations WHERE name = ? COLLATE NOCASE AND id != ?')
-      .get(vName.value, loc.id);
-    if (conflict) return res.status(409).json({ error: 'Storage location already exists.', code: 409, reason: 'pantry_location_exists' });
+  const conflict = db.get()
+    .prepare('SELECT id FROM pantry_locations WHERE name = ? COLLATE NOCASE AND id != ?')
+    .get(vName.value, loc.id);
+  if (conflict) return res.status(409).json({ error: 'Storage location already exists.', code: 409, reason: 'pantry_location_exists' });
 
-    db.get()
-      .prepare('UPDATE pantry_locations SET name = ?, icon = ? WHERE id = ?')
-      .run(vName.value, vIcon.value ?? loc.icon, loc.id);
+  db.get()
+    .prepare('UPDATE pantry_locations SET name = ?, icon = ? WHERE id = ?')
+    .run(vName.value, vIcon.value ?? loc.icon, loc.id);
 
-    res.json({ data: db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(loc.id) });
-  } catch (err) {
-    log.error('PUT /locations/:locId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(loc.id) });
 });
 
 // --------------------------------------------------------
@@ -322,29 +291,37 @@ router.put('/locations/:locId', (req, res) => {
 // Der letzte verbleibende Ort kann nicht gelöscht werden.
 // Response: { ok: true, orphaned: number }
 // --------------------------------------------------------
-router.delete('/locations/:locId', (req, res) => {
-  try {
-    const vId = idParam(req.params.locId, 'locId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+router.delete('/locations/:locId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.locId, 'locId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
-    const loc = db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(vId.value);
-    if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404, reason: 'pantry_location_not_found' });
+  const loc = db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(vId.value);
+  if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404, reason: 'pantry_location_not_found' });
 
-    const total = db.get().prepare('SELECT COUNT(*) AS c FROM pantry_locations').get().c;
-    if (total <= 1) return res.status(400).json({ error: 'The last storage location cannot be deleted.', code: 400, reason: 'pantry_location_last' });
+  const total = db.get().prepare('SELECT COUNT(*) AS c FROM pantry_locations').get().c;
+  if (total <= 1) return res.status(400).json({ error: 'The last storage location cannot be deleted.', code: 400, reason: 'pantry_location_last' });
 
-    const orphaned = db.get()
-      .prepare('SELECT COUNT(*) AS c FROM pantry_items WHERE location_id = ?')
-      .get(loc.id).c;
+  const orphaned = db.get()
+    .prepare('SELECT COUNT(*) AS c FROM pantry_items WHERE location_id = ?')
+    .get(loc.id).c;
 
-    db.get().prepare('DELETE FROM pantry_locations WHERE id = ?').run(loc.id);
+  db.get().prepare('DELETE FROM pantry_locations WHERE id = ?').run(loc.id);
 
-    res.json({ ok: true, orphaned });
-  } catch (err) {
-    log.error('DELETE /locations/:locId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ ok: true, orphaned });
 });
+
+/**
+ * Lesen der Einkaufsliste fuer /import-shopping, vor validateRequest() (#2810).
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireShoppingRead(req, res, next) {
+  if (!mayReadModule(req, 'shopping')) {
+    return res.status(403).json({ error: 'Read access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
 
 // --------------------------------------------------------
 // POST /api/v1/pantry/import-shopping
@@ -359,7 +336,16 @@ router.delete('/locations/:locId', (req, res) => {
 // LESEN BRAUCHT DAS LESERECHT DER QUELLE. Der Pfad-Guard misst diese Route als
 // `pantry`; Name und Kategorie der Einkaufsartikel stehen danach im Vorrat.
 // Deshalb fragt die Route selbst nach `shopping: read` (beide Achsen), und
-// zwar vor der Listensuche, damit ein 404 keine Listen-ID bestaetigt.
+// zwar vor der Listensuche, damit ein 404 keine Listen-ID bestaetigt - als
+// Routen-Middleware (requireShoppingRead) VOR validateRequest() (#2810): ohne
+// das Recht bleibt es 403 fuer jeden Rumpf, nie ein 400, das Felder nennt.
+//
+// EIN UNBEKANNTER LAGERORT IST EIN 400, KEIN 500 (#2810). Bis dahin lief eine
+// `location_id` eines Orts, den es nicht (mehr) gibt - etwa in einer anderen
+// Sitzung geloescht, waehrend der Dialog offen stand -, in den Fremdschluessel
+// und rollte als 500 zurueck. Jetzt prueft die Route jeden Ort vor dem
+// Schreiben und antwortet wie POST /pantry mit `Location not found.`; nichts
+// wird teilweise uebernommen.
 // Response: { data: { added, merged, skipped, changes } }
 //
 // ZUSAMMENFUEHREN (R23, D3). Eine Zeile wandert in eine bestehende Charge, wenn
@@ -377,128 +363,132 @@ router.delete('/locations/:locId', (req, res) => {
 // alten Stand zurueckzuschreiben - was jemand in der Zwischenzeit an der
 // Charge geaendert hat, bleibt.
 // --------------------------------------------------------
-router.post('/import-shopping', (req, res) => {
-  try {
-    if (!mayReadModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Read access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
+router.post('/import-shopping', requireShoppingRead, validateRequest(), (req, res) => {
+  const vList = idParam(req.body.list_id, 'list_id');
+  if (vList.error) return res.status(400).json({ error: vList.error, code: 400 });
+
+  const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(vList.value);
+  if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+
+  // Laut Schema eine Liste von Objekten oder weggelassen (#2810).
+  const entries = req.body.items ?? [];
+  if (!entries.length) return res.json({ data: { added: 0, merged: 0, skipped: 0, changes: [] } });
+
+  const checked = db.get()
+    .prepare('SELECT * FROM shopping_items WHERE list_id = ? AND is_checked = 1')
+    .all(vList.value);
+  const checkedById = new Map(checked.map((i) => [i.id, i]));
+
+  // Jeder Ort einer Zeile, die geschrieben wird, muss es geben - vor der
+  // Transaktion, damit ein unbekannter keinen Teilimport hinterlaesst.
+  const locationOf = (/** @type {any} */ entry) => (entry.location_id ? Number(entry.location_id) || null : null);
+  const locationExists = db.get().prepare('SELECT id FROM pantry_locations WHERE id = ?');
+  for (const entry of entries) {
+    if (!checkedById.has(Number(entry?.shopping_item_id))) continue;
+    const locationId = locationOf(entry);
+    if (locationId !== null && !locationExists.get(locationId)) {
+      return res.status(400).json({ error: 'Location not found.', code: 400 });
+    }
+  }
+
+  const userId = req.authUserId || req.session.userId;
+  const categoryNames = validCategoryNames();
+  const fallbackCategory = categoryNames[categoryNames.length - 1] ?? 'Sonstiges';
+
+  // Die Rechte EINMAL fuer den ganzen Import aufloesen, nicht je Zeile: die
+  // Schleife laeuft synchron in einer Transaktion, und bei vierzig Eintraegen
+  // und vier Mitgliedern waeren das ein paar hundert Abfragen, die alle
+  // dieselbe Antwort geben.
+  const access = resolvePantryAccess(db.get());
+  // `today` genauso EINMAL wie die Rechte: es kostet sonst je Importzeile
+  // eine sync_config-Abfrage plus zwei Intl.DateTimeFormat-Konstruktionen,
+  // und die Schleife laeuft synchron in einer Transaktion.
+  const today = householdToday(db.get());
+
+  const result = db.get().transaction(() => {
+    const sameLocation = db.get().prepare(
+      'SELECT id, name, quantity, unit, expires_on FROM pantry_items WHERE location_id IS ? ORDER BY id ASC',
+    );
+    const bump = db.get().prepare('UPDATE pantry_items SET quantity = ?, expires_on = ? WHERE id = ?');
+    const insert = db.get().prepare(`
+      INSERT INTO pantry_items (name, quantity, unit, location_id, category, expires_on, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    // Die beste passende Charge: gleiche Einheit und gleiches MHD vor gleicher
+    // Einheit vor umrechenbarer Einheit - "Milch 1 l" landet lieber bei der
+    // Literpackung als bei den 500 ml daneben.
+    const findMatch = (name, unit, locationId, expiresOn) => {
+      const key = productKey(name);
+      if (!key) return null;
+      let best = null;
+      let bestRank = Infinity;
+      for (const row of sameLocation.all(locationId)) {
+        if (productKey(row.name) !== key) continue;
+        if (convertPantryQuantity(1, unit, row.unit) === null) continue;
+        if (row.expires_on && expiresOn && row.expires_on !== expiresOn) continue;
+        const rank = (row.unit === unit ? 0 : 2) + (row.expires_on === expiresOn ? 0 : 1);
+        if (rank < bestRank) { best = row; bestRank = rank; }
+      }
+      return best;
+    };
+    const changes = [];
+
+    let added = 0, merged = 0, skipped = 0;
+
+    for (const entry of entries) {
+      const source = checkedById.get(Number(entry?.shopping_item_id));
+      // Nicht abgehakt, fremde Liste oder inzwischen gelöscht → still übergehen.
+      if (!source) { skipped += 1; continue; }
+
+      const quantity = normalizePantryQuantity(entry.quantity, { fallback: 1 });
+      const unit = normalizePantryUnit(entry.unit);
+      const locationId = locationOf(entry);
+      // KALENDARISCH prüfen, nicht nur die Form: `date()` ist dieselbe
+      // Funktion, die POST/PUT/PATCH benutzen. Die rohe Regex liess ein
+      // '2027-02-30' durch - vorher nur eine unsinnige Zeile, seit die
+      // Erinnerung mit dem Datum RECHNET ein Fehler mitten in der
+      // Transaktion, der den ganzen Import zurückrollt.
+      //
+      // DER ARTIKEL KOMMT TROTZDEM AN, nur ohne MHD. Er selbst ist in
+      // Ordnung - Name, Menge und Kategorie stammen aus der Einkaufsliste,
+      // kaputt ist allein das Datum. Die Zeile zu verwerfen hiesse: jemand
+      // hakt den Joghurt ab, drückt Übernehmen, und der Joghurt fehlt im
+      // Vorrat. Ein Artikel ohne Ablaufdatum ist der kleinere Verlust, und
+      // es ist der Zustand, den der Vorrat für die Mehrheit seiner Zeilen
+      // ohnehin kennt.
+      const expiresOn = date(entry.expires_on, 'expires_on').value;
+      const category = categoryNames.includes(source.category) ? source.category : fallbackCategory;
+
+      // Gleicher Name, gleicher Ort, vertraegliche Einheit, MHD gleich oder
+      // eins leer → dieselbe Charge, also aufaddieren (Regel im Kopf). Zwei
+      // VERSCHIEDENE MHDs sind zwei Chargen und bekommen eigene Zeilen.
+      const match = findMatch(source.name, unit, locationId, expiresOn);
+      if (match) {
+        const added = normalizePantryQuantity(convertPantryQuantity(quantity, unit, match.unit), { fallback: quantity });
+        const expiresSet = !match.expires_on && Boolean(expiresOn);
+        bump.run(
+          normalizePantryQuantity(Number(match.quantity) + added, { fallback: added }),
+          match.expires_on ?? expiresOn,
+          match.id,
+        );
+        changes.push({ pantry_item_id: match.id, kind: 'merged', quantity_added: added, expires_set: expiresSet });
+        // Eine aufgefüllte Charge kann von Menge 0 zurückkommen - dann ist die
+        // Erinnerung wieder fällig, die das Ausbuchen abgeräumt hat.
+        syncReminder(getItem(match.id), access, today);
+        merged += 1;
+      } else {
+        const inserted = insert.run(source.name, quantity, unit, locationId, category, expiresOn, userId);
+        assignPantryProduct(db.get(), inserted.lastInsertRowid, { userId });
+        syncReminder(getItem(inserted.lastInsertRowid), access, today);
+        changes.push({ pantry_item_id: Number(inserted.lastInsertRowid), kind: 'added' });
+        added += 1;
+      }
     }
 
-    const vList = idParam(req.body.list_id, 'list_id');
-    if (vList.error) return res.status(400).json({ error: vList.error, code: 400 });
+    return { added, merged, skipped, changes };
+  })();
 
-    const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(vList.value);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
-
-    const entries = Array.isArray(req.body.items) ? req.body.items : [];
-    if (!entries.length) return res.json({ data: { added: 0, merged: 0, skipped: 0, changes: [] } });
-
-    const checked = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE list_id = ? AND is_checked = 1')
-      .all(vList.value);
-    const checkedById = new Map(checked.map((i) => [i.id, i]));
-
-    const userId = req.authUserId || req.session.userId;
-    const categoryNames = validCategoryNames();
-    const fallbackCategory = categoryNames[categoryNames.length - 1] ?? 'Sonstiges';
-
-    // Die Rechte EINMAL fuer den ganzen Import aufloesen, nicht je Zeile: die
-    // Schleife laeuft synchron in einer Transaktion, und bei vierzig Eintraegen
-    // und vier Mitgliedern waeren das ein paar hundert Abfragen, die alle
-    // dieselbe Antwort geben.
-    const access = resolvePantryAccess(db.get());
-    // `today` genauso EINMAL wie die Rechte: es kostet sonst je Importzeile
-    // eine sync_config-Abfrage plus zwei Intl.DateTimeFormat-Konstruktionen,
-    // und die Schleife laeuft synchron in einer Transaktion.
-    const today = householdToday(db.get());
-
-    const result = db.get().transaction(() => {
-      const sameLocation = db.get().prepare(
-        'SELECT id, name, quantity, unit, expires_on FROM pantry_items WHERE location_id IS ? ORDER BY id ASC',
-      );
-      const bump = db.get().prepare('UPDATE pantry_items SET quantity = ?, expires_on = ? WHERE id = ?');
-      const insert = db.get().prepare(`
-        INSERT INTO pantry_items (name, quantity, unit, location_id, category, expires_on, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-      // Die beste passende Charge: gleiche Einheit und gleiches MHD vor gleicher
-      // Einheit vor umrechenbarer Einheit - "Milch 1 l" landet lieber bei der
-      // Literpackung als bei den 500 ml daneben.
-      const findMatch = (name, unit, locationId, expiresOn) => {
-        const key = productKey(name);
-        if (!key) return null;
-        let best = null;
-        let bestRank = Infinity;
-        for (const row of sameLocation.all(locationId)) {
-          if (productKey(row.name) !== key) continue;
-          if (convertPantryQuantity(1, unit, row.unit) === null) continue;
-          if (row.expires_on && expiresOn && row.expires_on !== expiresOn) continue;
-          const rank = (row.unit === unit ? 0 : 2) + (row.expires_on === expiresOn ? 0 : 1);
-          if (rank < bestRank) { best = row; bestRank = rank; }
-        }
-        return best;
-      };
-      const changes = [];
-
-      let added = 0, merged = 0, skipped = 0;
-
-      for (const entry of entries) {
-        const source = checkedById.get(Number(entry?.shopping_item_id));
-        // Nicht abgehakt, fremde Liste oder inzwischen gelöscht → still übergehen.
-        if (!source) { skipped += 1; continue; }
-
-        const quantity = normalizePantryQuantity(entry.quantity, { fallback: 1 });
-        const unit = normalizePantryUnit(entry.unit);
-        const locationId = entry.location_id ? Number(entry.location_id) || null : null;
-        // KALENDARISCH prüfen, nicht nur die Form: `date()` ist dieselbe
-        // Funktion, die POST/PUT/PATCH benutzen. Die rohe Regex liess ein
-        // '2027-02-30' durch - vorher nur eine unsinnige Zeile, seit die
-        // Erinnerung mit dem Datum RECHNET ein Fehler mitten in der
-        // Transaktion, der den ganzen Import zurückrollt.
-        //
-        // DER ARTIKEL KOMMT TROTZDEM AN, nur ohne MHD. Er selbst ist in
-        // Ordnung - Name, Menge und Kategorie stammen aus der Einkaufsliste,
-        // kaputt ist allein das Datum. Die Zeile zu verwerfen hiesse: jemand
-        // hakt den Joghurt ab, drückt Übernehmen, und der Joghurt fehlt im
-        // Vorrat. Ein Artikel ohne Ablaufdatum ist der kleinere Verlust, und
-        // es ist der Zustand, den der Vorrat für die Mehrheit seiner Zeilen
-        // ohnehin kennt.
-        const expiresOn = date(entry.expires_on, 'expires_on').value;
-        const category = categoryNames.includes(source.category) ? source.category : fallbackCategory;
-
-        // Gleicher Name, gleicher Ort, vertraegliche Einheit, MHD gleich oder
-        // eins leer → dieselbe Charge, also aufaddieren (Regel im Kopf). Zwei
-        // VERSCHIEDENE MHDs sind zwei Chargen und bekommen eigene Zeilen.
-        const match = findMatch(source.name, unit, locationId, expiresOn);
-        if (match) {
-          const added = normalizePantryQuantity(convertPantryQuantity(quantity, unit, match.unit), { fallback: quantity });
-          const expiresSet = !match.expires_on && Boolean(expiresOn);
-          bump.run(
-            normalizePantryQuantity(Number(match.quantity) + added, { fallback: added }),
-            match.expires_on ?? expiresOn,
-            match.id,
-          );
-          changes.push({ pantry_item_id: match.id, kind: 'merged', quantity_added: added, expires_set: expiresSet });
-          // Eine aufgefüllte Charge kann von Menge 0 zurückkommen - dann ist die
-          // Erinnerung wieder fällig, die das Ausbuchen abgeräumt hat.
-          syncReminder(getItem(match.id), access, today);
-          merged += 1;
-        } else {
-          const inserted = insert.run(source.name, quantity, unit, locationId, category, expiresOn, userId);
-          assignPantryProduct(db.get(), inserted.lastInsertRowid, { userId });
-          syncReminder(getItem(inserted.lastInsertRowid), access, today);
-          changes.push({ pantry_item_id: Number(inserted.lastInsertRowid), kind: 'added' });
-          added += 1;
-        }
-      }
-
-      return { added, merged, skipped, changes };
-    })();
-
-    res.json({ data: result });
-  } catch (err) {
-    log.error('POST /import-shopping error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: result });
 });
 
 // --------------------------------------------------------
@@ -517,50 +507,49 @@ router.post('/import-shopping', (req, res) => {
 // Kein Lesen des Einkaufs, also kein zweiter Riegel: die Route schreibt nur in
 // den Vorrat und gehoert damit allein dessen Schreibrecht (Pfad-Guard).
 // --------------------------------------------------------
-router.post('/import-shopping/undo', (req, res) => {
-  try {
-    const raw = Array.isArray(req.body?.changes) ? req.body.changes : [];
-    const changes = raw
-      .map((c) => ({
-        id: Number(c?.pantry_item_id),
-        kind: c?.kind,
-        quantity: Number(c?.quantity_added),
-        expiresSet: c?.expires_set === true,
-      }))
-      .filter((c) => Number.isInteger(c.id) && c.id > 0 && (c.kind === 'added' || (c.kind === 'merged' && Number.isFinite(c.quantity))));
-    if (!changes.length) return res.json({ data: { removed: 0, reduced: 0 } });
+router.post('/import-shopping/undo', validateRequest(), (req, res) => {
+  // Die Form sagt das Schema (#2810): `changes` ist Pflicht und eine Liste von
+  // Objekten mit `pantry_item_id` (ganze Zahl) und `kind` (`added`/`merged`),
+  // `quantity_added` eine Zahl, `expires_set` ein Wahrheitswert. Still
+  // uebergangen wird hier nur, was es nicht sagt: eine ID unter 1 und ein
+  // `merged` ohne `quantity_added`.
+  const changes = req.body.changes
+    .map((/** @type {any} */ c) => ({
+      id: c.pantry_item_id,
+      kind: c.kind,
+      quantity: c.quantity_added,
+      expiresSet: c.expires_set === true,
+    }))
+    .filter((/** @type {any} */ c) => c.id > 0 && (c.kind === 'added' || Number.isFinite(c.quantity)));
+  if (!changes.length) return res.json({ data: { removed: 0, reduced: 0 } });
 
-    const access = resolvePantryAccess(db.get());
-    const today = householdToday(db.get());
+  const access = resolvePantryAccess(db.get());
+  const today = householdToday(db.get());
 
-    const result = db.get().transaction(() => {
-      const remove = db.get().prepare('DELETE FROM pantry_items WHERE id = ?');
-      const removeReminder = db.get().prepare("DELETE FROM reminders WHERE entity_type = 'pantry_item' AND entity_id = ?");
-      const reduce = db.get().prepare('UPDATE pantry_items SET quantity = ?, expires_on = ? WHERE id = ?');
-      let removed = 0;
-      let reduced = 0;
-      for (const change of changes) {
-        const item = getItem(change.id);
-        if (!item) continue;
-        if (change.kind === 'added') {
-          remove.run(change.id);
-          removeReminder.run(change.id);
-          removed += 1;
-          continue;
-        }
-        const quantity = normalizePantryQuantity(Number(item.quantity) - change.quantity, { fallback: 0 });
-        reduce.run(quantity, change.expiresSet ? null : item.expires_on, change.id);
-        syncReminder(getItem(change.id), access, today);
-        reduced += 1;
+  const result = db.get().transaction(() => {
+    const remove = db.get().prepare('DELETE FROM pantry_items WHERE id = ?');
+    const removeReminder = db.get().prepare("DELETE FROM reminders WHERE entity_type = 'pantry_item' AND entity_id = ?");
+    const reduce = db.get().prepare('UPDATE pantry_items SET quantity = ?, expires_on = ? WHERE id = ?');
+    let removed = 0;
+    let reduced = 0;
+    for (const change of changes) {
+      const item = getItem(change.id);
+      if (!item) continue;
+      if (change.kind === 'added') {
+        remove.run(change.id);
+        removeReminder.run(change.id);
+        removed += 1;
+        continue;
       }
-      return { removed, reduced };
-    })();
+      const quantity = normalizePantryQuantity(Number(item.quantity) - change.quantity, { fallback: 0 });
+      reduce.run(quantity, change.expiresSet ? null : item.expires_on, change.id);
+      syncReminder(getItem(change.id), access, today);
+      reduced += 1;
+    }
+    return { removed, reduced };
+  })();
 
-    res.json({ data: result });
-  } catch (err) {
-    log.error('POST /import-shopping/undo error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: result });
 });
 
 // --------------------------------------------------------
@@ -572,13 +561,8 @@ router.post('/import-shopping/undo', (req, res) => {
 // including products without batches (#1448).
 // Response: { data: PantryItem[], products: [], locations: [], categories: [] }
 // --------------------------------------------------------
-router.get('/', (_req, res) => {
-  try {
-    res.json({ data: loadItems(), products: loadProducts(), locations: loadLocations(), categories: loadCategories() });
-  } catch (err) {
-    log.error('GET / error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/', validateRequest(), (_req, res) => {
+  res.json({ data: loadItems(), products: loadProducts(), locations: loadLocations(), categories: loadCategories() });
 });
 
 // --------------------------------------------------------
@@ -594,35 +578,30 @@ router.get('/', (_req, res) => {
 // (module gate in server/index.js).
 // Response: 204
 // --------------------------------------------------------
-router.delete('/products/:productId', (req, res) => {
-  try {
-    const vId = idParam(req.params.productId, 'productId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+router.delete('/products/:productId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.productId, 'productId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
-    const outcome = db.get().transaction(() => {
-      const product = db.get().prepare('SELECT id FROM pantry_products WHERE id = ?').get(vId.value);
-      if (!product) return { status: 404 };
-      const { batches } = db.get()
-        .prepare('SELECT COUNT(*) AS batches FROM pantry_items WHERE product_id = ?').get(vId.value);
-      if (batches > 0) return { status: 409, batches };
-      db.get().prepare('DELETE FROM pantry_products WHERE id = ?').run(vId.value);
-      return { status: 204 };
-    })();
+  const outcome = db.get().transaction(() => {
+    const product = db.get().prepare('SELECT id FROM pantry_products WHERE id = ?').get(vId.value);
+    if (!product) return { status: 404 };
+    const { batches } = db.get()
+      .prepare('SELECT COUNT(*) AS batches FROM pantry_items WHERE product_id = ?').get(vId.value);
+    if (batches > 0) return { status: 409, batches };
+    db.get().prepare('DELETE FROM pantry_products WHERE id = ?').run(vId.value);
+    return { status: 204 };
+  })();
 
-    if (outcome.status === 404) return res.status(404).json({ error: 'Product not found.', code: 404 });
-    if (outcome.status === 409) {
-      return res.status(409).json({
-        error: 'The product still has batches; delete them first.',
-        code: 409,
-        reason: 'pantry_product_has_batches',
-        count: outcome.batches,
-      });
-    }
-    res.status(204).end();
-  } catch (err) {
-    log.error('DELETE /products/:productId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (outcome.status === 404) return res.status(404).json({ error: 'Product not found.', code: 404 });
+  if (outcome.status === 409) {
+    return res.status(409).json({
+      error: 'The product still has batches; delete them first.',
+      code: 409,
+      reason: 'pantry_product_has_batches',
+      count: outcome.batches,
+    });
   }
+  res.status(204).end();
 });
 
 // --------------------------------------------------------
@@ -630,39 +609,34 @@ router.delete('/products/:productId', (req, res) => {
 // Body: { name, quantity?, unit?, location_id?, category?, expires_on?, min_quantity?, notes? }
 // Response: { data: PantryItem }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
-  try {
-    const { values, errors } = validateItemFields(req.body);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+router.post('/', validateRequest(), (req, res) => {
+  const { values, errors } = validateItemFields(req.body);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    // Schreiben und Erinnerung in EINER Transaktion, wie in
-    // server/routes/inventory/items.js: sonst kann der Artikel stehen und die
-    // Erinnerung fehlen, ohne dass die Antwort davon erzählt.
-    const created = db.get().transaction(() => {
-      const result = db.get().prepare(`
-        INSERT INTO pantry_items
-          (name, quantity, unit, location_id, category, expires_on, min_quantity, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        values.name, values.quantity, values.unit, values.location_id,
-        values.category, values.expires_on, values.min_quantity ?? null, values.notes,
-        req.authUserId || req.session.userId
-      );
-      assignPantryProduct(db.get(), result.lastInsertRowid, { userId: req.authUserId || req.session.userId });
-      // A new batch sets its product's minimum only with a number: a create
-      // without one (or with an empty field) leaves the minimum of an existing
-      // product alone, it cannot know better than the product.
-      if (values.min_quantity != null) writeMinimumThrough(db.get(), result.lastInsertRowid, values.min_quantity);
-      const item = getItem(result.lastInsertRowid);
-      syncReminder(item);
-      return item;
-    })();
+  // Schreiben und Erinnerung in EINER Transaktion, wie in
+  // server/routes/inventory/items.js: sonst kann der Artikel stehen und die
+  // Erinnerung fehlen, ohne dass die Antwort davon erzählt.
+  const created = db.get().transaction(() => {
+    const result = db.get().prepare(`
+      INSERT INTO pantry_items
+        (name, quantity, unit, location_id, category, expires_on, min_quantity, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      values.name, values.quantity, values.unit, values.location_id,
+      values.category, values.expires_on, values.min_quantity ?? null, values.notes,
+      req.authUserId || req.session.userId
+    );
+    assignPantryProduct(db.get(), result.lastInsertRowid, { userId: req.authUserId || req.session.userId });
+    // A new batch sets its product's minimum only with a number: a create
+    // without one (or with an empty field) leaves the minimum of an existing
+    // product alone, it cannot know better than the product.
+    if (values.min_quantity != null) writeMinimumThrough(db.get(), result.lastInsertRowid, values.min_quantity);
+    const item = getItem(result.lastInsertRowid);
+    syncReminder(item);
+    return item;
+  })();
 
-    res.status(201).json({ data: created });
-  } catch (err) {
-    log.error('POST / error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.status(201).json({ data: created });
 });
 
 // --------------------------------------------------------
@@ -670,48 +644,43 @@ router.post('/', (req, res) => {
 // Vollständiges Update (Bearbeiten-Formular).
 // Response: { data: PantryItem }
 // --------------------------------------------------------
-router.put('/:itemId', (req, res) => {
-  try {
-    const vId = idParam(req.params.itemId, 'itemId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+router.put('/:itemId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.itemId, 'itemId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
-    const item = getItem(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+  const item = getItem(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
-    const { values, errors } = validateItemFields(req.body, { current: item });
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    const minGiven = 'min_quantity' in values;
+  const { values, errors } = validateItemFields(req.body, { current: item });
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const minGiven = 'min_quantity' in values;
 
-    const updated = db.get().transaction(() => {
-      db.get().prepare(`
-        UPDATE pantry_items
-        SET name = ?, quantity = ?, unit = ?, location_id = ?, category = ?,
-            expires_on = ?, min_quantity = CASE WHEN ? THEN ? ELSE min_quantity END, notes = ?
-        WHERE id = ?
-      `).run(
-        values.name, values.quantity, values.unit, values.location_id,
-        values.category, values.expires_on, minGiven ? 1 : 0, values.min_quantity ?? null, values.notes, item.id
-      );
-      // A changed name or unit moves the batch to the matching product (#1448).
-      // The category reaches the product only when this edit changed it: the
-      // form sends every field, and an expiry edit must not push the batch's
-      // old category over one set later through another batch.
-      assignPantryProduct(db.get(), item.id, {
-        userId: req.authUserId || req.session.userId,
-        syncCategory: values.category !== item.category,
-      });
-      // Sent, the minimum goes to the product the batch belongs to now.
-      if (minGiven) writeMinimumThrough(db.get(), item.id, values.min_quantity);
-      const fresh = getItem(item.id);
-      syncReminder(fresh);
-      return fresh;
-    })();
+  const updated = db.get().transaction(() => {
+    db.get().prepare(`
+      UPDATE pantry_items
+      SET name = ?, quantity = ?, unit = ?, location_id = ?, category = ?,
+          expires_on = ?, min_quantity = CASE WHEN ? THEN ? ELSE min_quantity END, notes = ?
+      WHERE id = ?
+    `).run(
+      values.name, values.quantity, values.unit, values.location_id,
+      values.category, values.expires_on, minGiven ? 1 : 0, values.min_quantity ?? null, values.notes, item.id
+    );
+    // A changed name or unit moves the batch to the matching product (#1448).
+    // The category reaches the product only when this edit changed it: the
+    // form sends every field, and an expiry edit must not push the batch's
+    // old category over one set later through another batch.
+    assignPantryProduct(db.get(), item.id, {
+      userId: req.authUserId || req.session.userId,
+      syncCategory: values.category !== item.category,
+    });
+    // Sent, the minimum goes to the product the batch belongs to now.
+    if (minGiven) writeMinimumThrough(db.get(), item.id, values.min_quantity);
+    const fresh = getItem(item.id);
+    syncReminder(fresh);
+    return fresh;
+  })();
 
-    res.json({ data: updated });
-  } catch (err) {
-    log.error('PUT /:itemId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: updated });
 });
 
 // --------------------------------------------------------
@@ -720,78 +689,68 @@ router.put('/:itemId', (req, res) => {
 // Vollobjekts, damit ein Tap keine ganze Zeile überschreibt.
 // Response: { data: PantryItem }
 // --------------------------------------------------------
-router.patch('/:itemId', (req, res) => {
-  try {
-    const vId = idParam(req.params.itemId, 'itemId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+router.patch('/:itemId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.itemId, 'itemId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
-    const item = getItem(vId.value);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+  const item = getItem(vId.value);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
-    const { values, errors } = validateItemFields(req.body, { partial: true, current: item });
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const { values, errors } = validateItemFields(req.body, { partial: true, current: item });
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    // Die Spaltennamen stammen aus dem festen Schlüsselvorrat von
-    // validateItemFields, nicht aus dem Request-Body - kein Injection-Pfad.
-    const fields = Object.keys(values);
-    if (!fields.length) return res.json({ data: item });
+  // Die Spaltennamen stammen aus dem festen Schlüsselvorrat von
+  // validateItemFields, nicht aus dem Request-Body - kein Injection-Pfad.
+  const fields = Object.keys(values);
+  if (!fields.length) return res.json({ data: item });
 
-    const updated = db.get().transaction(() => {
-      db.get().prepare(`
-        UPDATE pantry_items SET ${fields.map((f) => `${f} = ?`).join(', ')} WHERE id = ?
-      `).run(...fields.map((f) => values[f]), item.id);
+  const updated = db.get().transaction(() => {
+    db.get().prepare(`
+      UPDATE pantry_items SET ${fields.map((f) => `${f} = ?`).join(', ')} WHERE id = ?
+    `).run(...fields.map((f) => values[f]), item.id);
 
-      // The stepper writes only the quantity and leaves the product alone. A
-      // name or unit moves the batch to the matching product, a category is
-      // the product's too (#1448).
-      if (fields.some((f) => f === 'name' || f === 'unit' || f === 'category')) {
-        assignPantryProduct(db.get(), item.id, {
-          userId: req.authUserId || req.session.userId,
-          syncCategory: fields.includes('category') && values.category !== item.category,
-        });
-      }
-      if (fields.includes('min_quantity')) writeMinimumThrough(db.get(), item.id, values.min_quantity);
+    // The stepper writes only the quantity and leaves the product alone. A
+    // name or unit moves the batch to the matching product, a category is
+    // the product's too (#1448).
+    if (fields.some((f) => f === 'name' || f === 'unit' || f === 'category')) {
+      assignPantryProduct(db.get(), item.id, {
+        userId: req.authUserId || req.session.userId,
+        syncCategory: fields.includes('category') && values.category !== item.category,
+      });
+    }
+    if (fields.includes('min_quantity')) writeMinimumThrough(db.get(), item.id, values.min_quantity);
 
-      // Auch der ±-Stepper landet hier: wer den letzten Joghurt ausbucht, soll
-      // nicht in fünf Tagen an sein Ablaufdatum erinnert werden.
-      const fresh = getItem(item.id);
-      syncReminder(fresh);
-      return fresh;
-    })();
+    // Auch der ±-Stepper landet hier: wer den letzten Joghurt ausbucht, soll
+    // nicht in fünf Tagen an sein Ablaufdatum erinnert werden.
+    const fresh = getItem(item.id);
+    syncReminder(fresh);
+    return fresh;
+  })();
 
-    res.json({ data: updated });
-  } catch (err) {
-    log.error('PATCH /:itemId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: updated });
 });
 
 // --------------------------------------------------------
 // DELETE /api/v1/pantry/:itemId
 // Response: 204
 // --------------------------------------------------------
-router.delete('/:itemId', (req, res) => {
-  try {
-    const vId = idParam(req.params.itemId, 'itemId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+router.delete('/:itemId', validateRequest(), (req, res) => {
+  const vId = idParam(req.params.itemId, 'itemId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
-    const removed = db.get().transaction(() => {
-      const result = db.get().prepare('DELETE FROM pantry_items WHERE id = ?').run(vId.value);
-      if (result.changes === 0) return false;
+  const removed = db.get().transaction(() => {
+    const result = db.get().prepare('DELETE FROM pantry_items WHERE id = ?').run(vId.value);
+    if (result.changes === 0) return false;
 
-      // `reminders` hat keinen Fremdschlüssel auf die Entität - entity_id ist
-      // über sechs Tabellen hinweg polymorph, ein FK könnte nur auf eine davon
-      // zeigen. Aufräumen ist deshalb Sache des Routers, wie im Inventar auch.
-      db.get().prepare("DELETE FROM reminders WHERE entity_type = 'pantry_item' AND entity_id = ?").run(vId.value);
-      return true;
-    })();
-    if (!removed) return res.status(404).json({ error: 'Item not found.', code: 404 });
+    // `reminders` hat keinen Fremdschlüssel auf die Entität - entity_id ist
+    // über sechs Tabellen hinweg polymorph, ein FK könnte nur auf eine davon
+    // zeigen. Aufräumen ist deshalb Sache des Routers, wie im Inventar auch.
+    db.get().prepare("DELETE FROM reminders WHERE entity_type = 'pantry_item' AND entity_id = ?").run(vId.value);
+    return true;
+  })();
+  if (!removed) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
-    res.status(204).end();
-  } catch (err) {
-    log.error('DELETE /:itemId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.status(204).end();
 });
 
 export default router;

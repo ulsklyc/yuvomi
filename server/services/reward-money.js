@@ -32,9 +32,10 @@ import { addInterval, dateKey, liftToAnchorDay, nextRunNotBefore, parseDateKey }
 import { householdCurrency } from '../utils/household-currency.js';
 import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
 import { personAvatarUrlSql } from './person-avatar.js';
+import { ALLOWANCE_FREQUENCIES, MONEY_KINDS } from './reward-fields.js';
 
-export const MONEY_KINDS = Object.freeze(['withdrawal', 'deposit']);
-export const ALLOWANCE_FREQUENCIES = Object.freeze(['weekly', 'monthly']);
+// Die Listen stehen in reward-fields.js, die auch das OpenAPI-Dokument liest (#2810).
+export { ALLOWANCE_FREQUENCIES, MONEY_KINDS };
 
 /*
  * DIE OBERGRENZE EINES BETRAGS HAENGT NICHT AN EINER WAEHRUNG. Die erste
@@ -479,8 +480,10 @@ function stepAnchor(plan) {
  * Plan einer Person lesen und pruefen. Gibt `{ error }` oder die Werte zurueck.
  */
 export function readPlanInput(d, userId, body) {
+  // `frequency` (ALLOWANCE_FREQUENCIES), `anchor_day` (a whole number 1 to 31)
+  // and `paused` (boolean) are held by the schema of the only caller,
+  // PUT /rewards/money/plans/{userId} (#2810); the weekly bound of 7 stays here.
   const frequency = body?.frequency;
-  if (!ALLOWANCE_FREQUENCIES.includes(frequency)) return { error: 'frequency must be weekly or monthly.' };
   const anchorDay = Number(body?.anchor_day);
   const max = frequency === 'weekly' ? 7 : 31;
   if (!Number.isInteger(anchorDay) || anchorDay < 1 || anchorDay > max) {
@@ -495,7 +498,6 @@ export function readPlanInput(d, userId, body) {
     if (err?.name === 'SplitInputError') return { error: err.message, reason: err.reason };
     throw err;
   }
-  if (body?.paused !== undefined && typeof body.paused !== 'boolean') return { error: 'paused must be a boolean.' };
   // `undefined` heisst "nicht angefasst": der gespeicherte Zustand bleibt.
   return { frequency, anchorDay, amountMinor, currency, paused: body?.paused };
 }

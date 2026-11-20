@@ -6219,8 +6219,10 @@ test('die Küchen-Tab-Leiste trägt den Zustand des Kreislaufs', () => {
     'der Kitchen-Router muss gemountet sein');
   assert.match(read('../server/openapi/paths/kitchen.js'), /'\/api\/v1\/kitchen\/summary'/,
     'die Route muss in der OpenAPI-Spec stehen');
-  assert.match(route, /router\.get\('\/summary'[\s\S]*?try \{[\s\S]*?\} catch \(err\)/,
-    'jeder Route-Handler in try/catch (Hard Constraint)');
+  // Seit #2810 (Phase 2 E) beantwortet der zentrale Fehlerhandler einen
+  // unerwarteten Fehler; ein eigener catch mit 500 waere eine zweite Stelle.
+  assert.doesNotMatch(route, /status\(500\)/,
+    'ein unerwarteter Fehler geht an den zentralen Fehlerhandler (server/middleware/error-handler.js)');
 
   // `today` kommt vom Client: „abgelaufen" hängt am lokalen Kalendertag, der Server
   // rechnet in UTC. Dieselbe Entscheidung wie im Kopf von pantry-status.js.

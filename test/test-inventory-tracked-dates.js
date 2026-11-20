@@ -21,7 +21,9 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: itemsRouter } = await import('../server/routes/inventory/items.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 // Das Inventar ist standardmaessig abgeschaltet (Migration 145), und seit #1279
 // liefert GET /reminders/pending keine Zeile eines abgeschalteten Moduls mehr aus.
@@ -33,9 +35,15 @@ const A = db.prepare("INSERT INTO users (username, display_name, password_hash, 
 let actor = { id: A };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => { req.authUserId = actor.id; req.session = { userId: actor.id }; next(); });
-app.use('/items', itemsRouter);
-app.use('/reminders', remindersRouter);
+// At its real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/(items|entries)(\/|\?|$)/.test(req.url)) req.url = `/api/v1/inventory${req.url}`; next(); });
+app.use('/api/v1/inventory/items', itemsRouter);
+// At its real prefix, with the central error handler: validateRequest() finds
+// its operation by the mount (#2810).
+app.use('/api/v1/reminders', remindersRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -186,7 +194,7 @@ test('GET /reminders/pending löst den Titel für inventory_tracked_date über d
     VALUES ('inventory_tracked_date', ?, '2000-01-01T00:00:00', ?)
   `).run(dateId, A);
 
-  const res = await call('GET', '/reminders/pending');
+  const res = await call('GET', '/api/v1/reminders/pending');
   assert.equal(res.status, 200);
   const match = res.body.data.find((r) => r.entity_type === 'inventory_tracked_date' && r.entity_id === dateId);
   assert.ok(match, 'Erinnerung sollte in /pending auftauchen');

@@ -612,7 +612,7 @@ function paperlessTagPaths() {
   };
   for (const folder of [false, true]) {
     const path = folder ? `${root}/folders/{id}/documents/{documentId}/tags` : `${root}/documents/{id}/tags`;
-    const params = [idParam(), ...(folder ? [{ name: 'documentId', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } }] : [])];
+    const params = [idParam(), ...(folder ? [idParam('documentId')] : [])];
     const description = 'Requires Documents read access and a visible Paperless link or current saved-view match. '
       + 'GET returns data {tags:[{id,name}],tag_ids,unresolved_tag_ids,can_edit,account_id?,catalogue_folder_id?,editable_tag_ids?}; hidden tag names fall back to #ID. '
       + 'Folder requests use the configured shared/personal token; missing personal credentials never fall back to the shared token. '
@@ -659,8 +659,8 @@ function paperlessFolderPaths() {
   const body = (create) => ({ required: true, content: { 'application/json': { schema: {
     type: 'object', required: create ? ['name', 'account_id'] : ['name', 'visibility'],
     ...(create ? { oneOf: [
-      { required: ['view_id'], not: { required: ['tag_filter'] } },
-      { required: ['tag_filter'], not: { required: ['view_id'] } },
+      { required: ['view_id'], properties: { view_id: {} } },
+      { required: ['tag_filter'], properties: { tag_filter: {} } },
     ] } : {}),
     properties: {
       name: { type: 'string', minLength: 1, maxLength: 200 },
@@ -693,13 +693,13 @@ function paperlessFolderPaths() {
       put: operation('Rename a Paperless folder or change its sharing', { admin: true, stateChanging: true, params: [id], requestBody: body(false) }),
       delete: operation('Disconnect a Paperless folder without deleting documents', { admin: true, stateChanging: true, params: [id], responses: {
         204: { description: 'Binding removed; Paperless documents and local Yuvomi links are untouched.' },
-        401: responses[401], 403: responses[403], 404: responses[404],
+        400: responses[400], 401: responses[401], 403: responses[403], 404: responses[404],
       } }),
     },
     [`${root}/folders/{id}/documents`]: { get: operation('List a page of the current Paperless view', { params: [id, page],
       description: `${note} Reads live document membership with validated view definitions cached for at most five seconds per source/token/view. data contains {id, title, created, filename, url}. Yuvomi category/archive/search filters do not apply.` }) },
     [`${root}/folders/{id}/documents/{documentId}/{action}`]: { get: operation('Preview, download or thumbnail a current view member', {
-      params: [id, { name: 'documentId', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+      params: [id, idParam('documentId'),
         { name: 'action', in: 'path', required: true, schema: { type: 'string', enum: ['preview', 'download', 'thumbnail'] } }],
       description: `${note} Intersects current view filters with documentId before fetching bytes and rechecks folder sharing after fetching. No arbitrary DMS document lookup.`,
       responses: { ...responses, 200: { description: 'File bytes; preview/thumbnail inline only for allowlisted MIME types, download as attachment.' },
@@ -711,7 +711,7 @@ function paperlessFolderPaths() {
 function paperlessLiveSettingsPaths() {
   const root = '/api/v1/documents/dms/paperless/live-settings';
   const id = idParam();
-  const allowedTags = { type: 'array', nullable: true, maxItems: 1000, items: { type: 'integer', minimum: 1 },
+  const allowedTags = { type: ['array', 'null'], maxItems: 1000, items: { type: 'integer', minimum: 1 },
     description: 'null permits all tags; an empty array permits no tag changes. Other existing assignments must be preserved.' };
   const mode = { type: 'string', enum: ['shared', 'personal'] };
   const error = { content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } };

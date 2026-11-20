@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import express from 'express';
+import { createHealthApp } from './health-app.js';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -16,7 +16,6 @@ const {
   MIGRATIONS,
   _setTestDatabase,
 } = await import('../server/db.js');
-const { default: healthRouter } = await import('../server/routes/health.js');
 const { default: idempotencyMiddleware } = await import('../server/middleware/idempotency.js');
 
 function buildTestDb() {
@@ -42,24 +41,26 @@ const userB = db.prepare(`INSERT INTO users (username, display_name, password_ha
   VALUES ('bob', 'Bob', '$2b$12$x', 'member')`).run().lastInsertRowid;
 
 let session = { userId: userA, role: 'member' };
-const app = express();
 // Grosszuegiger als der express.json()-Standard (100kb): sonst wuerde
 // body-parser einen ueberlangen Cycle-Import-Body schon VOR der Route mit
 // einem HTML-413 abweisen, statt der Route ihre eigene 100-KB-Grenze mit
 // einem JSON-400 pruefen zu lassen - genau wie in server/index.js, wo
 // BODY_LIMIT (server/utils/upload-limit.js) aus demselben Grund groesser ist
 // als jede einzelne Feature-Obergrenze.
-app.use(express.json({ limit: '10mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = session.userId;
-  req.authRole = session.role;
-  req.session = { userId: session.userId, role: session.role };
-  next();
-});
 // Wie in server/index.js: die Idempotenz-Middleware vor den Routen. Ohne
 // `Idempotency-Key` ist sie folgenlos (#822), mit ihm haelt sie #2069.
-app.use('/api/v1', idempotencyMiddleware);
-app.use('/api/v1/health', healthRouter);
+// createHealthApp (test/health-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createHealthApp({
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = session.userId;
+    req.authRole = session.role;
+    req.session = { userId: session.userId, role: session.role };
+    next();
+  },
+  before: [['/api/v1', idempotencyMiddleware]],
+});
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/health`;
@@ -2140,11 +2141,12 @@ test.after(() => { server.close(); });
 
 test('PRN: 0 als Mindestabstand nennt seine Grenze richtig', async () => {
   // Die Meldung sagte „between 0 and 672", wies die 0 aber ab - und das
-  // Formularfeld liess sie zu. Wer 0 eintippt, soll lesen, was gilt.
+  // Formularfeld liess sie zu. Wer 0 eintippt, soll lesen, was gilt. Seit
+  // #2810 sagt es das Schema (`exclusiveMinimum: 0`) vor der Route.
   asA();
   const res = await call('POST', '/medications', { name: 'Grenzfall', prn: true, min_interval_hours: 0 });
   assert.equal(res.status, 400);
-  assert.match(JSON.stringify(res.body), /greater than 0 and at most 672/);
+  assert.deepEqual(res.body.fields, [{ path: 'body/min_interval_hours', rule: 'exclusiveMinimum' }]);
 });
 
 test('PRN: eine negative Bedarfsdosis wird abgewiesen', async () => {
@@ -2305,7 +2307,8 @@ test('#2054: ein ungueltiges Zeitfenster weist alles ab, es bleibt kein Medikame
     name: 'Halbangelegt', schedules: [{ time_of_day: '08:00' }, { time_of_day: '09:00', days_mask: 200 }],
   });
   assert.equal(res.status, 400);
-  assert.match(res.body.error, /schedules\[1\]/, 'die Meldung nennt das Zeitfenster');
+  // Seit #2810 nennt das Schema das Zeitfenster und die Regel (vorher der Satz der Route).
+  assert.deepEqual(res.body.fields, [{ path: 'body/schedules/1/days_mask', rule: 'maximum' }], 'die Absage nennt das Zeitfenster');
   assert.equal(countMeds('Halbangelegt'), 0);
 
   for (const schedules of ['08:00', [null], [[]], Array.from({ length: 49 }, () => ({ time_of_day: '08:00' }))]) {
@@ -2501,12 +2504,14 @@ test('B9: caregivers - whole answers and the table after each write', async () =
     assert.deepEqual([r.status, r.body], [400, { error: 'caregiver_ids contains an unknown user.', code: 400 }]);
     assert.deepEqual(table(), [[e, g], [e, f]]);
     // Invalid subject, unknown subject, no list.
+    // Seit #2810 sind Pfad-ID und Liste Sache des Schemas (vorher 'Invalid user_id.'
+    // und 'caregiver_ids must be an array.' der Route).
     r = await call('PUT', '/caregivers/abc', { caregiver_ids: [f] });
-    assert.deepEqual([r.status, r.body], [400, { error: 'Invalid user_id.', code: 400 }]);
+    assert.deepEqual([r.status, r.body.fields], [400, [{ path: 'path/subjectId', rule: 'type' }]]);
     r = await put(999999, [f]);
     assert.deepEqual([r.status, r.body], [404, { error: 'User not found.', code: 404 }]);
     r = await put(d, 'f');
-    assert.deepEqual([r.status, r.body], [400, { error: 'caregiver_ids must be an array.', code: 400 }]);
+    assert.deepEqual([r.status, r.body.fields], [400, [{ path: 'body/caregiver_ids', rule: 'type' }]]);
 
     // A deactivated caregiver: stored stays allowed, new is refused.
     deactivate(g);

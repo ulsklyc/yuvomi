@@ -95,6 +95,24 @@ function routePattern(req) {
 }
 
 /**
+ * The `fields` of an HttpError, or null: only a non-empty array counts.
+ * @param {any} err
+ * @returns {{ path: string, rule: string, reason?: string }[] | null}
+ */
+function fieldsOf(err) {
+  return err instanceof HttpError && Array.isArray(err.fields) && err.fields.length > 0 ? err.fields : null;
+}
+
+/**
+ * ` (fields: <rule> at <path> as <reason>, ...)` for the log, or ''. Rule,
+ * path and the schema's reason only, never a value of the request.
+ * @param {{ path: string, rule: string, reason?: string }[] | null} fields
+ */
+function fieldsNote(fields) {
+  return fields ? ` (fields: ${fields.map((f) => `${f.rule} at ${f.path}${f.reason ? ` as ${f.reason}` : ''}`).join(', ')})` : '';
+}
+
+/**
  * @param {{ warn: Function, error: Function }} log
  * @returns {import('express').ErrorRequestHandler}
  */
@@ -114,11 +132,14 @@ export function createErrorHandler(log) {
     }
     const status = exposedStatus(err);
     if (status !== null) {
-      log.warn(`Request refused: ${where} -> ${status}: ${err.message}${causeNote(err)}`);
+      const fields = fieldsOf(err);
+      log.warn(`Request refused: ${where} -> ${status}: ${err.message}${fieldsNote(fields)}${causeNote(err)}`);
       if (res.headersSent) return next(err);
       if (!(err instanceof HttpError)) return res.status(status).json({ error: sentenceFor(status), code: status });
       const withReason = typeof err.reason === 'string' && err.reason !== '';
-      return res.status(status).json({ error: err.message, code: status, ...(withReason ? { reason: err.reason } : {}) });
+      return res.status(status).json({
+        error: err.message, code: status, ...(withReason ? { reason: err.reason } : {}), ...(fields ? { fields } : {}),
+      });
     }
     log.error(`Unhandled error: ${where} -> 500${causeNote(err)}`, err);
     if (res.headersSent) return next(err);

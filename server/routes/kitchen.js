@@ -36,14 +36,18 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { createLogger } from '../logger.js';
 import { deniedModules } from '../authorize/index.ts';
 import { todayKey } from '../utils/timezone.js';
+import { DATE_PATTERN } from '../utils/datetime-pattern.js';
+import { validateRequest } from '../api/validate-request.ts';
 
-const log = createLogger('Kitchen');
 const router = express.Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// One source with the `today` pattern of the OpenAPI document (#2810).
+// validateRequest() refuses any other shape but the empty text, which still
+// means "no day given"; a day of that shape that does not exist (2026-02-30)
+// is compared as text, as before.
+const DATE_RE = new RegExp(DATE_PATTERN);
 
 // Nichts zu melden - dieselbe Form, nur ohne Zahlen.
 const EMPTY_PANTRY = Object.freeze({ attention: 0, expired: 0, low: 0, out: 0 });
@@ -78,85 +82,82 @@ const EMPTY_PANTRY = Object.freeze({ attention: 0, expired: 0, low: 0, out: 0 })
  * A batch without a product (written by an older version under
  * DB_ALLOW_NEWER_SCHEMA, until the next start adopts it) stands for itself,
  * with its own minimum, as the client treats it.
+ *
+ * An unexpected error goes to the central error handler (#2810).
  */
-router.get('/summary', (req, res) => {
-  try {
-    const today = DATE_RE.test(req.query.today ?? '')
-      ? req.query.today
-      : todayKey(db.get());
+router.get('/summary', validateRequest(), (req, res) => {
+  const today = DATE_RE.test(req.query.today ?? '')
+    ? req.query.today
+    : todayKey(db.get());
 
-    /* EIN GESPERRTES MODUL ZÄHLT HIER NICHT MIT (#467).
-     *
-     * Diese Route trägt zwei Module in einer Antwort, und der Pfad-Guard in
-     * server/index.js erreicht sie erst recht nicht: `kitchen` ist nicht
-     * einmal ein Scope-Modul, `moduleForPath('/kitchen')` ergibt null.
-     *
-     * Es sind „nur" Zahlen und keine Titel - aber die Leiste rendert auf JEDER
-     * Küchen-Seite, und ein Mitglied ohne Einkaufszugriff bekam auf der
-     * Essensplan-Seite ein Abzeichen „7 offen" für eine Liste, die es nicht
-     * öffnen darf. Eine Zahl über einen Bestand, den jemand nicht sehen darf,
-     * ist eine kleine Auskunft über genau diesen Bestand. */
-    const denied = deniedModules(req.sessionModuleAccess);
+  /* EIN GESPERRTES MODUL ZÄHLT HIER NICHT MIT (#467).
+   *
+   * Diese Route trägt zwei Module in einer Antwort, und der Pfad-Guard in
+   * server/index.js erreicht sie erst recht nicht: `kitchen` ist nicht
+   * einmal ein Scope-Modul, `moduleForPath('/kitchen')` ergibt null.
+   *
+   * Es sind „nur" Zahlen und keine Titel - aber die Leiste rendert auf JEDER
+   * Küchen-Seite, und ein Mitglied ohne Einkaufszugriff bekam auf der
+   * Essensplan-Seite ein Abzeichen „7 offen" für eine Liste, die es nicht
+   * öffnen darf. Eine Zahl über einen Bestand, den jemand nicht sehen darf,
+   * ist eine kleine Auskunft über genau diesen Bestand. */
+  const denied = deniedModules(req.sessionModuleAccess);
 
-    const open = denied.has('shopping') ? 0 : db.get().prepare(
-      'SELECT COUNT(*) AS c FROM shopping_items WHERE is_checked = 0'
-    ).get().c;
+  const open = denied.has('shopping') ? 0 : db.get().prepare(
+    'SELECT COUNT(*) AS c FROM shopping_items WHERE is_checked = 0'
+  ).get().c;
 
-    // Die drei Bedingungen spiegeln pantryStockStatus() und pantryItemStatus() in
-    // public/utils/pantry-status.js. Bleiben sie hier und dort nicht gleich, zeigt
-    // die Leiste eine andere Zahl als die Filter-Chips daneben - ein Guard in
-    // test/test-frontend-audit.js hält die Definitionen zusammen.
-    //
-    // One row per product (`stock`): its total rounded like the client's
-    // (normalizePantryQuantity, two decimals), its minimum, and how many of its
-    // batches have expired. Every count below reads that row, so a product is
-    // counted once however many batches it has. A product without batches is
-    // out only when it has a minimum above 0 (hasPantryMinimum() in the
-    // client, #2118): without one it tells nobody that something is missing.
-    const pantry = denied.has('pantry') ? null : db.get().prepare(`
-      WITH stock AS (
-        SELECT p.min_quantity AS min_quantity,
-               COUNT(pi.id) AS batches,
-               ROUND(COALESCE(SUM(pi.quantity), 0), 2) AS quantity,
-               SUM(CASE WHEN pi.expires_on IS NOT NULL AND pi.expires_on < ? THEN 1 ELSE 0 END) AS expired
-        FROM pantry_products p
-        LEFT JOIN pantry_items pi ON pi.product_id = p.id
-        GROUP BY p.id
-        UNION ALL
-        SELECT min_quantity, 1, quantity,
-               CASE WHEN expires_on IS NOT NULL AND expires_on < ? THEN 1 ELSE 0 END
-        FROM pantry_items WHERE product_id IS NULL
-      )
-      , status AS (
-        SELECT expired,
-               CASE WHEN batches > 0 THEN quantity <= 0 ELSE COALESCE(min_quantity > 0, 0) END AS is_out,
-               CASE WHEN batches > 0 AND quantity > 0 AND min_quantity IS NOT NULL AND quantity <= min_quantity
-                    THEN 1 ELSE 0 END AS is_low
-        FROM stock
-      )
-      SELECT
-        SUM(expired) AS expired,
-        SUM(is_out) AS out_of_stock,
-        SUM(is_low) AS low,
-        SUM(CASE WHEN expired > 0 OR is_out OR is_low THEN 1 ELSE 0 END) AS attention
-      FROM status
-    `).get(today, today);
+  // Die drei Bedingungen spiegeln pantryStockStatus() und pantryItemStatus() in
+  // public/utils/pantry-status.js. Bleiben sie hier und dort nicht gleich, zeigt
+  // die Leiste eine andere Zahl als die Filter-Chips daneben - ein Guard in
+  // test/test-frontend-audit.js hält die Definitionen zusammen.
+  //
+  // One row per product (`stock`): its total rounded like the client's
+  // (normalizePantryQuantity, two decimals), its minimum, and how many of its
+  // batches have expired. Every count below reads that row, so a product is
+  // counted once however many batches it has. A product without batches is
+  // out only when it has a minimum above 0 (hasPantryMinimum() in the
+  // client, #2118): without one it tells nobody that something is missing.
+  const pantry = denied.has('pantry') ? null : db.get().prepare(`
+    WITH stock AS (
+      SELECT p.min_quantity AS min_quantity,
+             COUNT(pi.id) AS batches,
+             ROUND(COALESCE(SUM(pi.quantity), 0), 2) AS quantity,
+             SUM(CASE WHEN pi.expires_on IS NOT NULL AND pi.expires_on < ? THEN 1 ELSE 0 END) AS expired
+      FROM pantry_products p
+      LEFT JOIN pantry_items pi ON pi.product_id = p.id
+      GROUP BY p.id
+      UNION ALL
+      SELECT min_quantity, 1, quantity,
+             CASE WHEN expires_on IS NOT NULL AND expires_on < ? THEN 1 ELSE 0 END
+      FROM pantry_items WHERE product_id IS NULL
+    )
+    , status AS (
+      SELECT expired,
+             CASE WHEN batches > 0 THEN quantity <= 0 ELSE COALESCE(min_quantity > 0, 0) END AS is_out,
+             CASE WHEN batches > 0 AND quantity > 0 AND min_quantity IS NOT NULL AND quantity <= min_quantity
+                  THEN 1 ELSE 0 END AS is_low
+      FROM stock
+    )
+    SELECT
+      SUM(expired) AS expired,
+      SUM(is_out) AS out_of_stock,
+      SUM(is_low) AS low,
+      SUM(CASE WHEN expired > 0 OR is_out OR is_low THEN 1 ELSE 0 END) AS attention
+    FROM status
+  `).get(today, today);
 
-    res.json({
-      data: {
-        shopping: { open },
-        pantry: pantry ? {
-          attention: pantry.attention ?? 0,
-          expired: pantry.expired ?? 0,
-          low: pantry.low ?? 0,
-          out: pantry.out_of_stock ?? 0,
-        } : { ...EMPTY_PANTRY },
-      },
-    });
-  } catch (err) {
-    log.error('GET /summary error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({
+    data: {
+      shopping: { open },
+      pantry: pantry ? {
+        attention: pantry.attention ?? 0,
+        expired: pantry.expired ?? 0,
+        low: pantry.low ?? 0,
+        out: pantry.out_of_stock ?? 0,
+      } : { ...EMPTY_PANTRY },
+    },
+  });
 });
 
 export default router;

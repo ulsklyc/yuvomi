@@ -81,7 +81,7 @@ app.use((req, _res, next) => {
   req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
   next();
 });
-app.use('/housekeeping', housekeepingRouter);
+app.use('/api/v1/housekeeping', housekeepingRouter);
 app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -170,7 +170,7 @@ test('#1451: Uebersicht und Modul zaehlen dieselben abgeschlossenen Besuche', wi
   seedVisit('2026-10-01T05:00:00.000Z', '2026-10-01T07:00:00.000Z', { paid: true });
   seedVisit('2026-09-30T20:00:00.000Z', '2026-09-30T21:30:00.000Z'); // 22:00 Berlin, noch September
   const { housekeeping } = await getJson('/');
-  const module = (await getJson('/housekeeping/dashboard')).data;
+  const module = (await getJson('/api/v1/housekeeping/dashboard')).data;
   assert.equal(module.visits_this_month, 2, 'Vorbedingung: das Modul zaehlt zwei Oktober-Besuche');
   assert.equal(housekeeping.visitsThisMonth, module.visits_this_month, 'Uebersicht und Modul sagen dieselbe Zahl');
 }));
@@ -208,11 +208,11 @@ test('Haushaltshilfe: letzter Besuch und offene Sitzung sind der spaeteste Zeitp
       assert.equal(housekeeping.lastVisit, '2031-07-15T10:00:00.000Z', 'der Besuch von 12:00, nicht der von 11:00');
       assert.equal(housekeeping.presentSince, '2031-07-15T07:30:00.000Z', 'die zuletzt begonnene offene Sitzung');
       assert.equal(housekeeping.workerName, 'Maria', 'und ihr Name');
-      const module = (await getJson('/housekeeping/dashboard')).data;
+      const module = (await getJson('/api/v1/housekeeping/dashboard')).data;
       // Das Modul fragt nach dem letzten Besuch ueberhaupt, die Kachel nach dem
       // letzten ABGESCHLOSSENEN - ohne die offenen sagen beide denselben.
       db.prepare('DELETE FROM housekeeping_work_sessions WHERE check_out IS NULL').run();
-      const moduleClosed = (await getJson('/housekeeping/dashboard')).data;
+      const moduleClosed = (await getJson('/api/v1/housekeeping/dashboard')).data;
       assert.equal(module.last_visit.check_in, '2031-07-15T10:00:00.000Z', 'Vorbedingung: das Modul nennt denselben Besuch');
       assert.equal(moduleClosed.last_visit.check_in, housekeeping.lastVisit, 'Uebersicht und Modul sagen denselben letzten Besuch');
 

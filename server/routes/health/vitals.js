@@ -14,11 +14,13 @@ import {
   resolveOwner, wallClockInput,
 } from './helpers.js';
 import { careAwareClause, writableClause } from '../../authorize/index.ts';
+import { validateRequest } from '../../api/validate-request.ts';
+import { MAX_TYPE } from '../../services/health-fields.js';
 
 const router = express.Router();
 
 // GET /vitals?user_id=&type=&from=&to=
-router.get('/vitals', (req, res) => {
+router.get('/vitals', validateRequest(), (req, res) => {
   try {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
@@ -39,11 +41,11 @@ router.get('/vitals', (req, res) => {
 });
 
 // POST /vitals
-router.post('/vitals', (req, res) => {
+router.post('/vitals', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
-    const type       = v.str(b.type, 'type', { max: 50 });
+    const type       = v.str(b.type, 'type', { max: MAX_TYPE });
     const valueNum   = v.num(b.value_num,  'value_num');
     const valueNum2  = v.num(b.value_num2, 'value_num2');
     const valueNum3  = v.num(b.value_num3, 'value_num3');
@@ -87,7 +89,7 @@ router.post('/vitals', (req, res) => {
 });
 
 // PATCH /vitals/:id
-router.patch('/vitals/:id', (req, res) => {
+router.patch('/vitals/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
@@ -101,7 +103,7 @@ router.patch('/vitals/:id', (req, res) => {
     const fields = {};
     const checks = [];
 
-    if (b.type !== undefined)        { const r = v.str(b.type, 'type', { max: 50 });               checks.push(r); if (!r.error) fields.type = r.value; }
+    if (b.type !== undefined)        { const r = v.str(b.type, 'type', { max: MAX_TYPE });               checks.push(r); if (!r.error) fields.type = r.value; }
     if (b.value_num !== undefined)   { const r = v.num(b.value_num,  'value_num');                 checks.push(r); if (!r.error) fields.value_num = r.value; }
     if (b.value_num2 !== undefined)  { const r = v.num(b.value_num2, 'value_num2');                checks.push(r); if (!r.error) fields.value_num2 = r.value; }
     if (b.value_num3 !== undefined)  { const r = v.num(b.value_num3, 'value_num3');                checks.push(r); if (!r.error) fields.value_num3 = r.value; }
@@ -140,7 +142,7 @@ router.patch('/vitals/:id', (req, res) => {
 });
 
 // DELETE /vitals/:id
-router.delete('/vitals/:id', (req, res) => {
+router.delete('/vitals/:id', validateRequest(), (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);

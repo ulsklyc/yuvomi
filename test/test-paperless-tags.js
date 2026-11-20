@@ -44,12 +44,13 @@ app.use((req, _res, next) => {
   req.sessionModuleAccess = identity.access;
   next();
 });
-app.use(router);
+const root = '/api/v1/documents/dms/paperless';
+app.use(root, router);
 app.use(createErrorHandler({ warn: (/** @type {unknown[]} */ ...args) => console.warn(...args), error: (/** @type {unknown[]} */ ...args) => console.warn(...args) }));
 const server = app.listen(0, '127.0.0.1');
 await new Promise((resolve) => server.once('listening', resolve));
 async function call(/** @type {string} */ method, /** @type {string} */ path, /** @type {unknown} */ body = undefined) {
-  const res = await realFetch(`http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}${path}`, {
+  const res = await realFetch(`http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}${root}${path}`, {
     method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: res.status, body: await res.json(), headers: res.headers };
@@ -297,4 +298,19 @@ test('local tag-folder membership gates tag reads and writes, including document
   assert.equal((await call('GET', folderPath())).status, 404);
   assert.equal((await call('PUT', folderPath(), { tags: [7, 150], expected_tags: [150] })).status, 404);
   assert.equal(writes.length, 1);
+});
+
+test('OpenAPI rejects repeated query parameters and malformed IDs before a source read', async () => {
+  let sourceReads = 0;
+  adapter.listTags = async () => { sourceReads++; return { results: [] }; };
+  adapter.getDocument = async () => { sourceReads++; return { tags: assigned }; };
+  for (const path of [`/tags?account_id=${accountId}&page=1&page=2`,
+    `/tags?account_id=${accountId}&account_id=${accountId}`,
+    `/documents/${linkId}abc/tags`, `/folders/${folderId}/documents/1e2/tags`]) {
+    const result = await call('GET', path);
+    assert.equal(result.status, 400);
+    assert.equal(result.body.reason, 'validation');
+    assert.ok(result.body.fields.length > 0);
+  }
+  assert.equal(sourceReads, 0);
 });

@@ -4733,6 +4733,7 @@
         "deleteGroupConfirm": "Excluir este grupo vazio? Grupos com despesas devem ser arquivados.",
         "deleteGroupConfirmDetail": "A lista de membros, a divisão padrão, as despesas recorrentes e o registro de atividade perdem-se definitivamente. Um grupo conta como vazio sem despesas nem acertos.",
         "splitCurrentTotal": "Total atual: {{total}}",
+        "exactSharesConverted": "Partes exatas em {{currency}}, convertidas de {{amount}}.",
         "statusLabel": "Estado",
         "statusActive": "Ativo",
         "statusArchived": "Arquivado",

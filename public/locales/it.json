@@ -4733,6 +4733,7 @@
         "deleteGroupConfirm": "Eliminare questo gruppo vuoto? I gruppi con spese devono essere archiviati.",
         "deleteGroupConfirmDetail": "Elenco dei membri, ripartizione predefinita, spese ricorrenti e registro attività vanno persi definitivamente. Un gruppo è vuoto già senza spese e saldi.",
         "splitCurrentTotal": "Totale attuale: {{total}}",
+        "exactSharesConverted": "Quote esatte in {{currency}}, convertite da {{amount}}.",
         "statusLabel": "Stato",
         "statusActive": "Attivo",
         "statusArchived": "Archiviato",

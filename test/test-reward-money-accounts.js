@@ -171,11 +171,13 @@ test('eine Buchung, eine Anfrage oder ein Plan mit fremdem Waehrungscode ist ein
       await kid.call('POST', '/rewards/redemptions', { kind: 'deposit', amount: '500', currency: 'JPY' }),
       await kid.call('POST', '/rewards/redemptions', { kind: 'withdrawal', amount: '1', currency: 'JPY' }),
       await admin('PUT', `/rewards/money/plans/${kid.id}`, { amount: '500', frequency: 'weekly', anchor_day: 1, currency: 'JPY' }),
-      await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '1.00', direction: 'credit', currency: ['EUR'] }),
     ]) {
       assert.equal(res.status, 400);
       assert.equal(res.body.reason, 'currency_mismatch');
     }
+    // Ein Code, der kein Text ist, weist seit #2810 das Schema ab (`validation`).
+    const listed = await admin('POST', '/rewards/money/entries', { user_id: kid.id, amount: '1.00', direction: 'credit', currency: ['EUR'] });
+    assert.deepEqual([listed.status, listed.body.reason], [400, 'validation']);
     assert.deepEqual([rows(), requests()], before, 'nichts davon wurde gespeichert');
     assert.equal(planOf(kid.id), undefined);
 
@@ -271,7 +273,8 @@ test('ein Konto eroeffnen ohne Plan: Sache der Admins, nur fuer Mitglieder, und 
   assert.deepEqual([refused.status, refused.body.reason], [409, 'account_deactivated'], 'fuer ein ehemaliges Kind wird nichts eroeffnet');
   assert.equal(money.hasMoneyAccount(db, former), false);
   assert.equal((await open(admin, { user_id: 99999999 })).status, 404);
-  assert.equal((await open(admin, {})).status, 404);
+  // Ohne `user_id` weist seit #2810 das Schema ab: 400 statt 404.
+  assert.equal((await open(admin, {})).status, 400);
   assert.equal((await open(admin, { user_id: kid.id, currency: 'JPY' })).body.reason, 'currency_mismatch', 'ein neues Konto steht in der Haushaltswaehrung');
   assert.equal(hasAccount(), false, 'und der abgewiesene Versuch hat nichts angelegt');
 

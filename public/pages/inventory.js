@@ -175,6 +175,9 @@ async function openLocationManager() {
         // des Servers; ein Loeschen, dem jemand zuvorkam, ist ein Erfolg.
         errorFallbackKey: 'common.errorGeneric',
         alreadyDeletedReason: 'inventory_location_not_found',
+        // Die Schluessel sind Orts-IDs: die Reihenfolge (auch die der
+        // Unterorte) geht als Zahlen raus (#2810).
+        numericKeys: true,
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem
@@ -2250,7 +2253,8 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
   const payload = {
     name,
     category,
-    location_id: panel.querySelector('#inv-location').value || null,
+    // Die Orts-ID als Zahl (#2810); Ziffern-Text nimmt der Server nur noch als Altform.
+    location_id: Number(panel.querySelector('#inv-location').value) || null,
     purchase_date: panel.querySelector('#inv-purchase-date').value || null,
     ...(priceInput ? { purchase_price: parseAmountInput(priceInput.value) } : {}),
     status: panel.querySelector('#inv-status').value,

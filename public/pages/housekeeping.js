@@ -2577,7 +2577,8 @@ function openStaffModal(worker, content, options = {}) {
         const modalContext = captureModalContext();
         try {
           await api.post('/housekeeping/worker', {
-            id: fields.id.value || null,
+            // Die ID als Zahl (#2810): Ziffern-Text nimmt der Server nur noch als Altform.
+            id: Number(fields.id.value) || null,
             display_name: fields.display_name.value.trim(),
             username: fields.username.value.trim() || null,
             phone: fields.phone.value.trim() || null,

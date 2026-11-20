@@ -4400,6 +4400,30 @@ function viewerStepKeys() {
   return rtl ? { prev: 'ArrowRight', next: 'ArrowLeft' } : { prev: 'ArrowLeft', next: 'ArrowRight' };
 }
 
+/** @param {HTMLElement} panel */
+function bindViewerMenu(panel) {
+  installPopoverMenus(panel);
+  /** @type {Record<string, string>} */
+  const VIEWER_MENU_TARGETS = {
+    'viewer-tags': '[data-action="paperless-tags"]',
+    'viewer-dms': '.doc-viewer__dms-link',
+    'viewer-open-tab': 'a.document-viewer__action[target="_blank"]',
+    'viewer-edit': '[data-action="edit-document"]',
+    'viewer-share': '[data-action="share"]',
+    'viewer-download': '[data-viewer-download]',
+  };
+  const menu = /** @type {HTMLElement | null} */ (panel.querySelector('#document-viewer-more-menu'));
+  if (!menu) return;
+  menu.addEventListener('click', (event) => {
+    const item = event.target instanceof Element ? event.target.closest('.popover-menu__item[data-action]') : null;
+    const selector = item instanceof HTMLElement ? VIEWER_MENU_TARGETS[item.dataset.action ?? ''] : null;
+    const target = selector ? panel.querySelector(selector) : null;
+    if (!(target instanceof HTMLElement) || target.matches(':disabled')) return;
+    menu.hidePopover?.();
+    target.click();
+  });
+}
+
 /**
  * @param {Record<string, any>} doc
  * @param {object} [carry]
@@ -4603,22 +4627,7 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
       // Das Mehr-Menue (schmal) loest die Knoepfe der Leiste aus - ein Weg je
       // Handlung. Synchron im Tipp: Teilen und Herunterladen brauchen die
       // Nutzeraktivierung des Klicks.
-      installPopoverMenus(panel);
-      const VIEWER_MENU_TARGETS = {
-        'viewer-tags': '[data-action="paperless-tags"]',
-        'viewer-dms': '.doc-viewer__dms-link',
-        'viewer-open-tab': 'a.document-viewer__action[target="_blank"]',
-        'viewer-edit': '[data-action="edit-document"]',
-        'viewer-share': '[data-action="share"]',
-        'viewer-download': '[data-viewer-download]',
-      };
-      panel.querySelector('#document-viewer-more-menu')?.addEventListener('click', (event) => {
-        const item = event.target.closest?.('.popover-menu__item[data-action]');
-        const target = item && panel.querySelector(VIEWER_MENU_TARGETS[item.dataset.action] ?? '');
-        if (!target || target.disabled) return;
-        panel.querySelector('#document-viewer-more-menu')?.hidePopover?.();
-        target.click();
-      });
+      bindViewerMenu(panel);
       // Vor/Zurueck: die Knoepfe und die Pfeiltasten, die auf sie zeigen
       // (RTL gespiegelt). Nicht aus einem Feld oder der PDF-Seitenleiste heraus
       // - dort gehoeren die Pfeile dem Element.

@@ -22,11 +22,11 @@ app.use((req, _res, next) => {
   req.authUserId = actor; req.authRole = 'member'; req.session = { userId: actor, role: 'member' };
   next();
 });
-app.use('/birthdays', birthdaysRouter);
-app.use('/calendar', calendarFeedRouter);
+app.use('/api/v1/birthdays', birthdaysRouter);
+app.use('/api/v1/calendar', calendarFeedRouter);
 const server = app.listen(0, '127.0.0.1');
 await new Promise(resolve => server.once('listening', resolve));
-const base = `http://127.0.0.1:${server.address().port}`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1`;
 test.after(() => { server.close(); db.close(); });
 async function call(method, path, body) {
   const res = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });

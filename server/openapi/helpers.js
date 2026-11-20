@@ -80,7 +80,18 @@ function jsonBody(schemaRef, description = 'JSON request body') {
   };
 }
 
-/** @param {{summary: string, operationId?: string, tag: string, description?: string, auth?: boolean, admin?: boolean, params?: object[], requestBody?: object | null, responses?: Record<string, object> | null, stateChanging?: boolean, documentDeleteConflict?: boolean, documentLinkRefusal?: boolean}} options */
+/**
+ * One operation of the document. Parameters, request body and responses are
+ * plain OpenAPI objects; the type only says so, so that a path file can hand
+ * them in without the checker reading `[]` and `null` as their only shape.
+ * @param {{
+ *   summary: string, operationId?: string, tag: string, description?: string,
+ *   auth?: boolean, admin?: boolean, params?: Array<Record<string, unknown>>,
+ *   requestBody?: Record<string, unknown> | null, responses?: Record<string, unknown> | null,
+ *   stateChanging?: boolean, documentDeleteConflict?: boolean, documentLinkRefusal?: boolean,
+ * }} options
+ * @returns {Record<string, any> & { responses: Record<string, unknown> }}
+ */
 function op({
   summary,
   operationId,
@@ -95,6 +106,7 @@ function op({
   documentDeleteConflict = false,
   documentLinkRefusal = false,
 }) {
+  /** @type {Record<string, any> & { responses: Record<string, unknown> }} */
   const operation = {
     tags: [tag],
     summary,
@@ -128,13 +140,34 @@ function op({
   return operation;
 }
 
+/**
+ * An operation of `op()` that also answers the 400 of validateRequest() (#2810):
+ * a path parameter or body outside its schema, with `reason: 'validation'`.
+ * For operations that keep the default answers of `op()` otherwise.
+ * @template {{ responses: Record<string, unknown> }} T
+ * @param {T} operation
+ * @returns {T}
+ */
+function withValidationRefusal(operation) {
+  operation.responses[400] = { $ref: '#/components/responses/BadRequest' };
+  return operation;
+}
+
+/**
+ * Upper bound of a numeric path id (#2810): Number.MAX_SAFE_INTEGER. Above it
+ * a JavaScript number no longer holds every integer, so the id a handler reads
+ * is not the one the client sent. No lower bound: `0` and a negative id stay
+ * the route's own answer.
+ */
+const MAX_PATH_ID = 9007199254740991;
+
 function idParam(name = 'id', description = 'Resource ID') {
   return {
     name,
     in: 'path',
     required: true,
     description,
-    schema: { type: 'integer' },
+    schema: { type: 'integer', maximum: MAX_PATH_ID },
   };
 }
 
@@ -188,4 +221,5 @@ function langParam({ fallback = 'default' } = {}) {
 export {
   authSecurity, csrfHeaderParam, idempotencyHeaderParam, jsonBody, op, idParam, stringPathParam, langParam,
   withCaseReasons, DOCUMENT_LINKS_READ_NOTE, DOCUMENT_LINK_REFUSAL, BUDGET_LINKS_READ_NOTE,
+  withValidationRefusal,
 };

@@ -16,6 +16,7 @@ process.env.DB_PATH = ':memory:';
 
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 // --------------------------------------------------------
 // Test-DB via vollständige Migrationskette
@@ -55,7 +56,9 @@ app.use((req, _res, next) => {
   req.session = { userId: currentUid, role: 'admin' };
   next();
 });
+// The central error handler of the app: validateRequest() hands its 400 on to it (#2810).
 app.use('/api/v1/reminders', remindersRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/reminders`;

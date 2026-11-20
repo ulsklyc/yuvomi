@@ -4733,6 +4733,7 @@
         "deleteGroupConfirm": "این گروه خالی حذف شود؟ گروه‌های دارای هزینه باید بایگانی شوند.",
         "deleteGroupConfirmDetail": "فهرست اعضا، تقسیم پیش‌فرض، هزینه‌های تکرارشونده و گزارش فعالیت برای همیشه از بین می‌روند. گروه بدون هزینه و تسویه خالی به شمار می‌آید.",
         "splitCurrentTotal": "مجموع فعلی: {{total}}",
+        "exactSharesConverted": "سهم‌های دقیق به {{currency}}، تبدیل‌شده از {{amount}}.",
         "statusLabel": "وضعیت",
         "statusActive": "فعال",
         "statusArchived": "بایگانی‌شده",
