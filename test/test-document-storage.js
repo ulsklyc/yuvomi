@@ -1602,10 +1602,14 @@ test('document upload removes staged WebDAV content when the database transactio
   const harness = createRouteHarness({ userId });
   t.after(() => harness.close());
 
+  // The insert fails inside the transaction, after the content was staged.
+  // Until #2810 an access id without an account did it (the foreign key); the
+  // route refuses that id before staging now, so a trigger stands in.
+  get().exec(`CREATE TEMP TRIGGER fail_compensated_upload BEFORE INSERT ON family_documents
+    WHEN NEW.name = 'Compensated upload' BEGIN SELECT RAISE(ABORT, 'test: the insert fails'); END`);
+  t.after(() => get().exec('DROP TRIGGER IF EXISTS fail_compensated_upload'));
   const result = await routeCall(harness, 'POST', '/', uploadBody({
     name: 'Compensated upload',
-    visibility: 'restricted',
-    allowed_member_ids: [999_999_999],
   }));
   assert.equal(result.response.status, 500);
   assert.equal(
@@ -1637,10 +1641,14 @@ test('document upload surfaces cleanup failure after a failed database transacti
   const harness = createRouteHarness({ userId });
   t.after(() => harness.close());
 
+  // The insert fails inside the transaction, after the content was staged.
+  // Until #2810 an access id without an account did it (the foreign key); the
+  // route refuses that id before staging now, so a trigger stands in.
+  get().exec(`CREATE TEMP TRIGGER fail_cleanup_upload BEFORE INSERT ON family_documents
+    WHEN NEW.name = 'Cleanup failure upload' BEGIN SELECT RAISE(ABORT, 'test: the insert fails'); END`);
+  t.after(() => get().exec('DROP TRIGGER IF EXISTS fail_cleanup_upload'));
   const result = await routeCall(harness, 'POST', '/', uploadBody({
     name: 'Cleanup failure upload',
-    visibility: 'restricted',
-    allowed_member_ids: [999_999_999],
   }));
   assert.equal(result.response.status, 502);
   assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CLEANUP_FAILED');

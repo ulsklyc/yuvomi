@@ -15,10 +15,11 @@ import { isBlockedAddress, isBlockedHostname, normalizeHostname } from '../utils
 import { isPathPersistent } from '../utils/container-persistence.js';
 import { remoteFailure, safeRequest } from '../utils/http.js';
 import { MAX_UPLOAD_BYTES } from '../utils/upload-limit.js';
+import { DOCUMENT_UPLOAD_BACKENDS } from './document-fields.js';
 
 const CONFIG_PREFIX = 'document_storage_webdav_';
 const SELECTED_BACKEND_KEY = 'document_storage_selected_backend';
-const SELECTABLE_BACKENDS = new Set(['local', 'webdav', 'google_drive']);
+const SELECTABLE_BACKENDS = new Set(DOCUMENT_UPLOAD_BACKENDS);
 const DEFAULT_BASE_PATH = 'yuvomi-documents';
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_READ_BYTES = MAX_UPLOAD_BYTES;

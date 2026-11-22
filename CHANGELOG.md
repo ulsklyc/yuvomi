@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **The shopping list, documents, the document storage settings and the DMS connection check
+  every request against the published API description.** This is about your own API clients;
+  the app sends nothing that is refused now (from this release on it sends the folder of a
+  document, the DMS account and the order of the shopping categories as numbers). Under
+  `/api/v1/shopping` and `/api/v1/documents` (with `storage/google-drive` and `dms`), input that
+  used to be quietly accepted, replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `0x1`, `1.0` and `1e0` reached document 1, and on the
+    shopping list `1.0` reached list or item 1;
+  - a number, list, object or truth value in a text field: a shopping list, shop, category,
+    folder or document named `{}` was stored as `"[object Object]"`, a number as text;
+  - an unknown `visibility` of a new or linked document became `family`, visible to the whole
+    household; an unknown `category` became `other`, and on editing a document an unknown
+    `visibility`, `category` or `status` was ignored;
+  - an unknown DMS `provider` became `paperless`; a `dms_document_id` that is neither text nor a
+    number was stored as its text (`true`, `"[object Object]"`);
+  - an unknown `folder_key` of an upload was dropped; an unknown `selected_upload_backend`, an
+    `enabled` of the WebDAV settings that is not `true` or `false`;
+  - a number field sent as a truth value, text or list: `expiry_reminder_days: true` was stored
+    as 1, `price_cents: true`, `[]` and `"0x10"` as 1, 0 and 16; ids in a body that are not
+    whole numbers or digit text (`folder_id`, `parent_id`, `subject_user_id`, `account_id`,
+    `document_id`; `parent_id: true` and `"0x1"` were read as folder 1);
+  - `archived: "false"` and `0` archived a document; `preview: "true"` of the meal-plan import
+    ran the real import; `is_checked` other than `true`, `false`, `0` or `1`;
+  - `order` of the shopping categories that is not a list of ids (`[{}]` and `[true]` answered
+    500, `[1.5]` and `["x"]` changed nothing), `items` of the pantry import that is not a list
+    of entries (taken as empty), `ids` of the kitchen undo that are not whole numbers (dropped);
+  - a query value outside its type, or given twice: a doubled `q` of the shopping suggestions
+    answered 500; `status`, `category`, `folder_id` and `expiring` of the document list and an
+    empty `documents` of a folder deletion fell back silently to no filter or `unfile`;
+    `limit` of the price history outside 1 to 50 was clamped.
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of the storage settings, Google Drive and
+  every DMS route, and the meal-plan and pantry rights of the two kitchen imports come first:
+  403 stays 403, also for a bad request. Lengths stay with the routes. Sharing a document with
+  an id that has no account answers the 400 of a non-member instead of 500. A DMS account stored
+  with a built-in property name as its provider no longer reaches a broken adapter.
 - **Contacts, contact sync and the meal plan check every request against the published API
   description.** This is about your own API clients; the app sends nothing that is refused now
   (from this release on the meal dialog sends the chosen recipe as a number). Under

@@ -536,7 +536,8 @@ test('undo-transfer: unbekannte IDs werden uebergangen, leerer Body ist kein Feh
 
   const list = await call('POST', '/shopping', { name: 'Teilweise' });
   const added = await call('POST', `/shopping/${list.body.data.id}/items`, { name: 'Butter' });
-  const r = await call('POST', '/shopping/items/undo-transfer', { ids: [added.body.data.id, 999999, 'x'] });
+  // `'x'` stand hier bis #2810 mit drin; das Schema weist ihn jetzt ab.
+  const r = await call('POST', '/shopping/items/undo-transfer', { ids: [added.body.data.id, 999999] });
   assert.equal(r.body.data.removed, 1);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM shopping_items WHERE list_id = ?').get(list.body.data.id).n, 0);
 });

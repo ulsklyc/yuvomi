@@ -110,6 +110,12 @@ const MOUNTS = [
   { file: 'meals.js', mount: '/api/v1/meals' },
   { file: 'cardav.js', mount: '/api/v1/contacts/cardav' },
   { file: 'contacts.js', mount: '/api/v1/contacts' },
+  // In der Reihenfolge von server/index.js: Google Drive und DMS vor den
+  // Dokumenten (sonst faenge `/:id/thumbnail` den DMS-Pfad `/dms/thumbnail`).
+  { file: 'shopping.js', mount: '/api/v1/shopping' },
+  { file: 'document-storage-google-drive.js', mount: '/api/v1/documents/storage/google-drive' },
+  { file: 'dms.js', mount: '/api/v1/documents/dms' },
+  { file: 'documents.js', mount: '/api/v1/documents' },
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
@@ -119,6 +125,7 @@ const WITHOUT_INTEGER_PATH_ID = [
   'waste/feed.js', 'waste/import.js', 'waste/occurrences.js', 'weather.js',
   'backup.js', 'system.js', 'changelog.js',
   'health/export.js', 'health/cycle-feed.js', 'health/visibility-defaults.js',
+  'document-storage-google-drive.js',
 ];
 
 const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));

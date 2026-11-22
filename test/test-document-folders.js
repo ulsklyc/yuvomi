@@ -606,7 +606,8 @@ test('DELETE with documents rejects a malformed snapshot with an explicit valida
     );
 
     assert.equal(del.status, 400);
-    assert.equal(del.body.error, 'Invalid expected folder snapshot.');
+    // Seit #2810 die Absage des Schemas, die den Parameter nennt.
+    assert.deepEqual(del.body.fields, [{ path: 'query/expected_snapshot', rule: 'pattern' }]);
     assert.ok(get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(folder.body.data.id));
   } finally {
     await h.close();

@@ -7,8 +7,10 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, MAX_TITLE } from '../middleware/validate.js';
-import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
-import { getAdapter as defaultGetAdapter, SUPPORTED_PROVIDERS } from '../services/dms/index.js';
+import { requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
+import { getAdapter as defaultGetAdapter } from '../services/dms/index.js';
+import { DMS_PROVIDERS, DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITIES } from '../services/document-fields.js';
 import { visibleWhere } from '../authorize/index.ts';
 import { StorageError, readDocumentContent } from '../services/document-storage.js';
 
@@ -18,8 +20,19 @@ export function _setAdapterFactory(fn) { adapterFactory = fn || defaultGetAdapte
 const log = createLogger('DMS');
 const router = express.Router();
 
-const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
-const VISIBILITIES = ['family', 'restricted', 'private'];
+// Die Wertelisten kommen aus server/services/document-fields.js, aus derselben
+// Quelle liest das Schema (#2810): ein unbekannter Wert ist dort schon 400.
+const CATEGORIES = DOCUMENT_CATEGORIES;
+const VISIBILITIES = DOCUMENT_VISIBILITIES;
+
+// Jede Route dieses Routers ist Sache der Admins: Konten verwalten, und das
+// DMS ungefiltert durchsuchen, wodurch die Sichtbarkeitsgrenzen des
+// Dokumente-Moduls umgangen wuerden. Als Router-Riegel und nicht je Route
+// (#2810, Gruppe 8): eine neue Route erbt ihn, statt ihn vergessen zu koennen,
+// und er steht vor validateRequest() in jeder Route - ein Mitglied bekommt
+// seine 403 vor jeder Pruefung der Anfrage, wie zuvor aus der ersten Zeile
+// jedes Handlers.
+router.use(requireAdmin);
 
 // Bild-Typen, die als Vorschau im Verknüpfungs-Picker (Issue #533) inline
 // ausgeliefert werden dürfen. Nur nicht-skriptfähige Rasterformate (kein SVG).
@@ -54,9 +67,8 @@ function getAccount(id) {
   return db.get().prepare('SELECT * FROM dms_accounts WHERE id = ?').get(id);
 }
 
-router.get('/accounts', (req, res) => {
+router.get('/accounts', validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const rows = db.get().prepare('SELECT * FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
     res.json({ data: rows.map(publicAccount) });
   } catch (err) {
@@ -65,10 +77,9 @@ router.get('/accounts', (req, res) => {
   }
 });
 
-router.post('/accounts', (req, res) => {
+router.post('/accounts', validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
-    const provider = SUPPORTED_PROVIDERS.includes(req.body.provider) ? req.body.provider : 'paperless';
+    const provider = DMS_PROVIDERS.includes(req.body.provider) ? req.body.provider : 'paperless';
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl = str(req.body.base_url, 'Base URL', { max: 500 });
     const vToken = str(req.body.api_token, 'API token', { max: 500 });
@@ -99,9 +110,8 @@ router.post('/accounts', (req, res) => {
   }
 });
 
-router.delete('/accounts/:id', (req, res) => {
+router.delete('/accounts/:id', validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const id = Number(req.params.id);
     const existing = getAccount(id);
     if (!existing) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
@@ -113,9 +123,8 @@ router.delete('/accounts/:id', (req, res) => {
   }
 });
 
-router.post('/accounts/:id/test', async (req, res) => {
+router.post('/accounts/:id/test', validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.params.id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const result = await adapterFactory(account).testConnection();
@@ -127,11 +136,10 @@ router.post('/accounts/:id/test', async (req, res) => {
   }
 });
 
-router.get('/search', async (req, res) => {
+router.get('/search', validateRequest(), async (req, res) => {
   try {
-    // Admin-only: DMS search proxies the entire Paperless instance ungescoped, which would
+    // Admin-only (router.use above): DMS search proxies the entire Paperless instance ungescoped, which would
     // bypass the per-document restricted/private visibility boundaries of the documents module.
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.query.account_id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     // Leerer Query ist erlaubt: er listet alle Dokumente des DMS, damit der Nutzer
@@ -145,11 +153,10 @@ router.get('/search', async (req, res) => {
   }
 });
 
-router.get('/thumbnail', async (req, res) => {
+router.get('/thumbnail', validateRequest(), async (req, res) => {
   try {
-    // Admin-only wie /search: der Picker durchsucht das gesamte DMS ungescoped,
+    // Admin-only wie /search (router.use oben): der Picker durchsucht das gesamte DMS ungescoped,
     // bevor ein Dokument in die sichtbarkeitsgebundene Dokumentenliste übernommen wird.
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.query.account_id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const dmsId = String(req.query.dms_document_id || '').trim();
@@ -178,9 +185,8 @@ router.get('/thumbnail', async (req, res) => {
   }
 });
 
-router.post('/link', async (req, res) => {
+router.post('/link', validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.body.account_id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const dmsId = String(req.body.dms_document_id || '').trim();
@@ -232,9 +238,8 @@ router.post('/link', async (req, res) => {
   }
 });
 
-router.post('/push', async (req, res) => {
+router.post('/push', validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) return refuseAdmin(req, res);
     const account = getAccount(Number(req.body.account_id));
     if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
     const docId = Number(req.body.document_id);

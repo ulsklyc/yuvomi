@@ -177,6 +177,10 @@ export const ROWS = [
   ...middlewareRows('server/routes/permissions.js', '/api/v1/permissions', ADMIN_REQUIRED, [
     ['USE', '', ''],
   ]).map(useRow),
+  // The DMS router: until #2810 (group 8) eight inline gates, one per route.
+  ...middlewareRows('server/routes/dms.js', '/api/v1/documents/dms', ADMIN_REQUIRED, [
+    ['USE', '', '/accounts'],
+  ]).map(useRow),
   // --- document storage -------------------------------------------------------
   ...middlewareRows('server/routes/document-storage-google-drive.js', '/api/v1/documents/storage/google-drive', ADMIN_REQUIRED, [
     ['GET', '/auth'],
@@ -318,25 +322,14 @@ export const ROWS = [
   // A local calendar with a feed token: deleting it is for an admin.
   { form: 'inline', file: 'server/routes/calendar/local-calendars.js', key: 'DELETE /calendars/:id', method: 'DELETE',
     path: (s) => `/api/v1/calendar/calendars/${s.ids.feedCalendar}`, expect: FEED_ADMIN_ONLY },
-  .../** @type {[string, string, string, unknown?][]} */ ([
-    ['GET', '/accounts', '/accounts'],
-    ['POST', '/accounts', '/accounts', {}],
-    ['DELETE', '/accounts/:id', `/accounts/${NO_ID}`],
-    ['POST', '/accounts/:id/test', `/accounts/${NO_ID}/test`, {}],
-    ['GET', '/search', '/search'],
-    ['GET', '/thumbnail', '/thumbnail'],
-    ['POST', '/link', '/link', {}],
-    ['POST', '/push', '/push', {}],
-  ]).map(([method, key, path, body]) => ({
-    form: 'inline', file: 'server/routes/dms.js', key: `${method} ${key}`, method,
-    path: `/api/v1/documents/dms${path}`, ...(body ? { body } : {}), expect: ADMIN_REQUIRED,
-  })),
-  { form: 'inline', file: 'server/routes/documents.js', key: 'GET /storage/config', method: 'GET',
-    path: '/api/v1/documents/storage/config', expect: ADMIN_REQUIRED },
-  { form: 'inline', file: 'server/routes/documents.js', key: 'PUT /storage/config', method: 'PUT',
-    path: '/api/v1/documents/storage/config', body: { selected_upload_backend: 'x' }, expect: ADMIN_REQUIRED },
-  { form: 'inline', file: 'server/routes/documents.js', key: 'POST /storage/test', method: 'POST',
-    path: '/api/v1/documents/storage/test', body: {}, expect: ADMIN_REQUIRED },
+  // The document storage settings: until #2810 (group 8) inline in the handler,
+  // now requireAdmin in front of validateRequest(). The PUT row sends a body
+  // outside the schema: the member still meets the 403, not the 400.
+  ...middlewareRows('server/routes/documents.js', '/api/v1/documents', ADMIN_REQUIRED, [
+    ['GET', '/storage/config'],
+    ['PUT', '/storage/config', '/storage/config', { selected_upload_backend: 'x' }],
+    ['POST', '/storage/test', '/storage/test', {}],
+  ]),
 ];
 
 /**
@@ -371,7 +364,9 @@ export const ADMIN_PASSES = [
   // A paid visit: the admin passes assertMayTouchSettled() and meets the calendar check (400), nothing is written.
   { form: 'assertAdmin', method: 'PUT', path: (s) => `/api/v1/housekeeping/visits/${s.ids.paidVisit}`, body: { date: '2026-02-30' } },
   { form: 'requireAdmin (route middleware)', method: 'GET', path: '/api/v1/recipe-providers/accounts' },
-  { form: 'inline', method: 'GET', path: '/api/v1/documents/dms/accounts' },
+  { form: 'requireAdmin (router.use)', method: 'GET', path: '/api/v1/documents/dms/accounts' },
+  // An admin meets the range check of the points (400), nothing is written.
+  { form: 'inline', method: 'GET', path: '/api/v1/tasks/points/affected?points=-1' },
   { form: 'inline (preferences)', method: 'PUT', path: '/api/v1/preferences', body: { countdown_grace_days: 3 } },
 ];
 
@@ -384,5 +379,6 @@ export const DEVICE_CASES = [
   { form: 'requireAdmin (shared)', method: 'GET', path: '/api/v1/backup/status', expect: DEVICE_CREDENTIAL },
   { form: 'requireAdmin (former local copy)', method: 'GET', path: '/api/v1/screensaver/config', expect: DEVICE_CREDENTIAL },
   { form: 'requireAdmin (route middleware)', method: 'GET', path: '/api/v1/recipe-providers/accounts', expect: DEVICE_CREDENTIAL },
-  { form: 'inline', method: 'GET', path: '/api/v1/documents/dms/accounts', expect: DEVICE_CREDENTIAL },
+  { form: 'requireAdmin (router.use)', method: 'GET', path: '/api/v1/documents/dms/accounts', expect: DEVICE_CREDENTIAL },
+  { form: 'inline', method: 'GET', path: '/api/v1/tasks/points/affected?points=1', expect: DEVICE_CREDENTIAL },
 ];

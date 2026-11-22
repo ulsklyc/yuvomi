@@ -1,4 +1,71 @@
 import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
+import { MODULE_FOLDER_KEYS } from '../../services/document-folders.js';
+import {
+  DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_VISIBILITIES,
+} from '../../services/document-fields.js';
+
+// ---------------------------------------------------------------------------
+// Bausteine der Anfrage-Schemata (#2810, Gruppe 8). Das Schema traegt Typ und
+// Gestalt; Laengen und Leere bleiben im Handler, weil er nach dem Trimmen
+// zaehlt. Die Wertelisten kommen aus server/services/document-fields.js,
+// aus derselben Quelle prueft die Route. Unbekannte Felder bleiben ignoriert.
+// ---------------------------------------------------------------------------
+
+const BAD_REQUEST = { $ref: '#/components/responses/BadRequest' };
+const UNAUTHORIZED = { $ref: '#/components/responses/Unauthorized' };
+const FORBIDDEN = { $ref: '#/components/responses/Forbidden' };
+const SERVER_ERROR = { $ref: '#/components/responses/InternalServerError' };
+const API_ERROR = { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } };
+
+/**
+ * A JSON body. `{}` sent on purpose counts as sent; a call without a body is 400.
+ * @param {Record<string, unknown>} properties
+ * @param {string[]} [required]
+ * @param {boolean} [mandatory]
+ */
+const body = (properties, required = [], mandatory = true) => ({
+  required: mandatory,
+  description: 'JSON request body. Fields the schema does not name are ignored.',
+  content: { 'application/json': { schema: { type: 'object', properties, ...(required.length ? { required } : {}) } } },
+});
+
+/**
+ * Free text the route trims and counts.
+ * @param {string} description
+ */
+const text = (description) => ({ type: 'string', description: `${description} Trimmed and counted by the route; empty or too long is its 400.` });
+/** @param {string} description */
+const optionalText = (description) => ({ type: ['string', 'null'], description: `${description} \`null\` or \`""\` means none.` });
+/**
+ * A row id in a body, or `null` for none.
+ * @param {string} description
+ */
+const rowIdOrNull = (description) => ({
+  anyOf: [{ $ref: '#/components/schemas/BodyRowId' }, { type: 'null' }],
+  description: `${description} A positive integer; a string of decimal digits is the older form and reads the same. \`null\` means none.`,
+});
+const EXPIRES_AT = {
+  type: ['string', 'null'],
+  pattern: OPTIONAL_DATE_PATTERN,
+  description: '`YYYY-MM-DD`, e.g. a passport or permit expiry; whether the day exists is the route\'s check. `null` or `""` clears it.',
+};
+const EXPIRY_REMINDER_DAYS = {
+  anyOf: [{ type: 'integer', minimum: 0, maximum: 365 }, { type: 'null' }, { type: 'string', enum: [''] }],
+  description: 'Days before `expires_at` to remind, 0-365. `null` or `""`: no reminder. Up to v2.93 `true` counted as 1 and digit text as its number; both are a 400 now.',
+};
+const ALLOWED_MEMBER_IDS = {
+  type: 'array',
+  items: { type: 'integer', minimum: 1 },
+  description: 'The household members who may see a `restricted` document; read only for `restricted`. An id without an account or of someone who is not a household member is the route\'s 400.',
+};
+const CATEGORY = { type: 'string', enum: [...DOCUMENT_CATEGORIES] };
+const VISIBILITY = { type: 'string', enum: [...DOCUMENT_VISIBILITIES] };
+const STATUS = { type: 'string', enum: [...DOCUMENT_STATUSES] };
+
+const documentId = () => idParam('id', 'Document ID, plain decimal digits.');
+const folderId = () => idParam('id', 'Folder ID, plain decimal digits; `0` or below is the route\'s 400 `Invalid folder id.`.');
+const accountId = () => idParam('id', 'DMS account ID, plain decimal digits.');
 
 export function documentsPaths() {
   return withCaseReasons('documents', CASE_REASONS, {
@@ -90,10 +157,16 @@ export function documentsPaths() {
         summary: 'Complete Google Drive document-storage OAuth',
         tag: 'Documents',
         admin: true,
-        stateChanging: true,
-        description: 'Validates Drive-specific OAuth state and candidate credentials before replacing stored Drive tokens, then redirects to the Documents storage settings. A successful callback does not select Drive for uploads.',
+        description: 'Validates Drive-specific OAuth state and candidate credentials before replacing stored Drive tokens, then redirects to the Documents storage settings. A successful callback does not select Drive for uploads. Google calls it as a plain redirect, so it takes no CSRF header; every outcome of the exchange is a redirect. Further parameters Google adds (`authuser`, `prompt`, `hd`) are ignored.',
+        params: [
+          { name: 'code', in: 'query', required: false, schema: { type: 'string' }, description: 'The authorization code. Without it the callback redirects with `drive_error`.' },
+          { name: 'state', in: 'query', required: false, schema: { type: 'string' }, description: 'The state value of the OAuth start; it must match the session.' },
+          { name: 'error', in: 'query', required: false, schema: { type: 'string' }, description: 'The refusal Google reports, e.g. `access_denied`.' },
+          { name: 'scope', in: 'query', required: false, schema: { type: 'string' }, description: 'The granted scopes, space-separated.' },
+        ],
         responses: {
           302: { description: 'Redirect to Documents storage settings with drive_ok or drive_error' },
+          400: BAD_REQUEST,
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
         },
@@ -141,7 +214,10 @@ export function documentsPaths() {
         summary: 'Create document folder',
         tag: 'Documents',
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: body({
+          name: text('The folder name.'),
+          parent_id: rowIdOrNull('The parent folder; `null` places the folder at the top.'),
+        }, ['name']),
         responses: {
           201: { description: 'Document folder created' },
           400: { $ref: '#/components/responses/BadRequest' },
@@ -155,9 +231,13 @@ export function documentsPaths() {
       put: op({
         summary: 'Rename or move document folder',
         tag: 'Documents',
-        params: [idParam()],
+        params: [folderId()],
         stateChanging: true,
-        requestBody: jsonBody(null),
+        description: 'Each field is optional and one that is not sent stays as it is: a rename does not move the folder, a move does not rename it.',
+        requestBody: body({
+          name: text('The new folder name.'),
+          parent_id: rowIdOrNull('The new parent folder; `null` moves the folder to the top.'),
+        }),
         responses: {
           200: { description: 'Document folder updated' },
           400: { $ref: '#/components/responses/BadRequest' },
@@ -173,18 +253,19 @@ export function documentsPaths() {
         stateChanging: true,
         description: 'Deletes the folder and all subfolders. `documents=unfile` keeps every document row and clears its folder link, including documents hidden from the caller, while reporting only the visible unfile count. `documents=delete` requires the opaque HMAC snapshot from the latest delete-impact response; the token binds exact folder identities and the document and collateral-link identities visible to the caller. The route then sequentially deletes visible document content and rows while locking the previewed identities, subtree targets and new document links. Documents hidden from the caller are never deleted, locked or reported in either mode: they keep their row and lose only their folder link, as with `documents=unfile`, so the answer is the same with and without them. Destructive deletion is rejected before the first storage operation: first with 409 `FOLDER_CONTENT_CHANGED` if the previewed visible identities changed, then with 403 `FOLDER_DOCUMENTS_NOT_MANAGEABLE` if a non-admin does not own every visible document. `documents=unfile` is not blocked by a single-document deletion in progress, only by an overlapping folder deletion. A 207 response distinguishes storage, database-row and concurrent-content failures while retaining the folder subtree; it names only documents visible to the caller.',
         params: [
-          idParam(),
+          folderId(),
           {
             name: 'documents',
             in: 'query',
             required: false,
+            description: 'What happens to the documents in the subtree. Up to v2.93 an empty value counted as `unfile`; it is a 400 now.',
             schema: { type: 'string', enum: ['unfile', 'delete'], default: 'unfile' },
           },
           {
             name: 'expected_documents',
             in: 'query',
             required: false,
-            description: 'Visible document count from the latest delete-impact response. A mismatch rejects the request before deletion.',
+            description: 'Visible document count from the latest delete-impact response. A mismatch rejects the request before deletion. Up to v2.93 an empty value counted as 0; it is a 400 now.',
             schema: { type: 'integer', minimum: 0 },
           },
           {
@@ -219,7 +300,7 @@ export function documentsPaths() {
         summary: 'Preview the impact of deleting a document folder subtree',
         tag: 'Documents',
         description: 'Returns the visible document count, exact folder count, affected-record counts grouped by module, an opaque HMAC snapshot bound to the folder identities and the visible document and collateral-link identities (changes to hidden documents or hidden records never change it), and `can_delete_documents`: whether the caller may delete every document they can see (always true for an admin). `linked_records` counts, per module, only records the caller can see there; a module the caller may not read (member right or token scope; shared expenses follow `budget`) is `null`, not zero. Hidden documents change nothing in this response - neither a count nor `can_delete_documents` reveals them; a destructive `DELETE` leaves them in place and only clears their folder link.',
-        params: [idParam()],
+        params: [folderId()],
         responses: {
           200: { description: 'Folder deletion impact' },
           400: { $ref: '#/components/responses/BadRequest' },
@@ -238,22 +319,28 @@ export function documentsPaths() {
             name: 'status',
             in: 'query',
             required: false,
-            schema: { type: 'string', enum: ['active', 'archived'], default: 'active' },
+            description: 'Up to v2.93 an unknown value listed the active documents silently; it is a 400 now.',
+            schema: { ...STATUS, default: 'active' },
           },
           {
             name: 'category',
             in: 'query',
             required: false,
-            schema: {
-              type: 'string',
-              enum: ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'],
-            },
+            description: 'Up to v2.93 an unknown value listed every category silently; it is a 400 now.',
+            schema: CATEGORY,
+          },
+          {
+            name: 'folder_id',
+            in: 'query',
+            required: false,
+            description: 'Only documents in this folder and the folders below it. A folder that does not exist lists nothing. Up to v2.93 a value that was not a positive integer listed every document silently; it is a 400 now.',
+            schema: { type: 'integer', minimum: 1 },
           },
           {
             name: 'expiring',
             in: 'query',
             required: false,
-            description: 'Only documents whose expires_at is within the next N days or already past. An invalid value is silently skipped (no filter applied), same as an invalid status/category.',
+            description: 'Only documents whose expires_at is within the next N days or already past. Up to v2.93 an invalid value was skipped silently (no filter); it is a 400 now.',
             schema: { type: 'integer', minimum: 0 },
           },
           {
@@ -279,7 +366,22 @@ export function documentsPaths() {
         tag: 'Documents',
         stateChanging: true,
         description: 'Stores a document using the active upload backend (`local`, `webdav`, or `google_drive`) with family, restricted, or private visibility. File content is sent as a base64 data URL in `content_data`. An environment-managed local folder may override the selected destination. Filing: `folder_id` targets an existing folder; `folder_key` names the system folder a module files its receipts in (`budget`, `tasks`, `splitExpenses`, `inventory`, `housekeeping`, `calendarItems`) and is what identifies it, while `folder_name` is only the label used if that folder still has to be created. Sending `folder_name` alone still works and matches on the name, which is what two clients in different languages used to file into two separate folders. `subject_user_id` names the household member the document is about.',
-        requestBody: jsonBody(null),
+        requestBody: body({
+          name: text('The document name.'),
+          original_name: text('The file name of the upload.'),
+          description: optionalText('Free text.'),
+          content_data: { type: 'string', description: 'The file as a base64 data URL (`data:<type>;base64,...`). Its grammar, type, size and signature are the route\'s checks, with their own `reason`.' },
+          category: { ...CATEGORY, default: 'other', description: 'Without it `other`. Up to v2.93 an unknown value became `other` silently; it is a 400 now.' },
+          visibility: { ...VISIBILITY, default: 'family', description: 'Without it `family`. Up to v2.93 an unknown value became `family` - visible to the whole household - silently; it is a 400 now.' },
+          status: { ...STATUS, description: 'Not read on upload: a new document is `active`.' },
+          folder_id: rowIdOrNull('An existing folder to file the document in.'),
+          folder_key: { type: 'string', enum: [...MODULE_FOLDER_KEYS], description: 'The system folder of a module. Up to v2.93 an unknown key was dropped silently; it is a 400 now.' },
+          folder_name: optionalText('The label of the folder `folder_key` names, used if it still has to be created; alone it matches a folder by name.'),
+          expires_at: EXPIRES_AT,
+          expiry_reminder_days: EXPIRY_REMINDER_DAYS,
+          subject_user_id: rowIdOrNull('The household member the document is about.'),
+          allowed_member_ids: ALLOWED_MEMBER_IDS,
+        }, ['name', 'original_name', 'content_data']),
         responses: {
           201: {
             description: 'Document created',
@@ -296,10 +398,21 @@ export function documentsPaths() {
       put: op({
         summary: 'Update family document metadata',
         tag: 'Documents',
-        params: [idParam()],
+        params: [documentId()],
         stateChanging: true,
-        description: 'Updates name, description, category, status, visibility, allowed member IDs and the member the document is about (`subject_user_id`, `null` clears it). Only the owner or an admin can update a document.',
-        requestBody: jsonBody(null),
+        description: 'Updates name, description, category, status, visibility, folder, expiry, allowed member IDs and the member the document is about (`subject_user_id`, `null` clears it). A field that is not sent stays as it is - except `allowed_member_ids`: the access list is replaced on every update, and left out it becomes empty. Only the owner or an admin can update a document.',
+        requestBody: body({
+          name: text('The document name.'),
+          description: optionalText('Free text.'),
+          category: { ...CATEGORY, description: 'Up to v2.93 an unknown value was ignored silently; it is a 400 now.' },
+          visibility: { ...VISIBILITY, description: 'Up to v2.93 an unknown value was ignored silently; it is a 400 now.' },
+          status: { ...STATUS, description: 'Up to v2.93 an unknown value was ignored silently; it is a 400 now.' },
+          folder_id: rowIdOrNull('The folder to file the document in; `null` takes it out of its folder.'),
+          expires_at: EXPIRES_AT,
+          expiry_reminder_days: EXPIRY_REMINDER_DAYS,
+          subject_user_id: rowIdOrNull('The household member the document is about.'),
+          allowed_member_ids: ALLOWED_MEMBER_IDS,
+        }),
         responses: {
           200: {
             description: 'Document metadata updated',
@@ -316,11 +429,12 @@ export function documentsPaths() {
       delete: op({
         summary: 'Delete family document',
         tag: 'Documents',
-        params: [idParam()],
+        params: [documentId()],
         stateChanging: true,
         description: 'Deletes a document. Only the owner or an admin can delete it.',
         responses: {
           204: { description: 'Document deleted' },
+          400: BAD_REQUEST,
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: { description: 'Document not found' },
@@ -334,18 +448,26 @@ export function documentsPaths() {
       patch: op({
         summary: 'Archive or restore family document',
         tag: 'Documents',
-        params: [idParam()],
+        params: [documentId()],
         stateChanging: true,
         documentDeleteConflict: true,
-        description: 'Archives the document by default. Send `{ "archived": false }` to restore it to active status.',
-        requestBody: jsonBody(null),
+        description: 'Archives the document by default, also without a body. Send `{ "archived": false }` to restore it to active status. Up to v2.93 `"false"` and `0` archived it; they are a 400 now.',
+        requestBody: body({ archived: { type: 'boolean' } }, [], false),
+        responses: {
+          200: { description: 'Successful response' },
+          400: BAD_REQUEST,
+          401: UNAUTHORIZED,
+          403: FORBIDDEN,
+          404: { description: 'Document not found', content: API_ERROR },
+          500: SERVER_ERROR,
+        },
       }),
     },
     '/api/v1/documents/{id}/preview': {
       get: op({
         summary: 'Preview family document file',
         tag: 'Documents',
-        params: [idParam()],
+        params: [documentId()],
         description: 'Returns inline bytes for supported previewable document types.',
         responses: {
           200: {
@@ -356,9 +478,13 @@ export function documentsPaths() {
               },
             },
           },
+          400: BAD_REQUEST,
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { description: 'Document not found' },
+          415: { description: 'The document type has no preview' },
           500: { $ref: '#/components/responses/InternalServerError' },
+          502: { description: 'Document-storage operation failed', content: API_ERROR },
+          503: { description: 'A restore is running' },
         },
       }),
     },
@@ -366,7 +492,7 @@ export function documentsPaths() {
       get: op({
         summary: 'Download family document file',
         tag: 'Documents',
-        params: [idParam()],
+        params: [documentId()],
         responses: {
           200: {
             description: 'Document file bytes',
@@ -376,9 +502,12 @@ export function documentsPaths() {
               },
             },
           },
+          400: BAD_REQUEST,
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { description: 'Document not found' },
           500: { $ref: '#/components/responses/InternalServerError' },
+          502: { description: 'Document-storage operation failed', content: API_ERROR },
+          503: { description: 'A restore is running' },
         },
       }),
     },
@@ -412,7 +541,7 @@ export function documentsPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
-          409: { description: 'An account with this base_url already exists' },
+          409: { description: 'An account with this base_url already exists', content: API_ERROR },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -423,9 +552,10 @@ export function documentsPaths() {
         tag: 'Documents',
         admin: true,
         stateChanging: true,
-        params: [idParam('id', 'DMS account ID')],
+        params: [accountId()],
         responses: {
           204: { description: 'DMS account deleted' },
+          400: BAD_REQUEST,
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: { description: 'DMS account not found' },
@@ -439,14 +569,16 @@ export function documentsPaths() {
         tag: 'Documents',
         admin: true,
         stateChanging: true,
-        params: [idParam('id', 'DMS account ID')],
+        params: [accountId()],
         responses: {
           200: {
             description: 'Connection test result',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/DmsTestResponse' } } },
           },
+          400: BAD_REQUEST,
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'DMS account not found', content: API_ERROR },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -461,8 +593,8 @@ export function documentsPaths() {
             name: 'account_id',
             in: 'query',
             required: true,
-            schema: { type: 'integer' },
-            description: 'DMS account ID to search in',
+            schema: { type: 'integer', minimum: 1 },
+            description: 'DMS account ID to search in, plain decimal digits.',
           },
           {
             name: 'q',
@@ -482,6 +614,7 @@ export function documentsPaths() {
           403: { $ref: '#/components/responses/Forbidden' },
           404: { description: 'DMS account not found' },
           500: { $ref: '#/components/responses/InternalServerError' },
+          502: { description: 'The DMS search failed', content: API_ERROR },
         },
       }),
     },
@@ -501,9 +634,10 @@ export function documentsPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
-          404: { description: 'DMS document not found in the remote system' },
-          409: { description: 'Document is already linked' },
+          404: { description: 'DMS account not found, or the document not found in the remote system', content: API_ERROR },
+          409: { description: 'Document is already linked', content: API_ERROR },
           500: { $ref: '#/components/responses/InternalServerError' },
+          502: { description: 'The DMS could not be reached', content: API_ERROR },
         },
       }),
     },
@@ -523,16 +657,50 @@ export function documentsPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
-          404: { description: 'Document or DMS account not found' },
+          404: { description: 'Document or DMS account not found', content: API_ERROR },
           500: { $ref: '#/components/responses/InternalServerError' },
+          502: { description: 'Reading the document or the upload to the DMS failed', content: API_ERROR },
         },
       }),
     },
     '/api/v1/documents/{id}/thumbnail': {
-      get: op({ summary: 'Fetch the thumbnail of a document', tag: 'Documents', params: [idParam()], description: 'Subject to the same visibility rules as the document itself.' }),
+      get: op({
+        summary: 'Fetch the thumbnail of a document',
+        tag: 'Documents',
+        params: [documentId()],
+        description: 'Subject to the same visibility rules as the document itself. Only a document linked from a DMS has one.',
+        responses: {
+          200: { description: 'The image bytes', content: { 'image/*': { schema: { type: 'string', format: 'binary' } } } },
+          400: BAD_REQUEST,
+          401: UNAUTHORIZED,
+          404: { description: 'Document not found, or its DMS account is gone' },
+          415: { description: 'The document has no thumbnail' },
+          500: SERVER_ERROR,
+          502: { description: 'The thumbnail could not be loaded' },
+        },
+      }),
     },
     '/api/v1/documents/dms/thumbnail': {
-      get: op({ summary: 'Fetch a thumbnail from the connected DMS', tag: 'Documents', description: 'Proxies the image from Paperless/Papra so the browser never needs the DMS credentials.' }),
+      get: op({
+        summary: 'Fetch a thumbnail from the connected DMS',
+        tag: 'Documents',
+        admin: true,
+        description: 'Proxies the image from Paperless/Papra so the browser never needs the DMS credentials. Admin-only like the search it belongs to: it reaches the whole DMS, past the visibility of the documents module.',
+        params: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'integer', minimum: 1 }, description: 'DMS account ID, plain decimal digits.' },
+          { name: 'dms_document_id', in: 'query', required: true, schema: { type: 'string', minLength: 1 }, description: 'The document ID in the DMS (`id` of a search result). Nothing but spaces is the route\'s 400.' },
+        ],
+        responses: {
+          200: { description: 'The image bytes (PNG, JPEG, WebP or GIF)', content: { 'image/*': { schema: { type: 'string', format: 'binary' } } } },
+          400: BAD_REQUEST,
+          401: UNAUTHORIZED,
+          403: FORBIDDEN,
+          404: { description: 'DMS account not found, or the document not found in the DMS', content: API_ERROR },
+          415: { description: 'The DMS has no thumbnail for this document', content: API_ERROR },
+          500: SERVER_ERROR,
+          502: { description: 'The thumbnail could not be loaded', content: API_ERROR },
+        },
+      }),
     },
   });
 }

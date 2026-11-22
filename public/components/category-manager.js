@@ -32,8 +32,9 @@
  *   - `numericKeys: true` schickt die Reihenfolge (`PATCH basePath/reorder` und
  *     die der Unterzeilen, `.../subcategories/reorder`) als Zahlen statt als
  *     Text der Schluessel (#2810). Nur fuer Verwalter, deren Schluessel sicher
- *     Ziffern-IDs sind (heute die Lagerorte des Vorrats und des Inventars); ohne
- *     die Option bleibt es Text, wie die anderen Routen es lesen
+ *     Ziffern-IDs sind (heute die Lagerorte des Vorrats und des Inventars und die
+ *     Kategorien des Einkaufs); ohne die Option bleibt es Text, wie die anderen
+ *     Routen es lesen
  *   - Räumt Listener in disconnectedCallback() auf
  *
  * VERTRAG FUER AUFRUFER: die Auffrischung gehoert in den Ereignis-Handler, nicht
