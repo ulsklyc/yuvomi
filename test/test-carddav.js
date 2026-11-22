@@ -1856,7 +1856,7 @@ describe('CardDAV API Routes', () => {
 
       const getHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.get
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(getHandler, 'GET /accounts handler should exist');
       await getHandler(req, res);
@@ -1883,7 +1883,7 @@ describe('CardDAV API Routes', () => {
 
       const getHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.get
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await getHandler(req, res);
 
@@ -1920,7 +1920,7 @@ describe('CardDAV API Routes', () => {
 
       const postHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(postHandler, 'POST /accounts handler should exist');
       await postHandler(req, res);
@@ -1952,7 +1952,7 @@ describe('CardDAV API Routes', () => {
 
       const postHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postHandler(req, res);
 
@@ -1982,7 +1982,7 @@ describe('CardDAV API Routes', () => {
 
       const postHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postHandler(createReq, createRes);
       const accountId = createRes.data.data.account.id;
@@ -2001,7 +2001,7 @@ describe('CardDAV API Routes', () => {
 
       const deleteHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id' && layer.route.methods.delete
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(deleteHandler, 'DELETE /accounts/:id handler should exist');
       await deleteHandler(req, res);
@@ -2026,7 +2026,7 @@ describe('CardDAV API Routes', () => {
 
       const deleteHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id' && layer.route.methods.delete
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await deleteHandler(req, res);
 
@@ -2061,7 +2061,7 @@ describe('CardDAV API Routes', () => {
 
       const testHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id/test' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(testHandler, 'POST /accounts/:id/test handler should exist');
       await testHandler(req, res);
@@ -2093,7 +2093,7 @@ describe('CardDAV API Routes', () => {
 
       const postAccountHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postAccountHandler(createReq, createRes);
       const accountId = createRes.data.data.account.id;
@@ -2112,7 +2112,7 @@ describe('CardDAV API Routes', () => {
 
       const getHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id/addressbooks' && layer.route.methods.get
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(getHandler, 'GET /accounts/:id/addressbooks handler should exist');
       await getHandler(req, res);
@@ -2144,7 +2144,7 @@ describe('CardDAV API Routes', () => {
 
       const getHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id/addressbooks' && layer.route.methods.get
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await getHandler(req, res);
 
@@ -2175,7 +2175,7 @@ describe('CardDAV API Routes', () => {
 
       const postAccountHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postAccountHandler(createReq, createRes);
       const accountId = createRes.data.data.account.id;
@@ -2194,7 +2194,7 @@ describe('CardDAV API Routes', () => {
 
       const refreshHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id/addressbooks/refresh' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(refreshHandler, 'POST /accounts/:id/addressbooks/refresh handler should exist');
       await refreshHandler(req, res);
@@ -2227,7 +2227,7 @@ describe('CardDAV API Routes', () => {
 
       const postAccountHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postAccountHandler(createReq, createRes);
       const accountId = createRes.data.data.account.id;
@@ -2246,7 +2246,7 @@ describe('CardDAV API Routes', () => {
 
       const getAddressbooksHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id/addressbooks' && layer.route.methods.get
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await getAddressbooksHandler(getReq, getRes);
 
@@ -2270,7 +2270,7 @@ describe('CardDAV API Routes', () => {
 
       const putHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/addressbooks/:id' && layer.route.methods.put
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(putHandler, 'PUT /addressbooks/:id handler should exist');
       await putHandler(req, res);
@@ -2296,7 +2296,7 @@ describe('CardDAV API Routes', () => {
 
       const putHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/addressbooks/:id' && layer.route.methods.put
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await putHandler(req, res);
 
@@ -2328,7 +2328,7 @@ describe('CardDAV API Routes', () => {
 
       const postAccountHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postAccountHandler(createReq, createRes);
       const accountId = createRes.data.data.account.id;
@@ -2347,7 +2347,7 @@ describe('CardDAV API Routes', () => {
 
       const syncHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id/sync' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(syncHandler, 'POST /accounts/:id/sync handler should exist');
       await syncHandler(req, res);
@@ -2374,7 +2374,7 @@ describe('CardDAV API Routes', () => {
 
       const syncHandler = cardavRouter.default.stack.find(
         layer => layer.route?.path === '/accounts/:id/sync' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await syncHandler(req, res);
 
@@ -2551,7 +2551,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const getByIdHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/:id' && layer.route.methods.get
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(getByIdHandler, 'GET /contacts/:id handler should exist');
       await getByIdHandler(req, res);
@@ -2634,7 +2634,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const getByIdHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/:id' && layer.route.methods.get
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await getByIdHandler(req, res);
 
@@ -2689,7 +2689,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const postHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       assert.ok(postHandler, 'POST /contacts handler should exist');
       await postHandler(req, res);
@@ -2753,7 +2753,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const postHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postHandler(req, res);
 
@@ -2781,7 +2781,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const postHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postHandler(req, res);
 
@@ -2823,7 +2823,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const postHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postHandler(createReq, createRes);
       const contactId = createRes.data.data.id;
@@ -2854,7 +2854,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const putHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/:id' && layer.route.methods.put
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await putHandler(updateReq, updateRes);
 
@@ -2907,7 +2907,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const postHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postHandler(createReq, createRes);
       const contactId = createRes.data.data.id;
@@ -2928,7 +2928,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const putHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/:id' && layer.route.methods.put
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await putHandler(updateReq, updateRes);
 
@@ -2957,7 +2957,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const postHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/' && layer.route.methods.post
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await postHandler(createReq, createRes);
       const contactId = createRes.data.data.id;
@@ -2979,7 +2979,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       const putHandler = contactsRouter.default.stack.find(
         layer => layer.route?.path === '/:id' && layer.route.methods.put
-      )?.route?.stack[0]?.handle;
+      )?.route?.stack.at(-1)?.handle;
 
       await putHandler(updateReq, updateRes);
 

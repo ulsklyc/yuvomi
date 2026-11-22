@@ -48,18 +48,20 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/shopping', shoppingRouter);
-app.use('/meals', mealsRouter);
 // Derselbe Router noch einmal unter seinem echten Pfad: die MCP-Bruecke ruft
 // `/api/v1/recipes` per Loopback auf (#2197), und genau diesen Weg nimmt der
 // Test am Ende dieser Datei.
 app.use('/api/v1/recipes', recipesRouter);
 // The short paths of this suite (`/`, `/:id/...`) reach the router at its real
 // prefix: validateRequest() reads the operation from the mount (#2810).
+// The meal plan the same way: `/meals...` reaches it at `/api/v1/meals`.
 app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => {
-  if (!/^\/(shopping|meals|api\/v1)(\/|\?|$)/.test(req.url)) req.url = `/api/v1/recipes${req.url}`;
+  if (/^\/meals(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`;
+  else if (!/^\/(shopping|api\/v1)(\/|\?|$)/.test(req.url)) req.url = `/api/v1/recipes${req.url}`;
   next();
 });
 app.use('/api/v1/recipes', recipesRouter);
+app.use('/api/v1/meals', mealsRouter);
 app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));

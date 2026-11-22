@@ -13,7 +13,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 let passed = 0, failed = 0;
 async function asyncTest(name, fn) {
@@ -33,7 +33,6 @@ freshTestDbPath('cardav-toggle');
 process.env.SESSION_SECRET = 'cardav-toggle-test-secret-32bytes-long';
 
 const db = await import('../server/db.js');
-const { default: cardavRouter } = await import('../server/routes/cardav.js');
 db.init();
 const database = db.get();
 
@@ -49,13 +48,15 @@ const insertAb = database.prepare(`
 const personalId = insertAb.run(accountId, 'https://dav.example.com/Contacts/personal/', 'Personal').lastInsertRowid;
 const sharedId = insertAb.run(accountId, 'https://dav.example.com/Contacts/shared/', 'Shared').lastInsertRowid;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); });
-app.use('/contacts/cardav', cardavRouter);
+// Am echten Praefix samt Fehlerhandler (#2810): validateRequest() findet die
+// Operation ueber `req.baseUrl`.
+const app = await createContactsMealsApp({
+  mount: ['cardav'],
+  auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise((r) => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}/contacts/cardav`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1/contacts/cardav`;
 
 const jget = async (u) => { const r = await fetch(u); return { status: r.status, body: await r.json().catch(() => null) }; };
 const jsend = async (u, method, body) => {

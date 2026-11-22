@@ -13,12 +13,15 @@ import { todayKey } from '../utils/timezone.js';
 import { mayWriteModule } from '../authorize/index.ts';
 import { handOverToShoppingList, mealPlanSource } from '../services/kitchen-handover.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL, cookField, cookForNewOccurrence, cookRefusal } from '../services/meal-cook.js';
+import { MEAL_TYPES } from '../services/meals-fields.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Meals');
 
 const router  = express.Router();
 
-const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+// Eine Quelle mit dem OpenAPI-Dokument (#2810): server/services/meals-fields.js.
+const VALID_MEAL_TYPES = [...MEAL_TYPES];
 const VALID_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6]; // 0 = Monday, 6 = Sunday
 
 // Haushaltsweit gültige Wochenstartag-Werte, gespiegelt aus preferences.js.
@@ -31,7 +34,10 @@ const WEEK_START_DAY = { monday: 1, sunday: 0, saturday: 6 };
 /** Wochenstartag des Haushalts als JS-getDay()-Wert (0 = So, 1 = Mo, 6 = Sa). */
 function householdWeekStartDay() {
   const row = db.get().prepare("SELECT value FROM sync_config WHERE key = 'week_start'").get();
-  return WEEK_START_DAY[row?.value] ?? 1;
+  // Nur eigene Schluessel (#2810): ein gespeicherter Wert `constructor` oder
+  // `toString` fand sonst eine Funktion des Prototyps statt keines Eintrags,
+  // und jede Wochenansicht antwortete mit 500 (`Invalid time value`).
+  return Object.hasOwn(WEEK_START_DAY, row?.value ?? '') ? WEEK_START_DAY[row.value] : 1;
 }
 
 /**
@@ -236,7 +242,7 @@ function materializeRecurringMeals(from, to) {
  * Query: ?q=<string>
  * Response: { data: [{ title, meal_type }] }
  */
-router.get('/suggestions', (req, res) => {
+router.get('/suggestions', validateRequest(), (req, res) => {
   try {
     const q = (req.query.q || '').trim();
     if (!q) return res.json({ data: [] });
@@ -270,7 +276,7 @@ router.get('/suggestions', (req, res) => {
  *         cook_color, recurrence_cook_user_id, ingredients: Ingredient[] }
  * Ingredient: { id, meal_id, name, quantity, on_shopping_list }
  */
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const refDate = req.query.week && DATE_RE.test(req.query.week)
       ? req.query.week
@@ -381,7 +387,7 @@ router.get('/', (req, res) => {
  * `repeat_weekly` traegt ihn auch die Serie.
  * Response: { data: Meal }
  */
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const { ingredients = [] } = req.body;
     const vDate       = date(req.body.date, 'date', true);
@@ -478,7 +484,7 @@ router.post('/', (req, res) => {
  * (Discussion #1380), und nennt die uebrigen in `skipped`.
  * Response: 201 { data: Meal[] } bzw. mit skip_occupied { data, skipped }
  */
-router.post('/apply-plan', (req, res) => {
+router.post('/apply-plan', validateRequest(), (req, res) => {
   try {
     const assignments = Array.isArray(req.body.assignments) ? req.body.assignments : [];
     const replaceExisting = req.body.replace_existing === true;
@@ -586,7 +592,7 @@ router.post('/apply-plan', (req, res) => {
  * `?scope=series` die Vorlage und alle Mahlzeiten der Serie.
  * Response: { data: Meal }
  */
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const meal = db.get().prepare('SELECT * FROM meals WHERE id = ?').get(id);
@@ -756,7 +762,7 @@ router.put('/:id', (req, res) => {
  * Mahlzeit löschen (Zutaten werden per CASCADE mitgelöscht).
  * Response: 204 No Content
  */
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id     = parseInt(req.params.id, 10);
     const meal   = db.get().prepare('SELECT * FROM meals WHERE id = ?').get(id);
@@ -825,7 +831,7 @@ router.delete('/:id', (req, res) => {
  * Body: { name, quantity? }
  * Response: { data: Ingredient }
  */
-router.post('/:id/ingredients', (req, res) => {
+router.post('/:id/ingredients', validateRequest(), (req, res) => {
   try {
     const mealId = parseInt(req.params.id, 10);
     const meal   = db.get().prepare('SELECT id FROM meals WHERE id = ?').get(mealId);
@@ -856,7 +862,7 @@ router.post('/:id/ingredients', (req, res) => {
  * Body: { name?, quantity?, on_shopping_list? }
  * Response: { data: Ingredient }
  */
-router.patch('/ingredients/:ingId', (req, res) => {
+router.patch('/ingredients/:ingId', validateRequest(), (req, res) => {
   try {
     const ingId = parseInt(req.params.ingId, 10);
     const ing   = db.get().prepare('SELECT * FROM meal_ingredients WHERE id = ?').get(ingId);
@@ -895,7 +901,7 @@ router.patch('/ingredients/:ingId', (req, res) => {
  * Zutat löschen.
  * Response: 204 No Content
  */
-router.delete('/ingredients/:ingId', (req, res) => {
+router.delete('/ingredients/:ingId', validateRequest(), (req, res) => {
   try {
     const ingId  = parseInt(req.params.ingId, 10);
     const result = db.get().prepare('DELETE FROM meal_ingredients WHERE id = ?').run(ingId);
@@ -911,6 +917,34 @@ router.delete('/ingredients/:ingId', (req, res) => {
 // --------------------------------------------------------
 // Integration: Zutaten → Einkaufsliste (Phase 2, Schritt 12)
 // --------------------------------------------------------
+
+/**
+ * WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1290).
+ *
+ * Die beiden Riegel in server/index.js urteilen am ERSTEN PFADSEGMENT
+ * (`moduleForPath`): diese Aufrufe laufen unter `/meals` und werden deshalb
+ * als `meals` gemessen - angelegt werden aber `shopping_items`. Ein
+ * Mitglied mit `meals: write` und `shopping: none` fuellte so eine Liste,
+ * die es nicht einmal oeffnen darf, und ein Token mit `meals:write` ohne
+ * jeden Einkaufs-Scope genauso. Die Zuordnung am Pfad ist dafuer die
+ * falsche Frage: was ein Aufruf SCHREIBT, weiss nur die Route selbst.
+ * `mayWriteModule()` prueft beide Achsen (Mitgliedsrecht und Token-Scope)
+ * in einem Aufruf.
+ *
+ * VOR DEN 404ern, nicht danach: sonst verriete die Antwort einem
+ * Gesperrten noch, welche Mahlzeit und welche Liste es gibt. Und vor
+ * validateRequest() (#2810): das Recht haengt an keiner Zeile, ein
+ * Gesperrter bekommt seine 403 auch fuer eine kaputte Anfrage.
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireShoppingWrite(req, res, next) {
+  if (!mayWriteModule(req, 'shopping')) {
+    return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
 
 /**
  * POST /api/v1/meals/:id/to-shopping-list
@@ -929,26 +963,9 @@ router.delete('/ingredients/:ingId', (req, res) => {
  * „schon übertragen" zurück - die Zutaten wären dann weder auf der Liste noch
  * erneut übertragbar.
  */
-router.post('/:id/to-shopping-list', (req, res) => {
+router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (req, res) => {
   try {
-    // WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1290).
-    //
-    // Die beiden Riegel in server/index.js urteilen am ERSTEN PFADSEGMENT
-    // (`moduleForPath`): dieser Aufruf laeuft unter `/meals` und wird deshalb
-    // als `meals` gemessen - angelegt werden aber `shopping_items`. Ein
-    // Mitglied mit `meals: write` und `shopping: none` fuellte so eine Liste,
-    // die es nicht einmal oeffnen darf, und ein Token mit `meals:write` ohne
-    // jeden Einkaufs-Scope genauso. Die Zuordnung am Pfad ist dafuer die
-    // falsche Frage: was ein Aufruf SCHREIBT, weiss nur die Route selbst.
-    // `mayWriteModule()` prueft beide Achsen (Mitgliedsrecht und Token-Scope)
-    // in einem Aufruf.
-    //
-    // VOR DEN 404ern, nicht danach: sonst verriete die Antwort einem
-    // Gesperrten noch, welche Mahlzeit und welche Liste es gibt.
-    if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
-    }
-
+    // Das Einkaufs-Recht prueft requireShoppingWrite() vor diesem Handler.
     const mealId = parseInt(req.params.id, 10);
     const meal   = db.get().prepare('SELECT id, recipe_id FROM meals WHERE id = ?').get(mealId);
     if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
@@ -991,14 +1008,9 @@ router.post('/:id/to-shopping-list', (req, res) => {
  * der Oberfläche; die IDs stehen trotzdem in der Antwort, damit ein künftiger
  * Aufrufer nicht als einziger Erzeuger-Pfad ohne Rücknahme dasteht.
  */
-router.post('/week-to-shopping-list', (req, res) => {
+router.post('/week-to-shopping-list', requireShoppingWrite, validateRequest(), (req, res) => {
   try {
-    // Derselbe Grund wie beim Einzel-Transfer darueber (#1290): der Pfad sagt
-    // `meals`, geschrieben wird in den Einkauf.
-    if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
-    }
-
+    // Das Einkaufs-Recht prueft requireShoppingWrite() vor diesem Handler.
     const { listId, week } = req.body;
 
     if (!listId)

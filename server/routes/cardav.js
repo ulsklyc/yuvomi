@@ -11,6 +11,7 @@ import * as CardDAVSync from '../services/cardav-sync.js';
 import { str, secret, bool, collectErrors, MAX_TITLE } from '../middleware/validate.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { remoteFailure } from '../utils/http.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('CardDAV');
 const MAX_URL = 500;
@@ -31,6 +32,9 @@ const router = express.Router();
 // zusaetzlich Pflicht (Scope-Gate in server/index.js). Der Kontakt-Abgleich
 // selbst laeuft im Hintergrund (`sync()`), und Kontakte lesen geht ueber
 // /contacts; beides beruehrt dieser Riegel nicht.
+//
+// Er steht vor validateRequest() in jeder Route (#2810): ein Nicht-Admin
+// bekommt seine 403 vor jeder Pruefung der Anfrage, wie bisher.
 router.use(requireAdmin);
 
 /**
@@ -75,7 +79,7 @@ function failIfConnection(res, err) {
  * Liste aller CardDAV Accounts.
  * Response: { data: Account[] }
  */
-router.get('/accounts', async (req, res) => {
+router.get('/accounts', validateRequest(), async (req, res) => {
   try {
     const accounts = await CardDAVSync.getAllAccounts();
     res.json({ data: accounts });
@@ -91,7 +95,7 @@ router.get('/accounts', async (req, res) => {
  * Body: { name, cardavUrl, username, password }
  * Response: { data: { account, addressbooks } }
  */
-router.post('/accounts', async (req, res) => {
+router.post('/accounts', validateRequest(), async (req, res) => {
   try {
     const vName     = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl      = str(req.body.cardavUrl, 'CardDAV URL', { max: MAX_URL });
@@ -124,7 +128,7 @@ router.post('/accounts', async (req, res) => {
  * 400 `password_required` (siehe `updateAccount`).
  * Response: { data: Account }
  */
-router.put('/accounts/:id', async (req, res) => {
+router.put('/accounts/:id', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
@@ -172,10 +176,16 @@ router.put('/accounts/:id', async (req, res) => {
  * CardDAV Account löschen (CASCADE löscht addressbooks + contacts).
  * Response: { data: { deleted: true } }
  */
-router.delete('/accounts/:id', async (req, res) => {
+router.delete('/accounts/:id', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
+
+    // Ein Konto, das es nicht gibt, ist 404 wie bei test, refresh und sync:
+    // deleteAccount() wirft dafuer, und bis #2810 kam das als 500 `internal`
+    // an, und die Seite zeigte nur den allgemeinen Fehlersatz.
+    const account = db.get().prepare('SELECT id FROM carddav_accounts WHERE id = ?').get(id);
+    if (!account) return fail(res, 404, 'account_not_found', 'Account not found');
 
     await CardDAVSync.deleteAccount(id);
 
@@ -191,7 +201,7 @@ router.delete('/accounts/:id', async (req, res) => {
  * Connection testen (ohne Account zu speichern).
  * Response: { data: { ok, addressbooks } }
  */
-router.post('/accounts/:id/test', async (req, res) => {
+router.post('/accounts/:id/test', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
@@ -218,7 +228,7 @@ router.post('/accounts/:id/test', async (req, res) => {
  * Addressbooks für Account auflisten.
  * Response: { data: Addressbook[] }
  */
-router.get('/accounts/:id/addressbooks', async (req, res) => {
+router.get('/accounts/:id/addressbooks', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
@@ -243,7 +253,7 @@ router.get('/accounts/:id/addressbooks', async (req, res) => {
  * Addressbooks neu discovern (PROPFIND).
  * Response: { data: Addressbook[] }
  */
-router.post('/accounts/:id/addressbooks/refresh', async (req, res) => {
+router.post('/accounts/:id/addressbooks/refresh', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
@@ -274,7 +284,7 @@ router.post('/accounts/:id/addressbooks/refresh', async (req, res) => {
  * Body: { enabled: boolean }
  * Response: { data: { updated: true, enabled: boolean } }
  */
-router.put('/addressbooks/:id', async (req, res) => {
+router.put('/addressbooks/:id', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
@@ -302,7 +312,7 @@ router.put('/addressbooks/:id', async (req, res) => {
  * Sync all enabled addressbooks for account.
  * Response: { data: { synced: boolean, contactsAdded: number, contactsUpdated: number } }
  */
-router.post('/accounts/:id/sync', async (req, res) => {
+router.post('/accounts/:id/sync', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');

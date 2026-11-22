@@ -15,10 +15,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: mealsRouter } = await import('../server/routes/meals.js');
 // Der Einkaufs-Router hängt mit drin, weil die Rücknahme eines Transfers über
 // ihn läuft (POST /shopping/items/undo-transfer). Beim Mahlzeit-Pfad gehört das
 // `on_shopping_list`-Flag zum Übertrag und muss mit zurück - das ist ohne beide
@@ -32,21 +31,25 @@ const LIST = db.prepare(`INSERT INTO shopping_lists (name, created_by) VALUES ('
 const RECIPE = db.prepare(`INSERT INTO recipes (title, created_by) VALUES ('Suppe', ?)`).run(U).lastInsertRowid;
 
 let actor = { id: U, role: 'member' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// Am echten Praefix samt Fehlerhandler (#2810): validateRequest() findet die
+// Operation ueber `req.baseUrl`. Die Pfade der Faelle bleiben relativ zum
+// Essensplan, `call()` setzt das Praefix davor.
+const app = await createContactsMealsApp({
+  mount: ['meals'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
+  after: [['/api/v1/shopping', shoppingRouter]],
 });
-app.use('/shopping', shoppingRouter);
-app.use('/', mealsRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const prefix = path.startsWith('/shopping') ? '/api/v1' : '/api/v1/meals';
+  const res = await fetch(`${baseUrl}${prefix}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -85,7 +88,9 @@ test('GET /suggestions: Präfix-Treffer liefert distinct Titel + Typ', async () 
 test('POST /: fehlender meal_type → 400', async () => {
   const r = await call('POST', '/', { date: '2026-06-15', title: 'X' });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Mahlzeit-Typ/);
+  // Seit #2810 das Schema vor der Route (vorher der deutsche Satz der Route).
+  assert.equal(r.body.reason, 'validation');
+  assert.ok(r.body.fields.some((/** @type {any} */ f) => f.path === 'body/meal_type' && f.rule === 'required'), JSON.stringify(r.body));
 });
 
 test('POST /: ungültiger meal_type → 400', async () => {
@@ -436,7 +441,8 @@ test('POST /apply-plan: skip_occupied, das kein Boolean ist -> 400 statt still a
       assignments: [{ date: '2045-01-15', meal_type: 'dinner', title: 'Import' }],
     });
     assert.equal(r.status, 400, `skip_occupied: ${JSON.stringify(value)}`);
-    assert.match(r.body.error, /skip_occupied/);
+    // Seit #2810 das Schema vor der Route; das Feld ist benannt.
+    assert.ok(r.body.fields.some((/** @type {any} */ f) => f.path === 'body/skip_occupied'), JSON.stringify(r.body));
   }
   assert.deepEqual(mealsIn('2045-01-15', 'dinner'), ['Bestand']);
 });

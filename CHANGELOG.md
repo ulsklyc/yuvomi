@@ -8,6 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Contacts, contact sync and the meal plan check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now
+  (from this release on the meal dialog sends the chosen recipe as a number). Under
+  `/api/v1/contacts`, `/api/v1/contacts/cardav` and `/api/v1/meals`, input that used to be
+  quietly accepted, replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `0x10` and `abc` found nothing (404), `1e2` reached row 1;
+  - a number, list, object or truth value in a text field: a contact named `{}` was stored as
+    `"[object Object]"`, a number as text; on editing a contact or a meal, and on the
+    ingredients of a meal, a number answered 500;
+  - `recipe_id` and `cook_user_id` that are neither whole numbers nor digit text (`"0x10"` was
+    read as recipe 16, `true` as 1 or a 500), a `listId` of a transfer that is not a whole
+    number, a meal type that is empty or `null`, a series end that is not a day;
+  - `ingredients` and `assignments` that are not lists of objects (500);
+  - an unknown `scope` on `PUT` and `DELETE /meals/{id}`: on `DELETE` it deleted the meal;
+  - `week` of the meal plan that is not a day: `abc` and an empty value fell back to the current
+    week, `2026-13-45` answered 500, `2026-02-30` rolled over into March;
+  - `order` of the contact categories that is not a list of text (taken as empty, or 500 for an
+    object entry), a category edit with neither `name` nor `color`;
+  - CardDAV: account fields that are not text (a password that was not text counted as empty),
+    `enabled` of an address book that is not `true` or `false`; the refusal carries
+    `reason: "validation"` and no `errorCode`, and the contact sync page says its sentence for
+    it;
+  - queries given twice (a doubled `q` of the meal suggestions answered 500).
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of contact sync and the shopping write
+  right of the two transfers to the shopping list come first: 403 stays 403, also for a bad
+  request. Lengths stay with the routes, with their `reason` and `params.limit`. Deleting a
+  contact sync account that does not exist answers 404 (`account_not_found`) instead of 500. A
+  week start stored as a built-in property name (`constructor`) no longer breaks the meal plan.
 - **Health answers an unexpected failure with the same sentence as the rest of the API.**
   Vitals, medications and the dose log, lab reports, activities, the CSV exports, the cycle
   tab, caregivers, preventive care and nutrition under `/api/v1/health` said
