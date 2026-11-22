@@ -197,7 +197,22 @@ const SCHED = (/** @type {Record<string, unknown>} */ over = {}) => ({ time_of_d
 const ACT = (/** @type {Record<string, unknown>} */ over = {}) => ({ type: 'run', duration_min: 30, distance_km: 5.2, intensity: 'mittel', calories: 300, performed_at: '2026-11-10T07:00', ...over });
 const LAB = (/** @type {Record<string, unknown>} */ over = {}) => ({ report_date: '2026-11-05', lab_name: 'Labor Nord', ...over });
 const RESULT = (/** @type {Record<string, unknown>} */ over = {}) => ({ analyte: 'Hb', value_num: 14.2, unit: 'g/dL', ref_low: 12, ref_high: 16, ...over });
-const DAYLOG = (/** @type {Record<string, unknown>} */ over = {}) => ({ log_date: '2026-11-12', flow: 'medium', ...over });
+// The full representations of #2810 (group 6, step c): every field a replace
+// or upsert overwrites, with the value leaving it out stood for up to v2.93,
+// so each answer stays the one written before.
+const DAY_FIELDS = (/** @type {Record<string, unknown>} */ over = {}) => ({
+  flow: null, note: null, visibility: null, symptoms: null, basal_temp: null, basal_temp_unit: null,
+  cervix_mucus: null, lh_test: null, pregnancy_test: null, intimacy: null, ...over,
+});
+const DAYLOG = (/** @type {Record<string, unknown>} */ over = {}) => DAY_FIELDS({ log_date: '2026-11-12', flow: 'medium', ...over });
+const SETTINGS = (/** @type {Record<string, unknown>} */ over = {}) => ({
+  cycle_length_avg: null, period_length_avg: null, luteal_length: null, track_fertility: true, pregnancy_mode: false,
+  pregnancy_due_date: null, default_visibility: null, remind_period_days_before: null, remind_log_daily: false,
+  contraception: null, perimenopause_mode: false, show_pms: true, notify_partner_user_id: null, notify_partner_days_before: null, ...over,
+});
+const TARGET = (/** @type {Record<string, unknown>} */ over = {}) => ({
+  energy_kcal: null, fat_g: null, saturated_fat_g: null, carbs_g: null, sugar_g: null, protein_g: null, salt_g: null, fiber_g: null, ...over,
+});
 const TYPE = (/** @type {Record<string, unknown>} */ over = {}) => ({ name: 'Tetanus', kind: 'vaccination', default_interval_months: 120, ...over });
 const RECORD = (/** @type {Record<string, unknown>} */ over = {}) => ({ given_on: '2026-10-01', type_id: ids.type1, ...over });
 const ENTRY = (/** @type {Record<string, unknown>} */ over = {}) => ({ title: 'Muesli', consumed_at: '2026-11-18T08:00', meal_type: 'breakfast', energy_kcal: 350, protein_g: 12, ...over });
@@ -442,12 +457,13 @@ const STEPS = [
   ['l create scheduled', 'POST', () => `/medications/${ids.m2}/logs`, () => ({ schedule_id: ids.s1, scheduled_at: '2026-11-18T08:00', status: 'taken', taken_at: '2026-11-18T08:05', dose_qty: 1, stock_deduct: 1 })],
   () => { ids.l1 = lastId('medication_logs'); },
   ['l create scheduled repeat', 'POST', () => `/medications/${ids.m2}/logs`, () => ({ schedule_id: String(ids.s1), scheduled_at: '2026-11-18T08:00', status: 'taken', stock_deduct: 1 })],
-  ['l create scheduled reset', 'POST', () => `/medications/${ids.m2}/logs`, () => ({ schedule_id: ids.s1, scheduled_at: '2026-11-18T08:00' })],
+  ['l create scheduled reset missing', 'POST', () => `/medications/${ids.m2}/logs`, () => ({ schedule_id: ids.s1, scheduled_at: '2026-11-18T08:00' })],
+  ['l create scheduled reset', 'POST', () => `/medications/${ids.m2}/logs`, () => ({ schedule_id: ids.s1, scheduled_at: '2026-11-18T08:00', status: null })],
   ['l create adhoc taken', 'POST', () => `/medications/${ids.m3}/logs`, { status: 'taken', dose_qty: 1, note: ' Kopfweh ', stock_deduct: 1 }],
   () => { ids.l2 = lastId('medication_logs'); },
   ['l create adhoc pending', 'POST', () => `/medications/${ids.m3}/logs`, { taken_at: '2026-11-18T09:00', status: 'skipped' }],
   () => { ids.l3 = lastId('medication_logs'); },
-  ['l create adhoc pending empty', 'POST', () => `/medications/${ids.m1}/logs`, {}],
+  ['l create adhoc pending empty', 'POST', () => `/medications/${ids.m1}/logs`, { status: null }],
   () => { ids.l4 = lastId('medication_logs'); },
   ['l create taken zoned', 'POST', () => `/medications/${ids.m1}/logs`, { status: 'taken', taken_at: '2026-11-18T07:00:00Z' }],
   ['l create status unknown', 'POST', () => `/medications/${ids.m1}/logs`, { status: 'done' }],
@@ -455,18 +471,18 @@ const STEPS = [
   ['l create status proto', 'POST', () => `/medications/${ids.m1}/logs`, { status: 'toString' }],
   ['l create deduct negative', 'POST', () => `/medications/${ids.m1}/logs`, { status: 'taken', stock_deduct: -1 }],
   ['l create deduct text', 'POST', () => `/medications/${ids.m1}/logs`, { status: 'taken', stock_deduct: '1' }],
-  ['l create dose text', 'POST', () => `/medications/${ids.m1}/logs`, { dose_qty: '1' }],
-  ['l create schedule foreign', 'POST', () => `/medications/${ids.m1}/logs`, () => ({ schedule_id: ids.s1 })],
-  ['l create schedule zero', 'POST', () => `/medications/${ids.m1}/logs`, { schedule_id: 0 }],
-  ['l create schedule letters', 'POST', () => `/medications/${ids.m1}/logs`, { schedule_id: '3a' }],
-  ['l create schedule empty', 'POST', () => `/medications/${ids.m1}/logs`, { schedule_id: '' }],
-  ['l create scheduled_at bad', 'POST', () => `/medications/${ids.m1}/logs`, { scheduled_at: 'morgen' }],
-  ['l create note long', 'POST', () => `/medications/${ids.m1}/logs`, { note: LONG(MAX_TEXT + 1) }],
+  ['l create dose text', 'POST', () => `/medications/${ids.m1}/logs`, { status: null, dose_qty: '1' }],
+  ['l create schedule foreign', 'POST', () => `/medications/${ids.m1}/logs`, () => ({ status: null, schedule_id: ids.s1 })],
+  ['l create schedule zero', 'POST', () => `/medications/${ids.m1}/logs`, { status: null, schedule_id: 0 }],
+  ['l create schedule letters', 'POST', () => `/medications/${ids.m1}/logs`, { status: null, schedule_id: '3a' }],
+  ['l create schedule empty', 'POST', () => `/medications/${ids.m1}/logs`, { status: null, schedule_id: '' }],
+  ['l create scheduled_at bad', 'POST', () => `/medications/${ids.m1}/logs`, { status: null, scheduled_at: 'morgen' }],
+  ['l create note long', 'POST', () => `/medications/${ids.m1}/logs`, { status: null, note: LONG(MAX_TEXT + 1) }],
   ['l create no body', 'POST', () => `/medications/${ids.m1}/logs`, NO_BODY],
-  ['l create out', 'POST', () => `/medications/${ids.m1}/logs`, {}, { actor: 'out' }],
+  ['l create out', 'POST', () => `/medications/${ids.m1}/logs`, { status: null }, { actor: 'out' }],
   ['l create care', 'POST', () => `/medications/${ids.mCare}/logs`, { status: 'taken', taken_at: '2026-11-18T10:00' }, { actor: 'care' }],
-  ['l create zero', 'POST', '/medications/0/logs', {}],
-  ['l create minus zero', 'POST', '/medications/-0/logs', {}],
+  ['l create zero', 'POST', '/medications/0/logs', { status: null }],
+  ['l create minus zero', 'POST', '/medications/-0/logs', { status: null }],
   ['l list', 'GET', () => `/medications/${ids.m3}/logs`, NO_BODY],
   ['l list range', 'GET', () => `/medications/${ids.m2}/logs?from=2026-11-18T00:00&to=2026-11-18T23:59`, NO_BODY],
   ['l list out', 'GET', () => `/medications/${ids.m3}/logs`, NO_BODY, { actor: 'out' }],
@@ -659,19 +675,20 @@ const STEPS = [
 
   // ══ NUTRITION ══════════════════════════════════════════════════════════════
   ['n target empty', 'GET', '/nutrition/targets', NO_BODY],
-  ['n target put', 'PUT', '/nutrition/targets', { energy_kcal: 2000, protein_g: 60, fat_g: 0 }],
-  ['n target put cared', 'PUT', '/nutrition/targets', { user_id: OWN, carbs_g: 250 }, { actor: 'care' }],
-  ['n target put other', 'PUT', '/nutrition/targets', { user_id: OWN, carbs_g: 250 }, { actor: 'out' }],
-  ['n target put user zero', 'PUT', '/nutrition/targets', { user_id: 0, carbs_g: 250 }],
-  ['n target put negative', 'PUT', '/nutrition/targets', { energy_kcal: -1 }],
-  ['n target put too much', 'PUT', '/nutrition/targets', { energy_kcal: 100001 }],
-  ['n target put text', 'PUT', '/nutrition/targets', { energy_kcal: '2000' }],
-  ['n target put empty text', 'PUT', '/nutrition/targets', { energy_kcal: '' }],
+  ['n target put', 'PUT', '/nutrition/targets', TARGET({ energy_kcal: 2000, protein_g: 60, fat_g: 0 })],
+  ['n target put cared', 'PUT', '/nutrition/targets', TARGET({ user_id: OWN, carbs_g: 250 }), { actor: 'care' }],
+  ['n target put other', 'PUT', '/nutrition/targets', TARGET({ user_id: OWN, carbs_g: 250 }), { actor: 'out' }],
+  ['n target put user zero', 'PUT', '/nutrition/targets', TARGET({ user_id: 0, carbs_g: 250 })],
+  ['n target put negative', 'PUT', '/nutrition/targets', TARGET({ energy_kcal: -1 })],
+  ['n target put too much', 'PUT', '/nutrition/targets', TARGET({ energy_kcal: 100001 })],
+  ['n target put text', 'PUT', '/nutrition/targets', TARGET({ energy_kcal: '2000' })],
+  ['n target put empty text', 'PUT', '/nutrition/targets', TARGET({ energy_kcal: '' })],
   ['n target get', 'GET', '/nutrition/targets', NO_BODY],
   ['n target get care', 'GET', `/nutrition/targets?user_id=${OWN}`, NO_BODY, { actor: 'care' }],
   ['n target get out', 'GET', `/nutrition/targets?user_id=${OWN}`, NO_BODY, { actor: 'out' }],
   ['n target get user zero', 'GET', '/nutrition/targets?user_id=0', NO_BODY],
-  ['n target put clear', 'PUT', '/nutrition/targets', { user_id: OWN }, { actor: 'care' }],
+  ['n target put missing', 'PUT', '/nutrition/targets', { user_id: OWN, carbs_g: 250 }, { actor: 'care' }],
+  ['n target put clear', 'PUT', '/nutrition/targets', TARGET({ user_id: OWN }), { actor: 'care' }],
   ['n target put no body', 'PUT', '/nutrition/targets', NO_BODY],
   ['n entry create', 'POST', '/nutrition/entries', ENTRY({ note: ' lecker ', visibility: 'all', fat_g: 0 })],
   () => { ids.n1 = lastId('health_nutrition_entries'); },
@@ -857,14 +874,15 @@ const STEPS = [
   ['c period patch leading zero', 'PATCH', () => `/cycle/periods/00${ids.cp2}`, { note: 'vorn' }],
   ['c log create', 'POST', '/cycle/logs', DAYLOG({ note: ' Bauch ', visibility: 'family', symptoms: [{ key: 'cramps', intensity: 2 }, 'headache', 'cramps'], basal_temp: 36.6, basal_temp_unit: 'c', cervix_mucus: 'creamy', lh_test: 'negative', pregnancy_test: '', intimacy: 'protected', feelings: ['good', 'anxious', 'good'] })],
   () => { ids.cl1 = lastId('cycle_day_logs'); },
+  ['c log create repeat missing', 'POST', '/cycle/logs', { log_date: '2026-11-12', flow: 'light' }],
   ['c log create repeat', 'POST', '/cycle/logs', DAYLOG({ flow: 'light' })],
-  ['c log create mood', 'POST', '/cycle/logs', { log_date: '2026-11-13', mood: 'sad', symptoms: 'cramps, bloating', basal_temp: 98.2, basal_temp_unit: 'f' }],
+  ['c log create mood', 'POST', '/cycle/logs', DAY_FIELDS({ log_date: '2026-11-13', mood: 'sad', symptoms: 'cramps, bloating', basal_temp: 98.2, basal_temp_unit: 'f' })],
   () => { ids.cl2 = lastId('cycle_day_logs'); },
-  ['c log create empty choices', 'POST', '/cycle/logs', { log_date: '2026-11-14', flow: '', cervix_mucus: null, mood: '', basal_temp: null, basal_temp_unit: null, symptoms: null }],
+  ['c log create empty choices', 'POST', '/cycle/logs', DAY_FIELDS({ log_date: '2026-11-14', flow: '', cervix_mucus: null, mood: '', basal_temp: null, basal_temp_unit: null, symptoms: null })],
   ['c log create flow unknown', 'POST', '/cycle/logs', DAYLOG({ flow: 'heavyish' })],
   ['c log create flow proto', 'POST', '/cycle/logs', DAYLOG({ flow: 'constructor' })],
   ['c log create date bad', 'POST', '/cycle/logs', DAYLOG({ log_date: '2026-11-31' })],
-  ['c log create date missing', 'POST', '/cycle/logs', { flow: 'light' }],
+  ['c log create date missing', 'POST', '/cycle/logs', DAY_FIELDS({ flow: 'light' })],
   ['c log create visibility unknown', 'POST', '/cycle/logs', DAYLOG({ visibility: 'all' })],
   ['c log create mucus unknown', 'POST', '/cycle/logs', DAYLOG({ cervix_mucus: 'wet' })],
   ['c log create lh unknown', 'POST', '/cycle/logs', DAYLOG({ lh_test: 'maybe' })],
@@ -879,12 +897,12 @@ const STEPS = [
   ['c log create temp unit upper', 'POST', '/cycle/logs', DAYLOG({ basal_temp: 36.5, basal_temp_unit: 'C' })],
   ['c log create temp unit proto', 'POST', '/cycle/logs', DAYLOG({ basal_temp: 99999, basal_temp_unit: 'constructor' })],
   ['c log create temp text', 'POST', '/cycle/logs', DAYLOG({ basal_temp: '36.5', basal_temp_unit: 'c' })],
-  ['c log create unit without temp', 'POST', '/cycle/logs', { log_date: '2026-11-15', basal_temp_unit: 'c' }],
+  ['c log create unit without temp', 'POST', '/cycle/logs', DAY_FIELDS({ log_date: '2026-11-15', basal_temp_unit: 'c' })],
   ['c log create feelings unknown', 'POST', '/cycle/logs', DAYLOG({ feelings: ['grumpy'] })],
   ['c log create feelings text', 'POST', '/cycle/logs', DAYLOG({ feelings: 'good' })],
   ['c log create feelings upper', 'POST', '/cycle/logs', DAYLOG({ feelings: ['Good'] })],
   ['c log create mood unknown', 'POST', '/cycle/logs', DAYLOG({ mood: 'grumpy' })],
-  ['c log create feelings null', 'POST', '/cycle/logs', { log_date: '2026-11-13', feelings: null }],
+  ['c log create feelings null', 'POST', '/cycle/logs', DAY_FIELDS({ log_date: '2026-11-13', feelings: null })],
   ['c log create no body', 'POST', '/cycle/logs', NO_BODY],
   ['c logs', 'GET', '/cycle/logs', NO_BODY],
   ['c logs range', 'GET', '/cycle/logs?from=2026-11-13&to=2026-11-13', NO_BODY],
@@ -896,39 +914,39 @@ const STEPS = [
   ['c log delete minus zero', 'DELETE', '/cycle/logs/-0', NO_BODY],
   ['c log delete', 'DELETE', () => `/cycle/logs/0${ids.cl2}`, NO_BODY],
   ['c settings default', 'GET', '/cycle/settings', NO_BODY],
-  ['c settings put', 'PUT', '/cycle/settings', { cycle_length_avg: 28, period_length_avg: 5, luteal_length: 13, track_fertility: false, pregnancy_mode: 0, default_visibility: 'family', remind_period_days_before: 2, remind_log_daily: true, contraception: 'pill', perimenopause_mode: false, show_pms: 1, notify_partner_user_id: CARE, notify_partner_days_before: 1 }],
+  ['c settings put', 'PUT', '/cycle/settings', SETTINGS({ cycle_length_avg: 28, period_length_avg: 5, luteal_length: 13, track_fertility: false, pregnancy_mode: 0, default_visibility: 'family', remind_period_days_before: 2, remind_log_daily: true, contraception: 'pill', perimenopause_mode: false, show_pms: 1, notify_partner_user_id: CARE, notify_partner_days_before: 1 })],
   ['c settings get', 'GET', '/cycle/settings', NO_BODY],
   ['c settings put empty', 'PUT', '/cycle/settings', {}],
-  ['c settings put partner text', 'PUT', '/cycle/settings', { notify_partner_user_id: String(CARE) }],
-  ['c settings put partner self', 'PUT', '/cycle/settings', { notify_partner_user_id: OWN }],
-  ['c settings put partner zero', 'PUT', '/cycle/settings', { notify_partner_user_id: 0 }],
-  ['c settings put partner zero text', 'PUT', '/cycle/settings', { notify_partner_user_id: '0' }],
-  ['c settings put partner negative', 'PUT', '/cycle/settings', { notify_partner_user_id: -3 }],
-  ['c settings put partner child', 'PUT', '/cycle/settings', { notify_partner_user_id: KID }],
-  ['c settings put partner guest', 'PUT', '/cycle/settings', { notify_partner_user_id: GUEST }],
-  ['c settings put partner missing', 'PUT', '/cycle/settings', { notify_partner_user_id: MISSING }],
-  ['c settings put partner letters', 'PUT', '/cycle/settings', { notify_partner_user_id: '12abc' }],
-  ['c settings put partner true', 'PUT', '/cycle/settings', { notify_partner_user_id: true }],
-  ['c settings put length low', 'PUT', '/cycle/settings', { cycle_length_avg: 14 }],
-  ['c settings put length high', 'PUT', '/cycle/settings', { cycle_length_avg: 100 }],
-  ['c settings put length text', 'PUT', '/cycle/settings', { cycle_length_avg: '28' }],
-  ['c settings put length fraction', 'PUT', '/cycle/settings', { cycle_length_avg: 28.5 }],
-  ['c settings put length empty', 'PUT', '/cycle/settings', { cycle_length_avg: '' }],
-  ['c settings put luteal null', 'PUT', '/cycle/settings', { luteal_length: null }],
-  ['c settings put remind high', 'PUT', '/cycle/settings', { remind_period_days_before: 99 }],
-  ['c settings put track text', 'PUT', '/cycle/settings', { track_fertility: 'yes' }],
-  ['c settings put track null', 'PUT', '/cycle/settings', { track_fertility: null }],
-  ['c settings put pregnancy two', 'PUT', '/cycle/settings', { pregnancy_mode: 2 }],
-  ['c settings put remind text', 'PUT', '/cycle/settings', { remind_log_daily: '1' }],
-  ['c settings put peri text', 'PUT', '/cycle/settings', { perimenopause_mode: 'false' }],
-  ['c settings put pms text', 'PUT', '/cycle/settings', { show_pms: 'on' }],
-  ['c settings put due bad', 'PUT', '/cycle/settings', { pregnancy_due_date: '2027-02-29' }],
-  ['c settings put due', 'PUT', '/cycle/settings', { pregnancy_mode: true, pregnancy_due_date: '2027-05-01' }],
-  ['c settings put visibility unknown', 'PUT', '/cycle/settings', { default_visibility: 'all' }],
-  ['c settings put contraception unknown', 'PUT', '/cycle/settings', { contraception: 'luck' }],
-  ['c settings put contraception proto', 'PUT', '/cycle/settings', { contraception: 'toString' }],
+  ['c settings put partner text', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: String(CARE) })],
+  ['c settings put partner self', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: OWN })],
+  ['c settings put partner zero', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: 0 })],
+  ['c settings put partner zero text', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: '0' })],
+  ['c settings put partner negative', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: -3 })],
+  ['c settings put partner child', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: KID })],
+  ['c settings put partner guest', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: GUEST })],
+  ['c settings put partner missing', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: MISSING })],
+  ['c settings put partner letters', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: '12abc' })],
+  ['c settings put partner true', 'PUT', '/cycle/settings', SETTINGS({ notify_partner_user_id: true })],
+  ['c settings put length low', 'PUT', '/cycle/settings', SETTINGS({ cycle_length_avg: 14 })],
+  ['c settings put length high', 'PUT', '/cycle/settings', SETTINGS({ cycle_length_avg: 100 })],
+  ['c settings put length text', 'PUT', '/cycle/settings', SETTINGS({ cycle_length_avg: '28' })],
+  ['c settings put length fraction', 'PUT', '/cycle/settings', SETTINGS({ cycle_length_avg: 28.5 })],
+  ['c settings put length empty', 'PUT', '/cycle/settings', SETTINGS({ cycle_length_avg: '' })],
+  ['c settings put luteal null', 'PUT', '/cycle/settings', SETTINGS({ luteal_length: null })],
+  ['c settings put remind high', 'PUT', '/cycle/settings', SETTINGS({ remind_period_days_before: 99 })],
+  ['c settings put track text', 'PUT', '/cycle/settings', SETTINGS({ track_fertility: 'yes' })],
+  ['c settings put track null', 'PUT', '/cycle/settings', SETTINGS({ track_fertility: null })],
+  ['c settings put pregnancy two', 'PUT', '/cycle/settings', SETTINGS({ pregnancy_mode: 2 })],
+  ['c settings put remind text', 'PUT', '/cycle/settings', SETTINGS({ remind_log_daily: '1' })],
+  ['c settings put peri text', 'PUT', '/cycle/settings', SETTINGS({ perimenopause_mode: 'false' })],
+  ['c settings put pms text', 'PUT', '/cycle/settings', SETTINGS({ show_pms: 'on' })],
+  ['c settings put due bad', 'PUT', '/cycle/settings', SETTINGS({ pregnancy_due_date: '2027-02-29' })],
+  ['c settings put due', 'PUT', '/cycle/settings', SETTINGS({ pregnancy_mode: true, pregnancy_due_date: '2027-05-01' })],
+  ['c settings put visibility unknown', 'PUT', '/cycle/settings', SETTINGS({ default_visibility: 'all' })],
+  ['c settings put contraception unknown', 'PUT', '/cycle/settings', SETTINGS({ contraception: 'luck' })],
+  ['c settings put contraception proto', 'PUT', '/cycle/settings', SETTINGS({ contraception: 'toString' })],
   ['c settings put no body', 'PUT', '/cycle/settings', NO_BODY],
-  ['c settings put back', 'PUT', '/cycle/settings', { default_visibility: 'family', cycle_length_avg: 30 }],
+  ['c settings put back', 'PUT', '/cycle/settings', SETTINGS({ default_visibility: 'family', cycle_length_avg: 30 })],
   ['c settings other', 'GET', '/cycle/settings', NO_BODY, { actor: 'out' }],
   ['c visibility', 'PATCH', '/cycle/visibility', { visibility: 'private' }],
   ['c visibility family', 'PATCH', '/cycle/visibility', { visibility: 'family' }],
@@ -1207,7 +1225,7 @@ test('an unexpected error in each of the 85 routes is a 500 of the central handl
   const med = await created('/medications', MED({ name: 'Probe' }));
   const schedule = await created(`/medications/${med}/schedules`, SCHED());
   const dose = await created(`/medications/${med}/logs`, { status: 'taken', dose_qty: 1 });
-  const pending = await created(`/medications/${med}/logs`, {});
+  const pending = await created(`/medications/${med}/logs`, { status: null });
   await assertAllCentral([
     ['GET', '/medications', NO_BODY, '/medications'],
     ['POST', '/medications', MED({ name: 'Probe 2' }), '/medications'],
@@ -1216,7 +1234,7 @@ test('an unexpected error in each of the 85 routes is a 500 of the central handl
     ['POST', `/medications/${med}/schedules`, SCHED({ time_of_day: '21:00' }), '/medications/:id/schedules'],
     ['PATCH', `/schedules/${schedule}`, { dose_qty: 2 }, '/schedules/:id'],
     ['GET', `/medications/${med}/logs`, NO_BODY, '/medications/:id/logs'],
-    ['POST', `/medications/${med}/logs`, {}, '/medications/:id/logs'],
+    ['POST', `/medications/${med}/logs`, { status: null }, '/medications/:id/logs'],
     ['PATCH', `/logs/${dose}`, { note: 'x' }, '/logs/:id'],
     ['POST', `/logs/${pending}/take`, {}, '/logs/:id/take'],
     ['POST', `/logs/${pending}/skip`, NO_BODY, '/logs/:id/skip'],
@@ -1248,17 +1266,17 @@ test('an unexpected error in each of the 85 routes is a 500 of the central handl
   ]);
   // Cycle and its feed
   const period = await created('/cycle/periods', { start_date: '2026-08-01' });
-  const dayLog = await created('/cycle/logs', { log_date: '2026-08-02' });
+  const dayLog = await created('/cycle/logs', DAY_FIELDS({ log_date: '2026-08-02' }));
   await assertAllCentral([
     ['GET', '/cycle/periods', NO_BODY, '/cycle/periods'],
     ['POST', '/cycle/periods', { start_date: '2026-07-01' }, '/cycle/periods'],
     ['PATCH', `/cycle/periods/${period}`, { note: 'x' }, '/cycle/periods/:id'],
     ['DELETE', `/cycle/periods/${period}`, NO_BODY, '/cycle/periods/:id'],
     ['GET', '/cycle/logs', NO_BODY, '/cycle/logs'],
-    ['POST', '/cycle/logs', { log_date: '2026-08-03' }, '/cycle/logs'],
+    ['POST', '/cycle/logs', DAY_FIELDS({ log_date: '2026-08-03' }), '/cycle/logs'],
     ['DELETE', `/cycle/logs/${dayLog}`, NO_BODY, '/cycle/logs/:id'],
     ['GET', '/cycle/settings', NO_BODY, '/cycle/settings'],
-    ['PUT', '/cycle/settings', {}, '/cycle/settings'],
+    ['PUT', '/cycle/settings', SETTINGS(), '/cycle/settings'],
     ['PATCH', '/cycle/visibility', { visibility: 'private' }, '/cycle/visibility'],
     ['GET', '/export/cycle', NO_BODY, '/export/cycle'],
     ['POST', '/cycle/import', { csv: '2026-06-01,2026-06-04' }, '/cycle/import'],
@@ -1310,7 +1328,7 @@ test('an unexpected error in each of the 85 routes is a 500 of the central handl
   const entry = await created('/nutrition/entries', ENTRY());
   await assertAllCentral([
     ['GET', '/nutrition/targets', NO_BODY, '/nutrition/targets'],
-    ['PUT', '/nutrition/targets', { energy_kcal: 1800 }, '/nutrition/targets'],
+    ['PUT', '/nutrition/targets', TARGET({ energy_kcal: 1800 }), '/nutrition/targets'],
     ['GET', '/nutrition/entries', NO_BODY, '/nutrition/entries'],
     ['POST', '/nutrition/entries', ENTRY(), '/nutrition/entries'],
     ['PATCH', `/nutrition/entries/${entry}`, { note: 'x' }, '/nutrition/entries/:id'],
@@ -1363,7 +1381,7 @@ test('the handled cases keep their own answer and never reach the central handle
   assert.deepEqual(await call('GET', '/fasting/history?from=2026-11-18&to=2026-11-17', NO_BODY), EXPECTED['f history reversed']);
   // health_dose_pending: undo of a pending entry.
   const med = await created('/medications', MED({ name: 'Handfall' }));
-  const pending = await created(`/medications/${med}/logs`, {});
+  const pending = await created(`/medications/${med}/logs`, { status: null });
   assert.deepEqual(await call('POST', `/logs/${pending}/undo`, {}), EXPECTED['l undo pending']);
   // The cycle import reasons with params.
   assert.deepEqual(await call('POST', '/cycle/import', { csv: `start_date\n${'2026-01-01\n'.repeat(10000)}` }), EXPECTED['c import too large']);

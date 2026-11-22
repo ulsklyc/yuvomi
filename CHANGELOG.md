@@ -61,6 +61,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dialog no longer drops the stored conversion and exchange snapshot of an expense whose amount
   and currency it leaves unchanged, and the exact shares of such a converted expense are entered
   and checked in the converted currency, as the server adds them up.
+- **Saving the cycle settings takes all of them.** This is about your own API clients; the app
+  sends every field already. `PUT /health/cycle/settings` without one of its fields reset it to
+  its default: the cycle and period lengths, the due date, contraception, the period reminder
+  and the partner notification were cleared, the luteal phase went back to 14 days, fertility
+  tracking and the PMS window were switched on, pregnancy and perimenopause mode and the daily
+  log nudge were switched off and the default visibility became `private` (`{}` reset them all).
+  All 14 fields are required now; `null` still clears a value where the field takes it, and
+  `luteal_length: null` is still 14.
+- **Saving a cycle day again takes the whole day.** This is about your own API clients; the app
+  sends the whole day already. `POST /health/cycle/logs` on a day that has a log without `flow`,
+  `note`, `visibility`, `symptoms`, `basal_temp`, `basal_temp_unit`, `cervix_mucus`, `lh_test`,
+  `pregnancy_test` or `intimacy` cleared the stored value, emptied the symptoms and made the day
+  `private`. These ten are required now besides `log_date`; `null` and `""` still mean "not
+  given". `feelings` and `mood` stay optional and keep the stored feelings when both are left
+  out.
+- **Setting a nutrition target takes all eight nutrients.** This is about your own API clients;
+  the app sends all eight already. `PUT /health/nutrition/targets` without a nutrient unset it,
+  and `{}` deleted the whole target. All eight are required now; `null` unsets one, and eight
+  `null` still delete the target. `user_id` stays optional and means the caller when left out.
+- **Recording a dose takes its status.** This is about your own API clients; the app sends it
+  already. `POST /health/medications/{id}/logs` without `status` stored `pending`, and repeating
+  a planned dose that was taken (same `schedule_id` and `scheduled_at`) reset it to `pending`
+  and dropped its time. `status` is required now; `null` still means `pending`. `taken_at`,
+  `dose_qty`, `note` and `stock_deduct` stay optional: left out, a repeat keeps the stored time,
+  dose and note and deducts nothing.
 - **An exchange snapshot is an object or `null`.** This is about your own API clients: on
   `POST /split-expenses/groups/{id}/expenses` and `PUT /split-expenses/expenses/{id}`,
   `exchange_snapshot` sent as `false`, `0`, `""` or any other value that is not an object is now

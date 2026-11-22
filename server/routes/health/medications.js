@@ -408,7 +408,12 @@ router.post('/medications/:id/logs', validateRequest(), (req, res) => {
   const takenAt     = v.datetime(b.taken_at, 'taken_at', false, wall);
   const note        = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
   // status aus LOG_STATUS oder null, Zahlen oder null, stock_deduct nicht
-  // negativ: das Schema (#2810).
+  // negativ: das Schema (#2810). `status` ist dort Pflicht: die Wiederholung
+  // eines geplanten Vorkommens ersetzt ihn, und bis v2.93 setzte ein fehlender
+  // einen genommenen Eintrag still auf `pending` zurueck. `null` bleibt
+  // `pending`. Die uebrigen Felder halten beim Fehlen den gespeicherten Wert
+  // (dose_qty, note, taken_at eines genommenen Eintrags) oder buchen nichts
+  // (stock_deduct) und bleiben frei.
   const dose        = b.dose_qty ?? null;
 
   const checks = [scheduledAt, takenAt, note];

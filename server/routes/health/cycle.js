@@ -317,6 +317,11 @@ router.get('/cycle/logs', validateRequest(), (req, res) => {
 });
 
 // POST /cycle/logs  (Upsert: ein Eintrag je user_id + log_date)
+// Der Upsert ersetzt einen bestehenden Tag. Deshalb verlangt das Schema seit
+// #2810 jedes Feld, das er ueberschreibt (flow, note, visibility, symptoms,
+// basal_temp(_unit), cervix_mucus, lh_test, pregnancy_test, intimacy): bis
+// v2.93 leerte ein fehlendes still den gespeicherten Wert. `feelings`/`mood`
+// bleiben frei - fehlen beide, bleibt das Gespeicherte (siehe unten).
 router.post('/cycle/logs', validateRequest(), (req, res) => {
   const viewer = viewerId(req);
   const b = req.body || {};
@@ -453,8 +458,12 @@ router.put('/cycle/settings', validateRequest(), (req, res) => {
 
   // Die Bereiche (ganze Zahlen aus CYCLE_SETTING_RANGES, health-fields.js, oder
   // null), die Schalter (true/false, 1/0) und default_visibility prueft das
-  // Schema vor der Route (#2810). Fehlt ein Wert, gilt sein Standard: das ist
-  // die Voll-Ersetzen-Semantik dieser Route.
+  // Schema vor der Route (#2810). Ein PUT ersetzt die ganze Zeile (RFC 9110),
+  // deshalb verlangt das Schema seit #2810 jedes der 14 Felder: bis v2.93 setzte
+  // ein fehlendes still seinen Standard (luteal 14, Fruchtbarkeit an, PMS an,
+  // der Rest aus/leer). Die Standards unten bleiben nur fuer `null`, wo das
+  // Schema es annimmt (`luteal_length: null` heisst 14, `default_visibility:
+  // null` heisst private).
   // remind_period_days_before: NULL = aus (Standard); sonst der Vorlauf in
   // Tagen vor dem vorhergesagten Periodenbeginn. Obergrenze wie luteal_length:
   // mehr Vorlauf als eine typische Lutealphase waere keine Vorwarnung mehr,
@@ -472,8 +481,8 @@ router.put('/cycle/settings', validateRequest(), (req, res) => {
   // (isEligibleCyclePartner(), cycle-reminders.js), damit die Route niemanden
   // annimmt, den die Auswahlliste gar nicht erst zeigt. Darf ausserdem nicht
   // die aufrufende Person selbst sein: der Eigentuemer veroeffentlicht, eine
-  // Benachrichtigung an sich selbst waere sinnlos. Leer/undefined loescht -
-  // gleiche Voll-Ersetzen-Semantik wie jedes andere Feld dieser Route.
+  // Benachrichtigung an sich selbst waere sinnlos. `null` loescht; fehlen
+  // darf das Feld seit #2810 nicht mehr (Voll-Ersetzen, siehe oben).
   let notifyPartnerUserId = null;
   let notifyPartnerError = null;
   if (b.notify_partner_user_id !== undefined && b.notify_partner_user_id !== null && b.notify_partner_user_id !== '') {

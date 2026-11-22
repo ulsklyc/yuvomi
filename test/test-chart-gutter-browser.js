@@ -138,16 +138,20 @@ const minimumInset = (hostWidth) => Math.max(0, (64 * 600 - hostWidth * 56) / 54
 /* ── 1. Woerter an der Achse: der Schweregrad-Verlauf ────────────────────── */
 
 async function seedCycle(page) {
+  // The whole day as POST /cycle/logs takes it since #2810, the rest as "not given".
+  const rest = { note: null, cervix_mucus: null, lh_test: null, pregnancy_test: null, intimacy: null };
   const days = [[-6, 'heavy', 3, 36.45], [-5, 'heavy', 2, 36.52], [-4, 'medium', 1, 36.61], [-3, 'light', 2, 36.38]];
   for (const [offset, flow, intensity, temp] of days) {
     await api(page, 'POST', '/health/cycle/logs', {
       log_date: await dayKey(page, offset), flow, visibility: 'family', basal_temp: temp, basal_temp_unit: 'c',
-      symptoms: [{ key: 'cramps', intensity }],
+      symptoms: [{ key: 'cramps', intensity }], ...rest,
     });
   }
   // Blutungslast braucht zwei abgeschlossene Perioden mit Eintraegen; der Seed traegt eine.
   for (const [index, flow] of ['heavy', 'medium', 'light'].entries()) {
-    await api(page, 'POST', '/health/cycle/logs', { log_date: await dayKey(page, -34 + index), flow, visibility: 'family' });
+    await api(page, 'POST', '/health/cycle/logs', {
+      log_date: await dayKey(page, -34 + index), flow, visibility: 'family', symptoms: [], basal_temp: null, basal_temp_unit: null, ...rest,
+    });
   }
 }
 
