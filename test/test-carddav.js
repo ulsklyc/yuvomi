@@ -2283,25 +2283,27 @@ describe('CardDAV API Routes', () => {
     it('PUT /addressbooks/:id - should return 400 for invalid enabled value', async () => {
       const cardavRouter = await import('../server/routes/cardav.js');
 
+      // Seit #2810 (Gruppe 7, Schritt b) weist das Schema einen Nicht-Boolean
+      // ab, nicht mehr der Handler: die Absage kommt aus der validateRequest()-
+      // Schicht der Route, als 400 mit dem Feld `body/enabled`.
+      const route = cardavRouter.default.stack.find(
+        layer => layer.route?.path === '/addressbooks/:id' && layer.route.methods.put
+      )?.route;
       const req = {
+        method: 'PUT',
+        baseUrl: '/api/v1/contacts/cardav',
+        route,
         params: { id: '1' },
         query: {},
+        headers: { 'content-type': 'application/json' },
         body: { enabled: 'invalid' }
       };
-      const res = {
-        statusCode: 200,
-        status(code) { this.statusCode = code; return this; },
-        json(data) { this.data = data; return this; },
-      };
 
-      const putHandler = cardavRouter.default.stack.find(
-        layer => layer.route?.path === '/addressbooks/:id' && layer.route.methods.put
-      )?.route?.stack.at(-1)?.handle;
+      let refusal = null;
+      route.stack[0].handle(req, {}, (err) => { refusal = err; });
 
-      await putHandler(req, res);
-
-      assert.strictEqual(res.statusCode, 400);
-      assert.ok(res.data.error.includes('enabled'));
+      assert.strictEqual(refusal?.status, 400);
+      assert.ok(refusal.fields.some((f) => f.path === 'body/enabled'));
     });
   });
 
