@@ -51,6 +51,20 @@ const NAME_PARTS = {
   nameSuffix: text('Suffix (kept, not shown in the display name).'),
 };
 
+const NAME_PART_KEYS = /** @type {Array<keyof typeof NAME_PARTS>} */ (Object.keys(NAME_PARTS));
+
+// Volle Darstellung (#2810, RFC 9110): auf PUT ersetzen die Namensteile alle
+// fuenf gespeicherten, sobald einer kommt; ein fehlender wurde bis v2.93 still
+// `null` (ein importierter Zweitname, Titel oder Suffix ging verloren). Steht
+// einer im Rumpf, sind alle fuenf Pflicht; keiner haelt alle fuenf.
+const NAME_GROUP_NOTE = 'One of five name parts (`firstName`, `lastName`, `middleName`, `namePrefix`, `nameSuffix`) that are sent together or not at all (#2810): left out all together, all five stay as they are; when one is sent, all five are required and replace the stored ones, and `name` is derived from them. Up to v2.93 a part left out next to another was cleared.';
+
+/** The name parts on update: each one names the group it belongs to. */
+const UPDATE_NAME_PARTS = Object.fromEntries(NAME_PART_KEYS.map((key) => [key, { ...NAME_PARTS[key], description: `${NAME_PARTS[key].description} ${NAME_GROUP_NOTE}` }]));
+
+/** Each name part requires the other four (`dependentRequired`). */
+const NAME_GROUP = Object.fromEntries(NAME_PART_KEYS.map((key) => [key, NAME_PART_KEYS.filter((other) => other !== key)]));
+
 /**
  * One entry of `phones` or `emails`. Its label and value are text; that they
  * are not empty, their length and the form of an email address are the
@@ -247,10 +261,10 @@ export function contactsPaths() {
       put: withValidationRefusal(op({
         summary: 'Update contact with multi-value fields',
         tag: 'Contacts',
-        description: 'Every field is optional: a field left out stays as it is. `phones`, `emails` and `addresses`, when sent, replace the whole stored list (an empty list removes all). On a contact linked to an account (`family_user_id`), `email` and `emails` can only be changed by that member or an admin, in a session or with an unscoped token; anyone else, and any token scoped to modules, is refused with 403. Addresses are compared without regard to letter case; sending them unchanged or only in another case is not a change, and the stored spelling is kept. When the member edits their own linked contact, a newly added address that already belongs to another account (split-expense guests excluded) is refused with 409 and `reason: "email_in_use"`; an admin may assign it. All other fields stay editable for anyone with write access to contacts. `birthday_year_unknown` (boolean or 0/1) marks a birthday without a year (#2095): `birthday` then carries the placeholder year 2000 whatever year is sent, and responses carry the flag as 0 or 1. Omitted, the stored flag stays; turning it off needs a `birthday` with its real year in the same request. A request outside the schema is a 400 before the contact is looked up, so it comes before a 404.',
+        description: 'Every field is optional: a field left out stays as it is, with one group: the five name parts (`firstName`, `lastName`, `middleName`, `namePrefix`, `nameSuffix`) are sent all together or not at all; one without the others is a 400 with `reason: "validation"` and `fields` naming a missing part (#2810). `phones`, `emails` and `addresses`, when sent, replace the whole stored list (an empty list removes all). On a contact linked to an account (`family_user_id`), `email` and `emails` can only be changed by that member or an admin, in a session or with an unscoped token; anyone else, and any token scoped to modules, is refused with 403. Addresses are compared without regard to letter case; sending them unchanged or only in another case is not a change, and the stored spelling is kept. When the member edits their own linked contact, a newly added address that already belongs to another account (split-expense guests excluded) is refused with 409 and `reason: "email_in_use"`; an admin may assign it. All other fields stay editable for anyone with write access to contacts. `birthday_year_unknown` (boolean or 0/1) marks a birthday without a year (#2095): `birthday` then carries the placeholder year 2000 whatever year is sent, and responses carry the flag as 0 or 1. Omitted, the stored flag stays; turning it off needs a `birthday` with its real year in the same request. A request outside the schema is a 400 before the contact is looked up, so it comes before a 404.',
         params: [contactId()],
         stateChanging: true,
-        requestBody: body({ properties: CONTACT_PROPERTIES }),
+        requestBody: body({ properties: { ...CONTACT_PROPERTIES, ...UPDATE_NAME_PARTS }, dependentRequired: NAME_GROUP }),
         responses: {
           200: { description: 'Successful response' },
           401: { $ref: '#/components/responses/Unauthorized' },

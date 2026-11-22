@@ -116,6 +116,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and dropped its time. `status` is required now; `null` still means `pending`. `taken_at`,
   `dose_qty`, `note` and `stock_deduct` stay optional: left out, a repeat keeps the stored time,
   dose and note and deducts nothing.
+- **Renaming a contact takes all five name parts.** This is about your own API clients.
+  `PUT /contacts/{id}` with some of `firstName`, `lastName`, `middleName`, `namePrefix` and
+  `nameSuffix` cleared the ones left out, so a middle name, title or suffix from a vCard or
+  CardDAV was lost. Sent together they are required together now: one without the others is a
+  400 naming a missing part; `null` still clears a part, and leaving out all five keeps them.
 - **An exchange snapshot is an object or `null`.** This is about your own API clients: on
   `POST /split-expenses/groups/{id}/expenses` and `PUT /split-expenses/expenses/{id}`,
   `exchange_snapshot` sent as `false`, `0`, `""` or any other value that is not an object is now
@@ -191,6 +196,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the own schedule settings answered this way already.
 
 ### Fixed
+- **Saving a contact in the app keeps its middle name, title and suffix.** A contact imported
+  from a vCard or synced over CardDAV lost them the first time its form was saved, because the
+  form sent only the first and last name; it now sends the stored ones along.
 - **A shared expense converted into a currency with other decimal places reports the converted
   amount correctly.** `converted_amount` in the expense answers was written with the decimal
   places of `currency` instead of `converted_currency`: 1500 JPY converted from USD read

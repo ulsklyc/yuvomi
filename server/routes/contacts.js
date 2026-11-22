@@ -664,7 +664,8 @@ router.post('/', validateRequest(), (req, res) => {
 /**
  * PUT /api/v1/contacts/:id
  * Kontakt bearbeiten.
- * Body: alle Felder optional, phones/emails/addresses mit Replacement-Semantik
+ * Body: alle Felder optional, phones/emails/addresses mit Replacement-Semantik;
+ * die fuenf Namensteile nur zusammen (Schema, #2810)
  * Response: { data: Contact }
  */
 router.put('/:id', validateRequest(), (req, res) => {
@@ -673,7 +674,9 @@ router.put('/:id', validateRequest(), (req, res) => {
   if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
 
   // Namensteile (#535): sobald welche mitkommen, ersetzen sie die gespeicherten
-  // und der Anzeigename wird neu daraus abgeleitet.
+  // und der Anzeigename wird neu daraus abgeleitet. Das Schema verlangt die
+  // Gruppe vollstaendig (#2810, `dependentRequired`): steht einer im Rumpf,
+  // stehen alle fuenf da, ein fehlender wird hier also nie still `null`.
   const nameParts = readNameParts(req.body);
   const derivedName = nameParts.provided ? nameParts.displayName : null;
 
