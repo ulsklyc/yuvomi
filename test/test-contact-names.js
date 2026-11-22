@@ -142,7 +142,8 @@ try {
     const created = await jsend(base, 'POST', { firstName: 'Anna', lastName: 'Alt', category: 'misc' });
     const id = created.body.data.id;
 
-    const res = await jsend(`${base}/${id}`, 'PUT', { firstName: 'Anna', lastName: 'Neu' });
+    // Die fuenf Namensteile kommen zusammen (#2810).
+    const res = await jsend(`${base}/${id}`, 'PUT', { firstName: 'Anna', lastName: 'Neu', middleName: null, namePrefix: null, nameSuffix: null });
     eq(res.status, 200);
     eq(res.body.data.name, 'Anna Neu');
     eq(res.body.data.last_name, 'Neu');
@@ -163,7 +164,7 @@ try {
     const created = await jsend(base, 'POST', { firstName: 'Cem', lastName: 'Weg', category: 'misc' });
     const id = created.body.data.id;
 
-    const res = await jsend(`${base}/${id}`, 'PUT', { firstName: 'Cem', lastName: '' });
+    const res = await jsend(`${base}/${id}`, 'PUT', { firstName: 'Cem', lastName: '', middleName: null, namePrefix: null, nameSuffix: null });
     eq(res.status, 200);
     eq(res.body.data.name, 'Cem');
     eq(res.body.data.last_name, null);
@@ -324,7 +325,7 @@ try {
       'structured-Bedingung fehlt oder wurde umgeschrieben'
     );
     assert(
-      /if \(structured\) \{ body\.firstName = firstName; body\.lastName = lastName; \}/.test(src),
+      /if \(structured\) Object\.assign\(body, \{ firstName, lastName, \.\.\.keptParts \}\);/.test(src),
       'Namensteile werden unbedingt gesendet - geratene Struktur würde persistiert'
     );
   });

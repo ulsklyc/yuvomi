@@ -5,7 +5,9 @@
  *          JSON body - and refuses it with a 400 before the handler runs:
  *            { error, code: 400, reason, fields: [{ path, rule, reason? }] }
  *          `path` is the place plus a pointer (`body/title`, `query/limit`,
- *          `path/id`), `rule` the Ajv keyword (`type`, `required`, `maxLength`),
+ *          `path/id`; a missing property of `required` or `dependentRequired`
+ *          is named in the pointer), `rule` the Ajv keyword (`type`,
+ *          `required`, `dependentRequired`, `maxLength`),
  *          `reason` the route's own one where the schema names it (`x-reason`
  *          below); the answer's `reason` is `validation` otherwise.
  *          Never a value of the request and never a message text of Ajv.
@@ -364,7 +366,9 @@ function compileParameters(ajv: Ajv2020, parameters: Parameter[], place: 'path' 
  * keyword, and the reason its annotation names, if any.
  */
 function fieldOf(spec: OpenApiDocument, place: string, error: ErrorObject): Field {
-  const missing = error.keyword === 'required' ? (error.params as { missingProperty?: unknown }).missingProperty : undefined;
+  const missing = error.keyword === 'required' || error.keyword === 'dependentRequired'
+    ? (error.params as { missingProperty?: unknown }).missingProperty
+    : undefined;
   const pointer = `${error.instancePath}${typeof missing === 'string' ? `/${missing}` : ''}`;
   return withReason({ path: `${place}${pointer}`.slice(0, MAX_PATH_LENGTH), rule: error.keyword }, reasonOfError(spec, error));
 }

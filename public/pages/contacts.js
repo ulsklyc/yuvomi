@@ -1746,8 +1746,21 @@ function buildContactForm({ mode, contact = null }) {
         // Struktur wird nur übertragen, wenn sie gespeichert war oder der Nutzer
         // sie angefasst hat; sonst bleibt der Anzeigename unverändert bestehen.
         const structured = !isEdit || hadStructure || nameTouched;
+        // Zweitname, Titel und Suffix zeigt das Formular nicht; es schickt die
+        // gespeicherten mit, denn der Server nimmt die fuenf Namensteile nur
+        // zusammen (#2810) und ersetzt alle fuenf. Beim Anlegen gibt es keine.
+        // Ohne gespeicherten Vor-/Nachnamen ist das Formular aus dem
+        // Anzeigenamen vorbelegt, der einen Zweitnamen schon enthaelt: dann
+        // ginge er doppelt mit, also bleibt er dort weg.
+        const stored = /** @type {Record<string, string|null>|null} */ (contact);
+        const keptParts = {
+          middleName: hadStructure ? (stored?.middle_name ?? null) : null,
+          namePrefix: stored?.name_prefix ?? null,
+          nameSuffix: stored?.name_suffix ?? null,
+        };
+        // Derselbe Anzeigename, den der Server aus den Teilen ableitet.
         const name      = structured
-          ? (composeDisplayName({ firstName, lastName }) || '')
+          ? (composeDisplayName({ firstName, lastName, middleName: keptParts.middleName }) || '')
           : contact.name;
         const category = panel.querySelector('#cm-category').value;
         // Mehrwert-Gruppen einsammeln: leere Zeilen fallen weg, die erste Zeile
@@ -1792,7 +1805,7 @@ function buildContactForm({ mode, contact = null }) {
           body.emails = emailEntries.map((r, i) => ({ label: r.label || 'other', value: r.value, isPrimary: i === 0 }));
           // Gesperrte Adressen gehen gar nicht erst mit: der Server behaelt sie.
           if (emailsLocked) { delete body.email; delete body.emails; }
-          if (structured) { body.firstName = firstName; body.lastName = lastName; }
+          if (structured) Object.assign(body, { firstName, lastName, ...keptParts });
           // Eine unverändert gebliebene Fremd-Kategorie würde der Server (zu Recht)
           // mit 400 ablehnen; sie wird deshalb weggelassen und bleibt serverseitig
           // per COALESCE erhalten.

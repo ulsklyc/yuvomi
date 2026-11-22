@@ -359,7 +359,11 @@ const STEPS = [
   ['c put notes list', 'PUT', () => `/contacts/${ids.c3}`, { notes: [] }],
   ['c put category gone', 'PUT', () => `/contacts/${ids.c3}`, { category: 'gone' }],
   ['c put category null', 'PUT', () => `/contacts/${ids.c3}`, { category: null }],
-  ['c put first name', 'PUT', () => `/contacts/${ids.c2}`, { firstName: 'Augusta' }],
+  // The name parts come together or not at all (#2810): one alone is a 400
+  // and keeps the stored five; the row after it sends the five, with `null`
+  // for what leaving them out cleared up to v2.93 (same answer as then).
+  ['c put first name alone', 'PUT', () => `/contacts/${ids.c2}`, { firstName: 'Augusta' }],
+  ['c put first name', 'PUT', () => `/contacts/${ids.c2}`, { firstName: 'Augusta', lastName: null, middleName: null, namePrefix: null, nameSuffix: null }],
   ['c put year unknown on', 'PUT', () => `/contacts/${ids.c1}`, { birthday: '1970-05-06' }],
   ['c put year unknown only', 'PUT', () => `/contacts/${ids.c1}`, { birthday_year_unknown: true }],
   ['c put year unknown off without day', 'PUT', () => `/contacts/${ids.c5}`, { birthday_year_unknown: false }],

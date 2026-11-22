@@ -48,6 +48,7 @@ process.env.MODULES_DIR = tempDir('yuvomi-validate-contacts-meals-');
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createContactsMealsApp } from './contacts-meals-app.js';
 
@@ -168,7 +169,7 @@ const FORM_CONTACT = (/** @type {Record<string, unknown>} */ over = {}) => ({
   birthday: '1990-07-18', birthday_year_unknown: false,
   phones: [{ label: 'other', value: '0800 1', isPrimary: true }],
   emails: [{ label: 'other', value: 'ada@example.org', isPrimary: true }],
-  firstName: 'Ada', lastName: 'Lovelace', ...over,
+  firstName: 'Ada', lastName: 'Lovelace', middleName: null, namePrefix: null, nameSuffix: null, ...over,
 });
 /** What the meal dialog sends on create (public/pages/meals.js, saveModal). */
 const FORM_MEAL = (/** @type {Record<string, unknown>} */ over = {}) => ({
@@ -350,6 +351,143 @@ test('contacts: a text field that is not text, a list that is not a list, a flag
 
   refused(await call('GET', '/contacts?q=a&q=b'), 'query/q', 'doubled q');
   refused(await call('GET', '/contacts?category=a&category=b'), 'query/category', 'doubled category');
+});
+
+// ---------------------------------------------------------------------------
+// Full representation: the five name parts of PUT come together (#2810)
+// ---------------------------------------------------------------------------
+
+const NAME_PART_KEYS = ['firstName', 'lastName', 'middleName', 'namePrefix', 'nameSuffix'];
+const NAME_COLUMNS = 'name, first_name, last_name, middle_name, name_prefix, name_suffix';
+/** A contact with all five parts stored, as the vCard import or CardDAV leave it. */
+async function importedContact() {
+  const created = await call('POST', '/contacts', { json: {
+    firstName: 'Ada', lastName: 'Lovelace', middleName: 'King', namePrefix: 'Dr.', nameSuffix: 'Jr.', category: 'misc',
+  } });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  return /** @type {number} */ (created.body.data.id);
+}
+const storedName = (/** @type {number} */ id) => db.prepare(`SELECT ${NAME_COLUMNS} FROM contacts WHERE id = ?`).get(id);
+
+test('contacts PUT: the five name parts come together or not at all', async () => {
+  const id = await importedContact();
+  const stored = storedName(id);
+  assert.deepEqual({ ...stored }, { name: 'Ada King Lovelace', first_name: 'Ada', last_name: 'Lovelace', middle_name: 'King', name_prefix: 'Dr.', name_suffix: 'Jr.' });
+  /** @type {Record<string, string>} */
+  const ALL = { firstName: 'Grace', lastName: 'Hopper', middleName: 'Brewster', namePrefix: 'Adm.', nameSuffix: 'Sr.' };
+
+  // Each part left out next to the other four: 400 naming it, nothing written.
+  for (const key of NAME_PART_KEYS) {
+    const { [key]: _left, ...rest } = ALL;
+    const res = await call('PUT', `/contacts/${id}`, { json: { ...rest, notes: 'nicht geschrieben' } });
+    refused(res, `body/${key}`, `without ${key}`);
+    assert.deepEqual(res.body.fields, [{ path: `body/${key}`, rule: 'dependentRequired' }], `without ${key}`);
+    assert.deepEqual(storedName(id), stored, `without ${key}: the stored five stay`);
+    assert.equal(db.prepare('SELECT notes FROM contacts WHERE id = ?').get(id).notes, null, `without ${key}: nothing written`);
+  }
+  // One part alone (what the form sent before): 400 as well.
+  refused(await call('PUT', `/contacts/${id}`, { json: { firstName: 'Augusta', lastName: 'Byron' } }), 'body/middleName', 'first and last only');
+  assert.deepEqual(storedName(id), stored, 'first and last only: the stored five stay');
+  // The group comes before the 404.
+  refused(await call('PUT', '/contacts/987654', { json: { firstName: 'X' } }), 'body/lastName', 'unknown contact, one part');
+
+  // No part at all: all five stay, the other fields are written.
+  accepted(await call('PUT', `/contacts/${id}`, { json: { notes: 'ohne Namen' } }), 'no part');
+  assert.deepEqual(storedName(id), stored, 'no part: the stored five stay');
+  assert.equal(db.prepare('SELECT notes FROM contacts WHERE id = ?').get(id).notes, 'ohne Namen');
+  accepted(await call('PUT', `/contacts/${id}`, { json: {} }), 'empty body');
+  assert.deepEqual(storedName(id), stored, 'empty body: the stored five stay');
+
+  // All five: they replace the stored ones, `name` is derived from them.
+  accepted(await call('PUT', `/contacts/${id}`, { json: ALL }), 'all five');
+  assert.deepEqual({ ...storedName(id) }, { name: 'Grace Brewster Hopper', first_name: 'Grace', last_name: 'Hopper', middle_name: 'Brewster', name_prefix: 'Adm.', name_suffix: 'Sr.' });
+
+  // `null` (and `""`) at each part passes and clears that part.
+  for (const key of NAME_PART_KEYS) {
+    accepted(await call('PUT', `/contacts/${id}`, { json: { ...ALL, [key]: null } }), `${key} null`);
+    accepted(await call('PUT', `/contacts/${id}`, { json: { ...ALL, [key]: '' } }), `${key} empty`);
+  }
+  accepted(await call('PUT', `/contacts/${id}`, { json: { firstName: 'Nur', lastName: null, middleName: null, namePrefix: null, nameSuffix: null } }), 'four null');
+  assert.deepEqual({ ...storedName(id) }, { name: 'Nur', first_name: 'Nur', last_name: null, middle_name: null, name_prefix: null, name_suffix: null });
+});
+
+/** The object literal starting at `open` (the `{`), up to its matching `}`. */
+function literalAt(/** @type {string} */ source, /** @type {number} */ open) {
+  let depth = 0;
+  for (let i = open; i < source.length; i += 1) {
+    if ('{(['.includes(source[i])) depth += 1;
+    else if ('})]'.includes(source[i]) && --depth === 0) return source.slice(open, i + 1);
+  }
+  throw new Error(`no end of the literal at ${open}`);
+}
+/** The top-level keys of an object literal; a spread is `...name`. */
+function literalKeys(/** @type {string} */ literal) {
+  const parts = [];
+  let depth = 0;
+  let start = 1;
+  for (let i = 1; i < literal.length - 1; i += 1) {
+    if ('{(['.includes(literal[i])) depth += 1;
+    else if ('})]'.includes(literal[i])) depth -= 1;
+    else if (literal[i] === ',' && depth === 0) { parts.push(literal.slice(start, i)); start = i + 1; }
+  }
+  parts.push(literal.slice(start, literal.length - 1));
+  return parts.map((p) => p.replace(/\/\/.*$/gm, '').trim()).filter(Boolean).map((p) => {
+    const key = /^(\.\.\.[A-Za-z_$][\w$]*|[A-Za-z_$][\w$]*)/.exec(p);
+    assert.ok(key, `a key: ${p.slice(0, 60)}`);
+    return key[1];
+  });
+}
+
+/**
+ * The name parts the save handler of the contact form puts into the body of
+ * its PUT: the literal it assigns on `structured`, spreads resolved through
+ * the `const` literal of the same handler.
+ * @param {string} source public/pages/contacts.js
+ */
+function formNameParts(source) {
+  const start = source.indexOf("panel.querySelector('#cm-save').addEventListener('click'");
+  assert.ok(start !== -1, 'the save handler of the form');
+  const handler = literalAt(source, source.indexOf('{', source.indexOf('=>', start)));
+  const assign = /if \(structured\) Object\.assign\(body, \{/.exec(handler);
+  assert.ok(assign, 'the name parts go into the body when structured');
+  const keys = literalKeys(literalAt(handler, assign.index + assign[0].length - 1));
+  return keys.flatMap((key) => {
+    if (!key.startsWith('...')) return [key];
+    const at = handler.indexOf(`const ${key.slice(3)} = {`);
+    assert.ok(at !== -1, `the spread ${key} is a literal of the handler`);
+    return literalKeys(literalAt(handler, handler.indexOf('{', at)));
+  });
+}
+
+test('the own caller: the contact form sends every name part of the group the schema ties together', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schema = spec.paths['/api/v1/contacts/{id}'].put.requestBody.content['application/json'].schema;
+  const group = /** @type {Record<string, string[]>} */ (schema.dependentRequired);
+  const members = [...new Set(Object.entries(group).flatMap(([key, others]) => [key, ...others]))].sort();
+  assert.deepEqual(members, [...NAME_PART_KEYS].sort(), 'the group is the five name parts');
+  for (const key of NAME_PART_KEYS) assert.deepEqual([...group[key]].sort(), NAME_PART_KEYS.filter((k) => k !== key).sort(), `${key} needs the other four`);
+  const sent = formNameParts(readFileSync(new URL('../public/pages/contacts.js', import.meta.url), 'utf8'));
+  assert.deepEqual(members.filter((key) => !sent.includes(key)), [], `the form sends ${JSON.stringify(sent)}`);
+});
+
+test('the contact form keeps the middle name, prefix and suffix of an imported contact', async () => {
+  const id = await importedContact();
+  // What #cm-save builds for this contact after the first name was edited:
+  // the two fields of the form, the three others as stored - and only the
+  // parts the handler really puts into the body.
+  const contactRow = (await call('GET', `/contacts/${id}`)).body.data;
+  /** @type {Record<string, unknown>} */
+  const values = {
+    firstName: 'Augusta', lastName: 'Lovelace',
+    middleName: contactRow.middle_name ?? null, namePrefix: contactRow.name_prefix ?? null, nameSuffix: contactRow.name_suffix ?? null,
+  };
+  const sent = formNameParts(readFileSync(new URL('../public/pages/contacts.js', import.meta.url), 'utf8'));
+  const { firstName: _f, lastName: _l, middleName: _m, namePrefix: _p, nameSuffix: _s, ...rest } = FORM_CONTACT({
+    name: 'Augusta King Lovelace', phones: [], emails: [], phone: null, email: null,
+  });
+  const form = { ...rest, ...Object.fromEntries(sent.map((key) => [key, values[key]])) };
+  accepted(await call('PUT', `/contacts/${id}`, { json: form }), 'form PUT');
+  assert.deepEqual({ ...storedName(id) }, { name: 'Augusta King Lovelace', first_name: 'Augusta', last_name: 'Lovelace', middle_name: 'King', name_prefix: 'Dr.', name_suffix: 'Jr.' });
 });
 
 test('contact categories: name, colour, order', async () => {
