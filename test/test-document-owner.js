@@ -115,7 +115,7 @@ function createHarness(userId, role, cookieSession) {
 const WRITES = [
   {
     route: 'PUT /:id',
-    send: (h, id) => h.call('PUT', `/${id}`, { name: 'Umbenannt' }),
+    send: (h, id) => h.call('PUT', `/${id}`, { name: 'Umbenannt', allowed_member_ids: [] }),
     status: 200,
     applied: (row) => row?.name === 'Umbenannt',
   },
@@ -173,7 +173,7 @@ test('PUT /:id: ein Mitglieds-Token neben einer Admin-Sitzung bekommt 403, die A
   const before = documentRow(id);
   const withToken = createHarness(MEMBER, 'member', { userId: ADMIN, role: 'admin' });
   try {
-    const res = await withToken.call('PUT', `/${id}`, { name: 'Umbenannt' });
+    const res = await withToken.call('PUT', `/${id}`, { name: 'Umbenannt', allowed_member_ids: [] });
     assert.equal(res.status, 403, 'das Gate urteilt nach der Rolle des Token-Subjekts');
     assert.deepEqual(documentRow(id), before, 'die Zeile bleibt unberuehrt');
   } finally {
@@ -181,7 +181,7 @@ test('PUT /:id: ein Mitglieds-Token neben einer Admin-Sitzung bekommt 403, die A
   }
   const adminOnly = createHarness(ADMIN, 'admin');
   try {
-    const res = await adminOnly.call('PUT', `/${id}`, { name: 'Umbenannt' });
+    const res = await adminOnly.call('PUT', `/${id}`, { name: 'Umbenannt', allowed_member_ids: [] });
     assert.equal(res.status, 200, JSON.stringify(res.body));
   } finally {
     await adminOnly.close();

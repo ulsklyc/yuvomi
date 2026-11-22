@@ -280,7 +280,7 @@ test('PUT /documents/:id verschiebt die Erinnerung, wenn sich das Ablaufdatum ae
     const id = created.body.data.id;
     assert.equal(reminderRows(id)[0].remind_at, `${daysFromToday(25)}T09:00`);
 
-    await h.call('PUT', `/${id}`, { expires_at: daysFromToday(60), expiry_reminder_days: 5 });
+    await h.call('PUT', `/${id}`, { expires_at: daysFromToday(60), expiry_reminder_days: 5, allowed_member_ids: [] });
     const rows = reminderRows(id);
     assert.equal(rows.length, 1, 'die alte Zeile darf nicht liegen bleiben');
     assert.equal(rows[0].remind_at, `${daysFromToday(55)}T09:00`);
@@ -299,7 +299,7 @@ test('PUT /documents/:id raeumt die Erinnerung ab, wenn das Ablaufdatum entfernt
     const id = created.body.data.id;
     assert.equal(reminderRows(id).length, 1);
 
-    await h.call('PUT', `/${id}`, { expires_at: null });
+    await h.call('PUT', `/${id}`, { expires_at: null, allowed_member_ids: [] });
     assert.equal(reminderRows(id).length, 0);
   } finally {
     await h.close();
@@ -361,7 +361,7 @@ test('PUT /documents/:id mit status=archived raeumt die Erinnerung ebenso ab', a
     const id = created.body.data.id;
     assert.equal(reminderRows(id).length, 1);
 
-    await h.call('PUT', `/${id}`, { status: 'archived' });
+    await h.call('PUT', `/${id}`, { status: 'archived', allowed_member_ids: [] });
     assert.equal(reminderRows(id).length, 0);
   } finally {
     await h.close();
@@ -406,7 +406,7 @@ test('die Erinnerung gehoert created_by, nicht der bearbeitenden Person (Admin)'
 
     // Ein Admin darf das fremde Dokument bearbeiten (#989) - die Erinnerung
     // bleibt trotzdem bei der Person, die das Dokument angelegt hat.
-    const edited = await admin.call('PUT', `/${id}`, { expires_at: daysFromToday(90), expiry_reminder_days: 3 });
+    const edited = await admin.call('PUT', `/${id}`, { expires_at: daysFromToday(90), expiry_reminder_days: 3, allowed_member_ids: [] });
     assert.equal(edited.status, 200);
     const rows = reminderRows(id);
     assert.equal(rows.length, 1);

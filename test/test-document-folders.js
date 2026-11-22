@@ -843,12 +843,12 @@ test('DELETE with documents locks previewed documents and folders against concur
         document_ids: [documents[0].id],
       }),
       h.call('PATCH', `/${documents[1].id}/archive`, { archived: true }),
-      memberHarness.call('PUT', `/${documents.at(-1).id}`, { folder_id: outside.body.data.id }),
+      memberHarness.call('PUT', `/${documents.at(-1).id}`, { folder_id: outside.body.data.id, allowed_member_ids: [] }),
       memberHarness.call('DELETE', `/${documents.at(-1).id}`),
-      h.call('PUT', `/${documents.at(-1).id}`, { folder_id: outside.body.data.id }),
+      h.call('PUT', `/${documents.at(-1).id}`, { folder_id: outside.body.data.id, allowed_member_ids: [] }),
       h.call('PUT', `/folders/${child.body.data.id}`, { parent_id: outside.body.data.id }),
       h.call('PUT', `/folders/${outside.body.data.id}`, { parent_id: root.body.data.id }),
-      h.call('PUT', `/${outsideDocumentId}`, { folder_id: child.body.data.id }),
+      h.call('PUT', `/${outsideDocumentId}`, { folder_id: child.body.data.id, allowed_member_ids: [] }),
       h.call('DELETE', `/${documents[2].id}`),
     ]);
 

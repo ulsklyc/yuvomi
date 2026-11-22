@@ -28,6 +28,10 @@
  *              409 of the handler; the rights without a row stand in front:
  *              `requireAdmin` on the storage settings, Google Drive and every
  *              DMS route, `cross_module_access` on both kitchen imports;
+ *            - FULL REPRESENTATION: `PUT /documents/{id}` requires
+ *              `allowed_member_ids`, which it replaces (left out, a restricted
+ *              document lost its members); both PUT bodies of
+ *              public/pages/documents.js carry every required field;
  *            - THE SINK: the DMS adapter lookup reads only own keys;
  *            - ONE SOURCE: every list of the schemas is the constant the
  *              handler reads, and the DMS providers are the adapters.
@@ -46,6 +50,7 @@ for (const key of ['DOCUMENT_STORAGE_LOCAL_PATH', 'WEBDAV_URL', 'WEBDAV_USERNAME
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createShoppingDocumentsApp } from './shopping-documents-app.js';
 
 const dbmod = await import('../server/db.js');
@@ -374,7 +379,8 @@ test('documents: unknown values, non-text, broken ids, query garbage', async () 
     [{ visibility: 5 }, 'body/visibility'],
     [{ description: 5 }, 'body/description'],
   ])) {
-    assertRefused(await call('PUT', `/documents/${doc}`, { json }), path, undefined, `PUT ${JSON.stringify(json)}`);
+    // The access list goes along (required since group 8 c), so the field under test is the refusal.
+    assertRefused(await call('PUT', `/documents/${doc}`, { json: { ...json, allowed_member_ids: [] } }), path, undefined, `PUT ${JSON.stringify(json)}`);
   }
   assertRefused(await call('PATCH', `/documents/${doc}/archive`, { json: { archived: 'false' } }), 'body/archived', 'type');
   assertRefused(await call('POST', '/documents/folders', { json: { name: 5 } }), 'body/name', 'type');
@@ -436,6 +442,158 @@ test('an access list with an id that has no account is the 400 of a non-member, 
 });
 
 // --------------------------------------------------------------------------
+// Full representation (group 8 c)
+// --------------------------------------------------------------------------
+
+/** A restricted document of the admin, shared with the member. */
+function sharedDocument(/** @type {string} */ name) {
+  const id = newDocument(name);
+  db.prepare("UPDATE family_documents SET visibility = 'restricted', description = 'Notiz' WHERE id = ?").run(id);
+  db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(id, MEM);
+  return id;
+}
+/** @param {number} id */
+function documentState(id) {
+  return {
+    row: db.prepare('SELECT name, description, category, folder_id, visibility, status, expires_at, expiry_reminder_days, subject_user_id FROM family_documents WHERE id = ?').get(id),
+    access: db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id').all(id).map((/** @type {any} */ r) => r.user_id),
+  };
+}
+/** Whether the member finds the document in the list. @param {number} id */
+async function memberSees(id) {
+  const r = await call('GET', '/documents', { actor: 'mem' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  return r.body.data.some((/** @type {any} */ d) => d.id === id);
+}
+
+test('full representation: PUT /documents/{id} requires the access list, which it replaces', async () => {
+  // Left out, the list was emptied: a restricted document lost every member it was shared with.
+  const doc = sharedDocument('Pass');
+  const before = documentState(doc);
+  assert.deepEqual(before.access, [MEM]);
+  for (const json of [
+    { name: 'Pass neu' },
+    { name: 'Pass neu', visibility: 'restricted', category: 'identity' },
+    {},
+  ]) {
+    assertRefused(await call('PUT', `/documents/${doc}`, { json }), 'body/allowed_member_ids', 'required', `PUT ${JSON.stringify(json)}`);
+    assert.deepEqual(documentState(doc), before, `${JSON.stringify(json)}: row and access unchanged`);
+  }
+  assert.equal(await memberSees(doc), true, 'the member still sees it after the refusals');
+  // On a document that does not exist the 400 comes before the 404.
+  assertRefused(await call('PUT', `/documents/${GONE}`, { json: { name: 'x' } }), 'body/allowed_member_ids', 'required', '400 before 404');
+  // A wrong type is still refused at the field.
+  assertRefused(await call('PUT', `/documents/${doc}`, { json: { allowed_member_ids: null } }), 'body/allowed_member_ids', 'type', 'null');
+
+  // Sent, it replaces; the other fields stay optional and keep what is stored.
+  const kept = await call('PUT', `/documents/${doc}`, { json: { allowed_member_ids: [MEM] } });
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assert.deepEqual(documentState(doc), before, 'only the list sent: everything stays');
+  const emptied = await call('PUT', `/documents/${doc}`, { json: { allowed_member_ids: [] } });
+  assert.equal(emptied.status, 200, JSON.stringify(emptied.body));
+  assert.deepEqual(documentState(doc).access, [], '[] shares it with nobody');
+  assert.equal(await memberSees(doc), false);
+
+  // Not restricted: the list is required as well, and ignored (the stored one is emptied).
+  const family = newDocument('Haushalt');
+  db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(family, MEM);
+  assertRefused(await call('PUT', `/documents/${family}`, { json: { name: 'Haushalt' } }), 'body/allowed_member_ids', 'required', 'family');
+  assert.deepEqual(documentState(family).access, [MEM], 'refused: the stale row stays');
+  const ignored = await call('PUT', `/documents/${family}`, { json: { name: 'Haushalt', allowed_member_ids: [MEM] } });
+  assert.equal(ignored.status, 200, JSON.stringify(ignored.body));
+  assert.deepEqual(documentState(family).access, [], 'family: the list is ignored');
+});
+
+/**
+ * The bodies of every `api.put(`/documents/${...}`, ...)` of the page (not the
+ * folders): the keys of the object literal, also when the body is a `const`
+ * declared before the call in the same source.
+ * @param {string} source public/pages/documents.js
+ * @returns {Array<{ at: number, keys: string[] | null }>}
+ */
+function documentPuts(source) {
+  /** The balanced `{...}` starting at `start`. @param {number} start */
+  const literalAt = (start) => {
+    let depth = 0;
+    for (let i = start; i < source.length; i++) {
+      if ('({['.includes(source[i])) depth++;
+      else if (')}]'.includes(source[i]) && --depth === 0) return source.slice(start, i + 1);
+    }
+    return '';
+  };
+  /** The top-level keys of an object literal. @param {string} literal */
+  const keysOf = (literal) => {
+    const text = literal.replace(/^\s*\/\/.*$/gm, '');
+    const keys = [];
+    let depth = 0;
+    for (let j = 0; j < text.length; j++) {
+      const c = text[j];
+      if ('({['.includes(c)) depth++;
+      else if (')}]'.includes(c)) depth--;
+      if (depth === 1 && (c === '{' || c === ',')) {
+        const m = /^\s*([A-Za-z_$][\w$]*)\s*[:,}]/.exec(text.slice(j + 1));
+        if (m) keys.push(m[1]);
+      }
+    }
+    return keys;
+  };
+  const calls = [];
+  for (const match of source.matchAll(/api\.put\(`\/documents\/\$\{[^`]*`\s*,\s*/g)) {
+    const at = /** @type {number} */ (match.index);
+    const rest = source.slice(at + match[0].length);
+    let keys = null;
+    if (rest.startsWith('{')) keys = keysOf(literalAt(at + match[0].length));
+    else {
+      const name = /^([A-Za-z_$][\w$]*)\s*\)/.exec(rest)?.[1];
+      const decl = name ? source.lastIndexOf(`const ${name} = {`, at) : -1;
+      if (decl !== -1) keys = keysOf(literalAt(source.indexOf('{', decl)));
+    }
+    calls.push({ at, keys });
+  }
+  return calls;
+}
+
+test('the own callers: both document PUTs of the page send every required field of the schema', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  /** @type {string[]} */
+  const required = spec.paths['/api/v1/documents/{id}'].put.requestBody.content['application/json'].schema.required;
+  assert.deepEqual(required, ['allowed_member_ids']);
+  const calls = documentPuts(readFileSync(new URL('../public/pages/documents.js', import.meta.url), 'utf8'));
+  // moveSelected() and saveDocument().
+  assert.equal(calls.length, 2, `the document PUTs found ${JSON.stringify(calls)}`);
+  for (const found of calls) {
+    assert.ok(found.keys?.length, `the body at ${found.at} is an object literal`);
+    const missing = required.filter((/** @type {string} */ key) => !found.keys?.includes(key));
+    assert.deepEqual(missing, [], `the PUT at ${found.at} sends ${JSON.stringify(found.keys)}`);
+  }
+});
+
+test('the own callers: saving or moving a shared document keeps who it is shared with', async () => {
+  const doc = sharedDocument('Zeugnis');
+  assert.equal(await memberSees(doc), true);
+  // pages/documents.js saveDocument(): restricted, the member ticked in the picker.
+  const saved = await call('PUT', `/documents/${doc}`, { json: {
+    name: 'Zeugnis 2027', description: null, category: 'school', folder_id: null, visibility: 'restricted', status: 'active',
+    expires_at: null, expiry_reminder_days: null, subject_user_id: null, allowed_member_ids: [MEM],
+  } });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual(documentState(doc).access, [MEM]);
+  assert.equal(await memberSees(doc), true, 'after the edit dialog');
+  // pages/documents.js moveSelected(): the document as the list answered it.
+  const folder = await call('POST', '/documents/folders', { json: { name: 'Schule', parent_id: null } });
+  assert.equal(folder.status, 201, JSON.stringify(folder.body));
+  const listed = (await call('GET', '/documents')).body.data.find((/** @type {any} */ d) => d.id === doc);
+  const moved = await call('PUT', `/documents/${doc}`, { json: {
+    name: listed.name, description: listed.description || null, category: listed.category, folder_id: folder.body.data.id,
+    visibility: listed.visibility, status: listed.status, allowed_member_ids: listed.allowed_member_ids || [],
+  } });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  assert.deepEqual(documentState(doc).access, [MEM]);
+  assert.equal(documentState(doc).row.folder_id, folder.body.data.id);
+  assert.equal(await memberSees(doc), true, 'after the bulk move');
+});
+
+// --------------------------------------------------------------------------
 // Order
 // --------------------------------------------------------------------------
 
@@ -450,7 +608,7 @@ test('a malformed request is a 400 before the 404, 403 and 409 of the handler', 
     ['PATCH', `/shopping/items/${GONE}`, { is_checked: 2 }, 'body/is_checked'],
     ['PUT', `/shopping/categories/${GONE}`, { name: 5 }, 'body/name'],
     ['PUT', `/shopping/stores/${GONE}`, { name: 5 }, 'body/name'],
-    ['PUT', `/documents/${GONE}`, { visibility: 'Private' }, 'body/visibility'],
+    ['PUT', `/documents/${GONE}`, { visibility: 'Private', allowed_member_ids: [] }, 'body/visibility'],
     ['PATCH', `/documents/${GONE}/archive`, { archived: 0 }, 'body/archived'],
     ['PUT', `/documents/folders/${GONE}`, { name: 5 }, 'body/name'],
     ['POST', '/documents/dms/link', { account_id: GONE }, 'body/dms_document_id'],
@@ -460,8 +618,8 @@ test('a malformed request is a 400 before the 404, 403 and 409 of the handler', 
   }
   // 403 at the row: a member may not change the document of another.
   const foreign = newDocument('Fremd', ADMIN);
-  assertRefused(await call('PUT', `/documents/${foreign}`, { json: { category: 'nope' }, actor: 'mem' }), 'body/category', 'enum', 'mayManage');
-  const valid = await call('PUT', `/documents/${foreign}`, { json: { category: 'home' }, actor: 'mem' });
+  assertRefused(await call('PUT', `/documents/${foreign}`, { json: { category: 'nope', allowed_member_ids: [] }, actor: 'mem' }), 'body/category', 'enum', 'mayManage');
+  const valid = await call('PUT', `/documents/${foreign}`, { json: { category: 'home', allowed_member_ids: [] }, actor: 'mem' });
   assert.equal(valid.status, 403, 'a valid request meets the old answer');
   // 409: a category name that is taken.
   const existing = (await call('GET', '/shopping/categories')).body.data[0].name;

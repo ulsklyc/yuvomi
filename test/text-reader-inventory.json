@@ -274,6 +274,7 @@
   "test-validate-health.js": {"class":"V","sBlocks":0,"targets":["public/pages/health.js"],"fate":"stays:coupling"},
   "test-validate-request-coverage.js": {"class":"V","sBlocks":0,"targets":["server/routes/"],"fate":"stays:coupling"},
   "test-validate-request.js": {"class":"V","sBlocks":0,"targets":["server/index.js"],"fate":"stays:coupling"},
+  "test-validate-shopping-documents.js": {"class":"V","sBlocks":0,"targets":["public/pages/documents.js"],"fate":"stays:coupling"},
   "test-validate-split-backup-core.js": {"class":"V","sBlocks":0,"targets":["public/pages/split-expenses.js"],"fate":"stays:coupling"},
   "test-validate-waste-schedule.js": {"class":"V","sBlocks":0,"targets":["public/pages/schedule.js","public/pages/waste.js"],"fate":"stays:coupling"},
   "test-vendor-policy.js": {"class":"V","sBlocks":0,"targets":["public/vendor/"],"fate":"stays:coupling"},

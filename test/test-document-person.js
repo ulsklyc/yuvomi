@@ -208,9 +208,9 @@ test('gewaehlt wird aus der Mitgliederliste: Personal und unbekannte Konten nich
 test('PUT ohne Feld laesst die Person stehen, null nimmt sie weg', async () => {
   const doc = await fileDocument({ subject_user_id: JOHN });
   await asUser(OWNER, async (h) => {
-    const kept = await h.call('PUT', `/${doc.id}`, { name: 'Neu' });
+    const kept = await h.call('PUT', `/${doc.id}`, { name: 'Neu', allowed_member_ids: [] });
     assert.equal(kept.body.data.subject_user_id, JOHN);
-    const cleared = await h.call('PUT', `/${doc.id}`, { subject_user_id: null });
+    const cleared = await h.call('PUT', `/${doc.id}`, { subject_user_id: null, allowed_member_ids: [] });
     assert.equal(cleared.body.data.subject_user_id, null);
   });
 });
@@ -219,7 +219,7 @@ test('eine gespeicherte Person, die kein Mitglied mehr ist, bleibt speicherbar',
   const later = seedUser('Spaeter Personal');
   const doc = await fileDocument({ subject_user_id: later });
   get().prepare('INSERT INTO housekeeping_workers (user_id) VALUES (?)').run(later);
-  const res = await asUser(OWNER, (h) => h.call('PUT', `/${doc.id}`, { subject_user_id: later, name: 'X' }));
+  const res = await asUser(OWNER, (h) => h.call('PUT', `/${doc.id}`, { subject_user_id: later, name: 'X', allowed_member_ids: [] }));
   assert.equal(res.status, 200);
   assert.equal(res.body.data.subject_user_id, later);
 });
@@ -239,14 +239,14 @@ test('Sichtbarkeit: die Person an einem privaten Dokument sieht es nicht (DECISI
     assert.ok(!list.body.data.some((d) => d.id === doc.id), 'die Liste nennt das private Dokument');
     const filtered = await h.call('GET', `?subject_user_id=${JOHN}`);
     assert.ok(!filtered.body.data.some((d) => d.id === doc.id), 'der Filter oeffnet es');
-    const edit = await h.call('PUT', `/${doc.id}`, { name: 'Fremd' });
+    const edit = await h.call('PUT', `/${doc.id}`, { name: 'Fremd', allowed_member_ids: [] });
     assert.equal(edit.status, 404);
   });
 });
 
 test('die Person darf das Dokument nicht verwalten, nur weil es sie betrifft', async () => {
   const doc = await fileDocument({ subject_user_id: JOHN });
-  const res = await asUser(JOHN, (h) => h.call('PUT', `/${doc.id}`, { name: 'Meins' }));
+  const res = await asUser(JOHN, (h) => h.call('PUT', `/${doc.id}`, { name: 'Meins', allowed_member_ids: [] }));
   assert.equal(res.status, 403);
 });
 
@@ -284,9 +284,9 @@ test('Erinnerung: einmal, wenn es dieselbe Person ist', async () => {
 test('Erinnerung: Personenwechsel zieht die Zeilen nach, Entfernen laesst die Ablegende', async () => {
   const doc = await fileDocument(withExpiry({ subject_user_id: JOHN }));
   await asUser(OWNER, async (h) => {
-    await h.call('PUT', `/${doc.id}`, { subject_user_id: MIRA });
+    await h.call('PUT', `/${doc.id}`, { subject_user_id: MIRA, allowed_member_ids: [] });
     assert.deepEqual(remindersOf(doc.id), sorted(OWNER, MIRA));
-    await h.call('PUT', `/${doc.id}`, { subject_user_id: null });
+    await h.call('PUT', `/${doc.id}`, { subject_user_id: null, allowed_member_ids: [] });
     assert.deepEqual(remindersOf(doc.id), [OWNER]);
   });
 });
@@ -294,7 +294,7 @@ test('Erinnerung: Personenwechsel zieht die Zeilen nach, Entfernen laesst die Ab
 test('Erinnerung: aendert ein Admin fremdes Dokument, bleiben die Empfaenger dieselben', async () => {
   const admin = seedUser('Admin', 'admin');
   const doc = await fileDocument(withExpiry({ subject_user_id: JOHN }));
-  await asUser(admin, (h) => h.call('PUT', `/${doc.id}`, { expiry_reminder_days: 5 }), { role: 'admin' });
+  await asUser(admin, (h) => h.call('PUT', `/${doc.id}`, { expiry_reminder_days: 5, allowed_member_ids: [] }), { role: 'admin' });
   assert.deepEqual(remindersOf(doc.id), sorted(OWNER, JOHN));
 });
 
