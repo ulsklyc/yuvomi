@@ -31,10 +31,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: mealsRouter } = await import('../server/routes/meals.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { addDays } = await import('../server/services/meal-recurrence.js');
 const { todayKey } = await import('../server/utils/timezone.js');
@@ -74,22 +73,26 @@ db.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').r
 const NON_MEMBERS = { Hauspersonal: CLARA, 'Geteilte-Ausgaben-Gast': DORA, Wandtablett: WAND };
 
 let actor = ANNA;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor;
-  req.authRole = actor === ANNA ? 'admin' : 'member';
-  req.session = { userId: actor, role: req.authRole };
-  next();
+// Am echten Praefix samt Fehlerhandler (#2810): validateRequest() findet die
+// Operation ueber `req.baseUrl`. Die Pfade der Faelle bleiben relativ zum
+// Essensplan, `call()` setzt das Praefix davor.
+const app = await createContactsMealsApp({
+  mount: ['meals'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor;
+    req.authRole = actor === ANNA ? 'admin' : 'member';
+    req.session = { userId: actor, role: req.authRole };
+    next();
+  },
+  after: [['/api/v1/dashboard', dashboardRouter]],
 });
-app.use('/dashboard', dashboardRouter);
-app.use('/', mealsRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const prefix = path.startsWith('/dashboard') ? '/api/v1' : '/api/v1/meals';
+  const res = await fetch(`${baseUrl}${prefix}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -657,7 +660,7 @@ test('das Bild des Kochs haengt an keiner Mahlzeit: eine volle Woche wiegt nicht
   assert.equal(angelegt.status, 201);
   assert.equal(angelegt.body.data.length, 21);
 
-  const res = await fetch(`${baseUrl}/?week=${montag}`);
+  const res = await fetch(`${baseUrl}/api/v1/meals/?week=${montag}`);
   const text = await res.text();
   // Die Serien der Tests darueber laufen ohne Ende und stehen auch in dieser
   // Woche; gemessen werden die 21 Mahlzeiten dieses Kochs, gewogen wird alles.

@@ -15,10 +15,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: mealsRouter } = await import('../server/routes/meals.js');
 // Der Einkaufs-Router hängt mit drin, weil die Rücknahme eines Transfers über
 // ihn läuft (POST /shopping/items/undo-transfer). Beim Mahlzeit-Pfad gehört das
 // `on_shopping_list`-Flag zum Übertrag und muss mit zurück - das ist ohne beide
@@ -32,21 +31,25 @@ const LIST = db.prepare(`INSERT INTO shopping_lists (name, created_by) VALUES ('
 const RECIPE = db.prepare(`INSERT INTO recipes (title, created_by) VALUES ('Suppe', ?)`).run(U).lastInsertRowid;
 
 let actor = { id: U, role: 'member' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// Am echten Praefix samt Fehlerhandler (#2810): validateRequest() findet die
+// Operation ueber `req.baseUrl`. Die Pfade der Faelle bleiben relativ zum
+// Essensplan, `call()` setzt das Praefix davor.
+const app = await createContactsMealsApp({
+  mount: ['meals'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
+  after: [['/api/v1/shopping', shoppingRouter]],
 });
-app.use('/shopping', shoppingRouter);
-app.use('/', mealsRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const prefix = path.startsWith('/shopping') ? '/api/v1' : '/api/v1/meals';
+  const res = await fetch(`${baseUrl}${prefix}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,

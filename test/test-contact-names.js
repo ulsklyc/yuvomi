@@ -11,7 +11,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 import {
   composeDisplayName, normalizeNameParts, splitDisplayName, contactSortKey,
@@ -34,18 +34,19 @@ freshTestDbPath('contact-names');
 process.env.SESSION_SECRET = 'contact-names-test-secret-32bytes-long';
 
 const db = await import('../server/db.js');
-const { default: contactsRouter } = await import('../server/routes/contacts.js');
 const { syncFamilyMemberArtifacts } = await import('../server/auth.js');
 db.init();
 const database = db.get();
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); });
-app.use('/contacts', contactsRouter);
+// Am echten Praefix samt Fehlerhandler (#2810): validateRequest() findet die
+// Operation ueber `req.baseUrl`.
+const app = await createContactsMealsApp({
+  mount: ['contacts'],
+  auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise((r) => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}/contacts`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1/contacts`;
 
 const jget = async (u) => { const r = await fetch(u); return { status: r.status, body: await r.json().catch(() => null) }; };
 const jsend = async (u, method, body) => {

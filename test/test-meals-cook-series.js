@@ -27,7 +27,7 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
 globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
@@ -43,10 +43,7 @@ globalThis.document.documentElement.classList = globalThis.document.documentElem
   ?? { add() {}, remove() {}, toggle() {}, contains: () => false };
 
 const dbmod = await import('../server/db.js');
-const { default: mealsRouter } = await import('../server/routes/meals.js');
 const { default: familyRouter } = await import('../server/routes/family.js');
-const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
-const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { addDays } = await import('../server/services/meal-recurrence.js');
 const { removeUser } = await import('../server/services/user-removal.js');
 await import('../server/auth.js');
@@ -76,25 +73,25 @@ const ANNA = addUser('Anna');
 const BEN = addUser('Ben');
 const CARLA = addUser('Carla');
 
-const app = express();
-app.use(express.json());
-app.use(defaultEmptyBody);
-app.use((req, _res, next) => {
-  req.authUserId = ADMIN;
-  req.authRole = 'admin';
-  req.session = { userId: ADMIN, role: 'admin' };
-  next();
+// Both routers at their real prefix: validateRequest() reads the operation
+// from the mount (#2810). The cases speak the paths of public/api.js
+// (`/meals/...`); `call()` puts `/api/v1` in front.
+const app = await createContactsMealsApp({
+  mount: ['meals'],
+  auth: (req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  },
+  after: [['/api/v1/family', familyRouter]],
 });
-// The family router at its real prefix: validateRequest() reads the operation from the mount (#2810).
-app.use('/api/v1/family', familyRouter);
-app.use('/meals', mealsRouter);
-app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}${path.startsWith('/api/') ? '' : '/api/v1'}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
