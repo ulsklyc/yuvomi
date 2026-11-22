@@ -582,3 +582,55 @@ test('the colours the page offers are the ones the route takes', async () => {
   const meta = (await call('GET', '/contacts/meta')).body.data;
   assert.deepEqual(meta.categoryColors, [...contactsFields.CONTACT_CATEGORY_COLORS]);
 });
+
+// The schema is the only guard since step (b) of group 7 (#2810): the handlers
+// dropped `oneOf(meal_type)` and its German "Mahlzeit-Typ ist erforderlich.",
+// `num(recipe_id)`, the `skip_occupied` type check, `!listId`, `bool(enabled)`
+// and the unknown-colour branch. So the types, lists, bounds and required
+// fields behind them are pinned here as literals - a looser type, a lost
+// `required`, a `null` let in or a wider bound turns this red. The lists
+// themselves are pinned against their constant in the case above.
+test('only guard: what the handlers no longer check is the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const body = (/** @type {string} */ path, /** @type {string} */ method) => spec.paths[path][method].requestBody.content['application/json'].schema;
+  const RECIPE_ID = [{ type: 'integer' }, { type: 'string', pattern: '^0*[1-9][0-9]*$' }, { type: 'null' }];
+  const MEAL_TYPE = { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] };
+
+  // meal_type: required and one of the list on create and in apply-plan, never null on update.
+  const create = body('/api/v1/meals', 'post');
+  assert.deepEqual(create.required, ['date', 'meal_type', 'title']);
+  assert.deepEqual(create.properties.meal_type, MEAL_TYPE);
+  const plan = body('/api/v1/meals/apply-plan', 'post');
+  assert.deepEqual(plan.required, ['assignments']);
+  assert.equal(plan.properties.assignments.type, 'array');
+  assert.equal(plan.properties.assignments.minItems, 1, 'at least one meal');
+  assert.equal(plan.properties.assignments.items.type, 'object');
+  assert.deepEqual(plan.properties.assignments.items.required, ['date', 'meal_type', 'title']);
+  assert.deepEqual(plan.properties.assignments.items.properties.meal_type, MEAL_TYPE);
+  const update = body('/api/v1/meals/{id}', 'put');
+  assert.equal(update.required, undefined, 'every field optional on update');
+  assert.deepEqual(update.properties.meal_type, MEAL_TYPE);
+  // recipe_id: a whole number, digit text or null - nothing Number() reads otherwise.
+  for (const [name, schema] of [['POST', create], ['PUT', update], ['apply-plan', plan.properties.assignments.items]]) {
+    assert.deepEqual(schema.properties.recipe_id.anyOf, RECIPE_ID, `${name} recipe_id`);
+  }
+  // skip_occupied and replace_existing: JSON booleans.
+  assert.equal(plan.properties.skip_occupied.type, 'boolean');
+  assert.equal(plan.properties.replace_existing.type, 'boolean');
+  // listId: required, a whole number from 1, on both transfers.
+  for (const path of ['/api/v1/meals/{id}/to-shopping-list', '/api/v1/meals/week-to-shopping-list']) {
+    const transfer = body(path, 'post');
+    assert.ok(transfer.required.includes('listId'), `${path} listId required`);
+    assert.equal(transfer.properties.listId.type, 'integer', `${path} listId`);
+    assert.equal(transfer.properties.listId.minimum, 1, `${path} listId`);
+  }
+  assert.ok(body('/api/v1/meals/week-to-shopping-list', 'post').required.includes('week'));
+  // CardDAV: `enabled` required and a JSON boolean.
+  const toggle = body('/api/v1/contacts/cardav/addressbooks/{id}', 'put');
+  assert.deepEqual(toggle.required, ['enabled']);
+  assert.equal(toggle.properties.enabled.type, 'boolean');
+  // The category colour: text or null from the list, never another type.
+  for (const [path, method] of [['/api/v1/contacts/categories', 'post'], ['/api/v1/contacts/categories/{key}', 'put']]) {
+    assert.deepEqual(body(path, method).properties.color.type, ['string', 'null'], `${path} color`);
+  }
+});

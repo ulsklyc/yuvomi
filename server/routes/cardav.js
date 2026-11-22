@@ -8,7 +8,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import * as CardDAVSync from '../services/cardav-sync.js';
-import { str, secret, bool, collectErrors, MAX_TITLE } from '../middleware/validate.js';
+import { str, secret, collectErrors, MAX_TITLE } from '../middleware/validate.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { remoteFailure } from '../utils/http.js';
 import { validateRequest } from '../api/validate-request.ts';
@@ -38,9 +38,28 @@ const router = express.Router();
 router.use(requireAdmin);
 
 /**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). `parseInt`
+ * read `7abc` as 7 until the schema stood in front; it lets nothing but digits
+ * through now, so `Number` reads the same value. `0`, `-0` and `-1` keep the
+ * route's own 400 `invalid_id`, a leading zero reaches the row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
+
+/**
  * Fehlerantwort mit stabilem, maschinenlesbarem Schlüssel. Der Client übersetzt
  * über `errorCode`; `error` bleibt eine englische Entwickler-Notiz und wird nur
  * als Fallback angezeigt.
+ *
+ * Die 500 `internal` der catch-Bloecke bleibt vorerst (#2810, Gruppe 7):
+ * ohne `errorCode` sagte die Einstellungsseite an zwei Stellen (Kontenliste,
+ * Sync) ihren eigenen Satz statt des allgemeinen; ob das gewollt ist, ist
+ * noch nicht entschieden.
  *
  * Vorher standen hier deutsche Klartexte („Konto mit dieser URL … existiert
  * bereits"), die unübersetzt in 22 von 23 Locales landeten - ausgerechnet beim
@@ -130,7 +149,7 @@ router.post('/accounts', validateRequest(), async (req, res) => {
  */
 router.put('/accounts/:id', validateRequest(), async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = pathId(req);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const vName     = str(req.body.name, 'Name', { max: MAX_TITLE });
@@ -139,7 +158,9 @@ router.put('/accounts/:id', validateRequest(), async (req, res) => {
     const errors = collectErrors([vName, vUrl, vUsername]);
     if (errors.length) return fail(res, 400, 'validation', errors.join(' '));
 
-    // Passwort ist optional: leer heißt „bestehendes behalten".
+    // Passwort ist optional: leer heißt „bestehendes behalten". Ein Wert, der
+    // kein Text ist, weist seit #2810 das Schema ab; die Typpruefung bleibt,
+    // weil gleich `.trim()` auf dem Rohwert laeuft (Senke, nicht Route).
     const rawPassword = typeof req.body.password === 'string' ? req.body.password : '';
     let password = null;
     if (rawPassword.trim().length > 0) {
@@ -178,7 +199,7 @@ router.put('/accounts/:id', validateRequest(), async (req, res) => {
  */
 router.delete('/accounts/:id', validateRequest(), async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = pathId(req);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     // Ein Konto, das es nicht gibt, ist 404 wie bei test, refresh und sync:
@@ -203,7 +224,7 @@ router.delete('/accounts/:id', validateRequest(), async (req, res) => {
  */
 router.post('/accounts/:id/test', validateRequest(), async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = pathId(req);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(id);
@@ -230,7 +251,7 @@ router.post('/accounts/:id/test', validateRequest(), async (req, res) => {
  */
 router.get('/accounts/:id/addressbooks', validateRequest(), async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = pathId(req);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const addressbooks = db.get().prepare(`
@@ -255,7 +276,7 @@ router.get('/accounts/:id/addressbooks', validateRequest(), async (req, res) => 
  */
 router.post('/accounts/:id/addressbooks/refresh', validateRequest(), async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = pathId(req);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(id);
@@ -286,21 +307,22 @@ router.post('/accounts/:id/addressbooks/refresh', validateRequest(), async (req,
  */
 router.put('/addressbooks/:id', validateRequest(), async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = pathId(req);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
-    const vEnabled = bool(req.body.enabled, 'enabled');
-    const errors = collectErrors([vEnabled]);
-    if (errors.length) return fail(res, 400, 'validation', errors.join(' '));
+    // `enabled` ist Pflicht und ein JSON-Boolean: das prueft seit #2810 das
+    // Schema, bevor der Handler laeuft (`bool()` sagte dasselbe mit
+    // `errorCode: validation`).
+    const enabled = req.body.enabled;
 
     const exists = db.get()
       .prepare('SELECT id FROM carddav_addressbook_selection WHERE id = ?')
       .get(id);
     if (!exists) return fail(res, 404, 'addressbook_not_found', 'Addressbook not found');
 
-    CardDAVSync.toggleAddressbook(id, vEnabled.value);
+    CardDAVSync.toggleAddressbook(id, enabled);
 
-    res.json({ data: { updated: true, enabled: vEnabled.value } });
+    res.json({ data: { updated: true, enabled } });
   } catch (err) {
     log.error('Error toggling addressbook:', err);
     fail(res, 500, 'internal', 'Internal error');
@@ -314,7 +336,7 @@ router.put('/addressbooks/:id', validateRequest(), async (req, res) => {
  */
 router.post('/accounts/:id/sync', validateRequest(), async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = pathId(req);
     if (!id || id < 1) return fail(res, 400, 'invalid_id', 'Invalid ID');
 
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(id);
