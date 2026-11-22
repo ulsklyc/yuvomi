@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, requireAuth } = await import('../server/auth.js');
@@ -44,7 +45,10 @@ app.get('/auth-context', requireAuth, (req, res) => res.json({
 }));
 // At its real prefix with the central error handler: validateRequest() finds its
 // operation by the mount and answers through next(err) (#2810).
-app.use('/api/v1/budget', requireAuth, csrfMiddleware, budgetRouter);
+// In server/index.js the general API limiter stands in front of it, here a
+// generous one does, far above what this suite sends.
+const budgetLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+app.use('/api/v1/budget', budgetLimiter, requireAuth, csrfMiddleware, budgetRouter);
 app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));

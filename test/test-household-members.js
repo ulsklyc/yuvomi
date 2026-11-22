@@ -153,7 +153,10 @@ app.use('/api/v1/schedule', requireAuth, scheduleRouter);
 app.use('/tasks', requireAuth, tasksRouter);
 app.use('/calendar', requireAuth, calendarRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
-app.use('/api/v1/budget', requireAuth, budgetRouter);
+// In server/index.js the general API limiter stands in front of it, here a
+// generous one does, far above what this suite sends.
+const budgetLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+app.use('/api/v1/budget', budgetLimiter, requireAuth, budgetRouter);
 app.use('/dashboard', requireAuth, dashboardRouter);
 app.use('/api/v1/rewards', requireAuth, rewardsRouter);
 app.use('/api/v1/split-expenses', requireAuth, splitRouter);
