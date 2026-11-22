@@ -480,3 +480,134 @@ test('one source: every list of the schemas is the constant the handler reads', 
   for (const key of fields.NUTRIENT_KEYS) assert.equal(nutrition[key].maximum, fields.MAX_NUTRIENT, key);
   assert.equal(bodyOf('/api/v1/health/visibility-defaults', 'put').properties.defaults.propertyNames.pattern, fields.SCOPE_KEY_PATTERN);
 });
+
+// Since step (b) of group 6 the handlers no longer check what the schema
+// covers on every input (`v.num`, `v.oneOf`, the `toBit` refusals, the ranges
+// of the cycle settings, `prnInterval`, `prnDose`, `stockDeduct`, the nutrient
+// and prevention ranges, `days_mask`, `time_of_day`, the shape of `schedules`,
+// `results`, `caregiver_ids`, `defaults`, `feelings`, `csv`, the export days).
+// The schema is the only guard, so its types, bounds and required fields are
+// pinned here as literals - a looser type, a lost `required`, a `null` let
+// into a list field or a wider bound in the document turns this red. The
+// constants themselves are pinned in the case above.
+test('only guard: the types and bounds the handlers no longer check are the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const H = '/api/v1/health';
+  const requestOf = (/** @type {string} */ path, /** @type {string} */ method) => spec.paths[`${H}${path}`][method].requestBody;
+  const bodyOf = (/** @type {string} */ path, /** @type {string} */ method) => requestOf(path, method).content['application/json'].schema;
+  const queryOf = (/** @type {string} */ path, /** @type {string} */ name) => spec.paths[`${H}${path}`].get.parameters.find((/** @type {any} */ p) => p.name === name && p.in === 'query').schema;
+  const NUMBER = ['number', 'null'];
+  const FLAG = [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }];
+  const flagOf = (/** @type {any} */ s) => s.anyOf;
+
+  // Numbers: a number or null, never text (`v.num` read "0x10" as 16).
+  const vitals = bodyOf('/vitals', 'post').properties;
+  for (const field of ['value_num', 'value_num2', 'value_num3']) assert.deepEqual(vitals[field].type, NUMBER, `vitals ${field}`);
+  const activity = bodyOf('/activities', 'post').properties;
+  for (const field of ['duration_min', 'distance_km', 'calories']) assert.deepEqual(activity[field].type, NUMBER, `activities ${field}`);
+  for (const path of ['/medications', '/medications/{id}']) {
+    const med = bodyOf(path, path === '/medications' ? 'post' : 'patch').properties;
+    for (const field of ['stock_qty', 'refill_threshold', 'min_interval_hours', 'prn_dose_qty']) assert.deepEqual(med[field].type, NUMBER, `${path} ${field}`);
+    // prnInterval: above 0; prnDose: not negative.
+    assert.equal(med.min_interval_hours.exclusiveMinimum, 0, `${path} min_interval_hours`);
+    assert.equal(med.prn_dose_qty.minimum, 0, `${path} prn_dose_qty`);
+    assert.deepEqual(flagOf(med.active), FLAG, `${path} active`);
+    assert.deepEqual(flagOf(med.prn), FLAG, `${path} prn`);
+    assert.deepEqual(med.visibility.type, ['string', 'null'], `${path} visibility`);
+  }
+  const meds = bodyOf('/medications', 'post').properties;
+  assert.deepEqual(meds.schedules.type, ['array', 'null']);
+  for (const schedule of [meds.schedules.items, bodyOf('/medications/{id}/schedules', 'post')]) {
+    assert.equal(schedule.type, 'object');
+    assert.deepEqual(schedule.required, ['time_of_day']);
+    assert.equal(schedule.properties.time_of_day.type, 'string');
+    assert.equal(schedule.properties.time_of_day.pattern, '^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+    assert.deepEqual([schedule.properties.days_mask.type, schedule.properties.days_mask.minimum, schedule.properties.days_mask.maximum], [['integer', 'null'], 0, 127]);
+    assert.deepEqual(schedule.properties.dose_qty.type, NUMBER);
+    assert.deepEqual(flagOf(schedule.properties.active), FLAG);
+  }
+  const schedulePatch = bodyOf('/schedules/{id}', 'patch').properties;
+  assert.equal(schedulePatch.time_of_day.type, 'string', 'time_of_day cannot be emptied');
+  assert.deepEqual([schedulePatch.days_mask.minimum, schedulePatch.days_mask.maximum], [0, 127]);
+  assert.deepEqual(flagOf(schedulePatch.active), FLAG);
+  // Dose log: status of the list or null, numbers, stock_deduct and stock_credit not negative.
+  for (const [path, method] of [['/medications/{id}/logs', 'post'], ['/logs/{id}', 'patch']]) {
+    const log = bodyOf(path, method).properties;
+    assert.deepEqual(log.status.type, ['string', 'null'], `${path} status`);
+    assert.deepEqual(log.dose_qty.type, NUMBER, `${path} dose_qty`);
+  }
+  for (const [path, field] of [['/medications/{id}/logs', 'stock_deduct'], ['/logs/{id}/take', 'stock_deduct'], ['/logs/{id}/undo', 'stock_credit']]) {
+    const prop = bodyOf(path, 'post').properties[field];
+    assert.deepEqual([prop.type, prop.minimum], [NUMBER, 0], `${path} ${field}`);
+    assert.equal(requestOf(path, 'post').required, true, `${path}: a body`);
+  }
+  // Labs: results a list of objects with an analyte, or null; the flag of the list or null.
+  const labs = bodyOf('/labs', 'post').properties;
+  assert.deepEqual(labs.results.type, ['array', 'null']);
+  assert.equal(labs.results.items.type, 'object');
+  assert.deepEqual(labs.results.items.required, ['analyte']);
+  assert.deepEqual(labs.results.items.properties.flag.type, ['string', 'null']);
+  assert.deepEqual(bodyOf('/results/{id}', 'patch').properties.value_num.type, NUMBER);
+  // Prevention: kind required and never null; whole numbers in their ranges.
+  const types = bodyOf('/prevention/types', 'post');
+  assert.deepEqual([...types.required].sort(), ['kind', 'name']);
+  assert.equal(types.properties.kind.type, 'string');
+  assert.equal(bodyOf('/prevention/types/{id}', 'patch').properties.kind.type, 'string');
+  assert.deepEqual([types.properties.default_interval_months.type, types.properties.default_interval_months.minimum], [['integer', 'null'], 1]);
+  assert.deepEqual(types.properties.sort_order.type, NUMBER);
+  const records = bodyOf('/prevention/records', 'post').properties;
+  assert.deepEqual([records.interval_months.type, records.interval_months.minimum], [['integer', 'null'], 1]);
+  assert.deepEqual([records.reminder_offset_days.type, records.reminder_offset_days.minimum], [['integer', 'null'], 0]);
+  assert.deepEqual(records.dose_number.type, NUMBER);
+  // Nutrition: each nutrient a number from 0 or null; meal_type of the list or null.
+  for (const [path, method] of [['/nutrition/entries', 'post'], ['/nutrition/entries/{id}', 'patch'], ['/nutrition/targets', 'put']]) {
+    const props = bodyOf(path, method).properties;
+    for (const key of fields.NUTRIENT_KEYS) assert.deepEqual([props[key].type, props[key].minimum], [NUMBER, 0], `${path} ${key}`);
+  }
+  assert.deepEqual(bodyOf('/nutrition/entries/{id}', 'patch').properties.meal_type.type, ['string', 'null']);
+  // Cycle: the settings ranges are whole numbers or null, the switches are flags.
+  const settings = bodyOf('/cycle/settings', 'put').properties;
+  for (const field of Object.keys(fields.CYCLE_SETTING_RANGES)) assert.deepEqual(settings[field].type, ['integer', 'null'], field);
+  for (const field of ['track_fertility', 'pregnancy_mode', 'remind_log_daily', 'perimenopause_mode', 'show_pms']) assert.deepEqual(flagOf(settings[field]), FLAG, field);
+  const day = bodyOf('/cycle/logs', 'post').properties;
+  assert.deepEqual(day.feelings.type, ['array', 'null']);
+  assert.equal(day.feelings.items.type, 'string');
+  assert.deepEqual(day.mood.type, ['string', 'null']);
+  const bulk = bodyOf('/cycle/visibility', 'patch');
+  assert.deepEqual([bulk.required, bulk.properties.visibility.type], [['visibility'], 'string']);
+  const csv = bodyOf('/cycle/import', 'post');
+  assert.deepEqual([csv.required, csv.properties.csv.type], [['csv'], 'string']);
+  // Caregivers: a required list of ids from 1.
+  const care = bodyOf('/caregivers/{subjectId}', 'put');
+  assert.deepEqual(care.required, ['caregiver_ids']);
+  assert.equal(care.properties.caregiver_ids.type, 'array');
+  assert.deepEqual(care.properties.caregiver_ids.items.anyOf, [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^0*[1-9][0-9]*$' }]);
+  // Visibility defaults: `defaults` a required object of visibilities; `scope` and `visibility` required.
+  const defaults = bodyOf('/visibility-defaults', 'put');
+  assert.deepEqual([defaults.required, defaults.properties.defaults.type, defaults.properties.defaults.additionalProperties.type], [['defaults'], 'object', 'string']);
+  const apply = bodyOf('/visibility-defaults/apply', 'patch');
+  assert.deepEqual([[...apply.required].sort(), apply.properties.scope.type, apply.properties.visibility.type], [['scope', 'visibility'], 'string', 'string']);
+  // Exports: a calendar day (exportRange() no longer checks it).
+  for (const path of ['/export/vitals', '/export/activities', '/export/labs', '/export/meds-logs', '/export/nutrition', '/export/cycle']) {
+    for (const name of ['from', 'to']) {
+      assert.deepEqual(queryOf(path, name), { type: 'string', format: 'date', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, `${path} ${name}`);
+    }
+  }
+  // Every write body above is required.
+  for (const [path, method] of [['/vitals', 'post'], ['/medications', 'post'], ['/labs', 'post'], ['/activities', 'post'], ['/cycle/logs', 'post'],
+    ['/cycle/settings', 'put'], ['/nutrition/targets', 'put'], ['/prevention/records', 'post']]) {
+    assert.equal(requestOf(path, method).required, true, `${method} ${path}: a body`);
+  }
+});
+
+test('the sink: the visibility-default areas are looked up by own keys only', async () => {
+  const { isValidScopeKey } = await import('../server/routes/health/visibility-defaults.js');
+  for (const key of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+    assert.equal(isValidScopeKey(key), false, `${key} is no area`);
+  }
+  assert.equal(isValidScopeKey('meds'), true);
+  assert.equal(isValidScopeKey('vital:bp'), true);
+  // In front of it the schema refuses the same.
+  refused(await call('PATCH', '/visibility-defaults/apply', { json: { scope: 'constructor', visibility: 'private' } }), 'body/scope', 'apply constructor');
+  refused(await call('PUT', '/visibility-defaults', { json: { defaults: { toString: 'family' } } }), 'body/defaults', 'defaults toString');
+});

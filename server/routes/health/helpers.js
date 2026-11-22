@@ -24,14 +24,16 @@ import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
 import { canWriteFor } from '../../authorize/index.ts';
-import { LOG_STATUS, MAX_UNIT, NUTRITION_VISIBILITIES, VISIBILITIES } from '../../services/health-fields.js';
+import { MAX_UNIT } from '../../services/health-fields.js';
 
 export const log = createLogger('Health');
 
-// Value lists for input validation: one source with the OpenAPI document in
-// server/services/health-fields.js (#2810); the open values themselves are
-// rules and come from server/authorize/care.ts.
-export { LOG_STATUS, MAX_UNIT, NUTRITION_VISIBILITIES, VISIBILITIES };
+// The length of a unit text, for the trimming check of the routes: one source
+// with the OpenAPI document in server/services/health-fields.js (#2810). The
+// value lists (visibility, dose status, ...) are the schema's alone since step
+// (b) of group 6; the open values themselves are rules and come from
+// server/authorize/care.ts.
+export { MAX_UNIT };
 
 /**
  * Wie die Zeitstempel der Gesundheit geprueft werden (`measured_at`,
@@ -61,6 +63,20 @@ export function wallClockNow() {
 
 export function viewerId(req) {
   return req.authUserId || req.session.userId;
+}
+
+/**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). `parseInt`
+ * read `7abc` as 7 until the schema stood in front; it lets nothing but digits
+ * through now, so `Number` reads the same value. `0` and `-0` stay falsy, and
+ * the routes keep answering them with their `Invalid id.`; `-1` finds no row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
+ */
+export function pathId(req, name = 'id') {
+  return Number(req.params[name]);
 }
 
 /**
@@ -142,7 +158,11 @@ export function sendCsv(res, filename, csv) {
   res.send(`﻿${csv}`);
 }
 
-/** Liest optionale from/to-Query als YYYY-MM-DD (nur wenn plausibel). */
+/**
+ * Liest optionale from/to-Query als YYYY-MM-DD (nur wenn plausibel). Dass es
+ * ein Kalendertag ist, prueft auch das Schema vor der Route (#2810); der Wert
+ * landet hier aber in SQL und im Dateinamen, und die Senke prueft selbst.
+ */
 export function exportRange(req) {
   const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from || '') ? req.query.from : null;
   const to   = /^\d{4}-\d{2}-\d{2}$/.test(req.query.to || '')   ? req.query.to   : null;
