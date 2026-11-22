@@ -347,6 +347,18 @@ test('"" in einem Pflichtfeld bleibt "is required", kein 500', async () => {
   }
 });
 
+// Seit #2810 prueft das Schema den Rumpf zuerst: ein fehlendes `name` waere
+// dort eine 400 ohne Feldnamen in der Werkzeugantwort (die Meldung traegt nur
+// `error` und `reason`, nie `fields`). Das Werkzeug schickt `name` deshalb
+// immer mit, und das Modell liest den Satz der Route.
+test('add_shopping_item ohne name nennt das Feld, nicht nur die Schema-Absage', async () => {
+  for (const args of [{}, { quantity: '2' }, { name: null }]) {
+    const res = await toolCall('add_shopping_item', args);
+    assert.equal(res.result.isError, true, JSON.stringify(args));
+    assert.match(res.result.content[0].text, /name is required\./, JSON.stringify(args));
+  }
+});
+
 // Das alte `v.str` wandelte per `String(val)`; die Route verlangt Text. Eine
 // Zahl in einem Textfeld legte vorher an und bleibt deshalb erlaubt.
 test('tools/call create_task: eine Zahl als Titel wird Text', async () => {
