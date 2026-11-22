@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, num, date as validateDate, month as validateMonth, MAX_TITLE, MAX_SHORT } from '../../middleware/validate.js';
@@ -11,6 +12,8 @@ import { normalizeObjectVisibility } from '../../authorize/index.ts';
 import { computeLoanSchedule, MAX_LOAN_MONTHS } from '../../services/loan-amortization.js';
 import { translate, resolveHouseholdLocale } from '../../utils/i18n.js';
 import { todayKey } from '../../utils/timezone.js';
+// One source with the schema (#2810).
+import { INTEREST_MODES } from '../../services/budget-fields.js';
 import {
   budgetFilter, mayEdit, getBudgetMode, loanSummaryRow, loadLoan, refreshLoanStatus, cents,
   budgetCurrency, toBudgetAmount, loanEntryRate, CURRENCY_RE, validateAccountRef, addMonths,
@@ -22,7 +25,6 @@ const router = express.Router();
 
 // 'variable' = Darlehen ganz ohne Zinsbindung (#569-Nachtrag): rechnet einphasig
 // wie 'fixed', der Satz gilt aber nur als aktueller Wert (Prognose).
-const INTEREST_MODES = ['none', 'fixed', 'variable', 'fixed_then_variable'];
 
 // Hoechste Ratenanzahl eines Darlehens ohne Zins. Die Absage nennt sie als
 // `max`, damit der Dialog die Grenze sagen kann (#1668).
@@ -178,7 +180,7 @@ function deriveInterestTerms(body, mode) {
 // Live-Vorschau für den Darlehens-Dialog: berechnet Monatsrate, Laufzeit,
 // Gesamtzins und Restschuld ohne zu speichern. Server bleibt einzige Quelle der
 // Zins-Mathematik (keine Formel-Dopplung im Client).
-router.post('/loans/preview', (req, res) => {
+router.post('/loans/preview', validateRequest(), (req, res) => {
   try {
     const mode = req.body.interest_mode;
     if (!INTEREST_MODES.includes(mode) || mode === 'none') {
@@ -210,7 +212,7 @@ router.post('/loans/preview', (req, res) => {
   }
 });
 
-router.get('/loans', (req, res) => {
+router.get('/loans', validateRequest(), (req, res) => {
   try {
     // Sichtbarkeit (#476/#505): Loans folgen dem Modus, ohne Mein/Haushalt-Scope.
     const filter = budgetFilter(req, 'l', { scoped: false });
@@ -328,7 +330,7 @@ function seedPaidInstallments(loanId, count, userId) {
   refreshLoanStatus(loanId);
 }
 
-router.post('/loans', (req, res) => {
+router.post('/loans', validateRequest(), (req, res) => {
   try {
     const vTitle = str(req.body.title || req.body.borrower, 'Title', { max: MAX_TITLE });
     const vBorrower = str(req.body.borrower, 'Borrower', { max: MAX_SHORT });
@@ -427,7 +429,7 @@ router.post('/loans', (req, res) => {
   }
 });
 
-router.put('/loans/:id', (req, res) => {
+router.put('/loans/:id', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const loan = db.get().prepare('SELECT * FROM budget_loans WHERE id = ?').get(id);
@@ -576,7 +578,7 @@ router.put('/loans/:id', (req, res) => {
   }
 });
 
-router.post('/loans/:id/payments', (req, res) => {
+router.post('/loans/:id/payments', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const loan = loadLoan(id);
@@ -679,7 +681,7 @@ router.post('/loans/:id/payments', (req, res) => {
   }
 });
 
-router.delete('/loans/:id/payments/:paymentId', (req, res) => {
+router.delete('/loans/:id/payments/:paymentId', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const paymentId = parseInt(req.params.paymentId, 10);
@@ -705,7 +707,7 @@ router.delete('/loans/:id/payments/:paymentId', (req, res) => {
   }
 });
 
-router.delete('/loans/:id', (req, res) => {
+router.delete('/loans/:id', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const loan = db.get().prepare('SELECT * FROM budget_loans WHERE id = ?').get(id);

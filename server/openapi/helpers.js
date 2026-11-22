@@ -199,10 +199,9 @@ function langParam({ fallback = 'default' } = {}) {
       in: 'query',
       required: false,
       description: `${supported} Without it, or with a value that is not supported, the labels come in the household language (the \`language\` preference, else derived from \`region\`, else ${DEFAULT_LOCALE}). The response names the language it used in \`lang\`.`,
-      schema: {
-        type: 'string',
-        enum: [...locales],
-      },
+      // No `enum` (#2810): validateRequest() reads one, and the tolerance this
+      // description promises (#1859) would turn into a 400.
+      schema: { type: 'string' },
     };
   }
   return {

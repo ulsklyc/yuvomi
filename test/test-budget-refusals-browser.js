@@ -31,6 +31,7 @@ process.env.DB_PATH = ':memory:';
 const PUBLIC = fileURLToPath(new URL('../public', import.meta.url));
 const dbmod = await import('../server/db.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { todayKey } = await import('../server/utils/timezone.js');
 const db = dbmod.get();
 const A = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('a','Anna','x','admin')").run().lastInsertRowid;
@@ -49,7 +50,8 @@ before(async () => {
   });
   app.get('/api/v1/preferences', (_req, res) => res.json({ data: { currency: 'EUR', budget_mode: 'shared' } }));
   app.get('/api/v1/family/members', (_req, res) => res.json({ data: [{ id: A, display_name: 'Anna' }] }));
-  app.use('/api/v1/budget', budgetRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use('/api/v1/budget', budgetRouter, createErrorHandler({ warn: () => {}, error: () => {} }));
   app.use('/api/v1', (_req, res) => res.json({ data: [] }));
   app.get('/__budget-probe.html', (_req, res) => res.type('html').send(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="/styles/tokens.css"></head>

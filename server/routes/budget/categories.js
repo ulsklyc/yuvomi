@@ -4,9 +4,11 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, MAX_SHORT } from '../../middleware/validate.js';
+import { CATEGORY_TYPES } from '../../services/budget-fields.js';
 import {
   loadBudgetMeta, requestLang, localizedCategory, localizedSubcategory,
   uniqueKey, categoryInUseCount, subcategoryInUseCount,
@@ -21,7 +23,7 @@ const router = express.Router();
  * Kategorien-Liste für Dropdowns.
  * Response: { data: { categories } }
  */
-router.get('/meta', (req, res) => {
+router.get('/meta', validateRequest(), (req, res) => {
   try {
     res.json({ data: loadBudgetMeta() });
   } catch (err) {
@@ -30,7 +32,7 @@ router.get('/meta', (req, res) => {
   }
 });
 
-router.get('/categories', (req, res) => {
+router.get('/categories', validateRequest(), (req, res) => {
   try {
     const lang = requestLang(req.query.lang);
     const categories = db.get().prepare(`
@@ -59,7 +61,7 @@ router.get('/categories', (req, res) => {
   }
 });
 
-router.get('/categories/:categoryKey/subcategories', (req, res) => {
+router.get('/categories/:categoryKey/subcategories', validateRequest(), (req, res) => {
   try {
     const lang = requestLang(req.query.lang);
     const category = db.get().prepare(`
@@ -87,10 +89,10 @@ router.get('/categories/:categoryKey/subcategories', (req, res) => {
   }
 });
 
-router.post('/categories', (req, res) => {
+router.post('/categories', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
-    const vType = oneOf(req.body.type || 'expense', ['expense', 'income'], 'Type');
+    const vType = oneOf(req.body.type || 'expense', CATEGORY_TYPES, 'Type');
     const errors = [...refusals('category_name_invalid', [vName]), ...refusals('category_type_invalid', [vType])];
     if (errors.length) return refuse(res, errors);
 
@@ -116,7 +118,7 @@ router.post('/categories', (req, res) => {
   }
 });
 
-router.put('/categories/:key', (req, res) => {
+router.put('/categories/:key', validateRequest(), (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM budget_categories WHERE key = ?').get(req.params.key);
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'budget_category_not_found' });
@@ -138,7 +140,7 @@ router.put('/categories/:key', (req, res) => {
   }
 });
 
-router.delete('/categories/:key', (req, res) => {
+router.delete('/categories/:key', validateRequest(), (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM budget_categories WHERE key = ?').get(req.params.key);
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'budget_category_not_found' });
@@ -158,9 +160,9 @@ router.delete('/categories/:key', (req, res) => {
   }
 });
 
-router.patch('/categories/reorder', (req, res) => {
+router.patch('/categories/reorder', validateRequest(), (req, res) => {
   try {
-    const vType = oneOf(req.body.type || 'expense', ['expense', 'income'], 'Type');
+    const vType = oneOf(req.body.type || 'expense', CATEGORY_TYPES, 'Type');
     if (vType.error) return refuse(res, refusals('category_type_invalid', [vType]));
     const order = Array.isArray(req.body.order) ? req.body.order : [];
     const tx = db.get().transaction((keys) => {
@@ -176,7 +178,7 @@ router.patch('/categories/reorder', (req, res) => {
   }
 });
 
-router.post('/categories/:categoryKey/subcategories', (req, res) => {
+router.post('/categories/:categoryKey/subcategories', validateRequest(), (req, res) => {
   try {
     const cat = db.get().prepare(`
       SELECT * FROM budget_categories WHERE key = ?
@@ -210,7 +212,7 @@ router.post('/categories/:categoryKey/subcategories', (req, res) => {
   }
 });
 
-router.put('/categories/:key/subcategories/:subKey', (req, res) => {
+router.put('/categories/:key/subcategories/:subKey', validateRequest(), (req, res) => {
   try {
     const sub = db.get().prepare('SELECT * FROM budget_subcategories WHERE key = ? AND category_key = ?').get(req.params.subKey, req.params.key);
     if (!sub) return res.status(404).json({ error: 'Subcategory not found.', code: 404, reason: 'budget_subcategory_not_found' });
@@ -232,7 +234,7 @@ router.put('/categories/:key/subcategories/:subKey', (req, res) => {
   }
 });
 
-router.delete('/categories/:key/subcategories/:subKey', (req, res) => {
+router.delete('/categories/:key/subcategories/:subKey', validateRequest(), (req, res) => {
   try {
     const sub = db.get().prepare('SELECT * FROM budget_subcategories WHERE key = ? AND category_key = ?').get(req.params.subKey, req.params.key);
     if (!sub) return res.status(404).json({ error: 'Subcategory not found.', code: 404, reason: 'budget_subcategory_not_found' });
@@ -252,7 +254,7 @@ router.delete('/categories/:key/subcategories/:subKey', (req, res) => {
   }
 });
 
-router.patch('/categories/:key/subcategories/reorder', (req, res) => {
+router.patch('/categories/:key/subcategories/reorder', validateRequest(), (req, res) => {
   try {
     const order = Array.isArray(req.body.order) ? req.body.order : [];
     const tx = db.get().transaction((keys) => {

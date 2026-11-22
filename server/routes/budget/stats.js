@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { bookedOnly, computeStatsRange, cents, budgetFilter, budgetCategoryExpr, todayLocalDateKey, STATS_RANGES, DATE_RE } from './helpers.js';
@@ -112,6 +113,6 @@ export function statsHandler(req, res) {
   }
 }
 
-router.get('/stats', statsHandler);
+router.get('/stats', validateRequest(), statsHandler);
 
 export default router;

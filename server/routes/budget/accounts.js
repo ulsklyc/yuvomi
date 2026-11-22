@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middleware/validate.js';
@@ -23,7 +24,7 @@ const router = express.Router();
  * Response: { data: { accounts: [], net_worth, net_worth_approx?, net_worth_rates_at?, net_worth_by_currency? } }
  * (netWorthSummary in helpers.js, #2302)
  */
-router.get('/accounts', (req, res) => {
+router.get('/accounts', validateRequest(), (req, res) => {
   try {
     const includeArchived = req.query.include_archived === '1' || req.query.include_archived === 'true';
     const accounts = listAccounts(includeArchived, budgetFilter(req, 'e', { scoped: false }));
@@ -40,7 +41,7 @@ router.get('/accounts', (req, res) => {
  * Body: { name, type?, starting_balance?, currency?, color?, credit_bank?, credit_limit? }
  * Response: { data: Account }
  */
-router.post('/accounts', (req, res) => {
+router.post('/accounts', validateRequest(), (req, res) => {
   try {
     const vName    = str(req.body.name, 'Name', { max: MAX_SHORT });
     const vType    = oneOf(req.body.type || 'checking', ACCOUNT_TYPE_KEYS, 'Account type');
@@ -112,7 +113,7 @@ function subscriptionsOn(accountId) {
  * bei Kreditkarten zusätzlich Bank und Kreditlimit).
  * Response: { data: Account }
  */
-router.put('/accounts/:id', async (req, res) => {
+router.put('/accounts/:id', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const existing = db.get().prepare('SELECT * FROM budget_accounts WHERE id = ?').get(id);
@@ -204,7 +205,7 @@ router.put('/accounts/:id', async (req, res) => {
  * (ACCOUNT_SHELL, helpers.js) - die Antwort ist dieselbe 204.
  * Response: 204 No Content
  */
-router.delete('/accounts/:id', async (req, res) => {
+router.delete('/accounts/:id', validateRequest(), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const filter = budgetFilter(req, 'e', { scoped: false });
