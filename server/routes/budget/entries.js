@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { SAVINGS_CHART_CATEGORY } from '../../../public/utils/budget-chart-category.js';
 import { transferPair, mirrorTransfer, deleteTransfer } from '../../services/budget-transfers.js';
 import { createLogger } from '../../logger.js';
@@ -60,7 +61,7 @@ function intervalCountCheck(value) {
  * Kategorien der Seitenleiste beim ganzen Haushalt, die Bilanz neben dem
  * Kontoauszug sprach also ueber andere Buchungen als die Liste darunter.
  */
-router.get('/summary', (req, res) => {
+router.get('/summary', validateRequest(), (req, res) => {
   try {
     // DER VOREINGESTELLTE MONAT IST EINE FRAGE AN DIE UHR, und die folgt der
     // Haushaltszone. `new Date().toISOString().slice(0, 7)` stand hier und ist
@@ -197,7 +198,7 @@ export function resolveExportRange({ from, to, month }) {
  * Query: ?month=YYYY-MM or ?from=YYYY-MM-DD&to=YYYY-MM-DD
  * Response: text/csv
  */
-router.get('/export', (req, res) => {
+router.get('/export', validateRequest(), (req, res) => {
   try {
     const { from, to } = resolveExportRange(req.query);
     const filename = (DATE_RE.test(req.query.from || '') && DATE_RE.test(req.query.to || ''))
@@ -290,7 +291,7 @@ const LEDGER_SEARCH_MAX_LENGTH = 100;
  * Query: ?month=YYYY-MM&category=<cat>  |  ?q=<text>&account_id=&scope=
  * Response: { data: Entry[] }  |  { data: Entry[], meta: { query, limit, truncated } }
  */
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     if (req.query.q !== undefined && !req.query.loan_id) return searchEntries(req, res);
     // Haushaltszone, nicht UTC - dieselbe Begruendung wie bei `/summary`
@@ -458,7 +459,7 @@ function searchEntries(req, res) {
  * Body: { title, amount, category?, subcategory?, date, is_recurring?, recurrence_rule? }
  * Response: { data: Entry }
  */
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     if (req.body.transfer_entry_id !== undefined) return refuse(res, [refusal('transfer_invalid', 'Create transfers through /budget/transfers.')]);
     const vTitle  = str(req.body.title,    'Title',  { max: MAX_TITLE });
@@ -554,7 +555,7 @@ router.post('/', (req, res) => {
  * Serie, #1545). `date` wird ignoriert: es ist das Datum einer Buchung.
  * Response: { data: Anker-Buchung + series: Definition | null }
  */
-router.put('/:id/series', (req, res) => {
+router.put('/:id/series', validateRequest(), (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
@@ -916,7 +917,7 @@ router.put('/:id/series', (req, res) => {
  * Löscht das Serien-Original und alle zugehörigen Instanzen.
  * Response: 204 No Content
  */
-router.delete('/:id/series', (req, res) => {
+router.delete('/:id/series', validateRequest(), (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
@@ -950,7 +951,7 @@ router.delete('/:id/series', (req, res) => {
  * Body: alle Felder optional
  * Response: { data: Entry }
  */
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
@@ -1208,7 +1209,7 @@ router.put('/:id', (req, res) => {
  * vorzeichnet. Ein reines "bestätigt"-Häkchen hätte die Diskrepanz zum
  * Kontoauszug stehen lassen, um die es geht.
  */
-router.patch('/:id/confirm', (req, res) => {
+router.patch('/:id/confirm', validateRequest(), (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
@@ -1260,7 +1261,7 @@ router.patch('/:id/confirm', (req, res) => {
  * Eintrag löschen.
  * Response: 204 No Content
  */
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     const entry = db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);

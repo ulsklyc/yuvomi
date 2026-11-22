@@ -316,9 +316,10 @@ test('Kreditkarte: Bank und Kreditrahmen werden gespeichert und wieder geliefert
     assert.equal(updated.body.data.credit_bank, 'Andere Bank');
     assert.equal(updated.body.data.credit_limit, 3500);
 
-    // Leerer String löscht, undefined lässt unangetastet: ein Teil-Update darf
-    // Bank und Rahmen nicht nebenbei verwerfen.
-    const cleared = await h.call('PUT', `/accounts/${res.body.data.id}`, { credit_bank: '', credit_limit: '' });
+    // Leerer String bzw. null löscht, undefined lässt unangetastet: ein Teil-Update
+    // darf Bank und Rahmen nicht nebenbei verwerfen. Den Rahmen leert seit #2810
+    // `null` (wie die Seite es schickt); `''` an einem Betrag ist eine Absage.
+    const cleared = await h.call('PUT', `/accounts/${res.body.data.id}`, { credit_bank: '', credit_limit: null });
     assert.equal(cleared.body.data.credit_bank, null);
     assert.equal(cleared.body.data.credit_limit, null);
 

@@ -1,5 +1,6 @@
 /** Transfer dialog endpoints; generic entry writes also protect the pair. */
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import { str, num, date as validateDate, MAX_TITLE } from '../../middleware/validate.js';
 import { normalizeBudgetVisibility } from '../../authorize/index.ts';
@@ -104,18 +105,18 @@ function writeBooking(entry, v) {
   mirrorTransfer(database, entry.id);
 }
 
-router.get('/transfers/:id', (req, res) => {
+router.get('/transfers/:id', validateRequest(), (req, res) => {
   try { const entry = access(req, res); if (entry) res.json({ data: response(entry) }); }
   catch (err) { log.error('', err); res.status(500).json({ error: 'Internal error', code: 500 }); }
 });
-router.post('/transfers', (req, res) => {
+router.post('/transfers', validateRequest(), (req, res) => {
   try {
     const v = values(req); if (!guard(res, v)) return;
     if (v.amount <= 0) return res.status(400).json({ error: 'Amount must be greater than zero.', code: 400 });
     res.status(201).json({ data: response(createTransfer(db.get(), v)) });
   } catch (err) { log.error('', err); res.status(500).json({ error: 'Internal error', code: 500 }); }
 });
-router.put('/transfers/:id', (req, res) => {
+router.put('/transfers/:id', validateRequest(), (req, res) => {
   try {
     const entry = access(req, res); if (!entry) return;
     const v = values(req, entry); if (!guard(res, v)) return;
@@ -127,7 +128,7 @@ router.put('/transfers/:id', (req, res) => {
     res.json({ data: response(load(entry.id)) });
   } catch (err) { log.error('', err); res.status(500).json({ error: 'Internal error', code: 500 }); }
 });
-router.put('/transfers/:id/series', (req, res) => {
+router.put('/transfers/:id/series', validateRequest(), (req, res) => {
   try {
     const entry = access(req, res); if (!entry) return;
     const current = transferSeries(entry);

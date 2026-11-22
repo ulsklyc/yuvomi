@@ -116,10 +116,17 @@ const MOUNTS = [
   { file: 'document-storage-google-drive.js', mount: '/api/v1/documents/storage/google-drive' },
   { file: 'dms.js', mount: '/api/v1/documents/dms' },
   { file: 'documents.js', mount: '/api/v1/documents' },
+  // In der Reihenfolge von server/index.js: die Abos VOR dem Budget (sonst
+  // faenge `/:id` der Buchungen `/subscriptions/...`), die sieben Budget-
+  // Router in der Reihenfolge von server/routes/budget.js.
+  { file: 'subscriptions.js', mount: '/api/v1/budget/subscriptions' },
+  ...['categories', 'loans', 'accounts', 'plans', 'stats', 'transfers', 'entries']
+    .map((name) => ({ file: `budget/${name}.js`, mount: '/api/v1/budget' })),
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
 const WITHOUT_INTEGER_PATH_ID = [
+  'budget/categories.js', 'budget/plans.js', 'budget/stats.js',
   'email.js', 'family.js', 'inventory/categories.js', 'inventory/deadlines-feed.js', 'kitchen.js',
   'modules.js', 'schedule-feed.js', 'schedule-preferences.js', 'screensaver.js', 'search.js',
   'waste/feed.js', 'waste/import.js', 'waste/occurrences.js', 'weather.js',

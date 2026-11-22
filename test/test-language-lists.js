@@ -89,9 +89,14 @@ test('OpenAPI: `lang` nennt genau die App-Sprachen', async () => {
   // OpenWeatherMap code, anything else falls back), and validateRequest() checks
   // the document since #2810: there it is plain text, an enum would refuse what
   // the routes take. The geocode search still names the app languages.
+  // The budget categories read it the same way (#1859: an unknown code falls
+  // back to the household language, group 9 of #2810) and name the languages
+  // in the description.
   const LENIENT = new Map([
     ['GET /api/v1/weather', { namesLocales: false }],
     ['GET /api/v1/weather/geocode', { namesLocales: true }],
+    ['GET /api/v1/budget/categories', { namesLocales: true }],
+    ['GET /api/v1/budget/categories/{categoryKey}/subcategories', { namesLocales: true }],
   ]);
   for (const { where, param } of langParams) {
     const lenient = LENIENT.get(where);

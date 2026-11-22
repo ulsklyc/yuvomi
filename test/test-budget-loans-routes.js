@@ -327,8 +327,9 @@ test('POST /loans/preview: unbekannter Modus bleibt abgewiesen', async () => {
     as: AA,
     body: { interest_mode: 'bogus', principal: 150000, fixed_rate: 3.5, initial_repayment_rate: 2 },
   });
-  assert.equal(r.status, 200);
-  assert.equal(r.body.data.ok, false);
+  // Bis #2810 200 mit `ok: false`; seit dem Schema eine Absage, die das Feld nennt.
+  assert.equal(r.status, 400);
+  assert.deepEqual(r.body.fields, [{ path: 'body/interest_mode', rule: 'enum' }]);
 });
 
 // --------------------------------------------------------------------------
@@ -1040,7 +1041,6 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
     [{ ...base, installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.', { max: 360 }],
     [{ ...base, paid_installments: -1 }, 'loan_paid_installments_invalid', 'Paid installments must be zero or a positive number.'],
     [{ ...base, paid_installments: 13 }, 'loan_paid_installments_exceed', 'Paid installments cannot exceed the installment count.', { max: 12 }],
-    [{ ...base, direction: 'sideways' }, 'loan_direction_invalid', 'Direction must be either lent or borrowed.'],
     [{ ...base, currency: 'US' }, 'loan_currency_invalid', 'Currency must be a three-letter ISO code.'],
     [{ ...base, currency: 'USD', exchange_rate: 0 }, 'loan_exchange_rate_invalid', 'Exchange rate must be greater than zero.'],
     [{ ...base, account_id: 987654 }, 'loan_account_invalid', 'Account not found.'],
@@ -1060,6 +1060,10 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
     const r = await call('POST', '/loans', { as: AA, body });
     assert.deepEqual(r.body, { error, code: 400, reason, ...extra }, `POST ${reason}`);
   }
+  // Eine Richtung ausserhalb der Liste weist seit #2810 das Schema ab (bis dahin
+  // `loan_direction_invalid`); der Dialog schickt nur `lent` oder `borrowed`.
+  const sideways = await call('POST', '/loans', { as: AA, body: { ...base, direction: 'sideways' } });
+  assert.deepEqual(sideways.body, { error: 'The request does not match the documented schema.', code: 400, reason: 'validation', fields: [{ path: 'body/direction', rule: 'enum' }] });
   // Mit Zins zaehlt die abgeleitete Laufzeit - dieselbe Zahl wie in der Vorschau.
   const preview = await call('POST', '/loans/preview', { as: AA, body: interest });
   const term = preview.body.data.total_months;
@@ -1092,16 +1096,20 @@ test('#1656: jede Absage des Darlehens-Formulars traegt ihren Grund, der Satz bl
   const puts = [
     [{ ...base, interest_mode: 'none', installment_count: 2 }, 'loan_term_below_paid', 'The resulting term is shorter than the already paid installments.'],
     [{ installment_count: 2 }, 'loan_term_below_paid', 'Installment count cannot be lower than paid installments.'],
-    [{ ...base, interest_mode: 'compound' }, 'loan_interest_mode_invalid', 'Interest mode is invalid.'],
     [{ ...base, interest_mode: 'none', installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.', { max: 360 }],
     [{ installment_count: 361 }, 'loan_installments_invalid', 'Installment count must be between 1 and 360.', { max: 360 }],
     [{ total_amount: -5 }, 'loan_amount_invalid', 'Amount must be greater than zero.'],
-    [{ direction: 'sideways' }, 'loan_direction_invalid', 'Direction must be either lent or borrowed.'],
     [{ account_id: 987654 }, 'loan_account_invalid', 'Account not found.'],
   ];
   for (const [body, reason, error, extra = {}] of puts) {
     const r = await call('PUT', `/loans/${id}`, { as: AA, body });
     assert.deepEqual(r.body, { error, code: 400, reason, ...extra }, `PUT ${reason}`);
+  }
+  // Modus und Richtung ausserhalb der Liste weist seit #2810 das Schema ab (bis
+  // dahin `loan_interest_mode_invalid` bzw. `loan_direction_invalid`).
+  for (const [body, field] of [[{ ...base, interest_mode: 'compound' }, 'interest_mode'], [{ direction: 'sideways' }, 'direction']]) {
+    const r = await call('PUT', `/loans/${id}`, { as: AA, body });
+    assert.deepEqual(r.body, { error: 'The request does not match the documented schema.', code: 400, reason: 'validation', fields: [{ path: `body/${field}`, rule: 'enum' }] }, `PUT ${field}`);
   }
   const withInterest = await call('POST', '/loans', { as: AA, body: interest });
   assert.equal(withInterest.status, 201);

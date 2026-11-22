@@ -8,6 +8,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **The budget and the subscriptions check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now.
+  Under `/api/v1/budget` (accounts, categories, entries, series, loans, plans, statistics,
+  transfers) and `/api/v1/budget/subscriptions`, input that used to be quietly accepted,
+  replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `1abc`, `1.0` and `1e0` reached account, entry or loan 1,
+    `0x1` and `1.0` reached transfer or subscription 1 - also to delete it, and `POST
+    /subscriptions/0x1/renew` booked a payment;
+  - a month outside 01 to 12: `GET /budget?month=2026-13` with a running series wrote an entry
+    dated `2026-13-05`, a loan stored `start_month: "2026-13"`, and the summary, the plan and
+    the export answered for month 13; a day that is not `YYYY-MM-DD` (`anchor=2026-13-45` of the
+    statistics answered 500);
+  - a number, list, object or truth value in a text field: an account, category, entry,
+    transfer, loan or subscription category named `{}` was stored as `"[object Object]"`, a
+    number as text; on editing an entry, a series, a loan or a subscription a number answered
+    500;
+  - `null`, an empty string, text, a truth value or a list as an amount: `null` and `""` set an
+    entry, a series, an account's starting balance or the subscription budget to 0, `true`
+    counted as 1, `[5]` as 5, `"0x10"` as 16; `credit_limit: ""` is now `null` to clear it;
+  - an unknown `interest_mode` of a new loan became a loan without interest, an unknown
+    `visibility` of an entry, transfer, loan or subscription the default; an unknown loan
+    `direction` or account `type` (`""` was stored as the type), category `type`,
+    `recurrence_interval` (`null` answered 500), `billing_cycle` (missing or `""` answered
+    500) or `end_type`;
+  - switches that are not `true`/`false` (`0`/`1` on entries): `is_recurring: "false"` started
+    a series, `archived: "false"` archived an account;
+  - ids in a body that are not whole numbers: `account_id: ""` or `"1"`, a subscription's
+    `category_id: true` (a 500), `responsible_user_ids` and `attachment_document_ids` with
+    non-numbers (dropped silently), the order lists (`order: [{}]` of the categories answered
+    500, missing or empty changed nothing; the subscription order took any list);
+  - a `query` of the logo search that is not text (`5` was looked up as the website `5`);
+  - a query value outside its type, or given twice: `scope=x`, `account_id=abc`, `loan_id=abc`,
+    a month of the export or plan that is not `YYYY-MM` (the current month), `range=day`,
+    `include_archived=yes`, a subscription `status`, `enabled`, `category_id` or
+    `payment_method_id` outside its values (no filter, or an empty list).
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404 or 403 (the
+  write rule of the personal budget mode); a valid one meets those as before. Lengths, ranges,
+  the calendar day and every refusal with a `reason` the budget page shows stay with the routes;
+  a body of the wrong type now answers `reason: validation` with the field (for example
+  `entry_date_invalid` for `date: "nope"`, `loan_direction_invalid` for an unknown direction).
+  The loan preview answers an unknown `interest_mode` with 400 instead of `{ ok: false }`. A
+  PUT without a body is a 400; `PATCH /budget/{id}/confirm` still takes none. An unexpected
+  error of a subscription route now answers `Internal server error.` like every other route
+  (it was `Internal error.`).
 - **The shopping list, documents, the document storage settings and the DMS connection check
   every request against the published API description.** This is about your own API clients;
   the app sends nothing that is refused now (from this release on it sends the folder of a
