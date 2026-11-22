@@ -75,6 +75,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request. Lengths stay with the routes, with their `reason` and `params.limit`. Deleting a
   contact sync account that does not exist answers 404 (`account_not_found`) instead of 500. A
   week start stored as a built-in property name (`constructor`) no longer breaks the meal plan.
+- **The shops and the price history of the shopping list answer an unexpected failure with the
+  same sentence as the rest of the API.** `GET`, `POST`, `PUT` and `DELETE` under
+  `/api/v1/shopping/stores` and `GET /api/v1/shopping/price-history` said `"Internal error"` on
+  a server-side failure; they now say `"Internal server error."` like every other module. Status
+  500 and `code` are unchanged, and so is every answer that names a known cause.
 - **Health answers an unexpected failure with the same sentence as the rest of the API.**
   Vitals, medications and the dose log, lab reports, activities, the CSV exports, the cycle
   tab, caregivers, preventive care and nutrition under `/api/v1/health` said
