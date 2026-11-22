@@ -88,7 +88,9 @@ test('GET /suggestions: Präfix-Treffer liefert distinct Titel + Typ', async () 
 test('POST /: fehlender meal_type → 400', async () => {
   const r = await call('POST', '/', { date: '2026-06-15', title: 'X' });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Mahlzeit-Typ/);
+  // Seit #2810 das Schema vor der Route (vorher der deutsche Satz der Route).
+  assert.equal(r.body.reason, 'validation');
+  assert.ok(r.body.fields.some((/** @type {any} */ f) => f.path === 'body/meal_type' && f.rule === 'required'), JSON.stringify(r.body));
 });
 
 test('POST /: ungültiger meal_type → 400', async () => {
@@ -439,7 +441,8 @@ test('POST /apply-plan: skip_occupied, das kein Boolean ist -> 400 statt still a
       assignments: [{ date: '2045-01-15', meal_type: 'dinner', title: 'Import' }],
     });
     assert.equal(r.status, 400, `skip_occupied: ${JSON.stringify(value)}`);
-    assert.match(r.body.error, /skip_occupied/);
+    // Seit #2810 das Schema vor der Route; das Feld ist benannt.
+    assert.ok(r.body.fields.some((/** @type {any} */ f) => f.path === 'body/skip_occupied'), JSON.stringify(r.body));
   }
   assert.deepEqual(mealsIn('2045-01-15', 'dinner'), ['Bestand']);
 });

@@ -18,6 +18,8 @@ import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
 } from '../services/contact-identity.js';
+import { CONTACT_CATEGORY_COLORS } from '../services/contacts-fields.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Contacts');
 
@@ -86,29 +88,8 @@ function loadContactCategories() {
   ).all();
 }
 
-/**
- * Die kuratierten Toene, aus denen eine Kategorie waehlen darf.
- *
- * EINE ALLOWLIST, KEIN FREIER FARBWAEHLER, und der Grund ist gemessen: die
- * Kategoriescheibe ist eine VOLLTON-Marke, ihre Tinte ist die feste
- * `--color-ink-on-vivid` (Vollton-Regel, DESIGN.md). Das haelt nur ueber
- * kuratierten Toenen - eine frei gewaehlte Farbe hat unbestimmte Helligkeit und
- * muesste als Kante statt als Flaeche erscheinen, also als zweites Gesicht
- * derselben Marke. Sieben Toene sind fuer ein Kategorie-Vokabular reichlich,
- * und es sind exakt die sieben, die vorher in contacts.css standen: bestehende
- * Haushalte sehen nach der Migration genau dasselbe wie davor.
- *
- * Der leere Wert gehoert dazu und heisst NEUTRAL - siehe Migration 152.
- */
-const CONTACT_CATEGORY_COLORS = Object.freeze([
-  'var(--color-success)',
-  'var(--color-warning)',
-  'var(--color-accent)',
-  'var(--module-budget)',
-  'var(--module-meals)',
-  'var(--color-danger)',
-  'var(--color-text-secondary)',
-]);
+// Die kuratierten Toene einer Kategorie: EINE Quelle mit dem OpenAPI-Dokument
+// (#2810), server/services/contacts-fields.js (dort begruendet).
 
 /** '' und null bedeuten beide "kein Ton"; alles ausserhalb der Liste wird abgewiesen. */
 function normalizeCategoryColor(value) {
@@ -331,7 +312,7 @@ function validateAddresses(addresses) {
 // --------------------------------------------------------
 
 // GET /api/v1/contacts/categories → { data: ContactCategory[] }
-router.get('/categories', (_req, res) => {
+router.get('/categories', validateRequest(), (_req, res) => {
   try {
     res.json({ data: loadContactCategories() });
   } catch (err) {
@@ -341,7 +322,7 @@ router.get('/categories', (_req, res) => {
 });
 
 // POST /api/v1/contacts/categories  Body: { name } → { data: ContactCategory }
-router.post('/categories', (req, res) => {
+router.post('/categories', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -369,7 +350,7 @@ router.post('/categories', (req, res) => {
 });
 
 // PATCH /api/v1/contacts/categories/reorder  Body: { order: string[] }
-router.patch('/categories/reorder', (req, res) => {
+router.patch('/categories/reorder', validateRequest(), (req, res) => {
   try {
     const order = Array.isArray(req.body.order) ? req.body.order : [];
     const update = db.get().prepare('UPDATE contact_categories SET sort_order = ? WHERE key = ?');
@@ -382,7 +363,7 @@ router.patch('/categories/reorder', (req, res) => {
 });
 
 // PUT /api/v1/contacts/categories/:key  Body: { name } → umbenennen (Key bleibt stabil).
-router.put('/categories/:key', (req, res) => {
+router.put('/categories/:key', validateRequest(), (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM contact_categories WHERE key = ?').get(req.params.key);
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'contacts_category_not_found' });
@@ -419,7 +400,7 @@ router.put('/categories/:key', (req, res) => {
 });
 
 // DELETE /api/v1/contacts/categories/:key → 409 wenn in Benutzung oder letzte Kategorie.
-router.delete('/categories/:key', (req, res) => {
+router.delete('/categories/:key', validateRequest(), (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM contact_categories WHERE key = ?').get(req.params.key);
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'contacts_category_not_found' });
@@ -539,7 +520,7 @@ function withBirthdaySuggestion(req, contact) {
  * Query: ?category=<cat>&q=<search>
  * Response: { data: Contact[] }
  */
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     let sql    = CONTACT_SELECT;
     const params = [];
@@ -576,7 +557,7 @@ router.get('/', (req, res) => {
  * Body: { name, category?, phone?, email?, address?, notes?, phones?, emails?, addresses? }
  * Response: { data: Contact }
  */
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     // Strukturierte Namensteile haben Vorrang vor einem mitgesendeten `name` (#535).
     const nameParts = readNameParts(req.body);
@@ -706,7 +687,7 @@ router.post('/', (req, res) => {
  * Body: alle Felder optional, phones/emails/addresses mit Replacement-Semantik
  * Response: { data: Contact }
  */
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const id      = parseInt(req.params.id, 10);
     const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(id);
@@ -919,7 +900,7 @@ router.put('/:id', (req, res) => {
  * Kontakt löschen.
  * Response: 204 No Content
  */
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id     = parseInt(req.params.id, 10);
     const contact = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(id);
@@ -949,7 +930,7 @@ router.delete('/:id', (req, res) => {
  *
  * Response: { data: { categories, categoryColors } }
  */
-router.get('/meta', (_req, res) => {
+router.get('/meta', validateRequest(), (_req, res) => {
   try {
     res.json({ data: { categories: loadContactCategories(), categoryColors: CONTACT_CATEGORY_COLORS } });
   } catch (err) {
@@ -963,7 +944,7 @@ router.get('/meta', (_req, res) => {
  * Einzelnen Kontakt abrufen mit Multi-Value Fields (phones, emails, addresses).
  * Response: { data: Contact }
  */
-router.get('/:id', (req, res) => {
+router.get('/:id', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const contact = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);
@@ -989,7 +970,7 @@ router.get('/:id', (req, res) => {
  * Kontakt als vCard 3.0 (.vcf) exportieren.
  * Response: text/vcard Dateidownload
  */
-router.get('/:id/vcard', (req, res) => {
+router.get('/:id/vcard', validateRequest(), (req, res) => {
   try {
     const id      = parseInt(req.params.id, 10);
     const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(id);

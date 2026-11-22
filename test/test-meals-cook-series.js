@@ -226,6 +226,8 @@ async function dialog(s, index) {
       for (const fn of handler.umfang) fn({ target: felder['#modal-edit-scope'] });
     },
     titel: (wert) => { felder['#modal-title'].value = wert; },
+    /** Ein Rezept im <select> waehlen: sein Wert ist Text, wie im Browser. */
+    rezept: (/** @type {string} */ wert) => { felder['#modal-recipe-id'].value = wert; },
     /** Speichern-Knopf: der Body geht an den ECHTEN Router; zurueck kommt, was gesendet wurde. */
     speichern: async () => {
       const gesendet = [];
@@ -476,4 +478,31 @@ test('leere Mitgliederliste: der Dialog laedt sie beim Oeffnen nach und reicht d
   } finally {
     globalThis.__apiStub = undefined;
   }
+});
+
+// #2810: das <select> des Rezepts liefert Text. Der Dialog schickt die ID als
+// Zahl - Ziffern-Text nimmt der Server nur noch als Altform an - und der
+// ECHTE Router nimmt den Rumpf, im Einzel- wie im Serien-Umfang.
+test('der Dialog schickt die Rezept-ID als Zahl, und der Router nimmt sie', async () => {
+  const rezept = Number(db.prepare("INSERT INTO recipes (title, created_by) VALUES ('Suppe', ?)").run(ADMIN).lastInsertRowid);
+  const s = await serie(ANNA);
+
+  const d = await dialog(s, 1);
+  d.rezept(String(rezept));
+  const einzeln = await d.speichern();
+  assert.equal(einzeln.path, `/meals/${s.ids[1]}`);
+  assert.equal(einzeln.body.recipe_id, rezept, 'als Zahl, nicht als Text');
+  assert.equal(einzeln.status, 200);
+
+  const e = await dialog(s, 2);
+  e.umfang('series');
+  e.rezept(String(rezept));
+  const serienweit = await e.speichern();
+  assert.equal(serienweit.path, `/meals/${s.ids[2]}?scope=series`);
+  assert.equal(serienweit.body.recipe_id, rezept);
+  assert.equal(serienweit.status, 200);
+
+  // Ohne Wahl bleibt es null.
+  const f = await dialog(s, 0);
+  assert.equal((await f.speichern()).body.recipe_id, null);
 });

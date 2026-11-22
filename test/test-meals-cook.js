@@ -415,6 +415,17 @@ test('gespeicherter Koch einer Serie: scope=series nimmt den Koch der VORLAGE we
   assert.equal(fremd.status, 400, 'wer nirgends steht, ist erst recht eine neue Wahl');
 });
 
+/**
+ * Eine Absage an der Form des Kochs: seit #2810 die Pruefung gegen das Schema
+ * vor der Route (fester Satz, Feld `body/cook_user_id`); was das Schema als
+ * Ziffernfolge durchlaesst, aber keine sichere ganze Zahl ist
+ * (`"9007199254740993"`), weist `cookField()` mit seinem Satz ab.
+ * @param {any} body
+ */
+const cookFormRefused = (body) => (body?.reason === 'validation' && body.fields?.some((/** @type {any} */ f) => f.path.startsWith('body/cook_user_id')
+  || f.path.startsWith('body/assignments/0/cook_user_id')))
+  || /Koch muss die ID eines Haushaltsmitglieds sein/.test(body?.error ?? '');
+
 test('ungueltige und unbekannte Angaben: 400 statt Fremdschluessel-Fehler, nichts geschrieben', async () => {
   const meal = (await createMeal({ date: '2035-02-05', cook_user_id: BEN })).body.data;
   const before = db.prepare('SELECT COUNT(*) AS c FROM meals').get().c;
@@ -423,11 +434,12 @@ test('ungueltige und unbekannte Angaben: 400 statt Fremdschluessel-Fehler, nicht
     const angelegt = await createMeal({ date: '2035-02-06', cook_user_id: wert });
     assert.equal(angelegt.status, 400, `POST mit ${JSON.stringify(wert)}`);
     // Die Meldung nennt die FORM, nicht "nicht gefunden": eine Liste oder ein
-    // Bruch ist keine unbekannte Person, sondern keine id.
-    assert.match(angelegt.body.error, /Koch muss die ID eines Haushaltsmitglieds sein/, `POST mit ${JSON.stringify(wert)}`);
+    // Bruch ist keine unbekannte Person, sondern keine id. Seit #2810 sagt es
+    // das Schema vor der Route, mit dem Feld.
+    assert.ok(cookFormRefused(angelegt.body), `POST mit ${JSON.stringify(wert)}: ${JSON.stringify(angelegt.body)}`);
     const geaendert = await call('PUT', `/${meal.id}`, { cook_user_id: wert });
     assert.equal(geaendert.status, 400, `PUT mit ${JSON.stringify(wert)}`);
-    assert.match(geaendert.body.error, /Koch muss die ID eines Haushaltsmitglieds sein/, `PUT mit ${JSON.stringify(wert)}`);
+    assert.ok(cookFormRefused(geaendert.body), `PUT mit ${JSON.stringify(wert)}: ${JSON.stringify(geaendert.body)}`);
   }
   const unbekannt = await createMeal({ date: '2035-02-06', cook_user_id: 999999 });
   assert.equal(unbekannt.status, 400);
@@ -482,7 +494,7 @@ test('cookField: nur eine positive ganze Zahl oder null - nichts, was erst `Numb
     assert.deepEqual(feld(wert), { given: true, value: null, error: 'Koch muss die ID eines Haushaltsmitglieds sein.' }, `cookField(${name})`);
     const angelegt = await createMeal({ date: '2035-04-03', cook_user_id: wert });
     assert.equal(angelegt.status, 400, `POST mit ${name}`);
-    assert.match(angelegt.body.error, /Koch muss die ID eines Haushaltsmitglieds sein/, `POST mit ${name}`);
+    assert.ok(cookFormRefused(angelegt.body), `POST mit ${name}: ${JSON.stringify(angelegt.body)}`);
     assert.equal((await call('PUT', `/${meal.id}`, { cook_user_id: wert })).status, 400, `PUT mit ${name}`);
     assert.equal((await call('POST', '/apply-plan', { assignments: [{ date: '2035-04-03', meal_type: 'lunch', title: 'X', cook_user_id: wert }] })).status,
       400, `apply-plan mit ${name}`);

@@ -106,6 +106,10 @@ const MOUNTS = [
   // /api/v1/health (server/routes/health.js), in dessen Reihenfolge.
   ...['vitals', 'medications', 'labs', 'activities', 'export', 'cycle', 'cycle-feed', 'caregivers',
     'visibility-defaults', 'fasting', 'prevention', 'nutrition'].map((name) => ({ file: `health/${name}.js`, mount: '/api/v1/health' })),
+  // In der Reihenfolge von server/index.js: CardDAV vor den Kontakten.
+  { file: 'meals.js', mount: '/api/v1/meals' },
+  { file: 'cardav.js', mount: '/api/v1/contacts/cardav' },
+  { file: 'contacts.js', mount: '/api/v1/contacts' },
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
