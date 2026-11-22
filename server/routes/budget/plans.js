@@ -5,14 +5,12 @@
 
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
-import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
-import { num, collectErrors, MONTH_RE } from '../../middleware/validate.js';
+import { num, collectErrors } from '../../middleware/validate.js';
 import {
   bookedOnly, cents, thisMonthLocalKey, validExpenseCategoryKeys, budgetFilter, budgetCategoryExpr,
 } from './helpers.js';
 
-const log = createLogger('Budget');
 const router = express.Router();
 
 // Reservierter Kategorie-Schlüssel für das Monats-Sparziel in budget_plans.
@@ -140,19 +138,16 @@ export function computePlanProgress(database, month, context) {
  * Query: ?month=YYYY-MM (default: aktueller Monat)
  */
 router.get('/plans', validateRequest(), (req, res) => {
-  try {
-    const month = MONTH_RE.test(req.query.month || '') ? req.query.month : thisMonthLocalKey();
-    // Sichtbarkeit/Scope wie Summary und Statistik (#476/#505/#659).
-    res.json({
-      data: computePlanProgress(db.get(), month, {
-        filter: budgetFilter(req, 'budget_entries'),
-        categoryExpr: budgetCategoryExpr(req, 'budget_entries'),
-      }),
-    });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  // `month` is `YYYY-MM` with a month 01-12 or absent: the schema refuses
+  // anything else (#2810), the fallback is only the default.
+  const month = req.query.month || thisMonthLocalKey();
+  // Sichtbarkeit/Scope wie Summary und Statistik (#476/#505/#659).
+  res.json({
+    data: computePlanProgress(db.get(), month, {
+      filter: budgetFilter(req, 'budget_entries'),
+      categoryExpr: budgetCategoryExpr(req, 'budget_entries'),
+    }),
+  });
 });
 
 /**
@@ -161,31 +156,26 @@ router.get('/plans', validateRequest(), (req, res) => {
  * BUDGET_SAVINGS_KEY) fest. Body: { amount } — positiv, sonst 400.
  */
 router.put('/plans/:category', validateRequest(), (req, res) => {
-  try {
-    const category  = req.params.category;
-    const isSavings = category === BUDGET_SAVINGS_KEY;
-    if (!isSavings && !validExpenseCategoryKeys().includes(category))
-      return res.status(400).json({ error: 'Invalid category.', code: 400 });
+  const category  = req.params.category;
+  const isSavings = category === BUDGET_SAVINGS_KEY;
+  if (!isSavings && !validExpenseCategoryKeys().includes(category))
+    return res.status(400).json({ error: 'Invalid category.', code: 400 });
 
-    const vAmount = num(req.body.amount, 'Amount', { required: true });
-    const errors  = collectErrors([vAmount]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    if (!(vAmount.value > 0))
-      return res.status(400).json({ error: 'Amount must be greater than zero.', code: 400 });
+  const vAmount = num(req.body.amount, 'Amount', { required: true });
+  const errors  = collectErrors([vAmount]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  if (!(vAmount.value > 0))
+    return res.status(400).json({ error: 'Amount must be greater than zero.', code: 400 });
 
-    const amount = cents(vAmount.value);
-    db.get().prepare(`
-      INSERT INTO budget_plans (category, amount, created_by, updated_at)
-      VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-      ON CONFLICT(category) DO UPDATE SET
-        amount = excluded.amount, updated_at = excluded.updated_at
-    `).run(category, amount, req.authUserId || req.session.userId);
+  const amount = cents(vAmount.value);
+  db.get().prepare(`
+    INSERT INTO budget_plans (category, amount, created_by, updated_at)
+    VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    ON CONFLICT(category) DO UPDATE SET
+      amount = excluded.amount, updated_at = excluded.updated_at
+  `).run(category, amount, req.authUserId || req.session.userId);
 
-    res.json({ data: { category, amount } });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  res.json({ data: { category, amount } });
 });
 
 /**
@@ -193,13 +183,8 @@ router.put('/plans/:category', validateRequest(), (req, res) => {
  * Entfernt den Budgetplan einer Kategorie bzw. das Sparziel.
  */
 router.delete('/plans/:category', validateRequest(), (req, res) => {
-  try {
-    db.get().prepare('DELETE FROM budget_plans WHERE category = ?').run(req.params.category);
-    res.json({ data: { deleted: true } });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  db.get().prepare('DELETE FROM budget_plans WHERE category = ?').run(req.params.category);
+  res.json({ data: { deleted: true } });
 });
 
 export default router;
