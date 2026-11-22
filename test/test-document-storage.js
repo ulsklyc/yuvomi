@@ -1515,6 +1515,7 @@ test('document routes store local uploads and return storage_backend in create, 
 
   const updated = await routeCall(harness, 'PUT', `/${created.body.data.id}`, {
     name: 'Updated local route upload',
+    allowed_member_ids: [],
   });
   assert.equal(updated.response.status, 200);
   assert.equal(updated.body.data.storage_backend, 'local');

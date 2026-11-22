@@ -1418,6 +1418,9 @@ router.put('/:id', validateRequest(), (req, res) => {
     return deletionInProgress(res);
   }
   if (selectedFolderMissing(selectedFolderId)) return selectedFolderGone(res);
+  // The schema requires `allowed_member_ids` on PUT (full representation,
+  // #2810): replaceAccess() below always replaces the list, and left out it
+  // emptied a restricted document's access silently.
   const allowedIds = (visibility || existing.visibility) === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
   // Neu freigeben laesst sich nur Haushaltsmitgliedern (#1207). Wer schon
   // freigegeben ist - auch Hauspersonal oder ein Gast -, bleibt speicherbar.

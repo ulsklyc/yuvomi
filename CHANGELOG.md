@@ -163,6 +163,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `nameSuffix` cleared the ones left out, so a middle name, title or suffix from a vCard or
   CardDAV was lost. Sent together they are required together now: one without the others is a
   400 naming a missing part; `null` still clears a part, and leaving out all five keeps them.
+- **Editing a document takes its access list.** This is about your own API clients; the app
+  sends it already. `PUT /documents/{id}` without `allowed_member_ids` emptied the list, so a
+  `restricted` document silently lost every member it was shared with. `allowed_member_ids` is
+  required now (`[]` shares it with nobody); for `family` and `private` it is ignored as before.
+  Every other field stays optional and keeps the stored value when left out.
 - **An exchange snapshot is an object or `null`.** This is about your own API clients: on
   `POST /split-expenses/groups/{id}/expenses` and `PUT /split-expenses/expenses/{id}`,
   `exchange_snapshot` sent as `false`, `0`, `""` or any other value that is not an object is now

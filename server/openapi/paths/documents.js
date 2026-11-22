@@ -400,7 +400,7 @@ export function documentsPaths() {
         tag: 'Documents',
         params: [documentId()],
         stateChanging: true,
-        description: 'Updates name, description, category, status, visibility, folder, expiry, allowed member IDs and the member the document is about (`subject_user_id`, `null` clears it). A field that is not sent stays as it is - except `allowed_member_ids`: the access list is replaced on every update, and left out it becomes empty. Only the owner or an admin can update a document.',
+        description: 'Updates name, description, category, status, visibility, folder, expiry, allowed member IDs and the member the document is about (`subject_user_id`, `null` clears it). A field that is not sent stays as it is - except `allowed_member_ids`, which is required: the access list is replaced on every update (full representation, RFC 9110). Up to v2.93 it could be left out and the list became empty, so a `restricted` document lost every member it was shared with; that is a 400 now, before the 404. Only the owner or an admin can update a document.',
         requestBody: body({
           name: text('The document name.'),
           description: optionalText('Free text.'),
@@ -411,8 +411,11 @@ export function documentsPaths() {
           expires_at: EXPIRES_AT,
           expiry_reminder_days: EXPIRY_REMINDER_DAYS,
           subject_user_id: rowIdOrNull('The household member the document is about.'),
-          allowed_member_ids: ALLOWED_MEMBER_IDS,
-        }),
+          allowed_member_ids: {
+            ...ALLOWED_MEMBER_IDS,
+            description: 'Required: the household members who may see a `restricted` document, replacing the stored list; `[]` shares it with nobody. For `family` or `private` the list is ignored and the stored one is emptied. An id without an account or of someone who is not a household member is the route\'s 400.',
+          },
+        }, ['allowed_member_ids']),
         responses: {
           200: {
             description: 'Document metadata updated',

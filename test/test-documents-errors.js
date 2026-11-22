@@ -128,7 +128,7 @@ const SERVER_GONE = [
   ['GET', `/folders/${GONE}/delete-impact`, null, 'documents_folder_not_found', 'Folder not found.'],
   ['PUT', `/folders/${GONE}`, { name: 'x' }, 'documents_folder_not_found', 'Folder not found.'],
   ['DELETE', `/folders/${GONE}`, null, 'documents_folder_not_found', 'Folder not found.'],
-  ['PUT', `/${GONE}`, { name: 'x' }, 'documents_document_not_found', 'Document not found.'],
+  ['PUT', `/${GONE}`, { name: 'x', allowed_member_ids: [] }, 'documents_document_not_found', 'Document not found.'],
   ['PATCH', `/${GONE}/archive`, { archived: true }, 'documents_document_not_found', 'Document not found.'],
   ['DELETE', `/${GONE}`, null, 'documents_document_not_found', 'Document not found.'],
 ];
@@ -150,7 +150,7 @@ test('Server: ein Ordner unter einem inzwischen geloeschten Ordner - anlegen und
 
 test('Server: ein Dokument in einen inzwischen geloeschten Ordner - hochladen und aendern antworten 400 mit dem Fall statt 500', async () => {
   const id = await documentRow();
-  for (const [method, path, body] of [['POST', '', upload({ folder_id: GONE })], ['PUT', `/${id}`, { folder_id: GONE }]]) {
+  for (const [method, path, body] of [['POST', '', upload({ folder_id: GONE })], ['PUT', `/${id}`, { folder_id: GONE, allowed_member_ids: [] }]]) {
     const r = await call(method, path, body);
     assert.deepEqual([r.status, r.body?.reason, r.body?.error], [400, 'documents_selected_folder_not_found', 'Folder not found.'], `${method} ${path}`);
   }
