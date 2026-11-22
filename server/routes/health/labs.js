@@ -102,10 +102,12 @@ router.post('/labs', validateRequest(), (req, res) => {
   const errors = v.collectErrors([reportDate, labName, note]);
   if (errors.length) return badRequest(res, errors);
 
-  // `results` ist eine Liste von Objekten oder null (Schema, #2810).
+  // `results` ist eine Liste von Objekten oder null (Schema, #2810); die
+  // Schleife prueft trotzdem selbst, worueber sie laeuft (Senke statt Route).
+  const rawResults = Array.isArray(b.results) ? b.results : [];
   const preparedResults = [];
-  for (const raw of b.results ?? []) {
-    const { row, error } = validateResult(raw);
+  for (const raw of rawResults) {
+    const { row, error } = validateResult(raw || {});
     if (error) return badRequest(res, [error]);
     preparedResults.push(row);
   }

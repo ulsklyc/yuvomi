@@ -139,15 +139,24 @@ function replaceSymptoms(database, dayLogId, entries) {
  * (400), kein still verworfener Eintrag: Gefuehle sind keine erweiterbare
  * Presets-Liste wie Symptome, sondern eine feste kleine Auswahl. Das Set und
  * die Form (`feelings` eine Liste oder null, `mood` ein Wert, `""` oder null)
- * prueft das Schema vor der Route (#2810); hier fallen nur Doppelte weg.
+ * prueft das Schema vor der Route (#2810); hier fallen Doppelte weg, und die
+ * Schleife prueft selbst, dass sie ueber eine Liste von Texten laeuft.
  *
  * Nimmt `feelings` (Array) entgegen, oder - fehlt es - das alte Einzelfeld
  * `mood` als Ein-Element-Liste (Abwaertskompatibilitaet, siehe POST-Handler).
- * @returns {string[]}
+ * @returns {{ keys: string[]|null, error: string|null }}
  */
 function normalizeFeelings(rawFeelings, rawMood) {
   const list = rawFeelings ?? (rawMood ? [rawMood] : []);
-  return [...new Set(list)];
+  // Die Schleife prueft selbst, worueber sie laeuft (Senke statt Route).
+  if (!Array.isArray(list)) return { keys: null, error: 'feelings must be an array.' };
+  /** @type {string[]} */
+  const keys = [];
+  for (const item of list) {
+    if (typeof item !== 'string') return { keys: null, error: 'feelings must be an array.' };
+    if (!keys.includes(item)) keys.push(item);
+  }
+  return { keys, error: null };
 }
 
 /** Gefuehls-Schluessel eines Tages-Logs, in Einfuegereihenfolge. */
@@ -333,13 +342,14 @@ router.post('/cycle/logs', validateRequest(), (req, res) => {
   // nur sein Wert ist leer (siehe normalizeFeelings()).
   const feelingsProvided = Object.prototype.hasOwnProperty.call(b, 'feelings')
     || Object.prototype.hasOwnProperty.call(b, 'mood');
-  const feelings = feelingsProvided ? normalizeFeelings(b.feelings, b.mood) : null;
+  const feelings = feelingsProvided ? normalizeFeelings(b.feelings, b.mood) : { keys: null, error: null };
 
   // flow aus FLOW_VALUES, `""` oder null (nicht angegeben), visibility
   // `private`/`family` oder null: das Schema (#2810).
   const errors = v.collectErrors([logDate, note, cervixMucus, lhTest, pregnancyTest, intimacy]);
   if (symptoms.length > MAX_SYMPTOMS_COUNT) errors.push(`symptoms may include at most ${MAX_SYMPTOMS_COUNT} entries.`);
   if (basalTemp.error) errors.push(basalTemp.error);
+  if (feelings.error) errors.push(feelings.error);
   if (errors.length) return badRequest(res, errors);
 
   const database = db.get();
@@ -365,7 +375,7 @@ router.post('/cycle/logs', validateRequest(), (req, res) => {
     );
     const id = database.prepare('SELECT id FROM cycle_day_logs WHERE user_id = ? AND log_date = ?').get(viewer, logDate.value).id;
     replaceSymptoms(database, id, symptoms);
-    if (feelings) replaceFeelings(database, id, feelings);
+    if (feelingsProvided) replaceFeelings(database, id, feelings.keys);
     return id;
   })();
 
@@ -658,9 +668,11 @@ function normalizeImportDate(raw) {
 // Datei versprach, oder gar nichts, nie eine stille Teilmenge.
 router.post('/cycle/import', validateRequest(), (req, res) => {
   const viewer = viewerId(req);
-  // Pflicht und Text (Schema, #2810); leer bleibt die Pruefung der Route.
-  const csv = req.body.csv;
-  if (!csv.trim()) {
+  // Pflicht und Text prueft das Schema (#2810). Die Typpruefung bleibt hier
+  // trotzdem: die Zeilen-Schleife unten (splitCsvLine) laeuft ueber den Wert,
+  // und die Senke prueft selbst, was sie zerlegt.
+  const csv = req.body?.csv;
+  if (typeof csv !== 'string' || !csv.trim()) {
     return badRequest(res, ['csv is required.']);
   }
   if (Buffer.byteLength(csv, 'utf8') > IMPORT_MAX_BYTES) {

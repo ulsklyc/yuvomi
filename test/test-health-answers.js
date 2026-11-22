@@ -1380,3 +1380,74 @@ test('the handled cases keep their own answer and never reach the central handle
   assert.deepEqual(await call('PUT', `/caregivers/${OUT}`, { caregiver_ids: [FORMER] }, { actor: 'admin' }), EXPECTED['cg put former']);
   assert.deepEqual(logged.error, [], 'none reached the central handler');
 });
+
+/**
+ * The handler of a route alone, without validateRequest() and whatever stands
+ * in front of it in the route: the last function of its route layer.
+ * @param {string} method lower case
+ * @param {string} path the Express pattern under /api/v1/health
+ */
+async function bareHandler(method, path) {
+  const { default: healthRouter } = await import('../server/routes/health.js');
+  for (const outer of healthRouter.stack) {
+    for (const layer of outer.handle.stack ?? []) {
+      if (layer.route?.path === path && layer.route.methods[method]) return layer.route.stack.at(-1).handle;
+    }
+  }
+  throw new Error(`no route ${method} ${path}`);
+}
+
+/**
+ * Runs a bare handler with a raw body and query and returns its answer.
+ * @param {string} method
+ * @param {string} path
+ * @param {{ body?: unknown, query?: Record<string, unknown>, actor?: string }} input
+ */
+async function callBare(method, path, { body = {}, query = {}, actor = 'own' }) {
+  const handler = await bareHandler(method, path);
+  const who = ACTORS[actor];
+  const req = { method: method.toUpperCase(), body, query, params: {}, authUserId: who.id, authRole: who.role, session: { userId: who.id, role: who.role } };
+  /** @type {{ status: number, body: unknown, headers: Record<string, string> }} */
+  const out = { status: 200, body: undefined, headers: {} };
+  const res = {
+    status(/** @type {number} */ code) { out.status = code; return res; },
+    json(/** @type {unknown} */ value) { out.body = value; return res; },
+    send(/** @type {unknown} */ value) { out.body = value; return res; },
+    end() { return res; },
+    setHeader(/** @type {string} */ name, /** @type {string} */ value) { out.headers[name] = value; },
+  };
+  handler(req, res, (/** @type {unknown} */ err) => { throw err; });
+  return out;
+}
+
+// The schema refuses each of these in front (the table holds that). Behind it
+// a loop, a `.length`, a string method or a lookup runs over the raw value, so
+// the handler keeps its own type check there (sink, not route; CodeQL
+// js/loop-bound-injection on splitCsvLine): called without validateRequest(),
+// each answers its old sentence instead of throwing or looping.
+test('the sinks check their own input: each handler alone refuses a raw value of the wrong type', async () => {
+  const sentence = (/** @type {string} */ error) => ({ error, code: 400 });
+  for (const csv of [5, ['2026-01-01'], { length: 1e9 }, null]) {
+    assert.deepEqual((await callBare('post', '/cycle/import', { body: { csv } })).body, sentence('csv is required.'), `csv ${JSON.stringify(csv)}`);
+  }
+  assert.deepEqual((await callBare('post', '/medications', { body: { name: 'X', schedules: 'x' } })).body, sentence('schedules must be an array.'));
+  assert.deepEqual((await callBare('post', '/medications', { body: { name: 'X', schedules: { length: 1e9 } } })).body, sentence('schedules must be an array.'));
+  assert.deepEqual((await callBare('post', '/medications', { body: { name: 'X', schedules: Array.from({ length: 49 }, () => ({ time_of_day: '08:00' })) } })).body,
+    sentence('schedules must not contain more than 48 entries.'));
+  assert.deepEqual((await callBare('post', '/medications', { body: { name: 'X', schedules: [5] } })).body, sentence('schedules[0] must be an object.'));
+  assert.deepEqual((await callBare('post', '/labs', { body: { report_date: '2026-11-01', results: { length: 1e9 } } })).status, 201, 'results that are no list are none');
+  const care = await bareHandler('put', '/caregivers/:subjectId');
+  /** @type {any} */
+  const careAnswer = {};
+  care({ body: { caregiver_ids: { length: 1e9 } }, params: { subjectId: String(OUT) }, query: {} },
+    { status(/** @type {number} */ c) { careAnswer.status = c; return this; }, json(/** @type {unknown} */ v) { careAnswer.body = v; return this; } });
+  assert.deepEqual(careAnswer, { status: 400, body: sentence('caregiver_ids must be an array.') });
+  assert.deepEqual((await callBare('put', '/visibility-defaults', { body: { defaults: 'meds' } })).body, sentence('defaults must be an object.'));
+  assert.deepEqual((await callBare('put', '/visibility-defaults', { body: { defaults: ['meds'] } })).body, sentence('defaults must be an object.'));
+  assert.deepEqual((await callBare('patch', '/visibility-defaults/apply', { body: { scope: { startsWith: 1 }, visibility: 'private' } })).body, sentence('Unknown scope: [object Object]'));
+  assert.deepEqual((await callBare('post', '/cycle/logs', { body: { log_date: '2026-11-20', feelings: 'good' } })).body, sentence('feelings must be an array.'));
+  assert.deepEqual((await callBare('post', '/cycle/logs', { body: { log_date: '2026-11-20', feelings: [{}] } })).body, sentence('feelings must be an array.'));
+  const csvAnswer = await callBare('get', '/export/vitals', { query: { from: ['2026-01-01', '2026-12-31'], to: { length: 5 } } });
+  assert.equal(csvAnswer.status, 200, 'a doubled or odd day is no range');
+  assert.equal(csvAnswer.headers['Content-Disposition'], 'attachment; filename="health-vitals.csv"');
+});

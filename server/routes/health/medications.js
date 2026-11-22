@@ -16,6 +16,7 @@ import {
 } from './helpers.js';
 import { careAwareClause, readableClause, writableChild, writableClause } from '../../authorize/index.ts';
 import { validateRequest } from '../../api/validate-request.ts';
+import { MAX_SCHEDULES_ON_CREATE } from '../../services/health-fields.js';
 
 const router = express.Router();
 
@@ -185,13 +186,22 @@ router.post('/medications', validateRequest(), (req, res) => {
   // scheiterte ein Zeitfenster, stand das Medikament schon - ein Abbrechen
   // liess es dann ohne Plan zurueck. Jetzt gilt alles oder nichts: erst
   // werden alle Zeitfenster geprueft, dann schreibt eine Transaktion.
-  // `schedules`: eine Liste von Objekten oder null (Schema, #2810).
+  // `schedules`: eine Liste von hoechstens MAX_SCHEDULES_ON_CREATE Objekten
+  // oder null prueft das Schema (#2810). Die Schleife prueft trotzdem selbst,
+  // worueber sie laeuft und wie weit (Senke statt Route).
   const schedules = [];
-  (b.schedules ?? []).forEach((raw, i) => {
-    const parsed = parseSchedule(raw);
-    for (const e of parsed.errors) errors.push(`schedules[${i}]: ${e}`);
-    schedules.push(parsed.values);
-  });
+  if (b.schedules !== undefined && b.schedules !== null) {
+    if (!Array.isArray(b.schedules)) errors.push('schedules must be an array.');
+    else if (b.schedules.length > MAX_SCHEDULES_ON_CREATE) errors.push(`schedules must not contain more than ${MAX_SCHEDULES_ON_CREATE} entries.`);
+    else {
+      b.schedules.forEach((raw, i) => {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { errors.push(`schedules[${i}] must be an object.`); return; }
+        const parsed = parseSchedule(raw);
+        for (const e of parsed.errors) errors.push(`schedules[${i}]: ${e}`);
+        schedules.push(parsed.values);
+      });
+    }
+  }
   if (errors.length) return badRequest(res, errors);
 
   const active = toBit(b.active); // undefined → default 1

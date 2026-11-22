@@ -159,10 +159,12 @@ export function sendCsv(res, filename, csv) {
 }
 
 /**
- * Die optionale from/to-Query der Exporte. Dass es ein Kalendertag ist
- * (`YYYY-MM-DD`, `format: date`), prueft das Schema vor der Route (#2810);
- * hier bleibt nur "nicht angegeben" -> null.
+ * Liest optionale from/to-Query als YYYY-MM-DD (nur wenn plausibel). Dass es
+ * ein Kalendertag ist, prueft auch das Schema vor der Route (#2810); der Wert
+ * landet hier aber in SQL und im Dateinamen, und die Senke prueft selbst.
  */
 export function exportRange(req) {
-  return { from: req.query.from ?? null, to: req.query.to ?? null };
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from || '') ? req.query.from : null;
+  const to   = /^\d{4}-\d{2}-\d{2}$/.test(req.query.to || '')   ? req.query.to   : null;
+  return { from, to };
 }

@@ -54,8 +54,12 @@ router.put('/caregivers/:subjectId', requireAdmin, validateRequest(), (req, res)
   const subject = db.get().prepare('SELECT id FROM users WHERE id = ?').get(subjectId);
   if (!subject) return res.status(404).json({ error: 'User not found.', code: 404 });
 
-  // Pflicht, eine Liste von Ids ab 1 (Zahl oder Ziffern-Text): das Schema (#2810).
-  const raw = /** @type {Array<number | string>} */ (req.body.caregiver_ids);
+  // Pflicht, eine Liste von Ids ab 1 (Zahl oder Ziffern-Text): das Schema
+  // (#2810). Die Senke (`map` ueber die Liste) prueft trotzdem selbst.
+  const raw = req.body?.caregiver_ids;
+  if (!Array.isArray(raw)) {
+    return res.status(400).json({ error: 'caregiver_ids must be an array.', code: 400 });
+  }
 
   // Doppelte Einträge und die Person selbst fallen still heraus: beides wäre
   // kein Fehler des Aufrufers, sondern eine Liste, die dasselbe zweimal oder

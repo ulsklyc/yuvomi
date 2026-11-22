@@ -186,7 +186,12 @@ router.put('/visibility-defaults', refuseFastingWithoutCapability, validateReque
   // gegen FLAT_SCOPES gefragt (eigene Schluessel, isValidScopeKey): er landet
   // als scope_key in der Tabelle, und PATCH /apply schlaegt mit ihm die
   // Tabelle nach, deren Zeilen es umschreibt.
-  const entries = Object.entries(req.body.defaults);
+  // Die Schleife prueft selbst, worueber sie laeuft (Senke statt Route).
+  const input = req.body?.defaults;
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return badRequest(res, ['defaults must be an object.']);
+  }
+  const entries = Object.entries(input);
   for (const [key] of entries) {
     if (!isValidScopeKey(key)) return badRequest(res, [`Unknown scope: ${key}`]);
   }
@@ -233,7 +238,9 @@ router.patch('/visibility-defaults/apply', refuseFastingWithoutCapability, valid
   // scope (Muster) und visibility (`private`/`family`) sind Pflicht: das Schema
   // (#2810). Der Nachschlag FLAT_SCOPES[scope] unten nennt eine Tabelle und
   // fragt deshalb selbst nach einem eigenen Schluessel (isValidScopeKey).
-  const { scope, visibility } = req.body;
+  // `scope` wird als Text gelesen (startsWith, slice): die Senke prueft selbst.
+  const scope = String(req.body?.scope || '');
+  const visibility = req.body?.visibility;
   if (!isValidScopeKey(scope)) return badRequest(res, [`Unknown scope: ${scope}`]);
 
   const database = db.get();
