@@ -33,7 +33,12 @@
  *              text (`query: 5` was looked up as the host `5`);
  *            - ONE SOURCE: every value list of the schemas is the constant the
  *              handler reads (server/services/budget-fields.js), equal to the
- *              visibility lists of the rights.
+ *              visibility lists of the rights;
+ *            - ONLY GUARD (step b): what the handlers no longer check - the
+ *              month of the plans, the interest mode of a loan and its
+ *              preview, the billing cycle, category and payment method ids,
+ *              the two switches and the end type of a subscription - is pinned
+ *              in the document as literal values.
  *          The household zone is pinned; no answer asserted here carries a
  *          date of the clock, and every date sent lies in a fixed year.
  * Run: npm run test:validate-budget
@@ -565,4 +570,43 @@ test('one source: the value lists of the schemas are the lists the handlers read
   assert.deepEqual(queryOf('/api/v1/budget/stats', 'range').enum, [...fields.STATS_RANGES]);
   assert.deepEqual(queryOf('/api/v1/budget/summary', 'scope').enum, [...fields.BUDGET_SCOPES]);
   assert.deepEqual(queryOf('/api/v1/budget/subscriptions', 'status').enum, [...fields.SUBSCRIPTION_STATUSES]);
+});
+
+// --------------------------------------------------------------------------
+// Only guard (step b)
+// --------------------------------------------------------------------------
+
+// Since group 9 step (b) the schema is the only guard for these: the handlers
+// dropped their own check or fallback (#2810). So the types, lists and
+// patterns are pinned here as literal values - a looser type, a value added to
+// a list (also to the constant in server/services/budget-fields.js the list is
+// read from), a lost `required` or a wider pattern turns this red.
+test('only guard: the types, lists and patterns the handlers no longer check are the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const bodyOf = (/** @type {string} */ path, /** @type {string} */ method) => spec.paths[path][method].requestBody.content['application/json'].schema;
+  const queryOf = (/** @type {string} */ path, /** @type {string} */ name) => spec.paths[path].get.parameters.find((/** @type {any} */ p) => p.name === name && p.in === 'query').schema;
+  const ROW_ID_OR_NULL = { type: ['integer', 'null'], minimum: 1 };
+  const INTEREST = ['none', 'fixed', 'variable', 'fixed_then_variable'];
+  const CYCLES = ['daily', 'weekly', 'monthly', 'yearly'];
+  const ENDS = ['never', 'on_date', 'after_count'];
+
+  // GET /plans: the month without a fallback for a month 13 or text.
+  assert.deepEqual(queryOf('/api/v1/budget/plans', 'month'), { type: 'string', pattern: '^\\d{4}-(0[1-9]|1[0-2])$' });
+  // POST /loans and /loans/preview: the interest mode, no fallback to `none`.
+  for (const path of ['/api/v1/budget/loans', '/api/v1/budget/loans/preview']) {
+    assert.deepEqual(bodyOf(path, 'post').properties.interest_mode, { type: 'string', enum: INTEREST }, path);
+  }
+  // POST and PUT /subscriptions: the billing cycle (required on POST), the ids,
+  // the two switches and the end type.
+  const create = bodyOf('/api/v1/budget/subscriptions', 'post');
+  assert.deepEqual(create.required, ['billing_cycle']);
+  for (const [path, method] of [['/api/v1/budget/subscriptions', 'post'], ['/api/v1/budget/subscriptions/{id}', 'put']]) {
+    const props = bodyOf(path, method).properties;
+    assert.deepEqual(props.billing_cycle, { type: 'string', enum: CYCLES }, `${method} billing_cycle`);
+    assert.deepEqual(props.category_id, ROW_ID_OR_NULL, `${method} category_id`);
+    assert.deepEqual(props.payment_method_id, ROW_ID_OR_NULL, `${method} payment_method_id`);
+    assert.deepEqual(props.enabled, { type: 'boolean' }, `${method} enabled`);
+    assert.deepEqual(props.reminder_enabled, { type: 'boolean' }, `${method} reminder_enabled`);
+    assert.deepEqual(props.end_type, { type: 'string', enum: ENDS }, `${method} end_type`);
+  }
 });

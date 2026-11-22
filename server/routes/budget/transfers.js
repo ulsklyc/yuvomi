@@ -5,13 +5,23 @@ import * as db from '../../db.js';
 import { str, num, date as validateDate, MAX_TITLE } from '../../middleware/validate.js';
 import { normalizeBudgetVisibility } from '../../authorize/index.ts';
 import { todayKey } from '../../utils/timezone.js';
-import { createLogger } from '../../logger.js';
 import { createTransfer, transferPair, mirrorTransfer, transferIncomeCategory, TRANSFER_SAVING_CATEGORY, TRANSFER_SAVING_SUBCATEGORY } from '../../services/budget-transfers.js';
 import { budgetFilter, mayEdit, getBudgetMode, defaultCategory, validExpenseCategoryKeys, validateSubcategory, validateAccountRef, transferCurrenciesMatch, isArchivedBudgetAccount, transferAmountFitsCurrency, budgetAccountCurrency,
   RECURRENCE_INTERVAL_KEYS, MAX_INTERVAL_COUNT, freezeSeriesPast, materializeSeriesStart } from './helpers.js';
 
 const router = express.Router();
-const log = createLogger('Budget transfers');
+
+/**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). `0`, `-0`
+ * and `-1` find no transfer (404), a leading zero reaches the row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
 const load = (id) => db.get().prepare('SELECT * FROM budget_entries WHERE id = ?').get(id);
 function outgoing(entry) {
   const partner = transferPair(db.get(), entry);
@@ -83,7 +93,7 @@ function values(req, base = null, currentPartner = null) {
     created_by: base?.created_by ?? me, owner_id: base?.owner_id ?? me };
 }
 function access(req, res) {
-  const entry = load(Number(req.params.id));
+  const entry = load(pathId(req));
   if (!entry?.transfer_entry_id) { res.status(404).json({ error: 'Transfer not found', code: 404 }); return null; }
   if (!mayEdit(req, entry) || !mayEdit(req, transferPair(db.get(), entry))) {
     res.status(403).json({ error: 'Permission denied.', code: 403 }); return null;
@@ -106,68 +116,61 @@ function writeBooking(entry, v) {
 }
 
 router.get('/transfers/:id', validateRequest(), (req, res) => {
-  try { const entry = access(req, res); if (entry) res.json({ data: response(entry) }); }
-  catch (err) { log.error('', err); res.status(500).json({ error: 'Internal error', code: 500 }); }
+  const entry = access(req, res); if (entry) res.json({ data: response(entry) });
 });
 router.post('/transfers', validateRequest(), (req, res) => {
-  try {
-    const v = values(req); if (!guard(res, v)) return;
-    if (v.amount <= 0) return res.status(400).json({ error: 'Amount must be greater than zero.', code: 400 });
-    res.status(201).json({ data: response(createTransfer(db.get(), v)) });
-  } catch (err) { log.error('', err); res.status(500).json({ error: 'Internal error', code: 500 }); }
+  const v = values(req); if (!guard(res, v)) return;
+  if (v.amount <= 0) return res.status(400).json({ error: 'Amount must be greater than zero.', code: 400 });
+  res.status(201).json({ data: response(createTransfer(db.get(), v)) });
 });
 router.put('/transfers/:id', validateRequest(), (req, res) => {
-  try {
-    const entry = access(req, res); if (!entry) return;
-    const v = values(req, entry); if (!guard(res, v)) return;
-    if (['is_recurring', 'recurrence_interval', 'recurrence_interval_count', 'recurrence_confirm'].some((k) => req.body[k] !== undefined
-      && (k === 'recurrence_interval' ? v[k] !== entry[k] : Number(v[k]) !== Number(entry[k])))) {
-      return res.status(400).json({ error: 'Change the recurrence through the transfer series.', reason: 'transfer_series_required', code: 400 });
-    }
-    db.get().transaction(() => writeBooking(entry, v))();
-    res.json({ data: response(load(entry.id)) });
-  } catch (err) { log.error('', err); res.status(500).json({ error: 'Internal error', code: 500 }); }
+  const entry = access(req, res); if (!entry) return;
+  const v = values(req, entry); if (!guard(res, v)) return;
+  if (['is_recurring', 'recurrence_interval', 'recurrence_interval_count', 'recurrence_confirm'].some((k) => req.body[k] !== undefined
+    && (k === 'recurrence_interval' ? v[k] !== entry[k] : Number(v[k]) !== Number(entry[k])))) {
+    return res.status(400).json({ error: 'Change the recurrence through the transfer series.', reason: 'transfer_series_required', code: 400 });
+  }
+  db.get().transaction(() => writeBooking(entry, v))();
+  res.json({ data: response(load(entry.id)) });
 });
 router.put('/transfers/:id/series', validateRequest(), (req, res) => {
-  try {
-    const entry = access(req, res); if (!entry) return;
-    const current = transferSeries(entry);
-    if (!current) return res.status(400).json({ error: 'Not a recurring transfer.', code: 400 });
-    const { anchor, partner, definition } = current;
-    const v = values(req, current.base, current.other);
-    if (!guard(res, v)) return;
-    if (!v.is_recurring) return res.status(400).json({ error: 'Delete the series to end it.', code: 400 });
-    const cutoff = todayKey(db.get());
-    const gridChanged = v.date !== definition.start_date || v.recurrence_interval !== anchor.recurrence_interval || v.recurrence_interval_count !== anchor.recurrence_interval_count;
-    if (gridChanged && anchor.date < cutoff && v.date.slice(0, 7) < anchor.date.slice(0, 7)) return res.status(400).json({ error: 'Series start cannot precede its first booked month.', code: 400 });
-    db.get().transaction(() => {
-      if (gridChanged) freezeSeriesPast(db.get(), anchor.id, cutoff);
-      for (const [row, sign, account, category, subcategory] of [
-        [anchor, -1, v.from_account_id, v.category, v.subcategory],
-        [partner, 1, v.to_account_id, transferIncomeCategory(db.get()), ''],
-      ]) {
-        db.get().prepare(`UPDATE budget_entries SET recurrence_interval = ?, recurrence_interval_count = ?, recurrence_confirm = ? WHERE id = ?`)
-          .run(v.recurrence_interval, v.recurrence_interval_count, v.recurrence_confirm, row.id);
-        db.get().prepare(`UPDATE budget_series SET title = ?, amount = ?, category = ?, subcategory = ?, account_id = ?, visibility = ?, start_date = ? WHERE anchor_id = ?`)
-          .run(v.title, sign * v.amount, category, subcategory, account, v.visibility, v.date, row.id);
+  const entry = access(req, res); if (!entry) return;
+  const current = transferSeries(entry);
+  if (!current) return res.status(400).json({ error: 'Not a recurring transfer.', code: 400 });
+  const { anchor, partner, definition } = current;
+  const v = values(req, current.base, current.other);
+  if (!guard(res, v)) return;
+  if (!v.is_recurring) return res.status(400).json({ error: 'Delete the series to end it.', code: 400 });
+  const cutoff = todayKey(db.get());
+  const gridChanged = v.date !== definition.start_date || v.recurrence_interval !== anchor.recurrence_interval || v.recurrence_interval_count !== anchor.recurrence_interval_count;
+  if (gridChanged && anchor.date < cutoff && v.date.slice(0, 7) < anchor.date.slice(0, 7)) return res.status(400).json({ error: 'Series start cannot precede its first booked month.', code: 400 });
+  db.get().transaction(() => {
+    if (gridChanged) freezeSeriesPast(db.get(), anchor.id, cutoff);
+    for (const [row, sign, account, category, subcategory] of [
+      [anchor, -1, v.from_account_id, v.category, v.subcategory],
+      [partner, 1, v.to_account_id, transferIncomeCategory(db.get()), ''],
+    ]) {
+      db.get().prepare(`UPDATE budget_entries SET recurrence_interval = ?, recurrence_interval_count = ?, recurrence_confirm = ? WHERE id = ?`)
+        .run(v.recurrence_interval, v.recurrence_interval_count, v.recurrence_confirm, row.id);
+      db.get().prepare(`UPDATE budget_series SET title = ?, amount = ?, category = ?, subcategory = ?, account_id = ?, visibility = ?, start_date = ? WHERE anchor_id = ?`)
+        .run(v.title, sign * v.amount, category, subcategory, account, v.visibility, v.date, row.id);
+    }
+    if (anchor.date >= cutoff) writeBooking(anchor, v);
+    if (gridChanged) {
+      db.get().prepare('DELETE FROM budget_entries WHERE recurrence_parent_id IN (?, ?) AND date >= ?').run(anchor.id, partner.id, cutoff);
+      db.get().prepare('UPDATE budget_series SET grid_from = ? WHERE anchor_id IN (?, ?)').run(cutoff, anchor.id, partner.id);
+      if (anchor.date < cutoff && v.date >= cutoff) materializeSeriesStart(db.get(), anchor.id);
+    } else {
+      const future = db.get().prepare('SELECT * FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?').all(anchor.id, cutoff);
+      for (const row of future) {
+        writeBooking(row, { ...v, date: row.date });
+        db.get().prepare('UPDATE budget_entries SET is_pending = ? WHERE id IN (?, ?)').run(v.recurrence_confirm, row.id, row.transfer_entry_id);
       }
-      if (anchor.date >= cutoff) writeBooking(anchor, v);
-      if (gridChanged) {
-        db.get().prepare('DELETE FROM budget_entries WHERE recurrence_parent_id IN (?, ?) AND date >= ?').run(anchor.id, partner.id, cutoff);
-        db.get().prepare('UPDATE budget_series SET grid_from = ? WHERE anchor_id IN (?, ?)').run(cutoff, anchor.id, partner.id);
-        if (anchor.date < cutoff && v.date >= cutoff) materializeSeriesStart(db.get(), anchor.id);
-      } else {
-        const future = db.get().prepare('SELECT * FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?').all(anchor.id, cutoff);
-        for (const row of future) {
-          writeBooking(row, { ...v, date: row.date });
-          db.get().prepare('UPDATE budget_entries SET is_pending = ? WHERE id IN (?, ?)').run(v.recurrence_confirm, row.id, row.transfer_entry_id);
-        }
-      }
-      // Visibility is a permission choice for the whole series, including its past.
-      db.get().prepare('UPDATE budget_entries SET visibility = ? WHERE id IN (?, ?) OR recurrence_parent_id IN (?, ?)')
-        .run(v.visibility, anchor.id, partner.id, anchor.id, partner.id);
-    })();
-    res.json({ data: response(load(anchor.id)) });
-  } catch (err) { log.error('', err); res.status(500).json({ error: 'Internal error', code: 500 }); }
+    }
+    // Visibility is a permission choice for the whole series, including its past.
+    db.get().prepare('UPDATE budget_entries SET visibility = ? WHERE id IN (?, ?) OR recurrence_parent_id IN (?, ?)')
+      .run(v.visibility, anchor.id, partner.id, anchor.id, partner.id);
+  })();
+  res.json({ data: response(load(anchor.id)) });
 });
 export default router;

@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PUT without a body is a 400; `PATCH /budget/{id}/confirm` still takes none. An unexpected
   error of a subscription route now answers `Internal server error.` like every other route
   (it was `Internal error.`).
+- **The budget and the subscriptions answer an unexpected failure with the same sentence as the
+  rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
+  and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,
+  `"Subscription could not be created."` and the like); they now answer
+  `{ "error": "Internal server error.", "code": 500 }`. The status stays 500, and the app shows
+  its own message for it as before. Every other answer is unchanged.
 - **The shopping list, documents, the document storage settings and the DMS connection check
   every request against the published API description.** This is about your own API clients;
   the app sends nothing that is refused now (from this release on it sends the folder of a
