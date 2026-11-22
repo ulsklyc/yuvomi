@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import express from 'express';
+import { createShoppingDocumentsApp } from './shopping-documents-app.js';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -19,7 +19,6 @@ const {
   _resetTestDatabase,
   _setTestDatabase,
 } = await import('../server/db.js');
-const { default: documentsRouter } = await import('../server/routes/documents.js');
 
 function buildTestDb() {
   const db = new Database(':memory:');
@@ -57,15 +56,17 @@ function seedDoc(mime, original) {
 const pdfId = seedDoc('application/pdf', 'doc.pdf');
 const pngId = seedDoc('image/png', 'pic.png');
 
-// Express-App mit injizierter Session aufsetzen
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = userId;
-  req.authRole = 'member';
-  req.session = { userId, role: 'member' };
-  next();
+// Express-App mit injizierter Session, der Router an seinem echten Praefix mit
+// dem zentralen Fehlerhandler (#2810)
+const app = await createShoppingDocumentsApp({
+  mount: ['documents'],
+  auth: (req, _res, next) => {
+    req.authUserId = userId;
+    req.authRole = 'member';
+    req.session = { userId, role: 'member' };
+    next();
+  },
 });
-app.use('/api/v1/documents', documentsRouter);
 
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));

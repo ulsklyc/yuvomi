@@ -38,6 +38,8 @@ const {
   default: documentsRouter,
   _setDmsAdapterFactory,
 } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 
 const moduleDatabase = get();
@@ -92,6 +94,7 @@ function createRouteHarness({ userId = 1, role = 'admin' } = {}) {
   let auth = { userId, role };
   const app = express();
   app.use(express.json());
+  app.use(defaultEmptyBody);
   app.use((req, _res, next) => {
     req.authUserId = auth.userId;
     req.authRole = auth.role;
@@ -100,6 +103,8 @@ function createRouteHarness({ userId = 1, role = 'admin' } = {}) {
   });
   app.use('/api/v1/documents', documentsRouter);
   app.use('/api/v1/calendar', calendarRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const server = http.createServer(app);
 
   return {

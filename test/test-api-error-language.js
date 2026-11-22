@@ -777,15 +777,18 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
   const { default: tasksRouter } = await import('../server/routes/tasks.js');
   const { default: pushRouter } = await import('../server/routes/push.js');
   const { buildRouter: buildWeatherRouter } = await import('../server/routes/weather.js');
+  const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
   const gApp = express();
   gApp.use(express.json());
+  gApp.use(defaultEmptyBody);
   gApp.use((req, _res, next) => {
     req.authUserId = ADMIN;
     req.authRole = 'admin';
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  gApp.use('/shopping', shoppingRouter);
+  // The shopping list at its real prefix (#2810): call() maps `/shopping...` there.
+  gApp.use('/api/v1/shopping', shoppingRouter);
   gApp.use('/tasks', tasksRouter);
   gApp.use('/push', pushRouter);
   // The weather router at its real prefix, with the central error handler (#2810).
@@ -799,7 +802,8 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const res = await fetch(`${gUrl}${route}`, { method, headers, body: payload });
+      const url = /^\/shopping(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
+      const res = await fetch(`${gUrl}${url}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
       return { status: res.status, body: json };

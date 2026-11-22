@@ -19,6 +19,8 @@ process.env.SESSION_SECRET = 'document-folders-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 
 const moduleDatabase = get();
@@ -56,6 +58,7 @@ function buildMigratedDatabase(migrations) {
 function createHarness({ userId = ADMIN_ID, role = 'admin', moduleAccess = null, scopes = null } = {}) {
   const app = express();
   app.use(express.json());
+  app.use(defaultEmptyBody);
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
@@ -68,6 +71,8 @@ function createHarness({ userId = ADMIN_ID, role = 'admin', moduleAccess = null,
   });
   app.use('/api/v1/documents', documentsRouter);
   app.use('/api/v1/tasks', tasksRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {

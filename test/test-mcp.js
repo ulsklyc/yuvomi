@@ -39,6 +39,8 @@ const { default: idempotencyMiddleware } = await import('../server/middleware/id
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 const uid = db.prepare(
   `INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -68,6 +70,7 @@ const SESSION_COOKIE = 'yuvomi.sid=mcp-test';
 const sessions = new Map();
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use('/api/v1', (/** @type {any} */ req, /** @type {any} */ _res, /** @type {any} */ next) => {
   const cookie = String(req.headers.cookie || '');
   req.authUserId = Number(uid);
@@ -83,6 +86,8 @@ app.use('/api/v1', idempotencyMiddleware);
 app.use('/api/v1/tasks', tasksRouter);
 app.use('/api/v1/shopping', shoppingRouter);
 app.use('/api/v1/calendar', calendarRouter);
+// The central error handler answers the 400 of validateRequest() as JSON (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(null)));
 const LOOPBACK = `http://127.0.0.1:${/** @type {any} */ (server.address()).port}`;

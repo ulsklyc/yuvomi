@@ -49,6 +49,8 @@ globalThis.window.matchMedia = globalThis.window.matchMedia
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter, _setStageUploadForTest } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { stageDocumentUpload } = await import('../server/services/document-storage.js');
 const { default: dmsRouter, _setAdapterFactory } = await import('../server/routes/dms.js');
 const { __test: page } = await import('../public/pages/documents.js');
@@ -82,6 +84,7 @@ const admin = db.prepare(`INSERT INTO users (username, display_name, password_ha
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = admin;
   req.authRole = 'admin';
@@ -90,6 +93,8 @@ app.use((req, _res, next) => {
 });
 app.use('/api/v1/documents/dms', dmsRouter);
 app.use('/api/v1/documents', documentsRouter);
+// The central error handler answers the 400 of validateRequest() as JSON (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));
