@@ -64,8 +64,8 @@ function mayReadTarget(viewer, ownerId) {
  */
 router.get('/nutrition/targets', validateRequest(), (req, res) => {
   const viewer = viewerId(req);
+  // `user_id` ist eine ganze Zahl ab 1 oder fehlt: das Schema (#2810).
   const ownerId = req.query.user_id ? parseInt(req.query.user_id, 10) : viewer;
-  if (!ownerId) return badRequest(res, ['user_id is invalid.']);
   // Ein Ziel ist keine Zeile mit Sichtbarkeit - es gibt nichts zu oeffnen.
   // Deshalb die Betreuungsfrage statt einer Sichtbarkeits-Klausel: wer fuer
   // jemanden eintraegt, muss dessen Ziel kennen, alle anderen nicht.
@@ -77,7 +77,7 @@ router.get('/nutrition/targets', validateRequest(), (req, res) => {
 
 /**
  * PUT /nutrition/targets
- * Body: { user_id?, energy_kcal?, …, fiber_g? }
+ * Body: { user_id?, energy_kcal, …, fiber_g } (die acht Pflicht seit #2810)
  *
  * SPARSE WIE health_fasting_settings: sind alle acht Werte NULL, wird die Zeile
  * GELOESCHT statt mit Nullen geschrieben. So bleibt "keine Zeile" die einzige
@@ -90,11 +90,11 @@ router.put('/nutrition/targets', validateRequest(), (req, res) => {
   const owner = resolveOwner(req, viewer);
   if (owner.error) return res.status(owner.status).json({ error: owner.error, code: owner.status });
 
-  // `undefined` (Feld gar nicht geschickt) und `null` (ausdruecklich
-  // geleert) laufen hier zusammen: ein PUT ersetzt das ganze Ziel, ein nicht
-  // genanntes Feld ist danach nicht gesetzt. Das PATCH-Verhalten waere die
-  // andere Wahl - sie haette aber keine Schreibweise fuer "dieses eine Ziel
-  // wieder loeschen" uebrig gelassen.
+  // Ein PUT ersetzt das ganze Ziel (RFC 9110): das Schema verlangt seit #2810
+  // alle acht Werte, `null` heisst "nicht gesetzt". Bis v2.93 war ein nicht
+  // genanntes Feld danach ebenfalls nicht gesetzt, und `{}` loeschte das Ziel
+  // still. Das PATCH-Verhalten waere die andere Wahl - sie haette aber keine
+  // Schreibweise fuer "dieses eine Ziel wieder loeschen" uebrig gelassen.
   const values = NUTRIENT_KEYS.map((key) => b[key] ?? null);
   const database = db.get();
   if (values.every((value) => value === null)) {
@@ -234,8 +234,8 @@ router.delete('/nutrition/entries/:id', validateRequest(), (req, res) => {
  */
 router.get('/nutrition/summary', validateRequest(), (req, res) => {
   const viewer  = viewerId(req);
+  // `user_id` ist eine ganze Zahl ab 1 oder fehlt: das Schema (#2810).
   const ownerId = req.query.user_id ? parseInt(req.query.user_id, 10) : viewer;
-  if (!ownerId) return badRequest(res, ['user_id is invalid.']);
 
   const dateCheck = v.date(req.query.date, 'date', false);
   if (dateCheck.error) return badRequest(res, [dateCheck.error]);

@@ -613,8 +613,8 @@ test('Gesundheit: "jetzt" als Einnahmezeit ist Wanduhrzeit des Haushalts, kein U
   // 2026-09-16T11:30Z ist in Kiritimati der 17.09. um 01:30.
   await inZone('Pacific/Kiritimati', async () => {
     const med = await call('POST', '/api/v1/health/medications', { name: 'Jetztprobe' });
-    const takeLog = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00' });
-    const patchLog = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00' });
+    const takeLog = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00', status: 'pending' });
+    const patchLog = await call('POST', `/api/v1/health/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-09-17T01:00', status: 'pending' });
 
     await withFrozenClock('2026-09-16T11:30:00.000Z', async () => {
       // `{}` statt keines Rumpfs: seit #2810 ist der Rumpf Pflicht, wie ihn die App schickt.

@@ -29,16 +29,13 @@ import * as db from '../../db.js';
 import * as v from '../../middleware/validate.js';
 import { cycleToCsv } from '../../services/health-export.js';
 import { syncCycleRemindersForUser, isEligibleCyclePartner, eligibleCyclePartners } from '../../services/cycle-reminders.js';
-// Die vier geschlossenen Wertelisten kommen aus health-cycle.js - EIN Zuhause
-// statt mehrerer Kopien (CERVIX_MUCUS_VALUES/TEST_RESULT_VALUES/INTIMACY_VALUES,
-// CONTRACEPTION_VALUES), die sonst auseinanderlaufen koennten. Das Schema
-// prueft dieselben Listen vor der Route (#2810); die Pruefung hier bleibt, bis
-// der Quelltext-Guard in test/test-health-cycle.js den Import am Schema statt
-// an der Route sucht.
-import {
-  normalizeSymptomEntries, BASAL_TEMP_UNITS,
-  CERVIX_MUCUS_VALUES, TEST_RESULT_VALUES, INTIMACY_VALUES, CONTRACEPTION_VALUES,
-} from '../../../public/utils/health-cycle.js';
+// Die vier geschlossenen Wertelisten (CERVIX_MUCUS_VALUES/TEST_RESULT_VALUES/
+// INTIMACY_VALUES, CONTRACEPTION_VALUES) haben EIN Zuhause in health-cycle.js;
+// geprueft werden sie seit #2810 nur noch vom Schema vor der Route
+// (server/openapi/paths/health.js), das genau diese Listen importiert -
+// test/test-health-cycle.js haelt das am gebauten Dokument fest. Die Werte
+// fliessen hier in keinen Nachschlag, nur in die Spalte.
+import { normalizeSymptomEntries, BASAL_TEMP_UNITS } from '../../../public/utils/health-cycle.js';
 import { MAX_SYMPTOMS_COUNT } from '../../services/health-fields.js';
 import {
   log,
@@ -124,9 +121,9 @@ function replaceSymptoms(database, dayLogId, entries) {
 }
 
 // Geschlossene Werte-Listen fuer die seit Migration 210 nullbaren Spalten
-// (kein CHECK auf der Spalte selbst, siehe dortiger Kommentar) - kommen als
-// Import von oben (health-cycle.js, EIN Zuhause statt dreier Kopien), nicht
-// mehr als lokale Konstanten hier.
+// (kein CHECK auf der Spalte selbst, siehe dortiger Kommentar) - stehen in
+// health-cycle.js (EIN Zuhause statt dreier Kopien) und werden vom Schema vor
+// der Route geprueft (#2810), nicht mehr hier.
 // intimacy, cervix_mucus, lh_test und pregnancy_test sind hart privat (siehe
 // GET /cycle/logs unten und docs/SPEC.md): INTIMACY_VALUES/CERVIX_MUCUS_VALUES/
 // TEST_RESULT_VALUES.
@@ -317,6 +314,11 @@ router.get('/cycle/logs', validateRequest(), (req, res) => {
 });
 
 // POST /cycle/logs  (Upsert: ein Eintrag je user_id + log_date)
+// Der Upsert ersetzt einen bestehenden Tag. Deshalb verlangt das Schema seit
+// #2810 jedes Feld, das er ueberschreibt (flow, note, visibility, symptoms,
+// basal_temp(_unit), cervix_mucus, lh_test, pregnancy_test, intimacy): bis
+// v2.93 leerte ein fehlendes still den gespeicherten Wert. `feelings`/`mood`
+// bleiben frei - fehlen beide, bleibt das Gespeicherte (siehe unten).
 router.post('/cycle/logs', validateRequest(), (req, res) => {
   const viewer = viewerId(req);
   const b = req.body || {};
@@ -324,10 +326,9 @@ router.post('/cycle/logs', validateRequest(), (req, res) => {
   const note          = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
   const symptoms      = normalizeSymptomEntries(b.symptoms);
   const basalTemp     = validateBasalTemp(b.basal_temp, b.basal_temp_unit);
-  const cervixMucus   = v.oneOf(b.cervix_mucus, CERVIX_MUCUS_VALUES, 'cervix_mucus');
-  const lhTest        = v.oneOf(b.lh_test, TEST_RESULT_VALUES, 'lh_test');
-  const pregnancyTest = v.oneOf(b.pregnancy_test, TEST_RESULT_VALUES, 'pregnancy_test');
-  const intimacy      = v.oneOf(b.intimacy, INTIMACY_VALUES, 'intimacy');
+  // cervix_mucus, lh_test, pregnancy_test und intimacy: ein Wert der Liste,
+  // `""` oder null (nicht angegeben) - das Schema (#2810); `""` wird NULL.
+  const choice = (/** @type {unknown} */ value) => value || null;
   // Legacy `mood` (Einzelwert) wird, wenn `feelings` fehlt, als
   // Ein-Element-Liste behandelt - siehe normalizeFeelings(). Die
   // `mood`-Spalte selbst wird nur dann aktiv auf NULL gesetzt (und die
@@ -346,7 +347,7 @@ router.post('/cycle/logs', validateRequest(), (req, res) => {
 
   // flow aus FLOW_VALUES, `""` oder null (nicht angegeben), visibility
   // `private`/`family` oder null: das Schema (#2810).
-  const errors = v.collectErrors([logDate, note, cervixMucus, lhTest, pregnancyTest, intimacy]);
+  const errors = v.collectErrors([logDate, note]);
   if (symptoms.length > MAX_SYMPTOMS_COUNT) errors.push(`symptoms may include at most ${MAX_SYMPTOMS_COUNT} entries.`);
   if (basalTemp.error) errors.push(basalTemp.error);
   if (feelings.error) errors.push(feelings.error);
@@ -371,7 +372,7 @@ router.post('/cycle/logs', validateRequest(), (req, res) => {
     `).run(
       viewer, logDate.value, b.flow || null, note.value, b.visibility || 'private',
       basalTemp.temp, basalTemp.unit,
-      cervixMucus.value, lhTest.value, pregnancyTest.value, intimacy.value,
+      choice(b.cervix_mucus), choice(b.lh_test), choice(b.pregnancy_test), choice(b.intimacy),
     );
     const id = database.prepare('SELECT id FROM cycle_day_logs WHERE user_id = ? AND log_date = ?').get(viewer, logDate.value).id;
     replaceSymptoms(database, id, symptoms);
@@ -419,8 +420,8 @@ router.delete('/cycle/logs/:id', validateRequest(), (req, res) => {
 // hormonal_iud, implant, injection, patch, ring) schaltet clientseitig die
 // Eisprung-/Fruchtbarkeitsvorhersage ab; Kupferspirale/Kondom/keine aendern
 // daran nichts - das entscheidet public/utils/health-cycle.js, nicht diese
-// Route. CONTRACEPTION_VALUES kommt als Import von oben (aus
-// CONTRACEPTION_TYPES abgeleitet), nicht mehr als lokale Kopie hier.
+// Route. CONTRACEPTION_VALUES (aus CONTRACEPTION_TYPES abgeleitet) prueft das
+// Schema vor der Route (#2810).
 
 /** Voreinstellungen, falls die Person noch keine Zeile hat. */
 function defaultCycleSettings(userId) {
@@ -453,8 +454,12 @@ router.put('/cycle/settings', validateRequest(), (req, res) => {
 
   // Die Bereiche (ganze Zahlen aus CYCLE_SETTING_RANGES, health-fields.js, oder
   // null), die Schalter (true/false, 1/0) und default_visibility prueft das
-  // Schema vor der Route (#2810). Fehlt ein Wert, gilt sein Standard: das ist
-  // die Voll-Ersetzen-Semantik dieser Route.
+  // Schema vor der Route (#2810). Ein PUT ersetzt die ganze Zeile (RFC 9110),
+  // deshalb verlangt das Schema seit #2810 jedes der 14 Felder: bis v2.93 setzte
+  // ein fehlendes still seinen Standard (luteal 14, Fruchtbarkeit an, PMS an,
+  // der Rest aus/leer). Die Standards unten bleiben nur fuer `null`, wo das
+  // Schema es annimmt (`luteal_length: null` heisst 14, `default_visibility:
+  // null` heisst private).
   // remind_period_days_before: NULL = aus (Standard); sonst der Vorlauf in
   // Tagen vor dem vorhergesagten Periodenbeginn. Obergrenze wie luteal_length:
   // mehr Vorlauf als eine typische Lutealphase waere keine Vorwarnung mehr,
@@ -463,7 +468,8 @@ router.put('/cycle/settings', validateRequest(), (req, res) => {
   const pregnancy = toBit(b.pregnancy_mode);
   const dueDate   = v.date(b.pregnancy_due_date, 'pregnancy_due_date');
   const remindLogDaily   = toBit(b.remind_log_daily);
-  const contraception    = v.oneOf(b.contraception, CONTRACEPTION_VALUES, 'contraception');
+  // contraception: ein Wert von CONTRACEPTION_VALUES oder null - das Schema (#2810).
+  const contraception    = b.contraception ?? null;
   const perimenopause    = toBit(b.perimenopause_mode);
   const showPms          = toBit(b.show_pms);
 
@@ -472,8 +478,8 @@ router.put('/cycle/settings', validateRequest(), (req, res) => {
   // (isEligibleCyclePartner(), cycle-reminders.js), damit die Route niemanden
   // annimmt, den die Auswahlliste gar nicht erst zeigt. Darf ausserdem nicht
   // die aufrufende Person selbst sein: der Eigentuemer veroeffentlicht, eine
-  // Benachrichtigung an sich selbst waere sinnlos. Leer/undefined loescht -
-  // gleiche Voll-Ersetzen-Semantik wie jedes andere Feld dieser Route.
+  // Benachrichtigung an sich selbst waere sinnlos. `null` loescht; fehlen
+  // darf das Feld seit #2810 nicht mehr (Voll-Ersetzen, siehe oben).
   let notifyPartnerUserId = null;
   let notifyPartnerError = null;
   if (b.notify_partner_user_id !== undefined && b.notify_partner_user_id !== null && b.notify_partner_user_id !== '') {
@@ -494,7 +500,7 @@ router.put('/cycle/settings', validateRequest(), (req, res) => {
     }
   }
 
-  const errors = v.collectErrors([dueDate, contraception]);
+  const errors = v.collectErrors([dueDate]);
   if (notifyPartnerError) errors.push(notifyPartnerError);
   if (errors.length) return badRequest(res, errors);
 
@@ -527,7 +533,7 @@ router.put('/cycle/settings', validateRequest(), (req, res) => {
          b.default_visibility || 'private',
          b.remind_period_days_before ?? null,
          remindLogDaily === undefined ? 0 : remindLogDaily,
-         contraception.value,
+         contraception,
          perimenopause === undefined ? 0 : perimenopause,
          showPms === undefined ? 1 : showPms,
          notifyPartnerUserId,

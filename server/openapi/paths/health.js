@@ -274,29 +274,46 @@ const SYMPTOM_ENTRY = {
  */
 const dayChoice = (values, description) => oneOf(values, `${description} \`""\` or \`null\`: not given.`, { nullable: true, empty: true });
 
+/**
+ * Why a field of a replace is required: what leaving it out did up to v2.93
+ * (#2810, the full representation of RFC 9110 like #2836 and #2841).
+ * @param {string} what
+ */
+const wasReset = (what) => `Required (#2810); up to v2.93 leaving it out ${what}.`;
+
+/** @param {Record<string, any>} schema @param {string} what */
+const resetRequired = (schema, what) => ({ ...schema, description: `${schema.description} ${wasReset(what)}` });
+
 const DAY_LOG_FIELDS = {
   log_date: DAY,
-  flow: dayChoice(FLOW_VALUES, 'Bleeding strength.'),
-  note: NOTE,
-  visibility: oneOf(VISIBILITIES, '`private` or `family`; `null` or left out: `private` - also on a day that was `family` before.', { nullable: true }),
+  flow: resetRequired(dayChoice(FLOW_VALUES, 'Bleeding strength.'), 'cleared the stored one'),
+  note: resetRequired(NOTE, 'cleared the stored one'),
+  visibility: oneOf(VISIBILITIES, `\`private\` or \`family\`; \`null\`: \`private\` - also on a day that was \`family\` before. ${wasReset('made the day `private`')}`, { nullable: true }),
   symptoms: {
     anyOf: [{ type: 'array', items: SYMPTOM_ENTRY }, { type: 'string' }, { type: 'null' }],
     description: 'The symptoms of the day: a list of `{ key, intensity }` (or keys), or the older comma-separated text. Unknown keys and doubles fall away; '
-      + 'more than 40 after that is 400. Left out, `null` or `""`: none - the stored symptoms are cleared. Until #2810 a number or an object cleared them as well.',
+      + `more than 40 after that is 400. \`[]\`, \`null\` or \`""\`: none - the stored symptoms are cleared. Until #2810 a number or an object cleared them as well. ${wasReset('cleared the stored symptoms')}`,
   },
-  basal_temp: number('Basal body temperature; with a value `basal_temp_unit` is required and the value must lie in the range of the unit (34-42 °C, 93-108 °F).'),
-  basal_temp_unit: oneOf(BASAL_TEMP_UNITS, '`c` or `f`; read only together with `basal_temp`.', { nullable: true }),
-  cervix_mucus: dayChoice(CERVIX_MUCUS_VALUES, 'Cervical mucus.'),
-  lh_test: dayChoice(TEST_RESULT_VALUES, 'LH test result.'),
-  pregnancy_test: dayChoice(TEST_RESULT_VALUES, 'Pregnancy test result.'),
-  intimacy: dayChoice(INTIMACY_VALUES, 'Intimacy.'),
+  basal_temp: resetRequired(number('Basal body temperature; with a value `basal_temp_unit` must name its unit and the value must lie in the range of the unit (34-42 °C, 93-108 °F).'), 'cleared the stored one'),
+  basal_temp_unit: oneOf(BASAL_TEMP_UNITS, `\`c\` or \`f\`; read only together with \`basal_temp\`, \`null\` without one. ${wasReset('cleared the stored temperature, or was a 400 next to a temperature')}`, { nullable: true }),
+  cervix_mucus: resetRequired(dayChoice(CERVIX_MUCUS_VALUES, 'Cervical mucus.'), 'cleared the stored one'),
+  lh_test: resetRequired(dayChoice(TEST_RESULT_VALUES, 'LH test result.'), 'cleared the stored one'),
+  pregnancy_test: resetRequired(dayChoice(TEST_RESULT_VALUES, 'Pregnancy test result.'), 'cleared the stored one'),
+  intimacy: resetRequired(dayChoice(INTIMACY_VALUES, 'Intimacy.'), 'cleared the stored one'),
   feelings: {
     type: ['array', 'null'],
     items: { type: 'string', enum: [...MOOD_VALUES] },
-    description: 'The feelings of the day from the fixed set; named (also as `[]` or `null`) it replaces the stored ones, left out it keeps them.',
+    description: 'The feelings of the day from the fixed set; named (also as `[]` or `null`) it replaces the stored ones and the older `mood`. Optional: left out (together with `mood`) it keeps the stored feelings and the stored `mood` unchanged.',
   },
-  mood: oneOf(MOOD_VALUES, 'Older single feeling, read as `feelings: [mood]` when `feelings` is left out.', { nullable: true, empty: true }),
+  mood: oneOf(MOOD_VALUES, 'Older single feeling, read as `feelings: [mood]` when `feelings` is left out. Optional: left out together with `feelings`, the stored feelings stay unchanged.', { nullable: true, empty: true }),
 };
+
+/**
+ * The day log is an upsert: on a day that has a log every field below
+ * replaces the stored one, so leaving it out reset it. `feelings`/`mood`
+ * stay optional - left out they keep the stored ones.
+ */
+const DAY_LOG_REQUIRED = ['log_date', 'flow', 'note', 'visibility', 'symptoms', 'basal_temp', 'basal_temp_unit', 'cervix_mucus', 'lh_test', 'pregnancy_test', 'intimacy'];
 
 /**
  * A whole number of the cycle settings within its range.
@@ -305,25 +322,28 @@ const DAY_LOG_FIELDS = {
  */
 const cycleRange = (field, description) => {
   const [min, max] = CYCLE_SETTING_RANGES[field];
-  return wholeNumber(min, max, `${description} ${min} to ${max}; left out resets it.`);
+  return wholeNumber(min, max, `${description} ${min} to ${max}. ${wasReset('cleared it')}`);
 };
 
 const CYCLE_SETTINGS_FIELDS = {
   cycle_length_avg: cycleRange('cycle_length_avg', 'Average cycle length in days,'),
   period_length_avg: cycleRange('period_length_avg', 'Average period length in days,'),
-  luteal_length: { ...cycleRange('luteal_length', 'Luteal phase in days,'), description: `Luteal phase in days, ${CYCLE_SETTING_RANGES.luteal_length[0]} to ${CYCLE_SETTING_RANGES.luteal_length[1]}; left out or \`null\`: 14.` },
-  track_fertility: flag('Predict the fertile window; left out: on.'),
-  pregnancy_mode: flag('Pregnancy mode; left out: off.'),
-  pregnancy_due_date: OPTIONAL_DAY,
-  default_visibility: oneOf(VISIBILITIES, 'Visibility of new periods and imports; `null` or left out: `private`.', { nullable: true }),
+  luteal_length: { ...cycleRange('luteal_length', 'Luteal phase in days,'), description: `Luteal phase in days, ${CYCLE_SETTING_RANGES.luteal_length[0]} to ${CYCLE_SETTING_RANGES.luteal_length[1]}; \`null\`: 14. ${wasReset('set it back to 14')}` },
+  track_fertility: flag(`Predict the fertile window. ${wasReset('switched it on')}`),
+  pregnancy_mode: flag(`Pregnancy mode. ${wasReset('switched it off')}`),
+  pregnancy_due_date: { ...OPTIONAL_DAY, description: `${OPTIONAL_DAY.description} ${wasReset('cleared it')}` },
+  default_visibility: oneOf(VISIBILITIES, `Visibility of new periods and imports; \`null\`: \`private\`. ${wasReset('set it back to `private`')}`, { nullable: true }),
   remind_period_days_before: cycleRange('remind_period_days_before', 'Reminder before the predicted period, days ahead,'),
-  remind_log_daily: flag('Daily log nudge; left out: off.'),
-  contraception: oneOf(CONTRACEPTION_VALUES, 'Contraception; `null` or left out: not stated.', { nullable: true }),
-  perimenopause_mode: flag('Perimenopause mode; left out: off.'),
-  show_pms: flag('Show the PMS window; left out: on.'),
-  notify_partner_user_id: bodyId('Opt-in partner notification: one of `eligible_partners`; `null` or left out clears it.'),
+  remind_log_daily: flag(`Daily log nudge. ${wasReset('switched it off')}`),
+  contraception: oneOf(CONTRACEPTION_VALUES, `Contraception; \`null\`: not stated. ${wasReset('cleared it')}`, { nullable: true }),
+  perimenopause_mode: flag(`Perimenopause mode. ${wasReset('switched it off')}`),
+  show_pms: flag(`Show the PMS window. ${wasReset('switched it on')}`),
+  notify_partner_user_id: bodyId(`Opt-in partner notification: one of \`eligible_partners\`; \`null\` clears it. ${wasReset('cleared it')}`),
   notify_partner_days_before: cycleRange('notify_partner_days_before', 'Days ahead of the partner notification,'),
 };
+
+/** PUT /cycle/settings replaces the whole row: every field is required (nullable as before). */
+const CYCLE_SETTINGS_REQUIRED = Object.keys(CYCLE_SETTINGS_FIELDS);
 
 // ---------------------------------------------------------------------------
 // Fasten (eigene Schemata seit #1902, hier unveraendert bis auf user_id)
@@ -363,6 +383,10 @@ const booleanPreference = { oneOf: [{ type: 'boolean' }, { type: 'integer', enum
 const nutrientSchema = Object.fromEntries(NUTRIENT_KEYS.map((name) => [name, {
   type: ['number', 'null'], minimum: 0, maximum: MAX_NUTRIENT,
   description: 'null means "not stated" and is not the same as 0.',
+}]));
+/** The target is a replace: every nutrient is required, `null` unsets it (#2810). */
+const nutrientTargetSchema = Object.fromEntries(Object.entries(nutrientSchema).map(([name, schema]) => [name, {
+  ...schema, description: `${schema.description} Required (#2810); up to v2.93 leaving it out unset it.`,
 }]));
 const wallClock = { type: 'string', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]+)?)?(Z|[+-][0-9]{2}:?[0-9]{2})?$', description: 'Household wall-clock time, NOT an instant - "today" is a calendar day in the household zone. Stored as YYYY-MM-DDTHH:MM. A value with Z or a numeric offset is converted into the household zone rather than having its offset dropped.' };
 /** @param {{ create?: boolean }} [options] */
@@ -466,16 +490,17 @@ export function healthPaths() {
         params: [MED_ID],
         stateChanging: true,
         requestBody: body({
+          required: ['status'],
           properties: {
             scheduled_at: OPTIONAL_WALL_CLOCK,
             schedule_id: bodyId('The intake schedule of this medication; `null` means none.'),
-            status: oneOf(LOG_STATUS, '`taken`, `skipped` or `pending`; `null` or left out: `pending`.', { nullable: true }),
+            status: oneOf(LOG_STATUS, '`taken`, `skipped` or `pending`; `null`: `pending`. Required (#2810); up to v2.93 leaving it out meant `pending`, so a repeat reset a taken entry.', { nullable: true }),
             ...DOSE_FIELDS,
             dose_qty: number('The dose taken.'),
             note: NOTE,
           },
         }),
-        description: 'Body: { scheduled_at?, schedule_id?, status?, taken_at?, dose_qty?, note?, stock_deduct? }; `status` defaults to `pending`. Only a `taken` entry keeps `taken_at`: sent alongside `pending` or `skipped`, it is dropped and stored as null. `stock_deduct` (not negative) lowers the recorded stock in the same transaction as the log entry, never below 0, and only for a `taken` entry; a medication without recorded stock keeps none (#2069). One entry per planned occurrence: when an entry for the same `schedule_id` and `scheduled_at` exists, it is updated and the answer is `200`, and stock is deducted only when it turns `taken`. Such a repeat replaces `status` (left out: `pending`, so a taken entry is reset) and `taken_at`; a left-out `dose_qty` or `note` keeps the stored one. Send an `Idempotency-Key` to retry an as-needed dose safely. The answer carries `stock_deducted`: what actually came off the stock (0 without recorded stock, less than asked when the stock ran out) - the amount `POST /logs/{id}/undo` credits back.' + TAKEN_NOW + WALL_CLOCK_INPUT,
+        description: 'Body: { scheduled_at?, schedule_id?, status, taken_at?, dose_qty?, note?, stock_deduct? }; `status` is required (#2810), `null` stands for `pending`. Only a `taken` entry keeps `taken_at`: sent alongside `pending` or `skipped`, it is dropped and stored as null. `stock_deduct` (not negative) lowers the recorded stock in the same transaction as the log entry, never below 0, and only for a `taken` entry; a medication without recorded stock keeps none (#2069). One entry per planned occurrence: when an entry for the same `schedule_id` and `scheduled_at` exists, it is updated and the answer is `200`, and stock is deducted only when it turns `taken`. Such a repeat replaces `status` (up to v2.93 a left-out one was `pending` and reset a taken entry; now it is a 400 with `reason: validation` and `fields`) and `taken_at`; a left-out `taken_at` keeps the stored time of an entry that stays `taken`, a left-out `dose_qty` or `note` keeps the stored one, and a left-out `stock_deduct` deducts nothing. Send an `Idempotency-Key` to retry an as-needed dose safely. The answer carries `stock_deducted`: what actually came off the stock (0 without recorded stock, less than asked when the stock ran out) - the amount `POST /logs/{id}/undo` credits back.' + TAKEN_NOW + WALL_CLOCK_INPUT,
       }),
     },
     '/api/v1/health/logs/{id}': {
@@ -597,9 +622,9 @@ export function healthPaths() {
         summary: 'Upsert a cycle day log (one per person and day)',
         tag: 'Health',
         stateChanging: true,
-        requestBody: body({ required: ['log_date'], properties: DAY_LOG_FIELDS }),
-        description: 'Body: { log_date, flow?, note?, visibility?, symptoms?, basal_temp?, basal_temp_unit?, cervix_mucus?, lh_test?, pregnancy_test?, intimacy?, feelings? }. `cervix_mucus` ∈ dry/sticky/creamy/watery/eggwhite; `lh_test`/`pregnancy_test` ∈ negative/positive; `intimacy` ∈ protected/unprotected/solo. `feelings` is an array from a fixed 7-key set (great/good/neutral/sensitive/sad/irritable/anxious, same as the frontend\'s MOOD_TYPES) - any other value is a 400, not stored as free text. The legacy single-value `mood` is still accepted and validated against the same fixed set, treated as `feelings: [mood]` when `feelings` is absent. A save whose body includes either `feelings` or `mood` as a key fully replaces the stored feelings rows (delete + re-insert) and sets the `mood` column to NULL; a save that includes neither key leaves both the existing feelings rows and the `mood` column untouched, so an unrelated field change cannot silently clear a frozen legacy mood value. '
-          + 'Every other field is replaced by the save on a day that already has a log: a left-out `flow`, `note`, `basal_temp`, `basal_temp_unit`, `cervix_mucus`, `lh_test`, `pregnancy_test` or `intimacy` is cleared, a left-out `visibility` becomes `private`, and `symptoms` is fully replaced on every save (an omitted `symptoms` array normalizes to empty and clears any existing rows), while `feelings`/`mood` are only replaced when the request actually names one of those two keys. The app sends the whole day every time.',
+        requestBody: body({ required: DAY_LOG_REQUIRED, properties: DAY_LOG_FIELDS }),
+        description: 'Body: { log_date, flow, note, visibility, symptoms, basal_temp, basal_temp_unit, cervix_mucus, lh_test, pregnancy_test, intimacy, feelings?, mood? }. `cervix_mucus` ∈ dry/sticky/creamy/watery/eggwhite; `lh_test`/`pregnancy_test` ∈ negative/positive; `intimacy` ∈ protected/unprotected/solo. `feelings` is an array from a fixed 7-key set (great/good/neutral/sensitive/sad/irritable/anxious, same as the frontend\'s MOOD_TYPES) - any other value is a 400, not stored as free text. The legacy single-value `mood` is still accepted and validated against the same fixed set, treated as `feelings: [mood]` when `feelings` is absent. A save whose body includes either `feelings` or `mood` as a key fully replaces the stored feelings rows (delete + re-insert) and sets the `mood` column to NULL; a save that includes neither key leaves both the existing feelings rows and the `mood` column untouched, so an unrelated field change cannot silently clear a frozen legacy mood value. '
+          + 'Every other field replaces the stored one on a day that already has a log (full representation, RFC 9110), so it is required (#2810): a body without `flow`, `note`, `visibility`, `symptoms`, `basal_temp`, `basal_temp_unit`, `cervix_mucus`, `lh_test`, `pregnancy_test` or `intimacy` is a 400 with `reason: validation` and `fields` and leaves the stored day untouched. Up to v2.93 a left-out one was cleared (`visibility` became `private`, `symptoms` emptied). `null` (and `""` for the choices) still means "not given"; `feelings`/`mood` stay optional and are only replaced when the request names one of those two keys. The app sends the whole day every time.',
       }),
     },
     '/api/v1/health/cycle/logs/{id}': {
@@ -615,8 +640,8 @@ export function healthPaths() {
         summary: 'Update the viewer\'s cycle prediction settings',
         tag: 'Health',
         stateChanging: true,
-        requestBody: body({ properties: CYCLE_SETTINGS_FIELDS }),
-        description: 'Full-replace semantics like every other field on this route: an omitted field resets to its default rather than leaving the stored value untouched (`{}` resets every setting). `contraception` ∈ none/pill/hormonal_iud/copper_iud/implant/injection/patch/ring/condom/other; hormonal methods auto-disable fertile-window prediction client-side. `perimenopause_mode`/`show_pms` are booleans. `notify_partner_user_id` (opt-in partner notification) must be one of the `eligible_partners` returned by GET (an existing household member with health-module access, not a child) and must not be the caller themselves - 400 otherwise; empty/absent clears it. `notify_partner_days_before` is an integer 0-14. The response is the same shape as GET, including the `eligible_partners` list.',
+        requestBody: body({ required: CYCLE_SETTINGS_REQUIRED, properties: CYCLE_SETTINGS_FIELDS }),
+        description: 'Replaces the whole settings row (full representation, RFC 9110), so every field is required (#2810): a body without one of them is a 400 with `reason: validation` and `fields` and leaves the stored settings untouched. Up to v2.93 a left-out field was reset to its default (`{}` reset every setting). `null` keeps its meaning where a field takes it. `contraception` ∈ none/pill/hormonal_iud/copper_iud/implant/injection/patch/ring/condom/other; hormonal methods auto-disable fertile-window prediction client-side. `perimenopause_mode`/`show_pms` are booleans. `notify_partner_user_id` (opt-in partner notification) must be one of the `eligible_partners` returned by GET (an existing household member with health-module access, not a child) and must not be the caller themselves - 400 otherwise; `null` clears it. `notify_partner_days_before` is an integer 0-14. The response is the same shape as GET, including the `eligible_partners` list.',
       }),
     },
     '/api/v1/health/cycle/feed': {
@@ -709,7 +734,7 @@ export function healthPaths() {
     },
     '/api/v1/health/nutrition/targets': {
       get: checked({ summary: 'Get a daily nutrition target', tag: 'Health', params: [{ ...PERSON_QUERY, description: `Defaults to the signed-in user; somebody else only for a caregiver of that person (403 otherwise). ${QUERY_NOTE}` }], description: 'Defaults to the signed-in user; `?user_id=` asks for somebody the caller is a caregiver for (#584) and is 403 otherwise - a target carries no visibility of its own, so there is nothing to open. Responds `{ user_id, target }` where `target` is null when no row exists. Null is not zero: a missing row means "no target set", while a stored `sugar_g: 0` is a deliberate target of zero and the progress reads against it.' }),
-      put: checked({ summary: 'Set or clear a daily nutrition target', tag: 'Health', stateChanging: true, requestBody: body({ properties: { user_id: { ...OWNER, description: `Caregiver path: the person the target belongs to; left out or \`null\`: the caller. ${LEGACY_NOTE}` }, ...nutrientSchema } }), description: 'Replaces the whole target: a nutrient left out is unset afterwards. Sparse like the fasting settings - if all eight are null (also `{}`) the row is DELETED rather than stored as zeros, so "no row" stays the only spelling of "no target". Values are 0 to 100000.' }),
+      put: checked({ summary: 'Set or clear a daily nutrition target', tag: 'Health', stateChanging: true, requestBody: body({ required: [...NUTRIENT_KEYS], properties: { user_id: { ...OWNER, description: `Caregiver path: the person the target belongs to; left out or \`null\`: the caller. Optional. ${LEGACY_NOTE}` }, ...nutrientTargetSchema } }), description: 'Replaces the whole target (full representation, RFC 9110), so all eight nutrients are required (#2810): a body without one of them is a 400 with `reason: validation` and `fields` and leaves the stored target untouched. Up to v2.93 a left-out nutrient was unset, and `{}` deleted the target. Sparse like the fasting settings - if all eight are null the row is DELETED rather than stored as zeros, so "no row" stays the only spelling of "no target". Values are 0 to 100000.' }),
     },
     '/api/v1/health/nutrition/entries': {
       get: checked({ summary: 'List logged nutrition entries', tag: 'Health', params: [PERSON_QUERY, ...DAY_QUERIES, { name: 'meal_type', in: 'query', required: false, schema: { type: 'string', enum: [...MEAL_TYPES] }, description: `Only this meal. ${QUERY_NOTE}` }], description: 'Scoped to the viewer; `?user_id=` filters to a family member (their `all`-visible rows, or every row if the viewer is a caregiver for that person). `from`/`to` compare the DATE part of `consumed_at`, which is household wall-clock time rather than an instant.' }),
