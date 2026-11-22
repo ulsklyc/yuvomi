@@ -470,24 +470,59 @@ test('the own caller: the contact form sends every name part of the group the sc
   assert.deepEqual(members.filter((key) => !sent.includes(key)), [], `the form sends ${JSON.stringify(sent)}`);
 });
 
+/**
+ * The name parts #cm-save puts into the body for a stored contact, computed by
+ * the page's own code: `hadStructure` of buildContactForm() and the
+ * `keptParts` literal of the save handler, evaluated on the contact.
+ * @param {string} source public/pages/contacts.js
+ * @returns {(contact: Record<string, unknown>|null, typed: { firstName: string, lastName: string }) => Record<string, unknown>}
+ */
+function formNameBody(source) {
+  const structure = /const hadStructure = (isEdit && [^;]+);/.exec(source);
+  assert.ok(structure, 'hadStructure of the form');
+  const start = source.indexOf("panel.querySelector('#cm-save').addEventListener('click'");
+  const handler = literalAt(source, source.indexOf('{', source.indexOf('=>', start)));
+  const stored = /const stored = [^;]*\(contact\);/.exec(handler);
+  assert.ok(stored, 'the handler reads the stored parts from the contact');
+  const at = handler.indexOf('const keptParts = {');
+  assert.ok(at !== -1, 'the keptParts literal of the handler');
+  const kept = literalAt(handler, handler.indexOf('{', at));
+  const hadStructure = new Function('isEdit', 'contact', `return ${structure[1]};`);
+  const keptParts = new Function('contact', 'hadStructure', `const stored = contact; return (${kept});`);
+  const sent = formNameParts(source);
+  return (contact, typed) => {
+    const values = { ...typed, ...keptParts(contact, hadStructure(contact !== null, contact)) };
+    return Object.fromEntries(sent.map((key) => [key, /** @type {Record<string, unknown>} */ (values)[key]]));
+  };
+}
+
 test('the contact form keeps the middle name, prefix and suffix of an imported contact', async () => {
   const id = await importedContact();
-  // What #cm-save builds for this contact after the first name was edited:
-  // the two fields of the form, the three others as stored - and only the
-  // parts the handler really puts into the body.
-  const contactRow = (await call('GET', `/contacts/${id}`)).body.data;
-  /** @type {Record<string, unknown>} */
-  const values = {
-    firstName: 'Augusta', lastName: 'Lovelace',
-    middleName: contactRow.middle_name ?? null, namePrefix: contactRow.name_prefix ?? null, nameSuffix: contactRow.name_suffix ?? null,
-  };
-  const sent = formNameParts(readFileSync(new URL('../public/pages/contacts.js', import.meta.url), 'utf8'));
+  const nameBody = formNameBody(readFileSync(new URL('../public/pages/contacts.js', import.meta.url), 'utf8'));
   const { firstName: _f, lastName: _l, middleName: _m, namePrefix: _p, nameSuffix: _s, ...rest } = FORM_CONTACT({
     name: 'Augusta King Lovelace', phones: [], emails: [], phone: null, email: null,
   });
-  const form = { ...rest, ...Object.fromEntries(sent.map((key) => [key, values[key]])) };
-  accepted(await call('PUT', `/contacts/${id}`, { json: form }), 'form PUT');
+
+  // A stored structure (first and last name set): the body of #cm-save after
+  // the first name was edited carries the stored three as they are.
+  const contactRow = (await call('GET', `/contacts/${id}`)).body.data;
+  const parts = nameBody(contactRow, { firstName: 'Augusta', lastName: 'Lovelace' });
+  assert.deepEqual(parts, { firstName: 'Augusta', lastName: 'Lovelace', middleName: 'King', namePrefix: 'Dr.', nameSuffix: 'Jr.' }, 'the stored parts go along, value for value');
+  accepted(await call('PUT', `/contacts/${id}`, { json: { ...rest, ...parts } }), 'form PUT');
   assert.deepEqual({ ...storedName(id) }, { name: 'Augusta King Lovelace', first_name: 'Augusta', last_name: 'Lovelace', middle_name: 'King', name_prefix: 'Dr.', name_suffix: 'Jr.' });
+
+  // Other stored values: they go along as they are, `null` stays `null`.
+  const other = nameBody({ ...contactRow, middle_name: 'Ann', name_prefix: null, name_suffix: 'III' }, { firstName: 'A', lastName: 'B' });
+  assert.deepEqual(other, { firstName: 'A', lastName: 'B', middleName: 'Ann', namePrefix: null, nameSuffix: 'III' });
+
+  // No stored first or last name: the form is prefilled from the display
+  // name, which already holds a derived middle name - it goes as `null`,
+  // prefix and suffix still as stored.
+  const bare = nameBody({ ...contactRow, first_name: null, last_name: null, middle_name: 'King', name: 'King' }, { firstName: 'King', lastName: '' });
+  assert.deepEqual(bare, { firstName: 'King', lastName: '', middleName: null, namePrefix: 'Dr.', nameSuffix: 'Jr.' });
+
+  // Create: no contact, the three go as `null`.
+  assert.deepEqual(nameBody(null, { firstName: 'Neu', lastName: 'Er' }), { firstName: 'Neu', lastName: 'Er', middleName: null, namePrefix: null, nameSuffix: null });
 });
 
 test('contact categories: name, colour, order', async () => {
