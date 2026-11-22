@@ -64,8 +64,8 @@ function mayReadTarget(viewer, ownerId) {
  */
 router.get('/nutrition/targets', validateRequest(), (req, res) => {
   const viewer = viewerId(req);
+  // `user_id` ist eine ganze Zahl ab 1 oder fehlt: das Schema (#2810).
   const ownerId = req.query.user_id ? parseInt(req.query.user_id, 10) : viewer;
-  if (!ownerId) return badRequest(res, ['user_id is invalid.']);
   // Ein Ziel ist keine Zeile mit Sichtbarkeit - es gibt nichts zu oeffnen.
   // Deshalb die Betreuungsfrage statt einer Sichtbarkeits-Klausel: wer fuer
   // jemanden eintraegt, muss dessen Ziel kennen, alle anderen nicht.
@@ -234,8 +234,8 @@ router.delete('/nutrition/entries/:id', validateRequest(), (req, res) => {
  */
 router.get('/nutrition/summary', validateRequest(), (req, res) => {
   const viewer  = viewerId(req);
+  // `user_id` ist eine ganze Zahl ab 1 oder fehlt: das Schema (#2810).
   const ownerId = req.query.user_id ? parseInt(req.query.user_id, 10) : viewer;
-  if (!ownerId) return badRequest(res, ['user_id is invalid.']);
 
   const dateCheck = v.date(req.query.date, 'date', false);
   if (dateCheck.error) return badRequest(res, [dateCheck.error]);

@@ -118,13 +118,12 @@ test('CONTRACEPTION_TYPES: HORMONAL_CONTRACEPTION_VALUES ist eine Teilmenge von 
   assert.deepEqual([...HORMONAL_CONTRACEPTION_VALUES].sort(), ['hormonal_iud', 'implant', 'injection', 'patch', 'pill', 'ring'].sort());
 });
 
-// Quelltext-Guard (source-text check, wie andere Guards dieses Repos): weder
-// health.js noch server/routes/health/cycle.js dürfen die geschlossenen
-// Wertelisten noch selbst definieren - beide müssen sie aus health-cycle.js
-// importieren (EIN Zuhause statt dreier Kopien).
-test('Fix 6 Guard: health.js und server/routes/health/cycle.js definieren CERVIX_MUCUS/TEST_RESULT/INTIMACY/CONTRACEPTION-Listen nicht mehr selbst', () => {
+// Ein Zuhause fuer die geschlossenen Wertelisten: health.js baut die Auswahl
+// aus den Typen von health-cycle.js (Quelltext-Guard), der Server prueft sie
+// am Schema des gebauten OpenAPI-Dokuments (#2810) - dieselben *_VALUES, keine
+// Abschrift. Seit #2810 Gruppe 6 (c) prueft die Route sie nicht mehr selbst.
+test('Fix 6 Guard: health.js definiert die Listen nicht selbst, das Schema der Zyklus-Routen nimmt genau die *_VALUES aus health-cycle.js', async () => {
   const healthJs = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
-  const routeJs = readFileSync(new URL('../server/routes/health/cycle.js', import.meta.url), 'utf8');
 
   assert.match(healthJs, /CERVIX_MUCUS_TYPES,\s*TEST_RESULT_VALUES,\s*INTIMACY_TYPES,\s*CONTRACEPTION_TYPES,/,
     'health.js muss die Typen aus health-cycle.js importieren');
@@ -132,10 +131,17 @@ test('Fix 6 Guard: health.js und server/routes/health/cycle.js definieren CERVIX
   assert.ok(!/const INTIMACY_TYPES = Object\.freeze/.test(healthJs), 'health.js darf INTIMACY_TYPES nicht mehr selbst definieren');
   assert.ok(!/const CONTRACEPTION_TYPES = Object\.freeze/.test(healthJs), 'health.js darf CONTRACEPTION_TYPES nicht mehr selbst definieren');
 
-  assert.match(routeJs, /CERVIX_MUCUS_VALUES,\s*TEST_RESULT_VALUES,\s*INTIMACY_VALUES,\s*CONTRACEPTION_VALUES,/,
-    'server/routes/health/cycle.js muss die *_VALUES aus health-cycle.js importieren');
-  assert.ok(!/const CERVIX_MUCUS_VALUES = \[/.test(routeJs), 'server-Route darf CERVIX_MUCUS_VALUES nicht mehr selbst definieren');
-  assert.ok(!/const CONTRACEPTION_VALUES = \[/.test(routeJs), 'server-Route darf CONTRACEPTION_VALUES nicht mehr selbst definieren');
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const bodyOf = (/** @type {string} */ path, /** @type {string} */ method) => spec.paths[`/api/v1/health${path}`][method].requestBody.content['application/json'].schema.properties;
+  // "" und null heissen "nicht angegeben"; der Rest ist genau die Liste.
+  const listOf = (/** @type {{ enum: unknown[] }} */ field) => field.enum.filter((value) => value !== '' && value !== null);
+  const day = bodyOf('/cycle/logs', 'post');
+  assert.deepEqual(listOf(day.cervix_mucus), [...CERVIX_MUCUS_VALUES], 'cervix_mucus');
+  assert.deepEqual(listOf(day.lh_test), [...TEST_RESULT_VALUES], 'lh_test');
+  assert.deepEqual(listOf(day.pregnancy_test), [...TEST_RESULT_VALUES], 'pregnancy_test');
+  assert.deepEqual(listOf(day.intimacy), [...INTIMACY_VALUES], 'intimacy');
+  assert.deepEqual(listOf(bodyOf('/cycle/settings', 'put').contraception), [...CONTRACEPTION_VALUES], 'contraception');
 });
 
 test('INTENSITY_LEVELS: drei Stufen, symptomIntensityLabelKey löst sie auf', () => {
