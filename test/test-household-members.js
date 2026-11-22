@@ -34,6 +34,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware, requireAuth } = await import('../server/auth.js');
@@ -157,7 +158,11 @@ app.use('/api/v1/rewards', requireAuth, rewardsRouter);
 app.use('/api/v1/split-expenses', requireAuth, splitRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 app.use('/api/v1/permissions', requireAuth, permissionsRouter);
-app.use('/api/v1/documents', requireAuth, documentsRouter);
+// At its real prefix (#2810). The documents router reads and writes files;
+// in server/index.js the general API limiter stands in front of it, here a
+// generous one does, far above what this suite sends.
+const documentsLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+app.use('/api/v1/documents', documentsLimiter, requireAuth, documentsRouter);
 app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
