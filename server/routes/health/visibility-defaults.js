@@ -23,7 +23,7 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { FastingError, requireFastingCapability } from '../../services/fasting.js';
-import { log, VISIBILITIES, viewerId, badRequest } from './helpers.js';
+import { log, viewerId, badRequest } from './helpers.js';
 import { FLAT_SCOPE_KEYS, SCOPE_KEY_PATTERN, VITAL_SCOPE_PREFIX } from '../../services/health-fields.js';
 import { OPEN_ALL, OPEN_FAMILY } from '../../authorize/index.ts';
 import { validateRequest } from '../../api/validate-request.ts';
@@ -162,17 +162,12 @@ function refuseFastingWithoutCapability(req, res, next) {
  * Nur die Abweichungen - was fehlt, ist 'private'.
  */
 router.get('/visibility-defaults', validateRequest(), (req, res) => {
-  try {
-    const rows = db.get().prepare(
-      'SELECT scope_key, visibility FROM health_visibility_defaults WHERE user_id = ?'
-    ).all(viewerId(req));
-    const defaults = {};
-    for (const r of rows) defaults[r.scope_key] = r.visibility;
-    res.json({ data: { defaults } });
-  } catch (err) {
-    log.error('Error loading visibility defaults:', err.message);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const rows = db.get().prepare(
+    'SELECT scope_key, visibility FROM health_visibility_defaults WHERE user_id = ?'
+  ).all(viewerId(req));
+  const defaults = {};
+  for (const r of rows) defaults[r.scope_key] = r.visibility;
+  res.json({ data: { defaults } });
 });
 
 /**
@@ -185,43 +180,38 @@ router.get('/visibility-defaults', validateRequest(), (req, res) => {
  * Eintraegen, die nichts aussagen.
  */
 router.put('/visibility-defaults', refuseFastingWithoutCapability, validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const input = req.body?.defaults;
-    if (!input || typeof input !== 'object' || Array.isArray(input)) {
-      return badRequest(res, ['defaults must be an object.']);
-    }
-    const entries = Object.entries(input);
-    for (const [key, visibility] of entries) {
-      if (!isValidScopeKey(key)) return badRequest(res, [`Unknown scope: ${key}`]);
-      if (!VISIBILITIES.includes(visibility)) return badRequest(res, [`Invalid visibility: ${visibility}`]);
-    }
-    const database = db.get();
-    if (!allowFastingMutation(database, viewer, res, entries.map(([key]) => key))) return;
-    const del = database.prepare('DELETE FROM health_visibility_defaults WHERE user_id = ? AND scope_key = ?');
-    const set = database.prepare(`
-      INSERT INTO health_visibility_defaults (user_id, scope_key, visibility)
-      VALUES (?, ?, ?)
-      ON CONFLICT(user_id, scope_key) DO UPDATE SET
-        visibility = excluded.visibility,
-        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-    `);
-    database.transaction(() => {
-      for (const [key, visibility] of entries) {
-        if (visibility === 'family') set.run(viewer, key, visibility);
-        else del.run(viewer, key);
-      }
-    })();
-    const rows = database.prepare(
-      'SELECT scope_key, visibility FROM health_visibility_defaults WHERE user_id = ?'
-    ).all(viewer);
-    const defaults = {};
-    for (const r of rows) defaults[r.scope_key] = r.visibility;
-    res.json({ data: { defaults } });
-  } catch (err) {
-    log.error('Error saving visibility defaults:', err.message);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const viewer = viewerId(req);
+  // `defaults` ist ein Objekt aus Bereichs-Schluesseln (SCOPE_KEY_PATTERN) und
+  // `private`/`family`: das Schema (#2810). Der Schluessel wird hier trotzdem
+  // gegen FLAT_SCOPES gefragt (eigene Schluessel, isValidScopeKey): er landet
+  // als scope_key in der Tabelle, und PATCH /apply schlaegt mit ihm die
+  // Tabelle nach, deren Zeilen es umschreibt.
+  const entries = Object.entries(req.body.defaults);
+  for (const [key] of entries) {
+    if (!isValidScopeKey(key)) return badRequest(res, [`Unknown scope: ${key}`]);
   }
+  const database = db.get();
+  if (!allowFastingMutation(database, viewer, res, entries.map(([key]) => key))) return;
+  const del = database.prepare('DELETE FROM health_visibility_defaults WHERE user_id = ? AND scope_key = ?');
+  const set = database.prepare(`
+    INSERT INTO health_visibility_defaults (user_id, scope_key, visibility)
+    VALUES (?, ?, ?)
+    ON CONFLICT(user_id, scope_key) DO UPDATE SET
+      visibility = excluded.visibility,
+      updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+  `);
+  database.transaction(() => {
+    for (const [key, visibility] of entries) {
+      if (visibility === 'family') set.run(viewer, key, visibility);
+      else del.run(viewer, key);
+    }
+  })();
+  const rows = database.prepare(
+    'SELECT scope_key, visibility FROM health_visibility_defaults WHERE user_id = ?'
+  ).all(viewer);
+  const defaults = {};
+  for (const r of rows) defaults[r.scope_key] = r.visibility;
+  res.json({ data: { defaults } });
 });
 
 /**
@@ -239,42 +229,38 @@ router.put('/visibility-defaults', refuseFastingWithoutCapability, validateReque
  * eine Entscheidung ueber die eigene Privatsphaere, keine Pflegehandlung.
  */
 router.patch('/visibility-defaults/apply', refuseFastingWithoutCapability, validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const scope = String(req.body?.scope || '');
-    const visibility = req.body?.visibility;
-    if (!isValidScopeKey(scope)) return badRequest(res, [`Unknown scope: ${scope}`]);
-    if (!VISIBILITIES.includes(visibility)) return badRequest(res, ['visibility is required.']);
+  const viewer = viewerId(req);
+  // scope (Muster) und visibility (`private`/`family`) sind Pflicht: das Schema
+  // (#2810). Der Nachschlag FLAT_SCOPES[scope] unten nennt eine Tabelle und
+  // fragt deshalb selbst nach einem eigenen Schluessel (isValidScopeKey).
+  const { scope, visibility } = req.body;
+  if (!isValidScopeKey(scope)) return badRequest(res, [`Unknown scope: ${scope}`]);
 
-    const database = db.get();
-    if (!allowFastingMutation(database, viewer, res, [scope])) return;
-    let updated = 0;
-    if (scope.startsWith(VITAL_PREFIX)) {
-      updated = database.prepare(
-        'UPDATE health_vitals SET visibility = ? WHERE user_id = ? AND type = ?'
-      ).run(visibility, viewer, scope.slice(VITAL_PREFIX.length)).changes;
-    } else if (scope === 'fasting') {
-      // Privacy changes must invalidate an already-open fasting editor too.
-      updated = database.prepare(
-        'UPDATE health_fasts SET visibility = ?, revision = revision + 1, updated_by = ?, updated_at = ? WHERE user_id = ?'
-      ).run(visibility, viewer, new Date().toISOString(), viewer).changes;
-    } else {
-      const target = FLAT_SCOPES[scope];
-      // In der Schreibweise DER ZIELTABELLE, nicht in der des Requests: die
-      // Anfrage spricht das Paar private/family (so steht es auch in der
-      // Oberflaeche), die Naehrwert-Tabelle fuehrt private/all. Ohne die
-      // Uebersetzung schriebe dieser Zweig ein 'family' gegen einen CHECK, der
-      // es nicht kennt - der Nachzieh-Knopf endete in einem 500.
-      const stored = visibility === 'family' ? target.open : 'private';
-      updated = database.prepare(
-        `UPDATE ${target.table} SET visibility = ? WHERE ${target.column} = ?`
-      ).run(stored, viewer).changes;
-    }
-    res.json({ data: { updated: Number(updated) } });
-  } catch (err) {
-    log.error('Error applying visibility to existing entries:', err.message);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const database = db.get();
+  if (!allowFastingMutation(database, viewer, res, [scope])) return;
+  let updated = 0;
+  if (scope.startsWith(VITAL_PREFIX)) {
+    updated = database.prepare(
+      'UPDATE health_vitals SET visibility = ? WHERE user_id = ? AND type = ?'
+    ).run(visibility, viewer, scope.slice(VITAL_PREFIX.length)).changes;
+  } else if (scope === 'fasting') {
+    // Privacy changes must invalidate an already-open fasting editor too.
+    updated = database.prepare(
+      'UPDATE health_fasts SET visibility = ?, revision = revision + 1, updated_by = ?, updated_at = ? WHERE user_id = ?'
+    ).run(visibility, viewer, new Date().toISOString(), viewer).changes;
+  } else {
+    const target = FLAT_SCOPES[scope];
+    // In der Schreibweise DER ZIELTABELLE, nicht in der des Requests: die
+    // Anfrage spricht das Paar private/family (so steht es auch in der
+    // Oberflaeche), die Naehrwert-Tabelle fuehrt private/all. Ohne die
+    // Uebersetzung schriebe dieser Zweig ein 'family' gegen einen CHECK, der
+    // es nicht kennt - der Nachzieh-Knopf endete in einem 500.
+    const stored = visibility === 'family' ? target.open : 'private';
+    updated = database.prepare(
+      `UPDATE ${target.table} SET visibility = ? WHERE ${target.column} = ?`
+    ).run(stored, viewer).changes;
   }
+  res.json({ data: { updated: Number(updated) } });
 });
 
 export default router;

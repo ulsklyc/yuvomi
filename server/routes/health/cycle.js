@@ -29,18 +29,20 @@ import * as db from '../../db.js';
 import * as v from '../../middleware/validate.js';
 import { cycleToCsv } from '../../services/health-export.js';
 import { syncCycleRemindersForUser, isEligibleCyclePartner, eligibleCyclePartners } from '../../services/cycle-reminders.js';
-// Die vier geschlossenen Wertelisten kommen aus health-cycle.js (dasselbe
-// Muster wie der bestehende MOOD_VALUES-Import) - EIN Zuhause statt mehrerer
-// Kopien (CERVIX_MUCUS_VALUES/TEST_RESULT_VALUES/INTIMACY_VALUES,
-// CONTRACEPTION_VALUES), die sonst auseinanderlaufen koennten.
+// Die vier geschlossenen Wertelisten kommen aus health-cycle.js - EIN Zuhause
+// statt mehrerer Kopien (CERVIX_MUCUS_VALUES/TEST_RESULT_VALUES/INTIMACY_VALUES,
+// CONTRACEPTION_VALUES), die sonst auseinanderlaufen koennten. Das Schema
+// prueft dieselben Listen vor der Route (#2810); die Pruefung hier bleibt, bis
+// der Quelltext-Guard in test/test-health-cycle.js den Import am Schema statt
+// an der Route sucht.
 import {
-  normalizeSymptomEntries, MOOD_VALUES, FLOW_VALUES, BASAL_TEMP_UNITS,
+  normalizeSymptomEntries, BASAL_TEMP_UNITS,
   CERVIX_MUCUS_VALUES, TEST_RESULT_VALUES, INTIMACY_VALUES, CONTRACEPTION_VALUES,
 } from '../../../public/utils/health-cycle.js';
-import { CYCLE_SETTING_RANGES, MAX_SYMPTOMS_COUNT } from '../../services/health-fields.js';
+import { MAX_SYMPTOMS_COUNT } from '../../services/health-fields.js';
 import {
-  log, VISIBILITIES,
-  viewerId, toBit, applyUpdate, badRequest,
+  log,
+  viewerId, pathId, toBit, applyUpdate, badRequest,
   exportFilename, sendCsv, exportRange,
 } from './helpers.js';
 import { visibilityClause } from '../../authorize/index.ts';
@@ -130,34 +132,22 @@ function replaceSymptoms(database, dayLogId, entries) {
 // TEST_RESULT_VALUES.
 
 /**
- * Gefuehle eines Tages (Mehrfachauswahl, seit Migration 211) validieren +
- * normalisieren. Anders als normalizeSymptomEntries() (offenes Schema, nur
- * eine Format-Regex) ist dies ein GESCHLOSSENES Set - MOOD_VALUES aus
- * health-cycle.js, dieselbe Quelle wie das Frontend-Preset - und ein
- * unbekannter Wert ist ein Fehler (400), kein still verworfener Eintrag:
- * Gefuehle sind keine erweiterbare Presets-Liste wie Symptome, sondern eine
- * feste kleine Auswahl.
+ * Gefuehle eines Tages (Mehrfachauswahl, seit Migration 211) normalisieren.
+ * Anders als normalizeSymptomEntries() (offenes Schema, nur eine Format-Regex)
+ * ist dies ein GESCHLOSSENES Set - MOOD_VALUES aus health-cycle.js, dieselbe
+ * Quelle wie das Frontend-Preset - und ein unbekannter Wert ist ein Fehler
+ * (400), kein still verworfener Eintrag: Gefuehle sind keine erweiterbare
+ * Presets-Liste wie Symptome, sondern eine feste kleine Auswahl. Das Set und
+ * die Form (`feelings` eine Liste oder null, `mood` ein Wert, `""` oder null)
+ * prueft das Schema vor der Route (#2810); hier fallen nur Doppelte weg.
  *
  * Nimmt `feelings` (Array) entgegen, oder - fehlt es - das alte Einzelfeld
  * `mood` als Ein-Element-Liste (Abwaertskompatibilitaet, siehe POST-Handler).
- * @returns {{ keys: string[]|null, error: string|null }}
+ * @returns {string[]}
  */
 function normalizeFeelings(rawFeelings, rawMood) {
-  const list = rawFeelings !== undefined && rawFeelings !== null
-    ? rawFeelings
-    : (rawMood !== undefined && rawMood !== null && rawMood !== '' ? [rawMood] : []);
-  if (!Array.isArray(list)) return { keys: null, error: 'feelings must be an array.' };
-
-  const keys = [];
-  const seen = new Set();
-  for (const item of list) {
-    const key = String(item).trim().toLowerCase();
-    if (!MOOD_VALUES.includes(key)) {
-      return { keys: null, error: `feelings must contain only: ${MOOD_VALUES.join(', ')}.` };
-    }
-    if (!seen.has(key)) { seen.add(key); keys.push(key); }
-  }
-  return { keys, error: null };
+  const list = rawFeelings ?? (rawMood ? [rawMood] : []);
+  return [...new Set(list)];
 }
 
 /** Gefuehls-Schluessel eines Tages-Logs, in Einfuegereihenfolge. */
@@ -192,261 +182,223 @@ function replaceFeelings(database, dayLogId, keys) {
 
 // GET /cycle/periods?user_id=&from=&to=
 router.get('/cycle/periods', validateRequest(), (req, res) => {
-  try {
-    const viewer   = viewerId(req);
-    const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
-    const clause   = visibilityClause('p', viewer, personId);
-    const params   = [...clause.params];
-    let sql = `SELECT p.* FROM cycle_periods p WHERE ${clause.sql}`;
-    if (req.query.from) { sql += ' AND p.start_date >= ?'; params.push(String(req.query.from)); }
-    if (req.query.to)   { sql += ' AND p.start_date <= ?'; params.push(String(req.query.to)); }
-    sql += ' ORDER BY p.start_date DESC, p.id DESC';
-    res.json({ data: db.get().prepare(sql).all(...params) });
-  } catch (err) {
-    log.error('Error listing cycle periods:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  const viewer   = viewerId(req);
+  const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
+  const clause   = visibilityClause('p', viewer, personId);
+  const params   = [...clause.params];
+  let sql = `SELECT p.* FROM cycle_periods p WHERE ${clause.sql}`;
+  if (req.query.from) { sql += ' AND p.start_date >= ?'; params.push(String(req.query.from)); }
+  if (req.query.to)   { sql += ' AND p.start_date <= ?'; params.push(String(req.query.to)); }
+  sql += ' ORDER BY p.start_date DESC, p.id DESC';
+  res.json({ data: db.get().prepare(sql).all(...params) });
 });
 
 // POST /cycle/periods
 router.post('/cycle/periods', validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const b = req.body || {};
-    const startDate  = v.date(b.start_date, 'start_date', true);
-    const endDate    = v.date(b.end_date, 'end_date');
-    const note       = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
-    const visibility = v.oneOf(b.visibility, VISIBILITIES, 'visibility');
+  const viewer = viewerId(req);
+  const b = req.body || {};
+  const startDate  = v.date(b.start_date, 'start_date', true);
+  const endDate    = v.date(b.end_date, 'end_date');
+  const note       = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
 
-    const errors = v.collectErrors([startDate, endDate, note, visibility]);
-    if (endDate.value && startDate.value && endDate.value < startDate.value) {
-      errors.push('end_date must not be before start_date.');
-    }
-    if (errors.length) return badRequest(res, errors);
-
-    const result = db.get().prepare(`
-      INSERT INTO cycle_periods (user_id, start_date, end_date, note, visibility)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(viewer, startDate.value, endDate.value, note.value, visibility.value || 'private');
-
-    // Sofort wirksam statt erst beim naechsten periodischen Lauf: ein neu
-    // geloggter Zyklus verschiebt sofort predictCycle()s naechsten
-    // Periodenbeginn, die Erinnerung soll dem nicht hinterherhinken.
-    try {
-      syncCycleRemindersForUser(db.get(), viewer);
-    } catch (err) {
-      log.error('Error syncing cycle reminders after period change:', err.message);
-    }
-
-    res.status(201).json({ data: db.get().prepare('SELECT * FROM cycle_periods WHERE id = ?').get(result.lastInsertRowid) });
-  } catch (err) {
-    log.error('Error creating cycle period:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  const errors = v.collectErrors([startDate, endDate, note]);
+  if (endDate.value && startDate.value && endDate.value < startDate.value) {
+    errors.push('end_date must not be before start_date.');
   }
+  if (errors.length) return badRequest(res, errors);
+
+  const result = db.get().prepare(`
+    INSERT INTO cycle_periods (user_id, start_date, end_date, note, visibility)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(viewer, startDate.value, endDate.value, note.value, b.visibility || 'private');
+
+  // Sofort wirksam statt erst beim naechsten periodischen Lauf: ein neu
+  // geloggter Zyklus verschiebt sofort predictCycle()s naechsten
+  // Periodenbeginn, die Erinnerung soll dem nicht hinterherhinken.
+  try {
+    syncCycleRemindersForUser(db.get(), viewer);
+  } catch (err) {
+    log.error('Error syncing cycle reminders after period change:', err.message);
+  }
+
+  res.status(201).json({ data: db.get().prepare('SELECT * FROM cycle_periods WHERE id = ?').get(result.lastInsertRowid) });
 });
 
 // PATCH /cycle/periods/:id
 router.patch('/cycle/periods/:id', validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+  const viewer = viewerId(req);
+  const id = pathId(req);
+  if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
-    const existing = db.get().prepare('SELECT * FROM cycle_periods WHERE id = ? AND user_id = ?').get(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Period not found.', code: 404, reason: 'health_cycle_period_not_found' });
+  const existing = db.get().prepare('SELECT * FROM cycle_periods WHERE id = ? AND user_id = ?').get(id, viewer);
+  if (!existing) return res.status(404).json({ error: 'Period not found.', code: 404, reason: 'health_cycle_period_not_found' });
 
-    const b = req.body || {};
-    const fields = {};
-    const checks = [];
+  const b = req.body || {};
+  const fields = {};
+  const checks = [];
 
-    if (b.start_date !== undefined) { const r = v.date(b.start_date, 'start_date', true); checks.push(r); if (!r.error) fields.start_date = r.value; }
-    if (b.end_date !== undefined)   { const r = v.date(b.end_date, 'end_date');           checks.push(r); if (!r.error) fields.end_date = r.value; }
-    if (b.note !== undefined)       { const r = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false }); checks.push(r); if (!r.error) fields.note = r.value; }
-    if (b.visibility !== undefined) { const r = v.oneOf(b.visibility, VISIBILITIES, 'visibility'); checks.push(r); if (!r.error && r.value) fields.visibility = r.value; }
+  if (b.start_date !== undefined) { const r = v.date(b.start_date, 'start_date', true); checks.push(r); if (!r.error) fields.start_date = r.value; }
+  if (b.end_date !== undefined)   { const r = v.date(b.end_date, 'end_date');           checks.push(r); if (!r.error) fields.end_date = r.value; }
+  if (b.note !== undefined)       { const r = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false }); checks.push(r); if (!r.error) fields.note = r.value; }
+  // null laesst die Sichtbarkeit stehen (Schema: `private`, `family` oder null).
+  if (b.visibility) fields.visibility = b.visibility;
 
-    const errors = v.collectErrors(checks);
-    const nextStart = fields.start_date !== undefined ? fields.start_date : existing.start_date;
-    const nextEnd   = fields.end_date   !== undefined ? fields.end_date   : existing.end_date;
-    if (nextEnd && nextStart && nextEnd < nextStart) errors.push('end_date must not be before start_date.');
-    if (errors.length) return badRequest(res, errors);
+  const errors = v.collectErrors(checks);
+  const nextStart = fields.start_date !== undefined ? fields.start_date : existing.start_date;
+  const nextEnd   = fields.end_date   !== undefined ? fields.end_date   : existing.end_date;
+  if (nextEnd && nextStart && nextEnd < nextStart) errors.push('end_date must not be before start_date.');
+  if (errors.length) return badRequest(res, errors);
 
-    applyUpdate('cycle_periods', id, fields);
-    res.json({ data: db.get().prepare('SELECT * FROM cycle_periods WHERE id = ?').get(id) });
-  } catch (err) {
-    log.error('Error updating cycle period:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  applyUpdate('cycle_periods', id, fields);
+  res.json({ data: db.get().prepare('SELECT * FROM cycle_periods WHERE id = ?').get(id) });
 });
 
 // DELETE /cycle/periods/:id
 router.delete('/cycle/periods/:id', validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+  const viewer = viewerId(req);
+  const id = pathId(req);
+  if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
-    const existing = db.get().prepare('SELECT id FROM cycle_periods WHERE id = ? AND user_id = ?').get(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Period not found.', code: 404, reason: 'health_cycle_period_not_found' });
+  const existing = db.get().prepare('SELECT id FROM cycle_periods WHERE id = ? AND user_id = ?').get(id, viewer);
+  if (!existing) return res.status(404).json({ error: 'Period not found.', code: 404, reason: 'health_cycle_period_not_found' });
 
-    db.get().prepare('DELETE FROM cycle_periods WHERE id = ?').run(id);
-    res.status(204).end();
-  } catch (err) {
-    log.error('Error deleting cycle period:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  db.get().prepare('DELETE FROM cycle_periods WHERE id = ?').run(id);
+  res.status(204).end();
 });
 
 // ---- Tages-Logs (Upsert je Person/Tag) ----
 
 // GET /cycle/logs?user_id=&from=&to=
 router.get('/cycle/logs', validateRequest(), (req, res) => {
-  try {
-    const viewer   = viewerId(req);
-    const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
-    const clause   = visibilityClause('l', viewer, personId);
-    const params   = [...clause.params];
-    let sql = `SELECT l.* FROM cycle_day_logs l WHERE ${clause.sql}`;
-    if (req.query.from) { sql += ' AND l.log_date >= ?'; params.push(String(req.query.from)); }
-    if (req.query.to)   { sql += ' AND l.log_date <= ?'; params.push(String(req.query.to)); }
-    sql += ' ORDER BY l.log_date DESC, l.id DESC';
-    const database = db.get();
-    const rows = database.prepare(sql).all(...params);
-    // `symptoms`/`feelings` kommen aus je einer eigenen Tabelle (Migration 178
-    // bzw. 211), nicht mehr aus den (nur noch historischen) Skalar-Spalten -
-    // `SELECT l.*` liefert die alten Spalten zwar mit, der Überschreib unten
-    // ersetzt `symptoms` in der Antwort und ergänzt `feelings`; `mood` bleibt
-    // als reiner Altlast-Lesewert stehen (siehe Migration 211). Batch statt
-    // einer Abfrage je Zeile (symptomsForLogs()/feelingsForLogs(), je ein
-    // `IN (...)`).
-    const symptomsByLog = symptomsForLogs(database, rows.map((row) => row.id));
-    const feelingsByLog = feelingsForLogs(database, rows.map((row) => row.id));
-    res.json({ data: rows.map((row) => {
-      // Vier Felder sind hart privat: unabhängig von `visibility` nur für den
-      // Eigentümer selbst sichtbar, auch wenn diese Zeile familienweit geteilt
-      // ist - siehe Migration 210's Kommentar und docs/SPEC.md. Sex-Leben
-      // (intimacy), Zyklusmonitor-Testergebnisse (lh_test, pregnancy_test) und
-      // Zervixschleim (cervix_mucus) sind Dinge, die man teilt, indem man sie
-      // ausdruecklich TEILT - nicht als Nebenwirkung davon, dass der restliche
-      // Tag family-sichtbar ist.
-      const { intimacy, cervix_mucus, lh_test, pregnancy_test, ...rest } = row;
-      return {
-        ...rest,
-        symptoms: symptomsByLog.get(row.id),
-        feelings: feelingsByLog.get(row.id),
-        ...(row.user_id === viewer ? { intimacy, cervix_mucus, lh_test, pregnancy_test } : {}),
-      };
-    }) });
-  } catch (err) {
-    log.error('Error listing cycle logs:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  const viewer   = viewerId(req);
+  const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
+  const clause   = visibilityClause('l', viewer, personId);
+  const params   = [...clause.params];
+  let sql = `SELECT l.* FROM cycle_day_logs l WHERE ${clause.sql}`;
+  if (req.query.from) { sql += ' AND l.log_date >= ?'; params.push(String(req.query.from)); }
+  if (req.query.to)   { sql += ' AND l.log_date <= ?'; params.push(String(req.query.to)); }
+  sql += ' ORDER BY l.log_date DESC, l.id DESC';
+  const database = db.get();
+  const rows = database.prepare(sql).all(...params);
+  // `symptoms`/`feelings` kommen aus je einer eigenen Tabelle (Migration 178
+  // bzw. 211), nicht mehr aus den (nur noch historischen) Skalar-Spalten -
+  // `SELECT l.*` liefert die alten Spalten zwar mit, der Überschreib unten
+  // ersetzt `symptoms` in der Antwort und ergänzt `feelings`; `mood` bleibt
+  // als reiner Altlast-Lesewert stehen (siehe Migration 211). Batch statt
+  // einer Abfrage je Zeile (symptomsForLogs()/feelingsForLogs(), je ein
+  // `IN (...)`).
+  const symptomsByLog = symptomsForLogs(database, rows.map((row) => row.id));
+  const feelingsByLog = feelingsForLogs(database, rows.map((row) => row.id));
+  res.json({ data: rows.map((row) => {
+    // Vier Felder sind hart privat: unabhängig von `visibility` nur für den
+    // Eigentümer selbst sichtbar, auch wenn diese Zeile familienweit geteilt
+    // ist - siehe Migration 210's Kommentar und docs/SPEC.md. Sex-Leben
+    // (intimacy), Zyklusmonitor-Testergebnisse (lh_test, pregnancy_test) und
+    // Zervixschleim (cervix_mucus) sind Dinge, die man teilt, indem man sie
+    // ausdruecklich TEILT - nicht als Nebenwirkung davon, dass der restliche
+    // Tag family-sichtbar ist.
+    const { intimacy, cervix_mucus, lh_test, pregnancy_test, ...rest } = row;
+    return {
+      ...rest,
+      symptoms: symptomsByLog.get(row.id),
+      feelings: feelingsByLog.get(row.id),
+      ...(row.user_id === viewer ? { intimacy, cervix_mucus, lh_test, pregnancy_test } : {}),
+    };
+  }) });
 });
 
 // POST /cycle/logs  (Upsert: ein Eintrag je user_id + log_date)
 router.post('/cycle/logs', validateRequest(), (req, res) => {
+  const viewer = viewerId(req);
+  const b = req.body || {};
+  const logDate       = v.date(b.log_date, 'log_date', true);
+  const note          = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
+  const symptoms      = normalizeSymptomEntries(b.symptoms);
+  const basalTemp     = validateBasalTemp(b.basal_temp, b.basal_temp_unit);
+  const cervixMucus   = v.oneOf(b.cervix_mucus, CERVIX_MUCUS_VALUES, 'cervix_mucus');
+  const lhTest        = v.oneOf(b.lh_test, TEST_RESULT_VALUES, 'lh_test');
+  const pregnancyTest = v.oneOf(b.pregnancy_test, TEST_RESULT_VALUES, 'pregnancy_test');
+  const intimacy      = v.oneOf(b.intimacy, INTIMACY_VALUES, 'intimacy');
+  // Legacy `mood` (Einzelwert) wird, wenn `feelings` fehlt, als
+  // Ein-Element-Liste behandelt - siehe normalizeFeelings(). Die
+  // `mood`-Spalte selbst wird nur dann aktiv auf NULL gesetzt (und die
+  // Gefuehls-Zeilen nur dann ersetzt), wenn der Request `feelings` oder das
+  // alte Einzelfeld `mood` ueberhaupt als Schluessel enthaelt - also einen
+  // dieser beiden Werte tatsaechlich ersetzen will. Ein Save, der nur Flow,
+  // Notiz oder Temperatur aendert und keinen der beiden Schluessel mitschickt,
+  // darf einen eingefrorenen Altwert in `mood` nicht zerstoeren (siehe
+  // Review: sonst loescht JEDE unbeteiligte Aenderung an einem Tag mit
+  // vor-migriertem Freitext-Mood diesen dauerhaft). `feelings: []` bleibt
+  // dabei weiterhin massgeblich zum Leeren - der Schluessel ist ja vorhanden,
+  // nur sein Wert ist leer (siehe normalizeFeelings()).
+  const feelingsProvided = Object.prototype.hasOwnProperty.call(b, 'feelings')
+    || Object.prototype.hasOwnProperty.call(b, 'mood');
+  const feelings = feelingsProvided ? normalizeFeelings(b.feelings, b.mood) : null;
+
+  // flow aus FLOW_VALUES, `""` oder null (nicht angegeben), visibility
+  // `private`/`family` oder null: das Schema (#2810).
+  const errors = v.collectErrors([logDate, note, cervixMucus, lhTest, pregnancyTest, intimacy]);
+  if (symptoms.length > MAX_SYMPTOMS_COUNT) errors.push(`symptoms may include at most ${MAX_SYMPTOMS_COUNT} entries.`);
+  if (basalTemp.error) errors.push(basalTemp.error);
+  if (errors.length) return badRequest(res, errors);
+
+  const database = db.get();
+  // Log-Zeile, ihre Symptome und ihre Gefühle zusammen, sonst könnte ein
+  // Absturz dazwischen eine Teilmenge ohne die andere zurücklassen.
+  const dayLogId = database.transaction(() => {
+    database.prepare(`
+      INSERT INTO cycle_day_logs (
+        user_id, log_date, flow, note, visibility, basal_temp, basal_temp_unit,
+        cervix_mucus, lh_test, pregnancy_test, intimacy, mood
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      ON CONFLICT(user_id, log_date) DO UPDATE SET
+        flow = excluded.flow, note = excluded.note, visibility = excluded.visibility,
+        basal_temp = excluded.basal_temp, basal_temp_unit = excluded.basal_temp_unit,
+        cervix_mucus = excluded.cervix_mucus, lh_test = excluded.lh_test,
+        pregnancy_test = excluded.pregnancy_test, intimacy = excluded.intimacy
+        ${feelingsProvided ? ', mood = NULL' : ''}
+    `).run(
+      viewer, logDate.value, b.flow || null, note.value, b.visibility || 'private',
+      basalTemp.temp, basalTemp.unit,
+      cervixMucus.value, lhTest.value, pregnancyTest.value, intimacy.value,
+    );
+    const id = database.prepare('SELECT id FROM cycle_day_logs WHERE user_id = ? AND log_date = ?').get(viewer, logDate.value).id;
+    replaceSymptoms(database, id, symptoms);
+    if (feelings) replaceFeelings(database, id, feelings);
+    return id;
+  })();
+
+  // Sofort wirksam statt erst beim naechsten periodischen Lauf: der
+  // taegliche Eintrags-Hinweis (syncLogNudgeReminder) faellt weg, sobald
+  // fuer heute ein Log existiert - ohne diesen Aufruf bliebe er bis zum
+  // naechsten Sync-Durchgang stehen, obwohl die Frage schon beantwortet ist.
   try {
-    const viewer = viewerId(req);
-    const b = req.body || {};
-    const logDate       = v.date(b.log_date, 'log_date', true);
-    const flow          = v.oneOf(b.flow, [...FLOW_VALUES], 'flow');
-    const note          = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
-    const visibility    = v.oneOf(b.visibility, VISIBILITIES, 'visibility');
-    const symptoms      = normalizeSymptomEntries(b.symptoms);
-    const basalTemp     = validateBasalTemp(b.basal_temp, b.basal_temp_unit);
-    const cervixMucus   = v.oneOf(b.cervix_mucus, CERVIX_MUCUS_VALUES, 'cervix_mucus');
-    const lhTest        = v.oneOf(b.lh_test, TEST_RESULT_VALUES, 'lh_test');
-    const pregnancyTest = v.oneOf(b.pregnancy_test, TEST_RESULT_VALUES, 'pregnancy_test');
-    const intimacy      = v.oneOf(b.intimacy, INTIMACY_VALUES, 'intimacy');
-    // Legacy `mood` (Einzelwert) wird, wenn `feelings` fehlt, als
-    // Ein-Element-Liste behandelt - siehe normalizeFeelings(). Die
-    // `mood`-Spalte selbst wird nur dann aktiv auf NULL gesetzt (und die
-    // Gefuehls-Zeilen nur dann ersetzt), wenn der Request `feelings` oder das
-    // alte Einzelfeld `mood` ueberhaupt als Schluessel enthaelt - also einen
-    // dieser beiden Werte tatsaechlich ersetzen will. Ein Save, der nur Flow,
-    // Notiz oder Temperatur aendert und keinen der beiden Schluessel mitschickt,
-    // darf einen eingefrorenen Altwert in `mood` nicht zerstoeren (siehe
-    // Review: sonst loescht JEDE unbeteiligte Aenderung an einem Tag mit
-    // vor-migriertem Freitext-Mood diesen dauerhaft). `feelings: []` bleibt
-    // dabei weiterhin massgeblich zum Leeren - der Schluessel ist ja vorhanden,
-    // nur sein Wert ist leer (siehe normalizeFeelings()).
-    const feelingsProvided = Object.prototype.hasOwnProperty.call(b, 'feelings')
-      || Object.prototype.hasOwnProperty.call(b, 'mood');
-    const feelings = feelingsProvided
-      ? normalizeFeelings(b.feelings, b.mood)
-      : { keys: null, error: null };
-
-    const errors = v.collectErrors([logDate, flow, note, visibility, cervixMucus, lhTest, pregnancyTest, intimacy]);
-    if (symptoms.length > MAX_SYMPTOMS_COUNT) errors.push(`symptoms may include at most ${MAX_SYMPTOMS_COUNT} entries.`);
-    if (basalTemp.error) errors.push(basalTemp.error);
-    if (feelings.error) errors.push(feelings.error);
-    if (errors.length) return badRequest(res, errors);
-
-    const database = db.get();
-    // Log-Zeile, ihre Symptome und ihre Gefühle zusammen, sonst könnte ein
-    // Absturz dazwischen eine Teilmenge ohne die andere zurücklassen.
-    const dayLogId = database.transaction(() => {
-      database.prepare(`
-        INSERT INTO cycle_day_logs (
-          user_id, log_date, flow, note, visibility, basal_temp, basal_temp_unit,
-          cervix_mucus, lh_test, pregnancy_test, intimacy, mood
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-        ON CONFLICT(user_id, log_date) DO UPDATE SET
-          flow = excluded.flow, note = excluded.note, visibility = excluded.visibility,
-          basal_temp = excluded.basal_temp, basal_temp_unit = excluded.basal_temp_unit,
-          cervix_mucus = excluded.cervix_mucus, lh_test = excluded.lh_test,
-          pregnancy_test = excluded.pregnancy_test, intimacy = excluded.intimacy
-          ${feelingsProvided ? ', mood = NULL' : ''}
-      `).run(
-        viewer, logDate.value, flow.value, note.value, visibility.value || 'private',
-        basalTemp.temp, basalTemp.unit,
-        cervixMucus.value, lhTest.value, pregnancyTest.value, intimacy.value,
-      );
-      const id = database.prepare('SELECT id FROM cycle_day_logs WHERE user_id = ? AND log_date = ?').get(viewer, logDate.value).id;
-      replaceSymptoms(database, id, symptoms);
-      if (feelingsProvided) replaceFeelings(database, id, feelings.keys);
-      return id;
-    })();
-
-    // Sofort wirksam statt erst beim naechsten periodischen Lauf: der
-    // taegliche Eintrags-Hinweis (syncLogNudgeReminder) faellt weg, sobald
-    // fuer heute ein Log existiert - ohne diesen Aufruf bliebe er bis zum
-    // naechsten Sync-Durchgang stehen, obwohl die Frage schon beantwortet ist.
-    try {
-      syncCycleRemindersForUser(database, viewer);
-    } catch (err) {
-      log.error('Error syncing cycle reminders after log change:', err.message);
-    }
-
-    const row = database.prepare('SELECT * FROM cycle_day_logs WHERE id = ?').get(dayLogId);
-    // POST ist immer der eigene Eintrag des Aufrufers (der Zyklus-Tab kennt
-    // keine Betreuung, siehe Datei-Kopfkommentar) - `intimacy` braucht hier
-    // deshalb keinen Eigentümer-Check wie bei GET.
-    res.status(201).json({
-      data: { ...row, symptoms: symptomsForLog(database, dayLogId), feelings: feelingsForLog(database, dayLogId) },
-    });
+    syncCycleRemindersForUser(database, viewer);
   } catch (err) {
-    log.error('Error saving cycle log:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    log.error('Error syncing cycle reminders after log change:', err.message);
   }
+
+  const row = database.prepare('SELECT * FROM cycle_day_logs WHERE id = ?').get(dayLogId);
+  // POST ist immer der eigene Eintrag des Aufrufers (der Zyklus-Tab kennt
+  // keine Betreuung, siehe Datei-Kopfkommentar) - `intimacy` braucht hier
+  // deshalb keinen Eigentümer-Check wie bei GET.
+  res.status(201).json({
+    data: { ...row, symptoms: symptomsForLog(database, dayLogId), feelings: feelingsForLog(database, dayLogId) },
+  });
 });
 
 // DELETE /cycle/logs/:id
 router.delete('/cycle/logs/:id', validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+  const viewer = viewerId(req);
+  const id = pathId(req);
+  if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
-    const existing = db.get().prepare('SELECT id FROM cycle_day_logs WHERE id = ? AND user_id = ?').get(id, viewer);
-    if (!existing) return res.status(404).json({ error: 'Day entry not found.', code: 404, reason: 'health_cycle_log_not_found' });
+  const existing = db.get().prepare('SELECT id FROM cycle_day_logs WHERE id = ? AND user_id = ?').get(id, viewer);
+  if (!existing) return res.status(404).json({ error: 'Day entry not found.', code: 404, reason: 'health_cycle_log_not_found' });
 
-    db.get().prepare('DELETE FROM cycle_day_logs WHERE id = ?').run(id);
-    res.status(204).end();
-  } catch (err) {
-    log.error('Error deleting cycle log:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  db.get().prepare('DELETE FROM cycle_day_logs WHERE id = ?').run(id);
+  res.status(204).end();
 });
 
 // ---- Einstellungen (nur eigene) ----
@@ -478,145 +430,118 @@ function defaultCycleSettings(userId) {
 // EINE Regel statt einer zweiten Abschrift). Ohne dieses Feld muesste das
 // Frontend raten, wer eine Meldung tatsaechlich bekaeme.
 router.get('/cycle/settings', validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const database = db.get();
-    const row = database.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer);
-    res.json({ data: { ...(row || defaultCycleSettings(viewer)), eligible_partners: eligibleCyclePartners(database, viewer) } });
-  } catch (err) {
-    log.error('Error loading cycle settings:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  const viewer = viewerId(req);
+  const database = db.get();
+  const row = database.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer);
+  res.json({ data: { ...(row || defaultCycleSettings(viewer)), eligible_partners: eligibleCyclePartners(database, viewer) } });
 });
 
 // PUT /cycle/settings
 router.put('/cycle/settings', validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const b = req.body || {};
+  const viewer = viewerId(req);
+  const b = req.body || {};
 
-    const intInRange = (val, field, lo, hi) => {
-      if (val === undefined || val === null || val === '') return { value: null, error: null };
-      const n = Number(val);
-      if (!Number.isInteger(n) || n < lo || n > hi) return { value: null, error: `${field} must be an integer between ${lo} and ${hi}.` };
-      return { value: n, error: null };
-    };
-    // Die Bereiche stehen in CYCLE_SETTING_RANGES (health-fields.js), eine
-    // Quelle mit dem OpenAPI-Dokument (#2810).
-    const ranged = (/** @type {string} */ field) => intInRange(b[field], field, CYCLE_SETTING_RANGES[field][0], CYCLE_SETTING_RANGES[field][1]);
-    const cycleLen  = ranged('cycle_length_avg');
-    const periodLen = ranged('period_length_avg');
-    const luteal    = ranged('luteal_length');
-    const track     = toBit(b.track_fertility);
-    const pregnancy = toBit(b.pregnancy_mode);
-    const dueDate   = v.date(b.pregnancy_due_date, 'pregnancy_due_date');
-    const defVis    = v.oneOf(b.default_visibility, VISIBILITIES, 'default_visibility');
-    // NULL = aus (Standard); sonst der Vorlauf in Tagen vor dem vorhergesagten
-    // Periodenbeginn. Obergrenze wie luteal_length: mehr Vorlauf als eine
-    // typische Lutealphase waere keine Vorwarnung mehr, sondern Dauerlaerm.
-    const remindDaysBefore = ranged('remind_period_days_before');
-    const remindLogDaily   = toBit(b.remind_log_daily);
-    const contraception    = v.oneOf(b.contraception, CONTRACEPTION_VALUES, 'contraception');
-    const perimenopause    = toBit(b.perimenopause_mode);
-    const showPms          = toBit(b.show_pms);
-    const partnerDaysBefore = ranged('notify_partner_days_before');
+  // Die Bereiche (ganze Zahlen aus CYCLE_SETTING_RANGES, health-fields.js, oder
+  // null), die Schalter (true/false, 1/0) und default_visibility prueft das
+  // Schema vor der Route (#2810). Fehlt ein Wert, gilt sein Standard: das ist
+  // die Voll-Ersetzen-Semantik dieser Route.
+  // remind_period_days_before: NULL = aus (Standard); sonst der Vorlauf in
+  // Tagen vor dem vorhergesagten Periodenbeginn. Obergrenze wie luteal_length:
+  // mehr Vorlauf als eine typische Lutealphase waere keine Vorwarnung mehr,
+  // sondern Dauerlaerm.
+  const track     = toBit(b.track_fertility);
+  const pregnancy = toBit(b.pregnancy_mode);
+  const dueDate   = v.date(b.pregnancy_due_date, 'pregnancy_due_date');
+  const remindLogDaily   = toBit(b.remind_log_daily);
+  const contraception    = v.oneOf(b.contraception, CONTRACEPTION_VALUES, 'contraception');
+  const perimenopause    = toBit(b.perimenopause_mode);
+  const showPms          = toBit(b.show_pms);
 
-    // notify_partner_user_id: muss in der eligible_partners-Menge stehen, die
-    // GET /cycle/settings dem Frontend liefert - derselbe Praedikat
-    // (isEligibleCyclePartner(), cycle-reminders.js), damit die Route niemanden
-    // annimmt, den die Auswahlliste gar nicht erst zeigt. Darf ausserdem nicht
-    // die aufrufende Person selbst sein: der Eigentuemer veroeffentlicht, eine
-    // Benachrichtigung an sich selbst waere sinnlos. Leer/undefined loescht -
-    // gleiche Voll-Ersetzen-Semantik wie jedes andere Feld dieser Route.
-    let notifyPartnerUserId = null;
-    let notifyPartnerError = null;
-    if (b.notify_partner_user_id !== undefined && b.notify_partner_user_id !== null && b.notify_partner_user_id !== '') {
-      // Striktes Parsen wie intInRange() oben statt parseInt(): parseInt('12abc', 10)
-      // liest still den führenden Ziffernteil und liefert 12 zurück, statt den
-      // Wert als Ganzes abzulehnen - ein vertipptes/manipuliertes Feld würde so
-      // stillschweigend auf eine andere, zufällig gültige Person zeigen.
-      const n = Number(b.notify_partner_user_id);
-      const candidate = Number.isInteger(n) ? n : NaN;
-      if (!candidate) {
-        notifyPartnerError = 'notify_partner_user_id must be a valid user id.';
-      } else if (candidate === viewer) {
-        notifyPartnerError = 'notify_partner_user_id must not be the caller themselves.';
-      } else if (!isEligibleCyclePartner(db.get(), candidate)) {
-        notifyPartnerError = 'notify_partner_user_id must be an eligible household member (health module access, not a child).';
-      } else {
-        notifyPartnerUserId = candidate;
-      }
+  // notify_partner_user_id: muss in der eligible_partners-Menge stehen, die
+  // GET /cycle/settings dem Frontend liefert - derselbe Praedikat
+  // (isEligibleCyclePartner(), cycle-reminders.js), damit die Route niemanden
+  // annimmt, den die Auswahlliste gar nicht erst zeigt. Darf ausserdem nicht
+  // die aufrufende Person selbst sein: der Eigentuemer veroeffentlicht, eine
+  // Benachrichtigung an sich selbst waere sinnlos. Leer/undefined loescht -
+  // gleiche Voll-Ersetzen-Semantik wie jedes andere Feld dieser Route.
+  let notifyPartnerUserId = null;
+  let notifyPartnerError = null;
+  if (b.notify_partner_user_id !== undefined && b.notify_partner_user_id !== null && b.notify_partner_user_id !== '') {
+    // Striktes Parsen wie intInRange() oben statt parseInt(): parseInt('12abc', 10)
+    // liest still den führenden Ziffernteil und liefert 12 zurück, statt den
+    // Wert als Ganzes abzulehnen - ein vertipptes/manipuliertes Feld würde so
+    // stillschweigend auf eine andere, zufällig gültige Person zeigen.
+    const n = Number(b.notify_partner_user_id);
+    const candidate = Number.isInteger(n) ? n : NaN;
+    if (!candidate) {
+      notifyPartnerError = 'notify_partner_user_id must be a valid user id.';
+    } else if (candidate === viewer) {
+      notifyPartnerError = 'notify_partner_user_id must not be the caller themselves.';
+    } else if (!isEligibleCyclePartner(db.get(), candidate)) {
+      notifyPartnerError = 'notify_partner_user_id must be an eligible household member (health module access, not a child).';
+    } else {
+      notifyPartnerUserId = candidate;
     }
-
-    const errors = v.collectErrors([
-      cycleLen, periodLen, luteal, dueDate, defVis, remindDaysBefore, contraception, partnerDaysBefore,
-    ]);
-    if (b.track_fertility !== undefined && track === undefined) errors.push('track_fertility must be a boolean.');
-    if (b.pregnancy_mode !== undefined && pregnancy === undefined) errors.push('pregnancy_mode must be a boolean.');
-    if (b.remind_log_daily !== undefined && remindLogDaily === undefined) errors.push('remind_log_daily must be a boolean.');
-    if (b.perimenopause_mode !== undefined && perimenopause === undefined) errors.push('perimenopause_mode must be a boolean.');
-    if (b.show_pms !== undefined && showPms === undefined) errors.push('show_pms must be a boolean.');
-    if (notifyPartnerError) errors.push(notifyPartnerError);
-    if (errors.length) return badRequest(res, errors);
-
-    db.get().prepare(`
-      INSERT INTO cycle_settings (
-        user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility, pregnancy_mode,
-        pregnancy_due_date, default_visibility, remind_period_days_before, remind_log_daily,
-        contraception, perimenopause_mode, show_pms, notify_partner_user_id, notify_partner_days_before
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET
-        cycle_length_avg = excluded.cycle_length_avg,
-        period_length_avg = excluded.period_length_avg,
-        luteal_length = excluded.luteal_length,
-        track_fertility = excluded.track_fertility,
-        pregnancy_mode = excluded.pregnancy_mode,
-        pregnancy_due_date = excluded.pregnancy_due_date,
-        default_visibility = excluded.default_visibility,
-        remind_period_days_before = excluded.remind_period_days_before,
-        remind_log_daily = excluded.remind_log_daily,
-        contraception = excluded.contraception,
-        perimenopause_mode = excluded.perimenopause_mode,
-        show_pms = excluded.show_pms,
-        notify_partner_user_id = excluded.notify_partner_user_id,
-        notify_partner_days_before = excluded.notify_partner_days_before
-    `).run(viewer, cycleLen.value, periodLen.value, luteal.value === null ? 14 : luteal.value,
-           track === undefined ? 1 : track,
-           pregnancy === undefined ? 0 : pregnancy,
-           dueDate.value,
-           defVis.value || 'private',
-           remindDaysBefore.value,
-           remindLogDaily === undefined ? 0 : remindLogDaily,
-           contraception.value,
-           perimenopause === undefined ? 0 : perimenopause,
-           showPms === undefined ? 1 : showPms,
-           notifyPartnerUserId,
-           partnerDaysBefore.value);
-
-    // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
-    // Erwartung wie ueberall sonst (server/routes/schedule-preferences.js).
-    try {
-      syncCycleRemindersForUser(db.get(), viewer);
-    } catch (err) {
-      log.error('Error syncing cycle reminders after settings change:', err.message);
-    }
-
-    // eligible_partners auch hier mitschicken (gleiche Hilfsfunktion wie GET) -
-    // sonst baut das Frontend nach diesem Save die Partner-Auswahl aus einer
-    // leeren Liste neu auf und der naechste Save wuerde einen echten Partner
-    // stillschweigend loeschen.
-    const database = db.get();
-    res.json({
-      data: {
-        ...database.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer),
-        eligible_partners: eligibleCyclePartners(database, viewer),
-      },
-    });
-  } catch (err) {
-    log.error('Error saving cycle settings:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
   }
+
+  const errors = v.collectErrors([dueDate, contraception]);
+  if (notifyPartnerError) errors.push(notifyPartnerError);
+  if (errors.length) return badRequest(res, errors);
+
+  db.get().prepare(`
+    INSERT INTO cycle_settings (
+      user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility, pregnancy_mode,
+      pregnancy_due_date, default_visibility, remind_period_days_before, remind_log_daily,
+      contraception, perimenopause_mode, show_pms, notify_partner_user_id, notify_partner_days_before
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      cycle_length_avg = excluded.cycle_length_avg,
+      period_length_avg = excluded.period_length_avg,
+      luteal_length = excluded.luteal_length,
+      track_fertility = excluded.track_fertility,
+      pregnancy_mode = excluded.pregnancy_mode,
+      pregnancy_due_date = excluded.pregnancy_due_date,
+      default_visibility = excluded.default_visibility,
+      remind_period_days_before = excluded.remind_period_days_before,
+      remind_log_daily = excluded.remind_log_daily,
+      contraception = excluded.contraception,
+      perimenopause_mode = excluded.perimenopause_mode,
+      show_pms = excluded.show_pms,
+      notify_partner_user_id = excluded.notify_partner_user_id,
+      notify_partner_days_before = excluded.notify_partner_days_before
+  `).run(viewer, b.cycle_length_avg ?? null, b.period_length_avg ?? null, b.luteal_length ?? 14,
+         track === undefined ? 1 : track,
+         pregnancy === undefined ? 0 : pregnancy,
+         dueDate.value,
+         b.default_visibility || 'private',
+         b.remind_period_days_before ?? null,
+         remindLogDaily === undefined ? 0 : remindLogDaily,
+         contraception.value,
+         perimenopause === undefined ? 0 : perimenopause,
+         showPms === undefined ? 1 : showPms,
+         notifyPartnerUserId,
+         b.notify_partner_days_before ?? null);
+
+  // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
+  // Erwartung wie ueberall sonst (server/routes/schedule-preferences.js).
+  try {
+    syncCycleRemindersForUser(db.get(), viewer);
+  } catch (err) {
+    log.error('Error syncing cycle reminders after settings change:', err.message);
+  }
+
+  // eligible_partners auch hier mitschicken (gleiche Hilfsfunktion wie GET) -
+  // sonst baut das Frontend nach diesem Save die Partner-Auswahl aus einer
+  // leeren Liste neu auf und der naechste Save wuerde einen echten Partner
+  // stillschweigend loeschen.
+  const database = db.get();
+  res.json({
+    data: {
+      ...database.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer),
+      eligible_partners: eligibleCyclePartners(database, viewer),
+    },
+  });
 });
 
 // PATCH /cycle/visibility  — Bulk: setzt ALLE eigenen Zyklus-Einträge (Perioden +
@@ -624,43 +549,33 @@ router.put('/cycle/settings', validateRequest(), (req, res) => {
 // fremde Einträge bleiben unberührt. Ein Transaktions-Wrapper hält Perioden und
 // Logs konsistent (entweder beide oder keine).
 router.patch('/cycle/visibility', validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const vis = v.oneOf(req.body?.visibility, VISIBILITIES, 'visibility');
-    if (vis.error || !vis.value) return badRequest(res, [vis.error || 'visibility is required.']);
+  const viewer = viewerId(req);
+  // Pflicht, `private` oder `family`: das Schema (#2810).
+  const visibility = req.body.visibility;
 
-    const database = db.get();
-    const applyBulk = database.transaction((value) => {
-      const p = database.prepare('UPDATE cycle_periods  SET visibility = ? WHERE user_id = ?').run(value, viewer);
-      const l = database.prepare('UPDATE cycle_day_logs SET visibility = ? WHERE user_id = ?').run(value, viewer);
-      return { periods: p.changes, logs: l.changes };
-    });
-    res.json({ data: applyBulk(vis.value) });
-  } catch (err) {
-    log.error('Error bulk-updating cycle visibility:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  const database = db.get();
+  const applyBulk = database.transaction((value) => {
+    const p = database.prepare('UPDATE cycle_periods  SET visibility = ? WHERE user_id = ?').run(value, viewer);
+    const l = database.prepare('UPDATE cycle_day_logs SET visibility = ? WHERE user_id = ?').run(value, viewer);
+    return { periods: p.changes, logs: l.changes };
+  });
+  res.json({ data: applyBulk(visibility) });
 });
 
 // GET /export/cycle?user_id=&from=&to=  (Perioden-Historie als CSV, chronologisch)
 router.get('/export/cycle', validateRequest(), (req, res) => {
-  try {
-    const viewer   = viewerId(req);
-    const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
-    const clause   = visibilityClause('p', viewer, personId);
-    const { from, to } = exportRange(req);
-    const params = [...clause.params];
-    let sql = `SELECT p.* FROM cycle_periods p WHERE ${clause.sql}`;
-    if (from) { sql += ' AND p.start_date >= ?'; params.push(from); }
-    if (to)   { sql += ' AND p.start_date <= ?'; params.push(to); }
-    sql += ' ORDER BY p.start_date ASC, p.id ASC';
+  const viewer   = viewerId(req);
+  const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : null;
+  const clause   = visibilityClause('p', viewer, personId);
+  const { from, to } = exportRange(req);
+  const params = [...clause.params];
+  let sql = `SELECT p.* FROM cycle_periods p WHERE ${clause.sql}`;
+  if (from) { sql += ' AND p.start_date >= ?'; params.push(from); }
+  if (to)   { sql += ' AND p.start_date <= ?'; params.push(to); }
+  sql += ' ORDER BY p.start_date ASC, p.id ASC';
 
-    const rows = db.get().prepare(sql).all(...params);
-    sendCsv(res, exportFilename('cycle', from, to), cycleToCsv(rows));
-  } catch (err) {
-    log.error('Error exporting cycle:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  const rows = db.get().prepare(sql).all(...params);
+  sendCsv(res, exportFilename('cycle', from, to), cycleToCsv(rows));
 });
 
 // ---- Perioden-Historie-Import ----
@@ -742,131 +657,127 @@ function normalizeImportDate(raw) {
 // calendar/subscriptions.js): entweder der Nutzer bekommt genau das, was die
 // Datei versprach, oder gar nichts, nie eine stille Teilmenge.
 router.post('/cycle/import', validateRequest(), (req, res) => {
-  try {
-    const viewer = viewerId(req);
-    const csv = req.body?.csv;
-    if (typeof csv !== 'string' || !csv.trim()) {
-      return badRequest(res, ['csv is required.']);
-    }
-    if (Buffer.byteLength(csv, 'utf8') > IMPORT_MAX_BYTES) {
-      // Was ein Nutzer mit seiner Datei erreicht, nennt seinen Fall (#1909),
-      // die Grenze steht als Zahl in `params` - den Satz baut die App.
-      return res.status(400).json({
-        error: `csv must be at most ${IMPORT_MAX_BYTES} bytes.`, code: 400,
-        reason: 'health_cycle_import_too_large', params: { limit_kb: IMPORT_MAX_BYTES / 1024 },
-      });
-    }
-
-    const lines = csv.split(/\r\n|\r|\n/).filter((line) => line.trim() !== '');
-    if (!lines.length) return badRequest(res, ['csv contains no rows.']);
-
-    const delimiter = detectCsvDelimiter(lines[0]);
-    // Kopfzeilen-tolerant: eine erste Zelle "start_date" (Gross-/Kleinschreibung
-    // egal) wird als Kopfzeile erkannt und uebersprungen - der eigene Export
-    // (CYCLE_HEADER) traegt genau diesen Namen an erster Stelle.
-    const firstCells = splitCsvLine(lines[0], delimiter);
-    const hasHeader = String(firstCells[0] || '').toLowerCase() === 'start_date';
-    const dataLines = hasHeader ? lines.slice(1) : lines;
-
-    if (!dataLines.length) {
-      return res.status(400).json({ error: 'csv contains no data rows.', code: 400, reason: 'health_cycle_import_no_rows' });
-    }
-    if (dataLines.length > IMPORT_MAX_ROWS) {
-      return res.status(400).json({
-        error: `csv may contain at most ${IMPORT_MAX_ROWS} data rows.`, code: 400,
-        reason: 'health_cycle_import_too_many_rows', params: { limit: IMPORT_MAX_ROWS },
-      });
-    }
-
-    const parsedRows = [];
-    const rowErrors = [];
-    dataLines.forEach((line, i) => {
-      const rowNum = i + 1;
-      const cells = splitCsvLine(line, delimiter);
-      const rawStart = cells[0];
-      const rawEnd = cells[1];
-
-      const startDate = normalizeImportDate(rawStart);
-      if (!startDate) {
-        rowErrors.push(`Row ${rowNum}: start_date "${rawStart || ''}" is not a valid date (expected YYYY-MM-DD or DD.MM.YYYY).`);
-        return;
-      }
-      // v.date() prueft zusaetzlich Kalendergueltigkeit (kein 2026-02-30) -
-      // dieselbe Pruefung wie POST /cycle/periods, kein zweiter Massstab hier.
-      if (v.date(startDate, 'start_date', true).error) {
-        rowErrors.push(`Row ${rowNum}: start_date "${rawStart}" is not a valid calendar date.`);
-        return;
-      }
-
-      let endDate = null;
-      if (rawEnd && String(rawEnd).trim()) {
-        endDate = normalizeImportDate(rawEnd);
-        if (!endDate || v.date(endDate, 'end_date').error) {
-          rowErrors.push(`Row ${rowNum}: end_date "${rawEnd}" is not a valid date (expected YYYY-MM-DD or DD.MM.YYYY).`);
-          return;
-        }
-        if (endDate < startDate) {
-          rowErrors.push(`Row ${rowNum}: end_date must not be before start_date.`);
-          return;
-        }
-      }
-
-      parsedRows.push({ startDate, endDate });
-    });
-
-    if (rowErrors.length) {
-      return res.status(400).json({
-        error: 'CSV contains invalid rows; nothing was imported.',
-        code: 400,
-        errors: rowErrors.slice(0, IMPORT_MAX_ERRORS),
-      });
-    }
-
-    const database = db.get();
-    const cycleSettingsRow = database.prepare('SELECT default_visibility FROM cycle_settings WHERE user_id = ?').get(viewer);
-    const visibility = cycleSettingsRow?.default_visibility || 'private';
-
-    // Duplikat-Regel: eine Zeile, deren start_date einer bereits vorhandenen
-    // Periode DIESES Nutzers entspricht, wird ÜBERSPRUNGEN (gezählt), nicht
-    // als Fehler behandelt - Ueberlappungen darueber hinaus sind erlaubt
-    // (weiche Warnung, keine Ablehnung; dieselbe Haltung wie beim manuellen
-    // Eintragen, das Ueberlappungen ebenfalls nicht prueft). Zwei Zeilen der
-    // Importdatei mit demselben start_date treffen dieselbe Regel: die erste
-    // zaehlt, jede weitere gilt als "schon vorhanden" und wird ebenfalls
-    // uebersprungen.
-    const { imported, skipped } = database.transaction(() => {
-      const existingStarts = new Set(
-        database.prepare('SELECT start_date FROM cycle_periods WHERE user_id = ?').all(viewer).map((r) => r.start_date)
-      );
-      const insert = database.prepare(
-        'INSERT INTO cycle_periods (user_id, start_date, end_date, visibility) VALUES (?, ?, ?, ?)'
-      );
-      let importedCount = 0;
-      let skippedCount = 0;
-      for (const row of parsedRows) {
-        if (existingStarts.has(row.startDate)) { skippedCount++; continue; }
-        insert.run(viewer, row.startDate, row.endDate, visibility);
-        existingStarts.add(row.startDate);
-        importedCount++;
-      }
-      return { imported: importedCount, skipped: skippedCount };
-    })();
-
-    // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
-    // Erwartung wie nach jeder anderen Aenderung an cycle_periods in dieser
-    // Datei (POST/PATCH/DELETE oben): ein Import verschiebt predictCycle()s
-    // naechsten Periodenbeginn sofort.
-    try {
-      syncCycleRemindersForUser(database, viewer);
-    } catch (err) {
-      log.error('Error syncing cycle reminders after import:', err.message);
-    }
-
-    res.status(201).json({ data: { imported, skipped, errors: [] } });
-  } catch (err) {
-    log.error('Error importing cycle history:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  const viewer = viewerId(req);
+  // Pflicht und Text (Schema, #2810); leer bleibt die Pruefung der Route.
+  const csv = req.body.csv;
+  if (!csv.trim()) {
+    return badRequest(res, ['csv is required.']);
   }
+  if (Buffer.byteLength(csv, 'utf8') > IMPORT_MAX_BYTES) {
+    // Was ein Nutzer mit seiner Datei erreicht, nennt seinen Fall (#1909),
+    // die Grenze steht als Zahl in `params` - den Satz baut die App.
+    return res.status(400).json({
+      error: `csv must be at most ${IMPORT_MAX_BYTES} bytes.`, code: 400,
+      reason: 'health_cycle_import_too_large', params: { limit_kb: IMPORT_MAX_BYTES / 1024 },
+    });
+  }
+
+  const lines = csv.split(/\r\n|\r|\n/).filter((line) => line.trim() !== '');
+  if (!lines.length) return badRequest(res, ['csv contains no rows.']);
+
+  const delimiter = detectCsvDelimiter(lines[0]);
+  // Kopfzeilen-tolerant: eine erste Zelle "start_date" (Gross-/Kleinschreibung
+  // egal) wird als Kopfzeile erkannt und uebersprungen - der eigene Export
+  // (CYCLE_HEADER) traegt genau diesen Namen an erster Stelle.
+  const firstCells = splitCsvLine(lines[0], delimiter);
+  const hasHeader = String(firstCells[0] || '').toLowerCase() === 'start_date';
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  if (!dataLines.length) {
+    return res.status(400).json({ error: 'csv contains no data rows.', code: 400, reason: 'health_cycle_import_no_rows' });
+  }
+  if (dataLines.length > IMPORT_MAX_ROWS) {
+    return res.status(400).json({
+      error: `csv may contain at most ${IMPORT_MAX_ROWS} data rows.`, code: 400,
+      reason: 'health_cycle_import_too_many_rows', params: { limit: IMPORT_MAX_ROWS },
+    });
+  }
+
+  const parsedRows = [];
+  const rowErrors = [];
+  dataLines.forEach((line, i) => {
+    const rowNum = i + 1;
+    const cells = splitCsvLine(line, delimiter);
+    const rawStart = cells[0];
+    const rawEnd = cells[1];
+
+    const startDate = normalizeImportDate(rawStart);
+    if (!startDate) {
+      rowErrors.push(`Row ${rowNum}: start_date "${rawStart || ''}" is not a valid date (expected YYYY-MM-DD or DD.MM.YYYY).`);
+      return;
+    }
+    // v.date() prueft zusaetzlich Kalendergueltigkeit (kein 2026-02-30) -
+    // dieselbe Pruefung wie POST /cycle/periods, kein zweiter Massstab hier.
+    if (v.date(startDate, 'start_date', true).error) {
+      rowErrors.push(`Row ${rowNum}: start_date "${rawStart}" is not a valid calendar date.`);
+      return;
+    }
+
+    let endDate = null;
+    if (rawEnd && String(rawEnd).trim()) {
+      endDate = normalizeImportDate(rawEnd);
+      if (!endDate || v.date(endDate, 'end_date').error) {
+        rowErrors.push(`Row ${rowNum}: end_date "${rawEnd}" is not a valid date (expected YYYY-MM-DD or DD.MM.YYYY).`);
+        return;
+      }
+      if (endDate < startDate) {
+        rowErrors.push(`Row ${rowNum}: end_date must not be before start_date.`);
+        return;
+      }
+    }
+
+    parsedRows.push({ startDate, endDate });
+  });
+
+  if (rowErrors.length) {
+    return res.status(400).json({
+      error: 'CSV contains invalid rows; nothing was imported.',
+      code: 400,
+      errors: rowErrors.slice(0, IMPORT_MAX_ERRORS),
+    });
+  }
+
+  const database = db.get();
+  const cycleSettingsRow = database.prepare('SELECT default_visibility FROM cycle_settings WHERE user_id = ?').get(viewer);
+  const visibility = cycleSettingsRow?.default_visibility || 'private';
+
+  // Duplikat-Regel: eine Zeile, deren start_date einer bereits vorhandenen
+  // Periode DIESES Nutzers entspricht, wird ÜBERSPRUNGEN (gezählt), nicht
+  // als Fehler behandelt - Ueberlappungen darueber hinaus sind erlaubt
+  // (weiche Warnung, keine Ablehnung; dieselbe Haltung wie beim manuellen
+  // Eintragen, das Ueberlappungen ebenfalls nicht prueft). Zwei Zeilen der
+  // Importdatei mit demselben start_date treffen dieselbe Regel: die erste
+  // zaehlt, jede weitere gilt als "schon vorhanden" und wird ebenfalls
+  // uebersprungen.
+  const { imported, skipped } = database.transaction(() => {
+    const existingStarts = new Set(
+      database.prepare('SELECT start_date FROM cycle_periods WHERE user_id = ?').all(viewer).map((r) => r.start_date)
+    );
+    const insert = database.prepare(
+      'INSERT INTO cycle_periods (user_id, start_date, end_date, visibility) VALUES (?, ?, ?, ?)'
+    );
+    let importedCount = 0;
+    let skippedCount = 0;
+    for (const row of parsedRows) {
+      if (existingStarts.has(row.startDate)) { skippedCount++; continue; }
+      insert.run(viewer, row.startDate, row.endDate, visibility);
+      existingStarts.add(row.startDate);
+      importedCount++;
+    }
+    return { imported: importedCount, skipped: skippedCount };
+  })();
+
+  // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
+  // Erwartung wie nach jeder anderen Aenderung an cycle_periods in dieser
+  // Datei (POST/PATCH/DELETE oben): ein Import verschiebt predictCycle()s
+  // naechsten Periodenbeginn sofort.
+  try {
+    syncCycleRemindersForUser(database, viewer);
+  } catch (err) {
+    log.error('Error syncing cycle reminders after import:', err.message);
+  }
+
+  res.status(201).json({ data: { imported, skipped, errors: [] } });
 });
 
 export default router;

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Health answers an unexpected failure with the same sentence as the rest of the API.**
+  Vitals, medications and the dose log, lab reports, activities, the CSV exports, the cycle
+  tab, caregivers, preventive care and nutrition under `/api/v1/health` said
+  `"Internal error."` on a server-side failure; they now say `"Internal server error."` like
+  every other module. Status 500 and `code` are unchanged. Every answer that names a known
+  cause stays as it was: the fasting refusals with their `reason` (and the `current` record of
+  a conflict), an undo of a dose that is not recorded (`health_dose_pending`), the reasons of
+  the cycle import, the vital limits and units, and the refusals of care. The cycle feed,
+  fasting and the visibility defaults answered this way already.
 - **Health checks every request against the published API description.** This is about your
   own API clients; the app sends nothing that is refused now (from this release on it sends the
   type of a preventive-care record as a number). Under `/api/v1/health`, input that used to be

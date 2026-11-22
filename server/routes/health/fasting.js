@@ -7,7 +7,7 @@ import {
   getFastingHistory, getAllFastingHistory, requireFastingCapability,
 } from '../../services/fasting.js';
 import { fastingToCsv } from '../../services/fasting-export.js';
-import { viewerId, log } from './helpers.js';
+import { viewerId, pathId } from './helpers.js';
 import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
@@ -35,14 +35,18 @@ function subject(req) {
   return value === undefined ? viewerId(req) : Number(value);
 }
 
+/**
+ * The answer of a refusal of the fasting service: its status, `reason` and,
+ * for a revision or overlap conflict, the `current` record. Anything else is
+ * not a refusal and goes on to the central error handler (#2810).
+ * @param {any} res
+ * @param {unknown} error
+ */
 function sendError(res, error) {
-  if (error instanceof FastingError) {
-    const body = { error: error.message, code: error.status, reason: error.reason };
-    if (error.current !== undefined) body.current = error.current;
-    return res.status(error.status).json(body);
-  }
-  log.error('Error handling fasting request:', error?.message || error);
-  return res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (!(error instanceof FastingError)) throw error;
+  const body = { error: error.message, code: error.status, reason: error.reason };
+  if (error.current !== undefined) body.current = error.current;
+  return res.status(error.status).json(body);
 }
 
 /**
@@ -92,15 +96,15 @@ router.post('/fasting/acknowledge-safety', requireCapability, validateRequest(),
 });
 
 router.post('/fasting/:id/finish', requireCapability, validateRequest(), (req, res) => {
-  try { return res.json({ data: finishFast(db.get(), { id: viewerId(req) }, req.params.id, { expectedRevision: req.body?.expected_revision, endAt: req.body?.end_at }) }); } catch (error) { return sendError(res, error); }
+  try { return res.json({ data: finishFast(db.get(), { id: viewerId(req) }, pathId(req), { expectedRevision: req.body?.expected_revision, endAt: req.body?.end_at }) }); } catch (error) { return sendError(res, error); }
 });
 
 router.patch('/fasting/:id', requireCapability, validateRequest(), (req, res) => {
-  try { return res.json({ data: updateFast(db.get(), { id: viewerId(req) }, req.params.id, { ...input(req.body), expectedRevision: req.body?.expected_revision }) }); } catch (error) { return sendError(res, error); }
+  try { return res.json({ data: updateFast(db.get(), { id: viewerId(req) }, pathId(req), { ...input(req.body), expectedRevision: req.body?.expected_revision }) }); } catch (error) { return sendError(res, error); }
 });
 
 router.delete('/fasting/:id', requireCapability, validateRequest(), (req, res) => {
-  try { deleteFast(db.get(), { id: viewerId(req) }, req.params.id, { expectedRevision: req.body?.expected_revision ?? req.query.expected_revision }); return res.status(204).end(); } catch (error) { return sendError(res, error); }
+  try { deleteFast(db.get(), { id: viewerId(req) }, pathId(req), { expectedRevision: req.body?.expected_revision ?? req.query.expected_revision }); return res.status(204).end(); } catch (error) { return sendError(res, error); }
 });
 
 router.get('/fasting/settings', requireCapability, validateRequest(), (req, res) => {
