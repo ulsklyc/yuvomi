@@ -4927,6 +4927,8 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
       manager.addEventListener('category-manager-changed', onCategoriesChanged);
       manager.configure({
         basePath: '/shopping/categories',
+        // Die Reihenfolge als Zahlen (#2810), wie Vorrat und Inventar.
+        numericKeys: true,
         labelResolver: (item) => categoryLabel(item.name),
         titleKey: 'shopping.manageCategories',
         hintKey: 'settings.shoppingCategoriesHint',

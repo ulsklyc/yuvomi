@@ -21,8 +21,9 @@
  *          3 (housekeeping, rewards), 4 (the eight route files of waste,
  *          schedule, schedule-extras, schedule-feed, schedule-preferences),
  *          5 (split-expenses, backup, and of the core system and changelog),
- *          6 (the twelve route files of health under server/routes/health/) and
- *          7 (contacts, cardav, meals).
+ *          6 (the twelve route files of health under server/routes/health/), 7
+ *          (contacts, cardav, meals) and 8 (shopping, documents,
+ *          document-storage-google-drive, dms).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -62,12 +63,8 @@ const NOT_MIGRATED = [
   'server/routes/calendar/subscriptions.js',
   'server/routes/calendar/sync-targets.js',
   'server/routes/dashboard.js',
-  'server/routes/dms.js',
-  'server/routes/document-storage-google-drive.js',
-  'server/routes/documents.js',
   'server/routes/preferences.js',
   'server/routes/push.js',
-  'server/routes/shopping.js',
   'server/routes/subscriptions.js',
   'server/routes/tasks.js',
 ];
@@ -94,6 +91,8 @@ const MIGRATED = [
   'server/routes/health/cycle-feed.js', 'server/routes/health/caregivers.js', 'server/routes/health/visibility-defaults.js',
   'server/routes/health/fasting.js', 'server/routes/health/prevention.js', 'server/routes/health/nutrition.js',
   'server/routes/contacts.js', 'server/routes/cardav.js', 'server/routes/meals.js',
+  'server/routes/shopping.js', 'server/routes/documents.js', 'server/routes/document-storage-google-drive.js',
+  'server/routes/dms.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

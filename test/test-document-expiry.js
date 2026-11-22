@@ -26,6 +26,8 @@ process.env.TZ = 'UTC';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 
 const moduleDatabase = get();
@@ -75,6 +77,7 @@ const OTHER_MEMBER = seedUser('member');
 function createHarness({ userId = OWNER, role = 'member', authScopes = null, sessionModuleAccess = null } = {}) {
   const app = express();
   app.use(express.json());
+  app.use(defaultEmptyBody);
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
@@ -85,6 +88,8 @@ function createHarness({ userId = OWNER, role = 'member', authScopes = null, ses
   });
   app.use('/api/v1/documents', documentsRouter);
   app.use('/api/v1/reminders', remindersRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {

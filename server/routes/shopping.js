@@ -23,6 +23,7 @@ import { isHouseholdMember } from '../services/household-members.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Shopping');
 
@@ -183,7 +184,7 @@ function withListChange(listId, write) {
 // Die Laufnummern aller Listen. Statisch vor /:listId, wie /categories.
 // Response: { data: [{ list_id, version }] }
 // --------------------------------------------------------
-router.get('/versions', (_req, res) => {
+router.get('/versions', validateRequest(), (_req, res) => {
   try {
     const rows = db.get()
       .prepare('SELECT list_id, version FROM shopping_list_changes ORDER BY list_id')
@@ -200,7 +201,7 @@ router.get('/versions', (_req, res) => {
 // Alle Kategorien zurückgeben.
 // Response: { data: ShoppingCategory[] }
 // --------------------------------------------------------
-router.get('/categories', (_req, res) => {
+router.get('/categories', validateRequest(), (_req, res) => {
   try {
     res.json({ data: loadCategories() });
   } catch (err) {
@@ -215,7 +216,7 @@ router.get('/categories', (_req, res) => {
 // Body: { name }
 // Response: { data: ShoppingCategory }
 // --------------------------------------------------------
-router.post('/categories', (req, res) => {
+router.post('/categories', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -249,7 +250,7 @@ router.post('/categories', (req, res) => {
 // Body: { name }
 // Response: { data: ShoppingCategory }
 // --------------------------------------------------------
-router.put('/categories/:catId', (req, res) => {
+router.put('/categories/:catId', validateRequest(), (req, res) => {
   try {
     const cat = db.get()
       .prepare('SELECT * FROM shopping_categories WHERE id = ?')
@@ -291,7 +292,7 @@ router.put('/categories/:catId', (req, res) => {
 // Die letzte verbleibende Kategorie kann nicht gelöscht werden.
 // Response: { ok: true }
 // --------------------------------------------------------
-router.delete('/categories/:catId', (req, res) => {
+router.delete('/categories/:catId', validateRequest(), (req, res) => {
   try {
     const cat = db.get()
       .prepare('SELECT * FROM shopping_categories WHERE id = ?')
@@ -350,7 +351,7 @@ router.delete('/categories/:catId', (req, res) => {
 // Body: { order: number[] }  (Array von IDs in gewünschter Reihenfolge)
 // Response: { data: ShoppingCategory[] }
 // --------------------------------------------------------
-router.patch('/categories/reorder', (req, res) => {
+router.patch('/categories/reorder', validateRequest(), (req, res) => {
   try {
     const { order } = req.body;
     if (!Array.isArray(order) || order.length === 0)
@@ -383,7 +384,7 @@ router.patch('/categories/reorder', (req, res) => {
 // Die Adressen bleiben hier: fuer die Auswahl reicht der Name, und wer sie
 // nicht herausgibt, kann sie auch nicht versehentlich anzeigen.
 // --------------------------------------------------------
-router.get('/send-recipients', (req, res) => {
+router.get('/send-recipients', validateRequest(), (req, res) => {
   try {
     void req;
     const members = listEmailableMembers({ db: db.get() })
@@ -413,7 +414,7 @@ router.get('/send-recipients', (req, res) => {
 // eingekauften stehen oben, statt hinter allem, was zufaellig frueher im
 // Alphabet liegt.
 // --------------------------------------------------------
-router.get('/suggestions', (req, res) => {
+router.get('/suggestions', validateRequest(), (req, res) => {
   try {
     const q = (req.query.q ?? '').trim();
     if (q.length < 1) return res.json({ data: [] });
@@ -489,7 +490,7 @@ function removeShoppingPurchase(database, itemId) {
 }
 
 // GET /api/v1/shopping/stores  -> { data: Store[] }
-router.get('/stores', (_req, res) => {
+router.get('/stores', validateRequest(), (_req, res) => {
   try {
     const stores = db.get().prepare('SELECT * FROM shopping_stores ORDER BY name COLLATE NOCASE ASC').all();
     res.json({ data: stores });
@@ -500,7 +501,7 @@ router.get('/stores', (_req, res) => {
 });
 
 // POST /api/v1/shopping/stores  Body: { name }
-router.post('/stores', (req, res) => {
+router.post('/stores', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     const errors = collectErrors([vName]);
@@ -527,7 +528,7 @@ router.post('/stores', (req, res) => {
 // Tippfehler soll die Historie nicht spalten. Die Form (PUT mit { name }) ist
 // die, die der geteilte Kategorie-Manager erwartet - so verwaltet dieselbe
 // Komponente Kategorien und Laeden, ohne einen zweiten Schirm.
-router.put('/stores/:id', (req, res) => {
+router.put('/stores/:id', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid store ID.', code: 400 });
@@ -552,7 +553,7 @@ router.put('/stores/:id', (req, res) => {
 });
 
 // DELETE /api/v1/shopping/stores/:id
-router.delete('/stores/:id', (req, res) => {
+router.delete('/stores/:id', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'Invalid store ID.', code: 400 });
@@ -573,7 +574,7 @@ router.delete('/stores/:id', (req, res) => {
 // Liefert die Kaufhistorie fuer einen Artikelnamen (#1003),
 // unbeeinflusst von Gross-/Kleinschreibung (COLLATE NOCASE).
 // Response: { data: Purchase[] }
-router.get('/price-history', (req, res) => {
+router.get('/price-history', validateRequest(), (req, res) => {
   try {
     const rawName = String(req.query.name ?? '').trim();
     if (!rawName) {
@@ -630,7 +631,7 @@ router.get('/price-history', (req, res) => {
 // Zettel, den der Schreibende offen hat. Die Zielliste bewegt ihre Nummer
 // über denselben Trigger wie jeder andere Schreibweg.
 // --------------------------------------------------------
-router.patch('/items/:itemId', (req, res) => {
+router.patch('/items/:itemId', validateRequest(), (req, res) => {
   try {
     const item = db.get()
       .prepare('SELECT * FROM shopping_items WHERE id = ?')
@@ -847,7 +848,7 @@ router.patch('/items/:itemId', (req, res) => {
 // was tatsächlich zurückging, und ein Undo, das mit einem Fehler endet, weil ein
 // Artikel inzwischen von Hand gelöscht wurde, wäre die schlechtere Antwort.
 // --------------------------------------------------------
-router.post('/items/undo-transfer', (req, res) => {
+router.post('/items/undo-transfer', validateRequest(), (req, res) => {
   try {
     const ids = Array.isArray(req.body?.ids)
       ? req.body.ids.map(Number).filter(Number.isInteger)
@@ -914,7 +915,7 @@ router.post('/items/undo-transfer', (req, res) => {
 // Einzelnen Artikel löschen.
 // Response: { ok: true }
 // --------------------------------------------------------
-router.delete('/items/:itemId', (req, res) => {
+router.delete('/items/:itemId', validateRequest(), (req, res) => {
   try {
     const item = db.get()
       .prepare('SELECT id, list_id FROM shopping_items WHERE id = ?')
@@ -957,7 +958,7 @@ const ACCEPTS_NEW_ITEMS_SQL = `CASE WHEN EXISTS (
 // Alle Einkaufslisten mit Artikel-Zähler und `accepts_new_items` (#2283).
 // Response: { data: ShoppingList[] }
 // --------------------------------------------------------
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const lists = db.get().prepare(`
       SELECT
@@ -983,7 +984,7 @@ router.get('/', (req, res) => {
 // Body: { name }
 // Response: { data: ShoppingList }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'name', { max: MAX_TITLE });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -1008,7 +1009,7 @@ router.post('/', (req, res) => {
 // Body: { name }
 // Response: { data: ShoppingList }
 // --------------------------------------------------------
-router.put('/:listId', (req, res) => {
+router.put('/:listId', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'name', { max: MAX_TITLE });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -1059,7 +1060,7 @@ router.put('/:listId', (req, res) => {
 //     haengen damit an denselben Sync-Spalten, die oben nicht mitkommen -
 //     dieselbe Regel, nicht ein Versehen.
 // --------------------------------------------------------
-router.post('/:listId/duplicate', (req, res) => {
+router.post('/:listId/duplicate', validateRequest(), (req, res) => {
   try {
     const list = db.get()
       .prepare('SELECT * FROM shopping_lists WHERE id = ?')
@@ -1130,7 +1131,7 @@ router.post('/:listId/duplicate', (req, res) => {
 // Liste und alle Artikel löschen (CASCADE).
 // Response: { ok: true }
 // --------------------------------------------------------
-router.delete('/:listId', (req, res) => {
+router.delete('/:listId', validateRequest(), (req, res) => {
   try {
     // Die Artikel gehen per CASCADE mit, also müssen ihre Löschungen vorher
     // vorgemerkt sein (#617).
@@ -1157,7 +1158,7 @@ router.delete('/:listId', (req, res) => {
 // gesetzte Reihenfolge (#678).
 // Response: { data: ShoppingItem[], list: ShoppingList, categories: ShoppingCategory[] }
 // --------------------------------------------------------
-router.get('/:listId/items', (req, res) => {
+router.get('/:listId/items', validateRequest(), (req, res) => {
   try {
     const list = db.get()
       .prepare('SELECT * FROM shopping_lists WHERE id = ?')
@@ -1192,7 +1193,7 @@ router.get('/:listId/items', (req, res) => {
 // Ränge der Ausgelassenen mit den neu vergebenen kollidieren lassen - danach
 // entschiede wieder created_at, und der Zug wäre teilweise verpufft.
 // --------------------------------------------------------
-router.patch('/:listId/items/reorder', (req, res) => {
+router.patch('/:listId/items/reorder', validateRequest(), (req, res) => {
   try {
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
@@ -1249,7 +1250,7 @@ router.patch('/:listId/items/reorder', (req, res) => {
 // Body: { name, quantity?, category?, notes?, url? }
 // Response: { data: ShoppingItem }
 // --------------------------------------------------------
-router.post('/:listId/items', (req, res) => {
+router.post('/:listId/items', validateRequest(), (req, res) => {
   try {
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
@@ -1319,7 +1320,7 @@ router.post('/:listId/items', (req, res) => {
 // Gesendet wird eine Abschrift, kein Zugang: kein Link, kein Token, nichts das
 // weiterlebt. Wer die Liste laufend braucht, ist Mitglied und hat die App.
 // --------------------------------------------------------
-router.post('/:listId/send', sendListLimiter, async (req, res) => {
+router.post('/:listId/send', sendListLimiter, validateRequest(), async (req, res) => {
   // Diese Datei exportiert einen fertigen Router, keine Fabrik - eine
   // Abhaengigkeit laesst sich daher nicht ueber Parameter hineinreichen.
   // `app.locals` ist der Express-eigene Platz dafuer und hier der kleinere
@@ -1415,6 +1416,39 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
   }
 });
 
+/**
+ * Rechte auf einem anderen Modul, ohne Zeilenbezug: sie stehen als Middleware
+ * VOR validateRequest() (#2810, Gruppe 8), damit eine Anmeldung ohne das Recht
+ * ihre 403 `cross_module_access` vor jeder Pruefung der Anfrage bekommt - vor
+ * einer unbekannten Liste (404) wie vor einem kaputten Rumpf (400), so wie
+ * zuvor als erste Zeile des Handlers. Die Ruecknahme (`undo-transfer`) fragt
+ * ihr Recht weiter im Handler: ob sie den Essensplan beruehrt, steht erst im
+ * Rumpf.
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireMealsWrite(req, res, next) {
+  // Der Import markiert die Zutaten als uebertragen - das sind Daten des
+  // Essensplans, also braucht er dessen Schreibrecht, auch fuer die Vorschau.
+  if (!mayWriteModule(req, 'meals')) {
+    return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
+
+/**
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requirePantryRead(req, res, next) {
+  if (!mayReadModule(req, 'pantry')) {
+    return res.status(403).json({ error: 'Read access to the pantry is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
+
 // --------------------------------------------------------
 // POST /api/v1/shopping/:listId/import-meal-plan
 // Importiert Zutaten aus dem Essensplan eines Datumsbereichs in eine Liste.
@@ -1429,7 +1463,7 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
 // fuer das Rueckgaengig - der Import schrieb bis dahin als einziger Kuechenweg
 // ohne Ruecknahme in die Liste.
 // --------------------------------------------------------
-router.post('/:listId/import-meal-plan', (req, res) => {
+router.post('/:listId/import-meal-plan', requireMealsWrite, validateRequest(), (req, res) => {
   try {
     // DIE GEGENRICHTUNG (#1290): der Pfad sagt `shopping`, geschrieben wird
     // auch in den Essensplan. Die Uebernahme setzt das Flag
@@ -1443,10 +1477,7 @@ router.post('/:listId/import-meal-plan', (req, res) => {
     // Mahlzeiten"), und sie zaehlt dafuer den Essensplan aus. Eine Vorschau,
     // die rechnet, und ein Import, der danach mit 403 endet, waeren eine
     // Zusage, die nicht haelt.
-    if (!mayWriteModule(req, 'meals')) {
-      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
-    }
-
+    // Das Recht auf den Essensplan prueft requireMealsWrite() vor diesem Handler.
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
@@ -1518,12 +1549,9 @@ router.post('/:listId/import-meal-plan', (req, res) => {
 // Liste. Deshalb fragt die Route selbst nach `pantry: read` (beide Achsen),
 // vor der Listensuche wie die Uebertraege darueber.
 // --------------------------------------------------------
-router.post('/:listId/import-pantry', (req, res) => {
+router.post('/:listId/import-pantry', requirePantryRead, validateRequest(), (req, res) => {
   try {
-    if (!mayReadModule(req, 'pantry')) {
-      return res.status(403).json({ error: 'Read access to the pantry is required.', code: 403, reason: 'cross_module_access' });
-    }
-
+    // Das Leserecht auf den Vorrat prueft requirePantryRead() vor diesem Handler.
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
@@ -1573,7 +1601,7 @@ router.post('/:listId/import-pantry', (req, res) => {
 // Body (optional): { ids: number[] } - nur diese, sonst alle abgehakten.
 // Response: { deleted: number, list_change }
 // --------------------------------------------------------
-router.delete('/:listId/items/checked', (req, res) => {
+router.delete('/:listId/items/checked', validateRequest(), (req, res) => {
   try {
     const list = db.get()
       .prepare('SELECT id FROM shopping_lists WHERE id = ?')

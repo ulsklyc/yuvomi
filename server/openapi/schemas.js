@@ -4,6 +4,9 @@ import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { DATETIME_PATTERN } from '../utils/datetime-pattern.js';
 import { ORIGIN_MODULE } from '../services/reminder-origins.js';
 import { wasteInputSchemas } from './waste-inputs.js';
+import {
+  DMS_PROVIDERS, DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_UPLOAD_BACKENDS, DOCUMENT_VISIBILITIES,
+} from '../services/document-fields.js';
 
 /**
  * A reminder time as the handlers accept it (`datetime()` in
@@ -740,8 +743,8 @@ export const schemas = {
             name: { type: 'string' },
             description: { type: ['string', 'null'] },
             category: { type: ['string', 'null'] },
-            status: { type: 'string', enum: ['active', 'archived'] },
-            visibility: { type: 'string', enum: ['family', 'restricted', 'private'] },
+            status: { type: 'string', enum: [...DOCUMENT_STATUSES] },
+            visibility: { type: 'string', enum: [...DOCUMENT_VISIBILITIES] },
             original_name: { type: ['string', 'null'] },
             mime_type: { type: ['string', 'null'] },
             file_size: { type: ['integer', 'null'] },
@@ -811,11 +814,11 @@ export const schemas = {
                 categories: { type: 'array', items: { type: 'string' } },
                 visibilities: {
                   type: 'array',
-                  items: { type: 'string', enum: ['family', 'restricted', 'private'] },
+                  items: { type: 'string', enum: [...DOCUMENT_VISIBILITIES] },
                 },
                 statuses: {
                   type: 'array',
-                  items: { type: 'string', enum: ['active', 'archived'] },
+                  items: { type: 'string', enum: [...DOCUMENT_STATUSES] },
                 },
                 max_file_size: { type: 'integer' },
                 allowed_mime_types: { type: 'array', items: { type: 'string' } },
@@ -840,7 +843,7 @@ export const schemas = {
                     properties: {
                       id: { type: 'integer' },
                       name: { type: 'string' },
-                      provider: { type: 'string', enum: ['paperless'] },
+                      provider: { type: 'string', enum: [...DMS_PROVIDERS] },
                     },
                     required: ['id', 'name', 'provider'],
                   },
@@ -862,21 +865,23 @@ export const schemas = {
         },
         DocumentStorageConfigRequest: {
           type: 'object',
+          description: 'Every field is optional; one that is not sent stays as it is. Fields the schema does not name are ignored.',
           properties: {
             selected_upload_backend: {
               type: 'string',
-              enum: ['local', 'webdav', 'google_drive'],
+              enum: [...DOCUMENT_UPLOAD_BACKENDS],
               description: 'Administrator-selected destination for future uploads. Connecting Google Drive does not change this value.',
             },
             enabled: { type: 'boolean' },
-            url: { type: ['string', 'null'], format: 'uri', description: 'HTTP(S) WebDAV server URL.' },
-            username: { type: ['string', 'null'] },
+            url: { type: ['string', 'null'], description: 'HTTP(S) WebDAV server URL, checked by the route after trimming. `null` or `""` removes it.' },
+            username: { type: ['string', 'null'], description: '`null` or `""` removes it.' },
             password: {
               type: ['string', 'null'],
               writeOnly: true,
               description: 'WebDAV password. Empty and masked values preserve the stored password.',
             },
-            path: { type: ['string', 'null'], description: 'Base path below the WebDAV server URL.' },
+            path: { type: ['string', 'null'], description: 'Base path below the WebDAV server URL. `null` or `""` resets it to the default.' },
+            basePath: { type: ['string', 'null'], description: 'Older name of `path`, read when `path` is not sent.' },
             confirm_existing_access: {
               type: 'boolean',
               description: 'Required for connection changes while WebDAV documents exist.',
@@ -889,12 +894,14 @@ export const schemas = {
         },
         DocumentStorageTestRequest: {
           type: 'object',
+          description: 'The fields of `DocumentStorageConfigRequest` to try; nothing is stored. A field that is not sent is taken from the stored configuration.',
           properties: {
             enabled: { type: 'boolean' },
-            url: { type: ['string', 'null'], format: 'uri' },
+            url: { type: ['string', 'null'], description: 'HTTP(S) WebDAV server URL, checked by the route after trimming.' },
             username: { type: ['string', 'null'] },
             password: { type: ['string', 'null'], writeOnly: true },
             path: { type: ['string', 'null'] },
+            basePath: { type: ['string', 'null'], description: 'Older name of `path`, read when `path` is not sent.' },
             clear_password: { type: 'boolean' },
           },
         },
@@ -1669,8 +1676,9 @@ export const schemas = {
         },
         ShoppingListCreateInput: {
           type: 'object',
+          description: 'Fields the schema does not name are ignored.',
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 200, description: 'Trimmed before it is stored.' },
+            name: { type: 'string', description: 'Trimmed before it is stored; empty after trimming or longer than 200 characters is the route\'s 400.' },
           },
           required: ['name'],
         },
@@ -1801,43 +1809,45 @@ export const schemas = {
         },
         ShoppingItemCreateInput: {
           type: 'object',
+          description: 'Fields the schema does not name are ignored. Lengths are counted by the route after trimming: `name` up to 200 characters, `quantity` 100, `notes` 5000, `url` 2000.',
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 200, description: 'Trimmed before it is stored.' },
-            quantity: { type: ['string', 'null'], maxLength: 100, description: 'Free text. Empty means none.' },
+            name: { type: 'string', description: 'Trimmed before it is stored; empty after trimming is the route\'s 400.' },
+            quantity: { type: ['string', 'null'], description: 'Free text. Empty means none.' },
             category: {
               type: ['string', 'null'],
-              description: 'The name of an existing category, otherwise 400. Without it, `Sonstiges` while the household has that category, else the last one in shop order.',
+              description: 'The name of an existing category, otherwise 400. Without it (or `null`, `""`), `Sonstiges` while the household has that category, else the last one in shop order.',
             },
-            notes: { type: ['string', 'null'], maxLength: 5000 },
-            url: { type: ['string', 'null'], format: 'uri', maxLength: 2000, description: 'http or https only.' },
+            notes: { type: ['string', 'null'] },
+            url: { type: ['string', 'null'], description: 'http or https only, checked by the route after trimming; `null` or `""` means none.' },
           },
           required: ['name'],
         },
         ShoppingItemUpdateInput: {
           type: 'object',
-          description: 'Every field is optional, and one that is not sent stays as it is. `name` and `quantity` have the limits of `ShoppingItemCreateInput`.',
+          description: 'Every field is optional, and one that is not sent stays as it is. Fields the schema does not name are ignored. `name`, `quantity`, `notes` and `url` have the limits of `ShoppingItemCreateInput`.',
           properties: {
-            is_checked: { type: 'boolean', description: 'true or false; 0 and 1 work as well, anything else answers 400. Responses carry 0 or 1.' },
-            name: { type: 'string', minLength: 1, maxLength: 200 },
-            quantity: { type: ['string', 'null'], maxLength: 100 },
-            category: { type: 'string', minLength: 1, description: 'The name of an existing category. It cannot be cleared.' },
-            notes: { type: ['string', 'null'], maxLength: 5000 },
-            url: { type: ['string', 'null'], format: 'uri', maxLength: 2000, description: 'http or https only.' },
+            is_checked: {
+              anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }],
+              description: '`true`/`false` or `1`/`0` (the app sends the numbers). Responses carry 0 or 1.',
+            },
+            name: { type: 'string', description: 'Empty after trimming is the route\'s 400.' },
+            quantity: { type: ['string', 'null'] },
+            category: { type: 'string', description: 'The name of an existing category. It cannot be cleared.' },
+            notes: { type: ['string', 'null'] },
+            url: { type: ['string', 'null'], description: 'http or https only, checked by the route after trimming; `null` or `""` clears it.' },
             price_cents: {
               type: ['integer', 'null'],
               minimum: 0,
               maximum: 100000000,
-              description: 'Whole cents. `null` or an empty string clears it, a string of digits is read as a number.',
+              description: 'Whole cents. `null` clears it. Up to v2.93 the route also read `""`, digit text, `true` and `[]` through `Number()`; they are a 400 now.',
             },
             store_id: {
-              type: ['integer', 'null'],
-              minimum: 1,
-              description: '`null` or an empty string clears it, a string of digits is read as a number.',
+              anyOf: [{ type: ['integer', 'null'], minimum: 1 }, { type: 'string', pattern: '^(?:[1-9][0-9]*)?$' }],
+              description: 'A shop id: a positive integer or a string of decimal digits without a leading zero. `null` or an empty string clears it.',
             },
             list_id: {
-              type: ['integer', 'null'],
-              minimum: 1,
-              description: 'Moves the item to this list. `null` or the list it is on means no move, a string of digits is read as a number.',
+              anyOf: [{ type: ['integer', 'null'], minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' }],
+              description: 'Moves the item to this list: a positive integer or a string of decimal digits without a leading zero. `null` or the list it is on means no move.',
             },
           },
         },
@@ -1861,6 +1871,7 @@ export const schemas = {
         },
         ShoppingCheckedDeleteInput: {
           type: 'object',
+          description: 'Fields the schema does not name are ignored.',
           properties: {
             ids: {
               type: 'array',
@@ -3039,9 +3050,10 @@ export const schemas = {
           description: 'A configured DMS account. The api_token is never returned; use has_token to check whether one is stored.',
           properties: {
             id: { type: 'integer' },
-            provider: { type: 'string', enum: ['paperless'], description: 'DMS provider type' },
+            provider: { type: 'string', enum: [...DMS_PROVIDERS], description: 'DMS provider type' },
             name: { type: 'string' },
-            base_url: { type: 'string', format: 'uri' },
+            base_url: { type: 'string', description: 'The address as stored, without trailing slashes.' },
+            org_id: { type: 'string', description: 'The Papra organization; empty for Paperless.' },
             created_at: { type: 'string', format: 'date-time' },
             last_check: { type: ['string', 'null'], format: 'date-time' },
             has_token: { type: 'boolean', description: 'Whether an API token is stored for this account' },
@@ -3064,13 +3076,15 @@ export const schemas = {
         },
         DmsAccountCreateRequest: {
           type: 'object',
+          description: 'Fields the schema does not name are ignored. Whether a field is empty after trimming, its length and the `http(s)://` of `base_url` are the route\'s checks, with `reason: "dms_field_required"` or `"dms_url_invalid"`.',
           properties: {
-            provider: { type: 'string', enum: ['paperless'] },
+            provider: { type: 'string', enum: [...DMS_PROVIDERS], default: 'paperless', description: 'Without it `paperless`. Up to v2.93 an unknown value fell back to `paperless` silently; it is a 400 now.' },
             name: { type: 'string' },
-            base_url: { type: 'string', format: 'uri' },
-            api_token: { type: 'string', description: 'API token for authenticating with the DMS. Write-only; never returned in responses.' },
+            base_url: { type: 'string', description: 'The address of the DMS, starting with `http://` or `https://`.' },
+            api_token: { type: 'string', writeOnly: true, description: 'API token for authenticating with the DMS. Write-only; never returned in responses.' },
+            org_id: { type: 'string', description: 'The Papra organization ID; required by the route for `papra`, ignored for `paperless`.' },
           },
-          required: ['provider', 'name', 'base_url', 'api_token'],
+          required: ['name', 'base_url', 'api_token'],
         },
         DmsTestResponse: {
           type: 'object',
@@ -3089,7 +3103,7 @@ export const schemas = {
         DmsSearchResult: {
           type: 'object',
           properties: {
-            id: { type: 'integer' },
+            id: { type: 'string', description: 'The document ID in the DMS, as text (a Papra ID is not a number). It is the `dms_document_id` of a link.' },
             title: { type: 'string' },
             created: { type: 'string', format: 'date-time' },
             filename: { type: ['string', 'null'] },
@@ -3104,13 +3118,21 @@ export const schemas = {
           },
           required: ['data'],
         },
+        BodyRowId: {
+          anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^0*[1-9][0-9]*$' }],
+          description: 'The ID of a row in a request body: a positive integer. A string of decimal digits is read as the same number (the older form of these fields); `"0"`, a sign, a fraction or anything else is refused.',
+        },
         DmsLinkRequest: {
           type: 'object',
+          description: 'Fields the schema does not name are ignored.',
           properties: {
-            account_id: { type: 'integer' },
-            dms_document_id: { type: 'integer' },
-            category: { type: 'string', enum: ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'] },
-            visibility: { type: 'string', enum: ['family', 'restricted', 'private'] },
+            account_id: { $ref: '#/components/schemas/BodyRowId' },
+            dms_document_id: {
+              anyOf: [{ type: 'string', minLength: 1 }, { type: 'integer', minimum: 1 }],
+              description: 'The document ID in the DMS (`id` of a search result), as text; a number is read as its digits. Text of nothing but spaces is the route\'s 400.',
+            },
+            category: { type: 'string', enum: [...DOCUMENT_CATEGORIES], default: 'other', description: 'Without it `other`. Up to v2.93 an unknown value became `other` silently; it is a 400 now.' },
+            visibility: { type: 'string', enum: [...DOCUMENT_VISIBILITIES], default: 'family', description: 'Without it `family`. Up to v2.93 an unknown value became `family` - visible to the whole household - silently; it is a 400 now.' },
           },
           required: ['account_id', 'dms_document_id'],
         },
@@ -3138,9 +3160,10 @@ export const schemas = {
         },
         DmsPushRequest: {
           type: 'object',
+          description: 'Fields the schema does not name are ignored.',
           properties: {
-            account_id: { type: 'integer' },
-            document_id: { type: 'integer' },
+            account_id: { $ref: '#/components/schemas/BodyRowId' },
+            document_id: { $ref: '#/components/schemas/BodyRowId' },
           },
           required: ['account_id', 'document_id'],
         },

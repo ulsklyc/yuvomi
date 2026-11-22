@@ -39,6 +39,8 @@ const { default: idempotencyMiddleware } = await import('../server/middleware/id
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 const uid = db.prepare(
   `INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -68,6 +70,7 @@ const SESSION_COOKIE = 'yuvomi.sid=mcp-test';
 const sessions = new Map();
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use('/api/v1', (/** @type {any} */ req, /** @type {any} */ _res, /** @type {any} */ next) => {
   const cookie = String(req.headers.cookie || '');
   req.authUserId = Number(uid);
@@ -83,6 +86,8 @@ app.use('/api/v1', idempotencyMiddleware);
 app.use('/api/v1/tasks', tasksRouter);
 app.use('/api/v1/shopping', shoppingRouter);
 app.use('/api/v1/calendar', calendarRouter);
+// The central error handler answers the 400 of validateRequest() as JSON (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(null)));
 const LOOPBACK = `http://127.0.0.1:${/** @type {any} */ (server.address()).port}`;
@@ -339,6 +344,18 @@ test('"" in einem Pflichtfeld bleibt "is required", kein 500', async () => {
     const res = await toolCall(tool, args);
     assert.equal(res.result.isError, true, tool);
     assert.match(res.result.content[0].text, new RegExp(`${field} is required`), tool);
+  }
+});
+
+// Seit #2810 prueft das Schema den Rumpf zuerst: ein fehlendes `name` waere
+// dort eine 400 ohne Feldnamen in der Werkzeugantwort (die Meldung traegt nur
+// `error` und `reason`, nie `fields`). Das Werkzeug schickt `name` deshalb
+// immer mit, und das Modell liest den Satz der Route.
+test('add_shopping_item ohne name nennt das Feld, nicht nur die Schema-Absage', async () => {
+  for (const args of [{}, { quantity: '2' }, { name: null }]) {
+    const res = await toolCall('add_shopping_item', args);
+    assert.equal(res.result.isError, true, JSON.stringify(args));
+    assert.match(res.result.content[0].text, /name is required\./, JSON.stringify(args));
   }
 });
 

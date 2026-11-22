@@ -24,6 +24,8 @@ process.env.TZ = 'UTC';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 const { getCountdowns } = await import('../server/services/countdowns.js');
 const { processDueNotifications } = await import('../server/services/notifications.js');
@@ -78,6 +80,7 @@ const MIRA = seedUser('Mira');
 function harness(userId = OWNER, { role = 'member' } = {}) {
   const app = express();
   app.use(express.json());
+  app.use(defaultEmptyBody);
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
@@ -88,6 +91,8 @@ function harness(userId = OWNER, { role = 'member' } = {}) {
   });
   app.use('/api/v1/documents', documentsRouter);
   app.use('/api/v1/reminders', remindersRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const server = http.createServer(app);
   const request = async (base, method, pathname, body) => {
     if (!server.listening) await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));

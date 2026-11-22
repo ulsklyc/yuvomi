@@ -9,7 +9,11 @@ import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, date as validateDate, num, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
+import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
+import {
+  DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_UPLOAD_BACKENDS, DOCUMENT_VISIBILITIES,
+} from '../services/document-fields.js';
 import {
   mayReadModule,
   budgetDetailsVisibleWhere,
@@ -97,9 +101,11 @@ function documentDeletionInProgress(res) {
   return res;
 }
 
-const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
-const VISIBILITIES = ['family', 'restricted', 'private'];
-const STATUSES = ['active', 'archived'];
+// Die Wertelisten kommen aus server/services/document-fields.js, aus derselben
+// Quelle liest das Schema (#2810): ein unbekannter Wert ist dort schon 400.
+const CATEGORIES = DOCUMENT_CATEGORIES;
+const VISIBILITIES = DOCUMENT_VISIBILITIES;
+const STATUSES = DOCUMENT_STATUSES;
 const MAX_FILE_BYTES = MAX_UPLOAD_BYTES;
 const ALLOWED_MIME = new Set([
   'application/pdf',
@@ -263,6 +269,22 @@ function removeDocumentExpiryReminder(documentId) {
   db.get().prepare(`
     DELETE FROM reminders WHERE entity_type = 'document_expiry' AND entity_id = ?
   `).run(documentId);
+}
+
+/**
+ * Wem ein Dokument freigegeben werden soll und der dafuer nicht in Frage
+ * kommt: wer kein Haushaltsmitglied ist (`newNonMembers`, ausser den schon
+ * gespeicherten) und - seit #2810 - wer gar kein Konto hat. Eine solche id lief
+ * bis dahin in `replaceAccess()` auf den Fremdschluessel und endete als 500;
+ * jetzt nennt sie dieselbe 400 wie ein Nicht-Mitglied.
+ * @param {number[]} ids
+ * @param {number[]} [stored]
+ * @returns {number[]}
+ */
+function accessStrangers(ids, stored = []) {
+  const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?');
+  const unknown = ids.filter((id) => !exists.get(id));
+  return [...new Set([...unknown, ...newNonMembers(ids, { stored })])];
 }
 
 function parseMemberIds(value) {
@@ -459,11 +481,12 @@ function configProtected(message, options = {}) {
   );
 }
 
-router.get('/storage/config', (req, res) => {
+// Die Speicher-Einstellungen sind Sache der Admins. `requireAdmin` steht VOR
+// validateRequest() (#2810, Gruppe 8): ein Mitglied bekommt seine 403 vor jeder
+// Pruefung der Anfrage und liest am 400 das Schema der Einstellungen nicht ab.
+// Bis dahin stand die Pruefung als erste Zeile im Handler.
+router.get('/storage/config', requireAdmin, validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) {
-      return refuseAdmin(req, res);
-    }
     res.json({ data: storageConfigStatus() });
   } catch (err) {
     log.error('GET /storage/config error:', err);
@@ -472,14 +495,11 @@ router.get('/storage/config', (req, res) => {
   }
 });
 
-router.put('/storage/config', async (req, res) => {
+router.put('/storage/config', requireAdmin, validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) {
-      return refuseAdmin(req, res);
-    }
     if (
       req.body.selected_upload_backend !== undefined
-      && !['local', 'webdav', 'google_drive'].includes(req.body.selected_upload_backend)
+      && !DOCUMENT_UPLOAD_BACKENDS.includes(req.body.selected_upload_backend)
     ) {
       return res.status(400).json({
         error: 'selected_upload_backend must be local, webdav, or google_drive.',
@@ -610,11 +630,8 @@ router.put('/storage/config', async (req, res) => {
   }
 });
 
-router.post('/storage/test', async (req, res) => {
+router.post('/storage/test', requireAdmin, validateRequest(), async (req, res) => {
   try {
-    if (!isAdminRequest(req)) {
-      return refuseAdmin(req, res);
-    }
     await assertWebdavTargetAllowed(resolveConfig(req.body));
     const result = await testStorageConnection(req.body);
     res.json({ data: result });
@@ -625,7 +642,7 @@ router.post('/storage/test', async (req, res) => {
   }
 });
 
-router.get('/meta/options', (req, res) => {
+router.get('/meta/options', validateRequest(), (req, res) => {
   try {
     const dmsAccounts = db.get().prepare('SELECT id, name, provider FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
     res.json({
@@ -835,7 +852,7 @@ function parentId(value) {
   return { value: num, error: null };
 }
 
-router.get('/folders', (_req, res) => {
+router.get('/folders', validateRequest(), (_req, res) => {
   try {
     // Flach mit `parent_id`, nicht verschachtelt: der Baum wird im Browser
     // gebaut, weil dort ohnehin die Zaehler und der aufgeklappte Zustand
@@ -857,7 +874,7 @@ router.get('/folders', (_req, res) => {
   }
 });
 
-router.get('/folders/:id/delete-impact', (req, res) => {
+router.get('/folders/:id/delete-impact', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
@@ -916,7 +933,7 @@ function selectedFolderGone(res) {
 /** Die Spalten, die eine Ordner-Antwort traegt - eine Schreibweise fuer alle Wege. */
 const FOLDER_COLUMNS = 'id, name, parent_id, module_key, created_by, created_at, updated_at';
 
-router.post('/folders', (req, res) => {
+router.post('/folders', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -945,7 +962,7 @@ router.post('/folders', (req, res) => {
   }
 });
 
-router.put('/folders/:id', (req, res) => {
+router.put('/folders/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
@@ -991,7 +1008,7 @@ router.put('/folders/:id', (req, res) => {
   }
 });
 
-router.delete('/folders/:id', async (req, res) => {
+router.delete('/folders/:id', validateRequest(), async (req, res) => {
   let deletionLock = null;
   try {
     const id = Number(req.params.id);
@@ -1218,7 +1235,7 @@ router.delete('/folders/:id', async (req, res) => {
   }
 });
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const status = STATUSES.includes(req.query.status) ? req.query.status : 'active';
     const category = CATEGORIES.includes(req.query.category) ? req.query.category : null;
@@ -1300,7 +1317,7 @@ router.get('/', (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validateRequest(), async (req, res) => {
   let stagedUpload;
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
@@ -1337,7 +1354,7 @@ router.post('/', async (req, res) => {
 
     const allowedIds = visibility === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
     // Freigeben laesst sich ein neues Dokument nur Haushaltsmitgliedern (#1207).
-    const strangers = newNonMembers(allowedIds);
+    const strangers = accessStrangers(allowedIds);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     stagedUpload = await stageUpload({
       buffer: parsed.buffer,
@@ -1418,7 +1435,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = getVisibleDocument(id, req);
@@ -1452,7 +1469,7 @@ router.put('/:id', (req, res) => {
     // Geprueft vor dem UPDATE: eine abgelehnte Anfrage aendert nichts.
     const storedAccess = db.get().prepare('SELECT user_id FROM family_document_access WHERE document_id = ?')
       .all(id).map((row) => row.user_id);
-    const strangers = newNonMembers(allowedIds, { stored: storedAccess });
+    const strangers = accessStrangers(allowedIds, storedAccess);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     const expiresAt = req.body.expires_at !== undefined ? vExpiresAtField.value : existing.expires_at;
     const expiryReminderDays = req.body.expiry_reminder_days !== undefined ? vExpiryReminderDaysField.value : existing.expiry_reminder_days;
@@ -1502,7 +1519,7 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.patch('/:id/archive', (req, res) => {
+router.patch('/:id/archive', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = getVisibleDocument(id, req);
@@ -1532,7 +1549,7 @@ router.patch('/:id/archive', (req, res) => {
   }
 });
 
-router.get('/:id/thumbnail', async (req, res) => {
+router.get('/:id/thumbnail', validateRequest(), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const doc = getVisibleDocument(id, req, true);
@@ -1556,7 +1573,7 @@ router.get('/:id/thumbnail', async (req, res) => {
 // Preview und Download lesen ein Drive-Dokument ueber den Google-Client, dessen
 // `tokens`-Listener ein erneuertes Token nach dem Warten speichert: waehrend
 // eines Restores 503, sonst festgehalten wie eine schreibende Anfrage (#1551).
-router.get('/:id/preview', refuseWhileRestoring, async (req, res) => {
+router.get('/:id/preview', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const doc = getVisibleDocument(id, req, true);
@@ -1599,7 +1616,7 @@ router.get('/:id/preview', refuseWhileRestoring, async (req, res) => {
   }
 });
 
-router.get('/:id/download', refuseWhileRestoring, async (req, res) => {
+router.get('/:id/download', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const doc = getVisibleDocument(id, req, true);
@@ -1622,7 +1639,7 @@ router.get('/:id/download', refuseWhileRestoring, async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validateRequest(), async (req, res) => {
   let lockedId = null;
   try {
     const id = Number(req.params.id);

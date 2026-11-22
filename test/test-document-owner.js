@@ -20,6 +20,8 @@ process.env.SESSION_SECRET = 'document-owner-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -79,6 +81,7 @@ function documentRow(id) {
 function createHarness(userId, role, cookieSession) {
   const app = express();
   app.use(express.json());
+  app.use(defaultEmptyBody);
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
@@ -86,6 +89,8 @@ function createHarness(userId, role, cookieSession) {
     next();
   });
   app.use('/api/v1/documents', documentsRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {

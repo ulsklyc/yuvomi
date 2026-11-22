@@ -19,6 +19,8 @@ process.env.SESSION_SECRET = 'document-folders-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 
 const moduleDatabase = get();
@@ -56,6 +58,7 @@ function buildMigratedDatabase(migrations) {
 function createHarness({ userId = ADMIN_ID, role = 'admin', moduleAccess = null, scopes = null } = {}) {
   const app = express();
   app.use(express.json());
+  app.use(defaultEmptyBody);
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
@@ -68,6 +71,8 @@ function createHarness({ userId = ADMIN_ID, role = 'admin', moduleAccess = null,
   });
   app.use('/api/v1/documents', documentsRouter);
   app.use('/api/v1/tasks', tasksRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {
@@ -601,7 +606,8 @@ test('DELETE with documents rejects a malformed snapshot with an explicit valida
     );
 
     assert.equal(del.status, 400);
-    assert.equal(del.body.error, 'Invalid expected folder snapshot.');
+    // Seit #2810 die Absage des Schemas, die den Parameter nennt.
+    assert.deepEqual(del.body.fields, [{ path: 'query/expected_snapshot', rule: 'pattern' }]);
     assert.ok(get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(folder.body.data.id));
   } finally {
     await h.close();

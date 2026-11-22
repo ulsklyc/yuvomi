@@ -801,7 +801,9 @@ test('without numericKeys the order of the sub rows stays the key text', async (
   assert.deepEqual((await sentSubOrder({})).order, ['5', '3', '12']);
 });
 
-test('numericKeys: only the managers keyed by location ids switch it on (pantry and inventory locations)', async () => {
+// The shopping categories joined in #2810 (group 8): their keys are row ids too,
+// and the route reads the order as numbers.
+test('numericKeys: only the managers keyed by row ids switch it on (pantry and inventory locations, shopping categories)', async () => {
   const { readFileSync, readdirSync } = await import('node:fs');
   const { withoutCommentsKeepingLines } = await import('./source-text.js');
   const dir = new URL('../public/pages/', import.meta.url);
@@ -812,5 +814,5 @@ test('numericKeys: only the managers keyed by location ids switch it on (pantry 
       if (/numericKeys:\s*true/.test(m[0])) found.push(`${file}: ${m[1]}`);
     }
   }
-  assert.deepEqual(found.sort(), ['inventory.js: /inventory/locations', 'pantry.js: /pantry/locations']);
+  assert.deepEqual(found.sort(), ['inventory.js: /inventory/locations', 'pantry.js: /pantry/locations', 'shopping.js: /shopping/categories']);
 });

@@ -34,6 +34,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware, requireAuth } = await import('../server/auth.js');
@@ -157,7 +158,11 @@ app.use('/api/v1/rewards', requireAuth, rewardsRouter);
 app.use('/api/v1/split-expenses', requireAuth, splitRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 app.use('/api/v1/permissions', requireAuth, permissionsRouter);
-app.use('/documents', requireAuth, documentsRouter);
+// At its real prefix (#2810). The documents router reads and writes files;
+// in server/index.js the general API limiter stands in front of it, here a
+// generous one does, far above what this suite sends.
+const documentsLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+app.use('/api/v1/documents', documentsLimiter, requireAuth, documentsRouter);
 app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -761,9 +766,9 @@ test('calendar: a rejected attendee leaves no staged attachment behind', async (
 test('documents: a new document can only be shared with household members', async () => {
   const contentData = `data:text/plain;base64,${Buffer.from('Vertrag').toString('base64')}`;
   const body = { name: 'Vertrag', original_name: 'vertrag.txt', content_data: contentData, visibility: 'restricted' };
-  assertRejectsNonMember(await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN, CLARA] } }), 'staff shared on a new document');
-  assertRejectsNonMember(await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN, DORA] } }), 'guest shared on a new document');
-  const ok = await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN] } });
+  assertRejectsNonMember(await call('POST', '/api/v1/documents', { body: { ...body, allowed_member_ids: [BEN, CLARA] } }), 'staff shared on a new document');
+  assertRejectsNonMember(await call('POST', '/api/v1/documents', { body: { ...body, allowed_member_ids: [BEN, DORA] } }), 'guest shared on a new document');
+  const ok = await call('POST', '/api/v1/documents', { body: { ...body, allowed_member_ids: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assert.deepEqual(ok.body.data.allowed_member_ids, [BEN]);
 });
@@ -776,7 +781,7 @@ test('documents: a stored grant stays saveable, a removed one cannot come back',
   db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, CLARA);
   const access = () => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
     .all(docId).map((row) => row.user_id);
-  const save = (ids) => call('PUT', `/documents/${docId}`, { body: { name: 'Mietvertrag', visibility: 'restricted', allowed_member_ids: ids } });
+  const save = (ids) => call('PUT', `/api/v1/documents/${docId}`, { body: { name: 'Mietvertrag', visibility: 'restricted', allowed_member_ids: ids } });
 
   const kept = await save([CLARA, BEN]);
   assert.equal(kept.status, 200, JSON.stringify(kept.body));

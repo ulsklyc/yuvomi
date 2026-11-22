@@ -25,6 +25,8 @@ const {
   default: documentsRouter,
   _setDmsAdapterFactory,
 } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 function buildTestDb() {
   const db = new Database(':memory:');
@@ -50,6 +52,7 @@ const memberId = db.prepare(`INSERT INTO users (username, display_name, password
 let session = { userId: adminId, role: 'admin' };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = session.userId;
   req.authRole = session.role;
@@ -60,6 +63,8 @@ app.use((req, _res, next) => {
 });
 app.use('/api/v1/documents/dms', dmsRouter);
 app.use('/api/v1/documents', documentsRouter);
+// The central error handler answers the 400 of validateRequest() as JSON (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/documents/dms`;
