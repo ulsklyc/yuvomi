@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 import { freshTestDbPath } from './tmp-db.js';
 freshTestDbPath('budget-plans');
@@ -14,7 +14,6 @@ process.env.SESSION_SECRET = 'budget-plans-test-session-secret-32-bytes';
 
 const db = await import('../server/db.js');
 const budget = await import('../server/routes/budget.js');
-const budgetRouter = budget.default;
 const { computePlanProgress, BUDGET_SAVINGS_KEY } = budget;
 
 let passed = 0;
@@ -49,15 +48,14 @@ function seedEntries() {
   ins.run('Alt', -999, catB, '2026-06-10');            // anderer Monat → ignoriert
 }
 
-const server = (() => {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
-  app.use('/budget', budgetRouter);
-  return app.listen(0, '127.0.0.1');
-})();
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const server = (await createBudgetApp({
+  mount: ['budget'],
+  auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); },
+})).listen(0, '127.0.0.1');
 await new Promise((resolve) => server.once('listening', resolve));
-const base = `http://127.0.0.1:${server.address().port}/budget`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1/budget`;
 
 try {
   // ---- computePlanProgress: reine Logik -------------------------------------

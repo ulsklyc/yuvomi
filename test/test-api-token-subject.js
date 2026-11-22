@@ -15,6 +15,7 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { router: authRouter, requireAuth } = await import('../server/auth.js');
 const { csrfMiddleware } = await import('../server/middleware/csrf.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
 const database = dbmod.get();
@@ -41,7 +42,10 @@ app.get('/auth-context', requireAuth, (req, res) => res.json({
   role: req.authRole,
   module_access: req.sessionModuleAccess,
 }));
-app.use('/budget', requireAuth, csrfMiddleware, budgetRouter);
+// At its real prefix with the central error handler: validateRequest() finds its
+// operation by the mount and answers through next(err) (#2810).
+app.use('/api/v1/budget', requireAuth, csrfMiddleware, budgetRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -83,7 +87,7 @@ test('admin may create a scoped token for a selected member and token writes bel
     WHERE subject_type = 'user' AND subject_id = ? AND resource_type = 'module' AND resource_key = 'budget'
   `).run(String(memberId));
 
-  const entry = await call('POST', '/budget', created.body.token, {
+  const entry = await call('POST', '/api/v1/budget', created.body.token, {
     title: 'Power bill', amount: -125.5, date: '2026-08-01', visibility: 'private',
   });
   assert.equal(entry.status, 201);

@@ -10,10 +10,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
 const db = dbmod.get();
 
 // Zwei Mitglieder + ein Admin.
@@ -27,14 +26,16 @@ function setMode(mode) {
 }
 
 let actor = { id: A, role: 'member' };
-function startApp() {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id }; next(); });
-  app.use('/', budgetRouter);
+async function startApp() {
+  // At their real prefix with the central error handler (#2810): validateRequest()
+  // finds its operation by the mount and answers through next(err).
+  const app = await createBudgetApp({
+    mount: ['budget'],
+    auth: (req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id }; next(); },
+  });
   return new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve({
-      baseUrl: `http://127.0.0.1:${s.address().port}`,
+      baseUrl: `http://127.0.0.1:${s.address().port}/api/v1/budget`,
       close: () => new Promise((r) => s.close(r)),
     }));
   });

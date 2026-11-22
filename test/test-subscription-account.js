@@ -25,7 +25,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'subscription-account-test-secret';
@@ -42,7 +42,6 @@ globalThis.window.matchMedia = globalThis.window.matchMedia
 
 const dbmod = await import('../server/db.js');
 const subscriptions = await import('../server/routes/subscriptions.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { setPermissions } = await import('../public/permissions.js');
 const { __test: page } = await import('../public/pages/subscriptions.js');
 const { CASE_MESSAGES } = await import('../public/utils/friendly-error.js');
@@ -63,16 +62,18 @@ const setMode = (mode) => db.prepare(`INSERT INTO sync_config (key, value) VALUE
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(mode);
 
 let actor = { id: ADA, role: 'admin' };
-const app = express();
-app.use(express.json({ limit: '2mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['subscriptions', 'budget'],
+  jsonLimit: '2mb',
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use('/api/v1/budget/subscriptions', subscriptions.default);
-app.use('/api/v1/budget', budgetRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));

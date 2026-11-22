@@ -1,24 +1,25 @@
 /** Account transfers through the real router: currencies and atomic paired bookings. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 process.env.SESSION_SECRET = 'transfer-route-test';
 process.env.DB_PATH = ':memory:';
 const dbmod = await import('../server/db.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
 const db = dbmod.get();
 const initialCategories = db.prepare('SELECT * FROM budget_categories').all();
 const initialSubcategories = db.prepare('SELECT * FROM budget_subcategories').all();
 const user = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('transfers', 'Transfers', 'x', 'member')").run().lastInsertRowid);
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = user; req.authRole = 'member'; req.session = { userId: user }; next(); });
-app.use('/', budgetRouter);
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['budget'],
+  auth: (req, _res, next) => { req.authUserId = user; req.authRole = 'member'; req.session = { userId: user }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise(resolve => server.on('listening', resolve));
-const base = `http://127.0.0.1:${server.address().port}`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1/budget`;
 test.after(() => server.close());
 test.afterEach(() => {
   db.exec('DROP TRIGGER IF EXISTS fail_transfer_link');

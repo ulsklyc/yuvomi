@@ -24,14 +24,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 import { freshTestDbPath } from './tmp-db.js';
 freshTestDbPath('subscription-meta-labels');
 process.env.SESSION_SECRET = 'subscription-meta-labels-session-secret-32';
 
 const db = await import('../server/db.js');
-const { default: subscriptionsRouter } = await import('../server/routes/subscriptions.js');
 
 db.init();
 const database = db.get();
@@ -41,13 +40,15 @@ const database = db.get();
 // also ohne zu sagen, was fehlt.
 database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('owner', 'Owner', 'x', 'admin')").run();
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
-app.use('/subscriptions', subscriptionsRouter);
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['subscriptions'],
+  auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise((resolve) => server.once('listening', resolve));
-const baseUrl = `http://127.0.0.1:${server.address().port}/subscriptions`;
+const baseUrl = `http://127.0.0.1:${server.address().port}/api/v1/budget/subscriptions`;
 
 const req = async (method, subPath, body) => {
   const res = await fetch(`${baseUrl}${subPath}`, {
