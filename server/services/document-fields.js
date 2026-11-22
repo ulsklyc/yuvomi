@@ -1,8 +1,8 @@
 /**
  * Module: the value lists of the documents input (#2810, group 8)
  * Purpose: ONE source for what a documents request may carry, read by the
- *          sides that must not drift apart: the route handlers in
- *          server/routes/documents.js and server/routes/dms.js, the storage
+ *          sides that must not drift apart: the option list of
+ *          server/routes/documents.js (`/meta/options`), the storage
  *          service server/services/document-storage.js, and the OpenAPI
  *          document (server/openapi/paths/documents.js and
  *          server/openapi/schemas.js), whose schemas validateRequest() checks

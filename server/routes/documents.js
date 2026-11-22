@@ -8,11 +8,11 @@ import express from 'express';
 import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { str, date as validateDate, num, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { str, date as validateDate, num, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import {
-  DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_UPLOAD_BACKENDS, DOCUMENT_VISIBILITIES,
+  DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_VISIBILITIES,
 } from '../services/document-fields.js';
 import {
   mayReadModule,
@@ -163,6 +163,19 @@ function effectiveMime(content, doc) {
   return live || 'application/octet-stream';
 }
 
+/**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). `0`, `-0`
+ * and `-1` find no document (404); the folder routes keep their own 400 for
+ * them. A leading zero reaches the row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
+
 function userId(req) {
   return req.authUserId || req.session.userId;
 }
@@ -218,12 +231,12 @@ function vExpiryReminderDays(value) {
 function vSubjectUserId(value, stored = null) {
   if (value === undefined) return { value: undefined, error: null };
   if (value === null || value === '') return { value: null, error: null };
-  const parsed = validateId(value, 'subject_user_id');
-  if (parsed.error) return parsed;
-  if (parsed.value !== stored && !isHouseholdMember(parsed.value)) {
-    return { value: null, error: nonMemberMessage([parsed.value]) };
+  // A positive integer or its digits: the schema checked it (#2810).
+  const subjectUserId = Number(value);
+  if (subjectUserId !== stored && !isHouseholdMember(subjectUserId)) {
+    return { value: null, error: nonMemberMessage([subjectUserId]) };
   }
-  return parsed;
+  return { value: subjectUserId, error: null };
 }
 
 /**
@@ -489,42 +502,19 @@ router.get('/storage/config', requireAdmin, validateRequest(), (req, res) => {
   try {
     res.json({ data: storageConfigStatus() });
   } catch (err) {
-    log.error('GET /storage/config error:', err);
-    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true })) return;
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    // Only the store's own refusal is answered here; anything else goes to
+    // the central error handler (#2810).
+    if (!(err instanceof StorageError)) throw err;
+    log.error('GET /storage/config storage error:', err);
+    sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true });
   }
 });
 
 router.put('/storage/config', requireAdmin, validateRequest(), async (req, res) => {
   try {
-    if (
-      req.body.selected_upload_backend !== undefined
-      && !DOCUMENT_UPLOAD_BACKENDS.includes(req.body.selected_upload_backend)
-    ) {
-      return res.status(400).json({
-        error: 'selected_upload_backend must be local, webdav, or google_drive.',
-        code: 400,
-      });
-    }
-    if (
-      req.body.confirm_existing_access !== undefined
-      && typeof req.body.confirm_existing_access !== 'boolean'
-    ) {
-      return res.status(400).json({
-        error: 'confirm_existing_access must be a boolean.',
-        code: 400,
-      });
-    }
-    if (
-      req.body.clear_password !== undefined
-      && typeof req.body.clear_password !== 'boolean'
-    ) {
-      return res.status(400).json({
-        error: 'clear_password must be a boolean.',
-        code: 400,
-      });
-    }
-
+    // `selected_upload_backend` (one of DOCUMENT_UPLOAD_BACKENDS),
+    // `confirm_existing_access` and `clear_password` (booleans) are the
+    // schema's checks (#2810); the service checks the backend again.
     const existing = db.get().prepare(`
       SELECT *
       FROM family_documents
@@ -624,9 +614,11 @@ router.put('/storage/config', requireAdmin, validateRequest(), async (req, res) 
     if (selectorProvided) setSelectedUploadBackend(req.body.selected_upload_backend);
     res.json({ data: storageConfigStatus() });
   } catch (err) {
-    log.error('PUT /storage/config error:', err);
-    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true })) return;
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    // Only the store's own refusal is answered here; anything else goes to
+    // the central error handler (#2810).
+    if (!(err instanceof StorageError)) throw err;
+    log.error('PUT /storage/config storage error:', err);
+    sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true });
   }
 });
 
@@ -636,34 +628,31 @@ router.post('/storage/test', requireAdmin, validateRequest(), async (req, res) =
     const result = await testStorageConnection(req.body);
     res.json({ data: result });
   } catch (err) {
-    log.error('POST /storage/test error:', err);
-    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true })) return;
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    // Only the store's own refusal is answered here; anything else goes to
+    // the central error handler (#2810).
+    if (!(err instanceof StorageError)) throw err;
+    log.error('POST /storage/test storage error:', err);
+    sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true });
   }
 });
 
 router.get('/meta/options', validateRequest(), (req, res) => {
-  try {
-    const dmsAccounts = db.get().prepare('SELECT id, name, provider FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
-    res.json({
-      data: {
-        categories: CATEGORIES,
-        visibilities: VISIBILITIES,
-        statuses: STATUSES,
-        max_file_size: MAX_FILE_BYTES,
-        allowed_mime_types: Array.from(ALLOWED_MIME),
-        storage_providers: ['local', 'external'],
-        active_upload_backend: getActiveUploadBackend(),
-        // Der Client blendet Deep-Links in die (admin-only) Dokument-Einstellungen
-        // nur ein, wenn sie auch erreichbar sind — kein toter Link für Mitglieder.
-        is_admin: isAdminRequest(req),
-        dms_accounts: isAdminRequest(req) ? dmsAccounts : [],
-      },
-    });
-  } catch (err) {
-    log.error('GET /meta/options error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const dmsAccounts = db.get().prepare('SELECT id, name, provider FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
+  res.json({
+    data: {
+      categories: CATEGORIES,
+      visibilities: VISIBILITIES,
+      statuses: STATUSES,
+      max_file_size: MAX_FILE_BYTES,
+      allowed_mime_types: Array.from(ALLOWED_MIME),
+      storage_providers: ['local', 'external'],
+      active_upload_backend: getActiveUploadBackend(),
+      // Der Client blendet Deep-Links in die (admin-only) Dokument-Einstellungen
+      // nur ein, wenn sie auch erreichbar sind - kein toter Link für Mitglieder.
+      is_admin: isAdminRequest(req),
+      dms_accounts: isAdminRequest(req) ? dmsAccounts : [],
+    },
+  });
 });
 
 /**
@@ -842,77 +831,67 @@ function folderMoveError(folderId, parentId) {
 }
 
 /**
- * Liest `parent_id` aus einem Request-Body.
- * @returns {{ value: number|null, error: string|null }}
+ * Liest `parent_id` aus einem Request-Body: eine positive Ganzzahl oder ihre
+ * Ziffern, oder null - das prueft das Schema davor (#2810).
+ * @param {unknown} value
+ * @returns {number|null}
  */
 function parentId(value) {
-  if (value === undefined || value === null || value === '') return { value: null, error: null };
-  const num = Number(value);
-  if (!Number.isInteger(num) || num <= 0) return { value: null, error: 'Invalid parent folder id.' };
-  return { value: num, error: null };
+  if (value === undefined || value === null || value === '') return null;
+  return Number(value);
 }
 
 router.get('/folders', validateRequest(), (_req, res) => {
-  try {
-    // Flach mit `parent_id`, nicht verschachtelt: der Baum wird im Browser
-    // gebaut, weil dort ohnehin die Zaehler und der aufgeklappte Zustand
-    // dazukommen. Eine geschachtelte Antwort waere derselbe Inhalt in einer
-    // Form, die der Client wieder auseinandernehmen muss.
-    //
-    // Die Sortierung ist die Geschwisterfolge - der Aufbau haengt sie unter
-    // ihre Eltern, die Reihenfolge innerhalb einer Ebene steht damit schon
-    // hier fest und nicht in zwei Clients verschieden.
-    const rows = db.get().prepare(`
-      SELECT id, name, parent_id, module_key, created_by, created_at, updated_at
-      FROM family_document_folders
-      ORDER BY name COLLATE NOCASE ASC
-    `).all();
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /folders error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  // Flach mit `parent_id`, nicht verschachtelt: der Baum wird im Browser
+  // gebaut, weil dort ohnehin die Zaehler und der aufgeklappte Zustand
+  // dazukommen. Eine geschachtelte Antwort waere derselbe Inhalt in einer
+  // Form, die der Client wieder auseinandernehmen muss.
+  //
+  // Die Sortierung ist die Geschwisterfolge - der Aufbau haengt sie unter
+  // ihre Eltern, die Reihenfolge innerhalb einer Ebene steht damit schon
+  // hier fest und nicht in zwei Clients verschieden.
+  const rows = db.get().prepare(`
+    SELECT id, name, parent_id, module_key, created_by, created_at, updated_at
+    FROM family_document_folders
+    ORDER BY name COLLATE NOCASE ASC
+  `).all();
+  res.json({ data: rows });
 });
 
 router.get('/folders/:id/delete-impact', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ error: 'Invalid folder id.', code: 400 });
-    }
-    const existing = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(id);
-    if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404, reason: 'documents_folder_not_found' });
-
-    const subtree = [...subtreeIds(allFolders(), id)];
-    const visibleDocuments = visibleFolderDocuments(req, subtree);
-    // AUCH DAS URTEIL SIEHT NUR DAS SICHTBARE (#1358). `can_delete_documents`
-    // fragte, ob ALLE Dokumente im Zweig sichtbar sind - fuer einen Admin, der
-    // jedes sichtbare Dokument loeschen darf, hiess `false` genau: hier liegt
-    // ein privates Dokument, das du nicht siehst. Die Vorschau ist mit und
-    // ohne unsichtbares Dokument dieselbe, und das DELETE ebenso: es loescht
-    // nur das Sichtbare, ein unsichtbares Dokument verliert nur den Ordner.
-    const canDeleteDocuments = visibleDocuments.every((document) => mayManage(req, document));
-
-    // DER SNAPSHOT DECKT NUR, WAS DIE FRAGENDE PERSON SIEHT (#1355). Ueber
-    // alle Dokumente gebildet, aenderte er sich mit jedem unsichtbaren
-    // Dokument, das in den Zweig kam, ging oder verknuepft wurde - zweimal
-    // fragen verriet Aktivitaet an fremden privaten Dokumenten. Dasselbe gilt
-    // fuer die Verknuepfungen: nur aus lesbaren Modulen, nur sichtbare
-    // Datensaetze (folderDeleteLinkedState).
-    const visibleIds = visibleDocuments.map((document) => document.id);
-    const visibleLinkedState = folderDeleteLinkedState(req, visibleIds);
-    res.json({ data: {
-      id,
-      removed_folders: subtree.length,
-      documents: visibleDocuments.length,
-      can_delete_documents: canDeleteDocuments,
-      linked_records: folderDeleteLinkedRecords(visibleLinkedState),
-      snapshot: folderDeleteSnapshot(subtree, visibleIds, visibleLinkedState),
-    } });
-  } catch (err) {
-    log.error('GET /folders/:id/delete-impact error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const id = pathId(req);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid folder id.', code: 400 });
   }
+  const existing = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404, reason: 'documents_folder_not_found' });
+
+  const subtree = [...subtreeIds(allFolders(), id)];
+  const visibleDocuments = visibleFolderDocuments(req, subtree);
+  // AUCH DAS URTEIL SIEHT NUR DAS SICHTBARE (#1358). `can_delete_documents`
+  // fragte, ob ALLE Dokumente im Zweig sichtbar sind - fuer einen Admin, der
+  // jedes sichtbare Dokument loeschen darf, hiess `false` genau: hier liegt
+  // ein privates Dokument, das du nicht siehst. Die Vorschau ist mit und
+  // ohne unsichtbares Dokument dieselbe, und das DELETE ebenso: es loescht
+  // nur das Sichtbare, ein unsichtbares Dokument verliert nur den Ordner.
+  const canDeleteDocuments = visibleDocuments.every((document) => mayManage(req, document));
+
+  // DER SNAPSHOT DECKT NUR, WAS DIE FRAGENDE PERSON SIEHT (#1355). Ueber
+  // alle Dokumente gebildet, aenderte er sich mit jedem unsichtbaren
+  // Dokument, das in den Zweig kam, ging oder verknuepft wurde - zweimal
+  // fragen verriet Aktivitaet an fremden privaten Dokumenten. Dasselbe gilt
+  // fuer die Verknuepfungen: nur aus lesbaren Modulen, nur sichtbare
+  // Datensaetze (folderDeleteLinkedState).
+  const visibleIds = visibleDocuments.map((document) => document.id);
+  const visibleLinkedState = folderDeleteLinkedState(req, visibleIds);
+  res.json({ data: {
+    id,
+    removed_folders: subtree.length,
+    documents: visibleDocuments.length,
+    can_delete_documents: canDeleteDocuments,
+    linked_records: folderDeleteLinkedRecords(visibleLinkedState),
+    snapshot: folderDeleteSnapshot(subtree, visibleIds, visibleLinkedState),
+  } });
 });
 
 /**
@@ -937,17 +916,16 @@ router.post('/folders', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
-    const vParent = parentId(req.body.parent_id);
-    if (vParent.error) return res.status(400).json({ error: vParent.error, code: 400 });
-    if (vParent.value !== null && activeFolderTreeDeletes.has(vParent.value)) {
+    const parent = parentId(req.body.parent_id);
+    if (parent !== null && activeFolderTreeDeletes.has(parent)) {
       return deletionInProgress(res);
     }
 
-    const moveError = folderMoveError(null, vParent.value);
+    const moveError = folderMoveError(null, parent);
     if (moveError) return res.status(400).json({ ...moveError, code: 400 });
 
     const result = db.get().prepare('INSERT INTO family_document_folders (name, parent_id, created_by) VALUES (?, ?, ?)')
-      .run(vName.value, vParent.value, userId(req));
+      .run(vName.value, parent, userId(req));
     const row = db.get().prepare(`SELECT ${FOLDER_COLUMNS} FROM family_document_folders WHERE id = ?`)
       .get(result.lastInsertRowid);
     res.status(201).json({ data: row });
@@ -957,14 +935,13 @@ router.post('/folders', validateRequest(), (req, res) => {
       // v164) - "Rechnungen" darf unter "Auto" und unter "Wohnung" stehen.
       return res.status(409).json({ error: 'A folder with this name already exists here.', code: 409, reason: 'documents_folder_exists' });
     }
-    log.error('POST /folders error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 router.put('/folders/:id', validateRequest(), (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const id = pathId(req);
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: 'Invalid folder id.', code: 400 });
     }
@@ -985,14 +962,13 @@ router.put('/folders/:id', validateRequest(), (req, res) => {
 
     let parent = existing.parent_id;
     if (req.body.parent_id !== undefined) {
-      const vParent = parentId(req.body.parent_id);
-      if (vParent.error) return res.status(400).json({ error: vParent.error, code: 400 });
-      if (vParent.value !== null && activeFolderTreeDeletes.has(vParent.value)) {
+      const newParent = parentId(req.body.parent_id);
+      if (newParent !== null && activeFolderTreeDeletes.has(newParent)) {
         return deletionInProgress(res);
       }
-      const moveError = folderMoveError(id, vParent.value);
+      const moveError = folderMoveError(id, newParent);
       if (moveError) return res.status(400).json({ ...moveError, code: 400 });
-      parent = vParent.value;
+      parent = newParent;
     }
 
     db.get().prepare('UPDATE family_document_folders SET name = ?, parent_id = ? WHERE id = ?')
@@ -1003,38 +979,26 @@ router.put('/folders/:id', validateRequest(), (req, res) => {
     if (err.message?.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'A folder with this name already exists here.', code: 409, reason: 'documents_folder_exists' });
     }
-    log.error('PUT /folders/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 router.delete('/folders/:id', validateRequest(), async (req, res) => {
   let deletionLock = null;
   try {
-    const id = Number(req.params.id);
+    const id = pathId(req);
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: 'Invalid folder id.', code: 400 });
     }
+    // `documents` (unfile|delete), the expected counts (integers from 0) and
+    // the snapshot (64 hex digits) are the schema's checks (#2810).
     const documentAction = req.query.documents || 'unfile';
-    if (!['unfile', 'delete'].includes(documentAction)) {
-      return res.status(400).json({ error: 'Invalid folder document action.', code: 400 });
-    }
-    const parseExpectedCount = (value) => {
-      if (value === undefined) return null;
-      const count = Number(value);
-      return Number.isInteger(count) && count >= 0 ? count : Number.NaN;
-    };
-    const expectedDocuments = parseExpectedCount(req.query.expected_documents);
-    const expectedFolders = parseExpectedCount(req.query.expected_folders);
+    const expectedCount = (/** @type {unknown} */ value) => (value === undefined ? null : Number(value));
+    const expectedDocuments = expectedCount(req.query.expected_documents);
+    const expectedFolders = expectedCount(req.query.expected_folders);
     const expectedSnapshot = req.query.expected_snapshot === undefined
       ? null
       : String(req.query.expected_snapshot);
-    if (Number.isNaN(expectedDocuments) || Number.isNaN(expectedFolders)) {
-      return res.status(400).json({ error: 'Invalid expected folder impact.', code: 400 });
-    }
-    if (expectedSnapshot !== null && !/^[a-f0-9]{64}$/.test(expectedSnapshot)) {
-      return res.status(400).json({ error: 'Invalid expected folder snapshot.', code: 400 });
-    }
     const existing = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'Folder not found.', code: 404, reason: 'documents_folder_not_found' });
 
@@ -1226,95 +1190,82 @@ router.delete('/folders/:id', validateRequest(), async (req, res) => {
       failed_documents: [],
       folder_deleted: true,
     } });
-  } catch (err) {
-    log.error('DELETE /folders/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
   } finally {
+    // Also when the error goes on to the central handler (#2810).
     deletionLock?.folderIds.forEach((folderId) => activeFolderTreeDeletes.delete(folderId));
     unlockDocumentDeletes(deletionLock?.documentIds);
   }
 });
 
 router.get('/', validateRequest(), (req, res) => {
-  try {
-    const status = STATUSES.includes(req.query.status) ? req.query.status : 'active';
-    const category = CATEGORIES.includes(req.query.category) ? req.query.category : null;
-    const folderId = req.query.folder_id !== undefined && req.query.folder_id !== ''
-      ? Number(req.query.folder_id)
-      : null;
-    // `?expiring=<days>` - Dokumente, deren Ablauf innerhalb der naechsten N Tage
-    // liegt oder bereits vergangen ist (dieselbe "faellig ODER ueberfaellig"-
-    // Lesart wie der Chip von public/utils/date-status.js). Ein ungueltiger Wert
-    // wird still uebersprungen (Filter bleibt aus, volle Liste) statt mit 400
-    // abgelehnt - derselbe Umgang wie beim Rest dieser Route (`status`/`category`
-    // fallen ebenso auf "kein Filter" zurueck statt einen Request abzulehnen).
-    const expiringDays = req.query.expiring !== undefined && req.query.expiring !== ''
-      ? Number(req.query.expiring)
-      : null;
-    const expiringWithinDays = Number.isInteger(expiringDays) && expiringDays >= 0 ? expiringDays : null;
-    // Ein Filter ueber die sichtbaren Dokumente, kein Weg an ihnen vorbei: er
-    // steht in derselben Abfrage wie `canSeeSql`. Nur fuer eine API-Anfrage; die
-    // Seite filtert ihre geladene Liste im Browser (`matchesPerson`).
-    const vSubject = req.query.subject_user_id !== undefined
-      ? validateId(req.query.subject_user_id, 'subject_user_id')
-      : { value: null, error: null };
-    if (vSubject.error) return res.status(400).json({ error: vSubject.error, code: 400 });
+  // Every query value is the schema's check (#2810): `status` and `category`
+  // from their lists, `folder_id` and `subject_user_id` positive integers,
+  // `expiring` an integer from 0. An unknown value fell back on "no filter"
+  // until v2.93; it is a 400 now. Left out is still no filter (`active` for
+  // the status).
+  const status = req.query.status ?? 'active';
+  const category = req.query.category ?? null;
+  const folderId = req.query.folder_id === undefined ? null : Number(req.query.folder_id);
+  // `?expiring=<days>` - Dokumente, deren Ablauf innerhalb der naechsten N Tage
+  // liegt oder bereits vergangen ist (dieselbe "faellig ODER ueberfaellig"-
+  // Lesart wie der Chip von public/utils/date-status.js).
+  const expiringWithinDays = req.query.expiring === undefined ? null : Number(req.query.expiring);
+  // Ein Filter ueber die sichtbaren Dokumente, kein Weg an ihnen vorbei: er
+  // steht in derselben Abfrage wie `canSeeSql`. Nur fuer eine API-Anfrage; die
+  // Seite filtert ihre geladene Liste im Browser (`matchesPerson`).
+  const subjectUserId = req.query.subject_user_id === undefined ? null : Number(req.query.subject_user_id);
 
-    /* EIN ORDNER ZEIGT AUCH, WAS UNTER IHM LIEGT (#785).
-     *
-     * In der flachen Ablage waren "Ordner" und "Filter" dasselbe. In einem
-     * Baum ist die alte Antwort die falsche: wer "Wohnung" oeffnet und alle
-     * zwoelf Dokumente in "Wohnung/Miete" abgelegt hat, saehe eine leere
-     * Ansicht und muesste raten, wo sie sind.
-     *
-     * Die ids kommen als Liste in die Abfrage und nicht als rekursives CTE:
-     * die Tiefe ist auf fuenf begrenzt, es sind also eine Handvoll Zeilen -
-     * und die Liste wird ohnehin gebraucht, um zu erkennen, dass der Ordner
-     * gar nicht existiert (dann darf die Antwort nicht stillschweigend ALLE
-     * Dokumente zeigen, was ein blosses `IS NULL` taete).
-     */
-    let subtree = null;
-    if (folderId != null && Number.isInteger(folderId) && folderId > 0) {
-      const exists = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(folderId);
-      subtree = exists ? [...subtreeIds(allFolders(), folderId)] : [folderId];
-    }
-
-    /* Benannte Platzhalter auch fuer die Liste: die uebrige Abfrage laeuft
-     * ueber `@userId`/`@status`, und better-sqlite3 nimmt benannte und
-     * positionelle Parameter nicht im selben Aufruf. */
-    const folderParams = Object.fromEntries((subtree ?? []).map((value, i) => [`f${i}`, value]));
-    const folderClause = subtree
-      ? `AND d.folder_id IN (${subtree.map((_v, i) => `@f${i}`).join(',')})`
-      : '';
-    const params = {
-      userId: userId(req), status, category, expiringWithinDays, subjectUserId: vSubject.value,
-      // `expires_at` ist ein lokal eingegebener Kalendertag, kein Instant -
-      // `date('now')` waere der UTC-Tag und oestlich von UTC am fruehen Abend,
-      // westlich davon am fruehen Morgen der falsche (server/services/
-      // task-scope.js hat dieselbe Falle). `todayKey()` bindet stattdessen den
-      // Haushalts-Tagesschluessel als Parameter.
-      today: todayKey(db.get()),
-      ...folderParams,
-    };
-    const expiringClause = expiringWithinDays !== null
-      ? "AND d.expires_at IS NOT NULL AND date(d.expires_at) <= date(@today, '+' || @expiringWithinDays || ' days')"
-      : '';
-    const rows = db.get().prepare(`
-      ${documentSelect()}
-      WHERE ${canSeeSql('d')}
-        AND d.status = @status
-        AND (@category IS NULL OR d.category = @category)
-        AND (@subjectUserId IS NULL OR d.subject_user_id = @subjectUserId)
-        ${folderClause}
-        ${expiringClause}
-      GROUP BY d.id
-      ORDER BY d.updated_at DESC
-    `).all(params);
-    res.json({ data: rows.map(normalizeDocument) });
-  } catch (err) {
-    log.error('GET / error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  /* EIN ORDNER ZEIGT AUCH, WAS UNTER IHM LIEGT (#785).
+   *
+   * In der flachen Ablage waren "Ordner" und "Filter" dasselbe. In einem
+   * Baum ist die alte Antwort die falsche: wer "Wohnung" oeffnet und alle
+   * zwoelf Dokumente in "Wohnung/Miete" abgelegt hat, saehe eine leere
+   * Ansicht und muesste raten, wo sie sind.
+   *
+   * Die ids kommen als Liste in die Abfrage und nicht als rekursives CTE:
+   * die Tiefe ist auf fuenf begrenzt, es sind also eine Handvoll Zeilen -
+   * und die Liste wird ohnehin gebraucht, um zu erkennen, dass der Ordner
+   * gar nicht existiert (dann darf die Antwort nicht stillschweigend ALLE
+   * Dokumente zeigen, was ein blosses `IS NULL` taete).
+   */
+  let subtree = null;
+  if (folderId !== null) {
+    const exists = db.get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(folderId);
+    subtree = exists ? [...subtreeIds(allFolders(), folderId)] : [folderId];
   }
+
+  /* Benannte Platzhalter auch fuer die Liste: die uebrige Abfrage laeuft
+   * ueber `@userId`/`@status`, und better-sqlite3 nimmt benannte und
+   * positionelle Parameter nicht im selben Aufruf. */
+  const folderParams = Object.fromEntries((subtree ?? []).map((value, i) => [`f${i}`, value]));
+  const folderClause = subtree
+    ? `AND d.folder_id IN (${subtree.map((_v, i) => `@f${i}`).join(',')})`
+    : '';
+  const params = {
+    userId: userId(req), status, category, expiringWithinDays, subjectUserId,
+    // `expires_at` ist ein lokal eingegebener Kalendertag, kein Instant -
+    // `date('now')` waere der UTC-Tag und oestlich von UTC am fruehen Abend,
+    // westlich davon am fruehen Morgen der falsche (server/services/
+    // task-scope.js hat dieselbe Falle). `todayKey()` bindet stattdessen den
+    // Haushalts-Tagesschluessel als Parameter.
+    today: todayKey(db.get()),
+    ...folderParams,
+  };
+  const expiringClause = expiringWithinDays !== null
+    ? "AND d.expires_at IS NOT NULL AND date(d.expires_at) <= date(@today, '+' || @expiringWithinDays || ' days')"
+    : '';
+  const rows = db.get().prepare(`
+    ${documentSelect()}
+    WHERE ${canSeeSql('d')}
+      AND d.status = @status
+      AND (@category IS NULL OR d.category = @category)
+      AND (@subjectUserId IS NULL OR d.subject_user_id = @subjectUserId)
+      ${folderClause}
+      ${expiringClause}
+    GROUP BY d.id
+    ORDER BY d.updated_at DESC
+  `).all(params);
+  res.json({ data: rows.map(normalizeDocument) });
 });
 
 router.post('/', validateRequest(), async (req, res) => {
@@ -1331,22 +1282,25 @@ router.post('/', validateRequest(), async (req, res) => {
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     // `folder_key` benennt den Systemordner eines Moduls, `folder_name` nur
-    // seine Beschriftung. Ein unbekannter Schluessel wird still verworfen und
-    // faellt auf den Namen zurueck - eine aeltere App-Version, die ihn noch
-    // nicht mitschickt, legt weiter ueber den Namen ab (Migration v157).
+    // seine Beschriftung. Ohne Schluessel legt eine aeltere App-Version weiter
+    // ueber den Namen ab (Migration v157). Einen unbekannten Schluessel weist
+    // seit #2810 das Schema ab; die Pruefung hier bleibt, weil der Schluessel
+    // in ensureModuleFolder() eine Liste nachschlaegt.
     const folderKey = isModuleFolderKey(req.body.folder_key) ? req.body.folder_key : null;
 
-    const category = CATEGORIES.includes(req.body.category) ? req.body.category : 'other';
-    const visibility = VISIBILITIES.includes(req.body.visibility) ? req.body.visibility : 'family';
-    const vFolderId = req.body.folder_id !== undefined && req.body.folder_id !== null && req.body.folder_id !== ''
-      ? validateId(req.body.folder_id, 'folder_id')
-      : { value: null, error: null };
-    if (vFolderId.error) return res.status(400).json({ error: vFolderId.error, code: 400 });
-    if (req.body.folder_id !== undefined && vFolderId.value !== null
-        && activeFolderTreeDeletes.has(vFolderId.value)) {
+    // `category` und `visibility` aus ihren Listen, `folder_id` als positive
+    // Ganzzahl oder ihre Ziffern: das prueft das Schema davor (#2810). Bis
+    // v2.93 wurde ein unbekannter Wert still zu `other` bzw. `family`.
+    const category = req.body.category ?? 'other';
+    const visibility = req.body.visibility ?? 'family';
+    const selectedFolderId = req.body.folder_id !== undefined && req.body.folder_id !== null && req.body.folder_id !== ''
+      ? Number(req.body.folder_id)
+      : null;
+    if (req.body.folder_id !== undefined && selectedFolderId !== null
+        && activeFolderTreeDeletes.has(selectedFolderId)) {
       return deletionInProgress(res);
     }
-    if (selectedFolderMissing(vFolderId.value)) return selectedFolderGone(res);
+    if (selectedFolderMissing(selectedFolderId)) return selectedFolderGone(res);
     const parsed = parseDataUrl(req.body.content_data);
     if (parsed.error) {
       return res.status(400).json({ error: parsed.error, code: 400, ...(parsed.reason ? { reason: parsed.reason } : {}) });
@@ -1367,8 +1321,8 @@ router.post('/', validateRequest(), async (req, res) => {
       // NOCHMAL, OHNE YIELD DAZWISCHEN: die Pruefung oben lag vor dem await des
       // Ablegens, und dort kann ein anderes Loeschen den Ordner nehmen (Review
       // zu #1994). Erst hier ist das Ergebnis bis zum INSERT verbindlich.
-      if (selectedFolderMissing(vFolderId.value)) throw new SelectedFolderGoneError();
-      const folderId = vFolderId.value ?? ensureFolder(folderKey, vFolderName.value, userId(req));
+      if (selectedFolderMissing(selectedFolderId)) throw new SelectedFolderGoneError();
+      const folderId = selectedFolderId ?? ensureFolder(folderKey, vFolderName.value, userId(req));
       const expiresAt = vExpiresAtField.value ?? null;
       const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
       const subjectUserId = vSubjectField.value ?? null;
@@ -1417,7 +1371,8 @@ router.post('/', validateRequest(), async (req, res) => {
       return sendStorageError(res, err, 'Document storage upload failed.');
     }
     const folderGone = err instanceof SelectedFolderGoneError;
-    if (!folderGone) log.error('POST / error:', err);
+    // The staged file goes in every case, also before an unexpected error
+    // goes on to the central error handler (#2810).
     if (stagedUpload) {
       try {
         await cleanupStagedUpload(stagedUpload);
@@ -1431,127 +1386,118 @@ router.post('/', validateRequest(), async (req, res) => {
       }
     }
     if (folderGone) return selectedFolderGone(res);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 router.put('/:id', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const existing = getVisibleDocument(id, req);
-    if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
-    if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
+  const id = pathId(req);
+  const existing = getVisibleDocument(id, req);
+  if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
+  if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
 
-    const vName = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_TITLE }) : { value: null };
-    const vDescription = req.body.description !== undefined ? str(req.body.description, 'Description', { max: MAX_TEXT, required: false }) : { value: null };
-    const vExpiresAtField = vExpiresAt(req.body.expires_at);
-    const vExpiryReminderDaysField = vExpiryReminderDays(req.body.expiry_reminder_days);
-    const vSubjectField = vSubjectUserId(req.body.subject_user_id, existing.subject_user_id);
-    const errors = collectErrors([vName, vDescription, vExpiresAtField, vExpiryReminderDaysField, vSubjectField]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const vName = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_TITLE }) : { value: null };
+  const vDescription = req.body.description !== undefined ? str(req.body.description, 'Description', { max: MAX_TEXT, required: false }) : { value: null };
+  const vExpiresAtField = vExpiresAt(req.body.expires_at);
+  const vExpiryReminderDaysField = vExpiryReminderDays(req.body.expiry_reminder_days);
+  const vSubjectField = vSubjectUserId(req.body.subject_user_id, existing.subject_user_id);
+  const errors = collectErrors([vName, vDescription, vExpiresAtField, vExpiryReminderDaysField, vSubjectField]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const category = req.body.category !== undefined && CATEGORIES.includes(req.body.category) ? req.body.category : null;
-    const visibility = req.body.visibility !== undefined && VISIBILITIES.includes(req.body.visibility) ? req.body.visibility : null;
-    const status = req.body.status !== undefined && STATUSES.includes(req.body.status) ? req.body.status : null;
-    const vFolderId = req.body.folder_id !== undefined && req.body.folder_id !== null && req.body.folder_id !== ''
-      ? validateId(req.body.folder_id, 'folder_id')
-      : { value: null, error: null };
-    if (vFolderId.error) return res.status(400).json({ error: vFolderId.error, code: 400 });
-    if (req.body.folder_id !== undefined && vFolderId.value !== null
-        && activeFolderTreeDeletes.has(vFolderId.value)) {
-      return deletionInProgress(res);
-    }
-    if (selectedFolderMissing(vFolderId.value)) return selectedFolderGone(res);
-    const allowedIds = (visibility || existing.visibility) === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
-    // Neu freigeben laesst sich nur Haushaltsmitgliedern (#1207). Wer schon
-    // freigegeben ist - auch Hauspersonal oder ein Gast -, bleibt speicherbar.
-    // Geprueft vor dem UPDATE: eine abgelehnte Anfrage aendert nichts.
-    const storedAccess = db.get().prepare('SELECT user_id FROM family_document_access WHERE document_id = ?')
-      .all(id).map((row) => row.user_id);
-    const strangers = accessStrangers(allowedIds, storedAccess);
-    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-    const expiresAt = req.body.expires_at !== undefined ? vExpiresAtField.value : existing.expires_at;
-    const expiryReminderDays = req.body.expiry_reminder_days !== undefined ? vExpiryReminderDaysField.value : existing.expiry_reminder_days;
-    const subjectUserId = req.body.subject_user_id !== undefined ? vSubjectField.value : existing.subject_user_id;
-    db.get().prepare(`
-      UPDATE family_documents
-      SET name = COALESCE(?, name),
-          description = ?,
-          category = COALESCE(?, category),
-          visibility = COALESCE(?, visibility),
-          status = COALESCE(?, status),
-          folder_id = ?,
-          expires_at = ?,
-          expiry_reminder_days = ?,
-          subject_user_id = ?
-      WHERE id = ?
-    `).run(
-      req.body.name !== undefined ? vName.value : null,
-      req.body.description !== undefined ? vDescription.value : existing.description,
-      category,
-      visibility,
-      status,
-      req.body.folder_id !== undefined ? vFolderId.value : existing.folder_id,
-      expiresAt,
-      expiryReminderDays,
-      subjectUserId,
-      id
-    );
-    replaceAccess(id, allowedIds);
-
-    // Ein archiviertes Dokument darf nicht mehr nagen (ein archiviertes
-    // Passfoto etwa) - dieselbe Teardown-Regel wie DELETE/Ordner-Loeschen.
-    const finalStatus = status ?? existing.status;
-    if (finalStatus === 'archived') {
-      removeDocumentExpiryReminder(id);
-    } else {
-      syncDocumentExpiryReminder({
-        id, expires_at: expiresAt, expiry_reminder_days: expiryReminderDays, created_by: existing.created_by, subject_user_id: subjectUserId,
-      });
-    }
-
-    const row = db.get().prepare(`${documentSelect()} WHERE d.id = ? GROUP BY d.id`).get(id);
-    res.json({ data: normalizeDocument(row) });
-  } catch (err) {
-    log.error('PUT /:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // The lists and the folder id are the schema's checks (#2810); an unknown
+  // value was ignored until v2.93. Left out still keeps what is stored.
+  const category = req.body.category ?? null;
+  const visibility = req.body.visibility ?? null;
+  const status = req.body.status ?? null;
+  const selectedFolderId = req.body.folder_id !== undefined && req.body.folder_id !== null && req.body.folder_id !== ''
+    ? Number(req.body.folder_id)
+    : null;
+  if (req.body.folder_id !== undefined && selectedFolderId !== null
+      && activeFolderTreeDeletes.has(selectedFolderId)) {
+    return deletionInProgress(res);
   }
+  if (selectedFolderMissing(selectedFolderId)) return selectedFolderGone(res);
+  const allowedIds = (visibility || existing.visibility) === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
+  // Neu freigeben laesst sich nur Haushaltsmitgliedern (#1207). Wer schon
+  // freigegeben ist - auch Hauspersonal oder ein Gast -, bleibt speicherbar.
+  // Geprueft vor dem UPDATE: eine abgelehnte Anfrage aendert nichts.
+  const storedAccess = db.get().prepare('SELECT user_id FROM family_document_access WHERE document_id = ?')
+    .all(id).map((row) => row.user_id);
+  const strangers = accessStrangers(allowedIds, storedAccess);
+  if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+  const expiresAt = req.body.expires_at !== undefined ? vExpiresAtField.value : existing.expires_at;
+  const expiryReminderDays = req.body.expiry_reminder_days !== undefined ? vExpiryReminderDaysField.value : existing.expiry_reminder_days;
+  const subjectUserId = req.body.subject_user_id !== undefined ? vSubjectField.value : existing.subject_user_id;
+  db.get().prepare(`
+    UPDATE family_documents
+    SET name = COALESCE(?, name),
+        description = ?,
+        category = COALESCE(?, category),
+        visibility = COALESCE(?, visibility),
+        status = COALESCE(?, status),
+        folder_id = ?,
+        expires_at = ?,
+        expiry_reminder_days = ?,
+        subject_user_id = ?
+    WHERE id = ?
+  `).run(
+    req.body.name !== undefined ? vName.value : null,
+    req.body.description !== undefined ? vDescription.value : existing.description,
+    category,
+    visibility,
+    status,
+    req.body.folder_id !== undefined ? selectedFolderId : existing.folder_id,
+    expiresAt,
+    expiryReminderDays,
+    subjectUserId,
+    id
+  );
+  replaceAccess(id, allowedIds);
+
+  // Ein archiviertes Dokument darf nicht mehr nagen (ein archiviertes
+  // Passfoto etwa) - dieselbe Teardown-Regel wie DELETE/Ordner-Loeschen.
+  const finalStatus = status ?? existing.status;
+  if (finalStatus === 'archived') {
+    removeDocumentExpiryReminder(id);
+  } else {
+    syncDocumentExpiryReminder({
+      id, expires_at: expiresAt, expiry_reminder_days: expiryReminderDays, created_by: existing.created_by, subject_user_id: subjectUserId,
+    });
+  }
+
+  const row = db.get().prepare(`${documentSelect()} WHERE d.id = ? GROUP BY d.id`).get(id);
+  res.json({ data: normalizeDocument(row) });
 });
 
 router.patch('/:id/archive', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const existing = getVisibleDocument(id, req);
-    if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
-    if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
-    if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
-    const status = req.body.archived === false ? 'active' : 'archived';
-    db.get().prepare('UPDATE family_documents SET status = ? WHERE id = ?').run(status, id);
-    // Ein archiviertes Dokument darf nicht mehr nagen (ein archiviertes
-    // Passfoto etwa). Reaktivieren stellt die Erinnerung wieder her, falls die
-    // Ablauf-Angaben noch stehen.
-    if (status === 'archived') {
-      removeDocumentExpiryReminder(id);
-    } else {
-      syncDocumentExpiryReminder({
-        id,
-        expires_at: existing.expires_at,
-        expiry_reminder_days: existing.expiry_reminder_days,
-        created_by: existing.created_by,
-        subject_user_id: existing.subject_user_id,
-      });
-    }
-    res.json({ data: { id, status } });
-  } catch (err) {
-    log.error('PATCH /:id/archive error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const id = pathId(req);
+  const existing = getVisibleDocument(id, req);
+  if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
+  if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
+  const status = req.body.archived === false ? 'active' : 'archived';
+  db.get().prepare('UPDATE family_documents SET status = ? WHERE id = ?').run(status, id);
+  // Ein archiviertes Dokument darf nicht mehr nagen (ein archiviertes
+  // Passfoto etwa). Reaktivieren stellt die Erinnerung wieder her, falls die
+  // Ablauf-Angaben noch stehen.
+  if (status === 'archived') {
+    removeDocumentExpiryReminder(id);
+  } else {
+    syncDocumentExpiryReminder({
+      id,
+      expires_at: existing.expires_at,
+      expiry_reminder_days: existing.expiry_reminder_days,
+      created_by: existing.created_by,
+      subject_user_id: existing.subject_user_id,
+    });
   }
+  res.json({ data: { id, status } });
 });
 
 router.get('/:id/thumbnail', validateRequest(), async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const id = pathId(req);
     const doc = getVisibleDocument(id, req, true);
     if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404 });
     if (doc.storage_backend !== 'dms') {
@@ -1575,7 +1521,7 @@ router.get('/:id/thumbnail', validateRequest(), async (req, res) => {
 // eines Restores 503, sonst festgehalten wie eine schreibende Anfrage (#1551).
 router.get('/:id/preview', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const id = pathId(req);
     const doc = getVisibleDocument(id, req, true);
     if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404 });
     const content = await resolveDocumentContent(doc);
@@ -1610,15 +1556,15 @@ router.get('/:id/preview', refuseWhileRestoring, validateRequest(), async (req, 
     if (err instanceof DmsDocumentUnavailableError) {
       return res.status(404).json({ error: 'Linked DMS account is gone.', code: 404 });
     }
-    log.error('GET /:id/preview error:', err);
-    if (sendStorageError(res, err, 'Document storage read failed.')) return;
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (!(err instanceof StorageError)) throw err;
+    log.error('GET /:id/preview storage error:', err);
+    sendStorageError(res, err, 'Document storage read failed.');
   }
 });
 
 router.get('/:id/download', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const id = pathId(req);
     const doc = getVisibleDocument(id, req, true);
     if (!doc) return res.status(404).json({ error: 'Document not found.', code: 404 });
     const content = await resolveDocumentContent(doc);
@@ -1633,16 +1579,16 @@ router.get('/:id/download', refuseWhileRestoring, validateRequest(), async (req,
     if (err instanceof DmsDocumentUnavailableError) {
       return res.status(404).json({ error: 'Linked DMS account is gone.', code: 404 });
     }
-    log.error('GET /:id/download error:', err);
-    if (sendStorageError(res, err, 'Document storage read failed.')) return;
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (!(err instanceof StorageError)) throw err;
+    log.error('GET /:id/download storage error:', err);
+    sendStorageError(res, err, 'Document storage read failed.');
   }
 });
 
 router.delete('/:id', validateRequest(), async (req, res) => {
   let lockedId = null;
   try {
-    const id = Number(req.params.id);
+    const id = pathId(req);
     const existing = getVisibleDocument(id, req, true);
     if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404, reason: 'documents_document_not_found' });
     if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
@@ -1654,10 +1600,11 @@ router.delete('/:id', validateRequest(), async (req, res) => {
     removeDocumentExpiryReminder(id);
     res.status(204).end();
   } catch (err) {
-    log.error('DELETE /:id error:', err);
-    if (sendStorageError(res, err, 'Document storage delete failed.')) return;
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (!(err instanceof StorageError)) throw err;
+    log.error('DELETE /:id storage error:', err);
+    sendStorageError(res, err, 'Document storage delete failed.');
   } finally {
+    // Also when the error goes on to the central handler (#2810).
     if (lockedId !== null) unlockDocumentDeletes([lockedId]);
   }
 });

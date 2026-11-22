@@ -538,6 +538,82 @@ test('every list of the schemas is the constant the handler reads', () => {
   }
 });
 
+// Since group 8 step (b) the schema is the only guard for these: the handlers
+// dropped their own check (#2810). So the types, lists and bounds are pinned
+// here as literal values - a looser type, a value added to a list (also to
+// the constant the list is read from), a lost `required` or a wider bound in
+// the document turns this red.
+test('only guard: the types, lists and bounds the handlers no longer check are the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schemas = spec.components.schemas;
+  const op = (/** @type {string} */ path, /** @type {string} */ method) => spec.paths[path][method];
+  const bodyOf = (/** @type {string} */ path, /** @type {string} */ method) => op(path, method).requestBody.content['application/json'].schema;
+  const queryOf = (/** @type {string} */ path, /** @type {string} */ method, /** @type {string} */ name) => op(path, method).parameters.find((/** @type {any} */ p) => p.name === name && p.in === 'query').schema;
+  const ROW_ID = { type: 'integer', minimum: 1 };
+  const ROW_ID_OR_NULL = [{ $ref: '#/components/schemas/BodyRowId' }, { type: 'null' }];
+  const CATEGORIES = ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'];
+  const VISIBILITIES = ['family', 'restricted', 'private'];
+  const STATUSES = ['active', 'archived'];
+
+  // Shopping: PATCH /items/{itemId} (is_checked, the text fields).
+  const update = schemas.ShoppingItemUpdateInput.properties;
+  assert.deepEqual(update.is_checked.anyOf, [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]);
+  assert.equal(update.name.type, 'string');
+  assert.equal(update.category.type, 'string', 'category cannot be null');
+  assert.deepEqual(update.quantity.type, ['string', 'null']);
+  assert.deepEqual(update.notes.type, ['string', 'null']);
+  // POST /{listId}/items: the text fields.
+  const create = schemas.ShoppingItemCreateInput;
+  assert.equal(create.properties.name.type, 'string');
+  assert.deepEqual(create.required, ['name']);
+  assert.deepEqual(create.properties.quantity.type, ['string', 'null']);
+  assert.deepEqual(create.properties.notes.type, ['string', 'null']);
+  // POST /{listId}/duplicate: the three flags.
+  const duplicate = bodyOf('/api/v1/shopping/{listId}/duplicate', 'post').properties;
+  for (const flag of ['resetChecked', 'keepQuantities', 'keepNotes']) assert.deepEqual(duplicate[flag], { type: 'boolean' }, flag);
+  // PATCH /{listId}/items/reorder: item ids as integers from 1.
+  const reorder = bodyOf('/api/v1/shopping/{listId}/items/reorder', 'patch');
+  assert.deepEqual([reorder.properties.order.type, reorder.properties.order.minItems, reorder.properties.order.items], ['array', 1, ROW_ID]);
+  assert.deepEqual(reorder.required, ['order']);
+
+  // Documents: the storage settings.
+  const config = schemas.DocumentStorageConfigRequest.properties;
+  assert.deepEqual([config.selected_upload_backend.type, config.selected_upload_backend.enum], ['string', ['local', 'webdav', 'google_drive']]);
+  assert.equal(config.confirm_existing_access.type, 'boolean');
+  assert.equal(config.clear_password.type, 'boolean');
+  // Folders: the parent, the deletion's query.
+  assert.deepEqual(schemas.BodyRowId.anyOf, [ROW_ID, { type: 'string', pattern: '^0*[1-9][0-9]*$' }]);
+  for (const [path, method] of [['/api/v1/documents/folders', 'post'], ['/api/v1/documents/folders/{id}', 'put']]) {
+    assert.deepEqual(bodyOf(path, method).properties.parent_id.anyOf, ROW_ID_OR_NULL, `${method} ${path} parent_id`);
+  }
+  const folderDelete = '/api/v1/documents/folders/{id}';
+  assert.deepEqual(queryOf(folderDelete, 'delete', 'documents').enum, ['unfile', 'delete']);
+  for (const name of ['expected_documents', 'expected_folders']) {
+    assert.deepEqual(queryOf(folderDelete, 'delete', name), { type: 'integer', minimum: 0 }, name);
+  }
+  assert.deepEqual(queryOf(folderDelete, 'delete', 'expected_snapshot'), { type: 'string', pattern: '^[a-f0-9]{64}$' });
+  // GET /documents: the filters.
+  assert.deepEqual(queryOf('/api/v1/documents', 'get', 'status').enum, STATUSES);
+  assert.deepEqual(queryOf('/api/v1/documents', 'get', 'category').enum, CATEGORIES);
+  assert.deepEqual(queryOf('/api/v1/documents', 'get', 'folder_id'), ROW_ID);
+  assert.deepEqual(queryOf('/api/v1/documents', 'get', 'expiring'), { type: 'integer', minimum: 0 });
+  assert.deepEqual(queryOf('/api/v1/documents', 'get', 'subject_user_id'), ROW_ID);
+  // POST and PUT /documents: the lists and the ids.
+  for (const [path, method] of [['/api/v1/documents', 'post'], ['/api/v1/documents/{id}', 'put']]) {
+    const props = bodyOf(path, method).properties;
+    assert.deepEqual([props.category.type, props.category.enum], ['string', CATEGORIES], `${method} category`);
+    assert.deepEqual([props.visibility.type, props.visibility.enum], ['string', VISIBILITIES], `${method} visibility`);
+    assert.deepEqual(props.folder_id.anyOf, ROW_ID_OR_NULL, `${method} folder_id`);
+    assert.deepEqual(props.subject_user_id.anyOf, ROW_ID_OR_NULL, `${method} subject_user_id`);
+  }
+  assert.deepEqual(bodyOf('/api/v1/documents/{id}', 'put').properties.status.enum, STATUSES);
+
+  // DMS: the provider and the lists of a link.
+  assert.deepEqual([schemas.DmsAccountCreateRequest.properties.provider.type, schemas.DmsAccountCreateRequest.properties.provider.enum], ['string', ['paperless', 'papra']]);
+  assert.deepEqual(schemas.DmsLinkRequest.properties.category.enum, CATEGORIES);
+  assert.deepEqual(schemas.DmsLinkRequest.properties.visibility.enum, VISIBILITIES);
+});
+
 test('the categories a document may carry are the ones the options offer', async () => {
   const r = await call('GET', '/documents/meta/options');
   assert.equal(r.status, 200);

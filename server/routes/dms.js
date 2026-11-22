@@ -10,7 +10,6 @@ import { str, MAX_TITLE } from '../middleware/validate.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { getAdapter as defaultGetAdapter } from '../services/dms/index.js';
-import { DMS_PROVIDERS, DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITIES } from '../services/document-fields.js';
 import { visibleWhere } from '../authorize/index.ts';
 import { StorageError, readDocumentContent } from '../services/document-storage.js';
 
@@ -19,11 +18,6 @@ export function _setAdapterFactory(fn) { adapterFactory = fn || defaultGetAdapte
 
 const log = createLogger('DMS');
 const router = express.Router();
-
-// Die Wertelisten kommen aus server/services/document-fields.js, aus derselben
-// Quelle liest das Schema (#2810): ein unbekannter Wert ist dort schon 400.
-const CATEGORIES = DOCUMENT_CATEGORIES;
-const VISIBILITIES = DOCUMENT_VISIBILITIES;
 
 // Jede Route dieses Routers ist Sache der Admins: Konten verwalten, und das
 // DMS ungefiltert durchsuchen, wodurch die Sichtbarkeitsgrenzen des
@@ -55,6 +49,18 @@ function mimeFromFilename(filename) {
   return map[ext] || 'application/octet-stream';
 }
 
+/**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). `0`, `-0`
+ * and `-1` find no account (404), a leading zero reaches the row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
+
 function userId(req) { return req.authUserId || req.session?.userId; }
 
 function publicAccount(row) {
@@ -68,18 +74,15 @@ function getAccount(id) {
 }
 
 router.get('/accounts', validateRequest(), (req, res) => {
-  try {
-    const rows = db.get().prepare('SELECT * FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
-    res.json({ data: rows.map(publicAccount) });
-  } catch (err) {
-    log.error('GET /accounts error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const rows = db.get().prepare('SELECT * FROM dms_accounts ORDER BY name COLLATE NOCASE').all();
+  res.json({ data: rows.map(publicAccount) });
 });
 
 router.post('/accounts', validateRequest(), (req, res) => {
   try {
-    const provider = DMS_PROVIDERS.includes(req.body.provider) ? req.body.provider : 'paperless';
+    // One of DMS_PROVIDERS: the schema's check (#2810; an unknown value was
+    // `paperless` until v2.93). Left out it still is.
+    const provider = req.body.provider ?? 'paperless';
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl = str(req.body.base_url, 'Base URL', { max: 500 });
     const vToken = str(req.body.api_token, 'API token', { max: 500 });
@@ -105,35 +108,24 @@ router.post('/accounts', validateRequest(), (req, res) => {
     if (err.message?.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'A DMS account with this URL already exists.', code: 409, reason: 'dms_account_exists' });
     }
-    log.error('POST /accounts error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 router.delete('/accounts/:id', validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const existing = getAccount(id);
-    if (!existing) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
-    db.get().prepare('DELETE FROM dms_accounts WHERE id = ?').run(id);
-    res.status(204).end();
-  } catch (err) {
-    log.error('DELETE /accounts/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const id = pathId(req);
+  const existing = getAccount(id);
+  if (!existing) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
+  db.get().prepare('DELETE FROM dms_accounts WHERE id = ?').run(id);
+  res.status(204).end();
 });
 
 router.post('/accounts/:id/test', validateRequest(), async (req, res) => {
-  try {
-    const account = getAccount(Number(req.params.id));
-    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
-    const result = await adapterFactory(account).testConnection();
-    db.get().prepare("UPDATE dms_accounts SET last_check = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?").run(account.id);
-    res.json({ data: result });
-  } catch (err) {
-    log.error('POST /accounts/:id/test error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const account = getAccount(pathId(req));
+  if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
+  const result = await adapterFactory(account).testConnection();
+  db.get().prepare("UPDATE dms_accounts SET last_check = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?").run(account.id);
+  res.json({ data: result });
 });
 
 router.get('/search', validateRequest(), async (req, res) => {
@@ -186,56 +178,53 @@ router.get('/thumbnail', validateRequest(), async (req, res) => {
 });
 
 router.post('/link', validateRequest(), async (req, res) => {
+  const account = getAccount(Number(req.body.account_id));
+  if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
+  const dmsId = String(req.body.dms_document_id || '').trim();
+  if (!dmsId) return res.status(400).json({ error: 'dms_document_id is required.', code: 400 });
+
+  const linked = () => db.get().prepare(`
+    SELECT id FROM family_documents
+    WHERE storage_backend = 'dms' AND dms_account_id = ? AND storage_key = ?
+  `).get(account.id, dmsId);
+  const alreadyLinked = () => res.status(409).json({ error: 'This DMS document is already linked.', code: 409, reason: 'dms_document_already_linked' });
+  if (linked()) return alreadyLinked();
+
+  // NUR DIE ANFRAGE AN DAS DMS ist "nicht erreichbar" (#1909, Codex an #1994).
+  // Was danach lokal scheitert, ist ein Fehler dieses Servers und bleibt 500.
+  let doc;
   try {
-    const account = getAccount(Number(req.body.account_id));
-    if (!account) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
-    const dmsId = String(req.body.dms_document_id || '').trim();
-    if (!dmsId) return res.status(400).json({ error: 'dms_document_id is required.', code: 400 });
-
-    const linked = () => db.get().prepare(`
-      SELECT id FROM family_documents
-      WHERE storage_backend = 'dms' AND dms_account_id = ? AND storage_key = ?
-    `).get(account.id, dmsId);
-    const alreadyLinked = () => res.status(409).json({ error: 'This DMS document is already linked.', code: 409, reason: 'dms_document_already_linked' });
-    if (linked()) return alreadyLinked();
-
-    // NUR DIE ANFRAGE AN DAS DMS ist "nicht erreichbar" (#1909, Codex an #1994).
-    // Was danach lokal scheitert, ist ein Fehler dieses Servers und bleibt 500.
-    let doc;
-    try {
-      doc = await adapterFactory(account).getDocument(dmsId);
-    } catch (err) {
-      if (err.status === 404) return res.status(404).json({ error: 'DMS document not found.', code: 404, reason: 'dms_document_not_found' });
-      log.error('POST /link DMS error:', err);
-      return res.status(502).json({ error: 'Failed to link DMS document.', code: 502, reason: 'dms_unreachable' });
-    }
-    // Waehrend der Anfrage kann ein Admin das Konto entfernt oder jemand
-    // dasselbe Dokument verknuepft haben: erst hier, ohne await bis zum
-    // INSERT, ist das verbindlich.
-    if (!getAccount(account.id)) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
-    if (linked()) return alreadyLinked();
-    const category = CATEGORIES.includes(req.body.category) ? req.body.category : 'other';
-    const visibility = VISIBILITIES.includes(req.body.visibility) ? req.body.visibility : 'family';
-    const meta = JSON.stringify({ correspondent: doc.correspondent ?? null, tags: doc.tags ?? [] });
-
-    // Echten MIME-Typ und Dateigröße aus dem DMS übernehmen, falls der Adapter sie
-    // liefert (Papra), sonst aus dem Dateinamen ableiten bzw. 0 (Issue #451).
-    const mimeType = doc.mime || mimeFromFilename(doc.filename);
-    const fileSize = Number.isFinite(doc.size) && doc.size >= 0 ? doc.size : 0;
-
-    const result = db.get().prepare(`
-      INSERT INTO family_documents
-        (name, category, visibility, original_name, mime_type, file_size, content_data,
-         storage_provider, storage_backend, storage_key, dms_account_id, external_url, external_meta, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, '', 'external', 'dms', ?, ?, ?, ?, ?)
-    `).run(doc.title, category, visibility, doc.filename, mimeType, fileSize, dmsId, account.id, doc.url, meta, userId(req));
-
-    const row = db.get().prepare('SELECT * FROM family_documents WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: row });
+    doc = await adapterFactory(account).getDocument(dmsId);
   } catch (err) {
-    log.error('POST /link error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (err.status === 404) return res.status(404).json({ error: 'DMS document not found.', code: 404, reason: 'dms_document_not_found' });
+    log.error('POST /link DMS error:', err);
+    return res.status(502).json({ error: 'Failed to link DMS document.', code: 502, reason: 'dms_unreachable' });
   }
+  // Waehrend der Anfrage kann ein Admin das Konto entfernt oder jemand
+  // dasselbe Dokument verknuepft haben: erst hier, ohne await bis zum
+  // INSERT, ist das verbindlich.
+  if (!getAccount(account.id)) return res.status(404).json({ error: 'DMS account not found.', code: 404, reason: 'dms_account_not_found' });
+  if (linked()) return alreadyLinked();
+  // From their lists: the schema's check (#2810; an unknown value became
+  // `other` and `family` until v2.93). Left out they still are.
+  const category = req.body.category ?? 'other';
+  const visibility = req.body.visibility ?? 'family';
+  const meta = JSON.stringify({ correspondent: doc.correspondent ?? null, tags: doc.tags ?? [] });
+
+  // Echten MIME-Typ und Dateigröße aus dem DMS übernehmen, falls der Adapter sie
+  // liefert (Papra), sonst aus dem Dateinamen ableiten bzw. 0 (Issue #451).
+  const mimeType = doc.mime || mimeFromFilename(doc.filename);
+  const fileSize = Number.isFinite(doc.size) && doc.size >= 0 ? doc.size : 0;
+
+  const result = db.get().prepare(`
+    INSERT INTO family_documents
+      (name, category, visibility, original_name, mime_type, file_size, content_data,
+       storage_provider, storage_backend, storage_key, dms_account_id, external_url, external_meta, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, '', 'external', 'dms', ?, ?, ?, ?, ?)
+  `).run(doc.title, category, visibility, doc.filename, mimeType, fileSize, dmsId, account.id, doc.url, meta, userId(req));
+
+  const row = db.get().prepare('SELECT * FROM family_documents WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ data: row });
 });
 
 router.post('/push', validateRequest(), async (req, res) => {
@@ -274,16 +263,16 @@ router.post('/push', validateRequest(), async (req, res) => {
     }
     res.status(202).json({ data: { taskId: out.taskId } });
   } catch (err) {
-    log.error('POST /push error:', err);
-    if (err instanceof StorageError) {
-      return res.status(502).json({
-        error: 'Failed to read document from storage.',
-        code: 502,
-        storage_code: err.storageCode,
-        reason: 'documents_storage_failed',
-      });
-    }
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    // Only the store's refusal is answered here; anything else goes to the
+    // central error handler (#2810).
+    if (!(err instanceof StorageError)) throw err;
+    log.error('POST /push storage error:', err);
+    res.status(502).json({
+      error: 'Failed to read document from storage.',
+      code: 502,
+      storage_code: err.storageCode,
+      reason: 'documents_storage_failed',
+    });
   }
 });
 
