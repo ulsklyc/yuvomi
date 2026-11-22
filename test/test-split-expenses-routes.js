@@ -2425,7 +2425,7 @@ test('Serie: budget_category wird gespeichert, ein PUT ohne sie laesst sie stehe
 // Kategorie mitschickt.
 test('eine Budget-Kategorie, die nur Aufteilungs-Ausgaben oder Serien tragen, ist in Benutzung und laesst sich nicht loeschen', async () => {
   const { categoryInUseCount } = await import('../server/routes/budget/helpers.js');
-  const { default: catRouter } = await import('../server/routes/budget/categories.js');
+  const { createBudgetApp } = await import('./budget-app.js');
   const insertCategory = db.prepare("INSERT INTO budget_categories (key, name, type, sort_order) VALUES (?, ?, 'expense', 900)");
   insertCategory.run('split_only_expense', 'Nur Aufteilung');
   insertCategory.run('split_only_series', 'Nur Serie');
@@ -2444,15 +2444,16 @@ test('eine Budget-Kategorie, die nur Aufteilungs-Ausgaben oder Serien tragen, is
   assert.equal(categoryInUseCount(db, 'split_only_expense'), 1, 'die Ausgabe zaehlt');
   assert.equal(categoryInUseCount(db, 'split_only_series'), 1, 'die Serie zaehlt');
 
-  const budgetApp = express();
-  budgetApp.use(express.json());
-  budgetApp.use((req, _res, next) => { req.authUserId = OWNER; req.authRole = 'member'; req.session = { userId: OWNER, role: 'member' }; next(); });
-  budgetApp.use('/', catRouter);
+  // At its real prefix with the central error handler (#2810).
+  const budgetApp = await createBudgetApp({
+    mount: ['budget'],
+    auth: (req, _res, next) => { req.authUserId = OWNER; req.authRole = 'member'; req.session = { userId: OWNER, role: 'member' }; next(); },
+  });
   const budgetServer = budgetApp.listen(0, '127.0.0.1');
   await new Promise((r) => budgetServer.on('listening', r));
   try {
     for (const key of ['split_only_expense', 'split_only_series']) {
-      const res = await fetch(`http://127.0.0.1:${budgetServer.address().port}/categories/${key}`, { method: 'DELETE' });
+      const res = await fetch(`http://127.0.0.1:${budgetServer.address().port}/api/v1/budget/categories/${key}`, { method: 'DELETE' });
       assert.equal(res.status, 409, `${key} ist in Benutzung`);
       assert.equal((await res.json()).reason, 'category_in_use');
       assert.ok(db.prepare('SELECT 1 FROM budget_categories WHERE key = ?').get(key), `${key} steht noch`);

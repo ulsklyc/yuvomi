@@ -115,7 +115,7 @@ router.use((_req, res, next) => {
 // Hold the DB identity across remote awaits: a concurrent restore must wait
 // for these responses, just as it waits for the core document media routes.
 router.get('/saved-views', requireAdmin, validateRequest(), refuseWhileRestoring, async (req, res) => {
-  
+
     const accountId = positiveId(req.query.account_id);
     const page = positiveId(req.query.page ?? 1);
     if (!accountId || !page || page > 100000) throw problem(400, 'paperless_folder_invalid');
@@ -124,7 +124,7 @@ router.get('/saved-views', requireAdmin, validateRequest(), refuseWhileRestoring
     recheckLiveAccount(source, actor(req));
     res.json({ data: result.results.map((/** @type {Record<string, any>} */ view) => ({ id: view.id, name: view.name })),
       meta: { page, count: result.count, has_more: result.has_more } });
-  
+
 });
 
 // Filter creation always uses the same credentials as Live-folder reads.
@@ -138,15 +138,15 @@ router.get('/filter-tags', requireAdmin, validateRequest(), refuseWhileRestoring
 });
 
 router.get('/folders', validateRequest(), (req, res) => {
-  
+
     const rows = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders f
       WHERE ${visibleWhere('paperless_folders', 'f', '@userId')} ORDER BY name COLLATE NOCASE, id`).all({ userId: actor(req) });
     res.json({ data: rows.map((/** @type {import("../../types/paperless.d.ts").Folder} */ row) => ({ ...withAccess(row), can_manage: isAdminRequest(req) && row.created_by === actor(req) })) });
-  
+
 });
 
 router.post('/folders', requireAdmin, validateRequest(), async (req, res) => {
-  
+
     const body = req.body || {};
     const values = fields({ visibility: 'private', ...body });
     shareConsent({ ...body, ...values }, { visibility: 'private', created_by: actor(req), allowed_member_ids: [] });
@@ -173,11 +173,11 @@ router.post('/folders', requireAdmin, validateRequest(), async (req, res) => {
       return result;
     })();
     res.status(201).json({ data: visibleFolder(req, result.lastInsertRowid) });
-  
+
 });
 
 router.put('/folders/:id', requireAdmin, validateRequest(), (req, res) => {
-  
+
     const before = visibleFolder(req, req.params.id);
     if (before.created_by !== actor(req)) throw problem(403, 'Permission denied.');
     const values = fields(req.body || {});
@@ -193,20 +193,20 @@ router.put('/folders/:id', requireAdmin, validateRequest(), (req, res) => {
       replaceAccess(before.id, values.allowed_member_ids);
     })();
     res.json({ data: visibleFolder(req, before.id) });
-  
+
 });
 
 router.delete('/folders/:id', requireAdmin, validateRequest(), (req, res) => {
-  
+
     const folder = visibleFolder(req, req.params.id);
     if (folder.created_by !== actor(req)) throw problem(403, 'Permission denied.');
     db.get().prepare('DELETE FROM paperless_view_folders WHERE id = ?').run(folder.id);
     res.status(204).end();
-  
+
 });
 
 router.get('/folders/:id/documents', validateRequest(), refuseWhileRestoring, async (req, res) => {
-  
+
     const folder = visibleFolder(req, req.params.id);
     const page = positiveId(req.query.page ?? 1);
     if (!page || page > 100000) throw problem(400, 'paperless_folder_invalid');
@@ -215,11 +215,11 @@ router.get('/folders/:id/documents', validateRequest(), refuseWhileRestoring, as
     const result = await remote(listFolderDocuments(adapterFactory(source), folder, { page, pageSize: 50, displayFields }));
     unchangedFolder(req, folder, source);
     res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more, display_fields: displayFields } });
-  
+
 });
 
 router.get('/folders/:id/documents/:documentId/:action', validateRequest(), refuseWhileRestoring, async (req, res) => {
-  
+
     const { documentId, action } = req.params;
     if (!positiveId(documentId) || !['preview', 'download', 'thumbnail'].includes(action)) {
       throw problem(404, 'paperless_document_not_found');
@@ -246,7 +246,7 @@ router.get('/folders/:id/documents/:documentId/:action', validateRequest(), refu
       res.set('Content-Security-Policy', "default-src 'none'; sandbox");
     }
     res.type(mime || 'application/octet-stream').send(file.buffer);
-  
+
 });
 
 router.use(paperlessErrorHandler);

@@ -29,14 +29,12 @@ delete process.env.NODE_ENV;
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createShoppingDocumentsApp } from './shopping-documents-app.js';
 import { startFakeDavServer } from './caldav-fake-server.js';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
-const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
-const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const todoOutbound  = await import('../server/services/caldav-todo-outbound.js');
 const remindersSync = await import('../server/services/caldav-reminders-sync.js');
 const { runSerialized } = await import('../server/utils/sync-lock.js');
@@ -47,18 +45,17 @@ const U = Number(db.prepare(
   "INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')"
 ).run().lastInsertRowid);
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = U;
-  req.authRole = 'admin';
-  req.session = { userId: U, role: 'admin' };
-  next();
+// Both at their real prefix: validateRequest() finds its operation by the mount (#2810).
+const app = await createShoppingDocumentsApp({
+  mount: ['shopping'],
+  auth: (req, _res, next) => {
+    req.authUserId = U;
+    req.authRole = 'admin';
+    req.session = { userId: U, role: 'admin' };
+    next();
+  },
+  after: [['/api/v1/reminders', remindersRouter]],
 });
-// At its real prefix: validateRequest() finds its operation by the mount (#2810).
-app.use('/api/v1/reminders', remindersRouter);
-app.use('/', shoppingRouter);
-app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const http = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => http.on('listening', () => r(`http://127.0.0.1:${http.address().port}`)));
 
@@ -158,7 +155,7 @@ function objectsWith(server, collectionUrl, uid = UID) {
 const settled = () => runSerialized('caldav-todo', 'settle', async () => null);
 
 async function patch(id, body) {
-  const res = await fetch(`${baseUrl}/items/${id}`, {
+  const res = await fetch(`${baseUrl}/api/v1/shopping/items/${id}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   const json = await res.json();
@@ -167,7 +164,7 @@ async function patch(id, body) {
 }
 
 async function remove(id) {
-  const res = await fetch(`${baseUrl}/items/${id}`, { method: 'DELETE' });
+  const res = await fetch(`${baseUrl}/api/v1/shopping/items/${id}`, { method: 'DELETE' });
   await settled();
   return res.status;
 }

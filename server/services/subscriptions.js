@@ -1,7 +1,8 @@
 import { reminderDateBefore } from '../utils/reminder-schedule.js';
 import { dateKey, parseDateKey, addMonthsClamped, addYearsClamped } from '../utils/interval-date.js';
 
-const BILLING_CYCLES = ['daily', 'weekly', 'monthly', 'yearly'];
+// One source with the schema (#2810): server/services/budget-fields.js.
+import { BILLING_CYCLES, END_TYPES } from './budget-fields.js';
 const CURRENCY_RE = /^[A-Z]{3}$/;
 
 // monthly/yearly sind duenne Fassaden ueber server/utils/interval-date.js -
@@ -32,7 +33,6 @@ function nextRenewalOnOrAfter(startDate, cycle, interval, minimumDate) {
   return result;
 }
 
-const END_TYPES = ['never', 'on_date', 'after_count'];
 
 // Verbleibende Zahlungen bei 'after_count' (inkl. der aktuell anstehenden),
 // sonst null.

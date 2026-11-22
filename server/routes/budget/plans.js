@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { num, collectErrors, MONTH_RE } from '../../middleware/validate.js';
@@ -138,7 +139,7 @@ export function computePlanProgress(database, month, context) {
  * Budgetplan-Fortschritt für einen Monat: geplant vs. Ist je Kategorie + Sparziel.
  * Query: ?month=YYYY-MM (default: aktueller Monat)
  */
-router.get('/plans', (req, res) => {
+router.get('/plans', validateRequest(), (req, res) => {
   try {
     const month = MONTH_RE.test(req.query.month || '') ? req.query.month : thisMonthLocalKey();
     // Sichtbarkeit/Scope wie Summary und Statistik (#476/#505/#659).
@@ -159,7 +160,7 @@ router.get('/plans', (req, res) => {
  * Legt den geplanten Monatsbetrag einer Ausgabenkategorie (oder das Sparziel via
  * BUDGET_SAVINGS_KEY) fest. Body: { amount } — positiv, sonst 400.
  */
-router.put('/plans/:category', (req, res) => {
+router.put('/plans/:category', validateRequest(), (req, res) => {
   try {
     const category  = req.params.category;
     const isSavings = category === BUDGET_SAVINGS_KEY;
@@ -191,7 +192,7 @@ router.put('/plans/:category', (req, res) => {
  * DELETE /api/v1/budget/plans/:category
  * Entfernt den Budgetplan einer Kategorie bzw. das Sparziel.
  */
-router.delete('/plans/:category', (req, res) => {
+router.delete('/plans/:category', validateRequest(), (req, res) => {
   try {
     db.get().prepare('DELETE FROM budget_plans WHERE category = ?').run(req.params.category);
     res.json({ data: { deleted: true } });

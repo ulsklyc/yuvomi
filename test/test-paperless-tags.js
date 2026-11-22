@@ -39,7 +39,7 @@ app.use(express.json());
 app.use((req, _res, next) => {
   req.authUserId = identity.id; req.authRole = identity.role;
   req.session = { userId: identity.id, role: identity.role };
- 
+
   resolveRequestModuleAccess(database, req);
   req.sessionModuleAccess = identity.access;
   next();

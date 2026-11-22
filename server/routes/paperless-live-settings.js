@@ -46,7 +46,7 @@ function personalActor(req) {
 router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 router.get('/live-settings', validateRequest(), (req, res) => {
-  
+
     const rows = db.get().prepare("SELECT id, name FROM dms_accounts WHERE provider = 'paperless' ORDER BY name COLLATE NOCASE").all();
     const canManage = isAdminRequest(req) && mayWriteModule(req, 'documents');
     res.json({ data: rows.map((/** @type {{id: number, name: string}} */ row) => {
@@ -54,11 +54,11 @@ router.get('/live-settings', validateRequest(), (req, res) => {
       return { ...row, token_mode: settings.token_mode, display_fields: settings.display_fields, has_personal_token: hasToken(row.id, actor(req)),
         ...(canManage ? { allowed_tag_ids: settings.allowed_tag_ids, revision: settings.revision } : {}) };
     }), meta: { can_manage: canManage } });
-  
+
 });
 
 router.put('/live-settings/:id', requireAdmin, validateRequest(), (req, res) => {
-  
+
     if (!mayWriteModule(req, 'documents')) throw problem(403, 'Permission denied.');
     const source = account(req);
     const { token_mode, allowed_tag_ids, expected_revision } = req.body || {};
@@ -80,11 +80,11 @@ router.put('/live-settings/:id', requireAdmin, validateRequest(), (req, res) => 
         .run(source.id, token_mode, tags === null ? null : JSON.stringify(tags), JSON.stringify([...new Set(displayFields)]));
     })();
     res.json({ data: liveSettings(source.id) });
-  
+
 });
 
 router.get('/live-settings/:id/tags', requireAdmin, validateRequest(), refuseWhileRestoring, async (req, res) => {
-  
+
     if (!mayWriteModule(req, 'documents')) throw problem(403, 'Permission denied.');
     const source = account(req);
     const page = positiveId(req.query.page ?? 1);
@@ -98,11 +98,11 @@ router.get('/live-settings/:id/tags', requireAdmin, validateRequest(), refuseWhi
     const current = account(req);
     if (current.api_token !== source.api_token || current.base_url !== source.base_url) throw problem(409, 'paperless_folder_changed');
     res.json({ data: result.results, meta: { page, count: result.count, has_more: result.has_more } });
-  
+
 });
 
 router.put('/live-settings/:id/token', validateRequest(), (req, res) => {
-  
+
     const userId = personalActor(req), source = account(req);
     const token = req.body?.api_token;
     if (typeof token !== 'string' || !token.trim() || token.length > 500 || [...token].some((char) => [0, 10, 13].includes(char.charCodeAt(0)))) {
@@ -112,15 +112,15 @@ router.put('/live-settings/:id/token', validateRequest(), (req, res) => {
       ON CONFLICT(account_id, user_id) DO UPDATE SET api_token = excluded.api_token,
       updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')`).run(source.id, userId, token.trim());
     res.json({ data: { has_personal_token: true } });
-  
+
 });
 
 router.delete('/live-settings/:id/token', validateRequest(), (req, res) => {
-  
+
     const userId = personalActor(req), source = account(req);
     db.get().prepare('DELETE FROM paperless_user_tokens WHERE account_id = ? AND user_id = ?').run(source.id, userId);
     res.status(204).end();
-  
+
 });
 
 router.use(paperlessErrorHandler);

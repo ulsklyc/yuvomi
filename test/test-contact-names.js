@@ -11,7 +11,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 import {
   composeDisplayName, normalizeNameParts, splitDisplayName, contactSortKey,
@@ -34,18 +34,19 @@ freshTestDbPath('contact-names');
 process.env.SESSION_SECRET = 'contact-names-test-secret-32bytes-long';
 
 const db = await import('../server/db.js');
-const { default: contactsRouter } = await import('../server/routes/contacts.js');
 const { syncFamilyMemberArtifacts } = await import('../server/auth.js');
 db.init();
 const database = db.get();
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); });
-app.use('/contacts', contactsRouter);
+// Am echten Praefix samt Fehlerhandler (#2810): validateRequest() findet die
+// Operation ueber `req.baseUrl`.
+const app = await createContactsMealsApp({
+  mount: ['contacts'],
+  auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise((r) => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}/contacts`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1/contacts`;
 
 const jget = async (u) => { const r = await fetch(u); return { status: r.status, body: await r.json().catch(() => null) }; };
 const jsend = async (u, method, body) => {
@@ -141,7 +142,8 @@ try {
     const created = await jsend(base, 'POST', { firstName: 'Anna', lastName: 'Alt', category: 'misc' });
     const id = created.body.data.id;
 
-    const res = await jsend(`${base}/${id}`, 'PUT', { firstName: 'Anna', lastName: 'Neu' });
+    // Die fuenf Namensteile kommen zusammen (#2810).
+    const res = await jsend(`${base}/${id}`, 'PUT', { firstName: 'Anna', lastName: 'Neu', middleName: null, namePrefix: null, nameSuffix: null });
     eq(res.status, 200);
     eq(res.body.data.name, 'Anna Neu');
     eq(res.body.data.last_name, 'Neu');
@@ -162,7 +164,7 @@ try {
     const created = await jsend(base, 'POST', { firstName: 'Cem', lastName: 'Weg', category: 'misc' });
     const id = created.body.data.id;
 
-    const res = await jsend(`${base}/${id}`, 'PUT', { firstName: 'Cem', lastName: '' });
+    const res = await jsend(`${base}/${id}`, 'PUT', { firstName: 'Cem', lastName: '', middleName: null, namePrefix: null, nameSuffix: null });
     eq(res.status, 200);
     eq(res.body.data.name, 'Cem');
     eq(res.body.data.last_name, null);
@@ -323,7 +325,7 @@ try {
       'structured-Bedingung fehlt oder wurde umgeschrieben'
     );
     assert(
-      /if \(structured\) \{ body\.firstName = firstName; body\.lastName = lastName; \}/.test(src),
+      /if \(structured\) Object\.assign\(body, \{ firstName, lastName, \.\.\.keptParts \}\);/.test(src),
       'Namensteile werden unbedingt gesendet - geratene Struktur würde persistiert'
     );
   });

@@ -2740,7 +2740,10 @@ async function saveModal(overlay) {
   const title     = overlay.querySelector('#modal-title').value.trim();
   const notes     = overlay.querySelector('#modal-notes').value.trim() || null;
   const recipe_url = overlay.querySelector('#modal-recipe-url').value.trim() || null;
-  const recipe_id = overlay.querySelector('#modal-recipe-id')?.value || null;
+  // Die Rezept-ID geht als Zahl raus (#2810): das <select> liefert Text, und
+  // Ziffern-Text nimmt der Server nur noch als Altform an.
+  const recipeIdRaw = overlay.querySelector('#modal-recipe-id')?.value;
+  const recipe_id = recipeIdRaw ? Number(recipeIdRaw) : null;
   const cook_user_id = selectedCookId(overlay);
   const repeat_weekly = state.modal?.mode === 'create'
     ? Boolean(overlay.querySelector('#modal-repeat-weekly')?.checked)

@@ -109,15 +109,33 @@ const MOUNTS = [
   // /api/v1/health (server/routes/health.js), in dessen Reihenfolge.
   ...['vitals', 'medications', 'labs', 'activities', 'export', 'cycle', 'cycle-feed', 'caregivers',
     'visibility-defaults', 'fasting', 'prevention', 'nutrition'].map((name) => ({ file: `health/${name}.js`, mount: '/api/v1/health' })),
+  // In der Reihenfolge von server/index.js: CardDAV vor den Kontakten.
+  { file: 'meals.js', mount: '/api/v1/meals' },
+  { file: 'cardav.js', mount: '/api/v1/contacts/cardav' },
+  { file: 'contacts.js', mount: '/api/v1/contacts' },
+  // In der Reihenfolge von server/index.js: Google Drive und DMS vor den
+  // Dokumenten (sonst faenge `/:id/thumbnail` den DMS-Pfad `/dms/thumbnail`).
+  { file: 'shopping.js', mount: '/api/v1/shopping' },
+  { file: 'document-storage-google-drive.js', mount: '/api/v1/documents/storage/google-drive' },
+  { file: 'dms.js', mount: '/api/v1/documents/dms' },
+  { file: 'documents.js', mount: '/api/v1/documents' },
+  // In der Reihenfolge von server/index.js: die Abos VOR dem Budget (sonst
+  // faenge `/:id` der Buchungen `/subscriptions/...`), die sieben Budget-
+  // Router in der Reihenfolge von server/routes/budget.js.
+  { file: 'subscriptions.js', mount: '/api/v1/budget/subscriptions' },
+  ...['categories', 'loans', 'accounts', 'plans', 'stats', 'transfers', 'entries']
+    .map((name) => ({ file: `budget/${name}.js`, mount: '/api/v1/budget' })),
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
 const WITHOUT_INTEGER_PATH_ID = [
+  'budget/categories.js', 'budget/plans.js', 'budget/stats.js',
   'email.js', 'family.js', 'inventory/categories.js', 'inventory/deadlines-feed.js', 'kitchen.js',
   'modules.js', 'schedule-feed.js', 'schedule-preferences.js', 'screensaver.js', 'search.js',
   'waste/feed.js', 'waste/import.js', 'waste/occurrences.js', 'weather.js',
   'backup.js', 'system.js', 'changelog.js',
   'health/export.js', 'health/cycle-feed.js', 'health/visibility-defaults.js',
+  'document-storage-google-drive.js',
 ];
 
 const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));

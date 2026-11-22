@@ -49,12 +49,14 @@ process.env.MODULES_DIR = tempDir('yuvomi-validate-health-');
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createHealthApp } from './health-app.js';
 
 const dbmod = await import('../server/db.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
 const fields = await import('../server/services/health-fields.js');
 const cycleLists = await import('../public/utils/health-cycle.js');
+const nutrition = await import('../public/utils/health-nutrition.js');
 const { validateBasalTemp } = await import('../server/routes/health/cycle.js');
 const { default: healthRouter } = await import('../server/routes/health.js');
 const db = dbmod.get();
@@ -119,6 +121,21 @@ async function call(method, route, { json, actor } = {}) {
   try { body = JSON.parse(text); } catch { /* no body */ }
   return { status: res.status, body };
 }
+
+// The full representations (#2810, group 6 step c): what the page sends when
+// nothing is filled in, so a case about one field passes every other one.
+const DAY_FIELDS = (/** @type {Record<string, unknown>} */ over = {}) => ({
+  flow: '', note: null, visibility: 'private', symptoms: [], basal_temp: null, basal_temp_unit: null,
+  cervix_mucus: '', lh_test: '', pregnancy_test: '', intimacy: '', ...over,
+});
+const SETTINGS = (/** @type {Record<string, unknown>} */ over = {}) => ({
+  cycle_length_avg: null, period_length_avg: null, luteal_length: 14, track_fertility: true, contraception: null, perimenopause_mode: false,
+  show_pms: true, default_visibility: 'private', remind_period_days_before: null, remind_log_daily: false, notify_partner_user_id: null,
+  notify_partner_days_before: null, pregnancy_mode: false, pregnancy_due_date: null, ...over,
+});
+const TARGET = (/** @type {Record<string, unknown>} */ over = {}) => ({
+  energy_kcal: null, fat_g: null, saturated_fat_g: null, carbs_g: null, sugar_g: null, protein_g: null, salt_g: null, fiber_g: null, ...over,
+});
 
 /**
  * A refusal of the schema: 400, the fixed sentence, `reason: validation` and
@@ -231,7 +248,7 @@ test('own callers: labs, activities, prevention and nutrition', async () => {
   accepted(await call('POST', '/nutrition/entries', { json: { title: 'Brot', consumed_at: '2026-09-02T12:00', meal_type: null, note: null, visibility: 'all', ...nutrients } }), 'entry with meal_type null');
   accepted(await call('PATCH', `/nutrition/entries/${entry.id}`, { json: { title: 'Muesli', consumed_at: '2026-09-01T07:30', meal_type: 'snack', note: null, visibility: 'private', ...nutrients } }), 'entry patch');
   accepted(await call('PUT', '/nutrition/targets', { json: nutrients }), 'target');
-  accepted(await call('PUT', '/nutrition/targets', { json: {} }), '{} clears the target');
+  accepted(await call('PUT', '/nutrition/targets', { json: TARGET() }), 'eight null clear the target');
 });
 
 test('own callers: the cycle tab, its settings and the import', async () => {
@@ -299,11 +316,11 @@ test('numbers: text, a truth value or a list is 400 (stored as 16, 0, 0 and 1 be
     const label = JSON.stringify(value);
     refused(await call('POST', '/vitals', { json: { type: 'weight', measured_at: '2026-09-02T08:00', value_num: value } }), 'body/value_num', `value_num ${label}`);
     refused(await call('PATCH', `/medications/${med.id}`, { json: { stock_qty: value } }), 'body/stock_qty', `stock_qty ${label}`);
-    refused(await call('POST', `/medications/${med.id}/logs`, { json: { dose_qty: value } }), 'body/dose_qty', `dose_qty ${label}`);
+    refused(await call('POST', `/medications/${med.id}/logs`, { json: { status: 'pending', dose_qty: value } }), 'body/dose_qty', `dose_qty ${label}`);
     refused(await call('POST', `/labs/${report.id}/results`, { json: { analyte: 'X', value_num: value } }), 'body/value_num', `lab value ${label}`);
     refused(await call('POST', '/activities', { json: { type: 'run', performed_at: '2026-09-02T08:00', calories: value } }), 'body/calories', `calories ${label}`);
     refused(await call('POST', '/nutrition/entries', { json: { title: 'X', consumed_at: '2026-09-02T08:00', fat_g: value } }), 'body/fat_g', `fat_g ${label}`);
-    refused(await call('PUT', '/cycle/settings', { json: { cycle_length_avg: value } }), 'body/cycle_length_avg', `cycle_length_avg ${label}`);
+    refused(await call('PUT', '/cycle/settings', { json: SETTINGS({ cycle_length_avg: value }) }), 'body/cycle_length_avg', `cycle_length_avg ${label}`);
   }
   // As-needed limits agree with the route on every number.
   refused(await call('PATCH', `/medications/${med.id}`, { json: { min_interval_hours: 0 } }), 'body/min_interval_hours', 'gap 0');
@@ -315,13 +332,13 @@ test('switches and lists: text or a value outside the list is 400 (fell back sil
   refused(await call('POST', '/medications', { json: { name: 'X', active: 'yes' } }), 'body/active', 'active yes (became 1 before)');
   refused(await call('POST', '/medications', { json: { name: 'X', prn: null } }), 'body/prn', 'prn null (became 0 before)');
   refused(await call('POST', `/medications/${med.id}/schedules`, { json: { time_of_day: '08:00', active: 'true' } }), 'body/active', 'schedule active as text');
-  refused(await call('PUT', '/cycle/settings', { json: { show_pms: 'yes' } }), 'body/show_pms', 'cycle switch as text');
+  refused(await call('PUT', '/cycle/settings', { json: SETTINGS({ show_pms: 'yes' }) }), 'body/show_pms', 'cycle switch as text');
   refused(await call('POST', '/vitals', { json: { type: 'weight', measured_at: '2026-09-02T08:00', visibility: 'public' } }), 'body/visibility', 'visibility');
   refused(await call('POST', `/medications/${med.id}/logs`, { json: { status: 'done' } }), 'body/status', 'log status');
   refused(await call('POST', `/labs/${report.id}/results`, { json: { analyte: 'X', flag: 'HIGH' } }), 'body/flag', 'lab flag');
-  refused(await call('POST', '/cycle/logs', { json: { log_date: '2026-08-22', flow: 'gush' } }), 'body/flow', 'flow');
-  refused(await call('POST', '/cycle/logs', { json: { log_date: '2026-08-22', intimacy: 'yes' } }), 'body/intimacy', 'intimacy');
-  refused(await call('POST', '/cycle/logs', { json: { log_date: '2026-08-22', symptoms: 5 } }), 'body/symptoms', 'symptoms as number (cleared them before)');
+  refused(await call('POST', '/cycle/logs', { json: DAY_FIELDS({ log_date: '2026-08-22', flow: 'gush' }) }), 'body/flow', 'flow');
+  refused(await call('POST', '/cycle/logs', { json: DAY_FIELDS({ log_date: '2026-08-22', intimacy: 'yes' }) }), 'body/intimacy', 'intimacy');
+  refused(await call('POST', '/cycle/logs', { json: DAY_FIELDS({ log_date: '2026-08-22', symptoms: 5 }) }), 'body/symptoms', 'symptoms as number (cleared them before)');
   refused(await call('POST', '/nutrition/entries', { json: { title: 'X', consumed_at: '2026-09-02T08:00', meal_type: 'brunch' } }), 'body/meal_type', 'meal type');
   refused(await call('PATCH', `/nutrition/entries/${entry.id}`, { json: { meal_type: 'brunch' } }), 'body/meal_type', 'meal type on patch');
   refused(await call('POST', '/prevention/types', { json: { name: 'X', kind: 'vaccine' } }), 'body/kind', 'kind');
@@ -356,7 +373,7 @@ test('type_id: a number or digit text, nothing else (read by parseInt before)', 
 
 test('ids, text and shapes', async () => {
   refused(await call('POST', '/vitals', { json: { type: 'weight', measured_at: '2026-09-02T08:00', user_id: '7abc' } }), 'body/user_id', 'user_id 7abc (read as 7 before)');
-  refused(await call('PUT', '/cycle/settings', { json: { notify_partner_user_id: true } }), 'body/notify_partner_user_id', 'partner true (read as 1 before)');
+  refused(await call('PUT', '/cycle/settings', { json: SETTINGS({ notify_partner_user_id: true }) }), 'body/notify_partner_user_id', 'partner true (read as 1 before)');
   refused(await call('POST', '/vitals', { json: { type: 5, measured_at: '2026-09-02T08:00' } }), 'body/type', 'number as type');
   refused(await call('POST', '/medications', { json: { name: { a: 1 } } }), 'body/name', 'object as name ("[object Object]" before)');
   refused(await call('PATCH', `/labs/${report.id}`, { json: { note: ['x'] } }), 'body/note', 'list as note');
@@ -441,7 +458,7 @@ test('the sink: validateBasalTemp() looks up own keys only (constructor stored 9
   assert.deepEqual(validateBasalTemp(36.6, 'C'), { temp: 36.6, unit: 'c', error: null });
   assert.ok(validateBasalTemp(99999, 'c').error);
   // In front of it the schema refuses the same.
-  return call('POST', '/cycle/logs', { json: { log_date: '2026-08-23', basal_temp: 99999, basal_temp_unit: 'constructor' } })
+  return call('POST', '/cycle/logs', { json: DAY_FIELDS({ log_date: '2026-08-23', basal_temp: 99999, basal_temp_unit: 'constructor' }) })
     .then((res) => refused(res, 'body/basal_temp_unit', 'basal unit constructor'));
 });
 
@@ -479,4 +496,364 @@ test('one source: every list of the schemas is the constant the handler reads', 
   assert.deepEqual(strip(nutrition.visibility.enum), [...fields.NUTRITION_VISIBILITIES]);
   for (const key of fields.NUTRIENT_KEYS) assert.equal(nutrition[key].maximum, fields.MAX_NUTRIENT, key);
   assert.equal(bodyOf('/api/v1/health/visibility-defaults', 'put').properties.defaults.propertyNames.pattern, fields.SCOPE_KEY_PATTERN);
+});
+
+// Since step (b) of group 6 the handlers no longer check what the schema
+// covers on every input (`v.num`, `v.oneOf`, the `toBit` refusals, the ranges
+// of the cycle settings, `prnInterval`, `prnDose`, `stockDeduct`, the nutrient
+// and prevention ranges, `days_mask`, `time_of_day`, the shape of `schedules`,
+// `results`, `caregiver_ids`, `defaults`, `feelings`, `csv`, the export days).
+// The schema is the only guard, so its types, bounds and required fields are
+// pinned here as literals - a looser type, a lost `required`, a `null` let
+// into a list field or a wider bound in the document turns this red. The
+// constants themselves are pinned in the case above.
+test('only guard: the types and bounds the handlers no longer check are the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const H = '/api/v1/health';
+  const requestOf = (/** @type {string} */ path, /** @type {string} */ method) => spec.paths[`${H}${path}`][method].requestBody;
+  const bodyOf = (/** @type {string} */ path, /** @type {string} */ method) => requestOf(path, method).content['application/json'].schema;
+  const queryOf = (/** @type {string} */ path, /** @type {string} */ name) => spec.paths[`${H}${path}`].get.parameters.find((/** @type {any} */ p) => p.name === name && p.in === 'query').schema;
+  const NUMBER = ['number', 'null'];
+  const FLAG = [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }];
+  const flagOf = (/** @type {any} */ s) => s.anyOf;
+
+  // Numbers: a number or null, never text (`v.num` read "0x10" as 16).
+  const vitals = bodyOf('/vitals', 'post').properties;
+  for (const field of ['value_num', 'value_num2', 'value_num3']) assert.deepEqual(vitals[field].type, NUMBER, `vitals ${field}`);
+  const activity = bodyOf('/activities', 'post').properties;
+  for (const field of ['duration_min', 'distance_km', 'calories']) assert.deepEqual(activity[field].type, NUMBER, `activities ${field}`);
+  for (const path of ['/medications', '/medications/{id}']) {
+    const med = bodyOf(path, path === '/medications' ? 'post' : 'patch').properties;
+    for (const field of ['stock_qty', 'refill_threshold', 'min_interval_hours', 'prn_dose_qty']) assert.deepEqual(med[field].type, NUMBER, `${path} ${field}`);
+    // prnInterval: above 0; prnDose: not negative.
+    assert.equal(med.min_interval_hours.exclusiveMinimum, 0, `${path} min_interval_hours`);
+    assert.equal(med.prn_dose_qty.minimum, 0, `${path} prn_dose_qty`);
+    assert.deepEqual(flagOf(med.active), FLAG, `${path} active`);
+    assert.deepEqual(flagOf(med.prn), FLAG, `${path} prn`);
+    assert.deepEqual(med.visibility.type, ['string', 'null'], `${path} visibility`);
+  }
+  const meds = bodyOf('/medications', 'post').properties;
+  assert.deepEqual(meds.schedules.type, ['array', 'null']);
+  for (const schedule of [meds.schedules.items, bodyOf('/medications/{id}/schedules', 'post')]) {
+    assert.equal(schedule.type, 'object');
+    assert.deepEqual(schedule.required, ['time_of_day']);
+    assert.equal(schedule.properties.time_of_day.type, 'string');
+    assert.equal(schedule.properties.time_of_day.pattern, '^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+    assert.deepEqual([schedule.properties.days_mask.type, schedule.properties.days_mask.minimum, schedule.properties.days_mask.maximum], [['integer', 'null'], 0, 127]);
+    assert.deepEqual(schedule.properties.dose_qty.type, NUMBER);
+    assert.deepEqual(flagOf(schedule.properties.active), FLAG);
+  }
+  const schedulePatch = bodyOf('/schedules/{id}', 'patch').properties;
+  assert.equal(schedulePatch.time_of_day.type, 'string', 'time_of_day cannot be emptied');
+  assert.deepEqual([schedulePatch.days_mask.minimum, schedulePatch.days_mask.maximum], [0, 127]);
+  assert.deepEqual(flagOf(schedulePatch.active), FLAG);
+  // Dose log: status of the list or null, numbers, stock_deduct and stock_credit not negative.
+  for (const [path, method] of [['/medications/{id}/logs', 'post'], ['/logs/{id}', 'patch']]) {
+    const log = bodyOf(path, method).properties;
+    assert.deepEqual(log.status.type, ['string', 'null'], `${path} status`);
+    assert.deepEqual(log.dose_qty.type, NUMBER, `${path} dose_qty`);
+  }
+  for (const [path, field] of [['/medications/{id}/logs', 'stock_deduct'], ['/logs/{id}/take', 'stock_deduct'], ['/logs/{id}/undo', 'stock_credit']]) {
+    const prop = bodyOf(path, 'post').properties[field];
+    assert.deepEqual([prop.type, prop.minimum], [NUMBER, 0], `${path} ${field}`);
+    assert.equal(requestOf(path, 'post').required, true, `${path}: a body`);
+  }
+  // Labs: results a list of objects with an analyte, or null; the flag of the list or null.
+  const labs = bodyOf('/labs', 'post').properties;
+  assert.deepEqual(labs.results.type, ['array', 'null']);
+  assert.equal(labs.results.items.type, 'object');
+  assert.deepEqual(labs.results.items.required, ['analyte']);
+  assert.deepEqual(labs.results.items.properties.flag.type, ['string', 'null']);
+  assert.deepEqual(bodyOf('/results/{id}', 'patch').properties.value_num.type, NUMBER);
+  // Prevention: kind required and never null; whole numbers in their ranges.
+  const types = bodyOf('/prevention/types', 'post');
+  assert.deepEqual([...types.required].sort(), ['kind', 'name']);
+  assert.equal(types.properties.kind.type, 'string');
+  assert.equal(bodyOf('/prevention/types/{id}', 'patch').properties.kind.type, 'string');
+  assert.deepEqual([types.properties.default_interval_months.type, types.properties.default_interval_months.minimum], [['integer', 'null'], 1]);
+  assert.deepEqual(types.properties.sort_order.type, NUMBER);
+  const records = bodyOf('/prevention/records', 'post').properties;
+  assert.deepEqual([records.interval_months.type, records.interval_months.minimum], [['integer', 'null'], 1]);
+  assert.deepEqual([records.reminder_offset_days.type, records.reminder_offset_days.minimum], [['integer', 'null'], 0]);
+  assert.deepEqual(records.dose_number.type, NUMBER);
+  // Nutrition: each nutrient a number from 0 or null; meal_type of the list or null.
+  for (const [path, method] of [['/nutrition/entries', 'post'], ['/nutrition/entries/{id}', 'patch'], ['/nutrition/targets', 'put']]) {
+    const props = bodyOf(path, method).properties;
+    for (const key of fields.NUTRIENT_KEYS) assert.deepEqual([props[key].type, props[key].minimum], [NUMBER, 0], `${path} ${key}`);
+  }
+  assert.deepEqual(bodyOf('/nutrition/entries/{id}', 'patch').properties.meal_type.type, ['string', 'null']);
+  // Cycle: the settings ranges are whole numbers or null, the switches are flags.
+  const settings = bodyOf('/cycle/settings', 'put').properties;
+  for (const field of Object.keys(fields.CYCLE_SETTING_RANGES)) assert.deepEqual(settings[field].type, ['integer', 'null'], field);
+  for (const field of ['track_fertility', 'pregnancy_mode', 'remind_log_daily', 'perimenopause_mode', 'show_pms']) assert.deepEqual(flagOf(settings[field]), FLAG, field);
+  const day = bodyOf('/cycle/logs', 'post').properties;
+  assert.deepEqual(day.feelings.type, ['array', 'null']);
+  assert.equal(day.feelings.items.type, 'string');
+  assert.deepEqual(day.mood.type, ['string', 'null']);
+  const bulk = bodyOf('/cycle/visibility', 'patch');
+  assert.deepEqual([bulk.required, bulk.properties.visibility.type], [['visibility'], 'string']);
+  const csv = bodyOf('/cycle/import', 'post');
+  assert.deepEqual([csv.required, csv.properties.csv.type], [['csv'], 'string']);
+  // Caregivers: a required list of ids from 1.
+  const care = bodyOf('/caregivers/{subjectId}', 'put');
+  assert.deepEqual(care.required, ['caregiver_ids']);
+  assert.equal(care.properties.caregiver_ids.type, 'array');
+  assert.deepEqual(care.properties.caregiver_ids.items.anyOf, [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^0*[1-9][0-9]*$' }]);
+  // Visibility defaults: `defaults` a required object of visibilities; `scope` and `visibility` required.
+  const defaults = bodyOf('/visibility-defaults', 'put');
+  assert.deepEqual([defaults.required, defaults.properties.defaults.type, defaults.properties.defaults.additionalProperties.type], [['defaults'], 'object', 'string']);
+  const apply = bodyOf('/visibility-defaults/apply', 'patch');
+  assert.deepEqual([[...apply.required].sort(), apply.properties.scope.type, apply.properties.visibility.type], [['scope', 'visibility'], 'string', 'string']);
+  // Exports: a calendar day (exportRange() no longer checks it).
+  for (const path of ['/export/vitals', '/export/activities', '/export/labs', '/export/meds-logs', '/export/nutrition', '/export/cycle']) {
+    for (const name of ['from', 'to']) {
+      assert.deepEqual(queryOf(path, name), { type: 'string', format: 'date', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }, `${path} ${name}`);
+    }
+  }
+  // Every write body above is required.
+  for (const [path, method] of [['/vitals', 'post'], ['/medications', 'post'], ['/labs', 'post'], ['/activities', 'post'], ['/cycle/logs', 'post'],
+    ['/cycle/settings', 'put'], ['/nutrition/targets', 'put'], ['/prevention/records', 'post']]) {
+    assert.equal(requestOf(path, method).required, true, `${method} ${path}: a body`);
+  }
+});
+
+test('the sink: the visibility-default areas are looked up by own keys only', async () => {
+  const { isValidScopeKey } = await import('../server/routes/health/visibility-defaults.js');
+  for (const key of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+    assert.equal(isValidScopeKey(key), false, `${key} is no area`);
+  }
+  assert.equal(isValidScopeKey('meds'), true);
+  assert.equal(isValidScopeKey('vital:bp'), true);
+  // In front of it the schema refuses the same.
+  refused(await call('PATCH', '/visibility-defaults/apply', { json: { scope: 'constructor', visibility: 'private' } }), 'body/scope', 'apply constructor');
+  refused(await call('PUT', '/visibility-defaults', { json: { defaults: { toString: 'family' } } }), 'body/defaults', 'defaults toString');
+});
+
+// ---------------------------------------------------------------------------
+// Volle Darstellung (#2810, Gruppe 6 Schritt c): wer ersetzt, schickt alles.
+// Ein fehlendes Feld, das gespeicherten Zustand zuruecksetzte, ist ein 400,
+// und die gespeicherte Zeile bleibt, wie sie war.
+// ---------------------------------------------------------------------------
+
+/** @param {Record<string, unknown>} body @param {string} key */
+const without = (body, key) => Object.fromEntries(Object.entries(body).filter(([name]) => name !== key));
+
+/** The stored day log with its symptoms and feelings. @param {string} day */
+function storedDay(day) {
+  const row = db.prepare('SELECT * FROM cycle_day_logs WHERE user_id = ? AND log_date = ?').get(ADMIN, day);
+  return {
+    ...row,
+    updated_at: undefined,
+    symptoms: db.prepare('SELECT symptom_key, intensity FROM cycle_day_log_symptoms WHERE day_log_id = ? ORDER BY id').all(row.id),
+    feelings: db.prepare('SELECT feeling_key FROM cycle_day_log_feelings WHERE day_log_id = ? ORDER BY id').all(row.id),
+  };
+}
+
+test('PUT /cycle/settings is the whole row: each of the 14 fields left out is a 400 and the stored settings stay', async () => {
+  const whole = SETTINGS({
+    cycle_length_avg: 30, period_length_avg: 6, luteal_length: 12, track_fertility: false, contraception: 'condom', perimenopause_mode: true,
+    show_pms: false, default_visibility: 'family', remind_period_days_before: 3, remind_log_daily: true, notify_partner_user_id: PARTNER,
+    notify_partner_days_before: 2, pregnancy_mode: true, pregnancy_due_date: '2027-03-01',
+  });
+  accepted(await call('PUT', '/cycle/settings', { json: whole }), 'the whole settings');
+  const stored = () => ({ ...db.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(ADMIN), updated_at: undefined });
+  const before = stored();
+  assert.equal(before.notify_partner_user_id, PARTNER, 'the partner is stored');
+  const required = Object.keys(whole);
+  assert.equal(required.length, 14);
+  for (const key of required) {
+    refused(await call('PUT', '/cycle/settings', { json: without(whole, key) }), `body/${key}`, `settings without ${key}`);
+    assert.deepEqual(stored(), before, `settings without ${key}: nothing reset`);
+  }
+  refused(await call('PUT', '/cycle/settings', { json: {} }), 'body/cycle_length_avg', '{} (reset every setting before)');
+  assert.deepEqual(stored(), before, '{}: nothing reset');
+  // null keeps its meaning where the schema takes it.
+  accepted(await call('PUT', '/cycle/settings', { json: SETTINGS({ luteal_length: null, default_visibility: null }) }), 'nullable fields as null');
+  const after = stored();
+  assert.deepEqual([after.luteal_length, after.default_visibility, after.notify_partner_user_id, after.contraception], [14, 'private', null, null]);
+});
+
+test('POST /cycle/logs on a stored day is the whole day: each replaced field left out is a 400, feelings and mood stay optional', async () => {
+  const day = '2026-10-01';
+  const whole = {
+    log_date: day, flow: 'heavy', note: 'Notiz', visibility: 'family', symptoms: [{ key: 'cramps', intensity: 2 }], basal_temp: 36.6, basal_temp_unit: 'c',
+    cervix_mucus: 'creamy', lh_test: 'positive', pregnancy_test: 'negative', intimacy: 'protected', feelings: ['good'],
+  };
+  accepted(await call('POST', '/cycle/logs', { json: whole }), 'the whole day');
+  db.prepare('UPDATE cycle_day_logs SET mood = ? WHERE user_id = ? AND log_date = ?').run('sad', ADMIN, day);
+  const before = storedDay(day);
+  for (const key of ['log_date', 'flow', 'note', 'visibility', 'symptoms', 'basal_temp', 'basal_temp_unit', 'cervix_mucus', 'lh_test', 'pregnancy_test', 'intimacy']) {
+    refused(await call('POST', '/cycle/logs', { json: without(whole, key) }), `body/${key}`, `day without ${key}`);
+    assert.deepEqual(storedDay(day), before, `day without ${key}: nothing cleared`);
+  }
+  // feelings and mood left out: the stored feelings and the older mood stay.
+  accepted(await call('POST', '/cycle/logs', { json: { ...without(whole, 'feelings'), note: 'neu' } }), 'day without feelings and mood');
+  const kept = storedDay(day);
+  assert.deepEqual([kept.note, kept.feelings, kept.mood], ['neu', before.feelings, 'sad'], 'feelings and mood kept');
+  // null and "" at the nullable fields still mean "not given".
+  accepted(await call('POST', '/cycle/logs', {
+    json: DAY_FIELDS({ log_date: day, flow: null, cervix_mucus: null, lh_test: null, pregnancy_test: null, intimacy: null, visibility: null, symptoms: null }),
+  }), 'all null');
+  const cleared = storedDay(day);
+  assert.deepEqual([cleared.flow, cleared.note, cleared.visibility, cleared.symptoms, cleared.basal_temp, cleared.intimacy], [null, null, 'private', [], null, null]);
+  accepted(await call('POST', '/cycle/logs', { json: DAY_FIELDS({ log_date: day, symptoms: '' }) }), 'the page form, nothing pressed, symptoms as ""');
+});
+
+test('PUT /nutrition/targets is the whole target: each nutrient left out is a 400, eight null delete it, user_id stays optional', async () => {
+  const whole = TARGET({ energy_kcal: 2000, fat_g: 70, saturated_fat_g: 20, carbs_g: 250, sugar_g: 0, protein_g: 80, salt_g: 6, fiber_g: 30 });
+  accepted(await call('PUT', '/nutrition/targets', { json: whole }), 'the whole target without user_id: the own one');
+  const stored = () => db.prepare('SELECT * FROM health_nutrition_targets WHERE user_id = ?').get(ADMIN);
+  const before = stored();
+  assert.equal(before.sugar_g, 0);
+  for (const key of fields.NUTRIENT_KEYS) {
+    refused(await call('PUT', '/nutrition/targets', { json: without(whole, key) }), `body/${key}`, `target without ${key}`);
+    assert.deepEqual(stored(), before, `target without ${key}: nothing unset`);
+  }
+  refused(await call('PUT', '/nutrition/targets', { json: {} }), 'body/energy_kcal', '{} (deleted the target before)');
+  assert.deepEqual(stored(), before, '{}: the target stays');
+  accepted(await call('PUT', '/nutrition/targets', { json: { ...TARGET(), user_id: ADMIN } }), 'eight null, own user_id');
+  assert.equal(stored(), undefined, 'eight null delete the row');
+});
+
+test('POST /medications/{id}/logs: status is required, a repeat without it no longer resets a taken dose; the other fields keep their value', async () => {
+  const at = '2026-10-02T08:00';
+  const stock = () => db.prepare('SELECT stock_qty FROM medications WHERE id = ?').get(med.id).stock_qty;
+  const first = await call('POST', `/medications/${med.id}/logs`, {
+    json: { schedule_id: schedule.id, scheduled_at: at, status: 'taken', taken_at: '2026-10-02T08:05', dose_qty: 2, note: 'x', stock_deduct: 1 },
+  });
+  accepted(first, 'taken');
+  const row = () => db.prepare('SELECT * FROM medication_logs WHERE id = ?').get(first.body.data.id);
+  const before = row();
+  const stockBefore = stock();
+  refused(await call('POST', `/medications/${med.id}/logs`, { json: { schedule_id: schedule.id, scheduled_at: at } }), 'body/status', 'repeat without status (reset to pending before)');
+  assert.deepEqual(row(), before, 'the dose stays taken');
+  refused(await call('POST', `/medications/${med.id}/logs`, { json: {} }), 'body/status', '{} (an as-needed pending entry before)');
+  // A repeat with status but without the optional fields keeps them.
+  accepted(await call('POST', `/medications/${med.id}/logs`, { json: { schedule_id: schedule.id, scheduled_at: at, status: 'taken' } }), 'repeat, only status');
+  assert.deepEqual(row(), before, 'taken_at, dose_qty and note kept');
+  assert.equal(stock(), stockBefore, 'nothing deducted twice');
+  // null still stands for pending.
+  accepted(await call('POST', `/medications/${med.id}/logs`, { json: { schedule_id: schedule.id, scheduled_at: at, status: null } }), 'status null');
+  assert.deepEqual([row().status, row().taken_at], ['pending', null]);
+});
+
+/**
+ * The index of the last character of the string, template or comment that
+ * starts at `i`, or `i` itself.
+ * @param {string} source @param {number} i
+ */
+function skipText(source, i) {
+  const c = source[i];
+  if (c === '/' && source[i + 1] === '/') return source.indexOf('\n', i);
+  if (c === '/' && source[i + 1] === '*') return source.indexOf('*/', i) + 1;
+  if (c === "'" || c === '"') {
+    for (let j = i + 1; j < source.length; j++) {
+      if (source[j] === '\\') j++;
+      else if (source[j] === c) return j;
+    }
+  }
+  if (c === '`') {
+    for (let j = i + 1; j < source.length; j++) {
+      if (source[j] === '\\') j++;
+      else if (source[j] === '`') return j;
+      else if (source[j] === '$' && source[j + 1] === '{') j = matching(source, j + 1);
+    }
+  }
+  return i;
+}
+
+/** The index of the bracket closing the one at `open`. @param {string} source @param {number} open */
+function matching(source, open) {
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    const end = skipText(source, i);
+    if (end !== i) { i = end; continue; }
+    if ('({['.includes(source[i])) depth++;
+    else if (')}]'.includes(source[i]) && --depth === 0) return i;
+  }
+  throw new Error(`unbalanced at ${open}`);
+}
+
+/** `text` split at its top-level commas, trimmed, comments dropped. @param {string} text */
+function splitTop(text) {
+  const parts = [];
+  let from = 0;
+  for (let i = 0; i < text.length; i++) {
+    const end = skipText(text, i);
+    if (end !== i) { i = end; continue; }
+    if ('({['.includes(text[i])) i = matching(text, i);
+    else if (text[i] === ',') { parts.push(text.slice(from, i)); from = i + 1; }
+  }
+  parts.push(text.slice(from));
+  return parts.map((part) => part.replace(/\/\/[^\n]*/g, '').trim()).filter(Boolean);
+}
+
+/** The arguments of the call whose `(` stands at `open`. @param {string} source @param {number} open */
+const callArgs = (source, open) => splitTop(source.slice(open + 1, matching(source, open)));
+
+/** The top-level keys of an object literal; a spread as `...name` (`...()` for an expression). @param {string} literal */
+function literalKeys(literal) {
+  assert.equal(literal[0], '{', `an object literal: ${literal.slice(0, 60)}`);
+  return splitTop(literal.slice(1, matching(literal, 0))).map((part) => {
+    if (part.startsWith('...')) return `...${/^\.\.\.([\w$]+)/.exec(part)?.[1] ?? '()'}`;
+    const key = /^([A-Za-z_$][\w$]*)\s*(:|$)/.exec(part);
+    assert.ok(key, `a key: ${part.slice(0, 60)}`);
+    return key[1];
+  });
+}
+
+/** The object literal of the last `const name = {` before `before`. @param {string} source @param {string} name @param {number} before */
+function constLiteral(source, name, before) {
+  const at = source.lastIndexOf(`const ${name} = {`, before);
+  assert.ok(at !== -1, `const ${name} before ${before}`);
+  const open = source.indexOf('{', at);
+  return source.slice(open, matching(source, open) + 1);
+}
+
+test('the own callers: the four replace calls of the health page send every required field of their schema', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const requiredOf = (/** @type {string} */ path, /** @type {string} */ method) => /** @type {string[]} */ (
+    spec.paths[`/api/v1/health${path}`][method].requestBody.content['application/json'].schema.required);
+  const source = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  /** @param {string} callee e.g. `api.put` */
+  const callsOf = (callee) => {
+    const found = [];
+    for (let at = source.indexOf(`${callee}(`); at !== -1; at = source.indexOf(`${callee}(`, at + 1)) {
+      found.push({ at, args: callArgs(source, at + callee.length) });
+    }
+    return found;
+  };
+  const missing = (/** @type {string[]} */ required, /** @type {string[]} */ keys) => required.filter((key) => !keys.includes(key));
+
+  // Cycle settings and day log: `api.put/post(path, body)` with `const body = {...}` right before.
+  for (const [callee, path, method] of [['api.put', '/cycle/settings', 'put'], ['api.post', '/cycle/logs', 'post']]) {
+    const own = callsOf(callee).filter((c) => c.args[0] === `'/health${path}'`);
+    assert.equal(own.length, 1, `${callee} ${path} found once`);
+    assert.equal(own[0].args[1], 'body', `${path}: the body`);
+    const keys = literalKeys(constLiteral(source, 'body', own[0].at));
+    assert.deepEqual(missing(requiredOf(path, method), keys), [], `${path} sends ${JSON.stringify(keys)}`);
+  }
+
+  // Nutrition target: `{ ...values, ...ownerField() }` with `values = collectNutrients(panel)`;
+  // collectNutrients() itself runs on a form whose fields are empty or missing.
+  const target = callsOf('api.put').filter((c) => c.args[0] === "'/health/nutrition/targets'");
+  assert.equal(target.length, 1, 'the target PUT found once');
+  assert.ok(literalKeys(target[0].args[1]).includes('...values'), target[0].args[1]);
+  assert.match(source.slice(source.lastIndexOf('const values = ', target[0].at)), /^const values = collectNutrients\(panel\);/);
+  const fnAt = source.indexOf('function collectNutrients(');
+  const fnSource = source.slice(fnAt, matching(source, source.indexOf('{', fnAt)) + 1);
+  const collectNutrients = new Function('NUTRIENTS', `${fnSource}\nreturn collectNutrients;`)(nutrition.NUTRIENTS);
+  for (const [form, label] of [[{ querySelector: () => ({ value: '' }) }, 'empty'], [{ querySelector: () => null }, 'missing']]) {
+    assert.deepEqual(missing(requiredOf('/nutrition/targets', 'put'), Object.keys(collectNutrients(form))), [], `a form with ${label} fields names all eight`);
+  }
+
+  // Dose log: both postDose() calls on the log path build their body with `status`.
+  const doses = callsOf('postDose').filter((c) => c.args[1] === '`/health/medications/${medId}/logs`');
+  assert.equal(doses.length, 2, 'the as-needed and the scheduled dose');
+  for (const dose of doses) {
+    const factory = dose.args[2];
+    const literal = /^\(\)\s*=>\s*\(\{/.test(factory) ? factory.slice(factory.indexOf('{')) : constLiteral(factory, 'body', factory.length);
+    const keys = literalKeys(literal);
+    assert.deepEqual(missing(requiredOf('/medications/{id}/logs', 'post'), keys), [], `dose sends ${JSON.stringify(keys)}`);
+  }
 });

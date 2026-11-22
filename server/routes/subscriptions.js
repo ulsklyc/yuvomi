@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import express from 'express';
+import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { color, collectErrors, date, num, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
@@ -616,7 +617,7 @@ async function subscriptionsWithConversions(rows, baseCurrency, refresh = false)
   };
 }
 
-router.get('/meta', (req, res) => {
+router.get('/meta', validateRequest(), (req, res) => {
   try {
     const categories = db.get().prepare(`
       SELECT c.*, (SELECT COUNT(*) FROM budget_subscriptions s WHERE s.category_id = c.id) AS usage_count
@@ -643,7 +644,7 @@ router.get('/meta', (req, res) => {
   }
 });
 
-router.get('/settings', (_req, res) => {
+router.get('/settings', validateRequest(), (_req, res) => {
   try {
     res.json({ data: settings() });
   } catch (err) {
@@ -652,7 +653,7 @@ router.get('/settings', (_req, res) => {
   }
 });
 
-router.put('/settings', (req, res) => {
+router.put('/settings', validateRequest(), (req, res) => {
   try {
     const monthlyBudget = Number(req.body.monthly_budget);
     const baseCurrency = String(req.body.base_currency || '').toUpperCase();
@@ -670,7 +671,7 @@ router.put('/settings', (req, res) => {
   }
 });
 
-router.post('/categories', (req, res) => {
+router.post('/categories', validateRequest(), (req, res) => {
   const name = str(req.body.name, 'Name', { max: MAX_SHORT });
   const categoryColor = color(req.body.color || '#0F766E', 'Color');
   const errors = collectErrors([name, categoryColor]);
@@ -697,7 +698,7 @@ router.post('/categories', (req, res) => {
   }
 });
 
-router.post('/payment-methods', (req, res) => {
+router.post('/payment-methods', validateRequest(), (req, res) => {
   const name = str(req.body.name, 'Name', { max: MAX_SHORT });
   if (name.error) return res.status(400).json({ error: name.error, code: 400 });
   try {
@@ -711,7 +712,7 @@ router.post('/payment-methods', (req, res) => {
   }
 });
 
-router.put('/meta/order', (req, res) => {
+router.put('/meta/order', validateRequest(), (req, res) => {
   try {
     const categories = Array.isArray(req.body.categories) ? req.body.categories.map(Number) : null;
     const methods = Array.isArray(req.body.payment_methods) ? req.body.payment_methods.map(Number) : null;
@@ -737,7 +738,7 @@ router.put('/meta/order', (req, res) => {
   }
 });
 
-router.put('/categories/:id', (req, res) => {
+router.put('/categories/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = db.get().prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id);
@@ -779,7 +780,7 @@ router.put('/categories/:id', (req, res) => {
   }
 });
 
-router.delete('/categories/:id', (req, res) => {
+router.delete('/categories/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = db.get().prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id);
@@ -805,7 +806,7 @@ router.delete('/categories/:id', (req, res) => {
   }
 });
 
-router.put('/payment-methods/:id', (req, res) => {
+router.put('/payment-methods/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(id);
@@ -827,7 +828,7 @@ router.put('/payment-methods/:id', (req, res) => {
   }
 });
 
-router.delete('/payment-methods/:id', (req, res) => {
+router.delete('/payment-methods/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const existing = db.get().prepare('SELECT * FROM subscription_payment_methods WHERE id = ?').get(id);
@@ -850,7 +851,7 @@ function logoSearchLogError(err) {
   };
 }
 
-router.post('/logo-search', async (req, res) => {
+router.post('/logo-search', validateRequest(), async (req, res) => {
   const diagnostics = [];
   let logoQuery = '';
   const started = Date.now();
@@ -890,7 +891,7 @@ router.post('/logo-search', async (req, res) => {
 // Ein veralteter Wechselkurs wird bei Fixer geholt und danach im Cache
 // gespeichert: waehrend eines Restores 503, sonst festgehalten wie eine
 // schreibende Anfrage (#1551).
-router.get('/', refuseWhileRestoring, async (req, res) => {
+router.get('/', validateRequest(), refuseWhileRestoring, async (req, res) => {
   try {
     const clauses = [];
     const params = [];
@@ -982,7 +983,7 @@ router.get('/', refuseWhileRestoring, async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validateRequest(), async (req, res) => {
   try {
     const validated = validatePayload(req.body);
     if (validated.errors.length) return res.status(400).json(problemBody(validated.errors));
@@ -1030,7 +1031,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateRequest(), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const current = loadSubscription(id);
@@ -1095,7 +1096,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.post('/:id/renew', async (req, res) => {
+router.post('/:id/renew', validateRequest(), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const current = loadSubscription(id);
@@ -1208,7 +1209,7 @@ function takeRenewal(id, token, userId) {
  * der Stand ist, den EIN Verlaengern aus dem gemerkten macht - sonst hat
  * seither jemand anderes bezahlt oder bearbeitet, und die Antwort ist 409.
  */
-router.post('/:id/renew/undo', async (req, res) => {
+router.post('/:id/renew/undo', validateRequest(), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const current = loadSubscription(id);
@@ -1260,7 +1261,7 @@ router.post('/:id/renew/undo', async (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     // Die 404 heisst hier nur "gibt es nicht mehr": loadSubscription liest
@@ -1283,9 +1284,9 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-router.use((err, _req, res, _next) => {
-  log.error('Unhandled route error:', err);
-  res.status(500).json({ error: 'Internal error.', code: 500 });
-});
+// No error handler of its own (#2810): a router-level one answered every
+// `next(err)` with 500, the 400 of validateRequest() too. An unexpected error
+// reaches the central handler (server/middleware/error-handler.js) like in
+// every other route file.
 
 export default router;

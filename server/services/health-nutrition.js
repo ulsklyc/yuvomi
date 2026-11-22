@@ -16,12 +16,13 @@
  */
 
 import { canWriteFor, careAwareClause, OPEN_ALL } from '../authorize/index.ts';
-import { MEAL_TYPES, NUTRIENT_KEYS } from './health-fields.js';
+import { NUTRIENT_KEYS } from './health-fields.js';
 
-// Die acht Naehrwerte in der Reihenfolge der EU-Naehrwerttabelle und die
-// Mahlzeitenarten: EINE Quelle mit dem OpenAPI-Dokument (#2810),
-// server/services/health-fields.js. Hier weiter exportiert fuer die Leser.
-export { MEAL_TYPES, NUTRIENT_KEYS };
+// Die acht Naehrwerte in der Reihenfolge der EU-Naehrwerttabelle: EINE Quelle
+// mit dem OpenAPI-Dokument (#2810), server/services/health-fields.js. Hier
+// weiter exportiert fuer die Leser. Die Mahlzeitenarten (MEAL_TYPES) liest nur
+// noch das Schema; die Route prueft sie seit #2810 nicht mehr selbst.
+export { NUTRIENT_KEYS };
 
 /**
  * Das Tagesziel einer Person, oder `null`.

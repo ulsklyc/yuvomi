@@ -4,7 +4,6 @@
  * Abhängigkeiten: express, server/db.js, server/auth.js
  */
 
-import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
@@ -18,12 +17,29 @@ import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
 } from '../services/contact-identity.js';
+import { CONTACT_CATEGORY_COLORS } from '../services/contacts-fields.js';
+import { validateRequest } from '../api/validate-request.ts';
 
-const log = createLogger('Contacts');
-
+// Ein unerwarteter Fehler geht an den zentralen Fehlerhandler
+// (server/middleware/error-handler.js, 500 `Internal server error.`); die
+// Handler fangen nur, was eine eigene Antwort hat (#2810).
 const router  = express.Router();
 
 const FALLBACK_CATEGORY = 'misc';
+
+/**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). `parseInt`
+ * read `7abc` as 7 until the schema stood in front; it lets nothing but digits
+ * through now, so `Number` reads the same value. `0`, `-0` and `-1` find no
+ * row (404), a leading zero reaches the row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
 
 /**
  * Liest die strukturierten Namensteile aus einem Request-Body (#535) und leitet
@@ -86,35 +102,17 @@ function loadContactCategories() {
   ).all();
 }
 
-/**
- * Die kuratierten Toene, aus denen eine Kategorie waehlen darf.
- *
- * EINE ALLOWLIST, KEIN FREIER FARBWAEHLER, und der Grund ist gemessen: die
- * Kategoriescheibe ist eine VOLLTON-Marke, ihre Tinte ist die feste
- * `--color-ink-on-vivid` (Vollton-Regel, DESIGN.md). Das haelt nur ueber
- * kuratierten Toenen - eine frei gewaehlte Farbe hat unbestimmte Helligkeit und
- * muesste als Kante statt als Flaeche erscheinen, also als zweites Gesicht
- * derselben Marke. Sieben Toene sind fuer ein Kategorie-Vokabular reichlich,
- * und es sind exakt die sieben, die vorher in contacts.css standen: bestehende
- * Haushalte sehen nach der Migration genau dasselbe wie davor.
- *
- * Der leere Wert gehoert dazu und heisst NEUTRAL - siehe Migration 152.
- */
-const CONTACT_CATEGORY_COLORS = Object.freeze([
-  'var(--color-success)',
-  'var(--color-warning)',
-  'var(--color-accent)',
-  'var(--module-budget)',
-  'var(--module-meals)',
-  'var(--color-danger)',
-  'var(--color-text-secondary)',
-]);
+// Die kuratierten Toene einer Kategorie: EINE Quelle mit dem OpenAPI-Dokument
+// (#2810), server/services/contacts-fields.js (dort begruendet).
 
-/** '' und null bedeuten beide "kein Ton"; alles ausserhalb der Liste wird abgewiesen. */
+/**
+ * '' und null bedeuten beide "kein Ton". Einen Ton ausserhalb der Liste weist
+ * seit #2810 das Schema ab (`enum` aus derselben Liste), bevor der Handler
+ * laeuft; hier bleibt nur die Faltung.
+ */
 function normalizeCategoryColor(value) {
   if (value === undefined) return { skip: true };
   if (value === null || value === '') return { value: null };
-  if (!CONTACT_CATEGORY_COLORS.includes(value)) return { error: 'Unknown category colour.' };
   return { value };
 }
 
@@ -331,112 +329,85 @@ function validateAddresses(addresses) {
 // --------------------------------------------------------
 
 // GET /api/v1/contacts/categories → { data: ContactCategory[] }
-router.get('/categories', (_req, res) => {
-  try {
-    res.json({ data: loadContactCategories() });
-  } catch (err) {
-    log.error('GET /categories error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/categories', validateRequest(), (_req, res) => {
+  res.json({ data: loadContactCategories() });
 });
 
 // POST /api/v1/contacts/categories  Body: { name } → { data: ContactCategory }
-router.post('/categories', (req, res) => {
-  try {
-    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+router.post('/categories', validateRequest(), (req, res) => {
+  const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+  if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
-    const conflict = db.get().prepare(`
-      SELECT key FROM contact_categories WHERE COALESCE(name, key) = ? COLLATE NOCASE
-    `).get(vName.value);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
+  const conflict = db.get().prepare(`
+    SELECT key FROM contact_categories WHERE COALESCE(name, key) = ? COLLATE NOCASE
+  `).get(vName.value);
+  if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
-    const vColor = normalizeCategoryColor(req.body.color);
-    if (vColor.error) return res.status(400).json({ error: vColor.error, code: 400 });
+  const vColor = normalizeCategoryColor(req.body.color);
 
-    const maxOrder = db.get().prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM contact_categories').get().m;
-    const key = uniqueKey(db.get(), 'contact_categories', vName.value);
-    db.get().prepare(
-      "INSERT INTO contact_categories (key, name, label_key, icon, sort_order, color) VALUES (?, ?, NULL, 'tag', ?, ?)"
-    ).run(key, vName.value, maxOrder + 1, vColor.skip ? null : vColor.value);
+  const maxOrder = db.get().prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM contact_categories').get().m;
+  const key = uniqueKey(db.get(), 'contact_categories', vName.value);
+  db.get().prepare(
+    "INSERT INTO contact_categories (key, name, label_key, icon, sort_order, color) VALUES (?, ?, NULL, 'tag', ?, ?)"
+  ).run(key, vName.value, maxOrder + 1, vColor.skip ? null : vColor.value);
 
-    const cat = db.get().prepare('SELECT key, name, label_key, icon, sort_order, color FROM contact_categories WHERE key = ?').get(key);
-    res.status(201).json({ data: cat });
-  } catch (err) {
-    log.error('POST /categories error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const cat = db.get().prepare('SELECT key, name, label_key, icon, sort_order, color FROM contact_categories WHERE key = ?').get(key);
+  res.status(201).json({ data: cat });
 });
 
 // PATCH /api/v1/contacts/categories/reorder  Body: { order: string[] }
-router.patch('/categories/reorder', (req, res) => {
-  try {
-    const order = Array.isArray(req.body.order) ? req.body.order : [];
-    const update = db.get().prepare('UPDATE contact_categories SET sort_order = ? WHERE key = ?');
-    db.get().transaction(() => order.forEach((key, i) => update.run(i, key)))();
-    res.json({ data: loadContactCategories() });
-  } catch (err) {
-    log.error('PATCH /categories/reorder error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.patch('/categories/reorder', validateRequest(), (req, res) => {
+  const order = Array.isArray(req.body.order) ? req.body.order : [];
+  const update = db.get().prepare('UPDATE contact_categories SET sort_order = ? WHERE key = ?');
+  db.get().transaction(() => order.forEach((key, i) => update.run(i, key)))();
+  res.json({ data: loadContactCategories() });
 });
 
 // PUT /api/v1/contacts/categories/:key  Body: { name } → umbenennen (Key bleibt stabil).
-router.put('/categories/:key', (req, res) => {
-  try {
-    const cat = db.get().prepare('SELECT * FROM contact_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'contacts_category_not_found' });
+router.put('/categories/:key', validateRequest(), (req, res) => {
+  const cat = db.get().prepare('SELECT * FROM contact_categories WHERE key = ?').get(req.params.key);
+  if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'contacts_category_not_found' });
 
-    const vColor = normalizeCategoryColor(req.body.color);
-    if (vColor.error) return res.status(400).json({ error: vColor.error, code: 400 });
+  const vColor = normalizeCategoryColor(req.body.color);
 
-    // NUR die Farbe aendern, ohne den Namen mitzuschicken: die sieben
-    // Seed-Kategorien tragen ihren Namen als `label_key` (uebersetzt), und ein
-    // Umweg ueber `name` wuerde sie beim Farbwechsel stillschweigend auf die
-    // Sprache des Klienten festnageln - genau der Verlust, den Migration 143
-    // beim Inventar behoben hat.
-    if (req.body.name === undefined && !vColor.skip) {
-      db.get().prepare('UPDATE contact_categories SET color = ? WHERE key = ?').run(vColor.value, cat.key);
-      return res.json({ data: db.get().prepare('SELECT key, name, label_key, icon, sort_order, color FROM contact_categories WHERE key = ?').get(cat.key) });
-    }
-
-    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
-
-    const conflict = db.get().prepare(`
-      SELECT key FROM contact_categories WHERE COALESCE(name, key) = ? COLLATE NOCASE AND key != ?
-    `).get(vName.value, cat.key);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
-
-    db.get().prepare('UPDATE contact_categories SET name = ?, label_key = NULL WHERE key = ?').run(vName.value, cat.key);
-    if (!vColor.skip) db.get().prepare('UPDATE contact_categories SET color = ? WHERE key = ?').run(vColor.value, cat.key);
-    const updated = db.get().prepare('SELECT key, name, label_key, icon, sort_order, color FROM contact_categories WHERE key = ?').get(cat.key);
-    res.json({ data: updated });
-  } catch (err) {
-    log.error('PUT /categories/:key error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // NUR die Farbe aendern, ohne den Namen mitzuschicken: die sieben
+  // Seed-Kategorien tragen ihren Namen als `label_key` (uebersetzt), und ein
+  // Umweg ueber `name` wuerde sie beim Farbwechsel stillschweigend auf die
+  // Sprache des Klienten festnageln - genau der Verlust, den Migration 143
+  // beim Inventar behoben hat.
+  if (req.body.name === undefined && !vColor.skip) {
+    db.get().prepare('UPDATE contact_categories SET color = ? WHERE key = ?').run(vColor.value, cat.key);
+    return res.json({ data: db.get().prepare('SELECT key, name, label_key, icon, sort_order, color FROM contact_categories WHERE key = ?').get(cat.key) });
   }
+
+  const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+  if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+
+  const conflict = db.get().prepare(`
+    SELECT key FROM contact_categories WHERE COALESCE(name, key) = ? COLLATE NOCASE AND key != ?
+  `).get(vName.value, cat.key);
+  if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
+
+  db.get().prepare('UPDATE contact_categories SET name = ?, label_key = NULL WHERE key = ?').run(vName.value, cat.key);
+  if (!vColor.skip) db.get().prepare('UPDATE contact_categories SET color = ? WHERE key = ?').run(vColor.value, cat.key);
+  const updated = db.get().prepare('SELECT key, name, label_key, icon, sort_order, color FROM contact_categories WHERE key = ?').get(cat.key);
+  res.json({ data: updated });
 });
 
 // DELETE /api/v1/contacts/categories/:key → 409 wenn in Benutzung oder letzte Kategorie.
-router.delete('/categories/:key', (req, res) => {
-  try {
-    const cat = db.get().prepare('SELECT * FROM contact_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'contacts_category_not_found' });
+router.delete('/categories/:key', validateRequest(), (req, res) => {
+  const cat = db.get().prepare('SELECT * FROM contact_categories WHERE key = ?').get(req.params.key);
+  if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'contacts_category_not_found' });
 
-    const inUse = contactCategoryInUseCount(cat.key);
-    if (inUse > 0) {
-      return res.status(409).json({ error: `Category is in use by ${inUse} contact${inUse === 1 ? '' : 's'}.`, code: 409, count: inUse, reason: 'category_in_use' });
-    }
-    const total = db.get().prepare('SELECT COUNT(*) AS n FROM contact_categories').get().n;
-    if (total <= 1) return res.status(409).json({ error: 'Cannot delete the last category.', code: 409, reason: 'category_last' });
-
-    db.get().prepare('DELETE FROM contact_categories WHERE key = ?').run(cat.key);
-    res.status(204).end();
-  } catch (err) {
-    log.error('DELETE /categories/:key error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const inUse = contactCategoryInUseCount(cat.key);
+  if (inUse > 0) {
+    return res.status(409).json({ error: `Category is in use by ${inUse} contact${inUse === 1 ? '' : 's'}.`, code: 409, count: inUse, reason: 'category_in_use' });
   }
+  const total = db.get().prepare('SELECT COUNT(*) AS n FROM contact_categories').get().n;
+  if (total <= 1) return res.status(409).json({ error: 'Cannot delete the last category.', code: 409, reason: 'category_last' });
+
+  db.get().prepare('DELETE FROM contact_categories WHERE key = ?').run(cat.key);
+  res.status(204).end();
 });
 
 // Der Geburtstag eines Kontakts kommt ueber die Verknuepfung ODER, beim
@@ -539,35 +510,30 @@ function withBirthdaySuggestion(req, contact) {
  * Query: ?category=<cat>&q=<search>
  * Response: { data: Contact[] }
  */
-router.get('/', (req, res) => {
-  try {
-    let sql    = CONTACT_SELECT;
-    const params = [];
-    const where  = ['NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = contacts.family_user_id)'];
+router.get('/', validateRequest(), (req, res) => {
+  let sql    = CONTACT_SELECT;
+  const params = [];
+  const where  = ['NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = contacts.family_user_id)'];
 
-    if (req.query.category && validContactCategoryKeys().includes(req.query.category)) {
-      where.push('contacts.category = ?');
-      params.push(req.query.category);
-    }
-
-    if (req.query.q) {
-      where.push('(contacts.name LIKE ? OR contacts.phone LIKE ? OR contacts.email LIKE ?)');
-      const like = `%${req.query.q}%`;
-      params.push(like, like, like);
-    }
-
-    if (where.length) sql += ' WHERE ' + where.join(' AND ');
-    // Sortiert nach Nachname, wo er bekannt ist; sonst nach dem Anzeigenamen (#535).
-    // Spalten qualifiziert: seit dem Join auf `users` waeren `name` und
-    // `category` sonst mehrdeutig.
-    sql += ' ORDER BY contacts.category ASC, COALESCE(NULLIF(contacts.last_name, \'\'), contacts.name) COLLATE NOCASE ASC, contacts.name COLLATE NOCASE ASC';
-
-    const contacts = db.get().prepare(sql).all(...params).map((c) => withBirthdayLink(req, c));
-    res.json({ data: contacts });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (req.query.category && validContactCategoryKeys().includes(req.query.category)) {
+    where.push('contacts.category = ?');
+    params.push(req.query.category);
   }
+
+  if (req.query.q) {
+    where.push('(contacts.name LIKE ? OR contacts.phone LIKE ? OR contacts.email LIKE ?)');
+    const like = `%${req.query.q}%`;
+    params.push(like, like, like);
+  }
+
+  if (where.length) sql += ' WHERE ' + where.join(' AND ');
+  // Sortiert nach Nachname, wo er bekannt ist; sonst nach dem Anzeigenamen (#535).
+  // Spalten qualifiziert: seit dem Join auf `users` waeren `name` und
+  // `category` sonst mehrdeutig.
+  sql += ' ORDER BY contacts.category ASC, COALESCE(NULLIF(contacts.last_name, \'\'), contacts.name) COLLATE NOCASE ASC, contacts.name COLLATE NOCASE ASC';
+
+  const contacts = db.get().prepare(sql).all(...params).map((c) => withBirthdayLink(req, c));
+  res.json({ data: contacts });
 });
 
 /**
@@ -576,342 +542,335 @@ router.get('/', (req, res) => {
  * Body: { name, category?, phone?, email?, address?, notes?, phones?, emails?, addresses? }
  * Response: { data: Contact }
  */
-router.post('/', (req, res) => {
-  try {
-    // Strukturierte Namensteile haben Vorrang vor einem mitgesendeten `name` (#535).
-    const nameParts = readNameParts(req.body);
-    const vName    = limitedStr(nameParts.displayName ?? req.body.name, 'name', MAX_TITLE, { reason: 'contacts_name_too_long' }, true);
-    const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'category');
-    const vPhone   = limitedStr(req.body.phone,   'phone',   CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' });
-    const vEmail   = limitedStr(req.body.email,   'email',   MAX_TITLE, { reason: 'contacts_email_too_long' });
-    const vAddress = limitedStr(req.body.address, 'address', MAX_TEXT,  { reason: 'contacts_address_too_long' });
-    const vNotes   = limitedStr(req.body.notes,   'notes',   MAX_TEXT,  { reason: 'contacts_notes_too_long' });
-    // Geburtstag (ISO YYYY-MM-DD, optional) - u. a. aus vCard-BDAY beim Import.
-    // Speist den bestehenden #518-Geburtstags-Import (GET /birthdays/import/candidates).
-    // Ohne Jahr (#2095): `birthday_year_unknown` setzt das Jahr auf den
-    // Platzhalter, die Anzeige laesst es weg.
-    const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
-    const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, vYearUnknown.value === true), 'birthday', false));
-    const checks   = [vName, vCat, vPhone, vEmail, vAddress, vNotes, vYearUnknown, vBirthday,
-                      ...namePartChecks(nameParts.parts)];
-    const errors   = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...fieldCase(vCat, checks, errors) });
+router.post('/', validateRequest(), (req, res) => {
+  // Strukturierte Namensteile haben Vorrang vor einem mitgesendeten `name` (#535).
+  const nameParts = readNameParts(req.body);
+  const vName    = limitedStr(nameParts.displayName ?? req.body.name, 'name', MAX_TITLE, { reason: 'contacts_name_too_long' }, true);
+  const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'category');
+  const vPhone   = limitedStr(req.body.phone,   'phone',   CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' });
+  const vEmail   = limitedStr(req.body.email,   'email',   MAX_TITLE, { reason: 'contacts_email_too_long' });
+  const vAddress = limitedStr(req.body.address, 'address', MAX_TEXT,  { reason: 'contacts_address_too_long' });
+  const vNotes   = limitedStr(req.body.notes,   'notes',   MAX_TEXT,  { reason: 'contacts_notes_too_long' });
+  // Geburtstag (ISO YYYY-MM-DD, optional) - u. a. aus vCard-BDAY beim Import.
+  // Speist den bestehenden #518-Geburtstags-Import (GET /birthdays/import/candidates).
+  // Ohne Jahr (#2095): `birthday_year_unknown` setzt das Jahr auf den
+  // Platzhalter, die Anzeige laesst es weg.
+  const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
+  const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, vYearUnknown.value === true), 'birthday', false));
+  const checks   = [vName, vCat, vPhone, vEmail, vAddress, vNotes, vYearUnknown, vBirthday,
+                    ...namePartChecks(nameParts.parts)];
+  const errors   = collectErrors(checks);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...fieldCase(vCat, checks, errors) });
 
-    // Validate multi-value fields if provided
-    if (req.body.phones !== undefined) {
-      const phonesValidation = validatePhones(req.body.phones);
-      if (!phonesValidation.valid) {
-        return res.status(400).json({ error: phonesValidation.error, code: 400, ...phonesValidation.case });
-      }
+  // Validate multi-value fields if provided
+  if (req.body.phones !== undefined) {
+    const phonesValidation = validatePhones(req.body.phones);
+    if (!phonesValidation.valid) {
+      return res.status(400).json({ error: phonesValidation.error, code: 400, ...phonesValidation.case });
     }
-
-    if (req.body.emails !== undefined) {
-      const emailsValidation = validateEmails(req.body.emails);
-      if (!emailsValidation.valid) {
-        return res.status(400).json({ error: emailsValidation.error, code: 400, ...emailsValidation.case });
-      }
-    }
-
-    if (req.body.addresses !== undefined) {
-      const addressesValidation = validateAddresses(req.body.addresses);
-      if (!addressesValidation.valid) {
-        return res.status(400).json({ error: addressesValidation.error, code: 400, ...addressesValidation.case });
-      }
-    }
-
-    // Insert contact and multi-value fields in a transaction
-    const transaction = db.get().transaction(() => {
-      const result = db.get().prepare(`
-        INSERT INTO contacts (name, category, phone, email, address, notes, birthday, birthday_year_unknown,
-                              first_name, last_name, middle_name, name_prefix, name_suffix)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(vName.value, vCat.value || FALLBACK_CATEGORY, vPhone.value, vEmail.value,
-             vAddress.value, vNotes.value, vBirthday.value, vBirthday.value && vYearUnknown.value ? 1 : 0,
-             nameParts.parts.firstName, nameParts.parts.lastName, nameParts.parts.middleName,
-             nameParts.parts.namePrefix, nameParts.parts.nameSuffix);
-
-      const contactId = result.lastInsertRowid;
-
-      // Insert phones. value_e164 ist additiv (Phase 2): der rohe value bleibt die
-      // Wahrheit; value_e164 wird nur gesetzt, wo parsebar (sonst NULL).
-      if (req.body.phones && Array.isArray(req.body.phones)) {
-        const defaultCountry = defaultCountryFromConfig(db.get());
-        const insertPhone = db.get().prepare(`
-          INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
-          VALUES (?, ?, ?, ?, ?)
-        `);
-        for (const phone of req.body.phones) {
-          insertPhone.run(contactId, phone.label, phone.value, phone.isPrimary ? 1 : 0,
-                          toE164(phone.value, defaultCountry));
-        }
-      }
-
-      // Insert emails
-      if (req.body.emails && Array.isArray(req.body.emails)) {
-        const insertEmail = db.get().prepare(`
-          INSERT INTO contact_emails (contact_id, label, value, is_primary)
-          VALUES (?, ?, ?, ?)
-        `);
-        for (const email of req.body.emails) {
-          insertEmail.run(contactId, email.label, email.value, email.isPrimary ? 1 : 0);
-        }
-      }
-
-      // Insert addresses
-      if (req.body.addresses && Array.isArray(req.body.addresses)) {
-        const insertAddress = db.get().prepare(`
-          INSERT INTO contact_addresses (contact_id, label, street, city, state, postal_code, country, is_primary)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        for (const address of req.body.addresses) {
-          insertAddress.run(
-            contactId,
-            address.label,
-            address.street || null,
-            address.city || null,
-            address.state || null,
-            address.postalCode || null,
-            address.country || null,
-            address.isPrimary ? 1 : 0
-          );
-        }
-      }
-
-      return contactId;
-    });
-
-    const contactId = transaction();
-
-    // Query the created contact with multi-value fields
-    const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
-    const multiValueFields = loadMultiValueFields(contactId);
-
-    // Beim Anlegen schon der Vorschlag (R23, G5-P2): wer "Tante Ingrid" mit
-    // dem Datum von "Ingrid Mueller" anlegt, sieht die Frage sofort.
-    res.status(201).json({
-      data: {
-        ...withBirthdaySuggestion(req, contact),
-        ...multiValueFields
-      }
-    });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
+
+  if (req.body.emails !== undefined) {
+    const emailsValidation = validateEmails(req.body.emails);
+    if (!emailsValidation.valid) {
+      return res.status(400).json({ error: emailsValidation.error, code: 400, ...emailsValidation.case });
+    }
+  }
+
+  if (req.body.addresses !== undefined) {
+    const addressesValidation = validateAddresses(req.body.addresses);
+    if (!addressesValidation.valid) {
+      return res.status(400).json({ error: addressesValidation.error, code: 400, ...addressesValidation.case });
+    }
+  }
+
+  // Insert contact and multi-value fields in a transaction
+  const transaction = db.get().transaction(() => {
+    const result = db.get().prepare(`
+      INSERT INTO contacts (name, category, phone, email, address, notes, birthday, birthday_year_unknown,
+                            first_name, last_name, middle_name, name_prefix, name_suffix)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(vName.value, vCat.value || FALLBACK_CATEGORY, vPhone.value, vEmail.value,
+           vAddress.value, vNotes.value, vBirthday.value, vBirthday.value && vYearUnknown.value ? 1 : 0,
+           nameParts.parts.firstName, nameParts.parts.lastName, nameParts.parts.middleName,
+           nameParts.parts.namePrefix, nameParts.parts.nameSuffix);
+
+    const contactId = result.lastInsertRowid;
+
+    // Insert phones. value_e164 ist additiv (Phase 2): der rohe value bleibt die
+    // Wahrheit; value_e164 wird nur gesetzt, wo parsebar (sonst NULL).
+    if (req.body.phones && Array.isArray(req.body.phones)) {
+      const defaultCountry = defaultCountryFromConfig(db.get());
+      const insertPhone = db.get().prepare(`
+        INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      for (const phone of req.body.phones) {
+        insertPhone.run(contactId, phone.label, phone.value, phone.isPrimary ? 1 : 0,
+                        toE164(phone.value, defaultCountry));
+      }
+    }
+
+    // Insert emails
+    if (req.body.emails && Array.isArray(req.body.emails)) {
+      const insertEmail = db.get().prepare(`
+        INSERT INTO contact_emails (contact_id, label, value, is_primary)
+        VALUES (?, ?, ?, ?)
+      `);
+      for (const email of req.body.emails) {
+        insertEmail.run(contactId, email.label, email.value, email.isPrimary ? 1 : 0);
+      }
+    }
+
+    // Insert addresses
+    if (req.body.addresses && Array.isArray(req.body.addresses)) {
+      const insertAddress = db.get().prepare(`
+        INSERT INTO contact_addresses (contact_id, label, street, city, state, postal_code, country, is_primary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const address of req.body.addresses) {
+        insertAddress.run(
+          contactId,
+          address.label,
+          address.street || null,
+          address.city || null,
+          address.state || null,
+          address.postalCode || null,
+          address.country || null,
+          address.isPrimary ? 1 : 0
+        );
+      }
+    }
+
+    return contactId;
+  });
+
+  const contactId = transaction();
+
+  // Query the created contact with multi-value fields
+  const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
+  const multiValueFields = loadMultiValueFields(contactId);
+
+  // Beim Anlegen schon der Vorschlag (R23, G5-P2): wer "Tante Ingrid" mit
+  // dem Datum von "Ingrid Mueller" anlegt, sieht die Frage sofort.
+  res.status(201).json({
+    data: {
+      ...withBirthdaySuggestion(req, contact),
+      ...multiValueFields
+    }
+  });
 });
 
 /**
  * PUT /api/v1/contacts/:id
  * Kontakt bearbeiten.
- * Body: alle Felder optional, phones/emails/addresses mit Replacement-Semantik
+ * Body: alle Felder optional, phones/emails/addresses mit Replacement-Semantik;
+ * die fuenf Namensteile nur zusammen (Schema, #2810)
  * Response: { data: Contact }
  */
-router.put('/:id', (req, res) => {
-  try {
-    const id      = parseInt(req.params.id, 10);
-    const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(id);
-    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
+router.put('/:id', validateRequest(), (req, res) => {
+  const id      = pathId(req);
+  const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(id);
+  if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
 
-    // Namensteile (#535): sobald welche mitkommen, ersetzen sie die gespeicherten
-    // und der Anzeigename wird neu daraus abgeleitet.
-    const nameParts = readNameParts(req.body);
-    const derivedName = nameParts.provided ? nameParts.displayName : null;
+  // Namensteile (#535): sobald welche mitkommen, ersetzen sie die gespeicherten
+  // und der Anzeigename wird neu daraus abgeleitet. Das Schema verlangt die
+  // Gruppe vollstaendig (#2810, `dependentRequired`): steht einer im Rumpf,
+  // stehen alle fuenf da, ein fehlender wird hier also nie still `null`.
+  const nameParts = readNameParts(req.body);
+  const derivedName = nameParts.provided ? nameParts.displayName : null;
 
-    const checks = [];
-    if (nameParts.provided)              checks.push(...namePartChecks(nameParts.parts));
-    if (req.body.name     !== undefined) checks.push(limitedStr(req.body.name, 'name', MAX_TITLE, { reason: 'contacts_name_too_long' }));
-    const vCat = req.body.category !== undefined ? oneOf(req.body.category, validContactCategoryKeys(), 'category') : null;
-    if (vCat) checks.push(vCat);
-    if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'phone',   CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' }));
-    if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'email',   MAX_TITLE, { reason: 'contacts_email_too_long' }));
-    if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'address', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
-    if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'notes',   MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
-    // Fehlt `birthday_year_unknown`, bleibt die gespeicherte Marke (#2095); wer
-    // sie abnimmt, schickt das Jahr mit, sonst wuerde der Platzhalter 2000 zum
-    // echten Geburtsjahr.
-    const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
-    checks.push(vYearUnknown);
-    const yearUnknown = vYearUnknown.value ?? contact.birthday_year_unknown === 1;
-    let birthday = contact.birthday;
-    if (req.body.birthday !== undefined) {
-      const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, yearUnknown), 'birthday', false));
-      checks.push(vBirthday);
-      birthday = vBirthday.value;
-    } else if (yearUnknown && contact.birthday_year_unknown !== 1 && contact.birthday) {
-      birthday = placeholderBirthDate(contact.birthday);
-    } else if (vYearUnknown.value === false && contact.birthday_year_unknown === 1 && contact.birthday) {
-      checks.push({ value: null, error: 'Birthday with its year is required when birthday_year_unknown is turned off.' });
-    }
-    const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...fieldCase(vCat, checks, errors) });
-
-    // Validate multi-value fields if provided
-    if (req.body.phones !== undefined) {
-      const phonesValidation = validatePhones(req.body.phones);
-      if (!phonesValidation.valid) {
-        return res.status(400).json({ error: phonesValidation.error, code: 400, ...phonesValidation.case });
-      }
-    }
-
-    if (req.body.emails !== undefined) {
-      const emailsValidation = validateEmails(req.body.emails);
-      if (!emailsValidation.valid) {
-        return res.status(400).json({ error: emailsValidation.error, code: 400, ...emailsValidation.case });
-      }
-    }
-
-    if (req.body.addresses !== undefined) {
-      const addressesValidation = validateAddresses(req.body.addresses);
-      if (!addressesValidation.valid) {
-        return res.status(400).json({ error: addressesValidation.error, code: 400, ...addressesValidation.case });
-      }
-    }
-
-    // Die E-Mail-Adressen eines verknuepften Kontakts fuehren zu seinem Konto
-    // (Passwort-Reset, SSO-Verknuepfung): sie aendern nur die Person selbst
-    // oder ein Admin. Die Regel steht in services/contact-identity.js.
-    const actor = contactActorFromRequest(req);
-    if (!mayChangeContactEmails(contact, actor)) {
-      const storedEmails = db.get()
-        .prepare('SELECT value FROM contact_emails WHERE contact_id = ?')
-        .all(id).map((r) => r.value);
-      if (bodyChangesContactEmails(contact, storedEmails, req.body)) {
-        return res.status(403).json({
-          error: 'Only this member or an admin, signed in or with a full-access token, can change the email addresses of a household member.',
-          code: 403,
-          reason: 'contact_email_protected',
-        });
-      }
-      // Gleiche Adressen (etwa nur anders geschrieben): die gespeicherten
-      // bleiben unangetastet, wie sie sind.
-      delete req.body.email;
-      delete req.body.emails;
-    } else if (contact.family_user_id && !actor.isAdmin
-      && (req.body.email !== undefined || Array.isArray(req.body.emails))) {
-      // Die Person selbst an ihrem eigenen Kontakt: eine Adresse, die schon ein
-      // anderes Konto traegt, fuehrt sie nicht neu ein (GHSA-6pmj-w42g-g6qv,
-      // dieselbe Regel wie PATCH /auth/me/profile). Synchron bis zum
-      // Schreiben, kein await dazwischen.
-      const storedEmails = db.get()
-        .prepare('SELECT value FROM contact_emails WHERE contact_id = ?')
-        .all(id).map((r) => r.value);
-      const taken = emailsTakenByOtherAccounts(db.get(), {
-        userId: contact.family_user_id,
-        before: [contact.email, ...storedEmails],
-        after: [
-          req.body.email !== undefined ? req.body.email : contact.email,
-          ...(Array.isArray(req.body.emails) ? req.body.emails.map((e) => e?.value) : storedEmails),
-        ],
-      });
-      if (taken.length) {
-        return res.status(409).json({ error: EMAIL_IN_USE_MESSAGE, code: 409, reason: 'email_in_use' });
-      }
-    }
-
-    // Update contact and multi-value fields in a transaction
-    const transaction = db.get().transaction(() => {
-      // Update scalar fields
-      db.get().prepare(`
-        UPDATE contacts
-        SET name        = COALESCE(?, name),
-            category    = COALESCE(?, category),
-            phone       = ?,
-            email       = ?,
-            address     = ?,
-            notes       = ?,
-            birthday    = ?,
-            birthday_year_unknown = ?,
-            first_name  = ?,
-            last_name   = ?,
-            middle_name = ?,
-            name_prefix = ?,
-            name_suffix = ?
-        WHERE id = ?
-      `).run(
-        derivedName ?? req.body.name?.trim() ?? null,
-        req.body.category ?? null,
-        req.body.phone   !== undefined ? (req.body.phone?.trim()   || null) : contact.phone,
-        req.body.email   !== undefined ? (req.body.email?.trim()   || null) : contact.email,
-        req.body.address !== undefined ? (req.body.address?.trim() || null) : contact.address,
-        req.body.notes   !== undefined ? (req.body.notes?.trim()   || null) : contact.notes,
-        birthday || null,
-        birthday && yearUnknown ? 1 : 0,
-        nameParts.provided ? nameParts.parts.firstName  : contact.first_name,
-        nameParts.provided ? nameParts.parts.lastName   : contact.last_name,
-        nameParts.provided ? nameParts.parts.middleName : contact.middle_name,
-        nameParts.provided ? nameParts.parts.namePrefix : contact.name_prefix,
-        nameParts.provided ? nameParts.parts.nameSuffix : contact.name_suffix,
-        id
-      );
-
-      // Replace phones (delete all, insert new). value_e164 additiv mitberechnen
-      // (Phase 2), value bleibt der rohe Eingabewert.
-      if (req.body.phones !== undefined && Array.isArray(req.body.phones)) {
-        db.get().prepare('DELETE FROM contact_phones WHERE contact_id = ?').run(id);
-
-        const defaultCountry = defaultCountryFromConfig(db.get());
-        const insertPhone = db.get().prepare(`
-          INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
-          VALUES (?, ?, ?, ?, ?)
-        `);
-        for (const phone of req.body.phones) {
-          insertPhone.run(id, phone.label, phone.value, phone.isPrimary ? 1 : 0,
-                          toE164(phone.value, defaultCountry));
-        }
-      }
-
-      // Replace emails (delete all, insert new)
-      if (req.body.emails !== undefined && Array.isArray(req.body.emails)) {
-        db.get().prepare('DELETE FROM contact_emails WHERE contact_id = ?').run(id);
-
-        const insertEmail = db.get().prepare(`
-          INSERT INTO contact_emails (contact_id, label, value, is_primary)
-          VALUES (?, ?, ?, ?)
-        `);
-        for (const email of req.body.emails) {
-          insertEmail.run(id, email.label, email.value, email.isPrimary ? 1 : 0);
-        }
-      }
-
-      // Replace addresses (delete all, insert new)
-      if (req.body.addresses !== undefined && Array.isArray(req.body.addresses)) {
-        db.get().prepare('DELETE FROM contact_addresses WHERE contact_id = ?').run(id);
-
-        const insertAddress = db.get().prepare(`
-          INSERT INTO contact_addresses (contact_id, label, street, city, state, postal_code, country, is_primary)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        for (const address of req.body.addresses) {
-          insertAddress.run(
-            id,
-            address.label,
-            address.street || null,
-            address.city || null,
-            address.state || null,
-            address.postalCode || null,
-            address.country || null,
-            address.isPrimary ? 1 : 0
-          );
-        }
-      }
-    });
-
-    transaction();
-
-    // Query the updated contact with multi-value fields
-    const updated = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);
-    const multiValueFields = loadMultiValueFields(id);
-
-    res.json({
-      data: {
-        ...withBirthdaySuggestion(req, withBirthdayLink(req, updated)),
-        ...multiValueFields
-      }
-    });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const checks = [];
+  if (nameParts.provided)              checks.push(...namePartChecks(nameParts.parts));
+  if (req.body.name     !== undefined) checks.push(limitedStr(req.body.name, 'name', MAX_TITLE, { reason: 'contacts_name_too_long' }));
+  const vCat = req.body.category !== undefined ? oneOf(req.body.category, validContactCategoryKeys(), 'category') : null;
+  if (vCat) checks.push(vCat);
+  if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'phone',   CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' }));
+  if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'email',   MAX_TITLE, { reason: 'contacts_email_too_long' }));
+  if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'address', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
+  if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'notes',   MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
+  // Fehlt `birthday_year_unknown`, bleibt die gespeicherte Marke (#2095); wer
+  // sie abnimmt, schickt das Jahr mit, sonst wuerde der Platzhalter 2000 zum
+  // echten Geburtsjahr.
+  const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
+  checks.push(vYearUnknown);
+  const yearUnknown = vYearUnknown.value ?? contact.birthday_year_unknown === 1;
+  let birthday = contact.birthday;
+  if (req.body.birthday !== undefined) {
+    const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, yearUnknown), 'birthday', false));
+    checks.push(vBirthday);
+    birthday = vBirthday.value;
+  } else if (yearUnknown && contact.birthday_year_unknown !== 1 && contact.birthday) {
+    birthday = placeholderBirthDate(contact.birthday);
+  } else if (vYearUnknown.value === false && contact.birthday_year_unknown === 1 && contact.birthday) {
+    checks.push({ value: null, error: 'Birthday with its year is required when birthday_year_unknown is turned off.' });
   }
+  const errors = collectErrors(checks);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...fieldCase(vCat, checks, errors) });
+
+  // Validate multi-value fields if provided
+  if (req.body.phones !== undefined) {
+    const phonesValidation = validatePhones(req.body.phones);
+    if (!phonesValidation.valid) {
+      return res.status(400).json({ error: phonesValidation.error, code: 400, ...phonesValidation.case });
+    }
+  }
+
+  if (req.body.emails !== undefined) {
+    const emailsValidation = validateEmails(req.body.emails);
+    if (!emailsValidation.valid) {
+      return res.status(400).json({ error: emailsValidation.error, code: 400, ...emailsValidation.case });
+    }
+  }
+
+  if (req.body.addresses !== undefined) {
+    const addressesValidation = validateAddresses(req.body.addresses);
+    if (!addressesValidation.valid) {
+      return res.status(400).json({ error: addressesValidation.error, code: 400, ...addressesValidation.case });
+    }
+  }
+
+  // Die E-Mail-Adressen eines verknuepften Kontakts fuehren zu seinem Konto
+  // (Passwort-Reset, SSO-Verknuepfung): sie aendern nur die Person selbst
+  // oder ein Admin. Die Regel steht in services/contact-identity.js.
+  const actor = contactActorFromRequest(req);
+  if (!mayChangeContactEmails(contact, actor)) {
+    const storedEmails = db.get()
+      .prepare('SELECT value FROM contact_emails WHERE contact_id = ?')
+      .all(id).map((r) => r.value);
+    if (bodyChangesContactEmails(contact, storedEmails, req.body)) {
+      return res.status(403).json({
+        error: 'Only this member or an admin, signed in or with a full-access token, can change the email addresses of a household member.',
+        code: 403,
+        reason: 'contact_email_protected',
+      });
+    }
+    // Gleiche Adressen (etwa nur anders geschrieben): die gespeicherten
+    // bleiben unangetastet, wie sie sind.
+    delete req.body.email;
+    delete req.body.emails;
+  } else if (contact.family_user_id && !actor.isAdmin
+    && (req.body.email !== undefined || Array.isArray(req.body.emails))) {
+    // Die Person selbst an ihrem eigenen Kontakt: eine Adresse, die schon ein
+    // anderes Konto traegt, fuehrt sie nicht neu ein (GHSA-6pmj-w42g-g6qv,
+    // dieselbe Regel wie PATCH /auth/me/profile). Synchron bis zum
+    // Schreiben, kein await dazwischen.
+    const storedEmails = db.get()
+      .prepare('SELECT value FROM contact_emails WHERE contact_id = ?')
+      .all(id).map((r) => r.value);
+    const taken = emailsTakenByOtherAccounts(db.get(), {
+      userId: contact.family_user_id,
+      before: [contact.email, ...storedEmails],
+      after: [
+        req.body.email !== undefined ? req.body.email : contact.email,
+        ...(Array.isArray(req.body.emails) ? req.body.emails.map((e) => e?.value) : storedEmails),
+      ],
+    });
+    if (taken.length) {
+      return res.status(409).json({ error: EMAIL_IN_USE_MESSAGE, code: 409, reason: 'email_in_use' });
+    }
+  }
+
+  // Update contact and multi-value fields in a transaction
+  const transaction = db.get().transaction(() => {
+    // Update scalar fields
+    db.get().prepare(`
+      UPDATE contacts
+      SET name        = COALESCE(?, name),
+          category    = COALESCE(?, category),
+          phone       = ?,
+          email       = ?,
+          address     = ?,
+          notes       = ?,
+          birthday    = ?,
+          birthday_year_unknown = ?,
+          first_name  = ?,
+          last_name   = ?,
+          middle_name = ?,
+          name_prefix = ?,
+          name_suffix = ?
+      WHERE id = ?
+    `).run(
+      derivedName ?? req.body.name?.trim() ?? null,
+      req.body.category ?? null,
+      req.body.phone   !== undefined ? (req.body.phone?.trim()   || null) : contact.phone,
+      req.body.email   !== undefined ? (req.body.email?.trim()   || null) : contact.email,
+      req.body.address !== undefined ? (req.body.address?.trim() || null) : contact.address,
+      req.body.notes   !== undefined ? (req.body.notes?.trim()   || null) : contact.notes,
+      birthday || null,
+      birthday && yearUnknown ? 1 : 0,
+      nameParts.provided ? nameParts.parts.firstName  : contact.first_name,
+      nameParts.provided ? nameParts.parts.lastName   : contact.last_name,
+      nameParts.provided ? nameParts.parts.middleName : contact.middle_name,
+      nameParts.provided ? nameParts.parts.namePrefix : contact.name_prefix,
+      nameParts.provided ? nameParts.parts.nameSuffix : contact.name_suffix,
+      id
+    );
+
+    // Replace phones (delete all, insert new). value_e164 additiv mitberechnen
+    // (Phase 2), value bleibt der rohe Eingabewert.
+    if (req.body.phones !== undefined && Array.isArray(req.body.phones)) {
+      db.get().prepare('DELETE FROM contact_phones WHERE contact_id = ?').run(id);
+
+      const defaultCountry = defaultCountryFromConfig(db.get());
+      const insertPhone = db.get().prepare(`
+        INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      for (const phone of req.body.phones) {
+        insertPhone.run(id, phone.label, phone.value, phone.isPrimary ? 1 : 0,
+                        toE164(phone.value, defaultCountry));
+      }
+    }
+
+    // Replace emails (delete all, insert new)
+    if (req.body.emails !== undefined && Array.isArray(req.body.emails)) {
+      db.get().prepare('DELETE FROM contact_emails WHERE contact_id = ?').run(id);
+
+      const insertEmail = db.get().prepare(`
+        INSERT INTO contact_emails (contact_id, label, value, is_primary)
+        VALUES (?, ?, ?, ?)
+      `);
+      for (const email of req.body.emails) {
+        insertEmail.run(id, email.label, email.value, email.isPrimary ? 1 : 0);
+      }
+    }
+
+    // Replace addresses (delete all, insert new)
+    if (req.body.addresses !== undefined && Array.isArray(req.body.addresses)) {
+      db.get().prepare('DELETE FROM contact_addresses WHERE contact_id = ?').run(id);
+
+      const insertAddress = db.get().prepare(`
+        INSERT INTO contact_addresses (contact_id, label, street, city, state, postal_code, country, is_primary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const address of req.body.addresses) {
+        insertAddress.run(
+          id,
+          address.label,
+          address.street || null,
+          address.city || null,
+          address.state || null,
+          address.postalCode || null,
+          address.country || null,
+          address.isPrimary ? 1 : 0
+        );
+      }
+    }
+  });
+
+  transaction();
+
+  // Query the updated contact with multi-value fields
+  const updated = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);
+  const multiValueFields = loadMultiValueFields(id);
+
+  res.json({
+    data: {
+      ...withBirthdaySuggestion(req, withBirthdayLink(req, updated)),
+      ...multiValueFields
+    }
+  });
 });
 
 /**
@@ -919,24 +878,19 @@ router.put('/:id', (req, res) => {
  * Kontakt löschen.
  * Response: 204 No Content
  */
-router.delete('/:id', (req, res) => {
-  try {
-    const id     = parseInt(req.params.id, 10);
-    const contact = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(id);
-    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
-    
-    if (contact.family_user_id) {
-      return res.status(403).json({ error: 'A household member cannot be deleted from the contact list.', code: 403, reason: 'family_member_contact' });
-    }
-
-    const result = db.get().prepare('DELETE FROM contacts WHERE id = ?').run(id);
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
-    res.status(204).end();
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+router.delete('/:id', validateRequest(), (req, res) => {
+  const id     = pathId(req);
+  const contact = db.get().prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(id);
+  if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
+  
+  if (contact.family_user_id) {
+    return res.status(403).json({ error: 'A household member cannot be deleted from the contact list.', code: 403, reason: 'family_member_contact' });
   }
+
+  const result = db.get().prepare('DELETE FROM contacts WHERE id = ?').run(id);
+  if (result.changes === 0)
+    return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
+  res.status(204).end();
 });
 
 /**
@@ -949,13 +903,8 @@ router.delete('/:id', (req, res) => {
  *
  * Response: { data: { categories, categoryColors } }
  */
-router.get('/meta', (_req, res) => {
-  try {
-    res.json({ data: { categories: loadContactCategories(), categoryColors: CONTACT_CATEGORY_COLORS } });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/meta', validateRequest(), (_req, res) => {
+  res.json({ data: { categories: loadContactCategories(), categoryColors: CONTACT_CATEGORY_COLORS } });
 });
 
 /**
@@ -963,25 +912,20 @@ router.get('/meta', (_req, res) => {
  * Einzelnen Kontakt abrufen mit Multi-Value Fields (phones, emails, addresses).
  * Response: { data: Contact }
  */
-router.get('/:id', (req, res) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    const contact = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);
-    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
+router.get('/:id', validateRequest(), (req, res) => {
+  const id = pathId(req);
+  const contact = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);
+  if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
 
-    // Load multi-value fields
-    const multiValueFields = loadMultiValueFields(id);
+  // Load multi-value fields
+  const multiValueFields = loadMultiValueFields(id);
 
-    res.json({
-      data: {
-        ...withBirthdaySuggestion(req, withBirthdayLink(req, contact)),
-        ...multiValueFields
-      }
-    });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({
+    data: {
+      ...withBirthdaySuggestion(req, withBirthdayLink(req, contact)),
+      ...multiValueFields
+    }
+  });
 });
 
 /**
@@ -989,50 +933,45 @@ router.get('/:id', (req, res) => {
  * Kontakt als vCard 3.0 (.vcf) exportieren.
  * Response: text/vcard Dateidownload
  */
-router.get('/:id/vcard', (req, res) => {
-  try {
-    const id      = parseInt(req.params.id, 10);
-    const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(id);
-    if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
+router.get('/:id/vcard', validateRequest(), (req, res) => {
+  const id      = pathId(req);
+  const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(id);
+  if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
 
-    const esc = (v) => String(v || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+  const esc = (v) => String(v || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
 
-    const lines = [
-      'BEGIN:VCARD',
-      'VERSION:3.0',
-      `FN:${esc(contact.name)}`,
-      // Strukturierte Komponenten exportieren, wo bekannt (#535); sonst trägt
-      // das Familiennamen-Feld weiterhin den Anzeigenamen als Ganzes.
-      (contact.first_name || contact.last_name)
-        ? `N:${esc(contact.last_name)};${esc(contact.first_name)};${esc(contact.middle_name)};${esc(contact.name_prefix)};${esc(contact.name_suffix)}`
-        : `N:${esc(contact.name)};;;;`,
-    ];
-    if (contact.phone)   lines.push(`TEL;TYPE=VOICE:${esc(contact.phone)}`);
-    if (contact.email)   lines.push(`EMAIL:${esc(contact.email)}`);
-    if (contact.address) lines.push(`ADR;TYPE=HOME:;;${esc(contact.address)};;;;`);
-    if (contact.notes)   lines.push(`NOTE:${esc(contact.notes)}`);
-    // Ohne Jahr in Apples Form (#2095): vCard 3.0 kennt kein `--MMDD`, und
-    // sabre/vobject (Nextcloud, Baikal) schreibt jahrlose Geburtstage in 3.0
-    // genau so. Apple liest die Marke und zeigt kein Jahr; der eigene Import
-    // (Sync und .vcf) erkennt sie ebenfalls.
-    if (contact.birthday && contact.birthday_year_unknown === 1) {
-      lines.push(`BDAY;X-APPLE-OMIT-YEAR=1604:1604${esc(contact.birthday).slice(4, 10)}`);
-    } else if (contact.birthday) {
-      lines.push(`BDAY:${esc(contact.birthday)}`);
-    }
-    if (contact.category) lines.push(`CATEGORIES:${esc(contact.category)}`);
-    lines.push('END:VCARD');
-
-    const vcf      = lines.join('\r\n');
-    const filename = encodeURIComponent(contact.name.replace(/[^a-zA-Z0-9-_ ]/g, '_')) + '.vcf';
-
-    res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(vcf);
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${esc(contact.name)}`,
+    // Strukturierte Komponenten exportieren, wo bekannt (#535); sonst trägt
+    // das Familiennamen-Feld weiterhin den Anzeigenamen als Ganzes.
+    (contact.first_name || contact.last_name)
+      ? `N:${esc(contact.last_name)};${esc(contact.first_name)};${esc(contact.middle_name)};${esc(contact.name_prefix)};${esc(contact.name_suffix)}`
+      : `N:${esc(contact.name)};;;;`,
+  ];
+  if (contact.phone)   lines.push(`TEL;TYPE=VOICE:${esc(contact.phone)}`);
+  if (contact.email)   lines.push(`EMAIL:${esc(contact.email)}`);
+  if (contact.address) lines.push(`ADR;TYPE=HOME:;;${esc(contact.address)};;;;`);
+  if (contact.notes)   lines.push(`NOTE:${esc(contact.notes)}`);
+  // Ohne Jahr in Apples Form (#2095): vCard 3.0 kennt kein `--MMDD`, und
+  // sabre/vobject (Nextcloud, Baikal) schreibt jahrlose Geburtstage in 3.0
+  // genau so. Apple liest die Marke und zeigt kein Jahr; der eigene Import
+  // (Sync und .vcf) erkennt sie ebenfalls.
+  if (contact.birthday && contact.birthday_year_unknown === 1) {
+    lines.push(`BDAY;X-APPLE-OMIT-YEAR=1604:1604${esc(contact.birthday).slice(4, 10)}`);
+  } else if (contact.birthday) {
+    lines.push(`BDAY:${esc(contact.birthday)}`);
   }
+  if (contact.category) lines.push(`CATEGORIES:${esc(contact.category)}`);
+  lines.push('END:VCARD');
+
+  const vcf      = lines.join('\r\n');
+  const filename = encodeURIComponent(contact.name.replace(/[^a-zA-Z0-9-_ ]/g, '_')) + '.vcf';
+
+  res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(vcf);
 });
 
 export default router;

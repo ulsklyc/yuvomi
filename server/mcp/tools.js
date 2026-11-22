@@ -274,7 +274,11 @@ async function addShoppingItem(ctx, args) {
     // No category of our own any more (#2616): the route checks it against
     // `validCategoryNames()` and falls back on the household's own rule. The
     // fixed 'Sonstiges' here wrote a name a renamed household no longer had.
-    payload: passedFields({ name: asText(args.name), quantity: asText(args.quantity), category: args.category }),
+    // `name` always goes along, a missing one as `""` (#2810): the route
+    // checks the form of the body first, and a missing field there is the
+    // schema's 400 without a word about which field; `""` reaches the route's
+    // own sentence `name is required.`, which tells the model what to fix.
+    payload: { name: asText(args.name) ?? '', ...passedFields({ quantity: asText(args.quantity), category: args.category }) },
     headers: idempotencyHeader(args),
   });
   // `list` as a NAME: the route answers with the item row, which only carries

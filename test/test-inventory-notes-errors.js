@@ -741,7 +741,9 @@ test('Kontakte: speichern - ein abgewiesener Eintrag der Mehrfachfelder sagt sei
     [{ emails: [{ label: 'other', value: 'ada.example.org' }] }, 'contacts.errorEmailInvalid'],
     [{ phones: [{ label: 'other', value: '1'.repeat(101) }] }, `contacts.errorPhoneTooLong${JSON.stringify({ limit: 100 })}`],
     [{ phones: many(21, (i) => ({ label: 'other', value: `0${i}` })) }, `contacts.errorPhonesTooMany${JSON.stringify({ limit: 20 })}`],
-    [{ phones: [{ label: 'other', value: '0800', isPrimary: 'ja' }] }, 'contacts.errorPhoneEntryInvalid'],
+    // Keine Liste: seit #2810 weist das Schema ab, mit dem Grund der Route
+    // (`x-reason`); ein Eintrag ausser Form ist dort `validation`.
+    [{ phones: 'keine Liste' }, 'contacts.errorPhoneEntryInvalid'],
     [{ emails: [{ label: 'L'.repeat(51), value: 'a@x.de' }] }, `contacts.errorEmailLabelTooLong${JSON.stringify({ limit: 50 })}`],
     [{ addresses: [{ label: 'home', city: 'C'.repeat(256) }] }, `contacts.errorAddressPartTooLong${JSON.stringify({ limit: 255 })}`],
   ]) {

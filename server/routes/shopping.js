@@ -23,6 +23,7 @@ import { isHouseholdMember } from '../services/household-members.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Shopping');
 
@@ -47,6 +48,21 @@ const sendListLimiter = rateLimit({
 // --------------------------------------------------------
 // Hilfsfunktionen
 // --------------------------------------------------------
+
+/**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). The routes
+ * read `listId`, `itemId` and `catId` as the text Express gave them until
+ * then, and the shops through `parseInt`; with nothing but digits let through,
+ * `Number` finds the same row. `0`, `-0` and `-1` find none (the shops keep
+ * their 400 for `0` and `-0`), a leading zero reaches the row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
 
 /**
  * Aus einer CalDAV-Liste gespiegelte Artikel einer Auswahl - vor dem Löschen zu
@@ -183,16 +199,11 @@ function withListChange(listId, write) {
 // Die Laufnummern aller Listen. Statisch vor /:listId, wie /categories.
 // Response: { data: [{ list_id, version }] }
 // --------------------------------------------------------
-router.get('/versions', (_req, res) => {
-  try {
-    const rows = db.get()
-      .prepare('SELECT list_id, version FROM shopping_list_changes ORDER BY list_id')
-      .all();
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /versions error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/versions', validateRequest(), (_req, res) => {
+  const rows = db.get()
+    .prepare('SELECT list_id, version FROM shopping_list_changes ORDER BY list_id')
+    .all();
+  res.json({ data: rows });
 });
 
 // --------------------------------------------------------
@@ -200,13 +211,8 @@ router.get('/versions', (_req, res) => {
 // Alle Kategorien zurückgeben.
 // Response: { data: ShoppingCategory[] }
 // --------------------------------------------------------
-router.get('/categories', (_req, res) => {
-  try {
-    res.json({ data: loadCategories() });
-  } catch (err) {
-    log.error('GET /categories error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/categories', validateRequest(), (_req, res) => {
+  res.json({ data: loadCategories() });
 });
 
 // --------------------------------------------------------
@@ -215,32 +221,27 @@ router.get('/categories', (_req, res) => {
 // Body: { name }
 // Response: { data: ShoppingCategory }
 // --------------------------------------------------------
-router.post('/categories', (req, res) => {
-  try {
-    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+router.post('/categories', validateRequest(), (req, res) => {
+  const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+  if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
-    const existing = db.get()
-      .prepare('SELECT id FROM shopping_categories WHERE name = ? COLLATE NOCASE')
-      .get(vName.value);
-    if (existing) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
+  const existing = db.get()
+    .prepare('SELECT id FROM shopping_categories WHERE name = ? COLLATE NOCASE')
+    .get(vName.value);
+  if (existing) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
-    const maxOrder = db.get()
-      .prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM shopping_categories')
-      .get().m;
+  const maxOrder = db.get()
+    .prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM shopping_categories')
+    .get().m;
 
-    const result = db.get()
-      .prepare('INSERT INTO shopping_categories (name, icon, sort_order) VALUES (?, ?, ?)')
-      .run(vName.value, 'tag', maxOrder + 1);
+  const result = db.get()
+    .prepare('INSERT INTO shopping_categories (name, icon, sort_order) VALUES (?, ?, ?)')
+    .run(vName.value, 'tag', maxOrder + 1);
 
-    const cat = db.get()
-      .prepare('SELECT * FROM shopping_categories WHERE id = ?')
-      .get(result.lastInsertRowid);
-    res.status(201).json({ data: cat });
-  } catch (err) {
-    log.error('POST /categories error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const cat = db.get()
+    .prepare('SELECT * FROM shopping_categories WHERE id = ?')
+    .get(result.lastInsertRowid);
+  res.status(201).json({ data: cat });
 });
 
 // --------------------------------------------------------
@@ -249,40 +250,36 @@ router.post('/categories', (req, res) => {
 // Body: { name }
 // Response: { data: ShoppingCategory }
 // --------------------------------------------------------
-router.put('/categories/:catId', (req, res) => {
-  try {
-    const cat = db.get()
-      .prepare('SELECT * FROM shopping_categories WHERE id = ?')
-      .get(req.params.catId);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'shopping_category_not_found' });
+router.put('/categories/:catId', validateRequest(), (req, res) => {
+  const catId = pathId(req, 'catId');
+  const cat = db.get()
+    .prepare('SELECT * FROM shopping_categories WHERE id = ?')
+    .get(catId);
+  if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'shopping_category_not_found' });
 
-    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+  const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+  if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
-    const conflict = db.get()
-      .prepare('SELECT id FROM shopping_categories WHERE name = ? COLLATE NOCASE AND id != ?')
-      .get(vName.value, cat.id);
-    if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
+  const conflict = db.get()
+    .prepare('SELECT id FROM shopping_categories WHERE name = ? COLLATE NOCASE AND id != ?')
+    .get(vName.value, cat.id);
+  if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
-    // Artikel und Küche, die die alte Kategorie nutzen, mitumbenennen
-    db.get().transaction(() => {
-      db.get()
-        .prepare('UPDATE shopping_items SET category = ? WHERE category = ?')
-        .run(vName.value, cat.name);
-      renameKitchenCategory(cat.name, vName.value);
-      db.get()
-        .prepare('UPDATE shopping_categories SET name = ? WHERE id = ?')
-        .run(vName.value, cat.id);
-    })();
+  // Artikel und Küche, die die alte Kategorie nutzen, mitumbenennen
+  db.get().transaction(() => {
+    db.get()
+      .prepare('UPDATE shopping_items SET category = ? WHERE category = ?')
+      .run(vName.value, cat.name);
+    renameKitchenCategory(cat.name, vName.value);
+    db.get()
+      .prepare('UPDATE shopping_categories SET name = ? WHERE id = ?')
+      .run(vName.value, cat.id);
+  })();
 
-    const updated = db.get()
-      .prepare('SELECT * FROM shopping_categories WHERE id = ?')
-      .get(cat.id);
-    res.json({ data: updated });
-  } catch (err) {
-    log.error('PUT /categories/:catId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const updated = db.get()
+    .prepare('SELECT * FROM shopping_categories WHERE id = ?')
+    .get(cat.id);
+  res.json({ data: updated });
 });
 
 // --------------------------------------------------------
@@ -291,57 +288,53 @@ router.put('/categories/:catId', (req, res) => {
 // Die letzte verbleibende Kategorie kann nicht gelöscht werden.
 // Response: { ok: true }
 // --------------------------------------------------------
-router.delete('/categories/:catId', (req, res) => {
-  try {
-    const cat = db.get()
-      .prepare('SELECT * FROM shopping_categories WHERE id = ?')
-      .get(req.params.catId);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'shopping_category_not_found' });
+router.delete('/categories/:catId', validateRequest(), (req, res) => {
+  const catId = pathId(req, 'catId');
+  const cat = db.get()
+    .prepare('SELECT * FROM shopping_categories WHERE id = ?')
+    .get(catId);
+  if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'shopping_category_not_found' });
 
-    const total = db.get()
-      .prepare('SELECT COUNT(*) AS c FROM shopping_categories')
-      .get().c;
-    if (total <= 1) return res.status(400).json({ error: 'The last category cannot be deleted.', code: 400, reason: 'category_last' });
+  const total = db.get()
+    .prepare('SELECT COUNT(*) AS c FROM shopping_categories')
+    .get().c;
+  if (total <= 1) return res.status(400).json({ error: 'The last category cannot be deleted.', code: 400, reason: 'category_last' });
 
-    // Fallback-Kategorie: erste andere Kategorie nach sort_order
-    const fallback = db.get()
-      .prepare('SELECT name FROM shopping_categories WHERE id != ? ORDER BY sort_order ASC LIMIT 1')
-      .get(cat.id);
+  // Fallback-Kategorie: erste andere Kategorie nach sort_order
+  const fallback = db.get()
+    .prepare('SELECT name FROM shopping_categories WHERE id != ? ORDER BY sort_order ASC LIMIT 1')
+    .get(cat.id);
 
-    db.get().transaction(() => {
-      // Umziehende Artikel hinten anstellen, je Liste (#678). Ohne den Versatz
-      // behielten sie ihre Ränge aus der gelöschten Kategorie und mischten sich
-      // zwischen die handsortierten der Zielkategorie - eine Reihenfolge, die
-      // niemand hergestellt hat.
-      //
-      // Der Versatz wird je Liste VOR dem Umzug bestimmt und nicht als Subquery
-      // im UPDATE gelesen: dort zählte die gerade umgezogene Zeile schon zum
-      // Maximum der Zielkategorie, und jede weitere sprang um ihren eigenen Rang
-      // höher - die Umzügler kamen in der Reihenfolge ihrer id an statt in ihrer
-      // eigenen (Test „Umzügler landen hinter der Handsortierung des Ziels").
-      const listen = db.get()
-        .prepare('SELECT DISTINCT list_id FROM shopping_items WHERE category = ?')
-        .all(cat.name);
-      const maxIn = db.get().prepare(
-        'SELECT COALESCE(MAX(sort_order), 0) AS m FROM shopping_items WHERE list_id = ? AND category = ?'
-      );
-      const move = db.get().prepare(
-        'UPDATE shopping_items SET category = ?, sort_order = sort_order + ? WHERE category = ? AND list_id = ?'
-      );
-      for (const { list_id: listId } of listen) {
-        move.run(fallback.name, maxIn.get(listId, fallback.name).m, cat.name, listId);
-      }
-      renameKitchenCategory(cat.name, fallback.name);
-      db.get()
-        .prepare('DELETE FROM shopping_categories WHERE id = ?')
-        .run(cat.id);
-    })();
+  db.get().transaction(() => {
+    // Umziehende Artikel hinten anstellen, je Liste (#678). Ohne den Versatz
+    // behielten sie ihre Ränge aus der gelöschten Kategorie und mischten sich
+    // zwischen die handsortierten der Zielkategorie - eine Reihenfolge, die
+    // niemand hergestellt hat.
+    //
+    // Der Versatz wird je Liste VOR dem Umzug bestimmt und nicht als Subquery
+    // im UPDATE gelesen: dort zählte die gerade umgezogene Zeile schon zum
+    // Maximum der Zielkategorie, und jede weitere sprang um ihren eigenen Rang
+    // höher - die Umzügler kamen in der Reihenfolge ihrer id an statt in ihrer
+    // eigenen (Test „Umzügler landen hinter der Handsortierung des Ziels").
+    const listen = db.get()
+      .prepare('SELECT DISTINCT list_id FROM shopping_items WHERE category = ?')
+      .all(cat.name);
+    const maxIn = db.get().prepare(
+      'SELECT COALESCE(MAX(sort_order), 0) AS m FROM shopping_items WHERE list_id = ? AND category = ?'
+    );
+    const move = db.get().prepare(
+      'UPDATE shopping_items SET category = ?, sort_order = sort_order + ? WHERE category = ? AND list_id = ?'
+    );
+    for (const { list_id: listId } of listen) {
+      move.run(fallback.name, maxIn.get(listId, fallback.name).m, cat.name, listId);
+    }
+    renameKitchenCategory(cat.name, fallback.name);
+    db.get()
+      .prepare('DELETE FROM shopping_categories WHERE id = ?')
+      .run(cat.id);
+  })();
 
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('DELETE /categories/:catId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ ok: true });
 });
 
 // --------------------------------------------------------
@@ -350,22 +343,17 @@ router.delete('/categories/:catId', (req, res) => {
 // Body: { order: number[] }  (Array von IDs in gewünschter Reihenfolge)
 // Response: { data: ShoppingCategory[] }
 // --------------------------------------------------------
-router.patch('/categories/reorder', (req, res) => {
-  try {
-    const { order } = req.body;
-    if (!Array.isArray(order) || order.length === 0)
-      return res.status(400).json({ error: 'order must be a non-empty array of ids.', code: 400 });
+router.patch('/categories/reorder', validateRequest(), (req, res) => {
+  const { order } = req.body;
+  if (!Array.isArray(order) || order.length === 0)
+    return res.status(400).json({ error: 'order must be a non-empty array of ids.', code: 400 });
 
-    const update = db.get().prepare('UPDATE shopping_categories SET sort_order = ? WHERE id = ?');
-    db.get().transaction(() => {
-      order.forEach((id, idx) => update.run(idx, id));
-    })();
+  const update = db.get().prepare('UPDATE shopping_categories SET sort_order = ? WHERE id = ?');
+  db.get().transaction(() => {
+    order.forEach((id, idx) => update.run(idx, id));
+  })();
 
-    res.json({ data: loadCategories() });
-  } catch (err) {
-    log.error('PATCH /categories/reorder error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: loadCategories() });
 });
 
 // --------------------------------------------------------
@@ -383,16 +371,11 @@ router.patch('/categories/reorder', (req, res) => {
 // Die Adressen bleiben hier: fuer die Auswahl reicht der Name, und wer sie
 // nicht herausgibt, kann sie auch nicht versehentlich anzeigen.
 // --------------------------------------------------------
-router.get('/send-recipients', (req, res) => {
-  try {
-    void req;
-    const members = listEmailableMembers({ db: db.get() })
-      .map(({ id, display_name }) => ({ id, display_name }));
-    res.json({ data: members });
-  } catch (err) {
-    log.error('GET /send-recipients error:', err.message);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/send-recipients', validateRequest(), (req, res) => {
+  void req;
+  const members = listEmailableMembers({ db: db.get() })
+    .map(({ id, display_name }) => ({ id, display_name }));
+  res.json({ data: members });
 });
 
 // --------------------------------------------------------
@@ -413,35 +396,30 @@ router.get('/send-recipients', (req, res) => {
 // eingekauften stehen oben, statt hinter allem, was zufaellig frueher im
 // Alphabet liegt.
 // --------------------------------------------------------
-router.get('/suggestions', (req, res) => {
-  try {
-    const q = (req.query.q ?? '').trim();
-    if (q.length < 1) return res.json({ data: [] });
+router.get('/suggestions', validateRequest(), (req, res) => {
+  const q = (req.query.q ?? '').trim();
+  if (q.length < 1) return res.json({ data: [] });
 
-    const names = db.get().prepare(`
-      SELECT name, MAX(created_at) AS latest, MAX(id) AS latest_id FROM shopping_items
-      WHERE name LIKE ? COLLATE NOCASE
-      GROUP BY name
-      ORDER BY latest DESC, latest_id DESC
-      LIMIT 8
-    `).all(`${q}%`);
+  const names = db.get().prepare(`
+    SELECT name, MAX(created_at) AS latest, MAX(id) AS latest_id FROM shopping_items
+    WHERE name LIKE ? COLLATE NOCASE
+    GROUP BY name
+    ORDER BY latest DESC, latest_id DESC
+    LIMIT 8
+  `).all(`${q}%`);
 
-    const mostRecent = db.get().prepare(`
-      SELECT category, quantity FROM shopping_items
-      WHERE name = ?
-      ORDER BY created_at DESC, id DESC
-      LIMIT 1
-    `);
-    const data = names.map((r) => {
-      const recent = mostRecent.get(r.name);
-      return { name: r.name, category: recent?.category ?? null, quantity: recent?.quantity ?? null };
-    });
+  const mostRecent = db.get().prepare(`
+    SELECT category, quantity FROM shopping_items
+    WHERE name = ?
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `);
+  const data = names.map((r) => {
+    const recent = mostRecent.get(r.name);
+    return { name: r.name, category: recent?.category ?? null, quantity: recent?.quantity ?? null };
+  });
 
-    res.json({ data });
-  } catch (err) {
-    log.error('suggestions error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data });
 });
 
 // --------------------------------------------------------
@@ -489,36 +467,26 @@ function removeShoppingPurchase(database, itemId) {
 }
 
 // GET /api/v1/shopping/stores  -> { data: Store[] }
-router.get('/stores', (_req, res) => {
-  try {
-    const stores = db.get().prepare('SELECT * FROM shopping_stores ORDER BY name COLLATE NOCASE ASC').all();
-    res.json({ data: stores });
-  } catch (err) {
-    log.error('GET /stores error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+router.get('/stores', validateRequest(), (_req, res) => {
+  const stores = db.get().prepare('SELECT * FROM shopping_stores ORDER BY name COLLATE NOCASE ASC').all();
+  res.json({ data: stores });
 });
 
 // POST /api/v1/shopping/stores  Body: { name }
-router.post('/stores', (req, res) => {
-  try {
-    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
-    const errors = collectErrors([vName]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+router.post('/stores', validateRequest(), (req, res) => {
+  const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+  const errors = collectErrors([vName]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    // Derselbe Laden zweimal ist kein Fehler des Nutzers, sondern schon da:
-    // die vorhandene Zeile zurueckgeben statt einen Konflikt zu melden.
-    const vorhanden = db.get().prepare('SELECT * FROM shopping_stores WHERE name = ? COLLATE NOCASE').get(vName.value);
-    if (vorhanden) return res.status(200).json({ data: vorhanden });
+  // Derselbe Laden zweimal ist kein Fehler des Nutzers, sondern schon da:
+  // die vorhandene Zeile zurueckgeben statt einen Konflikt zu melden.
+  const vorhanden = db.get().prepare('SELECT * FROM shopping_stores WHERE name = ? COLLATE NOCASE').get(vName.value);
+  if (vorhanden) return res.status(200).json({ data: vorhanden });
 
-    const result = db.get().prepare(
-      'INSERT INTO shopping_stores (name, created_by) VALUES (?, ?)'
-    ).run(vName.value, req.authUserId || req.session.userId);
-    res.status(201).json({ data: db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(result.lastInsertRowid) });
-  } catch (err) {
-    log.error('POST /stores error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  const result = db.get().prepare(
+    'INSERT INTO shopping_stores (name, created_by) VALUES (?, ?)'
+  ).run(vName.value, req.authUserId || req.session.userId);
+  res.status(201).json({ data: db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(result.lastInsertRowid) });
 });
 
 // PUT /api/v1/shopping/stores/:id  Body: { name }
@@ -527,45 +495,35 @@ router.post('/stores', (req, res) => {
 // Tippfehler soll die Historie nicht spalten. Die Form (PUT mit { name }) ist
 // die, die der geteilte Kategorie-Manager erwartet - so verwaltet dieselbe
 // Komponente Kategorien und Laeden, ohne einen zweiten Schirm.
-router.put('/stores/:id', (req, res) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid store ID.', code: 400 });
-    const store = db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(id);
-    if (!store) return res.status(404).json({ error: 'Store not found.', code: 404, reason: 'shopping_store_not_found' });
+router.put('/stores/:id', validateRequest(), (req, res) => {
+  const id = pathId(req);
+  if (!id) return res.status(400).json({ error: 'Invalid store ID.', code: 400 });
+  const store = db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(id);
+  if (!store) return res.status(404).json({ error: 'Store not found.', code: 404, reason: 'shopping_store_not_found' });
 
-    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
-    const errors = collectErrors([vName]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+  const errors = collectErrors([vName]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const kollision = db.get().prepare(
-      'SELECT id FROM shopping_stores WHERE name = ? COLLATE NOCASE AND id != ?'
-    ).get(vName.value, id);
-    if (kollision) return res.status(409).json({ error: 'Store already exists.', code: 409, reason: 'shopping_store_exists' });
+  const kollision = db.get().prepare(
+    'SELECT id FROM shopping_stores WHERE name = ? COLLATE NOCASE AND id != ?'
+  ).get(vName.value, id);
+  if (kollision) return res.status(409).json({ error: 'Store already exists.', code: 409, reason: 'shopping_store_exists' });
 
-    db.get().prepare('UPDATE shopping_stores SET name = ? WHERE id = ?').run(vName.value, id);
-    res.json({ data: db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(id) });
-  } catch (err) {
-    log.error('PUT /stores/:id error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  db.get().prepare('UPDATE shopping_stores SET name = ? WHERE id = ?').run(vName.value, id);
+  res.json({ data: db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(id) });
 });
 
 // DELETE /api/v1/shopping/stores/:id
-router.delete('/stores/:id', (req, res) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Invalid store ID.', code: 400 });
-    const store = db.get().prepare('SELECT id FROM shopping_stores WHERE id = ?').get(id);
-    if (!store) return res.status(404).json({ error: 'Store not found.', code: 404, reason: 'shopping_store_not_found' });
-    // Der Fremdschluessel steht auf SET NULL: bezahlte Preise bleiben stehen,
-    // sie verlieren nur ihren Laden. Was einmal bezahlt wurde, bleibt wahr.
-    db.get().prepare('DELETE FROM shopping_stores WHERE id = ?').run(id);
-    res.status(204).end();
-  } catch (err) {
-    log.error('DELETE /stores/:id error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+router.delete('/stores/:id', validateRequest(), (req, res) => {
+  const id = pathId(req);
+  if (!id) return res.status(400).json({ error: 'Invalid store ID.', code: 400 });
+  const store = db.get().prepare('SELECT id FROM shopping_stores WHERE id = ?').get(id);
+  if (!store) return res.status(404).json({ error: 'Store not found.', code: 404, reason: 'shopping_store_not_found' });
+  // Der Fremdschluessel steht auf SET NULL: bezahlte Preise bleiben stehen,
+  // sie verlieren nur ihren Laden. Was einmal bezahlt wurde, bleibt wahr.
+  db.get().prepare('DELETE FROM shopping_stores WHERE id = ?').run(id);
+  res.status(204).end();
 });
 
 // GET /api/v1/shopping/price-history?name=...
@@ -573,45 +531,40 @@ router.delete('/stores/:id', (req, res) => {
 // Liefert die Kaufhistorie fuer einen Artikelnamen (#1003),
 // unbeeinflusst von Gross-/Kleinschreibung (COLLATE NOCASE).
 // Response: { data: Purchase[] }
-router.get('/price-history', (req, res) => {
-  try {
-    const rawName = String(req.query.name ?? '').trim();
-    if (!rawName) {
-      return res.json({ data: [] });
-    }
-    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
-    // Ohne Pruefung wuerde "abc" zu NaN, das SQLite als NULL bindet - und
-    // "shopping_item_id IS NOT NULL" blendete dann jeden geraeumten Kauf aus.
-    const rawExclude = req.query.exclude_item_id;
-    let excludeItemId = null;
-    if (rawExclude !== undefined && rawExclude !== '') {
-      excludeItemId = bodyId(rawExclude);
-      if (excludeItemId === null) {
-        return res.status(400).json({ error: 'exclude_item_id must be an item id.', code: 400 });
-      }
-    }
-
-    const sql = `
-      SELECT p.id, p.item_name, p.price_cents, p.store_id, p.purchased_at,
-             s.name AS store_name
-      FROM shopping_purchases p
-      LEFT JOIN shopping_stores s ON s.id = p.store_id
-      WHERE p.item_name = ? COLLATE NOCASE
-        ${excludeItemId != null ? 'AND p.shopping_item_id IS NOT ?' : ''}
-      ORDER BY p.purchased_at DESC, p.id DESC
-      LIMIT ?
-    `;
-    const params = excludeItemId != null
-      ? [rawName, excludeItemId, limit]
-      : [rawName, limit];
-
-    const purchases = db.get().prepare(sql).all(...params);
-
-    res.json({ data: purchases });
-  } catch (err) {
-    log.error('GET /price-history error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+router.get('/price-history', validateRequest(), (req, res) => {
+  const rawName = String(req.query.name ?? '').trim();
+  if (!rawName) {
+    return res.json({ data: [] });
   }
+  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+  // Ohne Pruefung wuerde "abc" zu NaN, das SQLite als NULL bindet - und
+  // "shopping_item_id IS NOT NULL" blendete dann jeden geraeumten Kauf aus.
+  const rawExclude = req.query.exclude_item_id;
+  let excludeItemId = null;
+  if (rawExclude !== undefined && rawExclude !== '') {
+    excludeItemId = bodyId(rawExclude);
+    if (excludeItemId === null) {
+      return res.status(400).json({ error: 'exclude_item_id must be an item id.', code: 400 });
+    }
+  }
+
+  const sql = `
+    SELECT p.id, p.item_name, p.price_cents, p.store_id, p.purchased_at,
+           s.name AS store_name
+    FROM shopping_purchases p
+    LEFT JOIN shopping_stores s ON s.id = p.store_id
+    WHERE p.item_name = ? COLLATE NOCASE
+      ${excludeItemId != null ? 'AND p.shopping_item_id IS NOT ?' : ''}
+    ORDER BY p.purchased_at DESC, p.id DESC
+    LIMIT ?
+  `;
+  const params = excludeItemId != null
+    ? [rawName, excludeItemId, limit]
+    : [rawName, limit];
+
+  const purchases = db.get().prepare(sql).all(...params);
+
+  res.json({ data: purchases });
 });
 
 // --------------------------------------------------------
@@ -630,194 +583,185 @@ router.get('/price-history', (req, res) => {
 // Zettel, den der Schreibende offen hat. Die Zielliste bewegt ihre Nummer
 // über denselben Trigger wie jeder andere Schreibweg.
 // --------------------------------------------------------
-router.patch('/items/:itemId', (req, res) => {
-  try {
-    const item = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE id = ?')
-      .get(req.params.itemId);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'shopping_item_not_found' });
+router.patch('/items/:itemId', validateRequest(), (req, res) => {
+  const itemId = pathId(req, 'itemId');
+  const item = db.get()
+    .prepare('SELECT * FROM shopping_items WHERE id = ?')
+    .get(itemId);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'shopping_item_not_found' });
 
-    // Form und Laenge wie beim Anlegen. Vorher lief eine Zahl als `name` in
-    // `.trim()` auf einen 500, `category: null` an NOT NULL, eine Zahl als
-    // Menge landete als "5.0", und `is_checked: 'false'` hakte ab, weil nur die
-    // Wahrheit des Werts zaehlte. Die PWA schickt 0 und 1, deshalb bleiben die.
-    const body = req.body ?? {};
-    if (body.is_checked !== undefined && ![true, false, 0, 1].includes(body.is_checked)) {
-      return res.status(400).json({ error: 'is_checked must be true, false, 0 or 1.', code: 400 });
+  // Die Form der Felder prueft das Schema davor (#2810): `is_checked` ist
+  // true, false, 0 oder 1, `category` Text, `quantity` und `notes` Text oder
+  // null. Die Laenge zaehlt die Route nach dem Trimmen. `textShape(name)`
+  // bleibt: weiter unten laeuft `name.trim()` auf dem Rohwert (Senke, nicht
+  // Route).
+  const body = req.body ?? {};
+  const shapeErrors = collectErrors([
+    textShape(body.name,     'name'),
+    body.name !== undefined ? str(body.name, 'name', { max: MAX_TITLE }) : {},
+    str(body.quantity, 'quantity', { max: MAX_SHORT, required: false }),
+  ]);
+  if (shapeErrors.length) return res.status(400).json({ error: shapeErrors.join(' '), code: 400 });
+
+  const {
+    is_checked = item.is_checked,
+    name       = item.name,
+    quantity   = item.quantity,
+    category   = item.category,
+    notes      = item.notes,
+    url: urlVal = item.url,
+  } = req.body;
+
+  /* PREIS UND LADEN (#1003, erster Schnitt).
+   *
+   * Beide sind optional und werden beim ABHAKEN erfasst - das ist der
+   * Augenblick, in dem die Zahl bekannt ist. Ein Preis, der beim Anlegen
+   * eingetippt wird, ist eine Schaetzung; einer beim Abhaken ist eine
+   * Tatsache.
+   *
+   * Nicht mitgeschickt heisst unveraendert, `null` loescht - dieselbe
+   * Unterscheidung wie beim Rezeptbild und aus demselben Grund: sonst raeumt
+   * jedes Teil-Update, etwa das blosse Umsortieren, den Preis ab.
+   */
+  const priceGiven = req.body.price_cents !== undefined;
+  let priceCents = item.price_cents;
+  if (priceGiven) {
+    const roh = req.body.price_cents;
+    if (roh === null || roh === '') priceCents = null;
+    else {
+      const n = Number(roh);
+      // Ganze Cent, nicht negativ, und eine Obergrenze, damit ein Vertipper
+      // nicht als Millionenbetrag in der spaeteren Historie steht.
+      if (!Number.isInteger(n) || n < 0 || n > 100_000_000) {
+        return res.status(400).json({ error: 'price_cents must be a whole number of cents from 0 to 100000000.', code: 400 });
+      }
+      priceCents = n;
     }
-    const shapeErrors = collectErrors([
-      textShape(body.name,     'name'),
-      textShape(body.quantity, 'quantity', { nullable: true }),
-      textShape(body.category, 'category'),
-      textShape(body.notes,    'notes',    { nullable: true }),
-      body.name !== undefined ? str(body.name, 'name', { max: MAX_TITLE }) : {},
-      str(body.quantity, 'quantity', { max: MAX_SHORT, required: false }),
-    ]);
-    if (shapeErrors.length) return res.status(400).json({ error: shapeErrors.join(' '), code: 400 });
-
-    const {
-      is_checked = item.is_checked,
-      name       = item.name,
-      quantity   = item.quantity,
-      category   = item.category,
-      notes      = item.notes,
-      url: urlVal = item.url,
-    } = req.body;
-
-    /* PREIS UND LADEN (#1003, erster Schnitt).
-     *
-     * Beide sind optional und werden beim ABHAKEN erfasst - das ist der
-     * Augenblick, in dem die Zahl bekannt ist. Ein Preis, der beim Anlegen
-     * eingetippt wird, ist eine Schaetzung; einer beim Abhaken ist eine
-     * Tatsache.
-     *
-     * Nicht mitgeschickt heisst unveraendert, `null` loescht - dieselbe
-     * Unterscheidung wie beim Rezeptbild und aus demselben Grund: sonst raeumt
-     * jedes Teil-Update, etwa das blosse Umsortieren, den Preis ab.
-     */
-    const priceGiven = req.body.price_cents !== undefined;
-    let priceCents = item.price_cents;
-    if (priceGiven) {
-      const roh = req.body.price_cents;
-      if (roh === null || roh === '') priceCents = null;
-      else {
-        const n = Number(roh);
-        // Ganze Cent, nicht negativ, und eine Obergrenze, damit ein Vertipper
-        // nicht als Millionenbetrag in der spaeteren Historie steht.
-        if (!Number.isInteger(n) || n < 0 || n > 100_000_000) {
-          return res.status(400).json({ error: 'price_cents must be a whole number of cents from 0 to 100000000.', code: 400 });
-        }
-        priceCents = n;
-      }
-    }
-
-    const storeGiven = req.body.store_id !== undefined;
-    let storeId = item.store_id;
-    if (storeGiven) {
-      const roh = req.body.store_id;
-      if (roh === null || roh === '') storeId = null;
-      else {
-        const n = bodyId(roh);
-        if (n === null) {
-          return res.status(400).json({ error: 'store_id must be a store id.', code: 400 });
-        }
-        // Ein unbekannter Laden wird abgelehnt statt still verworfen: anders als
-        // bei einer Personenauswahl ist das hier ein Aufruffehler - die Liste
-        // der Laeden ist verwaltet und kurz.
-        if (!db.get().prepare('SELECT 1 FROM shopping_stores WHERE id = ?').get(n)) {
-          return res.status(400).json({ error: 'Unknown store.', code: 400, reason: 'shopping_store_not_found' });
-        }
-        storeId = n;
-      }
-    }
-
-    if (!name?.trim()) return res.status(400).json({ error: 'name must not be empty.', code: 400 });
-
-    // ZIELLISTE (#1700). Nicht mitgeschickt oder die eigene Liste heisst: kein
-    // Umzug. Geprüft wird hier, nicht nur im Dialog: die Route ist Teil der
-    // zugesagten API. Eine Liste, die es nicht gibt, ist ein Aufruffehler wie
-    // ein unbekannter Laden - der Artikel bleibt, wo er ist, statt am
-    // Fremdschlüssel in einem 500 zu enden. Listen kennen keine eigene
-    // Sichtbarkeit; wer hier schreibt, hat `shopping: write` (Modul-Gate) und
-    // damit jede Liste des Haushalts.
-    let targetListId = item.list_id;
-    if (req.body.list_id !== undefined && req.body.list_id !== null) {
-      const n = bodyId(req.body.list_id);
-      if (n === null) {
-        return res.status(400).json({ error: 'list_id must be a list id.', code: 400 });
-      }
-      const target = n === item.list_id ? null : db.get().prepare(
-        `SELECT ${ACCEPTS_NEW_ITEMS_SQL} AS accepts_new_items FROM shopping_lists sl WHERE sl.id = ?`
-      ).get(n);
-      if (n !== item.list_id && !target) {
-        return res.status(400).json({ error: 'Unknown list.', code: 400, reason: 'shopping_list_not_found' });
-      }
-      // Eine nur lesbar gespiegelte Liste ist kein Umzugsziel (#2283). Die
-      // eigene Liste bleibt es: wer einen Artikel darauf bearbeitet, zieht
-      // nicht um.
-      if (target && !target.accepts_new_items) {
-        return res.status(400).json({ error: 'list_id: this list does not accept new items.', code: 400 });
-      }
-      targetListId = n;
-    }
-    const moved = targetListId !== item.list_id;
-
-    const validNames = validCategoryNames();
-    if (category && !validNames.includes(category))
-      return res.status(400).json({ error: 'Invalid category.', code: 400, reason: 'shopping_category_not_found' });
-
-    // notes/url gleich validieren wie beim Anlegen (URL nur http/https → XSS-sicher).
-    const vNotes = str(notes, 'notes', { max: MAX_TEXT, required: false });
-    const vUrl   = url(urlVal, 'URL');
-    const fieldErrors = collectErrors([vNotes, vUrl]);
-    if (fieldErrors.length) return res.status(400).json({ error: fieldErrors.join(' '), code: 400 });
-
-    const { list_change } = withListChange(item.list_id, () => {
-      // Eine Transaktion: ein Umzug, der zwischen der Vormerkung für den
-      // Server und "auf der neuen Liste" abbricht, hinterliesse einen Artikel,
-      // dessen Objekt in eine Liste gezogen würde, in der er nicht steht.
-      db.get().transaction(() => {
-        // VOR dem Umzug, mit der Zeile der alten Liste.
-        if (moved) moveShoppingMirror(item, targetListId, req.authUserId || req.session.userId);
-
-        db.get().prepare(`
-          UPDATE shopping_items
-          SET is_checked = ?, name = ?, quantity = ?, category = ?, notes = ?, url = ?,
-              price_cents = ?, store_id = ?, list_id = ?
-          WHERE id = ?
-        `).run(is_checked ? 1 : 0, name.trim(), quantity ?? null, category, vNotes.value, vUrl.value,
-          priceCents ?? null, storeId ?? null, targetListId, req.params.itemId);
-
-        // Kategoriewechsel heißt Positionswechsel: die Handsortierung zählt je
-        // Kategorie (#678), der alte Rang gilt in der neuen Nachbarschaft nicht.
-        // Ans Ende - dort landet in dieser Liste auch alles neu Hinzugefügte.
-        // Ein Listenwechsel ebenso, und gemessen wird an der ZIELLISTE: der
-        // Rang aus der alten Liste stünde dort zwischen fremden Nachbarn.
-        if (moved || category !== item.category) {
-          db.get().prepare(`
-            UPDATE shopping_items SET sort_order = COALESCE((
-              SELECT MAX(sort_order) FROM shopping_items
-               WHERE list_id = ? AND category = ? AND id != ?
-            ), 0) + 1 WHERE id = ?
-          `).run(targetListId, category, item.id, item.id);
-        }
-
-        // KAUFHISTORIE (#1003): ein abgehakter Artikel mit Preis traegt sich
-        // in die Historie ein. Ein entfernter Haken nimmt den noch unvollendeten
-        // Einkauf wieder zurueck, und ein geaenderter Preis aktualisiert ihn.
-        if (is_checked && priceCents !== null) {
-          recordShoppingPurchase(db.get(), {
-            id: req.params.itemId,
-            name,
-            price_cents: priceCents,
-            store_id: storeId,
-          });
-        } else if (!is_checked || priceCents === null) {
-          removeShoppingPurchase(db.get(), req.params.itemId);
-        }
-      })();
-    });
-
-    const updated = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE id = ?')
-      .get(req.params.itemId);
-
-    // Abhaken oder Umbenennen eines gespiegelten Artikels zieht auf dem
-    // CalDAV-Server nach (#617).
-    // Bleibt der Artikel nach einem Umzug Spiegel, geht eine Bearbeitung aus
-    // derselben Anfrage mit seinem Objekt an den neuen Platz.
-    const pending = markTodoOutbound('shopping', item, updated);
-
-    res.json({ data: updated, list_change });
-
-    if (pending) pushToCalDAV('Änderung');
-    // Wie beim Anlegen ohne Vorprüfung: ob die Zielliste gespiegelt ist, weiss
-    // der Lauf selbst, und ohne offene Arbeit kehrt er sofort zurück.
-    else if (moved) pushToCalDAV('Umzug');
-  } catch (err) {
-    log.error('PATCH items/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
+
+  const storeGiven = req.body.store_id !== undefined;
+  let storeId = item.store_id;
+  if (storeGiven) {
+    const roh = req.body.store_id;
+    if (roh === null || roh === '') storeId = null;
+    else {
+      const n = bodyId(roh);
+      if (n === null) {
+        return res.status(400).json({ error: 'store_id must be a store id.', code: 400 });
+      }
+      // Ein unbekannter Laden wird abgelehnt statt still verworfen: anders als
+      // bei einer Personenauswahl ist das hier ein Aufruffehler - die Liste
+      // der Laeden ist verwaltet und kurz.
+      if (!db.get().prepare('SELECT 1 FROM shopping_stores WHERE id = ?').get(n)) {
+        return res.status(400).json({ error: 'Unknown store.', code: 400, reason: 'shopping_store_not_found' });
+      }
+      storeId = n;
+    }
+  }
+
+  if (!name?.trim()) return res.status(400).json({ error: 'name must not be empty.', code: 400 });
+
+  // ZIELLISTE (#1700). Nicht mitgeschickt oder die eigene Liste heisst: kein
+  // Umzug. Geprüft wird hier, nicht nur im Dialog: die Route ist Teil der
+  // zugesagten API. Eine Liste, die es nicht gibt, ist ein Aufruffehler wie
+  // ein unbekannter Laden - der Artikel bleibt, wo er ist, statt am
+  // Fremdschlüssel in einem 500 zu enden. Listen kennen keine eigene
+  // Sichtbarkeit; wer hier schreibt, hat `shopping: write` (Modul-Gate) und
+  // damit jede Liste des Haushalts.
+  let targetListId = item.list_id;
+  if (req.body.list_id !== undefined && req.body.list_id !== null) {
+    const n = bodyId(req.body.list_id);
+    if (n === null) {
+      return res.status(400).json({ error: 'list_id must be a list id.', code: 400 });
+    }
+    const target = n === item.list_id ? null : db.get().prepare(
+      `SELECT ${ACCEPTS_NEW_ITEMS_SQL} AS accepts_new_items FROM shopping_lists sl WHERE sl.id = ?`
+    ).get(n);
+    if (n !== item.list_id && !target) {
+      return res.status(400).json({ error: 'Unknown list.', code: 400, reason: 'shopping_list_not_found' });
+    }
+    // Eine nur lesbar gespiegelte Liste ist kein Umzugsziel (#2283). Die
+    // eigene Liste bleibt es: wer einen Artikel darauf bearbeitet, zieht
+    // nicht um.
+    if (target && !target.accepts_new_items) {
+      return res.status(400).json({ error: 'list_id: this list does not accept new items.', code: 400 });
+    }
+    targetListId = n;
+  }
+  const moved = targetListId !== item.list_id;
+
+  const validNames = validCategoryNames();
+  if (category && !validNames.includes(category))
+    return res.status(400).json({ error: 'Invalid category.', code: 400, reason: 'shopping_category_not_found' });
+
+  // notes/url gleich validieren wie beim Anlegen (URL nur http/https → XSS-sicher).
+  const vNotes = str(notes, 'notes', { max: MAX_TEXT, required: false });
+  const vUrl   = url(urlVal, 'URL');
+  const fieldErrors = collectErrors([vNotes, vUrl]);
+  if (fieldErrors.length) return res.status(400).json({ error: fieldErrors.join(' '), code: 400 });
+
+  const { list_change } = withListChange(item.list_id, () => {
+    // Eine Transaktion: ein Umzug, der zwischen der Vormerkung für den
+    // Server und "auf der neuen Liste" abbricht, hinterliesse einen Artikel,
+    // dessen Objekt in eine Liste gezogen würde, in der er nicht steht.
+    db.get().transaction(() => {
+      // VOR dem Umzug, mit der Zeile der alten Liste.
+      if (moved) moveShoppingMirror(item, targetListId, req.authUserId || req.session.userId);
+
+      db.get().prepare(`
+        UPDATE shopping_items
+        SET is_checked = ?, name = ?, quantity = ?, category = ?, notes = ?, url = ?,
+            price_cents = ?, store_id = ?, list_id = ?
+        WHERE id = ?
+      `).run(is_checked ? 1 : 0, name.trim(), quantity ?? null, category, vNotes.value, vUrl.value,
+        priceCents ?? null, storeId ?? null, targetListId, itemId);
+
+      // Kategoriewechsel heißt Positionswechsel: die Handsortierung zählt je
+      // Kategorie (#678), der alte Rang gilt in der neuen Nachbarschaft nicht.
+      // Ans Ende - dort landet in dieser Liste auch alles neu Hinzugefügte.
+      // Ein Listenwechsel ebenso, und gemessen wird an der ZIELLISTE: der
+      // Rang aus der alten Liste stünde dort zwischen fremden Nachbarn.
+      if (moved || category !== item.category) {
+        db.get().prepare(`
+          UPDATE shopping_items SET sort_order = COALESCE((
+            SELECT MAX(sort_order) FROM shopping_items
+             WHERE list_id = ? AND category = ? AND id != ?
+          ), 0) + 1 WHERE id = ?
+        `).run(targetListId, category, item.id, item.id);
+      }
+
+      // KAUFHISTORIE (#1003): ein abgehakter Artikel mit Preis traegt sich
+      // in die Historie ein. Ein entfernter Haken nimmt den noch unvollendeten
+      // Einkauf wieder zurueck, und ein geaenderter Preis aktualisiert ihn.
+      if (is_checked && priceCents !== null) {
+        recordShoppingPurchase(db.get(), {
+          id: itemId,
+          name,
+          price_cents: priceCents,
+          store_id: storeId,
+        });
+      } else if (!is_checked || priceCents === null) {
+        removeShoppingPurchase(db.get(), itemId);
+      }
+    })();
+  });
+
+  const updated = db.get()
+    .prepare('SELECT * FROM shopping_items WHERE id = ?')
+    .get(itemId);
+
+  // Abhaken oder Umbenennen eines gespiegelten Artikels zieht auf dem
+  // CalDAV-Server nach (#617).
+  // Bleibt der Artikel nach einem Umzug Spiegel, geht eine Bearbeitung aus
+  // derselben Anfrage mit seinem Objekt an den neuen Platz.
+  const pending = markTodoOutbound('shopping', item, updated);
+
+  res.json({ data: updated, list_change });
+
+  if (pending) pushToCalDAV('Änderung');
+  // Wie beim Anlegen ohne Vorprüfung: ob die Zielliste gespiegelt ist, weiss
+  // der Lauf selbst, und ohne offene Arbeit kehrt er sofort zurück.
+  else if (moved) pushToCalDAV('Umzug');
 });
 
 // --------------------------------------------------------
@@ -847,66 +791,61 @@ router.patch('/items/:itemId', (req, res) => {
 // was tatsächlich zurückging, und ein Undo, das mit einem Fehler endet, weil ein
 // Artikel inzwischen von Hand gelöscht wurde, wäre die schlechtere Antwort.
 // --------------------------------------------------------
-router.post('/items/undo-transfer', (req, res) => {
-  try {
-    const ids = Array.isArray(req.body?.ids)
-      ? req.body.ids.map(Number).filter(Number.isInteger)
-      : [];
-    // Seit R23 (D2) nennt der Transfer die Zutaten, die er markiert hat
-    // (`ingredient_ids`), auch die uebersprungenen - sie stehen ja auf der
-    // Liste. Die Ruecknahme setzt genau diese zurueck. Ohne das Feld (aeltere
-    // Clients) bleibt es beim Rueckschluss ueber Mahlzeit und Name unten.
-    const ingredientIds = Array.isArray(req.body?.ingredient_ids)
-      ? req.body.ingredient_ids.map(Number).filter(Number.isInteger)
-      : null;
-    if (!ids.length && !ingredientIds?.length) return res.json({ data: { removed: 0 } });
+router.post('/items/undo-transfer', validateRequest(), (req, res) => {
+  const ids = Array.isArray(req.body?.ids)
+    ? req.body.ids.map(Number).filter(Number.isInteger)
+    : [];
+  // Seit R23 (D2) nennt der Transfer die Zutaten, die er markiert hat
+  // (`ingredient_ids`), auch die uebersprungenen - sie stehen ja auf der
+  // Liste. Die Ruecknahme setzt genau diese zurueck. Ohne das Feld (aeltere
+  // Clients) bleibt es beim Rueckschluss ueber Mahlzeit und Name unten.
+  const ingredientIds = Array.isArray(req.body?.ingredient_ids)
+    ? req.body.ingredient_ids.map(Number).filter(Number.isInteger)
+    : null;
+  if (!ids.length && !ingredientIds?.length) return res.json({ data: { removed: 0 } });
 
-    // DIESELBE GEGENRICHTUNG (#1290), aber nur fuer den Mahlzeit-Pfad. Die
-    // Ruecknahme loescht Einkaufsartikel UND setzt aus Grund 2. oben
-    // `meal_ingredients.on_shopping_list` zurueck - genau dann schreibt sie in
-    // den Essensplan und braucht dessen Recht. Ein Vorrats- oder
-    // Rezept-Uebertrag traegt kein `added_from_meal`, ruehrt den Plan nicht an
-    // und bleibt ohne diese Frage erreichbar; eine pauschale Sperre haette dem
-    // Einkauf das Undo seiner EIGENEN Uebertraege genommen.
-    //
-    // Je ID eine Abfrage statt eines `IN (...)`: die Liste kommt vom Client
-    // und ist unbegrenzt, die Platzhalter-Grenze von SQLite dagegen nicht.
-    const findSource = db.get().prepare('SELECT added_from_meal FROM shopping_items WHERE id = ?');
-    const touchesMealPlan = Boolean(ingredientIds?.length) || ids.some((id) => findSource.get(id)?.added_from_meal);
-    if (touchesMealPlan && !mayWriteModule(req, 'meals')) {
-      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
-    }
-
-    const removed = db.get().transaction(() => {
-      const findItem = db.get()
-        .prepare('SELECT id, name, added_from_meal FROM shopping_items WHERE id = ?');
-      const deleteItem = db.get().prepare('DELETE FROM shopping_items WHERE id = ?');
-      const unmarkIngredient = db.get().prepare(`
-        UPDATE meal_ingredients SET on_shopping_list = 0
-        WHERE meal_id = ? AND name = ? AND on_shopping_list = 1
-      `);
-
-      const unmarkById = db.get().prepare(
-        'UPDATE meal_ingredients SET on_shopping_list = 0 WHERE id = ? AND on_shopping_list = 1',
-      );
-
-      let count = 0;
-      for (const id of ids) {
-        const item = findItem.get(id);
-        if (!item) continue;
-        deleteItem.run(id);
-        if (!ingredientIds && item.added_from_meal) unmarkIngredient.run(item.added_from_meal, item.name);
-        count += 1;
-      }
-      for (const id of ingredientIds ?? []) unmarkById.run(id);
-      return count;
-    })();
-
-    res.json({ data: { removed } });
-  } catch (err) {
-    log.error('POST /items/undo-transfer error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // DIESELBE GEGENRICHTUNG (#1290), aber nur fuer den Mahlzeit-Pfad. Die
+  // Ruecknahme loescht Einkaufsartikel UND setzt aus Grund 2. oben
+  // `meal_ingredients.on_shopping_list` zurueck - genau dann schreibt sie in
+  // den Essensplan und braucht dessen Recht. Ein Vorrats- oder
+  // Rezept-Uebertrag traegt kein `added_from_meal`, ruehrt den Plan nicht an
+  // und bleibt ohne diese Frage erreichbar; eine pauschale Sperre haette dem
+  // Einkauf das Undo seiner EIGENEN Uebertraege genommen.
+  //
+  // Je ID eine Abfrage statt eines `IN (...)`: die Liste kommt vom Client
+  // und ist unbegrenzt, die Platzhalter-Grenze von SQLite dagegen nicht.
+  const findSource = db.get().prepare('SELECT added_from_meal FROM shopping_items WHERE id = ?');
+  const touchesMealPlan = Boolean(ingredientIds?.length) || ids.some((id) => findSource.get(id)?.added_from_meal);
+  if (touchesMealPlan && !mayWriteModule(req, 'meals')) {
+    return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
   }
+
+  const removed = db.get().transaction(() => {
+    const findItem = db.get()
+      .prepare('SELECT id, name, added_from_meal FROM shopping_items WHERE id = ?');
+    const deleteItem = db.get().prepare('DELETE FROM shopping_items WHERE id = ?');
+    const unmarkIngredient = db.get().prepare(`
+      UPDATE meal_ingredients SET on_shopping_list = 0
+      WHERE meal_id = ? AND name = ? AND on_shopping_list = 1
+    `);
+
+    const unmarkById = db.get().prepare(
+      'UPDATE meal_ingredients SET on_shopping_list = 0 WHERE id = ? AND on_shopping_list = 1',
+    );
+
+    let count = 0;
+    for (const id of ids) {
+      const item = findItem.get(id);
+      if (!item) continue;
+      deleteItem.run(id);
+      if (!ingredientIds && item.added_from_meal) unmarkIngredient.run(item.added_from_meal, item.name);
+      count += 1;
+    }
+    for (const id of ingredientIds ?? []) unmarkById.run(id);
+    return count;
+  })();
+
+  res.json({ data: { removed } });
 });
 
 // --------------------------------------------------------
@@ -914,30 +853,26 @@ router.post('/items/undo-transfer', (req, res) => {
 // Einzelnen Artikel löschen.
 // Response: { ok: true }
 // --------------------------------------------------------
-router.delete('/items/:itemId', (req, res) => {
-  try {
-    const item = db.get()
-      .prepare('SELECT id, list_id FROM shopping_items WHERE id = ?')
-      .get(req.params.itemId);
-    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'shopping_item_not_found' });
+router.delete('/items/:itemId', validateRequest(), (req, res) => {
+  const itemId = pathId(req, 'itemId');
+  const item = db.get()
+    .prepare('SELECT id, list_id FROM shopping_items WHERE id = ?')
+    .get(itemId);
+  if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'shopping_item_not_found' });
 
-    const queued = queueTodoDeletions('shopping', mirroredItems('id = ?', req.params.itemId));
+  const queued = queueTodoDeletions('shopping', mirroredItems('id = ?', itemId));
 
-    const { list_change } = withListChange(item.list_id, () => {
-      // Ein einzeln geloeschter Artikel (z.B. per Wischgeste oder "Loeschen"
-      // im Detailblatt) gilt als verworfen/nicht gekauft - sein provisorischer
-      // Kauf wird entfernt (#1003). Dauerhaft in der Historie bleiben nur
-      // Artikel, die ueber "Erledigte loeschen" (checked) aufgeraumt werden.
-      removeShoppingPurchase(db.get(), item.id);
-      db.get().prepare('DELETE FROM shopping_items WHERE id = ?').run(item.id);
-    });
-    res.json({ ok: true, list_change });
+  const { list_change } = withListChange(item.list_id, () => {
+    // Ein einzeln geloeschter Artikel (z.B. per Wischgeste oder "Loeschen"
+    // im Detailblatt) gilt als verworfen/nicht gekauft - sein provisorischer
+    // Kauf wird entfernt (#1003). Dauerhaft in der Historie bleiben nur
+    // Artikel, die ueber "Erledigte loeschen" (checked) aufgeraumt werden.
+    removeShoppingPurchase(db.get(), item.id);
+    db.get().prepare('DELETE FROM shopping_items WHERE id = ?').run(item.id);
+  });
+  res.json({ ok: true, list_change });
 
-    if (queued) pushToCalDAV('Löschung');
-  } catch (err) {
-    log.error('DELETE items/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  if (queued) pushToCalDAV('Löschung');
 });
 
 // Nimmt die Liste neue Artikel an (#2283)? Nein, wenn eine eingeschaltete
@@ -957,24 +892,19 @@ const ACCEPTS_NEW_ITEMS_SQL = `CASE WHEN EXISTS (
 // Alle Einkaufslisten mit Artikel-Zähler und `accepts_new_items` (#2283).
 // Response: { data: ShoppingList[] }
 // --------------------------------------------------------
-router.get('/', (req, res) => {
-  try {
-    const lists = db.get().prepare(`
-      SELECT
-        sl.*,
-        COUNT(si.id)                                          AS item_total,
-        SUM(CASE WHEN si.is_checked = 1 THEN 1 ELSE 0 END)   AS item_checked,
-        ${ACCEPTS_NEW_ITEMS_SQL}                              AS accepts_new_items
-      FROM shopping_lists sl
-      LEFT JOIN shopping_items si ON si.list_id = sl.id
-      GROUP BY sl.id
-      ORDER BY sl.created_at ASC
-    `).all();
-    res.json({ data: lists });
-  } catch (err) {
-    log.error('GET / error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/', validateRequest(), (req, res) => {
+  const lists = db.get().prepare(`
+    SELECT
+      sl.*,
+      COUNT(si.id)                                          AS item_total,
+      SUM(CASE WHEN si.is_checked = 1 THEN 1 ELSE 0 END)   AS item_checked,
+      ${ACCEPTS_NEW_ITEMS_SQL}                              AS accepts_new_items
+    FROM shopping_lists sl
+    LEFT JOIN shopping_items si ON si.list_id = sl.id
+    GROUP BY sl.id
+    ORDER BY sl.created_at ASC
+  `).all();
+  res.json({ data: lists });
 });
 
 // --------------------------------------------------------
@@ -983,23 +913,18 @@ router.get('/', (req, res) => {
 // Body: { name }
 // Response: { data: ShoppingList }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
-  try {
-    const vName = str(req.body.name, 'name', { max: MAX_TITLE });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+router.post('/', validateRequest(), (req, res) => {
+  const vName = str(req.body.name, 'name', { max: MAX_TITLE });
+  if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
-    const result = db.get()
-      .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
-      .run(vName.value, req.authUserId || req.session.userId);
+  const result = db.get()
+    .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
+    .run(vName.value, req.authUserId || req.session.userId);
 
-    const list = db.get()
-      .prepare('SELECT * FROM shopping_lists WHERE id = ?')
-      .get(result.lastInsertRowid);
-    res.status(201).json({ data: list });
-  } catch (err) {
-    log.error('POST / error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const list = db.get()
+    .prepare('SELECT * FROM shopping_lists WHERE id = ?')
+    .get(result.lastInsertRowid);
+  res.status(201).json({ data: list });
 });
 
 // --------------------------------------------------------
@@ -1008,25 +933,21 @@ router.post('/', (req, res) => {
 // Body: { name }
 // Response: { data: ShoppingList }
 // --------------------------------------------------------
-router.put('/:listId', (req, res) => {
-  try {
-    const vName = str(req.body.name, 'name', { max: MAX_TITLE });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+router.put('/:listId', validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  const vName = str(req.body.name, 'name', { max: MAX_TITLE });
+  if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
-    const result = db.get()
-      .prepare('UPDATE shopping_lists SET name = ? WHERE id = ?')
-      .run(vName.value, req.params.listId);
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+  const result = db.get()
+    .prepare('UPDATE shopping_lists SET name = ? WHERE id = ?')
+    .run(vName.value, listId);
+  if (result.changes === 0)
+    return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
-    const list = db.get()
-      .prepare('SELECT * FROM shopping_lists WHERE id = ?')
-      .get(req.params.listId);
-    res.json({ data: list });
-  } catch (err) {
-    log.error('PUT /:listId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const list = db.get()
+    .prepare('SELECT * FROM shopping_lists WHERE id = ?')
+    .get(listId);
+  res.json({ data: list });
 });
 
 // --------------------------------------------------------
@@ -1059,70 +980,59 @@ router.put('/:listId', (req, res) => {
 //     haengen damit an denselben Sync-Spalten, die oben nicht mitkommen -
 //     dieselbe Regel, nicht ein Versehen.
 // --------------------------------------------------------
-router.post('/:listId/duplicate', (req, res) => {
-  try {
-    const list = db.get()
-      .prepare('SELECT * FROM shopping_lists WHERE id = ?')
-      .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+router.post('/:listId/duplicate', validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  const list = db.get()
+    .prepare('SELECT * FROM shopping_lists WHERE id = ?')
+    .get(listId);
+  if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
-    // Express 5 laesst req.body bei einem POST ohne Body undefined -
-    // ohne das ?. antwortete die Route hier mit 500 statt 400.
-    const vName = str(req.body?.name, 'name', { max: MAX_TITLE });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+  // Express 5 laesst req.body bei einem POST ohne Body undefined -
+  // ohne das ?. antwortete die Route hier mit 500 statt 400.
+  const vName = str(req.body?.name, 'name', { max: MAX_TITLE });
+  if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
-    // Die drei Flags sind optional, aber wenn gesetzt, echte Booleans. Ohne
-    // diese Pruefung wirkte jeder Nicht-false-Wert wie true - der String
-    // 'false' duplizierte also mit zurueckgesetzten Haken und behaltenen
-    // Mengen, und der API-Aufrufer erfuhr nie, dass sein Flag ignoriert wurde.
-    for (const flag of ['resetChecked', 'keepQuantities', 'keepNotes']) {
-      const value = req.body?.[flag];
-      if (value !== undefined && typeof value !== 'boolean')
-        return res.status(400).json({ error: `${flag} must be a boolean.`, code: 400 });
+  // Die drei Flags sind optional, aber wenn gesetzt, echte Booleans: das
+  // prueft das Schema davor (#2810). Bis dahin wirkte jeder Nicht-false-Wert
+  // wie true - der String 'false' duplizierte also mit zurueckgesetzten Haken.
+  const resetChecked   = req.body?.resetChecked !== false;
+  const keepQuantities = req.body?.keepQuantities !== false;
+  const keepNotes      = req.body?.keepNotes !== false;
+
+  const items = db.get()
+    .prepare('SELECT * FROM shopping_items WHERE list_id = ?')
+    .all(listId);
+
+  const newList = db.get().transaction(() => {
+    const info = db.get()
+      .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
+      .run(vName.value, req.authUserId || req.session.userId);
+    const newListId = info.lastInsertRowid;
+
+    const insertItem = db.get().prepare(`
+      INSERT INTO shopping_items
+        (list_id, name, quantity, category, is_checked, notes, url, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const item of items) {
+      insertItem.run(
+        newListId,
+        item.name,
+        keepQuantities ? item.quantity : null,
+        item.category,
+        resetChecked ? 0 : item.is_checked,
+        keepNotes ? item.notes : null,
+        keepNotes ? item.url : null,
+        // Rang explizit uebernehmen statt dem Einfuege-Trigger zu ueberlassen
+        // (der neue Zeilen mit sort_order=0 ans Ende ihrer Kategorie stellt) -
+        // die Handsortierung IST das, was diese Route verspricht zu erhalten.
+        item.sort_order,
+      );
     }
+    return db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(newListId);
+  })();
 
-    const resetChecked   = req.body?.resetChecked !== false;
-    const keepQuantities = req.body?.keepQuantities !== false;
-    const keepNotes      = req.body?.keepNotes !== false;
-
-    const items = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE list_id = ?')
-      .all(req.params.listId);
-
-    const newList = db.get().transaction(() => {
-      const info = db.get()
-        .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
-        .run(vName.value, req.authUserId || req.session.userId);
-      const newListId = info.lastInsertRowid;
-
-      const insertItem = db.get().prepare(`
-        INSERT INTO shopping_items
-          (list_id, name, quantity, category, is_checked, notes, url, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      for (const item of items) {
-        insertItem.run(
-          newListId,
-          item.name,
-          keepQuantities ? item.quantity : null,
-          item.category,
-          resetChecked ? 0 : item.is_checked,
-          keepNotes ? item.notes : null,
-          keepNotes ? item.url : null,
-          // Rang explizit uebernehmen statt dem Einfuege-Trigger zu ueberlassen
-          // (der neue Zeilen mit sort_order=0 ans Ende ihrer Kategorie stellt) -
-          // die Handsortierung IST das, was diese Route verspricht zu erhalten.
-          item.sort_order,
-        );
-      }
-      return db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(newListId);
-    })();
-
-    res.status(201).json({ data: newList });
-  } catch (err) {
-    log.error('POST /:listId/duplicate error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.status(201).json({ data: newList });
 });
 
 // --------------------------------------------------------
@@ -1130,24 +1040,20 @@ router.post('/:listId/duplicate', (req, res) => {
 // Liste und alle Artikel löschen (CASCADE).
 // Response: { ok: true }
 // --------------------------------------------------------
-router.delete('/:listId', (req, res) => {
-  try {
-    // Die Artikel gehen per CASCADE mit, also müssen ihre Löschungen vorher
-    // vorgemerkt sein (#617).
-    const queued = queueTodoDeletions('shopping', mirroredItems('list_id = ?', req.params.listId));
+router.delete('/:listId', validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  // Die Artikel gehen per CASCADE mit, also müssen ihre Löschungen vorher
+  // vorgemerkt sein (#617).
+  const queued = queueTodoDeletions('shopping', mirroredItems('list_id = ?', listId));
 
-    const result = db.get()
-      .prepare('DELETE FROM shopping_lists WHERE id = ?')
-      .run(req.params.listId);
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
-    res.json({ ok: true });
+  const result = db.get()
+    .prepare('DELETE FROM shopping_lists WHERE id = ?')
+    .run(listId);
+  if (result.changes === 0)
+    return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+  res.json({ ok: true });
 
-    if (queued) pushToCalDAV('Löschung');
-  } catch (err) {
-    log.error('DELETE /:listId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  if (queued) pushToCalDAV('Löschung');
 });
 
 // --------------------------------------------------------
@@ -1157,24 +1063,20 @@ router.delete('/:listId', (req, res) => {
 // gesetzte Reihenfolge (#678).
 // Response: { data: ShoppingItem[], list: ShoppingList, categories: ShoppingCategory[] }
 // --------------------------------------------------------
-router.get('/:listId/items', (req, res) => {
-  try {
-    const list = db.get()
-      .prepare('SELECT * FROM shopping_lists WHERE id = ?')
-      .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+router.get('/:listId/items', validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  const list = db.get()
+    .prepare('SELECT * FROM shopping_lists WHERE id = ?')
+    .get(listId);
+  if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
-    const categories = loadCategories();
-    // Die Laufnummer, zu der diese Artikel gehoeren: der Zettel sagt sie dem
-    // Feed als seinen Stand. Sonst haengt es an der Reihenfolge zweier
-    // Antworten beim Oeffnen - Laufnummern zuerst oder Artikel zuerst -, ob
-    // eine Aenderung dazwischen bis zur uebernaechsten verloren geht.
-    // Synchron mit dem Lesen der Artikel, also derselbe Stand.
-    res.json({ data: loadListItems(req.params.listId, categories), list, categories, version: listVersion(list.id) });
-  } catch (err) {
-    log.error('GET /:listId/items error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const categories = loadCategories();
+  // Die Laufnummer, zu der diese Artikel gehoeren: der Zettel sagt sie dem
+  // Feed als seinen Stand. Sonst haengt es an der Reihenfolge zweier
+  // Antworten beim Oeffnen - Laufnummern zuerst oder Artikel zuerst -, ob
+  // eine Aenderung dazwischen bis zur uebernaechsten verloren geht.
+  // Synchron mit dem Lesen der Artikel, also derselbe Stand.
+  res.json({ data: loadListItems(listId, categories), list, categories, version: listVersion(list.id) });
 });
 
 // --------------------------------------------------------
@@ -1192,55 +1094,51 @@ router.get('/:listId/items', (req, res) => {
 // Ränge der Ausgelassenen mit den neu vergebenen kollidieren lassen - danach
 // entschiede wieder created_at, und der Zug wäre teilweise verpufft.
 // --------------------------------------------------------
-router.patch('/:listId/items/reorder', (req, res) => {
-  try {
-    const list = db.get()
-      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
-      .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+router.patch('/:listId/items/reorder', validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  const list = db.get()
+    .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+    .get(listId);
+  if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
-    const { category, order } = req.body;
-    if (!Array.isArray(order) || order.length === 0)
-      return res.status(400).json({ error: 'order must be a non-empty array of ids.', code: 400 });
+  const { category, order } = req.body;
+  if (!Array.isArray(order) || order.length === 0)
+    return res.status(400).json({ error: 'order must be a non-empty array of ids.', code: 400 });
 
-    const ids = order.map(Number);
-    if (ids.some((id) => !Number.isInteger(id)))
-      return res.status(400).json({ error: 'order may only contain item ids.', code: 400 });
-    if (new Set(ids).size !== ids.length)
-      return res.status(400).json({ error: 'order must not contain an id twice.', code: 400 });
+  // Ganze Zahlen ab 1 prueft das Schema davor (#2810); die Typpruefung von
+  // `order` darueber bleibt, `map` und die Schleife laufen auf dem Rohwert.
+  const ids = order.map(Number);
+  if (new Set(ids).size !== ids.length)
+    return res.status(400).json({ error: 'order must not contain an id twice.', code: 400 });
 
-    // oneOf lässt Leerwerte durch (es validiert optionale Felder); hier ist die
-    // Kategorie der Geltungsbereich der Ränge und damit Pflicht.
-    if (!category) return res.status(400).json({ error: 'category is required.', code: 400 });
-    const vCat = oneOf(category, validCategoryNames(), 'category');
-    if (vCat.error) return res.status(400).json({ error: vCat.error, code: 400 });
+  // oneOf lässt Leerwerte durch (es validiert optionale Felder); hier ist die
+  // Kategorie der Geltungsbereich der Ränge und damit Pflicht.
+  if (!category) return res.status(400).json({ error: 'category is required.', code: 400 });
+  const vCat = oneOf(category, validCategoryNames(), 'category');
+  if (vCat.error) return res.status(400).json({ error: vCat.error, code: 400 });
 
-    // Die Kategorie ist der Geltungsbereich der Ränge - eine fremde ID darin
-    // würde einen Artikel einer anderen Liste oder Kategorie umnummerieren.
-    const own = db.get()
-      .prepare('SELECT id FROM shopping_items WHERE list_id = ? AND category = ?')
-      .all(req.params.listId, vCat.value)
-      .map((r) => r.id);
-    const ownSet = new Set(own);
-    if (ids.some((id) => !ownSet.has(id)))
-      return res.status(400).json({ error: 'order contains items outside this list or category.', code: 400 });
-    if (ids.length !== own.length)
-      return res.status(400).json({ error: 'order must contain every item of the category.', code: 400 });
+  // Die Kategorie ist der Geltungsbereich der Ränge - eine fremde ID darin
+  // würde einen Artikel einer anderen Liste oder Kategorie umnummerieren.
+  const own = db.get()
+    .prepare('SELECT id FROM shopping_items WHERE list_id = ? AND category = ?')
+    .all(listId, vCat.value)
+    .map((r) => r.id);
+  const ownSet = new Set(own);
+  if (ids.some((id) => !ownSet.has(id)))
+    return res.status(400).json({ error: 'order contains items outside this list or category.', code: 400 });
+  if (ids.length !== own.length)
+    return res.status(400).json({ error: 'order must contain every item of the category.', code: 400 });
 
-    const update = db.get().prepare('UPDATE shopping_items SET sort_order = ? WHERE id = ?');
-    const { list_change } = withListChange(req.params.listId, () => {
-      db.get().transaction(() => {
-        // Ab 1: die 0 bleibt dem Trigger als Marke "noch nicht eingeordnet".
-        ids.forEach((id, idx) => update.run(idx + 1, id));
-      })();
-    });
+  const update = db.get().prepare('UPDATE shopping_items SET sort_order = ? WHERE id = ?');
+  const { list_change } = withListChange(listId, () => {
+    db.get().transaction(() => {
+      // Ab 1: die 0 bleibt dem Trigger als Marke "noch nicht eingeordnet".
+      ids.forEach((id, idx) => update.run(idx + 1, id));
+    })();
+  });
 
-    const categories = loadCategories();
-    res.json({ data: loadListItems(req.params.listId, categories), categories, list_change });
-  } catch (err) {
-    log.error('PATCH /:listId/items/reorder error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const categories = loadCategories();
+  res.json({ data: loadListItems(listId, categories), categories, list_change });
 });
 
 // --------------------------------------------------------
@@ -1249,59 +1147,51 @@ router.patch('/:listId/items/reorder', (req, res) => {
 // Body: { name, quantity?, category?, notes?, url? }
 // Response: { data: ShoppingItem }
 // --------------------------------------------------------
-router.post('/:listId/items', (req, res) => {
-  try {
-    const list = db.get()
-      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
-      .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+router.post('/:listId/items', validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  const list = db.get()
+    .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+    .get(listId);
+  if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
-    // Ohne Kategorie faellt der Artikel auf "Sonstiges", solange der Haushalt
-    // diese Kategorie noch hat - erst wenn sie umbenannt oder geloescht wurde,
-    // auf die LETZTE nach Gang-Reihenfolge. Nur "letzte" reicht nicht: POST
-    // /categories haengt Neues bei MAX(sort_order)+1 an, die letzte Kategorie
-    // ist also schlicht die zuletzt angelegte ("Baumarkt"), nicht die neutrale
-    // Sammelkategorie. Es kursierten drei Definitionen des Standards (hier:
-    // letzte; Quick-Add-Client: der NAME via DEFAULT_CATEGORY_NAME; Loesch-
-    // Rueckfall: erste) - diese Regel deckt sich mit dem Client und der
-    // Absicht von #548. Der Quick-Add-Client schickt die Kategorie ohnehin
-    // immer explizit mit; dieser Rueckfall greift nur, wenn sie fehlt (z.B.
-    // direkter API-Aufruf).
-    const validNames = validCategoryNames();
-    const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
-    const requestedCat = req.body.category || defaultCat;
+  // Ohne Kategorie faellt der Artikel auf "Sonstiges", solange der Haushalt
+  // diese Kategorie noch hat - erst wenn sie umbenannt oder geloescht wurde,
+  // auf die LETZTE nach Gang-Reihenfolge. Nur "letzte" reicht nicht: POST
+  // /categories haengt Neues bei MAX(sort_order)+1 an, die letzte Kategorie
+  // ist also schlicht die zuletzt angelegte ("Baumarkt"), nicht die neutrale
+  // Sammelkategorie. Es kursierten drei Definitionen des Standards (hier:
+  // letzte; Quick-Add-Client: der NAME via DEFAULT_CATEGORY_NAME; Loesch-
+  // Rueckfall: erste) - diese Regel deckt sich mit dem Client und der
+  // Absicht von #548. Der Quick-Add-Client schickt die Kategorie ohnehin
+  // immer explizit mit; dieser Rueckfall greift nur, wenn sie fehlt (z.B.
+  // direkter API-Aufruf).
+  const validNames = validCategoryNames();
+  const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
+  const requestedCat = req.body.category || defaultCat;
 
-    const vName  = str(req.body.name, 'name', { max: MAX_TITLE });
-    const vQty   = str(req.body.quantity, 'quantity', { max: MAX_SHORT, required: false });
-    const vCat   = oneOf(requestedCat, validNames, 'category');
-    const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
-    const vUrl   = url(req.body.url, 'URL');
-    const errors = collectErrors([
-      // Die Form vor dem Inhalt, wie bei PATCH: `str()` machte aus 5 den Namen "5".
-      textShape(req.body.name, 'name'),
-      textShape(req.body.quantity, 'quantity', { nullable: true }),
-      textShape(req.body.notes, 'notes', { nullable: true }),
-      vName, vQty, vCat, vNotes, vUrl,
-    ]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  const vName  = str(req.body.name, 'name', { max: MAX_TITLE });
+  const vQty   = str(req.body.quantity, 'quantity', { max: MAX_SHORT, required: false });
+  const vCat   = oneOf(requestedCat, validNames, 'category');
+  const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
+  const vUrl   = url(req.body.url, 'URL');
+  // Die Form (Text, bei `quantity` und `notes` auch null) prueft das Schema
+  // davor (#2810); `str()` machte bis dahin aus 5 den Namen "5".
+  const errors = collectErrors([vName, vQty, vCat, vNotes, vUrl]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const { result, list_change } = withListChange(req.params.listId, () => db.get().prepare(`
-      INSERT INTO shopping_items (list_id, name, quantity, category, notes, url)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(req.params.listId, vName.value, vQty.value, vCat.value || defaultCat, vNotes.value, vUrl.value));
+  const { result, list_change } = withListChange(listId, () => db.get().prepare(`
+    INSERT INTO shopping_items (list_id, name, quantity, category, notes, url)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(listId, vName.value, vQty.value, vCat.value || defaultCat, vNotes.value, vUrl.value));
 
-    const item = db.get()
-      .prepare('SELECT * FROM shopping_items WHERE id = ?')
-      .get(result.lastInsertRowid);
-    res.status(201).json({ data: item, list_change });
-    // Gehört die Liste zu einer gespiegelten CalDAV-Liste, wandert der neue
-    // Artikel gleich mit (#831) - sonst hinge er bis zum nächsten Sync-Intervall
-    // fest, während Umbenennen und Abhaken sofort hinausgehen.
-    pushToCalDAV('Neuer Einkaufsartikel');
-  } catch (err) {
-    log.error('POST /:listId/items error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const item = db.get()
+    .prepare('SELECT * FROM shopping_items WHERE id = ?')
+    .get(result.lastInsertRowid);
+  res.status(201).json({ data: item, list_change });
+  // Gehört die Liste zu einer gespiegelten CalDAV-Liste, wandert der neue
+  // Artikel gleich mit (#831) - sonst hinge er bis zum nächsten Sync-Intervall
+  // fest, während Umbenennen und Abhaken sofort hinausgehen.
+  pushToCalDAV('Neuer Einkaufsartikel');
 });
 
 // --------------------------------------------------------
@@ -1319,7 +1209,8 @@ router.post('/:listId/items', (req, res) => {
 // Gesendet wird eine Abschrift, kein Zugang: kein Link, kein Token, nichts das
 // weiterlebt. Wer die Liste laufend braucht, ist Mitglied und hat die App.
 // --------------------------------------------------------
-router.post('/:listId/send', sendListLimiter, async (req, res) => {
+router.post('/:listId/send', sendListLimiter, validateRequest(), async (req, res, /** @type {(err: unknown) => void} */ next) => {
+  const listId = pathId(req, 'listId');
   // Diese Datei exportiert einen fertigen Router, keine Fabrik - eine
   // Abhaengigkeit laesst sich daher nicht ueber Parameter hineinreichen.
   // `app.locals` ist der Express-eigene Platz dafuer und hier der kleinere
@@ -1327,7 +1218,7 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
   // Wert nie gesetzt und es bleibt beim Standarddienst.
   const emailService = req.app?.locals?.emailService || defaultEmailService;
   try {
-    const list = db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.listId);
+    const list = db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(listId);
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const userId = Number(req.body?.userId);
@@ -1370,7 +1261,7 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
     }
 
     const categories = loadCategories();
-    const items = loadListItems(req.params.listId, categories);
+    const items = loadListItems(listId, categories);
     // Wer sich die Liste selbst schickt, braucht kein "X hat dir diese Liste
     // geschickt" ueber der eigenen Einkaufsliste.
     const sender = userId === req.authUserId
@@ -1391,12 +1282,13 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
     } catch (err) {
       // Eine leere Liste ist kein Serverfehler, sondern eine Eingabe, die
       // nichts bewirken kann. Only that case keeps its sentence; a failure
-      // while rendering the mail is a fixed 500 (Phase 0 section H).
+      // while rendering the mail goes to the central error handler (#2810) -
+      // through `next`, since the catch around this block answers 502 for the
+      // mail service.
       if (err?.code === 'nothing_open') {
         return res.status(422).json({ error: err.message, code: 422, reason: 'nothing_open' });
       }
-      log.error('POST /:listId/send: rendering the mail failed:', err);
-      return res.status(500).json({ error: 'Internal server error.', code: 500 });
+      return next(err);
     }
 
     await emailService.sendMail({
@@ -1415,6 +1307,39 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
   }
 });
 
+/**
+ * Rechte auf einem anderen Modul, ohne Zeilenbezug: sie stehen als Middleware
+ * VOR validateRequest() (#2810, Gruppe 8), damit eine Anmeldung ohne das Recht
+ * ihre 403 `cross_module_access` vor jeder Pruefung der Anfrage bekommt - vor
+ * einer unbekannten Liste (404) wie vor einem kaputten Rumpf (400), so wie
+ * zuvor als erste Zeile des Handlers. Die Ruecknahme (`undo-transfer`) fragt
+ * ihr Recht weiter im Handler: ob sie den Essensplan beruehrt, steht erst im
+ * Rumpf.
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireMealsWrite(req, res, next) {
+  // Der Import markiert die Zutaten als uebertragen - das sind Daten des
+  // Essensplans, also braucht er dessen Schreibrecht, auch fuer die Vorschau.
+  if (!mayWriteModule(req, 'meals')) {
+    return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
+
+/**
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requirePantryRead(req, res, next) {
+  if (!mayReadModule(req, 'pantry')) {
+    return res.status(403).json({ error: 'Read access to the pantry is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
+
 // --------------------------------------------------------
 // POST /api/v1/shopping/:listId/import-meal-plan
 // Importiert Zutaten aus dem Essensplan eines Datumsbereichs in eine Liste.
@@ -1429,63 +1354,56 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
 // fuer das Rueckgaengig - der Import schrieb bis dahin als einziger Kuechenweg
 // ohne Ruecknahme in die Liste.
 // --------------------------------------------------------
-router.post('/:listId/import-meal-plan', (req, res) => {
-  try {
-    // DIE GEGENRICHTUNG (#1290): der Pfad sagt `shopping`, geschrieben wird
-    // auch in den Essensplan. Die Uebernahme setzt das Flag
-    // `on_shopping_list` auf den Zutaten, und das ist Essensplan-Bestand -
-    // eine markierte Zutat ist danach weder erneut uebertragbar noch ohne
-    // Ruecknahme zurueckzuholen. Ein Mitglied mit `meals: read` aenderte damit
-    // fremde Plandaten, ein Token mit `shopping:write` allein ebenso.
-    //
-    // AUCH FUER `preview: true`, obwohl die Vorschau nichts schreibt: sie gibt
-    // es nur, um den Schreibvorgang anzukuendigen ("X Zutaten aus Y
-    // Mahlzeiten"), und sie zaehlt dafuer den Essensplan aus. Eine Vorschau,
-    // die rechnet, und ein Import, der danach mit 403 endet, waeren eine
-    // Zusage, die nicht haelt.
-    if (!mayWriteModule(req, 'meals')) {
-      return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
-    }
+router.post('/:listId/import-meal-plan', requireMealsWrite, validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  // DIE GEGENRICHTUNG (#1290): der Pfad sagt `shopping`, geschrieben wird
+  // auch in den Essensplan. Die Uebernahme setzt das Flag
+  // `on_shopping_list` auf den Zutaten, und das ist Essensplan-Bestand -
+  // eine markierte Zutat ist danach weder erneut uebertragbar noch ohne
+  // Ruecknahme zurueckzuholen. Ein Mitglied mit `meals: read` aenderte damit
+  // fremde Plandaten, ein Token mit `shopping:write` allein ebenso.
+  //
+  // AUCH FUER `preview: true`, obwohl die Vorschau nichts schreibt: sie gibt
+  // es nur, um den Schreibvorgang anzukuendigen ("X Zutaten aus Y
+  // Mahlzeiten"), und sie zaehlt dafuer den Essensplan aus. Eine Vorschau,
+  // die rechnet, und ein Import, der danach mit 403 endet, waeren eine
+  // Zusage, die nicht haelt.
+  // Das Recht auf den Essensplan prueft requireMealsWrite() vor diesem Handler.
+  const list = db.get()
+    .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+    .get(listId);
+  if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
-    const list = db.get()
-      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
-      .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
-
-    const vFrom = date(req.body.from, 'From date', true);
-    const vTo = date(req.body.to, 'To date', true);
-    const errors = collectErrors([vFrom, vTo]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    if (vFrom.value > vTo.value) {
-      return res.status(400).json({ error: 'From date must be before or equal to end date.', code: 400 });
-    }
-
-    const range = { from: vFrom.value, to: vTo.value };
-    const empty = { transferred: 0, added: 0, skipped: 0, meals: 0, added_ids: [], ingredient_ids: [] };
-
-    // Vorschau (Audit A1-22): dieselbe Auswahl und Aggregation, aber ohne
-    // Schreib-Transaktion - Rezept-Mahlzeiten werden dafuer aus dem Rezept
-    // gelesen statt kopiert. Der Client zeigt "X Zutaten aus Y Mahlzeiten",
-    // und seit R23 auch, wie viele davon schon auf der Liste stehen.
-    if (req.body.preview === true) {
-      const { ingredients, rows, meals } = mealPlanSource(db.get(), range, { materialize: false });
-      if (!ingredients.length) return res.json({ data: { ...empty, preview: true } });
-      const { added, skipped } = previewHandover(db.get(), req.params.listId, rows);
-      return res.json({ data: { transferred: ingredients.length, added, skipped, meals, preview: true } });
-    }
-
-    const result = db.transaction(() => {
-      const { ingredients, rows, meals } = mealPlanSource(db.get(), range);
-      if (!ingredients.length) return null;
-      return { transferred: ingredients.length, meals, ...handOverToShoppingList(db.get(), req.params.listId, rows) };
-    });
-    if (!result) return res.json({ data: empty });
-
-    res.json({ data: { ...result, added: result.added_ids.length } });
-  } catch (err) {
-    log.error('POST /:listId/import-meal-plan error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const vFrom = date(req.body.from, 'From date', true);
+  const vTo = date(req.body.to, 'To date', true);
+  const errors = collectErrors([vFrom, vTo]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  if (vFrom.value > vTo.value) {
+    return res.status(400).json({ error: 'From date must be before or equal to end date.', code: 400 });
   }
+
+  const range = { from: vFrom.value, to: vTo.value };
+  const empty = { transferred: 0, added: 0, skipped: 0, meals: 0, added_ids: [], ingredient_ids: [] };
+
+  // Vorschau (Audit A1-22): dieselbe Auswahl und Aggregation, aber ohne
+  // Schreib-Transaktion - Rezept-Mahlzeiten werden dafuer aus dem Rezept
+  // gelesen statt kopiert. Der Client zeigt "X Zutaten aus Y Mahlzeiten",
+  // und seit R23 auch, wie viele davon schon auf der Liste stehen.
+  if (req.body.preview === true) {
+    const { ingredients, rows, meals } = mealPlanSource(db.get(), range, { materialize: false });
+    if (!ingredients.length) return res.json({ data: { ...empty, preview: true } });
+    const { added, skipped } = previewHandover(db.get(), listId, rows);
+    return res.json({ data: { transferred: ingredients.length, added, skipped, meals, preview: true } });
+  }
+
+  const result = db.transaction(() => {
+    const { ingredients, rows, meals } = mealPlanSource(db.get(), range);
+    if (!ingredients.length) return null;
+    return { transferred: ingredients.length, meals, ...handOverToShoppingList(db.get(), listId, rows) };
+  });
+  if (!result) return res.json({ data: empty });
+
+  res.json({ data: { ...result, added: result.added_ids.length } });
 });
 
 // --------------------------------------------------------
@@ -1518,53 +1436,46 @@ router.post('/:listId/import-meal-plan', (req, res) => {
 // Liste. Deshalb fragt die Route selbst nach `pantry: read` (beide Achsen),
 // vor der Listensuche wie die Uebertraege darueber.
 // --------------------------------------------------------
-router.post('/:listId/import-pantry', (req, res) => {
-  try {
-    if (!mayReadModule(req, 'pantry')) {
-      return res.status(403).json({ error: 'Read access to the pantry is required.', code: 403, reason: 'cross_module_access' });
+router.post('/:listId/import-pantry', requirePantryRead, validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  // Das Leserecht auf den Vorrat prueft requirePantryRead() vor diesem Handler.
+  const list = db.get()
+    .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+    .get(listId);
+  if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+
+  const entries = Array.isArray(req.body.items) ? req.body.items : [];
+  if (!entries.length) return res.json({ data: { added: 0, skipped: 0, added_ids: [] } });
+
+  const validNames = validCategoryNames();
+  // Gleiche Standard-Regel wie beim Artikel-POST oben: "Sonstiges" solange
+  // es die Kategorie gibt, sonst die letzte nach Gang-Reihenfolge - die
+  // beiden Routen sollen nicht auseinanderlaufen.
+  const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
+
+  // Die Dublettenregel ist die der ganzen Kueche (services/kitchen-handover.js,
+  // R23 D2) - bis dahin stand hier eine eigene mit SQLites NOCASE, die nur
+  // ASCII kennt: "Öl" und "öl" waren zwei Artikel.
+  const result = db.transaction(() => {
+    const findPantryItem = db.get().prepare('SELECT name, category FROM pantry_items WHERE id = ?');
+    const findPantryProduct = db.get().prepare('SELECT name, category FROM pantry_products WHERE id = ?');
+    let missing = 0;
+    const rows = [];
+    for (const entry of entries) {
+      const byProduct = entry?.pantry_item_id == null && entry?.pantry_product_id != null;
+      const pantryItem = byProduct
+        ? findPantryProduct.get(Number(entry.pantry_product_id))
+        : findPantryItem.get(Number(entry?.pantry_item_id));
+      if (!pantryItem) { missing += 1; continue; }
+      const vQty = str(entry.quantity, 'quantity', { max: MAX_SHORT, required: false });
+      const category = validNames.includes(pantryItem.category) ? pantryItem.category : defaultCat;
+      rows.push({ name: pantryItem.name, quantity: vQty.value, category });
     }
+    const { added_ids: addedIds, skipped } = handOverToShoppingList(db.get(), listId, rows);
+    return { added: addedIds.length, skipped: skipped + missing, added_ids: addedIds };
+  });
 
-    const list = db.get()
-      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
-      .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
-
-    const entries = Array.isArray(req.body.items) ? req.body.items : [];
-    if (!entries.length) return res.json({ data: { added: 0, skipped: 0, added_ids: [] } });
-
-    const validNames = validCategoryNames();
-    // Gleiche Standard-Regel wie beim Artikel-POST oben: "Sonstiges" solange
-    // es die Kategorie gibt, sonst die letzte nach Gang-Reihenfolge - die
-    // beiden Routen sollen nicht auseinanderlaufen.
-    const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
-
-    // Die Dublettenregel ist die der ganzen Kueche (services/kitchen-handover.js,
-    // R23 D2) - bis dahin stand hier eine eigene mit SQLites NOCASE, die nur
-    // ASCII kennt: "Öl" und "öl" waren zwei Artikel.
-    const result = db.transaction(() => {
-      const findPantryItem = db.get().prepare('SELECT name, category FROM pantry_items WHERE id = ?');
-      const findPantryProduct = db.get().prepare('SELECT name, category FROM pantry_products WHERE id = ?');
-      let missing = 0;
-      const rows = [];
-      for (const entry of entries) {
-        const byProduct = entry?.pantry_item_id == null && entry?.pantry_product_id != null;
-        const pantryItem = byProduct
-          ? findPantryProduct.get(Number(entry.pantry_product_id))
-          : findPantryItem.get(Number(entry?.pantry_item_id));
-        if (!pantryItem) { missing += 1; continue; }
-        const vQty = str(entry.quantity, 'quantity', { max: MAX_SHORT, required: false });
-        const category = validNames.includes(pantryItem.category) ? pantryItem.category : defaultCat;
-        rows.push({ name: pantryItem.name, quantity: vQty.value, category });
-      }
-      const { added_ids: addedIds, skipped } = handOverToShoppingList(db.get(), req.params.listId, rows);
-      return { added: addedIds.length, skipped: skipped + missing, added_ids: addedIds };
-    });
-
-    res.json({ data: result });
-  } catch (err) {
-    log.error('POST /:listId/import-pantry error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: result });
 });
 
 // --------------------------------------------------------
@@ -1573,56 +1484,52 @@ router.post('/:listId/import-pantry', (req, res) => {
 // Body (optional): { ids: number[] } - nur diese, sonst alle abgehakten.
 // Response: { deleted: number, list_change }
 // --------------------------------------------------------
-router.delete('/:listId/items/checked', (req, res) => {
-  try {
-    const list = db.get()
-      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
-      .get(req.params.listId);
-    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+router.delete('/:listId/items/checked', validateRequest(), (req, res) => {
+  const listId = pathId(req, 'listId');
+  const list = db.get()
+    .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+    .get(listId);
+  if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
 
-    // Ohne Body: alles, was beim Eintreffen abgehakt ist. Mit `{ ids }`: nur
-    // diese - und auch davon nur, was abgehakt ist und zu dieser Liste
-    // gehoert. Der Zettel schickt die IDs, die er selbst entfernt hat: im
-    // Undo-Fenster kann jemand anderes einen weiteren Artikel abhaken (den
-    // die Auffrischung dann herbringt), und der ginge sonst mit - und das
-    // Zuruecknehmen brachte nur den eigenen Schnappschuss zurueck.
-    let ids = null;
-    if (req.body?.ids !== undefined) {
-      if (!Array.isArray(req.body.ids) || req.body.ids.length === 0)
-        return res.status(400).json({ error: 'ids must be a non-empty array of item ids.', code: 400 });
-      ids = req.body.ids.map(Number);
-      if (ids.some((id) => !Number.isInteger(id) || id <= 0))
-        return res.status(400).json({ error: 'ids may only contain item ids.', code: 400 });
-    }
-    const scope = ids
-      ? { where: `list_id = ? AND is_checked = 1 AND id IN (${ids.map(() => '?').join(',')})`, params: [req.params.listId, ...ids] }
-      : { where: 'list_id = ? AND is_checked = 1', params: [req.params.listId] };
-
-    const queued = queueTodoDeletions('shopping', mirroredItems(scope.where, ...scope.params));
-
-    const { result, list_change } = withListChange(req.params.listId, () => {
-      // Bevor die Zeilen geloescht werden (#1003): alle noch nicht erfassten
-      // abgehakten Artikel mit Preis in die Historie eintragen.
-      const pricedItems = db.get().prepare(`
-        SELECT id, name, price_cents, store_id
-        FROM shopping_items
-        WHERE ${scope.where} AND price_cents IS NOT NULL
-      `).all(...scope.params);
-      for (const pItem of pricedItems) {
-        recordShoppingPurchase(db.get(), pItem);
-      }
-
-      return db.get().prepare(`
-        DELETE FROM shopping_items WHERE ${scope.where}
-      `).run(...scope.params);
-    });
-    res.json({ deleted: result.changes, list_change });
-
-    if (queued) pushToCalDAV('Löschung');
-  } catch (err) {
-    log.error('DELETE /:listId/items/checked error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // Ohne Body: alles, was beim Eintreffen abgehakt ist. Mit `{ ids }`: nur
+  // diese - und auch davon nur, was abgehakt ist und zu dieser Liste
+  // gehoert. Der Zettel schickt die IDs, die er selbst entfernt hat: im
+  // Undo-Fenster kann jemand anderes einen weiteren Artikel abhaken (den
+  // die Auffrischung dann herbringt), und der ginge sonst mit - und das
+  // Zuruecknehmen brachte nur den eigenen Schnappschuss zurueck.
+  let ids = null;
+  if (req.body?.ids !== undefined) {
+    if (!Array.isArray(req.body.ids) || req.body.ids.length === 0)
+      return res.status(400).json({ error: 'ids must be a non-empty array of item ids.', code: 400 });
+    ids = req.body.ids.map(Number);
+    if (ids.some((id) => !Number.isInteger(id) || id <= 0))
+      return res.status(400).json({ error: 'ids may only contain item ids.', code: 400 });
   }
+  const scope = ids
+    ? { where: `list_id = ? AND is_checked = 1 AND id IN (${ids.map(() => '?').join(',')})`, params: [listId, ...ids] }
+    : { where: 'list_id = ? AND is_checked = 1', params: [listId] };
+
+  const queued = queueTodoDeletions('shopping', mirroredItems(scope.where, ...scope.params));
+
+  const { result, list_change } = withListChange(listId, () => {
+    // Bevor die Zeilen geloescht werden (#1003): alle noch nicht erfassten
+    // abgehakten Artikel mit Preis in die Historie eintragen.
+    const pricedItems = db.get().prepare(`
+      SELECT id, name, price_cents, store_id
+      FROM shopping_items
+      WHERE ${scope.where} AND price_cents IS NOT NULL
+    `).all(...scope.params);
+    for (const pItem of pricedItems) {
+      recordShoppingPurchase(db.get(), pItem);
+    }
+
+    return db.get().prepare(`
+      DELETE FROM shopping_items WHERE ${scope.where}
+    `).run(...scope.params);
+  });
+  res.json({ deleted: result.changes, list_change });
+
+  if (queued) pushToCalDAV('Löschung');
 });
 
 // Der Versand-Limiter, damit ihn eine Testsuite zwischen den Faellen zuruecksetzen

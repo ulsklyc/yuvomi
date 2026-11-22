@@ -38,10 +38,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
 const db = dbmod.get();
 
@@ -56,10 +55,12 @@ function setMode(mode) {
 setMode('shared'); // Default für die meisten Tests; 403-Tests schalten lokal auf personal.
 
 let actor = { id: A, role: 'member' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id }; next(); });
-app.use('/', budgetRouter);
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['budget'],
+  auth: (req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -72,7 +73,7 @@ async function call(method, route, { as = { id: A, role: 'member' }, body } = {}
   const headers = {};
   let payload;
   if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-  const res = await fetch(`${baseUrl}${route}`, { method, headers, body: payload });
+  const res = await fetch(`${baseUrl}/api/v1/budget${route}`, { method, headers, body: payload });
   const ct = res.headers.get('content-type') || '';
   // arrayBuffer statt text(): res.text() strippt ein führendes BOM (U+FEFF) beim
   // WHATWG-Decode; für den CSV-BOM-Check muss der rohe Body erhalten bleiben.
@@ -106,7 +107,8 @@ function insertEntry(fields) {
 test('GET /summary: ungültiger Monat → 400', async () => {
   const r = await call('GET', '/summary?month=2030-13-01');
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /YYYY-MM/);
+  // Seit #2810 die Absage des Schemas, die den Parameter nennt.
+  assert.deepEqual(r.body.fields, [{ path: 'query/month', rule: 'pattern' }]);
 });
 
 test('GET /summary: aggregiert income/expenses/balance + byCategory', async () => {
@@ -210,8 +212,10 @@ test('GET /summary?account_id: Bilanz und Kategorien folgen dem Kontofilter der 
 
   const alle = await call('GET', '/summary?month=2047-04');
   assert.equal(alle.body.data.balance, 2905, 'ohne Filter bleibt es der ganze Haushalt');
+  // Bis #2810 filterte ein unbrauchbarer Filter still nicht; jetzt ist er eine Absage.
   const unsinn = await call('GET', '/summary?month=2047-04&account_id=abc');
-  assert.equal(unsinn.body.data.balance, 2905, 'ein unbrauchbarer Filter filtert nicht, wie in der Liste');
+  assert.equal(unsinn.status, 400);
+  assert.deepEqual(unsinn.body.fields, [{ path: 'query/account_id', rule: 'type' }]);
 });
 
 test('GET /summary?account_id: eingehende Umbuchungen stehen getrennt neben den ausgehenden (#2207)', async () => {
@@ -385,7 +389,8 @@ test('PUT /:id: half_year ist kein Intervall mehr → 400', async () => {
   const id = insertEntry({ title: 'legacy', amount: -50, category: 'food', date: '2033-05-11' });
   const r = await call('PUT', `/${id}`, { body: { is_recurring: true, recurrence_interval: 'half_year' } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /^Interval /);
+  // Seit #2810 die Absage des Schemas (Werteliste), die das Feld nennt.
+  assert.deepEqual(r.body.fields, [{ path: 'body/recurrence_interval', rule: 'enum' }]);
 });
 
 test('POST: Intervall-Anzahl ausserhalb von [1, 99] → 400', async () => {
@@ -412,7 +417,8 @@ test('PUT /:id: ungültiger Betrag → 400', async () => {
   const id = insertEntry({ title: 'amt', amount: -5, category: 'food', date: '2033-05-20' });
   const r = await call('PUT', `/${id}`, { body: { amount: 'viel' } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /^Amount /);
+  // Seit #2810 die Absage des Schemas, die das Feld nennt.
+  assert.deepEqual(r.body.fields, [{ path: 'body/amount', rule: 'type' }]);
 });
 
 test('PUT /:id: unbekanntes Konto → 400', async () => {
@@ -635,7 +641,8 @@ test('PUT /:id/series: ungültiger Betrag → 400', async () => {
   const parent = insertEntry({ title: 's-amt', amount: -5, category: 'food', date: '2035-01-20', is_recurring: 1 });
   const r = await call('PUT', `/${parent}/series`, { body: { amount: 'nope' } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /^Amount /);
+  // Seit #2810 die Absage des Schemas, die das Feld nennt.
+  assert.deepEqual(r.body.fields, [{ path: 'body/amount', rule: 'type' }]);
 });
 
 test('PUT /:id/series: virtuelles Budget glättet den Serien-Jahresbetrag', async () => {
@@ -1605,22 +1612,29 @@ test('#1585: Rhythmuswechsel ueber PUT /:id an der ersten Buchung - Vergangenhei
 test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihren Grund, der Satz bleibt', async () => {
   setMode('shared');
   const ADM = { id: ADMIN, role: 'admin' };
+  // Seit #2810 weist das Schema Typ, Werteliste und Muster ab, bevor der
+  // Handler seinen Grund sagt: diese Faelle antworten mit `validation` und dem
+  // Feld (bis dahin der Grund des Handlers, z. B. `entry_date_invalid`).
+  const schemaRefusal = (/** @type {string} */ field, /** @type {string} */ rule) => ({
+    status: 400, reason: 'validation', error: 'The request does not match the documented schema.',
+    fields: [{ path: `body/${field}`, rule }],
+  });
   const EXPECTED = {
     'e-title': { status: 400, reason: 'entry_title_invalid', error: 'Title is required.' },
     'e-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount is required.' },
     'e-category': { status: 400, reason: 'entry_category_invalid', error: 'Category must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
-    'e-date': { status: 400, reason: 'entry_date_invalid', error: 'Date must be in YYYY-MM-DD format.' },
-    'e-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Interval must be one of: weekly, monthly, yearly.' },
+    'e-date': schemaRefusal('date', 'pattern'),
+    'e-interval': schemaRefusal('recurrence_interval', 'enum'),
     'e-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Interval count must be between 1 and 99.' },
     'e-sub': { status: 400, reason: 'entry_subcategory_invalid', error: 'Invalid subcategory.' },
     'e-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
-    'e-account-nan': { status: 400, reason: 'entry_account_invalid', error: 'account_id must be a valid account id.' },
-    'e-two': { status: 400, reason: 'entry_title_invalid', error: 'Title is required. Amount is required. Date must be in YYYY-MM-DD format.' },
+    'e-account-nan': schemaRefusal('account_id', 'type'),
+    'e-two': schemaRefusal('date', 'pattern'),
     'p-title': { status: 400, reason: 'entry_title_invalid', error: 'Title may be at most 200 characters long.' },
-    'p-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be a valid number.' },
+    'p-amount': schemaRefusal('amount', 'type'),
     'p-category': { status: 400, reason: 'entry_category_invalid', error: 'Category must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
-    'p-date': { status: 400, reason: 'entry_date_invalid', error: 'Date must be in YYYY-MM-DD format.' },
-    'p-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Interval must be one of: weekly, monthly, yearly.' },
+    'p-date': schemaRefusal('date', 'pattern'),
+    'p-interval': schemaRefusal('recurrence_interval', 'enum'),
     'p-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Interval count must be between 1 and 99.' },
     'p-sub': { status: 400, reason: 'entry_subcategory_invalid', error: 'Invalid subcategory.' },
     'p-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
@@ -1628,44 +1642,44 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
     'sd-notrec': { status: 400, reason: 'entry_not_recurring', error: 'Not a recurring entry.' },
     'c-booked': { status: 400, reason: 'entry_already_booked', error: 'Entry is already booked.' },
     's-title': { status: 400, reason: 'entry_title_invalid', error: 'Title may be at most 200 characters long.' },
-    's-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be a valid number.' },
+    's-amount': schemaRefusal('amount', 'type'),
     's-category': { status: 400, reason: 'entry_category_invalid', error: 'Category must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
-    's-interval': { status: 400, reason: 'entry_recurrence_invalid', error: 'Interval must be one of: weekly, monthly, yearly.' },
+    's-interval': schemaRefusal('recurrence_interval', 'enum'),
     's-count': { status: 400, reason: 'entry_interval_count_invalid', error: 'Interval count must be between 1 and 99.' },
-    's-start': { status: 400, reason: 'entry_start_date_invalid', error: 'start_date must be in YYYY-MM-DD format.' },
+    's-start': schemaRefusal('start_date', 'pattern'),
     's-end': { status: 400, reason: 'series_end_refused', error: 'A series edit cannot end the series. To end it, set is_recurring to false on its first entry (PUT /budget/:id) or delete it (DELETE /budget/:id/series).' },
     's-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
     's-early': { status: 400, reason: 'series_start_too_early', error: 'The start day of a series cannot lie in a month before its first entry once that entry is booked.' },
-    'c-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be a valid number.' },
-    'c-date': { status: 400, reason: 'entry_date_invalid', error: 'Date must be in YYYY-MM-DD format.' },
+    'c-amount': schemaRefusal('amount', 'type'),
+    'c-date': schemaRefusal('date', 'pattern'),
     'a-name': { status: 400, reason: 'account_name_invalid', error: 'Name is required.' },
-    'a-type': { status: 400, reason: 'account_type_invalid', error: 'Account type must be one of: checking, savings, cash, credit, investment, other.' },
-    'a-balance': { status: 400, reason: 'account_balance_invalid', error: 'Starting balance must be a valid number.' },
+    'a-type': schemaRefusal('type', 'enum'),
+    'a-balance': schemaRefusal('starting_balance', 'type'),
     'a-color': { status: 400, reason: 'account_color_invalid', error: 'Color must be a valid HEX color (#RRGGBB).' },
     'a-bank': { status: 400, reason: 'account_credit_bank_invalid', error: 'Bank may be at most 100 characters long.' },
-    'a-limit': { status: 400, reason: 'account_credit_limit_invalid', error: 'Credit limit must be a valid number.' },
+    'a-limit': schemaRefusal('credit_limit', 'type'),
     'a-limit-neg': { status: 400, reason: 'account_credit_limit_invalid', error: 'Credit limit must not be negative.' },
     'ap-name': { status: 400, reason: 'account_name_invalid', error: 'Name is required.' },
-    'ap-type': { status: 400, reason: 'account_type_invalid', error: 'Account type must be one of: checking, savings, cash, credit, investment, other.' },
-    'ap-balance': { status: 400, reason: 'account_balance_invalid', error: 'Starting balance must be a valid number.' },
+    'ap-type': schemaRefusal('type', 'enum'),
+    'ap-balance': schemaRefusal('starting_balance', 'type'),
     'ap-color': { status: 400, reason: 'account_color_invalid', error: 'Color must be a valid HEX color (#RRGGBB).' },
     'ap-bank': { status: 400, reason: 'account_credit_bank_invalid', error: 'Bank may be at most 100 characters long.' },
-    'ap-limit': { status: 400, reason: 'account_credit_limit_invalid', error: 'Credit limit must be a valid number.' },
+    'ap-limit': schemaRefusal('credit_limit', 'type'),
     'ap-limit-neg': { status: 400, reason: 'account_credit_limit_invalid', error: 'Credit limit must not be negative.' },
     'k-name': { status: 400, reason: 'category_name_invalid', error: 'Name is required.' },
-    'k-type': { status: 400, reason: 'category_type_invalid', error: 'Type must be one of: expense, income.' },
+    'k-type': schemaRefusal('type', 'enum'),
     'k-dup': { status: 409, reason: 'category_exists', error: 'Category already exists.' },
     'kp-name': { status: 400, reason: 'category_name_invalid', error: 'Name is required.' },
-    'kr-type': { status: 400, reason: 'category_type_invalid', error: 'Type must be one of: expense, income.' },
+    'kr-type': schemaRefusal('type', 'enum'),
     'ks-name': { status: 400, reason: 'subcategory_name_invalid', error: 'Name is required.' },
     'ks-dup': { status: 409, reason: 'subcategory_exists', error: 'Subcategory already exists.' },
     'ksp-name': { status: 400, reason: 'subcategory_name_invalid', error: 'Name is required.' },
-    'l-amount': { status: 400, reason: 'loan_payment_amount_invalid', error: 'Amount must be a valid number.' },
-    'l-date': { status: 400, reason: 'loan_payment_date_invalid', error: 'Paid date must be in YYYY-MM-DD format.' },
+    'l-amount': schemaRefusal('amount', 'type'),
+    'l-date': schemaRefusal('paid_date', 'pattern'),
     'l-number': { status: 400, reason: 'loan_payment_installment_invalid', error: 'Installment number is invalid.' },
     'l-zero': { status: 400, reason: 'loan_payment_amount_invalid', error: 'Amount must be greater than zero.' },
     'l-exceeds': { status: 400, reason: 'loan_payment_amount_exceeds', error: 'Amount cannot be greater than the remaining loan amount.' },
-    'l-three': { status: 400, reason: 'loan_payment_date_invalid', error: 'Paid date must be in YYYY-MM-DD format. Installment number is invalid. Amount cannot be greater than the remaining loan amount.' },
+    'l-three': schemaRefusal('paid_date', 'pattern'),
     'l-paid': { status: 409, reason: 'loan_installment_paid', error: 'Installment already paid.' },
     'p-loan-zero': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be greater than zero.' },
     'p-loan-exceeds': { status: 400, reason: 'entry_amount_exceeds_loan', error: 'Amount cannot be greater than the remaining loan amount.' },
@@ -1678,7 +1692,7 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
     assert.ok(want, `Vorbedingung: ${label} ist gefuehrt`);
     assert.deepEqual(
       { status: r.status, body: r.body },
-      { status: want.status, body: { error: want.error, code: want.status, reason: want.reason } },
+      { status: want.status, body: { error: want.error, code: want.status, reason: want.reason, ...(want.fields ? { fields: want.fields } : {}) } },
       `${label}: ${method} ${route}`,
     );
     seen.push(label);
@@ -1744,7 +1758,8 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
   const cat = await call('POST', '/categories', { as: ADM, body: { name: 'Probe1668' } }); const key = cat.body.data.key;
   await run('k-dup', 'POST', '/categories', { name: 'probe1668' });
   await run('kp-name', 'PUT', `/categories/${key}`, { name: '' });
-  await run('kr-type', 'PATCH', '/categories/reorder', { type: 'nope', order: [] });
+  // `order` ist seit #2810 Pflicht und nicht leer; hier traegt es einen Schluessel, damit nur der Typ faellt.
+  await run('kr-type', 'PATCH', '/categories/reorder', { type: 'nope', order: [key] });
   await run('ks-name', 'POST', `/categories/${key}/subcategories`, {});
   const sub = await call('POST', `/categories/${key}/subcategories`, { as: ADM, body: { name: 'Unter1668' } });
   await run('ks-dup', 'POST', `/categories/${key}/subcategories`, { name: 'unter1668' });

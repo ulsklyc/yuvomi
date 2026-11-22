@@ -34,6 +34,12 @@ process.env.DB_PATH = ':memory:';
 
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const { NUTRIENT_KEYS } = await import('../server/services/health-nutrition.js');
+/**
+ * A whole target as PUT /nutrition/targets takes it since #2810: all eight
+ * nutrients, the ones not named as `null` ("not set").
+ * @param {Record<string, unknown>} values
+ */
+const wholeTarget = (values) => ({ ...Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, null])), ...values });
 const { HEALTH_EXPORT_HEADERS } = await import('../server/services/health-export.js');
 // `utcDateKey` ist hier die RICHTIGE Funktion und nicht der Fehler, den sie
 // sonst markiert: dieser Test vergleicht den Haushaltstag ausdruecklich GEGEN
@@ -385,7 +391,7 @@ test('eine Person ohne Betreuungs-Freigabe bekommt 403 statt einer fremden Zeile
   });
   assert.equal(denied.status, 403, JSON.stringify(denied.body));
 
-  const deniedTarget = await call('PUT', '/nutrition/targets', { user_id: userB, energy_kcal: 1 });
+  const deniedTarget = await call('PUT', '/nutrition/targets', wholeTarget({ user_id: userB, energy_kcal: 1 }));
   assert.equal(deniedTarget.status, 403);
 });
 
@@ -404,7 +410,7 @@ test('ein Admin hat keinen Sonderzugriff auf fremde Eintraege (DECISIONS Abschni
 
 test('das Tagesziel ist keine Zeile mit Sichtbarkeit: fremd heisst 403, nicht "leer"', async () => {
   asB();
-  assert.equal((await call('PUT', '/nutrition/targets', { energy_kcal: 2000 })).status, 200);
+  assert.equal((await call('PUT', '/nutrition/targets', wholeTarget({ energy_kcal: 2000 }))).status, 200);
 
   asC();
   const foreign = await call('GET', `/nutrition/targets?user_id=${userB}`);
@@ -436,11 +442,11 @@ test('ohne Zeile ist das Ziel null - nicht ein Ziel aus Nullen', async () => {
 
 test('ein ausdrueckliches Ziel von 0 ist ein Ziel und ueberlebt den Round-Trip', async () => {
   asC();
-  const saved = await call('PUT', '/nutrition/targets', { energy_kcal: 1800, sugar_g: 0 });
+  const saved = await call('PUT', '/nutrition/targets', wholeTarget({ energy_kcal: 1800, sugar_g: 0 }));
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.equal(saved.body.data.target.sugar_g, 0, 'eine 0 darf nicht als "nicht gesetzt" gespeichert werden');
   assert.equal(saved.body.data.target.energy_kcal, 1800);
-  assert.equal(saved.body.data.target.fat_g, null, 'ein nicht genanntes Ziel bleibt nicht gesetzt');
+  assert.equal(saved.body.data.target.fat_g, null, 'ein als null geschicktes Ziel bleibt nicht gesetzt');
 
   const read = await call('GET', '/nutrition/targets');
   assert.equal(read.body.data.target.sugar_g, 0, 'die 0 muss auch beim Lesen 0 bleiben');
@@ -454,7 +460,7 @@ test('ein ausdrueckliches Ziel von 0 ist ein Ziel und ueberlebt den Round-Trip',
 
 test('ein Ziel, in dem alle acht leer sind, LOESCHT die Zeile (sparse)', async () => {
   asC();
-  const cleared = await call('PUT', '/nutrition/targets', {});
+  const cleared = await call('PUT', '/nutrition/targets', wholeTarget({}));
   assert.equal(cleared.status, 200);
   assert.equal(cleared.body.data.target, null);
   const rows = db.prepare('SELECT COUNT(*) AS n FROM health_nutrition_targets WHERE user_id = ?').get(userC).n;

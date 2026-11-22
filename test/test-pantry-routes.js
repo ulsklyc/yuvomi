@@ -39,10 +39,10 @@ app.use((req, _res, next) => {
   req.session = { userId: USER, role: 'member' };
   next();
 });
-// At its real prefix: validateRequest() reads the operation from the mount (#2810).
-app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/pantry(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`; next(); });
+// At their real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/(pantry|shopping)(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`; next(); });
 app.use('/api/v1/pantry', pantryRouter);
-app.use('/shopping', shoppingRouter);
+app.use('/api/v1/shopping', shoppingRouter);
 app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
@@ -536,7 +536,8 @@ test('undo-transfer: unbekannte IDs werden uebergangen, leerer Body ist kein Feh
 
   const list = await call('POST', '/shopping', { name: 'Teilweise' });
   const added = await call('POST', `/shopping/${list.body.data.id}/items`, { name: 'Butter' });
-  const r = await call('POST', '/shopping/items/undo-transfer', { ids: [added.body.data.id, 999999, 'x'] });
+  // `'x'` stand hier bis #2810 mit drin; das Schema weist ihn jetzt ab.
+  const r = await call('POST', '/shopping/items/undo-transfer', { ids: [added.body.data.id, 999999] });
   assert.equal(r.body.data.removed, 1);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM shopping_items WHERE list_id = ?').get(list.body.data.id).n, 0);
 });

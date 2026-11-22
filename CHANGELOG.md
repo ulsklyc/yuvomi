@@ -17,7 +17,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the binding. Migration 283 adds the folder and member-access tables.
 - **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
 
+### Fixed
+- **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
+- **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+
+## [2.94.0] - 2026-11-22
+
 ### Changed
+- **The budget and the subscriptions check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now.
+  Under `/api/v1/budget` (accounts, categories, entries, series, loans, plans, statistics,
+  transfers) and `/api/v1/budget/subscriptions`, input that used to be quietly accepted,
+  replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `1abc`, `1.0` and `1e0` reached account, entry or loan 1,
+    `0x1` and `1.0` reached transfer or subscription 1 - also to delete it, and `POST
+    /subscriptions/0x1/renew` booked a payment;
+  - a month outside 01 to 12: `GET /budget?month=2026-13` with a running series wrote an entry
+    dated `2026-13-05`, a loan stored `start_month: "2026-13"`, and the summary, the plan and
+    the export answered for month 13; a day that is not `YYYY-MM-DD` (`anchor=2026-13-45` of the
+    statistics answered 500);
+  - a number, list, object or truth value in a text field: an account, category, entry,
+    transfer, loan or subscription category named `{}` was stored as `"[object Object]"`, a
+    number as text; on editing an entry, a series, a loan or a subscription a number answered
+    500;
+  - `null`, an empty string, text, a truth value or a list as an amount: `null` and `""` set an
+    entry, a series, an account's starting balance or the subscription budget to 0, `true`
+    counted as 1, `[5]` as 5, `"0x10"` as 16; `credit_limit: ""` is now `null` to clear it;
+  - an unknown `interest_mode` of a new loan became a loan without interest, an unknown
+    `visibility` of an entry, transfer, loan or subscription the default; an unknown loan
+    `direction` or account `type` (`""` was stored as the type), category `type`,
+    `recurrence_interval` (`null` answered 500), `billing_cycle` (missing or `""` answered
+    500) or `end_type`;
+  - switches that are not `true`/`false` (`0`/`1` on entries): `is_recurring: "false"` started
+    a series, `archived: "false"` archived an account;
+  - ids in a body that are not whole numbers: `account_id: ""` or `"1"`, a subscription's
+    `category_id: true` (a 500), `responsible_user_ids` and `attachment_document_ids` with
+    non-numbers (dropped silently), the order lists (`order: [{}]` of the categories answered
+    500, missing or empty changed nothing; the subscription order took any list);
+  - a `query` of the logo search that is not text (`5` was looked up as the website `5`);
+  - a query value outside its type, or given twice: `scope=x`, `account_id=abc`, `loan_id=abc`,
+    a month of the export or plan that is not `YYYY-MM` (the current month), `range=day`,
+    `include_archived=yes`, a subscription `status`, `enabled`, `category_id` or
+    `payment_method_id` outside its values (no filter, or an empty list).
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404 or 403 (the
+  write rule of the personal budget mode); a valid one meets those as before. Lengths, ranges,
+  the calendar day and every refusal with a `reason` the budget page shows stay with the routes;
+  a body of the wrong type now answers `reason: validation` with the field (for example
+  `entry_date_invalid` for `date: "nope"`, `loan_direction_invalid` for an unknown direction).
+  The loan preview answers an unknown `interest_mode` with 400 instead of `{ ok: false }`. A
+  PUT without a body is a 400; `PATCH /budget/{id}/confirm` still takes none. An unexpected
+  error of a subscription route now answers `Internal server error.` like every other route
+  (it was `Internal error.`).
+- **The shopping list, documents, the document storage settings and the DMS connection check
+  every request against the published API description.** This is about your own API clients;
+  the app sends nothing that is refused now (from this release on it sends the folder of a
+  document, the DMS account and the order of the shopping categories as numbers). Under
+  `/api/v1/shopping` and `/api/v1/documents` (with `storage/google-drive` and `dms`), input that
+  used to be quietly accepted, replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `0x1`, `1.0` and `1e0` reached document 1, and on the
+    shopping list `1.0` reached list or item 1;
+  - a number, list, object or truth value in a text field: a shopping list, shop, category,
+    folder or document named `{}` was stored as `"[object Object]"`, a number as text;
+  - an unknown `visibility` of a new or linked document became `family`, visible to the whole
+    household; an unknown `category` became `other`, and on editing a document an unknown
+    `visibility`, `category` or `status` was ignored;
+  - an unknown DMS `provider` became `paperless`; a `dms_document_id` that is neither text nor a
+    number was stored as its text (`true`, `"[object Object]"`);
+  - an unknown `folder_key` of an upload was dropped; an unknown `selected_upload_backend`, an
+    `enabled` of the WebDAV settings that is not `true` or `false`;
+  - a number field sent as a truth value, text or list: `expiry_reminder_days: true` was stored
+    as 1, `price_cents: true`, `[]` and `"0x10"` as 1, 0 and 16; ids in a body that are not
+    whole numbers or digit text (`folder_id`, `parent_id`, `subject_user_id`, `account_id`,
+    `document_id`; `parent_id: true` and `"0x1"` were read as folder 1);
+  - `archived: "false"` and `0` archived a document; `preview: "true"` of the meal-plan import
+    ran the real import; `is_checked` other than `true`, `false`, `0` or `1`;
+  - `order` of the shopping categories that is not a list of ids (`[{}]` and `[true]` answered
+    500, `[1.5]` and `["x"]` changed nothing), `items` of the pantry import that is not a list
+    of entries (taken as empty), `ids` of the kitchen undo that are not whole numbers (dropped);
+  - a query value outside its type, or given twice: a doubled `q` of the shopping suggestions
+    answered 500; `status`, `category`, `folder_id` and `expiring` of the document list and an
+    empty `documents` of a folder deletion fell back silently to no filter or `unfile`;
+    `limit` of the price history outside 1 to 50 was clamped.
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of the storage settings, Google Drive and
+  every DMS route, and the meal-plan and pantry rights of the two kitchen imports come first:
+  403 stays 403, also for a bad request. Lengths stay with the routes. Sharing a document with
+  an id that has no account answers the 400 of a non-member instead of 500. A DMS account stored
+  with a built-in property name as its provider no longer reaches a broken adapter.
+- **Contacts, contact sync and the meal plan check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now
+  (from this release on the meal dialog sends the chosen recipe as a number). Under
+  `/api/v1/contacts`, `/api/v1/contacts/cardav` and `/api/v1/meals`, input that used to be
+  quietly accepted, replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `0x10` and `abc` found nothing (404), `1e2` reached row 1;
+  - a number, list, object or truth value in a text field: a contact named `{}` was stored as
+    `"[object Object]"`, a number as text; on editing a contact or a meal, and on the
+    ingredients of a meal, a number answered 500;
+  - `recipe_id` and `cook_user_id` that are neither whole numbers nor digit text (`"0x10"` was
+    read as recipe 16, `true` as 1 or a 500), a `listId` of a transfer that is not a whole
+    number, a meal type that is empty or `null`, a series end that is not a day;
+  - `ingredients` and `assignments` that are not lists of objects (500);
+  - an unknown `scope` on `PUT` and `DELETE /meals/{id}`: on `DELETE` it deleted the meal;
+  - `week` of the meal plan that is not a day: `abc` and an empty value fell back to the current
+    week, `2026-13-45` answered 500, `2026-02-30` rolled over into March;
+  - `order` of the contact categories that is not a list of text (taken as empty, or 500 for an
+    object entry), a category edit with neither `name` nor `color`;
+  - CardDAV: account fields that are not text (a password that was not text counted as empty),
+    `enabled` of an address book that is not `true` or `false`; the refusal carries
+    `reason: "validation"` and no `errorCode`, and the contact sync page says its sentence for
+    it;
+  - queries given twice (a doubled `q` of the meal suggestions answered 500).
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of contact sync and the shopping write
+  right of the two transfers to the shopping list come first: 403 stays 403, also for a bad
+  request. Lengths stay with the routes, with their `reason` and `params.limit`. Deleting a
+  contact sync account that does not exist answers 404 (`account_not_found`) instead of 500. A
+  week start stored as a built-in property name (`constructor`) no longer breaks the meal plan.
+- **The shops and the price history of the shopping list answer an unexpected failure with the
+  same sentence as the rest of the API.** `GET`, `POST`, `PUT` and `DELETE` under
+  `/api/v1/shopping/stores` and `GET /api/v1/shopping/price-history` said `"Internal error"` on
+  a server-side failure; they now say `"Internal server error."` like every other module. Status
+  500 and `code` are unchanged, and so is every answer that names a known cause.
+- **Health answers an unexpected failure with the same sentence as the rest of the API.**
+  Vitals, medications and the dose log, lab reports, activities, the CSV exports, the cycle
+  tab, caregivers, preventive care and nutrition under `/api/v1/health` said
+  `"Internal error."` on a server-side failure; they now say `"Internal server error."` like
+  every other module. Status 500 and `code` are unchanged. Every answer that names a known
+  cause stays as it was: the fasting refusals with their `reason` (and the `current` record of
+  a conflict), an undo of a dose that is not recorded (`health_dose_pending`), the reasons of
+  the cycle import, the vital limits and units, and the refusals of care. The cycle feed,
+  fasting and the visibility defaults answered this way already.
 - **Health checks every request against the published API description.** This is about your
   own API clients; the app sends nothing that is refused now (from this release on it sends the
   type of a preventive-care record as a number). Under `/api/v1/health`, input that used to be
@@ -62,6 +194,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dialog no longer drops the stored conversion and exchange snapshot of an expense whose amount
   and currency it leaves unchanged, and the exact shares of such a converted expense are entered
   and checked in the converted currency, as the server adds them up.
+- **Saving the cycle settings takes all of them.** This is about your own API clients; the app
+  sends every field already. `PUT /health/cycle/settings` without one of its fields reset it to
+  its default: the cycle and period lengths, the due date, contraception, the period reminder
+  and the partner notification were cleared, the luteal phase went back to 14 days, fertility
+  tracking and the PMS window were switched on, pregnancy and perimenopause mode and the daily
+  log nudge were switched off and the default visibility became `private` (`{}` reset them all).
+  All 14 fields are required now; `null` still clears a value where the field takes it, and
+  `luteal_length: null` is still 14.
+- **Saving a cycle day again takes the whole day.** This is about your own API clients; the app
+  sends the whole day already. `POST /health/cycle/logs` on a day that has a log without `flow`,
+  `note`, `visibility`, `symptoms`, `basal_temp`, `basal_temp_unit`, `cervix_mucus`, `lh_test`,
+  `pregnancy_test` or `intimacy` cleared the stored value, emptied the symptoms and made the day
+  `private`. These ten are required now besides `log_date`; `null` and `""` still mean "not
+  given". `feelings` and `mood` stay optional and keep the stored feelings when both are left
+  out.
+- **Setting a nutrition target takes all eight nutrients.** This is about your own API clients;
+  the app sends all eight already. `PUT /health/nutrition/targets` without a nutrient unset it,
+  and `{}` deleted the whole target. All eight are required now; `null` unsets one, and eight
+  `null` still delete the target. `user_id` stays optional and means the caller when left out.
+- **Recording a dose takes its status.** This is about your own API clients; the app sends it
+  already. `POST /health/medications/{id}/logs` without `status` stored `pending`, and repeating
+  a planned dose that was taken (same `schedule_id` and `scheduled_at`) reset it to `pending`
+  and dropped its time. `status` is required now; `null` still means `pending`. `taken_at`,
+  `dose_qty`, `note` and `stock_deduct` stay optional: left out, a repeat keeps the stored time,
+  dose and note and deducts nothing.
+- **Renaming a contact takes all five name parts.** This is about your own API clients.
+  `PUT /contacts/{id}` with some of `firstName`, `lastName`, `middleName`, `namePrefix` and
+  `nameSuffix` cleared the ones left out, so a middle name, title or suffix from a vCard or
+  CardDAV was lost. Sent together they are required together now: one without the others is a
+  400 naming a missing part; `null` still clears a part, and leaving out all five keeps them.
+- **Editing a document takes its access list.** This is about your own API clients; the app
+  sends it already. `PUT /documents/{id}` without `allowed_member_ids` emptied the list, so a
+  `restricted` document silently lost every member it was shared with. `allowed_member_ids` is
+  required now (`[]` shares it with nobody); for `family` and `private` it is ignored as before.
+  Every other field stays optional and keeps the stored value when left out.
 - **An exchange snapshot is an object or `null`.** This is about your own API clients: on
   `POST /split-expenses/groups/{id}/expenses` and `PUT /split-expenses/expenses/{id}`,
   `exchange_snapshot` sent as `false`, `0`, `""` or any other value that is not an object is now
@@ -137,8 +304,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the own schedule settings answered this way already.
 
 ### Fixed
-- **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
-- **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+- **Saving a contact in the app keeps its middle name, title and suffix.** A contact imported
+  from a vCard or synced over CardDAV lost them the first time its form was saved, because the
+  form sent only the first and last name; it now sends the stored ones along.
 - **A shared expense converted into a currency with other decimal places reports the converted
   amount correctly.** `converted_amount` in the expense answers was written with the decimal
   places of `currency` instead of `converted_currency`: 1500 JPY converted from USD read

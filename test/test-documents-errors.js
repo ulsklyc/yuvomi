@@ -49,6 +49,8 @@ globalThis.window.matchMedia = globalThis.window.matchMedia
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter, _setStageUploadForTest } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { stageDocumentUpload } = await import('../server/services/document-storage.js');
 const { default: dmsRouter, _setAdapterFactory } = await import('../server/routes/dms.js');
 const { __test: page } = await import('../public/pages/documents.js');
@@ -82,6 +84,7 @@ const admin = db.prepare(`INSERT INTO users (username, display_name, password_ha
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = admin;
   req.authRole = 'admin';
@@ -90,6 +93,8 @@ app.use((req, _res, next) => {
 });
 app.use('/api/v1/documents/dms', dmsRouter);
 app.use('/api/v1/documents', documentsRouter);
+// The central error handler answers the 400 of validateRequest() as JSON (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));
@@ -123,7 +128,7 @@ const SERVER_GONE = [
   ['GET', `/folders/${GONE}/delete-impact`, null, 'documents_folder_not_found', 'Folder not found.'],
   ['PUT', `/folders/${GONE}`, { name: 'x' }, 'documents_folder_not_found', 'Folder not found.'],
   ['DELETE', `/folders/${GONE}`, null, 'documents_folder_not_found', 'Folder not found.'],
-  ['PUT', `/${GONE}`, { name: 'x' }, 'documents_document_not_found', 'Document not found.'],
+  ['PUT', `/${GONE}`, { name: 'x', allowed_member_ids: [] }, 'documents_document_not_found', 'Document not found.'],
   ['PATCH', `/${GONE}/archive`, { archived: true }, 'documents_document_not_found', 'Document not found.'],
   ['DELETE', `/${GONE}`, null, 'documents_document_not_found', 'Document not found.'],
 ];
@@ -145,7 +150,7 @@ test('Server: ein Ordner unter einem inzwischen geloeschten Ordner - anlegen und
 
 test('Server: ein Dokument in einen inzwischen geloeschten Ordner - hochladen und aendern antworten 400 mit dem Fall statt 500', async () => {
   const id = await documentRow();
-  for (const [method, path, body] of [['POST', '', upload({ folder_id: GONE })], ['PUT', `/${id}`, { folder_id: GONE }]]) {
+  for (const [method, path, body] of [['POST', '', upload({ folder_id: GONE })], ['PUT', `/${id}`, { folder_id: GONE, allowed_member_ids: [] }]]) {
     const r = await call(method, path, body);
     assert.deepEqual([r.status, r.body?.reason, r.body?.error], [400, 'documents_selected_folder_not_found', 'Folder not found.'], `${method} ${path}`);
   }

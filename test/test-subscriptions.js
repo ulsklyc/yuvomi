@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 import { freshTestDbPath } from './tmp-db.js';
 freshTestDbPath('subscriptions');
@@ -10,7 +10,6 @@ process.env.SESSION_SECRET = 'subscription-test-session-secret-32-bytes';
 
 const service = await import('../server/services/subscriptions.js');
 const db = await import('../server/db.js');
-const { default: subscriptionsRouter } = await import('../server/routes/subscriptions.js');
 const logoService = await import('../server/services/subscription-logo.js');
 
 try {
@@ -119,18 +118,20 @@ try {
     1,
   );
 
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.authUserId = 1;
-    req.authRole = 'admin';
-    next();
+  // At its real prefix with the central error handler (#2810): validateRequest()
+  // finds its operation by the mount and answers through next(err).
+  const app = await createBudgetApp({
+    mount: ['subscriptions'],
+    auth: (req, _res, next) => {
+      req.authUserId = 1;
+      req.authRole = 'admin';
+      next();
+    },
   });
-  app.use('/subscriptions', subscriptionsRouter);
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const baseUrl = `http://127.0.0.1:${server.address().port}/subscriptions`;
+    const baseUrl = `http://127.0.0.1:${server.address().port}/api/v1/budget/subscriptions`;
     const entertainment = database.prepare(
       "SELECT id FROM subscription_categories WHERE name = 'Entertainment'",
     ).get();

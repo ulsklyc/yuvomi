@@ -358,7 +358,10 @@ async function call(method, template, { params = {}, query = '', body, headers =
         split_method: 'equal', expense_date: today,
       });
 
-      await seed('PUT', '/health/nutrition/targets', { energy_kcal: 2000 });
+      // The whole target (#2810): all eight nutrients, the rest `null`.
+      await seed('PUT', '/health/nutrition/targets', {
+        energy_kcal: 2000, fat_g: null, saturated_fat_g: null, carbs_g: null, sugar_g: null, protein_g: null, salt_g: null, fiber_g: null,
+      });
       await seed('POST', '/health/nutrition/entries', {
         title: 'Fruehstueck', consumed_at: `${today}T08:00`, meal_type: 'breakfast', energy_kcal: 400, visibility: 'private',
       });

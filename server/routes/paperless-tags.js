@@ -97,7 +97,7 @@ router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); 
 
 // The global tag catalogue is account-wide, so only administrators may browse it.
 router.get('/tags', requireAdmin, validateRequest(), refuseWhileRestoring, async (req, res) => {
-  
+
     if (!writable(req)) throw problem(403, 'Permission denied.');
     const accountId = positiveId(req.query.account_id);
     const page = positiveId(req.query.page ?? 1);
@@ -121,12 +121,12 @@ router.get('/tags', requireAdmin, validateRequest(), refuseWhileRestoring, async
     const allowed = source.live_settings?.allowed_tag_ids ?? null;
     const results = allowed === null ? result.results : result.results.filter((tag) => allowed.includes(tag.id));
     res.json({ data: results, meta: { page, has_more: result.has_more, count: result.count } });
-  
+
 });
 
 /** @param {import("../utils/http-router.ts").Request} req @param {import("../utils/http-router.ts").Response} res */
 async function readTags(req, res) {
-    
+
       const context = resolve(req);
       const adapter = adapterFactory(context.source);
       await inView(adapter, context);
@@ -145,11 +145,11 @@ async function readTags(req, res) {
         ...(context.canEdit ? { account_id: context.source.id,
           ...(context.row.view_id !== undefined ? { catalogue_folder_id: context.row.id,
             editable_tag_ids: context.source.live_settings?.allowed_tag_ids ?? null } : {}) } : {}) } });
-    
+
 }
 /** @param {import("../utils/http-router.ts").Request} req @param {import("../utils/http-router.ts").Response} res */
 async function writeTags(req, res) {
-    
+
       const context = resolve(req);
       if (!context.canEdit) throw problem(403, 'Permission denied.');
       const wanted = ids(req.body?.tags);
@@ -167,7 +167,7 @@ async function writeTags(req, res) {
       recheck(req, context, true);
       // A successful tag change may intentionally remove the document from its view.
       res.json({ data: { tag_ids: ids(updated.tags) } });
-    
+
 }
 router.get('/folders/:id/documents/:documentId/tags', validateRequest(), refuseWhileRestoring, readTags);
 router.put('/folders/:id/documents/:documentId/tags', validateRequest(), refuseWhileRestoring, writeTags);

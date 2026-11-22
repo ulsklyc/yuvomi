@@ -20,8 +20,11 @@
  *          inventory: locations, categories, items, entries, deadlines-feed),
  *          3 (housekeeping, rewards), 4 (the eight route files of waste,
  *          schedule, schedule-extras, schedule-feed, schedule-preferences),
- *          5 (split-expenses, backup, and of the core system and changelog) and
- *          6 (the twelve route files of health under server/routes/health/).
+ *          5 (split-expenses, backup, and of the core system and changelog),
+ *          6 (the twelve route files of health under server/routes/health/), 7
+ *          (contacts, cardav, meals), 8 (shopping, documents,
+ *          document-storage-google-drive, dms) and 9 (the seven route files
+ *          of the budget under server/routes/budget/, and subscriptions).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -43,13 +46,6 @@ const ROUTES = join(ROOT, 'server', 'routes');
  */
 const NOT_MIGRATED = [
   'server/routes/birthday-feed.js',
-  'server/routes/budget/accounts.js',
-  'server/routes/budget/categories.js',
-  'server/routes/budget/entries.js',
-  'server/routes/budget/loans.js',
-  'server/routes/budget/plans.js',
-  'server/routes/budget/stats.js',
-  'server/routes/budget/transfers.js',
   'server/routes/calendar/apple.js',
   'server/routes/calendar/caldav.js',
   'server/routes/calendar/crud.js',
@@ -60,17 +56,9 @@ const NOT_MIGRATED = [
   'server/routes/calendar/read.js',
   'server/routes/calendar/subscriptions.js',
   'server/routes/calendar/sync-targets.js',
-  'server/routes/cardav.js',
-  'server/routes/contacts.js',
   'server/routes/dashboard.js',
-  'server/routes/dms.js',
-  'server/routes/document-storage-google-drive.js',
-  'server/routes/documents.js',
-  'server/routes/meals.js',
   'server/routes/preferences.js',
   'server/routes/push.js',
-  'server/routes/shopping.js',
-  'server/routes/subscriptions.js',
   'server/routes/tasks.js',
 ];
 
@@ -95,6 +83,12 @@ const MIGRATED = [
   'server/routes/health/activities.js', 'server/routes/health/export.js', 'server/routes/health/cycle.js',
   'server/routes/health/cycle-feed.js', 'server/routes/health/caregivers.js', 'server/routes/health/visibility-defaults.js',
   'server/routes/health/fasting.js', 'server/routes/health/prevention.js', 'server/routes/health/nutrition.js',
+  'server/routes/contacts.js', 'server/routes/cardav.js', 'server/routes/meals.js',
+  'server/routes/shopping.js', 'server/routes/documents.js', 'server/routes/document-storage-google-drive.js',
+  'server/routes/dms.js',
+  'server/routes/budget/accounts.js', 'server/routes/budget/categories.js', 'server/routes/budget/entries.js',
+  'server/routes/budget/loans.js', 'server/routes/budget/plans.js', 'server/routes/budget/stats.js',
+  'server/routes/budget/transfers.js', 'server/routes/subscriptions.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

@@ -65,6 +65,7 @@ import express from 'express';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { germanIn, outboundLiterals } from './error-language.js';
 import { createErrorHandler } from '../server/middleware/error-handler.js';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 const ROUTES = new URL('../server/routes/', import.meta.url);
 // The settings registry (phase 2, C3) holds the refusal texts of
@@ -594,16 +595,17 @@ test('keine Absage des Inventars traegt deutschen Wortlaut', async () => {
 });
 
 test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
-  const { default: contactsRouter } = await import('../server/routes/contacts.js');
-  const cApp = express();
-  cApp.use(express.json());
-  cApp.use((req, _res, next) => {
-    req.authUserId = ADMIN;
-    req.authRole = 'admin';
-    req.session = { userId: ADMIN, role: 'admin' };
-    next();
+  // At the real prefix with the error handler: validateRequest() reads the
+  // operation from the mount (#2810); `run()` puts `/api/v1` in front.
+  const cApp = await createContactsMealsApp({
+    mount: ['contacts'],
+    auth: (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    },
   });
-  cApp.use('/contacts', contactsRouter);
   const cServer = cApp.listen(0, '127.0.0.1');
   const cUrl = await new Promise((r) => cServer.on('listening', () => r(`http://127.0.0.1:${cServer.address().port}`)));
   try {
@@ -612,7 +614,7 @@ test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const res = await fetch(`${cUrl}${route}`, { method, headers, body: payload });
+      const res = await fetch(`${cUrl}/api/v1${route}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
       seen.push({ label, status: res.status, error: json?.error ?? null });
@@ -775,15 +777,18 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
   const { default: tasksRouter } = await import('../server/routes/tasks.js');
   const { default: pushRouter } = await import('../server/routes/push.js');
   const { buildRouter: buildWeatherRouter } = await import('../server/routes/weather.js');
+  const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
   const gApp = express();
   gApp.use(express.json());
+  gApp.use(defaultEmptyBody);
   gApp.use((req, _res, next) => {
     req.authUserId = ADMIN;
     req.authRole = 'admin';
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  gApp.use('/shopping', shoppingRouter);
+  // The shopping list at its real prefix (#2810): call() maps `/shopping...` there.
+  gApp.use('/api/v1/shopping', shoppingRouter);
   gApp.use('/tasks', tasksRouter);
   gApp.use('/push', pushRouter);
   // The weather router at its real prefix, with the central error handler (#2810).
@@ -797,7 +802,8 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const res = await fetch(`${gUrl}${route}`, { method, headers, body: payload });
+      const url = /^\/shopping(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
+      const res = await fetch(`${gUrl}${url}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
       return { status: res.status, body: json };
@@ -866,13 +872,13 @@ test('keine Absage von Essensplan, Vorrat und Rezepten traegt deutschen Wortlaut
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  kApp.use('/meals', mealsRouter);
-  // Pantry and recipes at their real prefix: validateRequest() reads the
-  // operation from the mount and hands its 400 to the error handler (#2810).
+  // Meal plan, pantry and recipes at their real prefix: validateRequest() reads
+  // the operation from the mount and hands its 400 to the error handler (#2810).
   kApp.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => {
-    if (/^\/(pantry|recipes)(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`;
+    if (/^\/(meals|pantry|recipes)(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`;
     next();
   });
+  kApp.use('/api/v1/meals', mealsRouter);
   kApp.use('/api/v1/pantry', pantryRouter);
   kApp.use('/api/v1/recipes', recipesRouter);
   kApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
