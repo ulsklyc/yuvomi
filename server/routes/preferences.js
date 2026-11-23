@@ -11,6 +11,11 @@
  *        von PUT / prueft das Dokument nur als Objekt: Form, Bereich und
  *        Schreibrecht jedes Felds bleiben im Register, damit ein Mitglied auf
  *        ein Admin-Feld weiter 403 bekommt und keine zweite Regelkopie entsteht.
+ *        Die Muster der Laender- und Regionscodes in den Feiertagspfaden prueft
+ *        allein das Dokument (#2810 Gruppe 11b, Schritt b). Ein unerwarteter
+ *        Fehler geht an den zentralen Fehlerhandler
+ *        (server/middleware/error-handler.js); eigene Antworten behalten nur die
+ *        Feiertagslisten (502) und der Feiertags-Sync (502 mit Fehlerklasse).
  * Abhängigkeiten: express, server/db.js, server/settings/registry.ts
  */
 
@@ -30,7 +35,6 @@ import { syncAllFastingReminders } from '../services/fasting-reminders.js';
 import { isScreensaverEnabled } from './screensaver.js';
 import { rekeyForHouseholdZoneChange } from '../services/calendar-occurrence-overrides.js';
 import { readSetting, readSettings, writeSettings } from '../settings/registry.ts';
-import { COUNTRY_ISO_RE, SUBDIVISION_RE } from '../settings/values.ts';
 import { remoteFailure } from '../utils/http.js';
 import { validateRequest } from '../api/validate-request.ts';
 
@@ -138,22 +142,17 @@ function sendRefusal(req, res, refusal) {
 // --------------------------------------------------------
 
 router.get('/', validateRequest(), (req, res) => {
-  try {
-    const data = settingsAnswer(db.get(), req.authUserId, { withWeatherSource: true });
-    // A derived flag (#1766): true when Immich is configured and, for a
-    // paired display, when an admin has switched the screensaver on for it.
-    data.screensaver_enabled = isScreensaverEnabled() && (req.authMethod !== 'display' || req.displayShowsScreensaver === true);
-    // EIN WANDTABLETT BEKOMMT NUR DEN DARSTELLUNGSTEIL (#1208). Diese Antwort
-    // ist die Sammelstelle des ganzen Haushalts - Wohnkoordinaten,
-    // Budget-Betriebsart, Zyklus-Einstellungen, Sync-Ziele -, und sie steht dem
-    // Display nur offen, weil die App ohne sie nicht startet. Was uebrig
-    // bleibt, ist eine Allowlist in display-scopes.js.
-    if (req.authMethod === 'display') data.display_device_settings = req.displayDeviceSettings ?? null;
-    res.json({ data: req.authMethod === 'display' ? pickDisplayPreferences(data) : data });
-  } catch (err) {
-    log.error('GET /', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const data = settingsAnswer(db.get(), req.authUserId, { withWeatherSource: true });
+  // A derived flag (#1766): true when Immich is configured and, for a
+  // paired display, when an admin has switched the screensaver on for it.
+  data.screensaver_enabled = isScreensaverEnabled() && (req.authMethod !== 'display' || req.displayShowsScreensaver === true);
+  // EIN WANDTABLETT BEKOMMT NUR DEN DARSTELLUNGSTEIL (#1208). Diese Antwort
+  // ist die Sammelstelle des ganzen Haushalts - Wohnkoordinaten,
+  // Budget-Betriebsart, Zyklus-Einstellungen, Sync-Ziele -, und sie steht dem
+  // Display nur offen, weil die App ohne sie nicht startet. Was uebrig
+  // bleibt, ist eine Allowlist in display-scopes.js.
+  if (req.authMethod === 'display') data.display_device_settings = req.displayDeviceSettings ?? null;
+  res.json({ data: req.authMethod === 'display' ? pickDisplayPreferences(data) : data });
 });
 
 // --------------------------------------------------------
@@ -167,8 +166,10 @@ router.get('/', validateRequest(), (req, res) => {
 // genau einmal, hinter dem letzten Feld und der fertig gebauten Erfolgsantwort,
 // unmittelbar vor dem Senden; jeder andere Ausgang
 // (400, 401, 403, geworfener Fehler) findet im finally eine offene Transaktion
-// vor und rollt sie zurueck. Ein neues Feld im Register ist damit von selbst
-// abgedeckt - es muss dafuer nichts nach oben gezogen werden.
+// vor und rollt sie zurueck. Ein geworfener Fehler laeuft nach dem finally
+// weiter an den zentralen Fehlerhandler (500, #2810 Gruppe 11b). Ein neues
+// Feld im Register ist damit von selbst abgedeckt - es muss dafuer nichts nach
+// oben gezogen werden.
 //
 // BEGIN/COMMIT von Hand statt `db.transaction(fn)`: der Helfer committet bei
 // jedem normalen Ruecksprung, ein `return res.status(400)` waere fuer ihn ein
@@ -201,15 +202,13 @@ router.put('/', validateRequest(), (req, res) => {
     // koennte.
     database.exec('COMMIT');
     res.json(payload);
-  } catch (err) {
-    log.error('PUT /', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
   } finally {
     // Noch offen heisst: der Handler ist NICHT ueber das COMMIT gegangen - ein
     // Feld wurde abgelehnt oder etwas hat geworfen. Dann gilt nichts aus dieser
-    // Patch (#1622). Die Antwort ist zu diesem Zeitpunkt schon abgeschickt und
-    // bleibt, wie sie ist; dazwischen liegt kein Yield-Punkt, an dem ein anderer
-    // Request den halben Stand lesen koennte.
+    // Patch (#1622). Eine Absage ist zu diesem Zeitpunkt schon abgeschickt und
+    // bleibt, wie sie ist; ein Fehler erreicht den zentralen Handler erst nach
+    // diesem Block, also nach dem Rollback. Dazwischen liegt kein Yield-Punkt,
+    // an dem ein anderer Request den halben Stand lesen koennte.
     if (database?.inTransaction) {
       try {
         database.exec('ROLLBACK');
@@ -231,7 +230,8 @@ router.put('/', validateRequest(), (req, res) => {
     // Datensprache nicht bewegt, dann findet er nichts zu tun.
     //
     // Fehler beenden die Anfrage nicht: die Antwort ist zu diesem Zeitpunkt
-    // längst gesendet, und die Präferenzen sind geschrieben. Der nächste PUT
+    // längst gesendet (oder ein Fehler davor wartet auf den zentralen
+    // Handler), und die Präferenzen sind geschrieben. Der nächste PUT
     // versucht es erneut - der Lauf ist idempotent.
     try {
       db.transaction(() => retitleBirthdayEvents(db.get()));
@@ -257,12 +257,10 @@ router.get('/holidays/countries', validateRequest(), async (_req, res) => {
 // supportedLocaleFor(), also durch die Liste der Locale-Dateien: alles andere
 // (unbekannter Code, Pfadzeichen) wird zu null und damit zu Englisch - wie bei
 // `lang` der Budget-Kategorien, kein 400. Nur ein doppelter Parameter ist kein
-// Text und antwortet seit #2810 (Gruppe 11b) 400 aus validateRequest().
+// Text und antwortet seit #2810 (Gruppe 11b) 400 aus validateRequest(), ebenso
+// ein Laendercode ausserhalb seines Musters (COUNTRY_ISO_RE, im Dokument).
 router.get('/holidays/subdivisions/:countryCode', validateRequest(), async (req, res) => {
   const { countryCode } = req.params;
-  if (!COUNTRY_ISO_RE.test(countryCode)) {
-    return res.status(400).json({ error: 'Invalid country code.', code: 400 });
-  }
   try {
     const subdivisions = await holidays.getSubdivisions(countryCode, supportedLocaleFor(req.query.lang));
     res.json({ data: subdivisions });
@@ -278,9 +276,6 @@ router.get('/holidays/subdivisions/:countryCode', validateRequest(), async (req,
 // zur Region und kommen ueber die Route darunter.
 router.get('/holidays/groups/:countryCode', validateRequest(), async (req, res) => {
   const { countryCode } = req.params;
-  if (!COUNTRY_ISO_RE.test(countryCode)) {
-    return res.status(400).json({ error: 'Invalid country code.', code: 400 });
-  }
   try {
     const groups = await holidays.getGroups(countryCode, null);
     res.json({ data: groups });
@@ -295,12 +290,6 @@ router.get('/holidays/groups/:countryCode', validateRequest(), async (req, res) 
 // wenn die Subdivision nur ein Ferien-Regime kennt. (#434)
 router.get('/holidays/groups/:countryCode/:subdivisionCode', validateRequest(), async (req, res) => {
   const { countryCode, subdivisionCode } = req.params;
-  if (!COUNTRY_ISO_RE.test(countryCode)) {
-    return res.status(400).json({ error: 'Invalid country code.', code: 400 });
-  }
-  if (!SUBDIVISION_RE.test(subdivisionCode)) {
-    return res.status(400).json({ error: 'Invalid region code.', code: 400 });
-  }
   try {
     const groups = await holidays.getGroups(countryCode, subdivisionCode);
     res.json({ data: groups });
@@ -319,12 +308,13 @@ router.post('/holidays/sync', validateRequest(), async (req, res) => {
     await holidays.sync(true);
     res.json({ data: { last_sync: readSetting(db.get(), 'holiday_last_sync') } });
   } catch (err) {
-    log.error('POST /holidays/sync', err);
     // Phase 0 section H: the class of the failure, never the text of the
-    // holiday service or of the network stack.
+    // holiday service or of the network stack. A database error is no
+    // foreign failure: it goes on to the central error handler (500).
     const failure = remoteFailure(err);
-    if (failure) return res.status(502).json({ error: 'Holiday sync failed.', code: 502, ...failure });
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (!failure) throw err;
+    log.error('POST /holidays/sync', err);
+    return res.status(502).json({ error: 'Holiday sync failed.', code: 502, ...failure });
   }
 });
 
