@@ -3115,6 +3115,8 @@
         "desktopNavigationTitle": "Mga module at pagkakasunod-sunod",
         "desktopNavigationHint": "Ayusin ang mga module sa loob ng kani-kanilang grupo.",
         "mobileNavigationSaved": "Na-save ang nabigasyon sa mobile.",
+        "navFixedLabel": "Mananatiling nakabuka ang ibabang nabigasyon",
+        "navFixedHint": "Pinapanatili ang ibabang bar sa buong laki habang nag-i-scroll sa halip na paikliin ito na parang tableta. Para lang sa device na ito.",
         "regionTitle": "Rehiyon / Format",
         "regionLabel": "Rehiyon",
         "regionHint": "Itinatakda ang pera, numero, petsa at format ng oras ayon sa rehiyon (hal. Switzerland: 1'234.50). Piliin ang \"Custom\" para i-configure sila nang isa-isa.",

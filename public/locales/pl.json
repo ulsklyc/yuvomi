@@ -3284,6 +3284,8 @@
         "desktopNavigationTitle": "Moduły i kolejność",
         "desktopNavigationHint": "Uporządkuj moduły w obrębie ich grupy.",
         "mobileNavigationSaved": "Nawigacja mobilna została zapisana.",
+        "navFixedLabel": "Dolna nawigacja pozostaje rozwinięta",
+        "navFixedHint": "Utrzymuje dolny pasek w pełnym rozmiarze podczas przewijania zamiast zwijać go do pigułki. Dotyczy tylko tego urządzenia.",
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Ustawia walutę oraz format liczb, daty i godziny odpowiednio do regionu (np. Szwajcaria: 1'234.50). Wybierz „Niestandardowy”, aby ustawić je osobno.",

@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "Mô-đun và thứ tự",
         "desktopNavigationHint": "Sắp xếp mô-đun trong nhóm của chúng.",
         "mobileNavigationSaved": "Đã lưu điều hướng di động.",
+        "navFixedLabel": "Thanh điều hướng dưới luôn mở rộng",
+        "navFixedHint": "Giữ thanh dưới ở kích thước đầy đủ khi cuộn thay vì thu nhỏ thành viên thuốc. Chỉ áp dụng cho thiết bị này.",
         "regionTitle": "Khu vực / Định dạng",
         "regionLabel": "Khu vực",
         "regionHint": "Đặt tiền tệ, định dạng số, ngày và giờ theo khu vực (ví dụ: Thụy Sĩ 1'234.50). Chọn “Tùy chỉnh” để cấu hình riêng.",

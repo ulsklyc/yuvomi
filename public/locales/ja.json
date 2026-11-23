@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "モジュールと並び順",
         "desktopNavigationHint": "それぞれのグループ内でモジュールを並べ替えます。",
         "mobileNavigationSaved": "モバイルナビゲーションを保存しました。",
+        "navFixedLabel": "下部ナビゲーションを展開したままにする",
+        "navFixedHint": "スクロール時に下部バーをピル状に縮めず、元の大きさのまま表示します。この端末にのみ適用されます。",
         "regionTitle": "地域 / 形式",
         "regionLabel": "地域",
         "regionHint": "地域に合わせて通貨・数値・日付・時刻の形式を設定します（例：スイス 1'234.50）。個別に設定するには「カスタム」を選択してください。",

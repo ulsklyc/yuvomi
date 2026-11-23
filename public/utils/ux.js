@@ -2180,10 +2180,10 @@ function flatCapsuleHeight(nav) {
  * also still; nur der FAB rueckt in die flachere Kapsel nach (layout.css).
  *
  * @param {Element} nav - `.nav-bottom`
- * @param {{ doc?: Document, settleMs?: number }} [opts]
+ * @param {{ doc?: Document, settleMs?: number, isFixed?: () => boolean }} [opts]
  * @returns {{ nav: Element, expand: () => void, destroy: () => void }|null}
  */
-export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
+export function watchNavMinimize(nav, { doc = document, settleMs = 450, isFixed = () => false } = {}) {
   if (!nav) return null;
   const last = new WeakMap();
   let state = { minimized: false, travel: 0 };
@@ -2218,6 +2218,16 @@ export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
     const top = port.scrollTop;
     const prev = last.get(port) ?? top;
     last.set(port, top);
+    // Der geraetelokale Schalter (utils/nav-fixed.js) haelt sie ausgefahren.
+    // Expandieren statt nur zu ignorieren: wer den Schalter bei minimierter
+    // Kapsel umlegt, sieht die volle Leiste sofort. `last` wird auch hier
+    // fortgeschrieben, damit das spaetere Ausschalten keinen Sprung als
+    // Nutzergeste liest.
+    if (isFixed()) {
+      state = { minimized: false, travel: 0 };
+      apply(false);
+      return;
+    }
     state = nextNavMinimized(state, {
       top,
       max: port.scrollHeight - port.clientHeight,
@@ -2275,7 +2285,7 @@ export function watchNavMinimize(nav, { doc = document, settleMs = 450 } = {}) {
  *
  * @param {ReturnType<typeof watchNavMinimize>} current
  * @param {Element|null} nav - die aktuelle `.nav-bottom`
- * @param {{ doc?: Document, settleMs?: number }} [opts]
+ * @param {{ doc?: Document, settleMs?: number, isFixed?: () => boolean }} [opts]
  */
 export function bindNavMinimize(current, nav, opts) {
   if (current && current.nav === nav) return current;

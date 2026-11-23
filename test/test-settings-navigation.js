@@ -5897,3 +5897,50 @@ test('R24: die Mobil-Plaetze stehen als Optionszeilen in einem Traeger', async (
   const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
   assert.ok(![...eachRule(css)].some((r) => r.selector.trim() === '.settings-mobile-nav-slot'), 'keine eigene Karte je Platz');
 });
+
+// Der Schalter gegen das Minimieren der unteren Leiste ist GERAETELOKAL. Er
+// darf die gespeicherte Mobile-Reihenfolge nicht anfassen - sonst wuerde ein
+// reiner Anzeige-Schalter die Auswahl der drei Plaetze ueberschreiben.
+test('der Schalter "untere Navigation ausgefahren" ist geraetelokal und laesst mobile_nav_order unberuehrt', async () => {
+  const store = new Map();
+  const savedLocalStorage = globalThis.localStorage;
+  const savedDocument = globalThis.document;
+  const attrs = new Set();
+  globalThis.localStorage = /** @type {any} */ ({
+    getItem: (/** @type {string} */ key) => store.get(key) ?? null,
+    setItem: (/** @type {string} */ key, /** @type {string} */ value) => store.set(key, String(value)),
+    removeItem: (/** @type {string} */ key) => store.delete(key),
+  });
+  globalThis.document = /** @type {any} */ ({
+    documentElement: {
+      toggleAttribute: (/** @type {string} */ name, /** @type {boolean} */ on) => { if (on) attrs.add(name); else attrs.delete(name); },
+    },
+  });
+  try {
+    const { isNavFixed, setNavFixed, syncNavFixedFromStorage, NAV_FIXED_KEY } = await import('../public/utils/nav-fixed.js');
+    assert.equal(isNavFixed(), false, 'Standard bleibt das bisherige Minimieren');
+    setNavFixed(true);
+    assert.equal(isNavFixed(), true);
+    assert.equal(store.get(NAV_FIXED_KEY), '1');
+    assert.ok(attrs.has('data-nav-fixed'), 'der Zustand steht an <html>');
+    setNavFixed(false);
+    assert.equal(isNavFixed(), false);
+    assert.equal(store.has(NAV_FIXED_KEY), false, 'der Standard liegt als fehlender Schluessel vor');
+    assert.ok(!attrs.has('data-nav-fixed'));
+
+    store.set(NAV_FIXED_KEY, '1');
+    syncNavFixedFromStorage(/** @type {any} */ ({ key: NAV_FIXED_KEY }));
+    assert.ok(attrs.has('data-nav-fixed'), 'ein anderer Tab zieht den Zustand nach');
+    syncNavFixedFromStorage(/** @type {any} */ ({ key: 'yuvomi-theme' }));
+    assert.ok(attrs.has('data-nav-fixed'), 'fremde Schluessel aendern nichts');
+  } finally {
+    globalThis.localStorage = savedLocalStorage;
+    globalThis.document = savedDocument;
+  }
+
+  const src = await readFile(new URL('../public/settings/pages/modules-navigation.js', import.meta.url), 'utf8');
+  const handler = src.slice(src.indexOf('function bindNavFixedToggle'), src.indexOf('export async function render'));
+  assert.match(src, /id: 'nav-fixed-toggle'/, 'die Schalterzeile steht im Blatt');
+  assert.match(handler, /setNavFixed/, 'der Handler schreibt den geraetelokalen Schalter');
+  assert.doesNotMatch(handler, /savePreferences|mobile_nav_order/, 'der Schalter schreibt keine Mobile-Reihenfolge');
+});

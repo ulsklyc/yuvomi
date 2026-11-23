@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "Modulok és sorrend",
         "desktopNavigationHint": "Rendezd a modulokat a saját csoportjukon belül.",
         "mobileNavigationSaved": "Mobil navigáció mentve.",
+        "navFixedLabel": "Az alsó navigáció kibontva marad",
+        "navFixedHint": "Görgetéskor teljes méretben tartja az alsó sávot ahelyett, hogy tablettává zsugorítaná. Csak ezen az eszközön érvényes.",
         "regionTitle": "Régió / Formátum",
         "regionLabel": "Régió",
         "regionHint": "Beállítja a pénznemet, a szám-, dátum- és időformátumot a régióhoz igazítva (pl. Svájc: 1'234.50). Válassza az „Egyéni” lehetőséget az egyéni konfiguráláshoz.",

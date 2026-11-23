@@ -3078,6 +3078,8 @@
         "desktopNavigationTitle": "Modul dan urutan",
         "desktopNavigationHint": "Urutkan modul di dalam grupnya masing-masing.",
         "mobileNavigationSaved": "Navigasi seluler disimpan.",
+        "navFixedLabel": "Navigasi bawah tetap terbuka",
+        "navFixedHint": "Menjaga bilah bawah tetap berukuran penuh saat menggulir, bukan mengecilkannya menjadi pil. Hanya berlaku untuk perangkat ini.",
         "regionTitle": "Wilayah / Format",
         "regionLabel": "Wilayah",
         "regionHint": "Menetapkan mata uang, format angka, tanggal dan waktu sesuai wilayah (mis. Swiss: 1'234.50). Untuk pengaturan individual, pilih „Kustom”.",

@@ -16,6 +16,7 @@ import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMinimize } from '/utils/ux.js';
+import { isNavFixed, setNavFixed as persistNavFixed, syncNavFixedFromStorage, NAV_FIXED_KEY } from '/utils/nav-fixed.js';
 import { glideSidebar } from '/utils/sidebar-glide.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { inertOutside } from '/utils/background-inert.js';
@@ -99,6 +100,7 @@ import {
 } from '/settings/module-order.js';
 
 /** Haelt die Minimier-Logik der Kapsel (bindNavMinimize); jeder Seitenwechsel faehrt sie aus. */
+/** @type {ReturnType<typeof bindNavMinimize>} */
 let navMinimizer = null;
 
 // --------------------------------------------------------
@@ -2196,6 +2198,9 @@ function renderAppShell(container) {
   const isGuest = routerState.currentUser?.access_scope === 'split_guest';
   const isDisplayShell = routerState.currentUser?.access_scope === 'display';
   const isMinimalNav = isGuest || isDisplayShell;
+  // Der geraetelokale Schalter "untere Navigation immer ausgefahren" lebt an
+  // <html>, damit der naechste Aufbau der Shell ihn ohne erneutes Lesen sieht.
+  document.documentElement.toggleAttribute('data-nav-fixed', isNavFixed());
   const skipLink = document.createElement('a');
   skipLink.href = '#main-content';
   skipLink.className = 'sr-only';
@@ -5664,7 +5669,7 @@ function observeNavCapsule() {
   // und ohne Labels, aufwaerts, oben und am Seitenende wieder ganz. An der
   // JEWEILS aktuellen Kapsel - nach Logout/Login ist es eine neue (Review #2049).
   const nav = items.closest('.nav-bottom');
-  if (nav) navMinimizer = bindNavMinimize(navMinimizer, nav);
+  if (nav) navMinimizer = bindNavMinimize(navMinimizer, nav, { isFixed: isNavFixed });
 }
 observeNavCapsule();
 
@@ -5868,6 +5873,13 @@ window.yuvomi = {
   // (settings/registry.js, settingsSheetsForDomain) - eine Reihenfolge, zwei Orte.
   moduleOrder: () => _moduleOrder.slice(),
   setMobileNavOrder,
+  // Geraetelokal (utils/nav-fixed.js): die untere Navigation bleibt
+  // ausgefahren, statt beim Abwaertsscrollen zur Pille zu schrumpfen.
+  setNavFixed: (on) => {
+    const fixed = persistNavFixed(on);
+    navMinimizer?.expand();
+    return fixed;
+  },
   refreshThirdPartyModules,
   isModuleDisabled,
   // Ein Modul hat etwas geaendert, das an einem Nav-Ziel gezaehlt wird (#868).
@@ -5954,3 +5966,10 @@ window.yuvomi = {
 // (window.oikos.navigate/showToast …) nach dem Rename, und der Router würde das
 // Modul als fehlerhaft deaktivieren. Der Alias hält den Upgrade-Pfad nahtlos.
 window.oikos = window.yuvomi;
+
+// Ein anderer Tab hat den geraetelokalen Schalter umgelegt: Attribut
+// nachziehen und eine gerade minimierte Kapsel sofort ausfahren.
+window.addEventListener('storage', (event) => {
+  syncNavFixedFromStorage(event);
+  if (event?.key === NAV_FIXED_KEY || event?.key === null) navMinimizer?.expand();
+});

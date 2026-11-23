@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "模块与顺序",
         "desktopNavigationHint": "在各自的分组内排序模块。",
         "mobileNavigationSaved": "移动导航已保存。",
+        "navFixedLabel": "底部导航保持展开",
+        "navFixedHint": "滚动时保持底部栏完整大小，而不是缩成胶囊形。仅适用于此设备。",
         "regionTitle": "地区 / 格式",
         "regionLabel": "地区",
         "regionHint": "根据地区设置货币、数字、日期和时间格式（例如瑞士：1'234.50）。选择“自定义”可单独配置。",

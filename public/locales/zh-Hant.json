@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "模組與順序",
         "desktopNavigationHint": "在各自的分組內排序模組。",
         "mobileNavigationSaved": "行動導航已儲存。",
+        "navFixedLabel": "底部導覽保持展開",
+        "navFixedHint": "捲動時讓底部列維持完整大小，而不是縮成膠囊狀。僅適用於此裝置。",
         "regionTitle": "地區 / 格式",
         "regionLabel": "地區",
         "regionHint": "根據地區設定貨幣、數字、日期和時間格式（例如瑞士：1'234.50）。選擇「自訂」可單獨配置。",

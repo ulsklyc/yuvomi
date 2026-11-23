@@ -3078,6 +3078,8 @@
         "desktopNavigationTitle": "모듈과 순서",
         "desktopNavigationHint": "각 그룹 안에서 모듈을 정렬하세요.",
         "mobileNavigationSaved": "모바일 탐색이 저장되었습니다.",
+        "navFixedLabel": "하단 탐색이 펼쳐진 상태로 유지됩니다",
+        "navFixedHint": "스크롤할 때 하단 표시줄을 알약 모양으로 줄이지 않고 전체 크기로 유지합니다. 이 기기에만 적용됩니다.",
         "regionTitle": "지역 / 형식",
         "regionLabel": "지역",
         "regionHint": "지역에 맞게 통화, 숫자, 날짜 및 시간 형식을 설정합니다(예: 스위스 1'234.50). 개별 설정을 원하면 “사용자 지정”을 선택하세요.",

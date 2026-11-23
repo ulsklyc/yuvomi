@@ -3097,6 +3097,8 @@
         "desktopNavigationTitle": "Moduler og rekkefølge",
         "desktopNavigationHint": "Sorter modulene innenfor gruppen sin.",
         "mobileNavigationSaved": "Mobilnavigasjon lagret.",
+        "navFixedLabel": "Den nederste navigasjonen holder seg utvidet",
+        "navFixedHint": "Holder den nederste linjen i full størrelse når du ruller, i stedet for å krympe den til en pille. Gjelder bare denne enheten.",
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Angir format for valuta, tall, dato og tid for å samsvare med regionen (f.eks. Sveits: 1'234.50). Velg «Tilpass» for å konfigurere dem individuelt.",

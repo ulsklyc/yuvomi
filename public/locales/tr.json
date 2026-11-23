@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "Modüller ve sıralama",
         "desktopNavigationHint": "Modülleri kendi grupları içinde sırala.",
         "mobileNavigationSaved": "Mobil gezinme kaydedildi.",
+        "navFixedLabel": "Alt gezinme açık kalır",
+        "navFixedHint": "Kaydırırken alt çubuğu hap biçimine küçültmek yerine tam boyutta tutar. Yalnızca bu cihaz için geçerlidir.",
         "regionTitle": "Bölge / Biçim",
         "regionLabel": "Bölge",
         "regionHint": "Para birimini, sayı, tarih ve saat biçimini bölgeye göre ayarlar (örn. İsviçre: 1'234.50). Bunları ayrı ayrı yapılandırmak için „Özel“ seçeneğini seçin.",

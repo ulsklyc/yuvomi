@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "Moduler och ordning",
         "desktopNavigationHint": "Sortera modulerna inom sin grupp.",
         "mobileNavigationSaved": "Mobil navigering sparad.",
+        "navFixedLabel": "Den nedre navigeringen förblir utfälld",
+        "navFixedHint": "Håller den nedre listen i full storlek när du scrollar i stället för att krympa den till en pillerform. Gäller bara den här enheten.",
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Ställer in valuta samt tal-, datum- och tidsformat efter regionen (t.ex. Schweiz: 1'234.50). Välj ”Anpassad” för att ställa in dem individuellt.",

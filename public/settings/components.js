@@ -248,7 +248,7 @@ export function settingRowHtml({
  * Nimmt dieselben Optionen wie `toggleRowHtml()`, dazu `description`,
  * `descriptionId` und `extra`.
  */
-export function settingSwitchRowHtml({ description = '', descriptionId = null, extra = '', rowAttrs = {}, ...toggle }) {
+export function settingSwitchRowHtml({ description = '', descriptionId = /** @type {string | null} */ (null), extra = '', rowAttrs = {}, ...toggle }) {
   const attrs = { ...(toggle.attrs ?? {}) };
   if (description && descriptionId && !attrs['aria-describedby']) attrs['aria-describedby'] = descriptionId;
   const descriptionHtml = description

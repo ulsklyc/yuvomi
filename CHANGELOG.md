@@ -126,6 +126,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
   and the own schedule settings answered this way already.
 
+### Added
+- **The bottom navigation can stay expanded on this device.** Settings > Navigation has a switch
+  that keeps the tab bar at full size while scrolling instead of shrinking it to a pill. It is
+  device-local, off by default, and leaves the saved three mobile slots and their order untouched.
+
 ### Fixed
 - **A shared expense converted into a currency with other decimal places reports the converted
   amount correctly.** `converted_amount` in the expense answers was written with the decimal

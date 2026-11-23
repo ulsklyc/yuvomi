@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "Modules en volgorde",
         "desktopNavigationHint": "Sorteer de modules binnen hun groep.",
         "mobileNavigationSaved": "Mobiele navigatie opgeslagen.",
+        "navFixedLabel": "De onderste navigatie blijft uitgeklapt",
+        "navFixedHint": "Houdt de onderste balk op volledige grootte tijdens het scrollen in plaats van hem tot een pil te verkleinen. Geldt alleen voor dit apparaat.",
         "regionTitle": "Regio / Formaat",
         "regionLabel": "Regio",
         "regionHint": "Stelt valuta en getal-, datum- en tijdnotatie in op basis van de regio (bijv. Zwitserland: 1'234.50). Kies “Aangepast” om ze afzonderlijk in te stellen.",

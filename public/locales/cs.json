@@ -3166,6 +3166,8 @@
         "desktopNavigationTitle": "Moduly a pořadí",
         "desktopNavigationHint": "Seřaď moduly v rámci jejich skupiny.",
         "mobileNavigationSaved": "Mobilní navigace byla uložena.",
+        "navFixedLabel": "Dolní navigace zůstává rozbalená",
+        "navFixedHint": "Ponechá dolní lištu při posouvání v plné velikosti, místo aby se zmenšila na pilulku. Platí jen pro toto zařízení.",
         "regionTitle": "Region / Formát",
         "regionLabel": "Region",
         "regionHint": "Nastaví měnu a formát čísel, data a času podle regionu (např. Švýcarsko: 1'234.50). Pro individuální nastavení zvolte „Vlastní“.",

@@ -3115,6 +3115,8 @@
         "desktopNavigationTitle": "Module und Reihenfolge",
         "desktopNavigationHint": "Sortiere die Module innerhalb ihrer Gruppe.",
         "mobileNavigationSaved": "Mobile Navigation gespeichert.",
+        "navFixedLabel": "Untere Navigation bleibt ausgefahren",
+        "navFixedHint": "Hält die untere Leiste beim Scrollen in voller Größe, statt sie zur Pille zu verkleinern. Gilt nur für dieses Gerät.",
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Setzt Währung, Zahlen-, Datums- und Zeitformat passend zur Region (z. B. Schweiz: 1'234.50). Für individuelle Einstellungen „Benutzerdefiniert“ wählen.",

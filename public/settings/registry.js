@@ -363,6 +363,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     options: [
       'settings.desktopNavigationTitle',
       'settings.mobileNavigationTitle',
+      'settings.navFixedLabel',
     ],
     adminOnly: false,
     loader: () => import('/settings/pages/modules-navigation.js'),

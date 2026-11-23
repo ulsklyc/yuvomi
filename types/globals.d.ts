@@ -14,6 +14,7 @@ interface YuvomiApi {
   setModuleOrder: YuvomiFn;
   moduleOrder: YuvomiFn;
   setMobileNavOrder: YuvomiFn;
+  setNavFixed: YuvomiFn;
   refreshThirdPartyModules: YuvomiFn;
   isModuleDisabled: YuvomiFn;
   invalidateModuleCounts: YuvomiFn;

@@ -3060,6 +3060,8 @@
         "desktopNavigationTitle": "Módulos e ordem",
         "desktopNavigationHint": "Ordene os módulos dentro do respetivo grupo.",
         "mobileNavigationSaved": "Navegação móvel guardada.",
+        "navFixedLabel": "A navegação inferior permanece expandida",
+        "navFixedHint": "Mantém a barra inferior em tamanho completo ao deslocar, em vez de a encolher para uma pílula. Aplica-se apenas a este dispositivo.",
         "regionTitle": "Região / Formato",
         "regionLabel": "Região",
         "regionHint": "Define a moeda e os formatos de número, data e hora de acordo com a região (por ex., Suíça: 1'234.50). Escolha «Personalizado» para configurá-los individualmente.",

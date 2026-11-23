@@ -3097,6 +3097,8 @@
         "desktopNavigationTitle": "Modules and order",
         "desktopNavigationHint": "Sort the modules within their group.",
         "mobileNavigationSaved": "Mobile navigation saved.",
+        "navFixedLabel": "Bottom navigation stays expanded",
+        "navFixedHint": "Keeps the bottom bar at full size while scrolling instead of shrinking it to a pill. Applies to this device only.",
         "regionTitle": "Region / Format",
         "regionLabel": "Region",
         "regionHint": "Sets currency, number, date and time format to match the region (e.g. Switzerland: 1'234.50). Choose “Custom” to configure them individually.",

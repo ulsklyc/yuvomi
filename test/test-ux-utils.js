@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { eachRule } from './css-rules.js';
 
 // Minimales Window/Navigator-Mock für Node
-const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, requestHeadCollapse, HEAD_COLLAPSE_EVENT, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken, isImeComposing, drawIconsInSightOrder } = await (async () => {
+const { stagger, vibrate, withBusy, scheduleUndoableDelete, wireSwipeToDismiss, wireCollapsingHeader, requestHeadCollapse, HEAD_COLLAPSE_EVENT, collapseOut, expandIn, watchNavCapsuleHeight, wireScrollFade, nextNavMinimized, NAV_MINIMIZE_DOWN, NAV_MINIMIZE_UP, bindNavMinimize, watchNavMinimize, navPillGeometry, NAV_PILL_MAX_INNER, STAGGER_ROWS, durationToken, isImeComposing, drawIconsInSightOrder } = await (async () => {
   global.window = {
     matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
@@ -2459,4 +2459,51 @@ test('R22-F F2.1: eine Eingabe vor dem Ende fuellt sofort, ein neuer Aufbau been
     rowFill.flushRowFill(third.host);
     assert.ok(!ids(third.carrier).includes('P'));
   });
+});
+
+// Der geraetelokale Schalter (utils/nav-fixed.js) haelt die Kapsel ausgefahren.
+// Er wird bei jedem Scroll gelesen, damit ein Umlegen ohne neuen Aufbau wirkt.
+test('watchNavMinimize: isFixed haelt die Kapsel ausgefahren und laesst sie danach wieder minimieren', () => {
+  const savedElement = /** @type {any} */ (globalThis.Element);
+  globalThis.Element = /** @type {any} */ (class {});
+  const listeners = new Map();
+  const classes = (set = new Set()) => ({
+    set,
+    contains: (/** @type {string} */ c) => set.has(c),
+    toggle: (/** @type {string} */ c, /** @type {boolean} */ on) => { if (on) set.add(c); else set.delete(c); return on; },
+    remove: (/** @type {string} */ c) => set.delete(c),
+  });
+  const doc = /** @type {any} */ ({
+    documentElement: { classList: classes() },
+    addEventListener: (/** @type {string} */ type, /** @type {any} */ fn) => listeners.set(type, [...(listeners.get(type) ?? []), fn]),
+    removeEventListener: (/** @type {string} */ type, /** @type {any} */ fn) => listeners.set(type, (listeners.get(type) ?? []).filter((/** @type {any} */ f) => f !== fn)),
+  });
+  const nav = /** @type {any} */ ({ classList: classes(), getClientRects: () => [{}] });
+  const port = /** @type {any} */ (Object.assign(new globalThis.Element(), {
+    scrollTop: 100, scrollHeight: 3000, clientHeight: 800,
+    closest: (/** @type {string} */ sel) => (sel === '.app-content' ? {} : null),
+  }));
+  const fire = (/** @type {string} */ type, /** @type {any} */ target) => (listeners.get(type) ?? []).forEach((/** @type {any} */ fn) => fn({ target }));
+  const readDown = () => {
+    fire('wheel', port);
+    port.scrollTop += NAV_MINIMIZE_DOWN + 6;
+    fire('scroll', port);
+  };
+  const fixed = { value: true };
+  try {
+    const minimizer = watchNavMinimize(nav, { doc, isFixed: () => fixed.value });
+    readDown();
+    assert.equal(nav.classList.contains('nav-bottom--minimized'), false,
+      'bei aktivem Schalter bleibt die Kapsel ausgefahren');
+    assert.equal(doc.documentElement.classList.contains('nav-minimized'), false,
+      'auch der Root-Zustand bleibt aus');
+
+    fixed.value = false;
+    readDown();
+    assert.equal(nav.classList.contains('nav-bottom--minimized'), true,
+      'ohne den Schalter gilt wieder das bisherige Minimieren');
+    minimizer?.destroy();
+  } finally {
+    globalThis.Element = savedElement;
+  }
 });

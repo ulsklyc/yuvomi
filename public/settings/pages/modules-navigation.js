@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
-import { bindDisclosure, createRetryState, thirdPartyStatusLabel, settingRowHtml, toggleRowHtml } from '/settings/components.js';
+import { bindDisclosure, createRetryState, thirdPartyStatusLabel, settingRowHtml, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 import {
   BUILT_IN_MODULES,
   DEFAULT_MODULE_ACCENT,
@@ -26,6 +26,7 @@ import { rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { sortableSet, restoreOrder } from '/utils/sortable.js';
 import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
+import { isNavFixed, setNavFixed } from '/utils/nav-fixed.js';
 
 /** Die Sortable-Instanzen des Blatts: frei bei jedem Neuaufbau (`render`). */
 const navSortables = sortableSet();
@@ -439,6 +440,16 @@ function renderPage(container, rows, mobileOrder) {
         <p class="form-hint">${t('settings.mobileNavigationHint')}</p>
         <div class="row-carrier settings-group settings-mobile-nav-slots">
           ${[0, 1, 2].map((index) => mobileSlotHtml(mobileRows, mobileOrder, index)).join('')}
+        </div>
+        <div class="row-carrier settings-group">
+          ${settingSwitchRowHtml({
+            label: t('settings.navFixedLabel'),
+            checked: isNavFixed(),
+            icon: 'panel-bottom',
+            description: t('settings.navFixedHint'),
+            descriptionId: 'nav-fixed-hint',
+            attrs: { id: 'nav-fixed-toggle', 'aria-describedby': 'nav-fixed-hint' },
+          })}
         </div>
       </section>
       <section class="settings-navigation-panel">
@@ -962,6 +973,22 @@ function bindMobileNavigationEvents(container, user) {
   });
 }
 
+/**
+ * Der geraetelokale Schalter unter den drei Mobil-Plaetzen. Er schreibt NUR
+ * `localStorage` und die laufende Shell - `mobile_nav_order` bleibt unberuehrt,
+ * damit eine bestehende Auswahl nicht durch das Umlegen dieses Schalters
+ * verloren geht oder neu sortiert wird.
+ *
+ * @param {HTMLElement} container
+ */
+function bindNavFixedToggle(container) {
+  const toggle = /** @type {HTMLInputElement | null} */ (container.querySelector('#nav-fixed-toggle'));
+  toggle?.addEventListener('change', () => {
+    if (window.yuvomi?.setNavFixed) window.yuvomi.setNavFixed(toggle.checked);
+    else setNavFixed(toggle.checked);
+  });
+}
+
 export async function render(container, { user }) {
   const isAdmin = user?.role === 'admin';
   const [preferencesResult, modulesResult] = await Promise.allSettled([
@@ -1012,6 +1039,7 @@ export async function render(container, { user }) {
   bindDisclosure(container, { triggerSelector: '[data-kitchen-expand]', panelSelector: '[data-kitchen-children]', id: 'kitchen-children-navigation' });
   bindModuleListEvents(container, user, rows, unrenderedOrderIds);
   bindMobileNavigationEvents(container, user);
+  bindNavFixedToggle(container);
 }
 
 // Die Endzone als Markup (test:manager-endzone).
