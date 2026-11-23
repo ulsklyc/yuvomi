@@ -151,13 +151,15 @@ app.use('/api/v1/family', requireAuth, familyRouter);
 app.use('/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter);
 app.use('/api/v1/schedule', requireAuth, scheduleRouter);
 app.use('/tasks', requireAuth, tasksRouter);
-app.use('/calendar', requireAuth, calendarRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/calendar', requireAuth, calendarRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 // In server/index.js the general API limiter stands in front of it, here a
 // generous one does, far above what this suite sends.
 const budgetLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
 app.use('/api/v1/budget', budgetLimiter, requireAuth, budgetRouter);
-app.use('/dashboard', requireAuth, dashboardRouter);
+// At its real prefix (#2810).
+app.use('/api/v1/dashboard', requireAuth, dashboardRouter);
 app.use('/api/v1/rewards', requireAuth, rewardsRouter);
 app.use('/api/v1/split-expenses', requireAuth, splitRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
@@ -266,7 +268,7 @@ test('members only: a task comment mention notifies neither staff nor guests', a
 });
 
 test('members only: the dashboard user list, reward standings and participant count', async () => {
-  const r = await call('GET', '/dashboard');
+  const r = await call('GET', '/api/v1/dashboard');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.users), MEMBERS);
   assert.deepEqual(idsOf(r.body.rewards.standings), MEMBERS);
@@ -431,9 +433,9 @@ test('tasks: a stored staff assignee stays saveable, a newly added guest does no
 });
 
 test('calendar: a new attendee must be a household member', async () => {
-  const ok = await call('POST', '/calendar', { body: { title: 'Arzt', start_datetime: '2030-03-01T10:00:00', assigned_to: [BEN] } });
+  const ok = await call('POST', '/api/v1/calendar', { body: { title: 'Arzt', start_datetime: '2030-03-01T10:00:00', assigned_to: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('POST', '/calendar', { body: { title: 'Gast', start_datetime: '2030-03-01T11:00:00', assigned_to: [EMIL] } }), 'guest attendee');
+  assertRejectsNonMember(await call('POST', '/api/v1/calendar', { body: { title: 'Gast', start_datetime: '2030-03-01T11:00:00', assigned_to: [EMIL] } }), 'guest attendee');
 });
 
 test('calendar: a stored staff attendee stays saveable, a newly added guest does not', async () => {
@@ -442,11 +444,11 @@ test('calendar: a stored staff attendee stays saveable, a newly added guest does
   `).run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(eventId, CLARA);
 
-  const kept = await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', eventId), byId([BEN, CLARA]));
 
-  assertRejectsNonMember(await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
+  assertRejectsNonMember(await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
   assert.deepEqual(assignedIds('event_assignments', 'event_id', eventId), byId([BEN, CLARA]), 'a rejected PUT writes nothing');
 });
 
@@ -457,10 +459,10 @@ test('calendar: a single occurrence keeps the series attendees and takes no new 
   `).run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(seriesId, CLARA);
 
-  const kept = await call('PUT', `/calendar/${seriesId}/occurrences/2030-04-03`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-04-03`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-04-04`, { body: { assigned_to: [CLARA, DORA] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-04-04`, { body: { assigned_to: [CLARA, DORA] } }),
     'guest added to one occurrence',
   );
 });
@@ -567,11 +569,11 @@ test('synced calendars: a new ICS subscription default assignee must be a househ
   // Kein Netz: 127.0.0.1 weist die SSRF-Pruefung vor jedem Abruf ab. Ein
   // Mitglied kommt an der Personenpruefung vorbei und scheitert erst dort - die
   // Positivkontrolle dafuer, dass die Ablehnung darunter die Mitgliedschaft meint.
-  const member = await call('POST', '/calendar/subscriptions', { body: { ...body, default_assignee_user_id: BEN } });
+  const member = await call('POST', '/api/v1/calendar/subscriptions', { body: { ...body, default_assignee_user_id: BEN } });
   assert.equal(member.status, 400, JSON.stringify(member.body));
   assert.match(String(member.body?.error), /private IP/i);
   assertRejectsNonMember(
-    await call('POST', '/calendar/subscriptions', { body: { ...body, default_assignee_user_id: CLARA } }),
+    await call('POST', '/api/v1/calendar/subscriptions', { body: { ...body, default_assignee_user_id: CLARA } }),
     'staff as default assignee of a new subscription',
   );
 });
@@ -585,11 +587,11 @@ test('synced calendars: a stored ICS subscription assignee stays saveable, a new
   db.prepare('INSERT INTO ics_subscription_assignees (subscription_id, user_id) VALUES (?, ?)').run(subId, CLARA);
   const assignee = () => db.prepare('SELECT user_id AS a FROM ics_subscription_assignees WHERE subscription_id = ?').get(subId)?.a;
 
-  const kept = await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { name: 'Verein neu', default_assignee_user_id: CLARA } });
+  const kept = await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { name: 'Verein neu', default_assignee_user_id: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  assertRejectsNonMember(await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: DORA } }), 'guest as default assignee');
+  assertRejectsNonMember(await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: DORA } }), 'guest as default assignee');
   assert.equal(assignee(), CLARA, 'a rejected PATCH writes nothing');
-  const member = await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: BEN } });
+  const member = await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assert.equal(assignee(), BEN);
 });
@@ -601,14 +603,14 @@ test('synced calendars: an external calendar default assignee (Google, Apple, Ca
   db.prepare('INSERT INTO external_calendar_assignees (calendar_id, user_id) VALUES (?, ?)').run(calId, CLARA);
   const assignee = () => db.prepare('SELECT user_id AS a FROM external_calendar_assignees WHERE calendar_id = ?').get(calId)?.a;
 
-  const kept = await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } });
+  const kept = await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  assertRejectsNonMember(await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: EMIL } }), 'guest as default assignee');
+  assertRejectsNonMember(await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: EMIL } }), 'guest as default assignee');
   assert.equal(assignee(), CLARA, 'a rejected PATCH writes nothing');
-  const member = await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: BEN } });
+  const member = await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assertRejectsNonMember(
-    await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } }),
+    await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } }),
     'staff chosen again after being replaced',
   );
 });
@@ -619,13 +621,13 @@ test('synced calendars: a stored Outlook account owner stays saveable, a new non
   `).run(CLARA).lastInsertRowid);
   const owner = () => db.prepare('SELECT owner_user_id AS o FROM outlook_accounts WHERE id = ?').get(accountId).o;
 
-  const kept = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { name: 'Arbeit neu', ownerUserId: CLARA } });
+  const kept = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { name: 'Arbeit neu', ownerUserId: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  const guestOwner = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } });
+  const guestOwner = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } });
   assertRejectsNonMember(guestOwner, 'guest as owner');
   assert.equal(guestOwner.body.reason, 'calendar_assignee_not_member', 'die App sagt den Satz (#1909)');
   assert.equal(owner(), CLARA, 'a rejected PUT writes nothing');
-  const member = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: BEN } });
+  const member = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assert.equal(owner(), BEN);
 });
@@ -666,7 +668,7 @@ test('calendar: the series path of PUT keeps a stored staff attendee and takes n
   const seriesId = addSeries('Wochenplan', '2030-05-01T08:00:00', [CLARA]);
   // Ein abgewandeltes Vorkommen zwingt PUT /:id in den Serienpfad
   // (updateSeriesWithOverrides) statt in das einfache Update.
-  const occurrence = await call('PUT', `/calendar/${seriesId}/occurrences/2030-05-03`, { body: { title: 'Anders' } });
+  const occurrence = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-05-03`, { body: { title: 'Anders' } });
   assert.equal(occurrence.status, 200, JSON.stringify(occurrence.body));
   assert.ok(db.prepare('SELECT 1 FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId), 'Vorbedingung: ein verknuepftes Vorkommen existiert');
 
@@ -676,10 +678,10 @@ test('calendar: the series path of PUT keeps a stored staff attendee and takes n
     rows: eventRows(),
   });
   const before = series();
-  assertRejectsNonMember(await call('PUT', `/calendar/${seriesId}`, { body: { assigned_to: [CLARA, DORA] } }), 'guest added to a series with an override');
+  assertRejectsNonMember(await call('PUT', `/api/v1/calendar/${seriesId}`, { body: { assigned_to: [CLARA, DORA] } }), 'guest added to a series with an override');
   assert.deepEqual(series(), before, 'a rejected series PUT writes nothing');
 
-  const kept = await call('PUT', `/calendar/${seriesId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', seriesId), byId([BEN, CLARA]));
 });
@@ -693,12 +695,12 @@ test('calendar: this-and-following keeps a stored staff attendee and takes no ne
   });
   const before = series();
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [CLARA, EMIL] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [CLARA, EMIL] } }),
     'guest added to this and the following occurrences',
   );
   assert.deepEqual(series(), before, 'a rejected split writes nothing: same series, no following series');
 
-  const kept = await call('PUT', `/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 201, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', kept.body.data.id), byId([BEN, CLARA]));
 });
@@ -709,21 +711,21 @@ test('calendar: an occurrence that owns its attendees is the stored state, not t
   // gespeichert - sie wieder hinzuzufuegen ist eine neue Wahl. Genau so
   // bestimmt upsertOccurrenceOverride() den geltenden Stand.
   const seriesId = addSeries('Einkauf', '2030-08-01T09:00:00', [CLARA]);
-  const removed = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN] } });
+  const removed = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN] } });
   assert.equal(removed.status, 200, JSON.stringify(removed.body));
   const child = db.prepare('SELECT id, overridden_fields FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?').get(seriesId, '2030-08-03T09:00:00');
   assert.match(String(child?.overridden_fields), /assignments/, 'Vorbedingung: das Vorkommen besitzt seine Zuweisungen');
   assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN]);
 
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN, CLARA] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN, CLARA] } }),
     'staff re-added to an occurrence that had removed them',
   );
   assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN], 'a rejected PUT writes nothing');
 
   // Gegenprobe: ein Vorkommen ohne eigene Zuweisung erbt die der Serie, dort
   // bleibt Clara gespeichert.
-  const inherited = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-04`, { body: { assigned_to: [BEN, CLARA] } });
+  const inherited = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-04`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(inherited.status, 200, JSON.stringify(inherited.body));
 });
 
@@ -745,12 +747,12 @@ test('calendar: a rejected attendee leaves no staged attachment behind', async (
     const dataUrl = `data:text/plain;base64,${Buffer.from('Anhang').toString('base64')}`;
 
     // Gegenprobe zuerst: legt dieser Aufbau ueberhaupt eine Datei ab?
-    const ok = await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN], attachment_data: dataUrl, attachment_name: 'gut.txt' } });
+    const ok = await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN], attachment_data: dataUrl, attachment_name: 'gut.txt' } });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
     assert.equal(await files(), 1, 'Vorbedingung: ein gelungener Anhang liegt im Ordner');
 
     assertRejectsNonMember(
-      await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, DORA], attachment_data: dataUrl, attachment_name: 'waise.txt' } }),
+      await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, DORA], attachment_data: dataUrl, attachment_name: 'waise.txt' } }),
       'guest added together with an attachment',
     );
     assert.equal(await files(), 1, 'the attachment staged for the rejected request was cleaned up');

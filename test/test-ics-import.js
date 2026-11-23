@@ -9,7 +9,6 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -18,7 +17,7 @@ process.env.SESSION_SECRET ||= 'test-secret-ics-import';
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const { importToLocal, toLocalRRule } = await import('../server/services/ics-subscription.js');
 const { expandRecurringEvents, loadEventExceptions } = await import('../server/services/calendar-events.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 // --------------------------------------------------------
 // Test-DB via vollständige Migrationskette
@@ -221,15 +220,18 @@ test('importToLocal: throws when neither ics nor url is provided', async () => {
 // POST /calendar/import route
 // --------------------------------------------------------
 let currentUid = uid;
-const app = express();
-app.use(express.json({ limit: '7mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = currentUid;
-  req.user = { id: currentUid, role: 'admin' };
-  req.session = { userId: currentUid, role: 'admin' };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '7mb',
+  auth: (req, _res, next) => {
+    req.authUserId = currentUid;
+    req.user = { id: currentUid, role: 'admin' };
+    req.session = { userId: currentUid, role: 'admin' };
+    next();
+  },
 });
-app.use('/api/v1/calendar', calendarRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;

@@ -43,11 +43,10 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { readFileSync } from 'node:fs';
 
 const dbmod = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const {
   calendarOccurrenceDeleteTarget,
   calendarOccurrenceMutationTarget,
@@ -88,22 +87,25 @@ db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALU
 
 // ── App mit injizierter Auth (actor zur Request-Zeit gelesen) ────────────────────
 let actor = ADMIN;
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
-  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
-  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
-  // Modulrechte und Token-Scope fuer die Dokumentenrecht-Faelle (#1358).
-  req.sessionModuleAccess = actor.moduleAccess ?? null;
-  req.authScopes = actor.authScopes ?? null;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+    // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+    req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
+    // Modulrechte und Token-Scope fuer die Dokumentenrecht-Faelle (#1358).
+    req.sessionModuleAccess = actor.moduleAccess ?? null;
+    req.authScopes = actor.authScopes ?? null;
+    next();
+  },
 });
-app.use(express.json({ limit: '10mb' }));
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
 
 test.after(() => server.close());
 

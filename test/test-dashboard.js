@@ -11,7 +11,6 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
 import * as nodeAssert from 'node:assert/strict';
-import express from 'express';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { addLocalDays, toLocalDateKey } from '../public/utils/date.js';
 import { withoutBlockComments } from './source-text.js';
@@ -1558,7 +1557,7 @@ test('Geburtstage: der Stichtag folgt der Haushaltszone, nicht der des Servers',
 
 test('Dashboard-Geburtstagswidget lädt Geburtstage haushaltsweit (Issue #406)', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM reminders WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-birthday-%')").run();
@@ -1580,18 +1579,19 @@ test('Dashboard-Geburtstagswidget lädt Geburtstage haushaltsweit (Issue #406)',
   routeDb.prepare('INSERT INTO birthdays (name, birth_date, created_by) VALUES (?, ?, ?)')
     .run('Widget Other Today', `2011-${today.slice(5)}`, routeUser2);
 
-  const app = express();
-  app.use((req, _res, next) => {
-    req.authUserId = routeUser1;
-    req.session = { userId: routeUser1 };
-    next();
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => {
+      req.authUserId = routeUser1;
+      req.session = { userId: routeUser1 };
+      next();
+    },
   });
-  app.use('/', dashboardRouter);
 
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`);
     const body = await response.json();
     const names = body.birthdays.map((birthday) => birthday.name);
 
@@ -1619,7 +1619,7 @@ test('Dashboard-Geburtstagswidget lädt Geburtstage haushaltsweit (Issue #406)',
 
 test('Dashboard-Endpoint filtert heutige Mahlzeiten nach sichtbaren Typen', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
   const previousMealTypes = routeDb.prepare('SELECT value FROM sync_config WHERE key = ?').get('visible_meal_types')?.value ?? null;
 
@@ -1645,18 +1645,19 @@ test('Dashboard-Endpoint filtert heutige Mahlzeiten nach sichtbaren Typen', asyn
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run();
 
-  const app = express();
-  app.use((req, _res, next) => {
-    req.authUserId = routeUser;
-    req.session = { userId: routeUser };
-    next();
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => {
+      req.authUserId = routeUser;
+      req.session = { userId: routeUser };
+      next();
+    },
   });
-  app.use('/', dashboardRouter);
 
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`);
     const body = await response.json();
 
     nodeAssert.equal(response.status, 200);
@@ -1683,7 +1684,7 @@ test('Dashboard-Endpoint filtert heutige Mahlzeiten nach sichtbaren Typen', asyn
 // (authRole). Die Sichten einzeln prueft test/test-dashboard-rewards.js.
 test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und offene Freigaben', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM users WHERE username LIKE 'dashboard-rewards-%'").run();
@@ -1709,13 +1710,14 @@ test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und of
   routeDb.prepare(`INSERT INTO reward_redemptions (user_id, reward_name, cost, status)
     VALUES (?, 'Kino', 50, 'pending')`).run(kidB);
 
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = parent; req.authRole = 'admin'; req.session = { userId: parent }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = parent; req.authRole = 'admin'; req.session = { userId: parent }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
     const names = body.rewards.standings.map((s) => s.display_name);
     nodeAssert.equal(body.rewards.view, 'approver');
     nodeAssert.equal(names[0], 'Kid A', 'nach Namen, nicht nach Saldo - Kid B hat mehr und steht nicht vorn');
@@ -1732,7 +1734,7 @@ test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und of
 
 test('Dashboard-Endpoint: Gesundheit zählt heute fällige eigene Dosen und Nachbestellungen', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM users WHERE username LIKE 'dashboard-health-%'").run();
@@ -1821,13 +1823,14 @@ test('Dashboard-Endpoint: Gesundheit zählt heute fällige eigene Dosen und Nach
     INSERT INTO medication_logs (medication_id, scheduled_at, status) VALUES (?, ?, 'skipped')
   `).run(skippedMed, `${localKey}T11:00:00`);
 
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
     nodeAssert.equal(body.health.hasMeds, true);
     // Fällig heute: Tagesmed (07:00), Vitamin D (08:00), Privat-Med (09:00),
     // Genommenmed (10:00), Ausgelassenmed (11:00). Zukunfts-/Abgelaufen-Plan zählen
@@ -1845,7 +1848,7 @@ test('Dashboard-Endpoint: Gesundheit zählt heute fällige eigene Dosen und Nach
 
 test('Dashboard-Endpoint: Haushaltshilfe meldet Anwesenheit, Monatsbesuche und offenen Betrag', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM users WHERE username LIKE 'dashboard-hk-%'").run();
@@ -1872,13 +1875,14 @@ test('Dashboard-Endpoint: Haushaltshilfe meldet Anwesenheit, Monatsbesuche und o
     VALUES (?, ?, 40, 10, NULL, ?, ?)
   `).run(`${currentMonth}-01T09:00:00`, `${currentMonth}-01T13:00:00`, workerId, owner);
 
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
     nodeAssert.equal(body.housekeeping.configured, true);
     nodeAssert.equal(body.housekeeping.present, true);
     nodeAssert.equal(body.housekeeping.workerName, 'Maria');
@@ -1892,7 +1896,7 @@ test('Dashboard-Endpoint: Haushaltshilfe meldet Anwesenheit, Monatsbesuche und o
 
 test('Dashboard-Endpoint: dringende Aufgaben, anstehende Termine, Einkaufslisten und Sparziel', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM budget_plans WHERE category = '__savings__'").run();
@@ -1943,13 +1947,14 @@ test('Dashboard-Endpoint: dringende Aufgaben, anstehende Termine, Einkaufslisten
   // Monats-Sparziel (Budgetplan) → deckt den savingsGoal-Zweig.
   routeDb.prepare("INSERT INTO budget_plans (category, amount) VALUES ('__savings__', 500)").run();
 
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
 
     const urgent = body.urgentTasks.find((t) => t.title === 'Widget Urgent');
     nodeAssert.ok(urgent, 'dringende Aufgabe erscheint im Widget');
@@ -1992,17 +1997,18 @@ test('Dashboard-Endpoint: dringende Aufgaben, anstehende Termine, Einkaufslisten
 });
 
 test('Dashboard-Endpoint: fehlender Auth-Kontext führt zu 500 (kritischer Fehlerpfad)', async () => {
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
 
-  const app = express();
   // Middleware setzt weder authUserId noch session → der Handler wirft beim Lesen von
   // req.session.userId und der äußere try/catch liefert die 500-Antwort.
-  app.use((req, _res, next) => { next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`);
     nodeAssert.equal(response.status, 500);
     const body = await response.json();
     nodeAssert.equal(body.code, 500);
@@ -4731,7 +4737,7 @@ test('Wetter: ohne Tageswerte bleibt die Hoch/Tief-Zeile weg statt leer zu stehe
 
 test('Dashboard serialisiert linked occurrences ohne rohe Persistenzfelder', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
   const owner = routeDb.prepare(`
     INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -4756,17 +4762,18 @@ test('Dashboard serialisiert linked occurrences ohne rohe Persistenzfelder', asy
   routeDb.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)')
     .run(masterId, slot);
 
-  const app = express();
-  app.use((req, _res, next) => {
-    req.authUserId = owner;
-    req.session = { userId: owner, role: 'member' };
-    next();
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => {
+      req.authUserId = owner;
+      req.session = { userId: owner, role: 'member' };
+      next();
+    },
   });
-  app.use('/', dashboardRouter);
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/?events_scope=mine`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/?events_scope=mine`)).json();
     const child = body.upcomingEvents.find((event) => Number(event.id) === Number(childId));
     nodeAssert.ok(child, 'linked occurrence musí být v dashboard odpovědi');
     nodeAssert.equal(child.series_id, Number(masterId));
@@ -5768,7 +5775,7 @@ const othersFirst = pendingTests.slice();
 test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe Kachel hinaus', async () => {
   await Promise.allSettled(othersFirst);
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
   const cleanup = () => {
     routeDb.prepare("DELETE FROM reminders WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
@@ -5791,13 +5798,14 @@ test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe 
     routeDb.prepare(`INSERT INTO budget_entries (title, amount, category, subcategory, date, created_by)
       VALUES (?, ?, ?, '', ?, ?)`).run(`U14 ${category}`, -(600 - i * 50), category, `${month}-0${1 + i}`, owner);
   });
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
     nodeAssert.equal(body.birthdays.length, 8, 'acht Geburtstage: fuenf fuer die hohe Kachel, drei fuer den gestreckten Platz');
     nodeAssert.ok(body.birthdayTotal >= 10, 'die Gesamtzahl bleibt die ganze');
     nodeAssert.equal(body.budget.topExpenses.length, 5, 'fuenf Kategorien: drei fuer die hohe Kachel, zwei fuer den gestreckten Platz');

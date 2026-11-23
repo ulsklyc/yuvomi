@@ -30,7 +30,6 @@ import http from 'node:http';
 import { register } from 'node:module';
 import { readFileSync, readdirSync } from 'node:fs';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 register('./test-browser-loader.mjs', import.meta.url);
 
@@ -39,7 +38,7 @@ process.env.SESSION_SECRET = 'dashboard-today-test-secret';
 
 const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 
 function buildMigratedDatabase(migrations) {
@@ -72,17 +71,20 @@ const ADMIN = db.prepare(`
   VALUES (?, 'Anna', 'hash', '#7C3AED', 'admin', 'parent')
 `).run(`today-admin-${randomUUID()}`).lastInsertRowid;
 
-const app = express();
-app.use((req, _res, next) => {
-  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(ADMIN);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(ADMIN);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
+    next();
+  },
+  before: [['/api/v1/housekeeping', housekeepingRouter]],
 });
-app.use('/api/v1/housekeeping', housekeepingRouter);
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -139,7 +141,7 @@ test('#1451 Berlin: ein Besuch am Ersten um 00:30 zaehlt in diesem Monat, nicht 
     seedVisit('2026-09-30T22:30:00.000Z', '2026-10-01T01:30:00.000Z', { extras: 10 });
     // Kontrolle: ein Besuch mitten im September zaehlt nicht.
     seedVisit('2026-09-15T07:00:00.000Z', '2026-09-15T11:00:00.000Z');
-    const { housekeeping } = await getJson('/');
+    const { housekeeping } = await getJson('/api/v1/dashboard/');
     assert.equal(housekeeping.visitsThisMonth, 1, 'der Besuch vom 01.10. ist ein Oktober-Besuch');
     assert.equal(housekeeping.unpaidAmount, 50, 'daily_rate 40 + extras 10 im Oktober');
   }));
@@ -149,7 +151,7 @@ test('#1451 Los Angeles: ein Besuch am Letzten abends zaehlt in diesem Monat, ni
     clearVisits();
     // 30.09. 18:00 bis 21:00 in Los Angeles - als Instant schon der 01.10.
     seedVisit('2026-10-01T01:00:00.000Z', '2026-10-01T04:00:00.000Z');
-    const { housekeeping } = await getJson('/');
+    const { housekeeping } = await getJson('/api/v1/dashboard/');
     assert.equal(housekeeping.visitsThisMonth, 1, 'es ist noch September - der Besuch gehoert dazu');
     assert.equal(housekeeping.unpaidAmount, 40);
   }));
@@ -160,7 +162,7 @@ test('#1451: zonenlose Wanduhrzeit zaehlt in ihrem eigenen Monat', withClock('20
   // zonenlos steht die Ziffernfolge schon in der Haushaltszone.
   seedVisit('2026-10-01T00:30:00', '2026-10-01T03:30:00');
   seedVisit('2026-09-30T23:30:00', '2026-10-01T01:00:00');
-  const { housekeeping } = await getJson('/');
+  const { housekeeping } = await getJson('/api/v1/dashboard/');
   assert.equal(housekeeping.visitsThisMonth, 1, 'nur der Besuch vom 01.10. gehoert in den Oktober');
 }));
 
@@ -169,7 +171,7 @@ test('#1451: Uebersicht und Modul zaehlen dieselben abgeschlossenen Besuche', wi
   seedVisit('2026-09-30T22:30:00.000Z', '2026-10-01T01:30:00.000Z');
   seedVisit('2026-10-01T05:00:00.000Z', '2026-10-01T07:00:00.000Z', { paid: true });
   seedVisit('2026-09-30T20:00:00.000Z', '2026-09-30T21:30:00.000Z'); // 22:00 Berlin, noch September
-  const { housekeeping } = await getJson('/');
+  const { housekeeping } = await getJson('/api/v1/dashboard/');
   const module = (await getJson('/api/v1/housekeeping/dashboard')).data;
   assert.equal(module.visits_this_month, 2, 'Vorbedingung: das Modul zaehlt zwei Oktober-Besuche');
   assert.equal(housekeeping.visitsThisMonth, module.visits_this_month, 'Uebersicht und Modul sagen dieselbe Zahl');
@@ -204,7 +206,7 @@ test('Haushaltshilfe: letzter Besuch und offene Sitzung sind der spaeteste Zeitp
       // Offen: Jonas seit 09:00 in Berlin (zonenlos), Maria seit 09:30 in Berlin (Instant).
       seedVisitFor(other, '2031-07-15T09:00:00', null);
       seedVisitFor(WORKER, '2031-07-15T07:30:00.000Z', null);
-      const { housekeeping } = await getJson('/');
+      const { housekeeping } = await getJson('/api/v1/dashboard/');
       assert.equal(housekeeping.lastVisit, '2031-07-15T10:00:00.000Z', 'der Besuch von 12:00, nicht der von 11:00');
       assert.equal(housekeeping.presentSince, '2031-07-15T07:30:00.000Z', 'die zuletzt begonnene offene Sitzung');
       assert.equal(housekeeping.workerName, 'Maria', 'und ihr Name');
@@ -220,7 +222,7 @@ test('Haushaltshilfe: letzter Besuch und offene Sitzung sind der spaeteste Zeitp
       clearVisits();
       seedVisitFor(WORKER, '2031-07-15T09:00:00Z', '2031-07-15T09:10:00Z');
       seedVisitFor(WORKER, '2031-07-15T09:00:00.500Z', '2031-07-15T09:10:00.000Z');
-      assert.equal((await getJson('/')).housekeeping.lastVisit, '2031-07-15T09:00:00.500Z', 'eine halbe Sekunde spaeter ist spaeter');
+      assert.equal((await getJson('/api/v1/dashboard/')).housekeeping.lastVisit, '2031-07-15T09:00:00.500Z', 'eine halbe Sekunde spaeter ist spaeter');
     } finally {
       clearVisits();
       db.prepare('DELETE FROM housekeeping_workers WHERE id = ?').run(other);
@@ -257,7 +259,7 @@ test('#1457: laufende mehrtaegige Termine stehen heute in upcomingEvents', withC
   addEvent('Gestern vorbei', '2026-09-23T10:00', '2026-09-23T12:00');
   addEvent('Ganztag gestern', '2026-09-23', '2026-09-23', { allDay: 1 });
   addEvent('Heute abend', '2026-09-24T19:00', '2026-09-24T20:00');
-  const { upcomingEvents } = await getJson('/');
+  const { upcomingEvents } = await getJson('/api/v1/dashboard/');
   const got = titles(upcomingEvents);
   for (const title of ['Reise', 'Klassenfahrt', 'Synchronisiert', 'Nachtschicht', 'Heute abend']) {
     assert.ok(got.includes(title), `${title} fehlt in upcomingEvents: ${got.join(', ')}`);
@@ -271,7 +273,7 @@ test('#1457: der Deckel von fuenf zaehlt den laufenden Termin, nicht den heute b
   clearEvents();
   addEvent('Nachtschicht', '2026-09-23T18:00', '2026-09-24T08:00');
   for (let i = 1; i <= 5; i += 1) addEvent(`Kommt ${i}`, `2026-09-24T1${i}:00`, `2026-09-24T1${i}:30`);
-  const { upcomingEvents } = await getJson('/');
+  const { upcomingEvents } = await getJson('/api/v1/dashboard/');
   const got = titles(upcomingEvents);
   assert.deepEqual(got, ['Nachtschicht', 'Kommt 1', 'Kommt 2', 'Kommt 3', 'Kommt 4', 'Kommt 5'],
     'die heute beendete Nachtschicht steht ausserhalb des Deckels, alle fuenf kommenden bleiben');
@@ -281,7 +283,7 @@ test('#1457: auch das Vorkommen einer Serie, das gestern begann, laeuft heute', 
   clearEvents();
   // Taeglich 23:00 bis 11:00 am Folgetag: das Vorkommen von gestern laeuft um 10:00 noch.
   addEvent('Bereitschaft', '2026-09-20T23:00', '2026-09-21T11:00', { rrule: 'FREQ=DAILY' });
-  const { upcomingEvents } = await getJson('/');
+  const { upcomingEvents } = await getJson('/api/v1/dashboard/');
   const starts = upcomingEvents.filter((e) => e.title === 'Bereitschaft').map((e) => String(e.start_datetime).slice(0, 16));
   assert.ok(starts.includes('2026-09-23T23:00'), `das laufende Vorkommen von gestern fehlt: ${starts.join(', ')}`);
   assert.ok(starts.includes('2026-09-24T23:00'), 'und das von heute Abend steht weiter da');
@@ -296,11 +298,11 @@ test('#1457: ob ein Termin in heute reicht, entscheidet die Haushaltszone', asyn
   };
   await withClock('2026-09-24T15:00:00Z', 'Europe/Berlin', async () => {
     setup();
-    assert.ok(titles((await getJson('/')).upcomingEvents).includes('Ueber Mitternacht'), 'Berlin: heute beendet, steht da');
+    assert.ok(titles((await getJson('/api/v1/dashboard/')).upcomingEvents).includes('Ueber Mitternacht'), 'Berlin: heute beendet, steht da');
   })();
   await withClock('2026-09-24T15:00:00Z', 'America/Los_Angeles', async () => {
     setup();
-    assert.ok(!titles((await getJson('/')).upcomingEvents).includes('Ueber Mitternacht'), 'Los Angeles: gestern vorbei');
+    assert.ok(!titles((await getJson('/api/v1/dashboard/')).upcomingEvents).includes('Ueber Mitternacht'), 'Los Angeles: gestern vorbei');
   })();
 });
 
@@ -432,7 +434,7 @@ function seedBusyDay() {
 
 test('#1449: familyEvents traegt den Abendtermin, den der Deckel der Kachel abschneidet', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
   seedBusyDay();
-  const body = await getJson('/');
+  const body = await getJson('/api/v1/dashboard/');
   assert.ok(!titles(body.upcomingEvents).includes('Leo Abend'), 'Vorbedingung: die Kachel zeigt fuenf Kommende, Leos Abend ist der sechste');
   const family = titles(body.familyEvents ?? []);
   assert.ok(family.includes('Leo Abend'), `familyEvents fehlt Leos Abendtermin: ${family.join(', ')}`);
@@ -441,7 +443,7 @@ test('#1449: familyEvents traegt den Abendtermin, den der Deckel der Kachel absc
 
 test('#1449: „nur meine" der Kachel gilt nicht fuer die Familienkarte', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
   seedBusyDay();
-  const body = await getJson('/?events_scope=mine');
+  const body = await getJson('/api/v1/dashboard/?events_scope=mine');
   assert.deepEqual([...new Set(titles(body.upcomingEvents).map((t) => t.split(' ')[0]))], ['Anna'], 'Vorbedingung: die Kachel zeigt nur Annas');
   assert.ok(titles(body.familyEvents ?? []).includes('Leo Abend'), 'die Karte zeigt jedes Mitglied - Leo ist nicht „frei"');
 }));
@@ -525,7 +527,7 @@ test('#1828 Wand: ein Termin fuer zwei zaehlt bei BEIDEN, nicht nur bei der erst
     clearEvents();
     addAssigned('Elternabend', '2026-09-24T19:00', '2026-09-24T20:00', [ADMIN, LEO]);
     addAssigned('Training', '2026-09-24T17:00', '2026-09-24T18:00', [LEO]);
-    const body = await getJson('/');
+    const body = await getJson('/api/v1/dashboard/');
     const shared = body.upcomingEvents.find((event) => event.title === 'Elternabend');
     assert.deepEqual(shared.assigned_users.map((user) => user.display_name).sort(), ['Anna', 'Leo'],
       'Vorbedingung: die Antwort traegt beide Zugewiesenen');
@@ -541,10 +543,10 @@ test('#1828 Wand: wer nur durch den gemeinsamen Termin dran ist, steht trotzdem 
     // Die Reihenfolge der Zuweisung darf nichts entscheiden: einmal Leo
     // zuerst, einmal Anna zuerst - beide Male stehen beide da.
     addAssigned('Zahnarzt', '2026-09-24T16:00', '2026-09-24T17:00', [LEO, ADMIN]);
-    assert.deepEqual(wallCounts(dash.renderWallSurface(await getJson('/'), null, { now: new Date() })), { Anna: 1, Leo: 1 });
+    assert.deepEqual(wallCounts(dash.renderWallSurface(await getJson('/api/v1/dashboard/'), null, { now: new Date() })), { Anna: 1, Leo: 1 });
     clearEvents();
     addAssigned('Zahnarzt', '2026-09-24T16:00', '2026-09-24T17:00', [ADMIN, LEO]);
-    assert.deepEqual(wallCounts(dash.renderWallSurface(await getJson('/'), null, { now: new Date() })), { Anna: 1, Leo: 1 });
+    assert.deepEqual(wallCounts(dash.renderWallSurface(await getJson('/api/v1/dashboard/'), null, { now: new Date() })), { Anna: 1, Leo: 1 });
   }));
 
 test('#1829 Wand: der Termin zeigt sein gewaehltes Icon, das Kalenderzeichen nur ohne Wahl',
@@ -554,7 +556,7 @@ test('#1829 Wand: der Termin zeigt sein gewaehltes Icon, das Kalenderzeichen nur
     setIcon.run('tooth', addEvent('Zahnarzt', '2026-09-24T16:00', '2026-09-24T17:00'));
     setIcon.run('drill', addEvent('Kontrolle', '2026-09-24T17:00', '2026-09-24T18:00'));
     setIcon.run('gibt-es-nicht', addEvent('Unbekannt', '2026-09-24T18:00', '2026-09-24T19:00'));
-    const body = await getJson('/');
+    const body = await getJson('/api/v1/dashboard/');
     const icons = Object.fromEntries(body.upcomingEvents.map((event) => [event.title, event.icon]));
     assert.deepEqual(icons, { Werkstatt: 'car', Zahnarzt: 'tooth', Kontrolle: 'drill', Unbekannt: 'gibt-es-nicht' },
       'Vorbedingung: die Antwort traegt das Icon jedes Termins');
@@ -562,7 +564,7 @@ test('#1829 Wand: der Termin zeigt sein gewaehltes Icon, das Kalenderzeichen nur
     const seals = wallSeals(dash.renderWallSurface(body, null, { now: new Date() }));
     clearEvents();
     addEvent('Ohne Wahl', '2026-09-24T19:00', '2026-09-24T20:00');
-    const plain = await getJson('/');
+    const plain = await getJson('/api/v1/dashboard/');
     assert.equal(plain.upcomingEvents[0].icon, 'calendar', 'Vorbedingung: ohne Wahl traegt die Spalte ihren Default');
     seals['Ohne Wahl'] = wallSeals(dash.renderWallSurface(plain, null, { now: new Date() }))['Ohne Wahl'];
     const generic = moduleIconHTML('calendar');
@@ -601,7 +603,7 @@ test('#1829 Heute wichtig: der Termin zeigt sein gewaehltes Icon wie an der Wand
     setIcon.run('drill', addEvent('Kontrolle', '2026-09-24T17:00', '2026-09-24T18:00'));
     setIcon.run('gibt-es-nicht', addEvent('Unbekannt', '2026-09-24T18:00', '2026-09-24T19:00'));
     addEvent('Ohne Wahl', '2026-09-24T19:00', '2026-09-24T20:00');
-    const body = await getJson('/');
+    const body = await getJson('/api/v1/dashboard/');
     const sheet = todaySeals(dash.renderTodayCockpit(body, [], false, { now: new Date() }));
     const wall = wallSeals(dash.renderWallSurface(body, null, { now: new Date() }));
     const generic = moduleIconHTML('calendar');

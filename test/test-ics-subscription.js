@@ -434,18 +434,17 @@ await (async () => {
       // Die Antworten der Route: der Fall reist als reason/params, das Abo
       // steht trotzdem (201), der Knopf bekommt 400 statt 200.
       process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-      const { default: express } = await import('express');
-      const { default: calendarRouter } = await import('../server/routes/calendar.js');
-      const app = express();
-      app.use(express.json());
-      app.use((req, _res, next) => {
-        req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1, role: 'admin' };
-        next();
+      const { createCalendarApp } = await import('./calendar-app.js');
+      const app = await createCalendarApp({
+        mount: ['calendar'],
+        auth: (req, _res, next) => {
+          req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1, role: 'admin' };
+          next();
+        },
       });
-      app.use('/calendar', calendarRouter);
       const api = app.listen(0, '127.0.0.1');
       await new Promise((r) => api.on('listening', r));
-      const base = `http://127.0.0.1:${api.address().port}/calendar`;
+      const base = `http://127.0.0.1:${api.address().port}/api/v1/calendar`;
       try {
         await atest('POST /subscriptions: 201 mit syncReason und syncParams', async () => {
           const res = await fetch(`${base}/subscriptions`, {

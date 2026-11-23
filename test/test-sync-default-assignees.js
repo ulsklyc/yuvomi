@@ -34,7 +34,6 @@ process.env.DB_PATH = ':memory:';
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 const dbmod = await import('../server/db.js');
@@ -63,7 +62,7 @@ const tableExists = (name) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE ty
 const ics = await import('../server/services/ics-subscription.js');
 const reminders = await import('../server/services/caldav-reminders-sync.js');
 const { removeUser } = await import('../server/services/user-removal.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 const CAL_TOGETHER = 'https://dav.example/together/';
 const CAL_BEN = 'https://dav.example/ben/';
@@ -392,16 +391,16 @@ describe('Routen', () => {
     db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(OWNER);
     actor = { id: OWNER, role: 'admin' };
     if (!server) {
-      const app = express();
-      app.use((req, _res, next) => {
-        req.authUserId = actor.id; req.authRole = actor.role;
-        req.session = { userId: actor.id, role: actor.role };
-        next();
+      const app = await createCalendarApp({
+        mount: ['calendar'],
+        auth: (req, _res, next) => {
+          req.authUserId = actor.id; req.authRole = actor.role;
+          req.session = { userId: actor.id, role: actor.role };
+          next();
+        },
       });
-      app.use(express.json());
-      app.use('/', calendarRouter);
       server = app.listen(0, '127.0.0.1');
-      baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+      baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
     }
   });
 

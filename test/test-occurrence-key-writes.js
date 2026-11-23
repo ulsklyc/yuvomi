@@ -40,7 +40,7 @@ const {
 } = await import('../server/services/calendar-occurrence-overrides.js');
 const { getCountdowns } = await import('../server/services/countdowns.js');
 const { buildFeed } = await import('../server/services/ics-export.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 
 db.prepare("INSERT INTO users (id, username, display_name, password_hash, role) VALUES (1, 'admin', 'Admin', 'x', 'admin')").run();
@@ -103,17 +103,35 @@ function startsOf(seriesIds, from, to) {
     .sort();
 }
 
+/**
+ * @param {any} app
+ * @param {string} [prefix]
+ */
+function listen(app, prefix = '') {
+  return new Promise((resolve) => {
+    const server = app.listen(0, '127.0.0.1', () => resolve({
+      base: `http://127.0.0.1:${server.address().port}${prefix}`,
+      close: () => new Promise((done) => server.close(done)),
+    }));
+  });
+}
+
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+async function startCalendar() {
+  const app = await createCalendarApp({
+    mount: ['calendar'],
+    auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); },
+  });
+  return listen(app, '/api/v1/calendar');
+}
+
 function startApp(router) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
   app.use('/', router);
-  return new Promise((resolve) => {
-    const server = app.listen(0, '127.0.0.1', () => resolve({
-      base: `http://127.0.0.1:${server.address().port}`,
-      close: () => new Promise((done) => server.close(done)),
-    }));
-  });
+  return listen(app);
 }
 
 // Europe/Berlin taeglich 01:30, Start im Sommer 2034. Im Maerz 2035: 01:30 MEZ
@@ -185,7 +203,7 @@ test('COUNT oestlich von UTC: "dieser und folgende" zaehlt am Schleifentag weite
 
 test('Altform als Eingabe: ein Treffer 200, in der Umstellungsnacht 409 ambiguous_recurrence_id', async () => {
   const id = insertSeries(BERLIN_NIGHT);
-  const { base, close } = await startApp(calendarRouter);
+  const { base, close } = await startCalendar();
   try {
     // `2035-03-25` meinte auf main das Vorkommen vom 26.03. 01:30 (23:30Z des 25.).
     const one = await fetch(`${base}/${id}/occurrences/2035-03-25`, {
@@ -246,7 +264,7 @@ test('Neue Startzeit der Serie: Ausnahme und Einzelvorkommen wandern mit (PUT /:
   upsertOccurrenceOverride(db, {
     seriesId: id, recurrenceId: keyShownOn(id, 'Europe/Berlin', '2035-05-04'), actorId: 1, changes: { title: 'Eigener Titel' },
   });
-  const { base, close } = await startApp(calendarRouter);
+  const { base, close } = await startCalendar();
   try {
     const res = await fetch(`${base}/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -294,7 +312,7 @@ test('Neue Startzeit einer Serie ohne Einzelvorkommen-Recht: die Ausnahme wander
   // laeuft dann ohne `updateSeriesWithOverrides`.
   const id = insertSeries({ title: 'Mit Ziel', start: '2035-05-01T09:00', end: '2035-05-01T10:00', rule: 'FREQ=DAILY' });
   db.prepare("UPDATE calendar_events SET target_google_calendar_id = 'family@test' WHERE id = ?").run(id);
-  const { base, close } = await startApp(calendarRouter);
+  const { base, close } = await startCalendar();
   try {
     const exception = await fetch(`${base}/${id}/exceptions`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

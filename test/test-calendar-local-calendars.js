@@ -3,10 +3,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const dbmod = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { buildCalendarFeed } = await import('../server/services/ics-export.js');
 const { findCalendarByFeedToken, ensureDefaultCalendar, resolveLocalCalendarId } = await import('../server/services/local-calendars.js');
 
@@ -16,20 +15,22 @@ const ADMIN = { id: 1, role: 'admin' };
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
 let actor = ADMIN;
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.sessionModuleAccess = { calendar: actor.access ?? 'write' };
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.sessionModuleAccess = { calendar: actor.access ?? 'write' };
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use(express.json({ limit: '10mb' }));
-app.use('/api/v1/calendar', calendarRouter);
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => {
-  server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`));
+  server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}/api/v1/calendar`));
 });
 
 test.after(() => server.close());
@@ -74,7 +75,7 @@ test('local calendars: default exists and calendars can be created', async () =>
 
   const original = await createEvent('Single-calendar appearance');
   assert.equal(original.local_calendar_color, null);
-  const listUrl = '/api/v1/calendar?from=2035-05-01&to=2035-05-31';
+  const listUrl = '/?from=2035-05-01&to=2035-05-31';
   const singleList = await call('GET', listUrl);
   assert.equal(singleList.status, 200);
   assert.equal(singleList.body.data.find(event => event.id === original.id).local_calendar_color, null,
@@ -968,7 +969,7 @@ function shownColor(event) {
 }
 
 async function listedImport(uid) {
-  const list = await call('GET', '/api/v1/calendar?from=2036-03-01&to=2036-03-31');
+  const list = await call('GET', '/?from=2036-03-01&to=2036-03-31');
   assert.equal(list.status, 200);
   const row = list.body.data.find((event) => event.external_calendar_id === uid);
   assert.ok(row, `importierter Termin ${uid} fehlt in der Liste`);

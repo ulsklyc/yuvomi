@@ -31,8 +31,6 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-// @ts-expect-error express 5 ships no type declarations (TS7016); new code type-checks clean
-import express from 'express';
 
 // 10:30 in Berlin on 2026-03-11: the route reads this clock once.
 const FROZEN_NOW = Date.parse('2026-03-11T09:30:00.000Z');
@@ -49,7 +47,7 @@ const { emptyWasteOverview, wasteOverviewSlice } = await import('../server/servi
 const { emptyMembersOverview, membersOverviewSlice } = await import('../server/services/members-slices.ts');
 const { emptyPantryExpiring } = await import('../server/services/pantry-expiring.js');
 const { sliceRunner } = await import('../server/services/slice-runner.ts');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 const db = get();
 
@@ -298,22 +296,25 @@ test('the empty forms are fresh objects in the route\'s key order', () => {
 let viewer = ANNA;
 /** @type {string[] | null} */
 let tokenScopes = null;
-const app = express();
-app.use((/** @type {any} */ req, /** @type {unknown} */ _res, /** @type {() => void} */ next) => {
-  const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(viewer);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.authMethod = tokenScopes ? 'api_token' : 'session';
-  req.session = { userId: user.id, role: user.role };
-  // What requireAuth does: hand the connection to the actor and resolve the modules.
-  req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
-  req.authScopes = tokenScopes;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (/** @type {any} */ req, /** @type {unknown} */ _res, /** @type {() => void} */ next) => {
+    const user = db.prepare('SELECT id, role FROM users WHERE id = ?').get(viewer);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.authMethod = tokenScopes ? 'api_token' : 'session';
+    req.session = { userId: user.id, role: user.role };
+    // What requireAuth does: hand the connection to the actor and resolve the modules.
+    req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
+    req.authScopes = tokenScopes;
+    next();
+  },
 });
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(undefined)));
-const endpoint = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}/`;
+const endpoint = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (server.address()).port}/api/v1/dashboard/`;
 
 test.after(async () => {
   await new Promise((resolve) => server.close(() => resolve(undefined)));

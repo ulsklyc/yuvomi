@@ -12,10 +12,9 @@ process.env.DB_PATH = ':memory:';
 
 import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const db = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 // Geteilte :memory:-DB (Singleton) → Events zwischen Tests zurücksetzen.
 // Ausnahmen verschwinden per ON DELETE CASCADE mit ihren Events.
@@ -23,14 +22,14 @@ beforeEach(() => {
   db.get().prepare('DELETE FROM calendar_events').run();
 });
 
-function startApp() {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
-  app.use('/', calendarRouter);
+async function startApp() {
+  const app = await createCalendarApp({
+    mount: ['calendar'],
+    auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); },
+  });
   return new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve({
-      baseUrl: `http://127.0.0.1:${s.address().port}`,
+      baseUrl: `http://127.0.0.1:${s.address().port}/api/v1/calendar`,
       close: () => new Promise((r) => s.close(r)),
     }));
   });

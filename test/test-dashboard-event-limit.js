@@ -33,7 +33,6 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { register } from 'node:module';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 import { readFileSync } from 'node:fs';
 
 register('./test-browser-loader.mjs', import.meta.url);
@@ -43,7 +42,7 @@ process.env.SESSION_SECRET = 'dashboard-event-limit-test-secret';
 
 const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 const { dashboardPaths } = await import('../server/openapi/paths/dashboard.js');
 const widgets = await import('../public/utils/dashboard-widgets.js');
@@ -82,18 +81,20 @@ const ADMIN = Number(addUser.run(`limit-admin-${randomUUID()}`, 'Anna', 'admin',
 const LEO = Number(addUser.run(`limit-leo-${randomUUID()}`, 'Leo', 'member', 'child').lastInsertRowid);
 
 let currentUser = ADMIN;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(currentUser);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(currentUser);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
+    next();
+  },
+  before: [['/preferences', preferencesRouter]],
 });
-app.use('/preferences', preferencesRouter);
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -151,19 +152,19 @@ const firstAhead = (n) => Array.from({ length: n }, (_, i) => `Kommt ${pad(i + 1
 
 test('ohne events_limit bleibt es bei fuenf Kommenden', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
   seedFullCalendar();
-  assert.deepEqual(ahead((await getJson('/')).upcomingEvents), firstAhead(5));
+  assert.deepEqual(ahead((await getJson('/api/v1/dashboard/')).upcomingEvents), firstAhead(5));
 }));
 
 for (const step of [8, 12]) {
   test(`events_limit=${step} liefert ${step} Kommende`, withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
     seedFullCalendar();
-    assert.deepEqual(ahead((await getJson(`/?events_limit=${step}`)).upcomingEvents), firstAhead(step));
+    assert.deepEqual(ahead((await getJson(`/api/v1/dashboard/?events_limit=${step}`)).upcomingEvents), firstAhead(step));
   }));
 }
 
 test('events_limit=5 ist die Vorgabe und liefert dasselbe wie kein Parameter', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
   seedFullCalendar();
-  assert.deepEqual(ahead((await getJson('/?events_limit=5')).upcomingEvents), firstAhead(5));
+  assert.deepEqual(ahead((await getJson('/api/v1/dashboard/?events_limit=5')).upcomingEvents), firstAhead(5));
 }));
 
 test('alles ausserhalb der Allowlist ist fuenf - kein Bereich, kein Runden', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
@@ -175,13 +176,13 @@ test('alles ausserhalb der Allowlist ist fuenf - kein Bereich, kein Runden', wit
     'events_limit=8&events_limit=12', 'events_limit[]=12', 'events_limit[a]=12',
   ];
   for (const query of outside) {
-    assert.deepEqual(ahead((await getJson(`/?${query}`)).upcomingEvents), firstAhead(5), `?${query} darf nicht mehr als fuenf liefern`);
+    assert.deepEqual(ahead((await getJson(`/api/v1/dashboard/?${query}`)).upcomingEvents), firstAhead(5), `?${query} darf nicht mehr als fuenf liefern`);
   }
 }));
 
 test('beendete Termine von heute kommen obendrauf und verbrauchen die Stufe nicht (#1449)', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
   seedFullCalendar();
-  const events = (await getJson('/?events_limit=12')).upcomingEvents;
+  const events = (await getJson('/api/v1/dashboard/?events_limit=12')).upcomingEvents;
   assert.deepEqual(titles(events).filter((title) => title.startsWith('Vorbei')), ['Vorbei 08', 'Vorbei 09', 'Vorbei 10']);
   assert.equal(ahead(events).length, 12, 'zwoelf Kommende NEBEN den drei beendeten');
 }));
@@ -189,13 +190,13 @@ test('beendete Termine von heute kommen obendrauf und verbrauchen die Stufe nich
 test('weniger Termine als die Stufe: die Antwort ist kuerzer, nicht aufgefuellt', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
   clearEvents();
   for (let i = 1; i <= 6; i += 1) addEvent(`Kommt ${pad(i)}`, `2026-09-${24 + i}T10:00`, `2026-09-${24 + i}T11:00`);
-  assert.deepEqual(ahead((await getJson('/?events_limit=12')).upcomingEvents), firstAhead(6));
+  assert.deepEqual(ahead((await getJson('/api/v1/dashboard/?events_limit=12')).upcomingEvents), firstAhead(6));
 }));
 
 test('die Stufe gilt der Liste: weekEvents und familyEvents bleiben, wie sie sind', withClock(THU_14_BERLIN, 'Europe/Berlin', async () => {
   seedFullCalendar();
-  const plain = await getJson('/');
-  const twelve = await getJson('/?events_limit=12');
+  const plain = await getJson('/api/v1/dashboard/');
+  const twelve = await getJson('/api/v1/dashboard/?events_limit=12');
   assert.deepEqual(twelve.weekEvents, plain.weekEvents);
   assert.deepEqual(twelve.familyEvents, plain.familyEvents);
 }));
@@ -206,7 +207,7 @@ test('die Stufe vertraegt sich mit „nur meine" und greift NACH dem Filter', wi
   const rows = db.prepare("SELECT id, title FROM calendar_events WHERE title LIKE 'Kommt %' ORDER BY title").all();
   // Jeder zweite gehoert Anna: sieben eigene unter vierzehn.
   rows.forEach((row, index) => { if (index % 2 === 1) assign.run(row.id, ADMIN); });
-  const mine = ahead((await getJson('/?events_scope=mine&events_limit=8')).upcomingEvents);
+  const mine = ahead((await getJson('/api/v1/dashboard/?events_scope=mine&events_limit=8')).upcomingEvents);
   assert.deepEqual(mine, ['02', '04', '06', '08', '10', '12', '14'].map((n) => `Kommt ${n}`),
     'acht ist der Deckel NACH dem Filter - sonst blieben vier von acht');
 }));
@@ -216,8 +217,8 @@ test('die Stufe vertraegt sich mit „nur meine" und greift NACH dem Filter', wi
 // es nicht) - die Stufe haengt an keiner Tagesgrenze.
 test('Gegenlauf Honolulu: die Stufe zaehlt dort genauso', withClock('2026-09-25T02:00:00Z', 'Pacific/Honolulu', async () => {
   seedFullCalendar();
-  assert.equal(ahead((await getJson('/?events_limit=8')).upcomingEvents).length, 8);
-  assert.equal(ahead((await getJson('/')).upcomingEvents).length, 5);
+  assert.equal(ahead((await getJson('/api/v1/dashboard/?events_limit=8')).upcomingEvents).length, 8);
+  assert.equal(ahead((await getJson('/api/v1/dashboard/')).upcomingEvents).length, 5);
 }));
 
 test('OpenAPI nennt den Parameter mit genau den Stufen der Route', () => {
@@ -716,14 +717,14 @@ test('die Zahlen der Navigation sind mit und ohne Stufe dieselben - und mit eine
       module: badges.moduleCountsFrom(data, { isAdmin: true, shoppingVisible: true }),
       nav: badges.navBadgeCountsFrom(data),
     });
-    const plain = counts(await getJson('/'));
+    const plain = counts(await getJson('/api/v1/dashboard/'));
     assert.equal(plain.module.tasks, 3, 'Vorbedingung: drei offene Aufgaben werden gezaehlt');
     assert.equal(plain.nav['/tasks'], 2, 'Vorbedingung: zwei davon ueberfaellig');
     for (const step of [8, 12]) {
-      assert.deepEqual(counts(await getJson(`/?events_limit=${step}`)), plain, `events_limit=${step} darf keine Zahl bewegen`);
+      assert.deepEqual(counts(await getJson(`/api/v1/dashboard/?events_limit=${step}`)), plain, `events_limit=${step} darf keine Zahl bewegen`);
     }
     // Die Messung sieht einen Filter, wenn es einer ist - sonst waere das Gleichheitszeichen oben nichts wert.
-    const filtered = counts(await getJson('/?tasks_category=household'));
+    const filtered = counts(await getJson('/api/v1/dashboard/?tasks_category=household'));
     assert.equal(filtered.module.tasks, 2);
     assert.equal(filtered.nav['/tasks'], 1);
   } finally {

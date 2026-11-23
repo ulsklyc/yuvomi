@@ -3,7 +3,6 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { dashboardPaths } from '../server/openapi/paths/dashboard.js';
 
 test('OpenAPI documents the repeatable AND note-category filter', () => {
@@ -18,7 +17,7 @@ test('OpenAPI documents the repeatable AND note-category filter', () => {
 });
 
 const dbmod = await import('../server/db.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { listVisibleCategories } = await import('../server/services/note-categories.js');
 const db = dbmod.get();
 
@@ -47,16 +46,19 @@ assign.run(both, school, userId);
 assign.run(onlyHome, home, userId);
 assign.run(invisible, hidden, otherId);
 
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = userId;
-  req.authRole = 'member';
-  req.session = { userId, role: 'member' };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    req.authUserId = userId;
+    req.authRole = 'member';
+    req.session = { userId, role: 'member' };
+    next();
+  },
 });
-app.use('/', dashboardRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}/api/v1/dashboard`)));
 
 test('dashboard note category filters are AND and run before the row limit', async () => {
   const response = await fetch(`${baseUrl}/?notes_category=${home}&notes_category=${school}`);

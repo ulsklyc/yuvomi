@@ -31,7 +31,6 @@ import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { register } from 'node:module';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 register('./test-browser-loader.mjs', import.meta.url);
 
@@ -99,7 +98,7 @@ test('Registrierung: Modulschalter, Dispatch, Beschriftung und Ton sind verdraht
 // --------------------------------------------------------------------------
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 function buildMigratedDatabase(migrations) {
   const database = new Database(':memory:');
@@ -132,20 +131,23 @@ const MEMBER = db.prepare(`
 `).run(`pantry-member-${randomUUID()}`).lastInsertRowid;
 
 let tokenScopes = null;
-const app = express();
-app.use((req, _res, next) => {
-  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(MEMBER);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
-  req.authScopes = tokenScopes;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(MEMBER);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
+    req.authScopes = tokenScopes;
+    next();
+  },
 });
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-const endpoint = `http://127.0.0.1:${server.address().port}/`;
+const endpoint = `http://127.0.0.1:${server.address().port}/api/v1/dashboard/`;
 
 test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
