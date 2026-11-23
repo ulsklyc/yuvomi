@@ -9,7 +9,6 @@ import { DatabaseSync } from 'node:sqlite';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import express from 'express';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 
 let passed = 0, failed = 0;
@@ -66,18 +65,17 @@ import { freshTestDbPath } from './tmp-db.js';
 freshTestDbPath('taskcat');
 process.env.SESSION_SECRET = 'task-categories-test-secret-32bytes-long';
 const db = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 db.init();
 const database = db.get();
 database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('owner', 'Owner', 'x', 'admin')").run();
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); });
-app.use('/tasks', tasksRouter);
+const app = await createTasksApp({
+  auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise((r) => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}/tasks`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;
 const jget = async (u) => { const r = await fetch(u); return { status: r.status, body: await r.json().catch(() => null) }; };
 const jsend = async (u, method, body) => {
   const r = await fetch(u, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });

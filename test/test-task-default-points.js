@@ -17,13 +17,12 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'task-default-points-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 
 const moduleDatabase = get();
@@ -64,16 +63,17 @@ const ADMIN  = seedUser('admin', 'admin');
 const MEMBER = seedUser('member', 'member');
 
 let actor = { id: ADMIN, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
+  after: [
+    ['/api/v1/preferences', preferencesRouter],
+  ],
 });
-app.use('/api/v1/tasks', tasksRouter);
-app.use('/api/v1/preferences', preferencesRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}/api/v1`;

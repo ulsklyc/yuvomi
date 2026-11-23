@@ -33,7 +33,6 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
 import rateLimit from 'express-rate-limit';
 
 const dbmod = await import('../server/db.js');
@@ -41,7 +40,7 @@ const { router: authRouter, sessionMiddleware, requireAuth } = await import('../
 const { default: familyRouter } = await import('../server/routes/family.js');
 const { default: scheduleRouter } = await import('../server/routes/schedule.js');
 const { default: scheduleExtrasRouter } = await import('../server/routes/schedule-extras.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
@@ -49,8 +48,6 @@ const { default: rewardsRouter } = await import('../server/routes/rewards.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
 const { default: permissionsRouter } = await import('../server/routes/permissions.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
-const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
-const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { householdOverview } = await import('../server/services/two-factor.js');
 const { listEmailableMembers } = await import('../server/services/member-email.js');
 const { householdMemberSql, isHouseholdMember, memberOrderSql } = await import('../server/services/household-members.js');
@@ -134,46 +131,45 @@ assert.deepEqual(byId(EVERYONE), [...EVERYONE].reverse(), 'Vorbedingung: ids lau
 // --------------------------------------------------------------------------
 
 let actor = ANNA;
-const app = express();
-app.use(express.json());
-app.use(defaultEmptyBody);
-app.use(sessionMiddleware);
-app.use((req, _res, next) => {
-  if (actor) {
-    req.session.userId = actor;
-    req.session.role = ROLE[actor];
-  }
-  next();
-});
-app.use('/auth', authRouter);
-app.use('/api/v1/family', requireAuth, familyRouter);
-// At their real prefixes, in the mount order of server/index.js (#2810).
-app.use('/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter);
-app.use('/api/v1/schedule', requireAuth, scheduleRouter);
-app.use('/tasks', requireAuth, tasksRouter);
-// At its real prefix: validateRequest() finds its operation by the mount (#2810).
-// In server/index.js the general API limiter stands in front of it, here a
-// generous one does, far above what this suite sends.
+// At their real prefixes, in the mount order of server/index.js (#2810). In
+// server/index.js the general API limiter stands in front of the routers,
+// here a generous one does, far above what this suite sends.
+const tasksLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
 const calendarLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
-app.use('/api/v1/calendar', calendarLimiter, requireAuth, calendarRouter);
-// At its real prefix: validateRequest() finds its operation by the mount (#2810).
-// In server/index.js the general API limiter stands in front of it, here a
-// generous one does, far above what this suite sends.
 const budgetLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
-app.use('/api/v1/budget', budgetLimiter, requireAuth, budgetRouter);
-// At its real prefix (#2810), behind a generous limiter as the calendar above.
 const dashboardLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
-app.use('/api/v1/dashboard', dashboardLimiter, requireAuth, dashboardRouter);
-app.use('/api/v1/rewards', requireAuth, rewardsRouter);
-app.use('/api/v1/split-expenses', requireAuth, splitRouter);
-// At its real prefix: validateRequest() finds its operation by the mount (#2810).
-app.use('/api/v1/permissions', requireAuth, permissionsRouter);
-// At its real prefix (#2810). The documents router reads and writes files;
-// in server/index.js the general API limiter stands in front of it, here a
-// generous one does, far above what this suite sends.
+// The documents router reads and writes files.
 const documentsLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
-app.use('/api/v1/documents', documentsLimiter, requireAuth, documentsRouter);
-app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
+// The tasks at their real prefix through test/tasks-app.js: validateRequest()
+// finds its operation by the mount.
+const app = await createTasksApp({
+  auth: [
+    sessionMiddleware,
+    (req, _res, next) => {
+      if (actor) {
+        req.session.userId = actor;
+        req.session.role = ROLE[actor];
+      }
+      next();
+    },
+  ],
+  before: [
+    ['/auth', authRouter],
+    ['/api/v1/family', requireAuth, familyRouter],
+    ['/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter],
+    ['/api/v1/schedule', requireAuth, scheduleRouter],
+    ['/api/v1/tasks', tasksLimiter, requireAuth],
+  ],
+  after: [
+    ['/api/v1/calendar', calendarLimiter, requireAuth, calendarRouter],
+    ['/api/v1/budget', budgetLimiter, requireAuth, budgetRouter],
+    ['/api/v1/dashboard', dashboardLimiter, requireAuth, dashboardRouter],
+    ['/api/v1/rewards', requireAuth, rewardsRouter],
+    ['/api/v1/split-expenses', requireAuth, splitRouter],
+    ['/api/v1/permissions', requireAuth, permissionsRouter],
+    ['/api/v1/documents', documentsLimiter, requireAuth, documentsRouter],
+  ],
+});
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -246,20 +242,20 @@ test('accounts: the 2FA overview lists every account', async () => {
 });
 
 test('members only: GET /tasks/meta/options', async () => {
-  const r = await call('GET', '/tasks/meta/options');
+  const r = await call('GET', '/api/v1/tasks/meta/options');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.users), MEMBERS);
 });
 
 test('members only: a task comment mention notifies neither staff nor guests', async () => {
-  const task = await call('POST', '/tasks', { body: { title: 'Wer hilft?', visibility: 'all' } });
+  const task = await call('POST', '/api/v1/tasks', { body: { title: 'Wer hilft?', visibility: 'all' } });
   assert.equal(task.status, 201);
 
   const pushed = [];
   const original = pushService.sendPushToUser;
   pushService.sendPushToUser = async (userId) => { pushed.push(userId); };
   try {
-    const r = await call('POST', `/tasks/${task.body.data.id}/comments`, {
+    const r = await call('POST', `/api/v1/tasks/${task.body.data.id}/comments`, {
       body: { comment: '@Ben @Clara @Dora wer uebernimmt das?' },
     });
     assert.equal(r.status, 201);
@@ -418,21 +414,21 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
 const assignedIds = (table, key, id) => byId(db.prepare(`SELECT user_id FROM ${table} WHERE ${key} = ?`).all(id).map((r) => r.user_id));
 
 test('tasks: a new assignee must be a household member', async () => {
-  const ok = await call('POST', '/tasks', { body: { title: 'Mitglied', assigned_to: [BEN] } });
+  const ok = await call('POST', '/api/v1/tasks', { body: { title: 'Mitglied', assigned_to: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('POST', '/tasks', { body: { title: 'Personal', assigned_to: [CLARA] } }), 'staff assignee');
-  assertRejectsNonMember(await call('POST', '/tasks', { body: { title: 'Gast', assigned_to: [BEN, DORA] } }), 'guest assignee');
+  assertRejectsNonMember(await call('POST', '/api/v1/tasks', { body: { title: 'Personal', assigned_to: [CLARA] } }), 'staff assignee');
+  assertRejectsNonMember(await call('POST', '/api/v1/tasks', { body: { title: 'Gast', assigned_to: [BEN, DORA] } }), 'guest assignee');
 });
 
 test('tasks: a stored staff assignee stays saveable, a newly added guest does not', async () => {
   const taskId = Number(db.prepare("INSERT INTO tasks (title, visibility, created_by) VALUES ('Fenster', 'all', ?)").run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(taskId, CLARA);
 
-  const kept = await call('PUT', `/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('task_assignments', 'task_id', taskId), byId([BEN, CLARA]));
 
-  assertRejectsNonMember(await call('PUT', `/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
+  assertRejectsNonMember(await call('PUT', `/api/v1/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
   assert.deepEqual(assignedIds('task_assignments', 'task_id', taskId), byId([BEN, CLARA]), 'a rejected PUT writes nothing');
 });
 
@@ -846,7 +842,7 @@ test('rewards: an old enrolment of an account that is not a member earns, redeem
   // Clara (Hauspersonal) ist seit der Fixture eingeschrieben (enabled = 1).
   const taskId = Number(db.prepare("INSERT INTO tasks (title, status, points, created_by) VALUES ('Fenster', 'open', 5, ?)").run(ANNA).lastInsertRowid);
   for (const id of [BEN, CLARA]) db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(taskId, id);
-  const done = await call('PATCH', `/tasks/${taskId}/status`, { body: { status: 'done' } });
+  const done = await call('PATCH', `/api/v1/tasks/${taskId}/status`, { body: { status: 'done' } });
   assert.equal(done.status, 200, JSON.stringify(done.body));
   const earned = db.prepare("SELECT user_id FROM reward_ledger WHERE task_id = ? AND type = 'earn' ORDER BY user_id").all(taskId)
     .map((row) => row.user_id);

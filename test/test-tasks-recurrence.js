@@ -11,7 +11,6 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -25,7 +24,7 @@ const {
   nextOccurrence, nextOccurrenceAfter, nextDueAfterCompletion,
 } = await import('../server/services/recurrence.js');
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 
 // --------------------------------------------------------
 // Helfer
@@ -171,16 +170,15 @@ _setTestDatabase(db);
 const uid = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
   VALUES ('admin', 'Admin', '$2b$12$x', 'admin')`).run().lastInsertRowid;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  // `x-test-user` laesst einen Test als zweite Person fragen.
-  const other = Number(req.headers['x-test-user']) || null;
-  req.authUserId = other ?? uid;
-  req.session = { userId: other ?? uid, role: other ? 'member' : 'admin' };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    // `x-test-user` laesst einen Test als zweite Person fragen.
+    const other = Number(req.headers['x-test-user']) || null;
+    req.authUserId = other ?? uid;
+    req.session = { userId: other ?? uid, role: other ? 'member' : 'admin' };
+    next();
+  },
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;

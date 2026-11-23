@@ -35,7 +35,7 @@ import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
 import {
   actorForUser, authorize, householdVisible, rowVisible, taskReader, taskRowVisible, taskVisibleWhere,
 } from '../authorize/index.ts';
-import { isAdminRequest, refuseAdmin } from '../middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
 import { householdMemberSql, isHouseholdMember, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 import { pushService } from '../services/push.js';
@@ -46,6 +46,11 @@ import {
   removeTagEverywhere, renameTag, setTags, tagKey, tagsKey, taskIdsWithTag,
 } from '../utils/task-tags.js';
 import * as v from '../middleware/validate.js';
+import { validateRequest } from '../api/validate-request.ts';
+import {
+  TASK_PRIORITIES as VALID_PRIORITIES, ARCHIVE_STATUS, TASK_STATUSES as VALID_STATUSES,
+  TASK_MAX_POINTS as MAX_POINTS, MAX_BULK_TASKS, MAX_ROTATION_POOL,
+} from '../services/task-fields.js';
 import { personAvatarUrlSql } from '../services/person-avatar.js';
 
 const log = createLogger('Tasks');
@@ -109,21 +114,11 @@ const router = express.Router();
 // Konstanten
 // --------------------------------------------------------
 
-const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'];
-
-// Die drei Zustände, die eine Aufgabe im Lauf durchläuft. Mehr steht nicht im
-// Statusfeld.
-const REAL_STATUSES = ['open', 'in_progress', 'done'];
-
-// 'archived' war bis v1.86.2 ein vierter Statuswert und ist seit #688 eine eigene
-// Achse (tasks.archived_at). Als Eingabe bleibt es erlaubt: Bestandsclients, die
-// MCP-Schnittstelle und der Filterchip der Oberfläche sprechen weiter so darüber,
-// und für sie bedeutet es unverändert „ablegen" bzw. „das Archiv zeigen". Was es
-// nicht mehr tut: den Status überschreiben.
-const ARCHIVE_STATUS = 'archived';
-const VALID_STATUSES = [...REAL_STATUSES, ARCHIVE_STATUS];
-
-const MAX_POINTS = 10000;
+// Prioritaeten, Status (die drei echten Zustaende plus `archived`, seit #688
+// eine eigene Achse, als Eingabe weiter "ablegen" bzw. "das Archiv zeigen"),
+// die Punktgrenze und die Obergrenzen der Sammelaktionen stehen in
+// server/services/task-fields.js: dieselben Listen liest das OpenAPI-Dokument,
+// gegen das validateRequest() jede Anfrage vor dem Handler prueft (#2810).
 const FALLBACK_CATEGORY = 'misc';
 
 /** Zeitstempel im Format der übrigen Spalten (UTC, sekundengenau). */
@@ -314,6 +309,23 @@ function parseAssignedTo(val) {
   return [];
 }
 
+/**
+ * Wer neu zugewiesen werden soll, aber keine Person des Haushalts ist: ein
+ * Konto, das es gibt und das kein Mitglied ist (newNonMembers), und - seit
+ * #2810 - eine id ohne Konto. newNonMembers meldet die bewusst nicht (jede
+ * Route hat dafuer ihre eigene Antwort); hier lief sie bis dahin in den
+ * Fremdschluessel von `task_assignments` und endete als 500. Jetzt nennt sie
+ * dieselbe 400 wie ein Nicht-Mitglied, wie bei den Dokumenten.
+ * @param {number[]} userIds
+ * @param {number[]} [stored] die schon gespeicherten Zuweisungen
+ * @returns {number[]}
+ */
+function assigneeStrangers(userIds, stored = []) {
+  const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?');
+  const unknown = userIds.filter((id) => !exists.get(id));
+  return [...new Set([...unknown, ...newNonMembers(userIds, { stored })])];
+}
+
 function setAssignments(d, taskId, userIds) {
   d.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(taskId);
   const ins = d.prepare('INSERT OR IGNORE INTO task_assignments (task_id, user_id) VALUES (?, ?)');
@@ -350,7 +362,7 @@ function parseRotationInput(body, { isRecurring, assignedUserIds = [], existingR
     }
     const requested = [...new Set(body.rotation_pool.map(Number))];
     pool = existingRows ? mergeRotationPool(existingRows, requested) : requested;
-    if (pool.length > 10) return { ok: false, error: 'rotation_pool allows at most 10 members.' };
+    if (pool.length > MAX_ROTATION_POOL) return { ok: false, error: `rotation_pool allows at most ${MAX_ROTATION_POOL} members.` };
   }
   // Ein Modus braucht einen Pool mit mindestens zwei Koepfen - sonst waere
   // "Rotation" die alte Zuordnung in anderem Kostuem.
@@ -609,7 +621,7 @@ function validateTaskInput(body, isCreate = true, currentRule = undefined) {
 // --------------------------------------------------------
 
 // GET /api/v1/tasks/categories → { data: TaskCategory[] }
-router.get('/categories', (_req, res) => {
+router.get('/categories', validateRequest(), (_req, res) => {
   try {
     res.json({ data: loadTaskCategories() });
   } catch (err) {
@@ -634,7 +646,7 @@ router.get('/categories', (_req, res) => {
 // Aufgabe dorthin zu schieben hieße, sie als Einkaufsposten zurückzubekommen.
 // Muss wie /categories vor den /:id-Routen stehen, sonst matcht „sync-targets" als :id.
 // --------------------------------------------------------
-router.get('/sync-targets', (req, res) => {
+router.get('/sync-targets', validateRequest(), (req, res) => {
   try {
     // NUR FUER DEN, DER AUCH SPEICHERN DARF. Die Liste fuellt ein Feld im
     // Aufgabendialog, und sie traegt Kontonamen samt Sammlungs-URL der
@@ -674,7 +686,7 @@ router.get('/sync-targets', (req, res) => {
 // Oberfläche. Der Server liefert Zeitpunkte und blättert über einen Cursor;
 // gruppiert wird dort, wo die Uhr steht.
 // --------------------------------------------------------
-router.get('/completions', (req, res) => {
+router.get('/completions', validateRequest(), (req, res) => {
   try {
     // A paired display reads the feed under the wall rule (taskReader).
     const { entries, hasMore } = completionFeed(db.get(), {
@@ -705,7 +717,7 @@ router.get('/completions', (req, res) => {
 // Freitext und verriete sonst den Inhalt einer privaten Aufgabe (#474).
 // Muss wie /categories vor den /:id-Routen stehen, sonst matcht „tags" als :id.
 // A paired display lists the tags under the wall rule (taskReader).
-router.get('/tags', (req, res) => {
+router.get('/tags', validateRequest(), (req, res) => {
   try {
     res.json({ data: allTags(db.get(), null, { reader: taskReader(req) }) });
   } catch (err) {
@@ -748,17 +760,17 @@ function visibleTaskIds(ids, me) {
   `).all(...ids, { me }).map((r) => r.id);
 }
 
-// Obergrenze für eine Bulk-Vergabe. Die Auswahl entsteht per Hand in der Liste,
-// alles darüber ist ein Skript - und ein Skript soll die Aufgaben einzeln
-// anfassen statt einen Sync-Lauf mit einem Schlag zu füllen.
-const MAX_BULK_TASKS = 500;
+// Obergrenze für eine Bulk-Vergabe (MAX_BULK_TASKS, task-fields.js). Die
+// Auswahl entsteht per Hand in der Liste, alles darüber ist ein Skript - und
+// ein Skript soll die Aufgaben einzeln anfassen statt einen Sync-Lauf mit
+// einem Schlag zu füllen.
 
 // POST /api/v1/tasks/tags/apply  Body: { ids, add?, remove? }
 // Vergibt oder entfernt Tags an mehreren Aufgaben auf einmal (#586). Eigener
 // Endpunkt statt einer Schleife über PUT /:id im Client: zum Anhängen müsste der
 // Client jede Aufgabe erst lesen, die Liste mischen und die ganze Aufgabe
 // zurückschreiben - und überschriebe dabei jede parallele Änderung.
-router.post('/tags/apply', (req, res) => {
+router.post('/tags/apply', validateRequest(), (req, res) => {
   try {
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isInteger) : [];
     if (!ids.length)
@@ -807,7 +819,7 @@ router.post('/tags/apply', (req, res) => {
 // server/index.js, wie fuer jeden schreibenden Aufruf unter /tasks.
 // Schon Abgelegtes bleibt, wie es ist: sein archived_at ist der Zeitpunkt des
 // ersten Ablegens, und den ueberschreibt eine Sammelaktion nicht.
-router.post('/archive', (req, res) => {
+router.post('/archive', validateRequest(), (req, res) => {
   try {
     const ids = Array.isArray(req.body.ids)
       ? [...new Set(req.body.ids.map(Number).filter(Number.isInteger))]
@@ -836,7 +848,7 @@ router.post('/archive', (req, res) => {
 // Benennt einen Tag auf allen sichtbaren Aufgaben um. Zielt der neue Name auf
 // einen vorhandenen Tag, führt das die beiden zusammen - das ist gewollt und der
 // übliche Weg, ein versehentliches Duplikat einzusammeln.
-router.put('/tags/:tag', (req, res) => {
+router.put('/tags/:tag', validateRequest(), (req, res) => {
   try {
     // Als Array-Element, nicht als String: die String-Form von normalizeTags
     // trennt am Komma, und ein Umbenennen auf "Haus, Hof" behielte nur "Haus" -
@@ -873,7 +885,7 @@ router.put('/tags/:tag', (req, res) => {
 // Nimmt den Tag von allen sichtbaren Aufgaben. Anders als bei Kategorien gibt es
 // keine 409-Sperre "noch in Benutzung": ein Tag IST nur seine Verwendungen, und
 // ihn zu löschen heißt genau, sie zu lösen. Die Aufgaben selbst bleiben.
-router.delete('/tags/:tag', (req, res) => {
+router.delete('/tags/:tag', validateRequest(), (req, res) => {
   try {
     const me = req.authUserId || req.session.userId;
     const affected = taskIdsWithTag(db.get(), req.params.tag, me);
@@ -894,7 +906,7 @@ router.delete('/tags/:tag', (req, res) => {
 });
 
 // POST /api/v1/tasks/categories  Body: { name } → { data: TaskCategory }
-router.post('/categories', (req, res) => {
+router.post('/categories', validateRequest(), (req, res) => {
   try {
     const vName = v.str(req.body.name, 'name', { max: v.MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -919,7 +931,7 @@ router.post('/categories', (req, res) => {
 });
 
 // PATCH /api/v1/tasks/categories/reorder  Body: { order: string[] }
-router.patch('/categories/reorder', (req, res) => {
+router.patch('/categories/reorder', validateRequest(), (req, res) => {
   try {
     const order = Array.isArray(req.body.order) ? req.body.order : [];
     const update = db.get().prepare('UPDATE task_categories SET sort_order = ? WHERE key = ?');
@@ -930,6 +942,22 @@ router.patch('/categories/reorder', (req, res) => {
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
+
+/**
+ * Die Handordnung gehoert dem Haushalt (R23, D15): wer sie nicht aendern darf,
+ * liest sie nur. Ein Recht ohne Zeilenbezug, deshalb steht es als Middleware
+ * VOR validateRequest() (#2810, Entscheidung 7): ohne die Capability
+ * `tasks_reorder_family` ist die Antwort 403 `reorder_not_allowed`, auch auf
+ * einen Rumpf, den das Schema abwiese - eine 400 waere hier die falsche
+ * Auskunft.
+ * @param {any} req @param {any} res @param {() => void} next
+ */
+function requireTasksReorderFamily(req, res, next) {
+  if (!requestHasCapability(db.get(), req, 'tasks_reorder_family')) {
+    return res.status(403).json({ error: 'You may not change the household order.', code: 403, reason: 'reorder_not_allowed' });
+  }
+  return next();
+}
 
 /**
  * Gemeinsame Pruefung der beiden Reorder-Routen: eine nicht-leere, hoechstens
@@ -943,13 +971,6 @@ router.patch('/categories/reorder', (req, res) => {
  * Aufgabe umnummeriert, die in keiner Liste dieser Person steht.
  */
 function parseReorderIds(req, res, list) {
-  // Die Handordnung gehoert dem Haushalt (R23, D15): wer sie nicht aendern
-  // darf, liest sie nur. Vor jeder Pruefung des Bodys - eine 400 waere hier
-  // die falsche Auskunft.
-  if (!requestHasCapability(db.get(), req, 'tasks_reorder_family')) {
-    res.status(403).json({ error: 'You may not change the household order.', code: 403, reason: 'reorder_not_allowed' });
-    return null;
-  }
   if (!Array.isArray(list) || list.length === 0) {
     res.status(400).json({ error: 'A non-empty array of task IDs is required.', code: 400 });
     return null;
@@ -997,7 +1018,7 @@ function parseReorderIds(req, res, list) {
 // Umsortieren aendert keinen Inhalt, darum greift die Sperre einzelner Aufgaben
 // (locked) hier nicht: die Reihenfolge gehoert dem Haushalt wie die der
 // Kategorien, nicht dem Ersteller.
-router.patch('/reorder', (req, res) => {
+router.patch('/reorder', requireTasksReorderFamily, validateRequest(), (req, res) => {
   try {
     const ids = parseReorderIds(req, res, req.body?.order);
     if (!ids) return;
@@ -1035,7 +1056,7 @@ router.patch('/reorder', (req, res) => {
 // wieder nach Faelligkeit und Prioritaet. Ohne diesen Weg machte ein einziger
 // versehentlicher Zug die Handordnung dauerhaft. Gleiche Regeln wie PATCH
 // /reorder: nur sichtbare oberste Aufgaben, gesperrte eingeschlossen.
-router.post('/reorder/reset', (req, res) => {
+router.post('/reorder/reset', requireTasksReorderFamily, validateRequest(), (req, res) => {
   try {
     const ids = parseReorderIds(req, res, req.body?.ids);
     if (!ids) return;
@@ -1050,7 +1071,7 @@ router.post('/reorder/reset', (req, res) => {
 
 // PUT /api/v1/tasks/categories/:key  Body: { name } → benennt um (Key bleibt stabil,
 // label_key wird gelöscht → der Custom-Name gilt fortan).
-router.put('/categories/:key', (req, res) => {
+router.put('/categories/:key', validateRequest(), (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM task_categories WHERE key = ?').get(req.params.key);
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'tasks_category_not_found' });
@@ -1073,7 +1094,7 @@ router.put('/categories/:key', (req, res) => {
 });
 
 // DELETE /api/v1/tasks/categories/:key → 409 wenn in Benutzung oder letzte Kategorie.
-router.delete('/categories/:key', (req, res) => {
+router.delete('/categories/:key', validateRequest(), (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM task_categories WHERE key = ?').get(req.params.key);
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'tasks_category_not_found' });
@@ -1099,7 +1120,7 @@ router.delete('/categories/:key', (req, res) => {
 // Query-Parameter: status, priority, assigned_to, category, archived
 // Response: { data: Task[] }  (jede Task enthält subtask_progress)
 // --------------------------------------------------------
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const { status, priority, assigned_to, category, tag, include_future, archived } = req.query;
     // A paired display reads the list under the wall rule (taskReader), the parent
@@ -1238,7 +1259,7 @@ router.get('/', (req, res) => {
 // Einzelne Aufgabe mit Subtasks.
 // Response: { data: Task & { subtasks: Task[] } }
 // --------------------------------------------------------
-router.get('/:id', (req, res) => {
+router.get('/:id', validateRequest(), (req, res) => {
   try {
     // A paired display reads the task and its subtasks under the wall rule.
     const reader = taskReader(req);
@@ -1280,7 +1301,7 @@ router.get('/:id', (req, res) => {
 //         assigned_to?, parent_task_id? }
 // Response: { data: Task }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     normalizeBlankTaskFields(req.body);
     const errors = validateTaskInput(req.body, true);
@@ -1347,7 +1368,7 @@ router.post('/', (req, res) => {
     const firstUid = userIds[0] ?? null;
     // Zuweisen nur an Haushaltsmitglieder (#1207) - dieselbe Liste, die
     // `meta/options` anbietet. Eine neue Aufgabe hat noch keinen Stand.
-    const strangers = newNonMembers(userIds);
+    const strangers = assigneeStrangers(userIds);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
     // Rotation (migration 277). Erst nach der Mitgliederpruefung der regulaeren
@@ -1464,7 +1485,7 @@ router.post('/', (req, res) => {
 // (nextDueDateAfter): gesetzt nur, wenn dieses Speichern eine Serie erledigt
 // hat und ein Vorkommen ansteht, das der Aufrufer sieht - sonst null.
 // --------------------------------------------------------
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
@@ -1528,7 +1549,7 @@ router.put('/:id', (req, res) => {
     const firstUid = userIds[0] ?? null;
     // Neu nur Haushaltsmitglieder (#1207). Wer schon zugewiesen ist, bleibt
     // es - auch eine Haushaltskraft an einer aelteren Aufgabe.
-    const strangers = newNonMembers(userIds, { stored: assignedBefore });
+    const strangers = assigneeStrangers(userIds, assignedBefore);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
     // Rotation (migration 277). Der Pool darf nur, was auch die Aufgabe selbst duerfte
@@ -2204,7 +2225,7 @@ function spawnRecurrenceFollowup(task) {
 // Laden von `prev` sah den Uebergang noch gar nicht und wies eine Nutzlast ab,
 // die sie im selben Atemzug als bedeutungslos beschrieb (Review Runde 1).
 // --------------------------------------------------------
-router.patch('/:id/status', (req, res) => {
+router.patch('/:id/status', validateRequest(), (req, res) => {
   try {
     const { status } = req.body;
     if (!VALID_STATUSES.includes(status))
@@ -2388,7 +2409,7 @@ router.patch('/:id/status', (req, res) => {
 // Body: { archived: boolean }  (fehlt/true = ablegen, wie bei den Dokumenten)
 // Response: { data: { id, status, archived_at } }
 // --------------------------------------------------------
-router.patch('/:id/archive', (req, res) => {
+router.patch('/:id/archive', validateRequest(), (req, res) => {
   try {
     // Ganze Zeile statt id+status: die Sichtbarkeit und die Sperre stehen in
     // Feldern, die die schmale Auswahl nicht mitbrachte.
@@ -2444,7 +2465,7 @@ router.patch('/:id/archive', (req, res) => {
  * Body: { line: number, checked: boolean, expect?: string }
  * Response: { data: { id, description } } | 409 { code: 409, reason }
  */
-router.patch('/:id/check', (req, res) => {
+router.patch('/:id/check', validateRequest(), (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(id);
@@ -2499,7 +2520,7 @@ router.patch('/:id/check', (req, res) => {
 // Aufgabe löschen (Subtasks werden per CASCADE mitgelöscht).
 // Response: { ok: true }
 // --------------------------------------------------------
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     // Vor dem DELETE vormerken (#617): danach sind UID und Objekt-URL weg. Die
     // per CASCADE mitgelöschten Unteraufgaben gehören dazu - eine gespiegelte
@@ -2593,7 +2614,7 @@ function loadTaskDocuments(taskId, viewer) {
 // the wall shows only what the whole household sees, even for a task that names the
 // display, and seriesHistory applies the same rule to every earlier instance.
 // --------------------------------------------------------
-router.get('/:id/completions', (req, res) => {
+router.get('/:id/completions', validateRequest(), (req, res) => {
   try {
     const reader = taskReader(req);
     const task = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
@@ -2608,7 +2629,7 @@ router.get('/:id/completions', (req, res) => {
 });
 
 // GET /api/v1/tasks/:id/documents → { data: LinkedDocument[] }
-router.get('/:id/documents', (req, res) => {
+router.get('/:id/documents', validateRequest(), (req, res) => {
   try {
     // A paired display asks under the wall rule (taskReader): a task the whole
     // household does not see answers 404 like an unknown id, before the 403 below.
@@ -2632,7 +2653,7 @@ router.get('/:id/documents', (req, res) => {
 // Replace-Set: setzt die Verknüpfungen neu. Es werden nur für die Person
 // sichtbare Dokumente verknüpft; ebenso werden nur sichtbare Alt-Verknüpfungen
 // ersetzt — unsichtbare (z.B. private Dokumente anderer) bleiben unberührt.
-router.put('/:id/documents', (req, res) => {
+router.put('/:id/documents', validateRequest(), (req, res) => {
   try {
     const me = req.authUserId || req.session.userId;
     const task = findVisibleTask(req.params.id, me);
@@ -2772,7 +2793,7 @@ function commentForWrite(req, { allowAdmin = false } = {}) {
 }
 
 // GET /api/v1/tasks/:id/comments → { data: Comment[] }
-router.get('/:id/comments', (req, res) => {
+router.get('/:id/comments', validateRequest(), (req, res) => {
   try {
     // A paired display reads the comments under the wall rule (taskReader).
     const task = findReadableTask(req.params.id, taskReader(req));
@@ -2785,7 +2806,7 @@ router.get('/:id/comments', (req, res) => {
 });
 
 // POST /api/v1/tasks/:id/comments  Body: { comment }
-router.post('/:id/comments', (req, res) => {
+router.post('/:id/comments', validateRequest(), (req, res) => {
   try {
     const me = req.authUserId || req.session.userId;
     const task = db.get().prepare(`
@@ -2817,7 +2838,7 @@ router.post('/:id/comments', (req, res) => {
 });
 
 // PATCH /api/v1/tasks/:id/comments/:commentId  Body: { comment }
-router.patch('/:id/comments/:commentId', (req, res) => {
+router.patch('/:id/comments/:commentId', validateRequest(), (req, res) => {
   try {
     const found = commentForWrite(req);
     if (found.refusal) return res.status(found.refusal.code).json(found.refusal);
@@ -2848,7 +2869,7 @@ router.patch('/:id/comments/:commentId', (req, res) => {
 });
 
 // DELETE /api/v1/tasks/:id/comments/:commentId
-router.delete('/:id/comments/:commentId', (req, res) => {
+router.delete('/:id/comments/:commentId', validateRequest(), (req, res) => {
   try {
     const found = commentForWrite(req, { allowAdmin: true });
     if (found.refusal) return res.status(found.refusal.code).json(found.refusal);
@@ -2865,7 +2886,7 @@ router.delete('/:id/comments/:commentId', (req, res) => {
 // Liefert Filteroptionen: alle User + gültige Werte für Dropdowns.
 // Response: { users, priorities, statuses, categories, tags }
 // --------------------------------------------------------
-router.get('/meta/options', (req, res) => {
+router.get('/meta/options', validateRequest(), (req, res) => {
   try {
     const users = db.get().prepare(
       `SELECT u.id, u.display_name, u.avatar_color, ${memberPositionSql('u')} AS sort_order FROM users u
@@ -2898,11 +2919,8 @@ router.get('/meta/options', (req, res) => {
 // Wie viele nicht erledigte Hauptaufgaben stehen exakt auf diesem Punktwert?
 // Vorschau für die Einstellungsseite, bevor sie den Wechsel anbietet — deshalb
 // dasselbe Admin-Gate wie beim Setzen des Standards und beim Nachziehen.
-router.get('/points/affected', (req, res) => {
+router.get('/points/affected', requireAdmin, validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) {
-      return refuseAdmin(req, res);
-    }
     const points = Number(req.query.points);
     if (!Number.isInteger(points) || points < 0 || points > MAX_POINTS) {
       return res.status(400).json({ error: `points must be an integer between 0 and ${MAX_POINTS}`, code: 400 });
@@ -2920,11 +2938,8 @@ router.get('/points/affected', (req, res) => {
 // bestimmt statt über ein verstecktes Flag: eine Aufgabe, der jemand von Hand
 // exakt den alten Standardwert gegeben hat, wandert deshalb mit. Die Anzahl
 // steht vorab im Bestätigungsdialog, der Wechsel ist also nie verdeckt.
-router.post('/points/rebase', (req, res) => {
+router.post('/points/rebase', requireAdmin, validateRequest(), (req, res) => {
   try {
-    if (!isAdminRequest(req)) {
-      return refuseAdmin(req, res);
-    }
     const from = Number(req.body.from);
     const to   = Number(req.body.to);
     const inRange = (n) => Number.isInteger(n) && n >= 0 && n <= MAX_POINTS;

@@ -137,8 +137,10 @@ export const MAX_DEFAULT_REMINDERS = 5;
 export const MAX_CALENDAR_TARGET_LENGTH = 500;
 
 // Default points for new tasks (#578, household-wide). 0 = no default, the
-// points field stays empty as before. The maximum mirrors MAX_POINTS in
-// server/routes/tasks.js.
+// points field stays empty as before. The maximum is the one of a task,
+// TASK_MAX_POINTS in server/services/task-fields.js (the settings stay a leaf
+// and import no service, depcruise `settings-is-a-leaf`); test:validate-tasks
+// holds the two equal.
 const DEFAULT_TASK_POINTS = 0;
 export const MAX_TASK_POINTS = 10000;
 
