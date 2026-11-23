@@ -12,12 +12,26 @@ import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 import { createLogger } from '../../logger.js';
 import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as outlookCalendar from '../../services/outlook-calendar.js';
 import { requireAdmin } from '../../auth.js';
 import { remoteFailure } from '../../utils/http.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
+
+/**
+ * An account in the path that does not exist (#2810, group 10b, decision 11):
+ * asked before the service, whose plain Error for it answered 500.
+ * @param {{ status: (code: number) => { json: (body: unknown) => unknown } }} res
+ * @param {number} accountId
+ * @returns {boolean} true when the answer is sent
+ */
+function refuseUnknownAccount(res, accountId) {
+  if (outlookCalendar.accountExists(accountId)) return false;
+  res.status(404).json({ error: 'Outlook account not found.', code: 404, reason: 'outlook_account_not_found' });
+  return true;
+}
 
 /**
  * The answer of a route that may ask Microsoft Graph, once its own named cases
@@ -42,7 +56,7 @@ function sendOutlookFailure(res, err, sentence) {
  * GET /api/v1/calendar/outlook/auth
  * Admin only. Leitet zum Microsoft-Consent-Screen weiter (persönliche Konten).
  */
-router.get('/outlook/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
+router.get('/outlook/auth', requireAdmin, refuseWhileRestoring, validateRequest(), (req, res) => {
   try {
     const url = outlookCalendar.getAuthUrl(req.session);
     res.redirect(url);
@@ -61,7 +75,7 @@ router.get('/outlook/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
  * und stößt einen initialen Push an.
  * Query: ?code=...&state=...
  */
-router.get('/outlook/callback', refuseWhileRestoring, async (req, res) => {
+router.get('/outlook/callback', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const { code, error, state } = req.query;
     if (error) return res.redirect('/settings?sync_error=outlook');
@@ -91,7 +105,7 @@ router.get('/outlook/callback', refuseWhileRestoring, async (req, res) => {
  * Response: { data: [{ id, name, email, needsReauth, lastSync, lastError,
  *                      autoSyncCalendarId, ownerUserId }] }
  */
-router.get('/outlook/accounts', requireAdmin, (req, res) => {
+router.get('/outlook/accounts', requireAdmin, validateRequest(), (req, res) => {
   try {
     // Laut wie Google (/google/calendars): fehlende Konfiguration wirft und
     // landet als Error im Log, statt still eine leere Liste zu liefern.
@@ -113,10 +127,11 @@ router.get('/outlook/accounts', requireAdmin, (req, res) => {
  * Auto-Sync ist aktiv, sobald Zielkalender UND Owner gesetzt sind; null
  * deaktiviert das jeweilige Feld.
  */
-router.put('/outlook/accounts/:id', requireAdmin, (req, res) => {
+router.put('/outlook/accounts/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const { name, autoSyncCalendarId, ownerUserId } = req.body;
+    if (refuseUnknownAccount(res, accountId)) return;
     const result = outlookCalendar.updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId });
     res.json({ data: result });
   } catch (err) {
@@ -142,9 +157,10 @@ router.put('/outlook/accounts/:id', requireAdmin, (req, res) => {
  * Admin only. Konto trennen und löschen. Bereits gepushte Events bleiben
  * in Outlook stehen; lokale Events verlieren ihr Outlook-Ziel.
  */
-router.delete('/outlook/accounts/:id', requireAdmin, (req, res) => {
+router.delete('/outlook/accounts/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
+    if (refuseUnknownAccount(res, accountId)) return;
     const result = outlookCalendar.deleteAccount(accountId);
     res.json({ data: result });
   } catch (err) {
@@ -159,11 +175,12 @@ router.delete('/outlook/accounts/:id', requireAdmin, (req, res) => {
  * von Graph). Mit `?refresh=true` schreibt sie Token und Auswahl nach dem Warten
  * auf Microsoft - deshalb `refuseWhileRestoring` (#1551).
  */
-router.get('/outlook/accounts/:id/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
+router.get('/outlook/accounts/:id/calendars', requireAdmin, refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     outlookCalendar.assertConfigured();
     const accountId = parseInt(req.params.id, 10);
     const refresh = req.query.refresh === 'true';
+    if (refuseUnknownAccount(res, accountId)) return;
     const calendars = await outlookCalendar.listCalendars(accountId, { refresh });
     res.json({ data: calendars });
   } catch (err) {
@@ -177,7 +194,7 @@ router.get('/outlook/accounts/:id/calendars', requireAdmin, refuseWhileRestoring
  * Admin only. Kalender als Push-Ziel aktivieren/deaktivieren.
  * Body: { calendarId: string, enabled: boolean }
  */
-router.patch('/outlook/accounts/:id/calendars', requireAdmin, (req, res) => {
+router.patch('/outlook/accounts/:id/calendars', requireAdmin, validateRequest(), (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const { calendarId, enabled } = req.body;
@@ -187,6 +204,7 @@ router.patch('/outlook/accounts/:id/calendars', requireAdmin, (req, res) => {
     if (typeof enabled !== 'boolean') {
       return res.status(400).json({ error: 'enabled must be a boolean.', code: 400 });
     }
+    if (refuseUnknownAccount(res, accountId)) return;
     const result = outlookCalendar.setCalendarEnabled(accountId, calendarId, enabled);
     res.json({ data: result });
   } catch (err) {
@@ -209,7 +227,7 @@ router.patch('/outlook/accounts/:id/calendars', requireAdmin, (req, res) => {
  * Admin only. Manueller Push-Trigger.
  * Response: { data: { success, syncedAccounts, pushed, updated, deleted } }
  */
-router.post('/outlook/sync', requireAdmin, async (req, res) => {
+router.post('/outlook/sync', requireAdmin, validateRequest(), async (req, res) => {
   try {
     outlookCalendar.assertConfigured();
     const result = await outlookCalendar.sync();
@@ -224,7 +242,7 @@ router.post('/outlook/sync', requireAdmin, async (req, res) => {
  * GET /api/v1/calendar/outlook/status
  * Response: { data: { configured, accounts, totalAccounts } }
  */
-router.get('/outlook/status', (req, res) => {
+router.get('/outlook/status', validateRequest(), (req, res) => {
   try {
     const status = outlookCalendar.getStatus();
     // Kontomailadresse und letzter Fehlertext sind Verwaltungsdaten - dieselbe

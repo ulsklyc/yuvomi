@@ -18,8 +18,11 @@
  *          client, and the alias `drill` is the route's own.
  *
  *          The source and target lists of the provider routes
- *          (`EXTERNAL_CALENDAR_SOURCES`, `REMINDER_LIST_TARGETS`) join this
- *          file with group 10b, where their routes get their schemas.
+ *          (`EXTERNAL_CALENDAR_SOURCES`, `REMINDER_LIST_TARGETS`) joined with
+ *          group 10b; the CHECK constraints of `external_calendars.source`
+ *          and `caldav_reminder_selection.target_module` in server/db.js hold
+ *          the same values, and test:validate-calendar-providers holds them
+ *          equal.
  *
  *          This file imports nothing: server/openapi.js must load without
  *          node_modules (the packaging contract), and the route files reach
@@ -40,3 +43,9 @@ export const MAX_REMINDER_OFFSETS = 5;
 
 /** The longest name of an ICS subscription; longer or empty answers `calendar_subscription_name_invalid`. */
 export const ICS_SUBSCRIPTION_NAME_MAX = 100;
+
+/** The providers whose calendars carry default assignees (`PATCH /calendar/external-calendars`). */
+export const EXTERNAL_CALENDAR_SOURCES = /** @type {string[]} */ (Object.freeze(['google', 'apple', 'caldav']));
+
+/** The modules a CalDAV reminder list is read into. */
+export const REMINDER_LIST_TARGETS = /** @type {string[]} */ (Object.freeze(['tasks', 'shopping']));

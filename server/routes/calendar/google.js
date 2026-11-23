@@ -7,6 +7,7 @@ import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 import { createLogger } from '../../logger.js';
 import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import * as googleCalendar from '../../services/google-calendar.js';
 import { requireAdmin } from '../../auth.js';
@@ -26,6 +27,7 @@ import {
 } from '../../services/sync-assignment.js';
 import { getUserId } from './helpers.js';
 import { remoteFailure } from '../../utils/http.js';
+import { EXTERNAL_CALENDAR_SOURCES } from '../../services/calendar-fields.js';
 
 const log = createLogger('Calendar');
 
@@ -65,7 +67,7 @@ const router = express.Router();
  * GET /api/v1/calendar/google/auth
  * Admin only. Leitet zum Google OAuth-Consent-Screen weiter.
  */
-router.get('/google/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
+router.get('/google/auth', requireAdmin, refuseWhileRestoring, validateRequest(), (req, res) => {
   try {
     const url = googleCalendar.getAuthUrl(req.session);
     if (!url) return res.status(503).json({ error: 'Google Calendar is not configured.', code: 503 });
@@ -81,7 +83,7 @@ router.get('/google/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
  * OAuth-Callback von Google. Tauscht Code gegen Tokens und startet initialen Sync.
  * Query: ?code=...
  */
-router.get('/google/callback', refuseWhileRestoring, async (req, res) => {
+router.get('/google/callback', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const { code, error, state } = req.query;
     if (error) return res.redirect('/settings?sync_error=google');
@@ -109,7 +111,7 @@ router.get('/google/callback', refuseWhileRestoring, async (req, res) => {
  * Manueller Sync-Trigger.
  * Response: { ok: true, lastSync: string }
  */
-router.post('/google/sync', requireAdmin, async (req, res) => {
+router.post('/google/sync', requireAdmin, validateRequest(), async (req, res) => {
   try {
     await googleCalendar.sync();
     const { lastSync } = googleCalendar.getStatus();
@@ -123,7 +125,7 @@ router.post('/google/sync', requireAdmin, async (req, res) => {
  * GET /api/v1/calendar/google/status
  * Response: { configured, connected, lastSync, missingEnv, redirectUri, ... }
  */
-router.get('/google/status', (req, res) => {
+router.get('/google/status', validateRequest(), (req, res) => {
   try {
     const status = googleCalendar.getStatus();
     // DER FEHLERTEXT DES LETZTEN LAUFS IST VERWALTUNGSDATEN. Er kommt vom
@@ -148,7 +150,7 @@ router.get('/google/status', (req, res) => {
  * Erneuert der Client dabei sein Token, speichert der `tokens`-Listener es nach
  * dem Warten auf Google - deshalb `refuseWhileRestoring` (#1551).
  */
-router.get('/google/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
+router.get('/google/calendars', requireAdmin, refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const data = await googleCalendar.listCalendars();
     // Bei abgelehntem Token liefert der Dienst keine Ziele, ohne Google zu
@@ -166,7 +168,7 @@ router.get('/google/calendars', requireAdmin, refuseWhileRestoring, async (req, 
  * Body: { calendarId: string, enabled: boolean }
  * Response: { ok: true, lastSync: string }
  */
-router.patch('/google/calendars', requireAdmin, async (req, res) => {
+router.patch('/google/calendars', requireAdmin, validateRequest(), async (req, res) => {
   const { calendarId, enabled } = req.body;
   if (!calendarId || typeof calendarId !== 'string' || calendarId.trim().length === 0) {
     return res.status(400).json({ error: 'calendarId is missing or invalid.', code: 400 });
@@ -231,10 +233,10 @@ function knownCalendarName(source, externalId) {
  *         default_assignee_user_ids?: number[], default_assignee_user_id?: number|null }
  * Response: { data: { source, external_id, default_assignee_user_ids, default_assignee_user_id } }
  */
-router.patch('/external-calendars', requireAdmin, (req, res) => {
+router.patch('/external-calendars', requireAdmin, validateRequest(), (req, res) => {
   try {
     const { source, external_id } = req.body;
-    if (!['google', 'apple', 'caldav'].includes(source)) {
+    if (!EXTERNAL_CALENDAR_SOURCES.includes(source)) {
       return res.status(400).json({ error: 'source must be google, apple or caldav.', code: 400 });
     }
     if (typeof external_id !== 'string' || external_id.trim().length === 0) {
@@ -364,7 +366,7 @@ function parseMoves(raw) {
  * wie seit #1154.
  * Response: { data: { count, token, moved: [...], moved_total, moved_offset, moved_next } }
  */
-router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, res) => {
+router.get('/external-calendars/default-assignee-backfill', requireAdmin, validateRequest(), (req, res) => {
   try {
     let after = null;
     if (req.query.moved_after !== undefined) {
@@ -415,7 +417,7 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  *         moves?: { event_id, from_user_ids, to_user_ids }[] } (Altform: from_user_id, to_user_id)
  * Response: { data: { assigned } } | 409 { data: { count, token, moved, moved_total, moved_offset, moved_next } }
  */
-router.post('/external-calendars/default-assignee-backfill', requireAdmin, async (req, res) => {
+router.post('/external-calendars/default-assignee-backfill', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const expected = req.body?.expected_count;
     if (!Number.isInteger(expected) || expected < 0) {
@@ -459,7 +461,7 @@ router.post('/external-calendars/default-assignee-backfill', requireAdmin, async
  * Query: ?deleteEvents=true nimmt die gespiegelten Termine mit (#820).
  * Response: { ok: true, removed: number }
  */
-router.delete('/google/disconnect', requireAdmin, (req, res) => {
+router.delete('/google/disconnect', requireAdmin, validateRequest(), (req, res) => {
   try {
     const { removed } = googleCalendar.disconnect({
       deleteEvents: req.query.deleteEvents === 'true',
@@ -480,7 +482,7 @@ router.delete('/google/disconnect', requireAdmin, (req, res) => {
  * Der Google-Kalender bleibt unberührt - geräumt wird die lokale Kopie.
  * Response: { data: { removed: number } }
  */
-router.delete('/google/mirrored-events', requireAdmin, (req, res) => {
+router.delete('/google/mirrored-events', requireAdmin, validateRequest(), (req, res) => {
   try {
     res.json({ data: { removed: googleCalendar.clearMirroredEvents() } });
   } catch (err) {
@@ -495,7 +497,7 @@ router.delete('/google/mirrored-events', requireAdmin, (req, res) => {
  * Body: { readonly: boolean }
  * Response: { data: { readonly: boolean } }
  */
-router.put('/google/readonly', requireAdmin, (req, res) => {
+router.put('/google/readonly', requireAdmin, validateRequest(), (req, res) => {
   const { readonly } = req.body;
   if (typeof readonly !== 'boolean') {
     return res.status(400).json({ error: 'readonly must be a boolean.', code: 400 });

@@ -122,13 +122,13 @@ const MOUNTS = [
   { file: 'subscriptions.js', mount: '/api/v1/budget/subscriptions' },
   ...['categories', 'loans', 'accounts', 'plans', 'stats', 'transfers', 'entries']
     .map((name) => ({ file: `budget/${name}.js`, mount: '/api/v1/budget' })),
-  // In der Reihenfolge von server/index.js: die Uebersicht, dann die sieben
-  // Kalender-Router der Gruppe 10a in der Reihenfolge von
+  // In der Reihenfolge von server/index.js: die Uebersicht, dann die zehn
+  // Kalender-Router (Gruppen 10a und 10b) in der Reihenfolge von
   // server/routes/calendar.js (die Termine mit `/:id` nach allen
-  // Einsegment-Pfaden). Die Anbieter (google, apple, caldav, outlook) kommen
-  // mit Gruppe 10b.
+  // Einsegment-Pfaden, CalDAV und Outlook mit ihren Mehrsegment-Pfaden
+  // danach). Ein unbekanntes Konto antwortet dort 404 (#2810, Entscheidung 11).
   { file: 'dashboard.js', mount: '/api/v1/dashboard' },
-  ...['read', 'subscriptions', 'feed', 'local-calendars', 'sync-targets', 'crud']
+  ...['read', 'google', 'apple', 'subscriptions', 'feed', 'local-calendars', 'sync-targets', 'crud', 'caldav', 'outlook']
     .map((name) => ({ file: `calendar/${name}.js`, mount: '/api/v1/calendar' })),
 ];
 
@@ -142,6 +142,7 @@ const WITHOUT_INTEGER_PATH_ID = [
   'health/export.js', 'health/cycle-feed.js', 'health/visibility-defaults.js',
   'document-storage-google-drive.js',
   'dashboard.js', 'calendar/read.js', 'calendar/feed.js', 'calendar/sync-targets.js',
+  'calendar/google.js', 'calendar/apple.js',
 ];
 
 const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));

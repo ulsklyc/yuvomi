@@ -46,6 +46,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `invalid_recurrence_id` and the others); a body of the wrong type now answers
   `reason: validation` with the field. `GET /dashboard` keeps its lenient query: every value its
   description tolerates still answers 200.
+- **The Google, Apple, CalDAV and Outlook settings routes check every request against the
+  published API description, and an unknown account answers 404.** This is about your own API
+  clients; the settings pages send nothing that is refused now. Under
+  `/api/v1/calendar/google`, `/apple`, `/caldav`, `/outlook` and `/external-calendars` input
+  that used to be quietly accepted or answered with a 500 is now refused with a 400:
+  - a switch that is not `true`/`false`: `enabled: "false"` or `{}` switched a CalDAV calendar
+    or reminder list ON, `0` or `null` off (the Google and Outlook switches and `readonly` were
+    refused already, now with `reason: validation`);
+  - a path id that is not plain digits: `PUT /caldav/accounts/1abc` changed account 1,
+    `DELETE /caldav/accounts/1abc` and `DELETE /outlook/accounts/1.0` deleted it;
+  - a value of the wrong type: `name: 5` was stored as the name of a CalDAV account,
+    `targetModule: "x"` of a reminder list and `calendarUrl: 5` answered 500, `ownerUserId` of
+    an Outlook account as text or `""` (use `null` to clear it), people as text or `0`, an
+    `expected_token` that is not 64 hex digits, a `source` other than `google`, `apple` or
+    `caldav`;
+  - `deleteEvents` and `refresh` in the query other than `true` or `false` (only `true` counted,
+    anything else meant false);
+  - `PUT /caldav/accounts/{id}` and `PUT /outlook/accounts/{id}` without a body.
+
+  A CalDAV or Outlook account in the path that does not exist now answers 404 with
+  `reason: caldav_account_not_found` or `outlook_account_not_found`. It answered 500
+  (`"Failed to delete CalDAV account."` and the like) or, for CalDAV, 502 with
+  `remote_failed` and `"The CalDAV server refused the request or could not be reached."` -
+  although no server was asked. Admin rights are checked first (a member gets 403 also with a
+  malformed request), then the request, then the account (a malformed request to an unknown
+  account is a 400). The OAuth callbacks take whatever query Google or Microsoft send and still
+  lead back to the settings. The refusals with a `reason` the app shows (`apple_url_invalid`,
+  `password_required`, the default assignees) and the checks of length and blank values stay
+  with the routes; a body of the wrong type now answers `reason: validation` with the field.
 - **The budget and the subscriptions answer an unexpected failure with the same sentence as the
   rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
   and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,

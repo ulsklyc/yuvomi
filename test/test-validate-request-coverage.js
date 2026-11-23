@@ -27,7 +27,8 @@
  *          of the budget under server/routes/budget/, and subscriptions) and
  *          10a (the calendar core under server/routes/calendar/: read, crud,
  *          local-calendars, feed, sync-targets, subscriptions; and the
- *          dashboard).
+ *          dashboard) and 10b (the provider routes under
+ *          server/routes/calendar/: google, apple, caldav, outlook).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -49,10 +50,6 @@ const ROUTES = join(ROOT, 'server', 'routes');
  */
 const NOT_MIGRATED = [
   'server/routes/birthday-feed.js',
-  'server/routes/calendar/apple.js',
-  'server/routes/calendar/caldav.js',
-  'server/routes/calendar/google.js',
-  'server/routes/calendar/outlook.js',
   'server/routes/preferences.js',
   'server/routes/push.js',
   'server/routes/tasks.js',
@@ -88,6 +85,8 @@ const MIGRATED = [
   'server/routes/calendar/read.js', 'server/routes/calendar/crud.js', 'server/routes/calendar/local-calendars.js',
   'server/routes/calendar/feed.js', 'server/routes/calendar/sync-targets.js', 'server/routes/calendar/subscriptions.js',
   'server/routes/dashboard.js',
+  'server/routes/calendar/google.js', 'server/routes/calendar/apple.js', 'server/routes/calendar/caldav.js',
+  'server/routes/calendar/outlook.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

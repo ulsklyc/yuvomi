@@ -101,6 +101,18 @@ function getAllAccounts() {
   return db.get().prepare('SELECT * FROM outlook_accounts').all();
 }
 
+/**
+ * Whether the account exists (#2810, group 10b): the routes with an account in
+ * the path ask this before the service, so an unknown account is a 404 of its
+ * own instead of the plain Error the service throws for it (500, or 502
+ * `remote_failed` as if the server had refused).
+ * @param {number} accountId
+ * @returns {boolean}
+ */
+function accountExists(accountId) {
+  return db.get().prepare('SELECT 1 FROM outlook_accounts WHERE id = ?').get(accountId) !== undefined;
+}
+
 function listAccounts() {
   // Tokens bewusst NICHT zurückgeben (Muster caldav-sync.listAccounts).
   return db.get().prepare(`
@@ -958,6 +970,7 @@ function getStatus() {
 }
 
 export {
+  accountExists,
   getAuthUrl,
   handleCallback,
   sync,
