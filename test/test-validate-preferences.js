@@ -29,7 +29,10 @@
  *              answers a member first whatever is sent;
  *            - ONE SOURCE: the path patterns of the holiday routes are the
  *              ones the routes held by hand (COUNTRY_ISO_RE, SUBDIVISION_RE);
- *            - THE DOCUMENT: 12 operations, each with input answering the 400.
+ *            - THE DOCUMENT: 12 operations, each with input answering the 400;
+ *            - ONLY GUARD (step b): the push shapes the handlers no longer
+ *              check are pinned as values (endpoint maxLength 2048, keys,
+ *              active, the test push texts).
  *          No network: OpenHolidays is stubbed (holidays.__setFetchImpl), the
  *          push service is a stand-in that sends nothing.
  * Run: npm run test:validate-preferences
@@ -236,6 +239,30 @@ test('holidays: the document patterns are the ones the routes held by hand', () 
   assert.equal(region.schema.pattern, SUBDIVISION_RE.source);
   for (const path of ['/api/v1/preferences/holidays/subdivisions/{countryCode}', '/api/v1/preferences/holidays/groups/{countryCode}']) {
     assert.equal(params(path).find((/** @type {any} */ p) => p.name === 'countryCode').schema.pattern, COUNTRY_ISO_RE.source, path);
+  }
+});
+
+test('only guard: the document holds the push shapes the handlers no longer check (#2810 group 11b step b)', () => {
+  // Since step b the push handlers read `endpoint`, `keys`, `active`, `title`,
+  // `body` without a type check of their own: the document is the one guard.
+  // Its rules are pinned as values here, so a looser schema turns this red.
+  const schemas = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test')).components.schemas;
+  const subscribe = schemas.PushSubscribeInput;
+  assert.deepEqual(subscribe.required, ['endpoint', 'keys']);
+  assert.deepEqual(subscribe.properties.endpoint, { ...subscribe.properties.endpoint, type: 'string', maxLength: 2048 });
+  assert.equal(subscribe.properties.keys.type, 'object');
+  assert.deepEqual(subscribe.properties.keys.required, ['p256dh', 'auth']);
+  for (const key of ['p256dh', 'auth']) {
+    assert.equal(subscribe.properties.keys.properties[key].type, 'string', key);
+    assert.equal(subscribe.properties.keys.properties[key].minLength, 1, key);
+  }
+  assert.deepEqual(schemas.PushUnsubscribeInput.required, ['endpoint']);
+  assert.equal(schemas.PushUnsubscribeInput.properties.endpoint.type, 'string');
+  assert.deepEqual(schemas.PushWallModeInput.required, ['endpoint', 'active']);
+  assert.equal(schemas.PushWallModeInput.properties.endpoint.type, 'string');
+  assert.equal(schemas.PushWallModeInput.properties.active.type, 'boolean');
+  for (const field of ['title', 'body', 'endpoint']) {
+    assert.equal(schemas.PushTestInput.properties[field].type, 'string', `test push ${field}`);
   }
 });
 
