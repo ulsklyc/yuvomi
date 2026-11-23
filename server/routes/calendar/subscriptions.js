@@ -4,6 +4,7 @@
 
 import { createLogger } from '../../logger.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import * as icsSubscription from '../../services/ics-subscription.js';
 import { color } from '../../middleware/validate.js';
@@ -13,6 +14,7 @@ import { readDefaultAssignees, validateAssigneeIds } from '../../services/defaul
 import { validateCalendarId } from '../../services/local-calendars.js';
 import { BlockedAddressError } from '../../utils/ssrf.js';
 import { remoteFailure } from '../../utils/http.js';
+import { ICS_SUBSCRIPTION_NAME_MAX } from '../../services/calendar-fields.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -38,7 +40,7 @@ function icsFetchCase(err) {
 // Müssen vor /:id registriert werden, um Konflikte zu vermeiden.
 // --------------------------------------------------------
 
-router.get('/subscriptions', (req, res) => {
+router.get('/subscriptions', validateRequest(), (req, res) => {
   try {
     const subs = icsSubscription.getAll(getUserId(req));
     // DIE QUELL-URL IST EIN ZUGANGSDATUM, KEIN ANZEIGEFELD. Private
@@ -60,10 +62,10 @@ router.get('/subscriptions', (req, res) => {
   }
 });
 
-router.post('/subscriptions', async (req, res) => {
+router.post('/subscriptions', validateRequest(), async (req, res) => {
   try {
     const { name, url, color: colorVal, shared } = req.body;
-    if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 100)
+    if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > ICS_SUBSCRIPTION_NAME_MAX)
       return res.status(400).json({ error: 'name is required and may be at most 100 characters long.', code: 400, ...NAME_INVALID });
     if (!url || typeof url !== 'string')
       return res.status(400).json({ error: 'url is required.', code: 400 });
@@ -117,14 +119,14 @@ router.post('/subscriptions', async (req, res) => {
   }
 });
 
-router.patch('/subscriptions/:id', (req, res) => {
+router.patch('/subscriptions/:id', validateRequest(), (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
     if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const isAdmin = isAdminRequest(req);
     const fields  = {};
     if (req.body.name  !== undefined) {
-      if (typeof req.body.name !== 'string' || req.body.name.trim().length === 0 || req.body.name.length > 100)
+      if (typeof req.body.name !== 'string' || req.body.name.trim().length === 0 || req.body.name.length > ICS_SUBSCRIPTION_NAME_MAX)
         return res.status(400).json({ error: 'name must not be empty and may be at most 100 characters long.', code: 400, ...NAME_INVALID });
       fields.name = req.body.name.trim();
     }
@@ -153,7 +155,7 @@ router.patch('/subscriptions/:id', (req, res) => {
   }
 });
 
-router.delete('/subscriptions/:id', (req, res) => {
+router.delete('/subscriptions/:id', validateRequest(), (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
     if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
@@ -170,7 +172,7 @@ router.delete('/subscriptions/:id', (req, res) => {
   }
 });
 
-router.post('/subscriptions/:id/sync', async (req, res) => {
+router.post('/subscriptions/:id/sync', validateRequest(), async (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
     if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
@@ -193,7 +195,7 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
 
 // POST /api/v1/calendar/import → einmaliger Import aus ICS-Datei/Feed als
 // echte, bearbeitbare lokale Termine (Discussion #437, Kalender-Migration).
-router.post('/import', async (req, res) => {
+router.post('/import', validateRequest(), async (req, res) => {
   try {
     const userId = getUserId(req);
     if (!userId) return res.status(401).json({ error: 'Not authenticated.', code: 401 });

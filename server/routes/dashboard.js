@@ -6,6 +6,7 @@
 
 import { createLogger } from '../logger.js';
 import express from 'express';
+import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
 import { resolveCalendarSelection } from '../services/calendar-selection.js';
 import { emptyTasksOverview, tasksOverviewSlice } from '../services/tasks-slices.ts';
@@ -152,7 +153,7 @@ const router = express.Router();
  *   quicklinks:      QuickLink[]        // Haushaltslinks der Kachelreihe (#469)
  * }
  */
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
   const d = db.get();
   const result = {};

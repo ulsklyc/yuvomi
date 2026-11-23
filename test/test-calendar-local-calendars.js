@@ -925,9 +925,10 @@ test('the calendar manager cases carry a reason and an English error text (#1909
       }
     }
     // Eine Farbe, die nur ein Aufrufer an der Oberflaeche vorbei schickt: kein Fall.
+    // Seit #2810 die 400 des Schemas (`pattern`), `reason: validation`.
     const color = await call('PUT', `/calendars/${calendar.id}`, { body: { color: 'blue' } });
     assert.equal(color.status, 400);
-    assert.equal(color.body.reason, undefined);
+    assert.equal(color.body.reason, 'validation');
     assert.doesNotMatch(color.body.error, GERMAN, color.body.error);
 
     // Die Liste hat sich inzwischen geaendert (ein Kalender kam dazu oder ging).
@@ -938,11 +939,12 @@ test('the calendar manager cases carry a reason and an English error text (#1909
       assert.equal(res.body.reason, 'calendar_order_changed', JSON.stringify(stale));
       assert.doesNotMatch(res.body.error, GERMAN, res.body.error);
     }
-    // Was nur ein Aufrufer schickt (keine Liste, doppelte, Texte): kein Fall.
+    // Was nur ein Aufrufer schickt (keine Liste, doppelte, Texte): kein Fall;
+    // seit #2810 die 400 des Schemas, `reason: validation`.
     for (const invalid of [undefined, ids.map(() => ids[0]), ids.map(String)]) {
       const res = await call('PATCH', '/calendars/reorder', { body: { order: invalid } });
       assert.equal(res.status, 400);
-      assert.equal(res.body.reason, undefined, JSON.stringify(invalid));
+      assert.equal(res.body.reason, 'validation', JSON.stringify(invalid));
       assert.doesNotMatch(res.body.error, GERMAN, res.body.error);
     }
 

@@ -225,8 +225,13 @@ test('OpenAPI nennt den Parameter mit genau den Stufen der Route', () => {
   const params = dashboardPaths()['/api/v1/dashboard'].get.parameters;
   const param = params.find((p) => p.name === 'events_limit' && p.in === 'query');
   assert.ok(param, 'events_limit fehlt in der OpenAPI-Beschreibung von GET /dashboard');
-  assert.deepEqual(param.schema.enum, [...limits.EVENT_LIMIT_STEPS]);
-  assert.equal(param.schema.default, limits.EVENT_LIMIT_DEFAULT);
+  // Seit #2810 (Gruppe 10, Entscheidung 9) traegt das Schema die zugesagte
+  // Toleranz - Text, auch doppelt angegeben, ohne `enum` -, denn
+  // validateRequest() liest es. Die Stufen nennt die Beschreibung, aus derselben
+  // Liste, mit der die Route klemmt.
+  assert.equal(param.schema.enum, undefined);
+  for (const step of limits.EVENT_LIMIT_STEPS) assert.match(param.description, new RegExp(`\`${step}\``));
+  assert.match(param.description, new RegExp(`means \`${limits.EVENT_LIMIT_DEFAULT}\``));
   assert.equal(param.required, false);
 });
 

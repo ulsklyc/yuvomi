@@ -269,20 +269,26 @@ test('PUT /calendar/:id: ein leerer oder null-Start ist ein 400, das Ende darf g
   for (const start of ['', null]) {
     const res = await call('PUT', `/api/v1/calendar/${id}`, { start_datetime: start });
     assert.equal(res.status, 400, `start_datetime: ${JSON.stringify(start)}`);
-    assert.match(res.body.error, /start_datetime is required\./, JSON.stringify(res.body));
+    // Seit #2810 die 400 des Schemas, mit dem Feld (vorher der Satz der Route).
+    assert.equal(res.body.reason, 'validation', JSON.stringify(res.body));
+    assert.equal(res.body.fields[0].path, 'body/start_datetime', JSON.stringify(res.body));
     assert.deepEqual({ ...eventRow(id) },
       { start_datetime: '2026-09-21T10:00', end_datetime: '2026-09-21T11:00', all_day: 0 },
       'eine abgewiesene Anfrage aendert nichts');
   }
   // Das Ende ist optional: ein Termin ohne Ende ist gueltig, und das Formular
-  // schickt `null`, wenn keins gesetzt ist. Leeren bleibt deshalb erlaubt.
-  for (const end of ['', null]) {
-    await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: '2026-09-21T11:00' });
-    const res = await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: end });
-    assert.equal(res.status, 200, `end_datetime: ${JSON.stringify(end)}`);
-    assert.equal(eventRow(id).end_datetime, null, `end_datetime: ${JSON.stringify(end)} leert das Ende`);
-    assert.equal(eventRow(id).start_datetime, '2026-09-21T10:00');
-  }
+  // schickt `null`, wenn keins gesetzt ist. Leeren bleibt deshalb erlaubt -
+  // mit `null`, wie das Dokument es nennt; `''` ist seit #2810 eine 400.
+  await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: '2026-09-21T11:00' });
+  const cleared = await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: null });
+  assert.equal(cleared.status, 200, 'end_datetime: null');
+  assert.equal(eventRow(id).end_datetime, null, 'end_datetime: null leert das Ende');
+  assert.equal(eventRow(id).start_datetime, '2026-09-21T10:00');
+  await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: '2026-09-21T11:00' });
+  const empty = await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: '' });
+  assert.equal(empty.status, 400, "end_datetime: ''");
+  assert.equal(empty.body.reason, 'validation');
+  assert.equal(eventRow(id).end_datetime, '2026-09-21T11:00', 'eine abgewiesene Anfrage aendert nichts');
 });
 
 test('PUT /calendar/:id: ganztaegig mit `T00:00Z` bleibt westlich von UTC am gesendeten Datum', async () => {

@@ -1,4 +1,5 @@
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import { isAdminRequest, requireAdmin } from '../../middleware/require-admin.js';
 import { mayWriteModule, readerVisibleWhere, rowReader } from '../../authorize/index.ts';
@@ -29,6 +30,25 @@ function sendCalendarGone(res) {
   return res.status(404).json({ error: 'Calendar not found.', code: 404, reason: 'calendar_calendar_not_found' });
 }
 
+const CALENDAR_WRITE_REFUSAL = 'Write access to the calendar is required.';
+
+/**
+ * Das Schreibrecht auf den Kalender VOR der Pruefung der Anfrage (#2810,
+ * Gruppe 10 Entscheidung 3): wer nicht schreiben darf, bekommt 403, auch mit
+ * einem Rumpf oder einer Kennung, die nicht zum Schema passt - wie zuvor, als
+ * die Pruefung die erste Zeile des Handlers war. Die Zeile im Handler bleibt
+ * bis Schritt (b).
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireCalendarWrite(req, res, next) {
+  if (!mayWriteModule(req, 'calendar')) {
+    return res.status(403).json({ error: CALENDAR_WRITE_REFUSAL, code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
+
 // Der erste Fehler einer Pruefung mit Grund gibt der Antwort ihren Fall.
 function sendValidationErrors(res, results) {
   const failed = results.filter((result) => result?.error);
@@ -51,7 +71,7 @@ function loadCalendars(database, reader) {
   `).all({ viewerId: reader.userId });
 }
 
-router.get('/calendars', (req, res) => {
+router.get('/calendars', validateRequest(), (req, res) => {
   try {
     // A paired display counts and names only what the whole household sees (rowReader).
     const reader = rowReader(req);
@@ -79,9 +99,9 @@ router.get('/calendars', (req, res) => {
   }
 });
 
-router.post('/calendars', (req, res) => {
+router.post('/calendars', requireCalendarWrite, validateRequest(), (req, res) => {
   if (!mayWriteModule(req, 'calendar')) {
-    return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
+    return res.status(403).json({ error: CALENDAR_WRITE_REFUSAL, code: 403, reason: 'cross_module_access' });
   }
   try {
     const vName = validateCalendarName(req.body?.name);
@@ -102,9 +122,9 @@ router.post('/calendars', (req, res) => {
   }
 });
 
-router.patch('/calendars/reorder', (req, res) => {
+router.patch('/calendars/reorder', requireCalendarWrite, validateRequest(), (req, res) => {
   if (!mayWriteModule(req, 'calendar')) {
-    return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
+    return res.status(403).json({ error: CALENDAR_WRITE_REFUSAL, code: 403, reason: 'cross_module_access' });
   }
   try {
     const database = db.get();
@@ -135,9 +155,9 @@ router.patch('/calendars/reorder', (req, res) => {
   }
 });
 
-router.put('/calendars/:id', (req, res) => {
+router.put('/calendars/:id', requireCalendarWrite, validateRequest(), (req, res) => {
   if (!mayWriteModule(req, 'calendar')) {
-    return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
+    return res.status(403).json({ error: CALENDAR_WRITE_REFUSAL, code: 403, reason: 'cross_module_access' });
   }
   try {
     const id = Number(req.params.id);
@@ -188,9 +208,9 @@ router.put('/calendars/:id', (req, res) => {
   }
 });
 
-router.delete('/calendars/:id', (req, res) => {
+router.delete('/calendars/:id', requireCalendarWrite, validateRequest(), (req, res) => {
   if (!mayWriteModule(req, 'calendar')) {
-    return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
+    return res.status(403).json({ error: CALENDAR_WRITE_REFUSAL, code: 403, reason: 'cross_module_access' });
   }
   try {
     const id = Number(req.params.id);
@@ -216,7 +236,7 @@ router.delete('/calendars/:id', (req, res) => {
   }
 });
 
-router.post('/calendars/:id/feed/regenerate', requireAdmin, (req, res) => {
+router.post('/calendars/:id/feed/regenerate', requireAdmin, validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const database = db.get();
@@ -230,7 +250,7 @@ router.post('/calendars/:id/feed/regenerate', requireAdmin, (req, res) => {
   }
 });
 
-router.delete('/calendars/:id/feed', requireAdmin, (req, res) => {
+router.delete('/calendars/:id/feed', requireAdmin, validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const database = db.get();

@@ -440,8 +440,10 @@ describe('Routen', () => {
   it('POST /import assigns the chosen people and refuses a non-member before writing', async () => {
     const icsText = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:route-1', 'SUMMARY:R',
       'DTSTART:20260601T090000Z', 'DTEND:20260601T100000Z', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    // A non-number is the schema's 400 since #2810 (`reason: validation`), the
+    // route's own `calendar_assignee_invalid` before.
     for (const [body, reason] of [[{ assignee_user_ids: [STAFF] }, 'calendar_assignee_not_member'],
-      [{ assignee_user_id: 987654 }, 'calendar_assignee_unknown'], [{ assignee_user_ids: ['x'] }, 'calendar_assignee_invalid']]) {
+      [{ assignee_user_id: 987654 }, 'calendar_assignee_unknown'], [{ assignee_user_ids: ['x'] }, 'validation']]) {
       const refused = await call('POST', '/import', { ics: icsText, ...body });
       assert.equal(refused.status, 400);
       assert.equal(refused.body.reason, reason);

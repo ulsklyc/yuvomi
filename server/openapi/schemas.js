@@ -7,6 +7,9 @@ import { wasteInputSchemas } from './waste-inputs.js';
 import {
   DMS_PROVIDERS, DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_UPLOAD_BACKENDS, DOCUMENT_VISIBILITIES,
 } from '../services/document-fields.js';
+import {
+  CALENDAR_NAME_MAX, EVENT_VISIBILITY, ICS_SUBSCRIPTION_NAME_MAX, MAX_REMINDER_OFFSETS,
+} from '../services/calendar-fields.js';
 
 /**
  * A reminder time as the handlers accept it (`datetime()` in
@@ -247,7 +250,7 @@ const calendarOccurrenceMutationProperties = {
       { type: 'null' },
     ],
   },
-  visibility: { type: 'string', enum: ['all', 'assignees', 'private'] },
+  visibility: { type: 'string', enum: [...EVENT_VISIBILITY] },
   countdown: { type: 'boolean' },
   attachment_name: { type: ['string', 'null'] },
   attachment_data: {
@@ -260,7 +263,7 @@ const calendarOccurrenceMutationProperties = {
   document_description: { type: ['string', 'null'] },
   reminder_offsets: {
     type: 'array',
-    maxItems: 5,
+    maxItems: MAX_REMINDER_OFFSETS,
     uniqueItems: true,
     items: { type: 'integer', minimum: 0 },
   },
@@ -435,7 +438,9 @@ export const schemas = {
           description: 'Import an ICS document or URL into a household local calendar.',
           properties: {
             ics: { type: 'string', description: 'Raw ICS file text. Required when url is omitted.' },
-            url: { type: 'string', format: 'uri', description: 'Shared calendar URL. Required when ics is omitted.' },
+            // No `format: uri` (#2810): an address that does not parse answers the
+            // route's own `calendar_ics_url_invalid`, which the page translates.
+            url: { type: 'string', description: 'Shared calendar URL (https:// or webcal://). Required when ics is omitted.' },
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Fallback event color for imported events without their own color.' },
             local_calendar_id: { type: 'integer', minimum: 1, description: 'Target local calendar. Omit to use the default calendar.' },
             assignee_user_ids: {
@@ -449,8 +454,10 @@ export const schemas = {
         LocalCalendarCreateInput: {
           type: 'object', required: ['name'],
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 80 },
-            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            // The length stays the route's check (#2810): an empty or too long
+            // name answers `calendar_name_invalid` with `params.limit`.
+            name: { type: 'string', description: `Trimmed, 1 to ${CALENDAR_NAME_MAX} characters; otherwise 400 with \`reason: calendar_name_invalid\` and \`params: { limit }\`.` },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Omitted: `#007AFF`.' },
           },
         },
         LocalCalendarReorderInput: {
@@ -462,9 +469,52 @@ export const schemas = {
           type: 'object',
           minProperties: 1,
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 80 },
+            name: { type: 'string', description: `Trimmed, 1 to ${CALENDAR_NAME_MAX} characters; otherwise 400 with \`reason: calendar_name_invalid\` and \`params: { limit }\`.` },
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
             sort_order: { type: 'integer', minimum: 0 },
+          },
+        },
+        IcsSubscriptionCreateInput: {
+          type: 'object',
+          description: 'A new ICS subscription. Name, address and colour are required; name and address are the route\'s checks, each with its own answer: an empty or too long name carries `calendar_subscription_name_invalid`, an address that does not parse `calendar_ics_url_invalid`, another scheme `calendar_ics_url_scheme`.',
+          properties: {
+            name: { type: 'string', description: `Trimmed, 1 to ${ICS_SUBSCRIPTION_NAME_MAX} characters.` },
+            url: { type: 'string', description: 'https:// or webcal:// (with ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK also http://).' },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            shared: { type: 'boolean', description: 'Visible to the whole household; otherwise only to its creator. Default false.' },
+            default_assignee_user_ids: { type: 'array', items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
+          },
+        },
+        IcsSubscriptionUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional: what is left out stays as stored. The default assignees change only when one of the two assignee fields is sent.',
+          properties: {
+            name: { type: 'string', description: `Trimmed, 1 to ${ICS_SUBSCRIPTION_NAME_MAX} characters; otherwise 400 with \`reason: calendar_subscription_name_invalid\`.` },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            shared: { type: 'boolean' },
+            default_assignee_user_ids: { type: 'array', items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
+          },
+        },
+        CalendarFeedOptionsInput: {
+          type: 'object',
+          description: 'At least one of the two switches; the one left out stays as stored.',
+          properties: {
+            showAssignees: { type: 'boolean', description: 'Name the assignees in the event description of the feed.' },
+            includeBirthdays: { type: 'boolean', description: 'Carry the birthday events; true by default.' },
+          },
+          anyOf: [
+            { properties: { showAssignees: { type: 'boolean' } }, required: ['showAssignees'] },
+            { properties: { includeBirthdays: { type: 'boolean' } }, required: ['includeBirthdays'] },
+          ],
+        },
+        CalendarExceptionInput: {
+          type: 'object',
+          description: 'The occurrence to exclude: `recurrence_id` as the calendar reads return it, or the former `date` (`YYYY-MM-DD`). Whether the value is an occurrence key is the route\'s check: otherwise 400 with `reason: malformed_recurrence_id`, also when both are missing.',
+          properties: {
+            recurrence_id: { type: ['string', 'null'] },
+            date: { type: ['string', 'null'] },
           },
         },
         ApiError: {

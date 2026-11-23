@@ -24,7 +24,8 @@ import { seriesReadingZone } from '../../services/calendar-events.js';
 // it without importing a route; re-exported here for the calendar routes.
 export { setEventAssignments } from '../../services/event-assignments.ts';
 
-export const VALID_SOURCES  = ['local', 'google', 'apple', 'ics'];
+// The source filter of `GET /calendar` (server/services/calendar-fields.js, #2810).
+export { VALID_SOURCES } from '../../services/calendar-fields.js';
 // Ein Termin-Anhang ist ein Upload wie jeder andere und teilt deshalb die
 // gemeinsame Grenze (#806).
 export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
@@ -311,6 +312,23 @@ function bodyUploadsAttachment(body) {
 /** `true`, wenn der Body hochlaedt und der Aufrufer Dokumente nicht schreiben darf. */
 export function attachmentUploadRefused(req) {
   return bodyUploadsAttachment(req.body) && !mayWriteModule(req, 'documents');
+}
+
+/**
+ * Dieselbe Absage als Middleware VOR der Pruefung der Anfrage (#2810, Gruppe 10
+ * Entscheidung 4): sie liest nur, ob `attachment_data` einen Wert traegt, und
+ * steht deshalb vor Schema, Suche und Zeilenrecht - die Absage verraet weder,
+ * ob es den Termin gibt, noch, ob der Rest des Rumpfs stimmt (DECISIONS.md
+ * Eintrag 10). Die Zeile im Handler bleibt bis Schritt (b).
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+export function refuseUploadWithoutDocumentsWrite(req, res, next) {
+  if (attachmentUploadRefused(req)) {
+    return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
+  }
+  return next();
 }
 
 /* WER DEN GESPEICHERTEN ANHANG NICHT SIEHT, LOEST IHN NICHT AB (#1358).

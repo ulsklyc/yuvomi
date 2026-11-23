@@ -426,7 +426,7 @@ const CASES = [
   },
   {
     name: 'ganztaegig',
-    entered: { start_datetime: '2035-01-15', end_datetime: '2035-01-15', all_day: 1, recurrence_rule: LAST_DAY },
+    entered: { start_datetime: '2035-01-15', end_datetime: '2035-01-15', all_day: true, recurrence_rule: LAST_DAY },
     sent: '2035-01-31', sentEnd: '2035-01-31',
   },
   {

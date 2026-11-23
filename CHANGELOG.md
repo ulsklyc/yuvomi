@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **The calendar and the overview check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that is refused now (from this
+  release on the subscription settings send `shared` as `true`/`false`, they sent `1`/`0`).
+  Under `/api/v1/calendar` (events, occurrences, local calendars, the personal feed, holidays,
+  sync targets, ICS subscriptions and the import; the Google, Apple, CalDAV and Outlook routes
+  follow) input that used to be quietly accepted, replaced or answered with a 500 is now refused
+  with a 400:
+  - a path id that is not plain digits: `1abc`, `1.0` and `1e0` reached event or subscription 1,
+    `0x1` and `1.0` local calendar 1 - also to delete it;
+  - a switch that is not `true`/`false`: `all_day` as `1`, `"false"` or `{}` made an all-day
+    event, `countdown` as `1` or text, `shared` of a subscription as `1`, `"x"` or `null` (stored
+    as 1 or 0);
+  - an id that is not a whole number: `local_calendar_id: "1"` or `true`, `assigned_to: "2"`,
+    and assignees `[1.5]` or `[-1]` (a 500) or `[0]`, `[{}]` (dropped silently); a subscription's
+    default assignees or the people of an import as text;
+  - an unknown `visibility` (silently `all`), an `icon` that is not text (`5` became `calendar`),
+    `color: ""` (no colour), `end_datetime: ""`, a start or end `2026-02-30` as a plain date, a
+    `target_*` or attachment field of the wrong type (`attachment_data: 5` was ignored);
+  - a local calendar `color: null` (became the default blue), `sort_order` as text, `null` or
+    `true`, and `PUT /calendar/calendars/{id}` with `{}` (did nothing);
+  - `POST /calendar/import` with both `ics` and `url` (the file won);
+  - query garbage: `/calendar/upcoming?limit=` `abc`, `0`, `-1`, `1.5` or given twice (5, or -1
+    unchecked; a limit above 20 is still cut to 20), `assigned_to=abc` and a `from`/`to` that is
+    no calendar day on `GET /calendar` (an empty list), `from`/`to` of `/calendar/holidays`
+    (month 13 answered an empty list; a missing day was a 400 already), `q` of the search given
+    twice.
+
+  A PUT or PATCH without a body is a 400 (it answered 200 and changed nothing). The check runs
+  before the event, series or subscription is looked up, so a bad request is a 400, not a 404 or
+  the 403 of a child without the right to change others' events; a valid one meets those as
+  before. Two refusals stay in front of it: without write access to the calendar, managing local
+  calendars answers 403 also with a malformed request, and so does an attachment without write
+  access to documents. Lengths, the calendar run of a date-time, the recurrence rule and every
+  refusal with a `reason` the app shows stay with the routes (`calendar_name_invalid`,
+  `calendar_subscription_name_invalid`, `calendar_ics_url_invalid`, `malformed_recurrence_id`,
+  `invalid_recurrence_id` and the others); a body of the wrong type now answers
+  `reason: validation` with the field. `GET /dashboard` keeps its lenient query: every value its
+  description tolerates still answers 200.
 - **The budget and the subscriptions answer an unexpected failure with the same sentence as the
   rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
   and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,

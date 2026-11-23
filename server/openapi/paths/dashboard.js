@@ -1,4 +1,17 @@
 import { op } from '../helpers.js';
+import { EVENT_LIMIT_DEFAULT, EVENT_LIMIT_STEPS } from '../../../public/utils/dashboard-event-limit.js';
+
+/* THE QUERY OF THE OVERVIEW IS LENIENT BY PROMISE (#2810, decision 9 of group
+ * 10). Every parameter below says what an unknown, empty or repeated value
+ * means - all appointments, the personal version, five events, the parameter
+ * left out - and stored layouts, wall tablets and older browsers send such
+ * values. validateRequest() reads these schemas, so they carry no `enum`, no
+ * `pattern` and no `minimum`: the allowed values stand in the descriptions,
+ * and server/services/overview-query.ts reads them. A scalar may come
+ * repeated (`events_limit=5&events_limit=8`), so it is text or a list of
+ * texts. */
+const LENIENT_ONE = { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] };
+const LENIENT_LIST = { type: 'array', items: { type: 'string' } };
 
 export function dashboardPaths() {
   return {
@@ -14,7 +27,7 @@ export function dashboardPaths() {
             in: 'query',
             required: false,
             description: 'Limit pinned notes to those carrying every selected category (AND). Repeatable positive category IDs, deduplicated and capped at 50. Omitted or empty means all visible pinned notes. Only household categories and the caller\'s own personal categories may match; another user\'s personal category cannot reveal notes.',
-            schema: { type: 'array', items: { type: 'integer', minimum: 1 }, maxItems: 50 },
+            schema: LENIENT_LIST,
             style: 'form',
             explode: true,
           },
@@ -22,36 +35,36 @@ export function dashboardPaths() {
             name: 'tasks_category',
             in: 'query',
             required: false,
-            description: 'Limit tasks to these categories. Repeatable; several values combine with OR. Omitted or empty means every category.',
-            schema: { type: 'array', items: { type: 'string' }, maxItems: 50 },
+            description: 'Limit tasks to these categories. Repeatable; several values combine with OR, at most 50 count. Omitted or empty means every category.',
+            schema: LENIENT_LIST,
           },
           {
             name: 'audience',
             in: 'query',
             required: false,
             description: '`household` asks for the version for a shared surface (wall mode): an allowlist. The response then carries only the keys a wall draws: `users`, `upcomingEvents`, `birthdays`, `urgentTasks`, `tasksDoneToday`, `wallTasks`, `todayMeals`, `shoppingOpenCount`, `wastePickups`, of `pantryExpiring` the fields `todayItems` and `todayCount`, and of `housekeeping` the fields `present`, `presentSince` and `workerName`. Tasks and appointments in them are those the whole household may see - visibility `all`, appointments from ICS subscriptions only from shared ones - whoever the caller is, creator and assignees included; `events_scope=mine` is ignored. Every other key keeps its place in the same empty form as for a caller without the module - notes, `budget`, `splitBalance`, `quicklinks`, `countdowns`, the counters and week/family slices of tasks and calendar, `housekeeping.unpaidAmount`, and what belongs to the caller alone (`health`, `fasting`, `nutrition`, `myShiftsToday`, `rewards`); `shoppingTile` is absent. A key added to this response later is empty for this audience until it is put on the list. The parameter only narrows the response, so it needs no scope of its own. Anything else means the personal version; for a paired display its task parts (`urgentTasks`, the task counts, `memberTodayTasks`, `tasksDoneToday` and the task countdowns) still hold only tasks with visibility `all` and its event parts (`upcomingEvents`, `weekEvents`, `familyEvents` and the event countdowns) only the appointments of this audience (the wall rule), even one that names the display as an assignee.',
-            schema: { type: 'string', enum: ['household'] },
+            schema: LENIENT_ONE,
           },
           {
             name: 'events_scope',
             in: 'query',
             required: false,
             description: '`mine` limits appointments to those assigned to the calling user - among the assignees, so an unassigned event is not "mine" (same reading as the calendar module). A paired display has no assignments of its own, so for it `mine` reads as all appointments. Anything else means all appointments.',
-            schema: { type: 'string', enum: ['all', 'mine'] },
+            schema: LENIENT_ONE,
           },
           {
             name: 'events_birthdays',
             in: 'query',
             required: false,
             description: '`hide` drops appointments that belong to a birthday entry from `upcomingEvents` and `weekEvents`, so a household that already shows the Birthdays tile does not read them twice. Applied before the cap (`events_limit`), so the freed rows are filled with the next real appointments. Anything else keeps them - birthdays are in by default.',
-            schema: { type: 'string', enum: ['show', 'hide'] },
+            schema: LENIENT_ONE,
           },
           {
             name: 'shopping_list',
             in: 'query',
             required: false,
             description: 'Which lists the shopping tile shows. Repeatable positive list IDs, deduplicated and capped at 50. The selection applies to the tile only: with it the response carries an extra field `shoppingTile` = `{ lists, openCount, listCount }` - the selected lists (at most three, also those without open items, lists with open items first, each with up to six open items), the open items within the selection, and how many selected lists exist. `shoppingLists`, `shoppingOpenCount` and `shoppingOpenLists` are never affected and keep counting across all lists. IDs of lists that do not exist are dropped; when none of the IDs exists, or the value is not an ID, the request answers like one without the parameter and `shoppingTile` is absent. A caller without access to shopping gets the empty shopping payload and no `shoppingTile`.',
-            schema: { type: 'array', items: { type: 'integer', minimum: 1 }, maxItems: 50 },
+            schema: LENIENT_LIST,
             style: 'form',
             explode: true,
           },
@@ -60,7 +73,7 @@ export function dashboardPaths() {
             in: 'query',
             required: false,
             description: 'Which calendars the appointments come from, under the keys of the calendar module: `local:<id>` for an own calendar, `cal:<id>` for a synced one (CalDAV, Google), `sub:<id>` for an ICS subscription - the `key` values of `sources` from `GET /calendar/calendars`, the catalogue the selection is checked against. Repeatable, deduplicated and capped at 50; a value of any other shape is dropped. Applies to `upcomingEvents` and `weekEvents` before the cap (`events_limit`), not to `familyEvents`. Appointments that belong to no calendar (birthdays, housekeeping visits) always pass; birthdays have `events_birthdays`. Keys the caller cannot choose (a deleted calendar, a removed subscription, a disconnected account, another member\'s private subscription) are dropped; when none is left the request answers like one without the parameter, never with an empty list.',
-            schema: { type: 'array', items: { type: 'string', pattern: '^(local|cal|sub):[1-9][0-9]{0,14}$' }, maxItems: 50 },
+            schema: LENIENT_LIST,
             style: 'form',
             explode: true,
           },
@@ -68,10 +81,13 @@ export function dashboardPaths() {
             name: 'events_limit',
             in: 'query',
             required: false,
-            description: 'How many upcoming appointments `upcomingEvents` lists: `5`, `8` or `12`. The value is matched against exactly these three; anything else - omitted, empty, repeated, `7`, `500` - means `5`. Appointments of today that have already ended come on top and do not count against it. `weekEvents` and `familyEvents` are not affected.',
-            schema: { type: 'integer', enum: [5, 8, 12], default: 5 },
+            // The steps come from the one list route and tile share (#1680).
+            description: `How many upcoming appointments \`upcomingEvents\` lists: ${EVENT_LIMIT_STEPS.map((step) => `\`${step}\``).join(', ')}. The value is matched against exactly these; anything else - omitted, empty, repeated, \`7\`, \`500\` - means \`${EVENT_LIMIT_DEFAULT}\`. Appointments of today that have already ended come on top and do not count against it. \`weekEvents\` and \`familyEvents\` are not affected.`,
+            schema: LENIENT_ONE,
           },
         ],
+        // No 400: lenient as the query is, the check refuses no query the
+        // URL parser can produce (text or a list of texts per name).
         responses: {
           200: {
             description: 'The data of the overview. Depending on module access it can carry further fields that are not described here.',

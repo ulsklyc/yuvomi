@@ -309,10 +309,14 @@ test('OpenAPI beschreibt den Parameter', () => {
   const parameter = dashboardPaths()['/api/v1/dashboard'].get.parameters.find((item) => item.name === 'shopping_list');
   assert.ok(parameter);
   assert.equal(parameter.in, 'query');
+  // Seit #2810 (Gruppe 10, Entscheidung 9): Text ohne Muster und ohne Hoechstzahl,
+  // denn `abc`, `0` oder eine 51. Liste fallen laut Beschreibung weg, statt
+  // abgewiesen zu werden. Form und Grenze stehen in der Beschreibung.
   assert.equal(parameter.schema.type, 'array');
-  assert.equal(parameter.schema.items.type, 'integer');
-  assert.equal(parameter.schema.items.minimum, 1);
-  assert.equal(parameter.schema.maxItems, 50);
+  assert.deepEqual(parameter.schema.items, { type: 'string' });
+  assert.equal(parameter.schema.maxItems, undefined);
+  assert.match(parameter.description, /positive list IDs, deduplicated and capped at 50/);
+  assert.match(parameter.description, /the value is not an ID, the request answers like one without the parameter/);
 });
 
 // --------------------------------------------------------------------------

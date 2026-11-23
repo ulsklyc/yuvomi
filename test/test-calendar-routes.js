@@ -163,7 +163,9 @@ const titles = (rows) => rows.map((e) => e.title);
 test('GET / — 400 bei ungültigem from/to', async () => {
   const res = await call('GET', '/?from=2035-3-1&to=xxxx');
   assert.equal(res.status, 400);
-  assert.match(res.body.error, /YYYY-MM-DD/);
+  // Seit #2810 die 400 des Schemas (`format: date`), mit dem Feld statt Satz.
+  assert.equal(res.body.reason, 'validation');
+  assert.equal(res.body.fields[0].path, 'query/from');
 });
 
 test('GET / — liefert Termine im Fenster (all-sichtbar)', async () => {
@@ -1422,7 +1424,7 @@ test('PATCH /subscriptions/:id — 400/404/403/Happy', async () => {
   assert.equal((await call('PATCH', `/subscriptions/${subId}`, { body: { name: '' } })).status, 400);
   assert.equal((await call('PATCH', `/subscriptions/${subId}`, { body: { color: 'nope' } })).status, 400);
   // Maria (Owner, non-admin) darf eigenen Sub ändern
-  const ok = await call('PATCH', `/subscriptions/${subId}`, { actor: MARIA, body: { name: 'Renamed', shared: 1 } });
+  const ok = await call('PATCH', `/subscriptions/${subId}`, { actor: MARIA, body: { name: 'Renamed', shared: true } });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.data.name, 'Renamed');
   // Tom (non-admin, fremd) -> 403
@@ -2242,12 +2244,18 @@ test('POST /:id/exceptions — 404 + 400 keine Serie + 400 extern', async () => 
 
 test('single event PUT ignores irrelevant orphan confirmation metadata', async () => {
   const id = insertEvent({ title: 'Single confirmation', start_datetime: '2042-02-03T09:00' });
-  for (const count of [0, null, 'obsolete metadata', -1]) {
+  // Seit #2810 prueft das Schema die Form (`integer >= 0`): was keine solche
+  // Zahl ist (`null`, Text, `-1`), ist eine 400, bevor der Handler sie
+  // ignorieren koennte; eine Zahl ohne Bedeutung fuer einen Einzeltermin bleibt
+  // ohne Wirkung.
+  for (const count of [0, 3, null, 'obsolete metadata', -1]) {
+    const valid = Number.isInteger(count) && Number(count) >= 0;
     const result = await call('PUT', `/${id}`, {
       body: { title: 'Still editable', confirmed_orphan_count: count },
     });
-    assert.equal(result.status, 200);
-    assert.equal(result.body.data.title, 'Still editable');
+    assert.equal(result.status, valid ? 200 : 400, JSON.stringify(count));
+    if (valid) assert.equal(result.body.data.title, 'Still editable');
+    else assert.equal(result.body.reason, 'validation');
   }
 });
 
@@ -3597,10 +3605,11 @@ test('occurrence mutation routes reject schema-invalid values before persistence
         body,
       });
       assert.equal(response.status, 400, `${suffix || '/only'} ${JSON.stringify(body)}`);
-      // Englisch fuer API-Clients, ohne Grund: das Formular laesst keinen dieser
-      // Werte durch, die App sagt ihren allgemeinen Satz (#1909).
+      // Englisch fuer API-Clients, ohne eigenen Fall: das Formular laesst keinen
+      // dieser Werte durch, die App sagt ihren allgemeinen Satz (#1909). Seit
+      // #2810 antwortet das Schema die Formfehler mit `reason: validation`.
       assert.doesNotMatch(response.body.error, /[äöüß]|Gib |Wähle/);
-      assert.equal(response.body.reason, undefined, JSON.stringify(body));
+      assert.ok([undefined, 'validation'].includes(response.body.reason), JSON.stringify(body));
       assert.equal(db.prepare(`
         SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
       `).get(seriesId).count, 0);
@@ -5577,9 +5586,10 @@ test('die Termin-Faelle tragen einen reason und einen englischen Text (#1909)', 
       english(res, `${method} ${route}`);
     }
     // Eine Kennung, die keine Zahl ist, schickt nur ein Aufrufer: kein Fall.
+    // Seit #2810 die 400 des Schemas, `reason: validation`.
     const malformed = await call('POST', '/', { body: { title: 'Neu', start_datetime: '2035-03-10T09:00', local_calendar_id: 'x' } });
     assert.equal(malformed.status, 400);
-    assert.equal(malformed.body.reason, undefined);
+    assert.equal(malformed.body.reason, 'validation');
     english(malformed, 'local_calendar_id x');
     // Ein leerer Titel ebenso (das Formular prueft ihn selbst).
     const untitled = await call('POST', '/', { body: { title: '', start_datetime: '2035-03-10T09:00' } });
