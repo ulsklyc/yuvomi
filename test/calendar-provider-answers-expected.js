@@ -14,7 +14,9 @@
  *          log line). `before` is the answer at 7d9eddb01, `now` the one after.
  *
  *          CENTRAL holds the rows that reached the central error handler
- *          already at 7d9eddb01, with their log line.
+ *          already at 7d9eddb01, with their log line. Its two rows ("o
+ *          calendars expired refresh", "o calendars refused") answer 409 and
+ *          502 since the service exports ReauthRequiredError (#2894).
  * Run: imported by test/test-calendar-provider-answers.js, no suite of its own.
  */
 
@@ -336,8 +338,8 @@ export const EXPECTED = {
   "o calendars": {"status":200,"body":{"data":[{"calendarId":"cal-A","calendarName":"Kalender A","calendarColor":null,"canEdit":true,"enabled":true}]}},
   "o calendars refresh": {"status":200,"body":{"data":[{"calendarId":"cal-A","calendarName":"Kalender A","calendarColor":null,"canEdit":true,"enabled":true},{"calendarId":"cal-B","calendarName":"Kalender B","calendarColor":null,"canEdit":false,"enabled":false}]}},
   "o calendars refresh one": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"query/refresh","rule":"enum"}]}},
-  "o calendars expired refresh": {"status":500,"body":{"error":"Internal server error.","code":500}},
-  "o calendars refused": {"status":500,"body":{"error":"Internal server error.","code":500}},
+  "o calendars expired refresh": {"status":409,"body":{"error":"Outlook sign-in expired - reconnect required.","code":409,"reason":"outlook_reauth_required"}},
+  "o calendars refused": {"status":502,"body":{"error":"Microsoft refused the request or could not be reached.","code":502,"reason":"remote_http_status","detail":"HTTP 500","params":{"status":500}}},
   "o sync refused": {"status":200,"body":{"data":{"success":true,"syncedAccounts":2,"pushed":0,"updated":0,"deleted":0}}},
   "o calendars unknown": {"status":404,"body":{"error":"Outlook account not found.","code":404,"reason":"outlook_account_not_found"}},
   "o calendars zero": {"status":404,"body":{"error":"Outlook account not found.","code":404,"reason":"outlook_account_not_found"}},
@@ -434,7 +436,4 @@ export const CHANGED = {
 };
 
 /** @type {Record<string, string>} */
-export const CENTRAL = {
-  "o calendars expired refresh": 'Unhandled error: GET /api/v1/calendar/outlook/accounts/:id/calendars -> 500',
-  "o calendars refused": 'Unhandled error: GET /api/v1/calendar/outlook/accounts/:id/calendars -> 500',
-};
+export const CENTRAL = {};

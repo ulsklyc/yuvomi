@@ -624,7 +624,7 @@
     "test:shopping-documents-answers": "node scripts/with-env.mjs DB_PATH=:memory: node --test test/test-shopping-documents-answers.js",
     "test:budget-answers": "node scripts/with-env.mjs DB_PATH=:memory: node --test test/test-budget-answers.js",
     "test:calendar-answers": "node scripts/with-env.mjs DB_PATH=:memory: node --test test/test-calendar-answers.js",
-    "test:calendar-provider-answers": "node scripts/with-env.mjs DB_PATH=:memory: node --test test/test-calendar-provider-answers.js",
+    "test:calendar-provider-answers": "node scripts/with-env.mjs DB_PATH=:memory: node --experimental-test-module-mocks --test test/test-calendar-provider-answers.js",
     "test:path-id-bound": "node scripts/with-env.mjs DB_PATH=:memory: node --test test/test-path-id-bound.js",
     "test:image-picker": "node --test test/test-image-picker.js",
     "test:task-completions": "node scripts/with-env.mjs DB_PATH=:memory: node --test test/test-task-completions.js",

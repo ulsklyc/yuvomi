@@ -104,6 +104,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for every other 500. A refusal of the foreign server keeps its class ("Connection failed: HTTP
   401"). Every other answer is unchanged.
 
+### Fixed
+- **Refreshing the calendars of an Outlook account answers an expired sign-in with 409
+  `outlook_reauth_required` and a refusal of Microsoft with 502 and its class, instead of a 500.**
+
 ## [2.94.0] - 2026-11-22
 
 ### Changed

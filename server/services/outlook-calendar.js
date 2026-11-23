@@ -982,6 +982,7 @@ export {
   listCalendarSelection,
   setCalendarEnabled,
   assertConfigured,
+  ReauthRequiredError,
 };
 
 export const __test = {
