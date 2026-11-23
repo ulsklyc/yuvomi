@@ -343,6 +343,26 @@ test('a check with a reason of its own keeps it: the schema carries only type an
   assert.equal((await call('PUT', `/calendar/${event.id}/occurrences/not-a-key`, { json: { title: 'x' } })).body.reason, 'invalid_recurrence_id');
 });
 
+test('PUT keeps a stored recurrence rule of any length: the edit form sends it back unchanged', async () => {
+  // A synced series (CalDAV, Google) stores its rule as the server sends it,
+  // without a length limit, and public/rrule-ui.js getRRuleValues() sends the
+  // stored rule back when its fields were not touched. The handler takes a
+  // rule equal to the stored one unchecked (#756); the schema of the update
+  // must not refuse it first (no `maxLength` there).
+  const longRule = `FREQ=YEARLY;COUNT=3;BYYEARDAY=${Array.from({ length: 120 }, (_, i) => i + 1).join(',')}`;
+  assert.ok(longRule.length > 300, `${longRule.length} characters`);
+  const event = await createEvent({ title: 'Synchronisiert' });
+  db.prepare('UPDATE calendar_events SET recurrence_rule = ? WHERE id = ?').run(longRule, event.id);
+  const res = await call('PUT', `/calendar/${event.id}`, { json: { title: 'Neuer Titel', recurrence_rule: longRule } });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(/** @type {any} */ (db.prepare('SELECT title, recurrence_rule FROM calendar_events WHERE id = ?').get(event.id)).recurrence_rule, longRule);
+  // A new rule of that length is still the handler's 400.
+  const other = await createEvent({ title: 'Lokal' });
+  const refused = await call('PUT', `/calendar/${other.id}`, { json: { recurrence_rule: longRule } });
+  assert.equal(refused.status, 400);
+  assert.equal(refused.body.reason, undefined, 'the handler sentence, not the schema');
+});
+
 // --------------------------------------------------------------------------
 // Order
 // --------------------------------------------------------------------------

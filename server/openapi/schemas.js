@@ -1361,6 +1361,14 @@ export const schemas = {
           description: 'Every field is optional: what is left out stays as stored. Null in `end_datetime`, `description` or `location` clears the field, null in `color` clears the event\'s own colour.',
           properties: {
             ...calendarEventMutationProperties,
+            // No `maxLength` here (#2810): a synced series stores its rule as
+            // the server sends it, without a limit, and the edit form sends
+            // the stored rule back unchanged. The route takes a rule equal to
+            // the stored one unchecked (#756) and checks the length of a new one.
+            recurrence_rule: {
+              type: ['string', 'null'],
+              description: 'As on create; a new rule may be at most 300 characters. A value equal to the stored rule is accepted unchecked, whatever its length, so an imported series that carries more stays editable.',
+            },
             local_calendar_id: {
               type: 'integer',
               minimum: 1,
