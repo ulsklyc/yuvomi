@@ -1817,12 +1817,13 @@ export function hasSplitExpenseGuests(database = null) {
 }
 
 // --------------------------------------------------------
-// Pruefung gegen das OpenAPI-Dokument (#2810, Gruppe 12a)
-// --------------------------------------------------------
+// Pruefung gegen das OpenAPI-Dokument (#2810, Gruppen 12a und 12b)
+// -----------------------------------------------------------------
 //
-// Jede Route der Anmeldung, der Sitzung und des eigenen Kontos prueft die
-// Anfrage vor dem Handler gegen ihre Operation (`validateRequest()`), HINTER
-// jedem Limiter, `requireAuth` und `csrfMiddleware`: ein 400 zaehlt am Limiter
+// Jede Route dieser Datei (Anmeldung, Sitzung, eigenes Konto und die
+// Verwaltung) prueft die Anfrage vor dem Handler gegen ihre Operation
+// (`validateRequest()`), HINTER jedem Limiter, `requireAuth`, `requireAdmin`
+// und `csrfMiddleware`: ein 400 zaehlt am Limiter
 // wie jeder andere Fehlversuch, und wer nicht angemeldet ist, erfaehrt nichts
 // ueber die Form. Was keinen Bezug auf eine Zeile des Rumpfs hat, steht als
 // Middleware DAVOR, damit seine Absage nicht vom Rumpf abhaengt:
@@ -1855,6 +1856,7 @@ const SIGN_IN_SESSION_REFUSALS = {
 };
 const BROWSER_SESSION_REFUSALS = {
   logoutOthers: { error: 'Only a signed-in browser session can sign out other sessions.', code: 403, reason: 'browser_session_required' },
+  signOutMember: { error: 'Only a signed-in browser session can sign out a member.', code: 403, reason: 'browser_session_required' },
 };
 
 /**
@@ -2209,15 +2211,15 @@ export function buildInviteRoutes(targetRouter, {
 } = {}) {
   const getDb = () => (database || db.get());
 
-  targetRouter.post('/invites', requireAuth, requireAdmin, csrfMiddleware, async (req, res) => {
+  targetRouter.post('/invites', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), async (req, res) => {
     try {
       const body = req.body || {};
       const username = String(body.username || '').trim();
       const displayName = String(body.display_name || '').trim();
       const email = String(body.email || '').trim();
       const familyRole = String(body.family_role || 'other').trim();
-      const sendEmail = body.send_email === true || body.send_email === 'true';
-      const role = body.system_admin === true || body.system_admin === 'true' ? 'admin' : 'member';
+      const sendEmail = body.send_email === true;
+      const role = body.system_admin === true ? 'admin' : 'member';
       // Startrechte (#869). Fehlt das Feld, gilt die enge Vorlage - ein
       // Client, der sie nicht kennt, laedt damit nicht versehentlich mit
       // vollem Zugriff ein. Das ist die einzige Stelle, an der die Umkehr
@@ -2306,7 +2308,7 @@ export function buildInviteRoutes(targetRouter, {
     }
   });
 
-  targetRouter.get('/invites', requireAuth, requireAdmin, (_req, res) => {
+  targetRouter.get('/invites', requireAuth, requireAdmin, validateRequest(), (_req, res) => {
     try {
       res.json({ data: { invites: inviteService.listOpen() } });
     } catch (err) {
@@ -2315,9 +2317,9 @@ export function buildInviteRoutes(targetRouter, {
     }
   });
 
-  targetRouter.delete('/invites/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res) => {
+  targetRouter.delete('/invites/:id', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
     try {
-      const id = parseInt(req.params.id, 10);
+      const id = Number(req.params.id);
       if (!Number.isFinite(id)) {
         return res.status(400).json({ error: 'Invalid invite ID.', code: 400 });
       }
@@ -3257,7 +3259,7 @@ router.post('/2fa/recovery-codes', requireAuth, csrfMiddleware, twoFactorLimiter
  * Bewusst eine eigene Admin-Route und nicht ein Feld an /auth/users: das liest
  * jedes Mitglied, und wer welchen Schutz hat, ist keine Angabe fuer alle.
  */
-router.get('/2fa/overview', requireAuth, requireAdmin, (_req, res) => {
+router.get('/2fa/overview', requireAuth, requireAdmin, validateRequest(), (_req, res) => {
   try {
     res.json({ data: twoFactor.householdOverview(db.get(), memberOrderSql('u')), required: twoFactor.isRequiredForHousehold(db.get()) });
   } catch (err) {
@@ -3285,9 +3287,9 @@ router.get('/2fa/overview', requireAuth, requireAdmin, (_req, res) => {
  * eingerichtete Geräte genau eine Folge: niemand kommt mehr hinein, auch der
  * Admin nicht.
  */
-router.put('/2fa/require', requireAuth, requireAdmin, csrfMiddleware, (req, res) => {
+router.put('/2fa/require', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
   try {
-    const required = req.body?.required === true || req.body?.required === '1';
+    const required = req.body?.required === true;
     twoFactor.setRequiredForHousehold(db.get(), required);
     log.info('Household two-factor requirement changed', { userId: req.authUserId, required });
     res.json({ data: { required: twoFactor.isRequiredForHousehold(db.get()) } });
@@ -3525,14 +3527,9 @@ router.delete('/devices/:id', requireAuth, refuseIntegrationToken, csrfMiddlewar
  * Nur aus einer Sitzung; die eigene bleibt stehen, wenn ein Admin sich selbst
  * meint.
  */
-router.post('/users/:id/devices/sign-out', requireAuth, requireAdmin, csrfMiddleware, sessionRevokeLimiter, (req, res) => {
-  if (req.authMethod !== 'session') {
-    return res.status(403).json({
-      error: 'Only a signed-in browser session can sign out a member.', code: 403, reason: 'browser_session_required',
-    });
-  }
+router.post('/users/:id/devices/sign-out', requireAuth, requireAdmin, csrfMiddleware, sessionRevokeLimiter, requireBrowserSession('signOutMember'), validateRequest(), (req, res) => {
   try {
-    const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
+    const id = Number(req.params.id);
     if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
     if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(id)) {
       return res.status(404).json({ error: 'User not found.', code: 404 });
@@ -3598,7 +3595,7 @@ router.get('/users', requireAuth, validateRequest(), (req, res) => {
   res.json({ data: users.map(publicUser) });
 });
 
-router.get('/api-tokens', requireAuth, requireAdmin, (req, res) => {
+router.get('/api-tokens', requireAuth, requireAdmin, validateRequest(), (req, res) => {
   try {
     const rows = db.get().prepare(`
       SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
@@ -3630,7 +3627,7 @@ router.get('/api-tokens', requireAuth, requireAdmin, (req, res) => {
   }
 });
 
-router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res) => {
+router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
   try {
     const name = String(req.body.name || '').trim();
     const expiresAt = req.body.expires_at ? String(req.body.expires_at).trim() : null;
@@ -3732,9 +3729,9 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
   }
 });
 
-router.delete('/api-tokens/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res) => {
+router.delete('/api-tokens/:id', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid token ID.', code: 400 });
 
     const result = db.get().prepare(`
@@ -3767,11 +3764,11 @@ router.delete('/api-tokens/:id', requireAuth, requireAdmin, csrfMiddleware, (req
  * Anweisung, damit zwischen beiden nichts liegt.
  * Response: { ok: true }
  */
-router.post('/api-tokens/:id/remove', requireAuth, requireAdmin, csrfMiddleware, (req, res) => {
+router.post('/api-tokens/:id/remove', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
   try {
-    // Strenger als `parseInt` beim Widerruf darueber: `12abc` ist keine Id.
+    // `12abc` ist keine Id: das Dokument laesst nur Ziffern durch (idParam()).
     // Eine Route, die endgueltig loescht, raet nicht, welche Zeile gemeint war.
-    const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
+    const id = Number(req.params.id);
     if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid token ID.', code: 400 });
 
     const result = db.get().prepare(`
@@ -3903,7 +3900,7 @@ export function assertSsoOnlyAllowed(ssoOnly, password, { linked = false, email 
  * Ausdruecklich ein eigenes Feld und nicht "Passwort weggelassen": ein
  * vergessenes Feld darf nie still ein Konto ohne Passwort ergeben.
  */
-router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res) => {
+router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), async (req, res) => {
   try {
     const {
       username,
@@ -3913,10 +3910,13 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
       avatar_color = avatarColors[crypto.randomInt(avatarColors.length)],
       avatar_data,
       family_role = 'other',
-      system_admin = req.body.role === 'admin',
+      system_admin,
     } = req.body;
-    const role = system_admin === true || system_admin === 'true' ? 'admin' : 'member';
-    const ssoOnly = sso_only === true || sso_only === 'true';
+    // Nur `system_admin: true` macht einen Administrator (#2810): der
+    // undokumentierte Zweitweg `role: 'admin'` ist weg, `role` ist ein
+    // unbekanntes Feld wie jedes andere.
+    const role = system_admin === true ? 'admin' : 'member';
+    const ssoOnly = sso_only === true;
 
     if (!username || !display_name || (!ssoOnly && !password)) {
       return res.status(400).json({ error: 'Username, display name, and password are required.', code: 400 });
@@ -4006,9 +4006,9 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
  * Nebenwirkung einer Umgebungsvariablen, die beim Zuruecksetzen stillschweigend
  * jedes Passwort im Haushalt geloescht haette.
  */
-router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req, res) => {
+router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), async (req, res) => {
   try {
-    const userId = parseInt(req.params.id, 10);
+    const userId = Number(req.params.id);
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
 
     // HASH FIRST, THEN NOTHING ELSE AWAITS (#2612). `hashPassword` is the only
@@ -4044,7 +4044,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const avatarColor = req.body.avatar_color !== undefined ? String(req.body.avatar_color || '').trim() : existing.avatar_color;
     const familyRole = req.body.family_role !== undefined ? String(req.body.family_role || '').trim() : existing.family_role;
     const nextRole = req.body.system_admin !== undefined
-      ? (req.body.system_admin === true || req.body.system_admin === 'true' ? 'admin' : 'member')
+      ? (req.body.system_admin === true ? 'admin' : 'member')
       : existing.role;
     const avatarData = req.body.avatar_data !== undefined
       ? normalizeAvatarData(req.body.avatar_data)
@@ -4078,7 +4078,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
 
     // undefined = unveraendert; nur ein mitgesendetes Feld schaltet um.
     const ssoOnly = req.body.sso_only !== undefined
-      ? (req.body.sso_only === true || req.body.sso_only === 'true')
+      ? req.body.sso_only === true
       : null;
     // Ein bereits verknuepftes Konto braucht keine E-Mail mehr - sein `sub`
     // findet es. Sonst zaehlt die Adresse, die nach diesem Aufruf gilt.
@@ -4459,9 +4459,9 @@ router.patch('/me/password', requireAuth, csrfMiddleware, validateRequest(), asy
  * Die Antwort bleibt 200 `{ ok: true }` und sagt zusaetzlich, was geschah.
  * Response: { ok: true, outcome: 'deactivated'|'deleted', traces: [{ table, column, rows }] }
  */
-router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res) => {
+router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
   try {
-    const userId = parseInt(req.params.id, 10);
+    const userId = Number(req.params.id);
 
     if (userId === req.authUserId) {
       return res.status(400).json({ error: 'You cannot delete your own account.', code: 400, reason: 'own_account' });

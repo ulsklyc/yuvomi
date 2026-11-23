@@ -17,8 +17,8 @@ import {
   TASK_VISIBILITY,
 } from '../services/task-fields.js';
 import {
-  CODE_MAX, DEVICE_ID_PATTERN, DEVICE_NAME_MAX, DEVICE_PLATFORM_PATTERN, DISPLAY_NAME_MAX, FAMILY_ROLES, LOGIN_USERNAME_MAX,
-  PASSWORD_MAX,
+  CODE_MAX, DEVICE_ID_PATTERN, DEVICE_NAME_MAX, DEVICE_PLATFORM_PATTERN, DISPLAY_NAME_MAX, FAMILY_ROLES, INVITE_PRESETS,
+  LOGIN_USERNAME_MAX, PASSWORD_MAX,
 } from '../services/auth-fields.js';
 
 /**
@@ -2489,20 +2489,30 @@ export const schemas = {
         },
         UserCreateRequest: {
           type: 'object',
+          description: 'Unknown fields are ignored, among them `role`: only `system_admin: true` makes an administrator.',
           properties: {
             username: { type: 'string' },
             display_name: { type: 'string' },
-            password: { type: 'string', description: 'Required unless sso_only is true.' },
+            password: {
+              type: 'string',
+              maxLength: PASSWORD_MAX,
+              description: 'Required unless sso_only is true. At least 8 characters after Unicode normalization (NFC).',
+            },
             sso_only: {
               type: 'boolean',
               description: 'Create the account without a password, so it can only be entered through SSO. '
                 + 'Requires OIDC to be configured, and rejects a password sent alongside it. '
                 + 'Deliberately explicit rather than inferred from a missing password.',
             },
-            avatar_color: { type: 'string' },
-            avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
+            avatar_color: { type: 'string', pattern: COLOR_PATTERN, description: 'A HEX color `#RRGGBB`. Omitted: a color is picked at random.' },
+            avatar_data: {
+              type: ['string', 'null'],
+              minLength: 1,
+              maxLength: MAX_AVATAR_DATA_LENGTH,
+              description: 'PNG, JPEG, or WebP data URL.',
+            },
             family_role: { type: 'string', enum: [...FAMILY_ROLES] },
-            system_admin: { type: 'boolean' },
+            system_admin: { type: 'boolean', description: 'Only true makes an administrator; omitted or false, a member.' },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
@@ -2512,20 +2522,30 @@ export const schemas = {
         },
         UserUpdateRequest: {
           type: 'object',
+          description: 'Every field is optional; a field left out stays as it is.',
           properties: {
             username: { type: 'string' },
             display_name: { type: 'string' },
-            password: { type: 'string', description: 'Write-only. Omit or leave empty to keep the current password.' },
+            password: {
+              type: 'string',
+              maxLength: PASSWORD_MAX,
+              description: 'Write-only. Omit or leave empty to keep the current password; otherwise at least 8 characters after Unicode normalization (NFC).',
+            },
             sso_only: {
               type: 'boolean',
               description: 'Switch the account between having a password and entering only through SSO. '
                 + 'true clears the password; false requires a password to be sent with it, otherwise the '
                 + 'account would be left with no way in at all. Omit to leave unchanged.',
             },
-            avatar_color: { type: 'string' },
-            avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL. Use null to remove.' },
+            avatar_color: { type: 'string', pattern: COLOR_PATTERN, description: 'A HEX color `#RRGGBB`.' },
+            avatar_data: {
+              type: ['string', 'null'],
+              minLength: 1,
+              maxLength: MAX_AVATAR_DATA_LENGTH,
+              description: 'PNG, JPEG, or WebP data URL. Use null to remove.',
+            },
             family_role: { type: 'string', enum: [...FAMILY_ROLES] },
-            system_admin: { type: 'boolean' },
+            system_admin: { type: 'boolean', description: 'true makes the account an administrator, false a member. Omit to leave unchanged.' },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
@@ -2575,6 +2595,7 @@ export const schemas = {
         },
         InviteCreateRequest: {
           type: 'object',
+          description: 'Every field is optional.',
           properties: {
             username: { type: 'string', description: 'Optional. When set, the invited person cannot choose a different one.' },
             display_name: { type: 'string' },
@@ -2582,6 +2603,11 @@ export const schemas = {
             family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             system_admin: { type: 'boolean', description: 'Only true grants the admin role; the value is taken from the invitation, never from the accept request.' },
             send_email: { type: 'boolean', description: 'Send the invitation by email. Requires SMTP and BASE_URL; check email_sent in the response.' },
+            permission_preset: {
+              type: 'string',
+              enum: [...INVITE_PRESETS],
+              description: 'The start rights of the new account: `restricted` (the narrow start, the default when omitted) or `role` (the rights of the family role).',
+            },
           },
         },
         InviteCreateResponse: {
@@ -2804,6 +2830,16 @@ export const schemas = {
             code: { type: 'string', maxLength: CODE_MAX, description: 'The six-digit TOTP code or a recovery code.' },
           },
           required: ['code'],
+        },
+        TwoFactorRequirementRequest: {
+          type: 'object',
+          properties: {
+            required: {
+              type: 'boolean',
+              description: 'true requires two-factor authentication household-wide, false lifts it. '
+                + 'Omitting `required` switches the requirement off.',
+            },
+          },
         },
         TwoFactorCodeRequest: {
           type: 'object',

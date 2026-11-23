@@ -140,7 +140,15 @@ export function authPaths() {
           + 'page without one. Deliberately does not reject existing sessions: in a household where '
           + 'nobody has set it up yet, that would lock everyone out, including the admin. '
           + 'A separate route rather than a field on PUT /preferences, so the admin gate is middleware '
-          + 'rather than a branch inside the handler.',
+          + 'rather than a branch inside the handler. `required` must be a boolean; '
+          + 'omitting `required` switches the requirement off.',
+        requestBody: { ...jsonBody('#/components/schemas/TwoFactorRequirementRequest'), required: false },
+        responses: {
+          200: { description: 'The requirement as it now stands' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/auth/2fa/overview': {
@@ -397,13 +405,14 @@ export function authPaths() {
         admin: true,
         stateChanging: true,
         description: 'Creates an invite link so a new member can set their own password. Role and family role are fixed here and are taken from the invitation when it is accepted.',
-        requestBody: jsonBody('#/components/schemas/InviteCreateRequest'),
+        requestBody: { ...jsonBody('#/components/schemas/InviteCreateRequest'), required: false },
         responses: {
           201: {
             description: 'Invitation created. The plaintext token is returned only once.',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/InviteCreateResponse' } } },
           },
           400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           409: { description: 'Username already taken' },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -421,6 +430,7 @@ export function authPaths() {
         responses: {
           200: { description: 'Invitation revoked.' },
           400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: { description: 'No pending invitation with this ID' },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -618,6 +628,7 @@ export function authPaths() {
         responses: {
           201: { description: 'User created' },
           400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           409: { description: 'Username already taken' },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -631,7 +642,15 @@ export function authPaths() {
         admin: true,
         stateChanging: true,
         params: [idParam('id', 'User ID')],
-        requestBody: jsonBody('#/components/schemas/UserUpdateRequest'),
+        requestBody: { ...jsonBody('#/components/schemas/UserUpdateRequest'), required: false },
+        responses: {
+          200: { description: 'User updated' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'No member with this ID (`reason: "members_member_not_found"`)' },
+          409: { description: 'Username already taken' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
       delete: op({
         summary: 'Remove user (deactivate or delete)',
@@ -807,8 +826,16 @@ export function authPaths() {
         description: 'Ends the member\'s signed-in devices and browser sessions, for example after a lost phone in a household without passwords. The answer says nothing about what ended: how many devices somebody has stays their own. Integration tokens stay. An administrator signing out themselves keeps the current session.',
         tag: 'Auth',
         admin: true,
-        params: [idParam()],
+        params: [idParam('id', 'User ID')],
         stateChanging: true,
+        responses: {
+          200: { description: 'The member is signed out everywhere' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'No account with this ID' },
+          429: TOO_MANY,
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/auth/api-tokens': {
@@ -826,6 +853,7 @@ export function authPaths() {
             content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiTokenCreateResponse' } } },
           },
           400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
@@ -839,6 +867,13 @@ export function authPaths() {
         stateChanging: true,
         description: 'Sets `revoked_at` and keeps the row, so the revocation stays on record. To drop the row of a token that no longer works, use `POST /api/v1/auth/api-tokens/{id}/remove`.',
         params: [idParam('id', 'API token ID')],
+        responses: {
+          200: { description: 'The token is revoked (also when it was revoked before)' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'No API token with this ID' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/auth/api-tokens/{id}/remove': {
