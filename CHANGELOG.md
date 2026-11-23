@@ -110,6 +110,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   required now (a 400 with `reason: "validation"`, before the 404 of an unknown calendar);
   `default_assignee_user_ids: []` or `default_assignee_user_id: null` still clears the set.
 
+### Fixed
+- **Refreshing the calendars of an Outlook account answers an expired sign-in with 409
+  `outlook_reauth_required` and a refusal of Microsoft with 502 and its class, instead of a 500.**
+
 ## [2.94.0] - 2026-11-22
 
 ### Changed

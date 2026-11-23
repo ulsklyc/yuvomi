@@ -87,6 +87,21 @@ const { movedCandidatesLimit } = await import('../server/services/sync-assignmen
 const { BODY_LIMIT } = await import('../server/utils/upload-limit.js');
 const database = () => dbmod.get();
 
+// POST /outlook/sync: sync() catches the failure of each account itself, so
+// neither an expired sign-in nor a refusal of Graph reaches the route through
+// the real service. The routers import the service through this mock (they
+// load on the first request, after it), which passes through to the real one
+// unless a test sets `outlookSyncFailure` (#2894).
+const realOutlook = await import('../server/services/outlook-calendar.js');
+/** @type {Error | null} */
+let outlookSyncFailure = null;
+mock.module(new URL('../server/services/outlook-calendar.js', import.meta.url).href, {
+  namedExports: {
+    ...realOutlook,
+    sync: (/** @type {any[]} */ ...args) => (outlookSyncFailure ? Promise.reject(outlookSyncFailure) : realOutlook.sync(...args)),
+  },
+});
+
 /** @param {string} key @param {string} value */
 function setConfig(key, value) {
   database().prepare('INSERT INTO sync_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
@@ -1010,6 +1025,35 @@ test('the refusals of the foreign servers keep their class and detail, and never
     assert.deepEqual(await call('POST', `${C}/outlook/sync`, NO_BODY), { status: 503, body: { error: 'Outlook is not configured on this server.', code: 503, reason: 'outlook_not_configured' } });
   } finally {
     msEnv(true);
+  }
+  assert.deepEqual(logged.error, [], 'nothing reached the central handler');
+});
+
+test('an expired Outlook sign-in answers 409 and a refusal of Graph 502 on both routes that ask Graph, never the central handler (#2894)', async () => {
+  logged.error.length = 0;
+  const REAUTH = { status: 409, body: { error: 'Outlook sign-in expired - reconnect required.', code: 409, reason: 'outlook_reauth_required' } };
+  const REFUSED = { status: 502, body: { error: 'Microsoft refused the request or could not be reached.', code: 502, reason: 'remote_http_status', detail: 'HTTP 503', params: { status: 503 } } };
+  // The calendars of an account through the real service: the token endpoint
+  // answers invalid_grant for an expired token, Graph a 500.
+  const expired = outlookAccount('Erneuern');
+  database().prepare("UPDATE outlook_accounts SET token_expiry = '2020-01-01T00:00:00Z' WHERE id = ?").run(expired);
+  assert.deepEqual(await call('GET', `${C}/outlook/accounts/${expired}/calendars?refresh=true`, NO_BODY), REAUTH);
+  const valid = outlookAccount('Absage Graph');
+  graph.mode = 'http500';
+  try {
+    assert.deepEqual(await call('GET', `${C}/outlook/accounts/${valid}/calendars?refresh=true`, NO_BODY),
+      { status: 502, body: { ...REFUSED.body, detail: 'HTTP 500', params: { status: 500 } } });
+  } finally {
+    graph.mode = 'ok';
+  }
+  // The sync: the service throws the error the route sorts.
+  try {
+    outlookSyncFailure = new realOutlook.__test.ReauthRequiredError('expired');
+    assert.deepEqual(await call('POST', `${C}/outlook/sync`, NO_BODY), REAUTH);
+    outlookSyncFailure = Object.assign(new Error('[Outlook] Graph request GET /me/calendars failed: HTTP 503'), { status: 503 });
+    assert.deepEqual(await call('POST', `${C}/outlook/sync`, NO_BODY), REFUSED);
+  } finally {
+    outlookSyncFailure = null;
   }
   assert.deepEqual(logged.error, [], 'nothing reached the central handler');
 });
