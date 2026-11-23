@@ -1438,7 +1438,7 @@
  "scripts/update-gh-stars.mjs\tTS7006": 2,
  "scripts/with-env.mjs\tTS7006": 2,
  "scripts/with-env.mjs\tTS7053": 1,
- "server/auth.js\tTS18046": 24,
+ "server/auth.js\tTS18046": 20,
  "server/auth.js\tTS18047": 1,
  "server/auth.js\tTS18048": 10,
  "server/auth.js\tTS2322": 26,
