@@ -33,6 +33,8 @@ const { default: housekeepingRouter } = await import('../server/routes/housekeep
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
 const { default: searchRouter } = await import('../server/routes/search.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { callTool } = await import('../server/mcp/tools.js');
 const {
   resolvePermissions, buildSessionModuleAccess, moduleAccessVerdict,
@@ -75,11 +77,15 @@ function moduleGate(moduleKey) {
 
 const app = express();
 app.use(express.json());
+// As server/index.js: a missing body is `{}`, and the 400 of validateRequest()
+// (#2810) goes to the central error handler behind the routers.
+app.use(defaultEmptyBody);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/housekeeping', requireAuth, moduleGate('housekeeping'), housekeepingRouter);
 app.use('/api/v1/dashboard', requireAuth, dashboardRouter);
 app.use('/api/v1/tasks', requireAuth, tasksRouter);
 app.use('/api/v1/search', requireAuth, searchRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

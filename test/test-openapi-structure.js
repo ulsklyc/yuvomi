@@ -602,11 +602,17 @@ test('#2062 events_calendar an GET /dashboard ist als Query-Parameter deklariert
   assert.ok(param, 'Query-Parameter events_calendar fehlt');
   assert.equal(param.in, 'query');
   assert.equal(param.required, false);
+  // Seit #2810 (Gruppe 10, Entscheidung 9) traegt das Schema die zugesagte
+  // Toleranz: Text ohne Muster und ohne Hoechstzahl, denn validateRequest()
+  // liest es, und ein fremder Schluessel faellt laut Beschreibung weg. Form
+  // und Grenze stehen in der Beschreibung.
   assert.equal(param.schema?.type, 'array');
-  assert.equal(param.schema.maxItems, 50);
-  assert.equal(param.schema.items?.pattern, '^(local|cal|sub):[1-9][0-9]{0,14}$');
+  assert.equal(param.schema.maxItems, undefined);
+  assert.deepEqual(param.schema.items, { type: 'string' });
   assert.equal(param.explode, true);
   assert.match(param.description, /GET \/calendar\/calendars/, 'nennt den Katalog');
+  assert.match(param.description, /`local:<id>`.*`cal:<id>`.*`sub:<id>`/, 'nennt die Form');
+  assert.match(param.description, /capped at 50; a value of any other shape is dropped/, 'nennt Grenze und Toleranz');
 });
 
 test('#2062 GET /calendar/calendars beschreibt sources neben data', () => {

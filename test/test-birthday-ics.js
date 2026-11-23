@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { spawn } from 'node:child_process';
 
 process.env.DB_PATH = ':memory:';
@@ -9,21 +8,23 @@ const { get } = await import('../server/db.js');
 const feed = await import('../server/services/birthday-ics.js');
 const { nextOccurrenceAfter } = await import('../server/services/recurrence.js');
 const calendarFeed = await import('../server/services/ics-export.js');
-const { default: calendarFeedRouter } = await import('../server/routes/calendar/feed.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { MIGRATIONS, migrate } = await import('../server/db.js');
 const { default: Database } = await import('better-sqlite3-multiple-ciphers');
 const { default: birthdaysRouter } = await import('../server/routes/birthdays.js');
 const db = get();
 const ids = ['first', 'second'].map(name => Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'x', 'member')").run(name, name).lastInsertRowid));
 let actor = ids[0];
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor; req.authRole = 'member'; req.session = { userId: actor, role: 'member' };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor; req.authRole = 'member'; req.session = { userId: actor, role: 'member' };
+    next();
+  },
+  before: [['/api/v1/birthdays', birthdaysRouter]],
 });
-app.use('/api/v1/birthdays', birthdaysRouter);
-app.use('/api/v1/calendar', calendarFeedRouter);
 const server = app.listen(0, '127.0.0.1');
 await new Promise(resolve => server.once('listening', resolve));
 const base = `http://127.0.0.1:${server.address().port}/api/v1`;

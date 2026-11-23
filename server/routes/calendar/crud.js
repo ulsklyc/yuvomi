@@ -5,6 +5,8 @@
 
 import { createLogger } from '../../logger.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
+import { MAX_REMINDER_OFFSETS } from '../../services/calendar-fields.js';
 import * as db from '../../db.js';
 import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
@@ -64,7 +66,7 @@ import {
   getUserId,
   eventIcon,
   parseAttachment,
-  attachmentUploadRefused, storedAttachmentLocked,
+  attachmentUploadRefused, refuseUploadWithoutDocumentsWrite, storedAttachmentLocked,
   ATTACHMENT_UPLOAD_REFUSAL, ATTACHMENT_CHANGE_REFUSAL,
   caldavTarget,
   caldavTargetOffered,
@@ -486,7 +488,7 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
 // Einzelnen Termin abrufen.
 // Response: { data: Event }
 // --------------------------------------------------------
-router.get('/:id', (req, res) => {
+router.get('/:id', validateRequest(), (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     // A paired display reads under the wall rule (rowReader), people under the row rule.
@@ -554,7 +556,7 @@ const SERIES_ENDS_BEFORE_START = 'recurrence_rule: the series ends before the st
 //         recurrence_rule?, countdown? }
 // Response: { data: Event }
 // --------------------------------------------------------
-router.post('/', async (req, res) => {
+router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (req, res) => {
   let stagedUpload;
   try {
     const userId = getUserId(req);
@@ -866,7 +868,7 @@ function rejectLinkedOccurrenceResource(res, event, req) {
 // Body: alle Felder optional außer title + start_datetime
 // Response: { data: Event }
 // --------------------------------------------------------
-router.put('/:id', async (req, res) => {
+router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (req, res) => {
   let stagedUpload;
   const stagedClones = [];
   try {
@@ -1455,7 +1457,7 @@ router.put('/:id', async (req, res) => {
 // PUT /api/v1/calendar/:seriesId/occurrences/:recurrenceId
 // Creates or updates one linked local recurrence replacement atomically.
 // --------------------------------------------------------
-router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
+router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsWrite, validateRequest(), async (req, res) => {
   if (Object.hasOwn(req.body, 'local_calendar_id')) {
     return res.status(400).json({ error: 'Calendar membership applies to the whole series.', code: 400 });
   }
@@ -1499,7 +1501,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     if (req.body.reminder_offsets !== undefined
         && (!Array.isArray(req.body.reminder_offsets)
-          || req.body.reminder_offsets.length > 5
+          || req.body.reminder_offsets.length > MAX_REMINDER_OFFSETS
           || new Set(req.body.reminder_offsets).size !== req.body.reminder_offsets.length
           || req.body.reminder_offsets.some((value) =>
             !Number.isInteger(value) || value < 0))) {
@@ -1619,7 +1621,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
   }
 });
 
-router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) => {
+router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithoutDocumentsWrite, validateRequest(), async (req, res) => {
   let stagedUpload;
   const stagedClones = [];
   try {
@@ -1688,7 +1690,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     }
     if (req.body.reminder_offsets !== undefined
         && (!Array.isArray(req.body.reminder_offsets)
-          || req.body.reminder_offsets.length > 5
+          || req.body.reminder_offsets.length > MAX_REMINDER_OFFSETS
           || new Set(req.body.reminder_offsets).size !== req.body.reminder_offsets.length
           || req.body.reminder_offsets.some((value) =>
             !Number.isInteger(value) || value < 0))) {
@@ -1840,7 +1842,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
   }
 });
 
-router.delete('/:seriesId/occurrences/:recurrenceId', (req, res) => {
+router.delete('/:seriesId/occurrences/:recurrenceId', validateRequest(), (req, res) => {
   try {
     const seriesId = parseInt(req.params.seriesId, 10);
     const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
@@ -1865,7 +1867,7 @@ router.delete('/:seriesId/occurrences/:recurrenceId', (req, res) => {
   }
 });
 
-router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
+router.delete('/:seriesId/occurrences/:recurrenceId/following', validateRequest(), (req, res) => {
   try {
     const seriesId = parseInt(req.params.seriesId, 10);
     const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
@@ -1896,7 +1898,7 @@ router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
 // Nur Event-Creator, Subscription-Creator oder Admin.
 // Response: { data: { reset: true } }
 // --------------------------------------------------------
-router.post('/:id/reset', (req, res) => {
+router.post('/:id/reset', validateRequest(), (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
@@ -1969,7 +1971,7 @@ router.post('/:id/reset', (req, res) => {
 // Nur lokale (nicht extern synchronisierte) wiederkehrende Termine.
 // Response: 201 { data: { event_id, exception_date } }
 // --------------------------------------------------------
-router.post('/:id/exceptions', (req, res) => {
+router.post('/:id/exceptions', validateRequest(), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
@@ -2027,7 +2029,7 @@ router.post('/:id/exceptions', (req, res) => {
 // mitsamt der Google-Event-ID weg), ausgeführt asynchron nach der Antwort.
 // Response: 204 No Content
 // --------------------------------------------------------
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateRequest(), (req, res) => {
   try {
     const id    = parseInt(req.params.id, 10);
     const event = loadVisibleEvent(id, req);

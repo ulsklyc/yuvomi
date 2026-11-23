@@ -35,7 +35,6 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { startFakeDavServer } from './caldav-fake-server.js';
 
 const dbmod = await import('../server/db.js');
@@ -43,7 +42,7 @@ const db = dbmod.get();
 const caldavSync = await import('../server/services/caldav-sync.js');
 const outbound = await import('../server/services/calendar-outbound.js');
 const { createCalDAVClient } = await import('../server/utils/caldav-client.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { retitleBirthdayEvents } = await import('../server/services/birthdays.js');
 const { waitForExternalJobs } = await import('../server/utils/restore-state.js');
 
@@ -746,13 +745,15 @@ test('Löschauftrag ohne Konto: der Lauf räumt ihn ab und meldet es, gesendet w
 
 // ── 7: das Upload-Ziel ──────────────────────────────────────────────────────────
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = userId; req.authRole = 'admin'; next(); });
-app.use('/calendar', calendarRouter);
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  auth: (req, _res, next) => { req.authUserId = userId; req.authRole = 'admin'; next(); },
+});
 const http = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
 test.after(() => new Promise((resolve) => { http.closeAllConnections?.(); http.close(resolve); }));
-const api = (method, path, body) => fetch(`http://127.0.0.1:${http.address().port}/calendar${path}`, {
+const api = (method, path, body) => fetch(`http://127.0.0.1:${http.address().port}/api/v1/calendar${path}`, {
   method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
 });
 const newEvent = (target) => ({

@@ -319,6 +319,11 @@ function listUpcomingEvents(db, actorId, args) {
 }
 
 async function createEvent(ctx, args) {
+  // A missing or empty start is said here, in the route's own words (#2810):
+  // the route checks the form of the body first, and there a missing or
+  // empty `start_datetime` is the schema's 400, whose message the tool
+  // answer carries without the field. The sentence tells the model what to fix.
+  if (args.start_datetime == null || args.start_datetime === '') throw new ToolError('start_datetime is required.');
   const data = await internalApiRequest(ctx, 'POST', '/api/v1/calendar', {
     // The same path as any other client (#1364 included): a `Z` or an offset -
     // the obvious form for an LLM client - is converted into the household zone

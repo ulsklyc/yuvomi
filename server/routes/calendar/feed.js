@@ -4,6 +4,7 @@
 
 import { createLogger } from '../../logger.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import * as icsExport from '../../services/ics-export.js';
 import * as holidays from '../../services/holidays.js';
@@ -13,7 +14,7 @@ const log = createLogger('Calendar');
 const router = express.Router();
 
 // GET /api/v1/calendar/feed → aktueller Feed-Status
-router.get('/feed', (req, res) => {
+router.get('/feed', validateRequest(), (req, res) => {
   try {
     const token = icsExport.getFeedToken(db.get(), getUserId(req));
     if (!token) return res.json({ data: null });
@@ -27,7 +28,7 @@ router.get('/feed', (req, res) => {
 });
 
 // PUT /api/v1/calendar/feed → personal feed options (#482, D#1965)
-router.put('/feed', (req, res) => {
+router.put('/feed', validateRequest(), (req, res) => {
   try {
     const { showAssignees, includeBirthdays } = req.body ?? {};
     if ((showAssignees === undefined && includeBirthdays === undefined)
@@ -51,7 +52,7 @@ router.put('/feed', (req, res) => {
 });
 
 // POST /api/v1/calendar/feed/regenerate → neuen Token erzeugen
-router.post('/feed/regenerate', (req, res) => {
+router.post('/feed/regenerate', validateRequest(), (req, res) => {
   try {
     const token = icsExport.regenerateFeedToken(db.get(), getUserId(req));
     res.json({ data: { token, url: feedUrl(req, token) } });
@@ -62,7 +63,7 @@ router.post('/feed/regenerate', (req, res) => {
 });
 
 // DELETE /api/v1/calendar/feed → Feed deaktivieren
-router.delete('/feed', (req, res) => {
+router.delete('/feed', validateRequest(), (req, res) => {
   try {
     icsExport.clearFeedToken(db.get(), getUserId(req));
     res.json({ data: { token: null } });
@@ -76,7 +77,7 @@ router.delete('/feed', (req, res) => {
 // GET /api/v1/calendar/holidays?from=YYYY-MM-DD&to=YYYY-MM-DD
 // Muss VOR /:id stehen, damit "holidays" nicht als ID-Parameter interpretiert wird.
 // ---------------------------------------------------------------------------
-router.get('/holidays', (req, res) => {
+router.get('/holidays', validateRequest(), (req, res) => {
   try {
     const { from, to } = req.query;
     if (!from || !to || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {

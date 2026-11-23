@@ -45,7 +45,6 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { startFakeDavServer } from './caldav-fake-server.js';
 
 const ZONE = process.env.TZ;
@@ -55,7 +54,7 @@ const db = dbmod.get();
 const google        = await import('../server/services/google-calendar.js');
 const caldavSync    = await import('../server/services/caldav-sync.js');
 const appleCalendar = await import('../server/services/apple-calendar.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { localToUTCPrecise, storedToInstantMsPrecise, utcToWall } = await import('../server/utils/timezone.js');
 const { waitForExternalJobs } = await import('../server/utils/restore-state.js');
 
@@ -70,17 +69,19 @@ test.after(() => dav.close());
 
 // ── Routen ──────────────────────────────────────────────────────────────────────
 
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = 1;
-  req.authRole = 'admin';
-  req.session = { userId: 1, role: 'admin' };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  auth: (req, _res, next) => {
+    req.authUserId = 1;
+    req.authRole = 'admin';
+    req.session = { userId: 1, role: 'admin' };
+    next();
+  },
 });
-app.use(express.json());
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
 test.after(() => { server.closeAllConnections?.(); server.close(); });
 
 async function callRoute(method, path, body) {
@@ -428,7 +429,7 @@ const CASES = [
   },
   {
     name: 'letzter Tag, ganztägig, Start am 15.',
-    entered: { start_datetime: '2035-01-15', end_datetime: '2035-01-15', all_day: 1, recurrence_rule: LAST_DAY },
+    entered: { start_datetime: '2035-01-15', end_datetime: '2035-01-15', all_day: true, recurrence_rule: LAST_DAY },
     sent: '2035-01-31', sentEnd: '2035-01-31', aligned: true,
   },
   {
@@ -526,7 +527,7 @@ for (const name of Object.keys(PROVIDERS)) {
       // der Zeile als Wanduhrzeit des Haushalts, dieselbe Regel.
       await editTitle(p, event.id, {
         title: 'Noch einmal', start_datetime: held, end_datetime: heldEnd,
-        all_day: c.entered.all_day ? 1 : 0, recurrence_rule: row(event.id).recurrence_rule,
+        all_day: c.entered.all_day === true, recurrence_rule: row(event.id).recurrence_rule,
       });
       assert.deepEqual(p.last(), p.first(), 'auch danach liegt beim Anbieter dasselbe');
     });
@@ -550,7 +551,7 @@ for (const name of Object.keys(PROVIDERS)) {
     // Wanduhrzeit des Haushalts, dieselbe Regel.
     await editTitle(p, imported.id, {
       title: 'Noch einmal', start_datetime: '2035-01-15T14:00', end_datetime: '2035-01-15T15:00',
-      all_day: 0, recurrence_rule: row(imported.id).recurrence_rule,
+      all_day: false, recurrence_rule: row(imported.id).recurrence_rule,
     });
     assert.deepEqual(atProvider(), before, 'derselbe Start in anderer Schreibweise ist keine Startänderung');
     assert.equal(row(imported.id).series_authored, 0, 'eine eingelesene Serie trägt keine Marke, auch nach der Bearbeitung');
@@ -634,7 +635,7 @@ for (const name of Object.keys(PROVIDERS)) {
     // siehe der Test darunter.)
     const p = provider(name);
     const event = await post({
-      title: 'Umzug', start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: 1, ...p.target,
+      title: 'Umzug', start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: true, ...p.target,
     });
     await p.sync();
     await p.sync();
@@ -657,7 +658,7 @@ for (const name of Object.keys(PROVIDERS)) {
     // Marke. Ausgerichtet werden muss an dieser Zeile nichts.
     const p = provider(name);
     const event = await post({
-      title: 'Miete', start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: 1,
+      title: 'Miete', start_datetime: '2035-01-31', end_datetime: '2035-01-31', all_day: true,
       recurrence_rule: LAST_DAY, ...p.target,
     });
     await p.sync();
@@ -672,7 +673,7 @@ for (const name of Object.keys(PROVIDERS)) {
     assert.deepEqual(p.last(), p.first());
 
     // Wer den Start danach in Yuvomi verlegt, hat ihn wieder verfasst.
-    await editTitle(p, event.id, { start_datetime: '2035-02-10', end_datetime: '2035-02-10', all_day: 1 });
+    await editTitle(p, event.id, { start_datetime: '2035-02-10', end_datetime: '2035-02-10', all_day: true });
     assert.equal(row(event.id).series_authored, 1);
     assert.deepEqual(p.last(), { start: '2035-02-28', end: '2035-03-01' });
   });

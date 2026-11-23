@@ -34,7 +34,6 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { startFakeDavServer } from './caldav-fake-server.js';
 
 const ZONE = process.env.TZ;
@@ -46,7 +45,7 @@ const apple = await import('../server/services/apple-calendar.js');
 const { icsFieldsForEvent } = await import('../server/services/caldav-outbound.js');
 const { __test: feed } = await import('../server/services/ics-export.js');
 const { expandRecurringEvents } = await import('../server/services/calendar-events.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
@@ -266,17 +265,19 @@ test(`[${ZONE}] Gegenprobe: eine Ganztagsserie bleibt beim Datum`, () => {
 
 // ── 3. Der Rueckweg: das Echo der umgeschriebenen Regel ─────────────────────
 
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = 1;
-  req.authRole = 'admin';
-  req.session = { userId: 1, role: 'admin' };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  auth: (req, _res, next) => {
+    req.authUserId = 1;
+    req.authRole = 'admin';
+    req.session = { userId: 1, role: 'admin' };
+    next();
+  },
 });
-app.use(express.json());
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
 test.after(() => { server.closeAllConnections?.(); server.close(); });
 
 const dav = await startFakeDavServer();

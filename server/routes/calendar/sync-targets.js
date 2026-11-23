@@ -17,6 +17,7 @@
  */
 
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import { mayWriteModule } from '../../authorize/index.ts';
 import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 
@@ -128,7 +129,7 @@ function listOutlookTargets() {
  * Die Google-Liste kann das Token erneuern, und der `tokens`-Listener speichert
  * es nach dem Warten auf Google - deshalb `refuseWhileRestoring` (#1551).
  */
-router.get('/sync-targets', refuseWhileRestoring, async (req, res) => {
+router.get('/sync-targets', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     // Dieselbe Erwaegung wie bei /tasks/sync-targets: die Liste fuellt das
     // Ziel-Feld des Termindialogs und nennt dabei die angebundenen Konten mit

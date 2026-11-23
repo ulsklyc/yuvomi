@@ -3,10 +3,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const dbmod = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { buildCalendarFeed } = await import('../server/services/ics-export.js');
 const { findCalendarByFeedToken, ensureDefaultCalendar, resolveLocalCalendarId } = await import('../server/services/local-calendars.js');
 
@@ -16,20 +15,22 @@ const ADMIN = { id: 1, role: 'admin' };
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
 let actor = ADMIN;
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.sessionModuleAccess = { calendar: actor.access ?? 'write' };
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.sessionModuleAccess = { calendar: actor.access ?? 'write' };
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use(express.json({ limit: '10mb' }));
-app.use('/api/v1/calendar', calendarRouter);
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => {
-  server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`));
+  server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}/api/v1/calendar`));
 });
 
 test.after(() => server.close());
@@ -74,7 +75,7 @@ test('local calendars: default exists and calendars can be created', async () =>
 
   const original = await createEvent('Single-calendar appearance');
   assert.equal(original.local_calendar_color, null);
-  const listUrl = '/api/v1/calendar?from=2035-05-01&to=2035-05-31';
+  const listUrl = '/?from=2035-05-01&to=2035-05-31';
   const singleList = await call('GET', listUrl);
   assert.equal(singleList.status, 200);
   assert.equal(singleList.body.data.find(event => event.id === original.id).local_calendar_color, null,
@@ -924,9 +925,10 @@ test('the calendar manager cases carry a reason and an English error text (#1909
       }
     }
     // Eine Farbe, die nur ein Aufrufer an der Oberflaeche vorbei schickt: kein Fall.
+    // Seit #2810 die 400 des Schemas (`pattern`), `reason: validation`.
     const color = await call('PUT', `/calendars/${calendar.id}`, { body: { color: 'blue' } });
     assert.equal(color.status, 400);
-    assert.equal(color.body.reason, undefined);
+    assert.equal(color.body.reason, 'validation');
     assert.doesNotMatch(color.body.error, GERMAN, color.body.error);
 
     // Die Liste hat sich inzwischen geaendert (ein Kalender kam dazu oder ging).
@@ -937,11 +939,12 @@ test('the calendar manager cases carry a reason and an English error text (#1909
       assert.equal(res.body.reason, 'calendar_order_changed', JSON.stringify(stale));
       assert.doesNotMatch(res.body.error, GERMAN, res.body.error);
     }
-    // Was nur ein Aufrufer schickt (keine Liste, doppelte, Texte): kein Fall.
+    // Was nur ein Aufrufer schickt (keine Liste, doppelte, Texte): kein Fall;
+    // seit #2810 die 400 des Schemas, `reason: validation`.
     for (const invalid of [undefined, ids.map(() => ids[0]), ids.map(String)]) {
       const res = await call('PATCH', '/calendars/reorder', { body: { order: invalid } });
       assert.equal(res.status, 400);
-      assert.equal(res.body.reason, undefined, JSON.stringify(invalid));
+      assert.equal(res.body.reason, 'validation', JSON.stringify(invalid));
       assert.doesNotMatch(res.body.error, GERMAN, res.body.error);
     }
 
@@ -968,7 +971,7 @@ function shownColor(event) {
 }
 
 async function listedImport(uid) {
-  const list = await call('GET', '/api/v1/calendar?from=2036-03-01&to=2036-03-31');
+  const list = await call('GET', '/?from=2036-03-01&to=2036-03-31');
   assert.equal(list.status, 200);
   const row = list.body.data.find((event) => event.external_calendar_id === uid);
   assert.ok(row, `importierter Termin ${uid} fehlt in der Liste`);

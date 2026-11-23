@@ -24,7 +24,10 @@
  *          6 (the twelve route files of health under server/routes/health/), 7
  *          (contacts, cardav, meals), 8 (shopping, documents,
  *          document-storage-google-drive, dms) and 9 (the seven route files
- *          of the budget under server/routes/budget/, and subscriptions).
+ *          of the budget under server/routes/budget/, and subscriptions) and
+ *          10a (the calendar core under server/routes/calendar/: read, crud,
+ *          local-calendars, feed, sync-targets, subscriptions; and the
+ *          dashboard).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -48,15 +51,8 @@ const NOT_MIGRATED = [
   'server/routes/birthday-feed.js',
   'server/routes/calendar/apple.js',
   'server/routes/calendar/caldav.js',
-  'server/routes/calendar/crud.js',
-  'server/routes/calendar/feed.js',
   'server/routes/calendar/google.js',
-  'server/routes/calendar/local-calendars.js',
   'server/routes/calendar/outlook.js',
-  'server/routes/calendar/read.js',
-  'server/routes/calendar/subscriptions.js',
-  'server/routes/calendar/sync-targets.js',
-  'server/routes/dashboard.js',
   'server/routes/preferences.js',
   'server/routes/push.js',
   'server/routes/tasks.js',
@@ -89,6 +85,9 @@ const MIGRATED = [
   'server/routes/budget/accounts.js', 'server/routes/budget/categories.js', 'server/routes/budget/entries.js',
   'server/routes/budget/loans.js', 'server/routes/budget/plans.js', 'server/routes/budget/stats.js',
   'server/routes/budget/transfers.js', 'server/routes/subscriptions.js',
+  'server/routes/calendar/read.js', 'server/routes/calendar/crud.js', 'server/routes/calendar/local-calendars.js',
+  'server/routes/calendar/feed.js', 'server/routes/calendar/sync-targets.js', 'server/routes/calendar/subscriptions.js',
+  'server/routes/dashboard.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

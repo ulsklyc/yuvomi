@@ -296,19 +296,22 @@ test('keine Absage der Preferences-Routen traegt deutschen Wortlaut', async () =
 });
 
 test('keine Absage der Kalender-Konten (Google, Outlook) traegt deutschen Wortlaut', async () => {
-  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const { movedCandidatesLimit } = await import('../server/services/sync-assignment.js');
-  const calApp = express();
-  calApp.use(express.json({ limit: '10mb' }));
-  calApp.use((req, _res, next) => {
-    req.authUserId = ADMIN;
-    req.authRole = 'admin';
-    req.session = { userId: ADMIN, role: 'admin' };
-    next();
+  // createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody
+  // und der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+  const calApp = await createCalendarApp({
+    mount: ['calendar'],
+    jsonLimit: '10mb',
+    auth: (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    },
   });
-  calApp.use('/calendar', calendarRouter);
   const calServer = calApp.listen(0, '127.0.0.1');
-  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body) => {
@@ -709,19 +712,21 @@ test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
 });
 
 test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt deutschen Wortlaut', async () => {
-  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const who = { userId: ADMIN, role: 'admin' };
-  const calApp = express();
-  calApp.use(express.json());
-  calApp.use((req, _res, next) => {
-    req.authUserId = who.userId;
-    req.authRole = who.role;
-    req.session = { userId: who.userId, role: who.role };
-    next();
+  // createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody
+  // und der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+  const calApp = await createCalendarApp({
+    mount: ['calendar'],
+    auth: (req, _res, next) => {
+      req.authUserId = who.userId;
+      req.authRole = who.role;
+      req.session = { userId: who.userId, role: who.role };
+      next();
+    },
   });
-  calApp.use('/calendar', calendarRouter);
   const calServer = calApp.listen(0, '127.0.0.1');
-  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body, as = { userId: ADMIN, role: 'admin' }) => {

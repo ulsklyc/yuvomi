@@ -525,7 +525,7 @@ test('das Display liest keine Abo-URLs, ein Mensch schon', async () => {
   // diesem Ticket schon fuer ein gescoptes Token mit `calendar:read`; gemessen
   // wird deshalb an den Scopes, nicht an der Anmeldeart.
   const created = await admin('POST', '/calendar/subscriptions', {
-    name: 'Schulferien', url: 'https://example.invalid/feed.ics?token=geheim', color: '#6366f1', shared: 1,
+    name: 'Schulferien', url: 'https://example.invalid/feed.ics?token=geheim', color: '#6366f1', shared: true,
   });
   assert.ok([200, 201].includes(created.status), `Abo anlegen: ${created.status}`);
 

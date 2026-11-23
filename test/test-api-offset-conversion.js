@@ -28,16 +28,13 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const { datetime } = await import('../server/middleware/validate.js');
 const { storedToInstantMs, storedToInstantMsPrecise } = await import('../server/utils/timezone.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
-const { createErrorHandler } = await import('../server/middleware/error-handler.js');
-const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 const { default: healthRouter } = await import('../server/routes/health.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { callTool } = await import('../server/mcp/tools.js');
@@ -78,26 +75,26 @@ const BEN = db.prepare(`
   VALUES ('ben', 'Ben', 'x', 'member')
 `).run().lastInsertRowid;
 
-const app = express();
-app.use(express.json({ limit: '10mb' }));
-app.use(defaultEmptyBody);
-app.use((req, _res, next) => {
-  req.authUserId = ADMIN;
-  req.authRole = 'admin';
-  req.session = { userId: ADMIN, role: 'admin' };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+// Das MCP-Werkzeug `create_event` geht seit #2616 per Loopback durch
+// POST /api/v1/calendar, und genau DAS ist die Aussage des Falls unten -
+// derselbe Weg wie POST, nicht ein zweiter.
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  },
+  after: [
+    ['/api/v1/reminders', remindersRouter],
+    ['/api/v1/health', healthRouter],
+    ['/api/v1/housekeeping', housekeepingRouter],
+  ],
 });
-app.use('/calendar', calendarRouter);
-// At its real prefix: validateRequest() finds its operation by the mount (#2810).
-app.use('/api/v1/reminders', remindersRouter);
-// At its real prefix: validateRequest() finds its operation by the mount (#2810).
-app.use('/api/v1/health', healthRouter);
-app.use('/api/v1/housekeeping', housekeepingRouter);
-// Zweite Montierung unter dem echten Pfad: das MCP-Werkzeug `create_event`
-// geht seit #2616 per Loopback durch POST /api/v1/calendar, und genau DAS ist
-// die Aussage des Falls unten - derselbe Weg wie POST, nicht ein zweiter.
-app.use('/api/v1/calendar', calendarRouter);
-app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening',
   () => resolve(`http://127.0.0.1:${server.address().port}`)));
@@ -240,7 +237,7 @@ test('datetime(): dieselbe Eingabe, drei Haushaltszonen, drei Wanduhrzeiten', ()
 // ── Kalender ─────────────────────────────────────────────────────────────────
 
 test('POST /calendar: `Z` ergibt die richtige Wanduhrzeit', async () => {
-  const res = await call('POST', '/calendar', {
+  const res = await call('POST', '/api/v1/calendar', {
     title: 'Z-Start', start_datetime: '2026-09-21T16:00:00.000Z', end_datetime: '2026-09-21T17:30:00Z',
   });
   assert.equal(res.status, 201);
@@ -251,9 +248,9 @@ test('POST /calendar: `Z` ergibt die richtige Wanduhrzeit', async () => {
 
 test('PUT /calendar/:id speichert denselben Wert wie POST, nicht den rohen', async () => {
   const input = { start_datetime: '2026-09-21T16:00:00.000Z', end_datetime: '2026-09-21T13:30:00-04:00' };
-  const posted = await call('POST', '/calendar', { title: 'POST', ...input });
-  const created = await call('POST', '/calendar', { title: 'PUT', start_datetime: '2026-09-21T10:00' });
-  const put = await call('PUT', `/calendar/${created.body.data.id}`, input);
+  const posted = await call('POST', '/api/v1/calendar', { title: 'POST', ...input });
+  const created = await call('POST', '/api/v1/calendar', { title: 'PUT', start_datetime: '2026-09-21T10:00' });
+  const put = await call('PUT', `/api/v1/calendar/${created.body.data.id}`, input);
   assert.equal(put.status, 200);
   assert.deepEqual({ ...eventRow(created.body.data.id) }, { ...eventRow(posted.body.data.id) });
   assert.equal(eventRow(created.body.data.id).start_datetime, '2026-09-21T18:00');
@@ -265,32 +262,38 @@ test('PUT /calendar/:id: ein leerer oder null-Start ist ein 400, das Ende darf g
   // die Zeile; seit PUT den geprueften Wert nimmt, hiess '' dasselbe wie null,
   // und beides liess den Start still stehen - eine Anfrage, die etwas leeren
   // will, bekam 200 und nichts geschah. Jetzt dieselbe Antwort wie bei POST.
-  const created = await call('POST', '/calendar', {
+  const created = await call('POST', '/api/v1/calendar', {
     title: 'Pflichtstart', start_datetime: '2026-09-21T10:00', end_datetime: '2026-09-21T11:00',
   });
   const id = created.body.data.id;
   for (const start of ['', null]) {
-    const res = await call('PUT', `/calendar/${id}`, { start_datetime: start });
+    const res = await call('PUT', `/api/v1/calendar/${id}`, { start_datetime: start });
     assert.equal(res.status, 400, `start_datetime: ${JSON.stringify(start)}`);
-    assert.match(res.body.error, /start_datetime is required\./, JSON.stringify(res.body));
+    // Seit #2810 die 400 des Schemas, mit dem Feld (vorher der Satz der Route).
+    assert.equal(res.body.reason, 'validation', JSON.stringify(res.body));
+    assert.equal(res.body.fields[0].path, 'body/start_datetime', JSON.stringify(res.body));
     assert.deepEqual({ ...eventRow(id) },
       { start_datetime: '2026-09-21T10:00', end_datetime: '2026-09-21T11:00', all_day: 0 },
       'eine abgewiesene Anfrage aendert nichts');
   }
   // Das Ende ist optional: ein Termin ohne Ende ist gueltig, und das Formular
-  // schickt `null`, wenn keins gesetzt ist. Leeren bleibt deshalb erlaubt.
-  for (const end of ['', null]) {
-    await call('PUT', `/calendar/${id}`, { end_datetime: '2026-09-21T11:00' });
-    const res = await call('PUT', `/calendar/${id}`, { end_datetime: end });
-    assert.equal(res.status, 200, `end_datetime: ${JSON.stringify(end)}`);
-    assert.equal(eventRow(id).end_datetime, null, `end_datetime: ${JSON.stringify(end)} leert das Ende`);
-    assert.equal(eventRow(id).start_datetime, '2026-09-21T10:00');
-  }
+  // schickt `null`, wenn keins gesetzt ist. Leeren bleibt deshalb erlaubt -
+  // mit `null`, wie das Dokument es nennt; `''` ist seit #2810 eine 400.
+  await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: '2026-09-21T11:00' });
+  const cleared = await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: null });
+  assert.equal(cleared.status, 200, 'end_datetime: null');
+  assert.equal(eventRow(id).end_datetime, null, 'end_datetime: null leert das Ende');
+  assert.equal(eventRow(id).start_datetime, '2026-09-21T10:00');
+  await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: '2026-09-21T11:00' });
+  const empty = await call('PUT', `/api/v1/calendar/${id}`, { end_datetime: '' });
+  assert.equal(empty.status, 400, "end_datetime: ''");
+  assert.equal(empty.body.reason, 'validation');
+  assert.equal(eventRow(id).end_datetime, '2026-09-21T11:00', 'eine abgewiesene Anfrage aendert nichts');
 });
 
 test('PUT /calendar/:id: ganztaegig mit `T00:00Z` bleibt westlich von UTC am gesendeten Datum', async () => {
   await inZone('America/New_York', async () => {
-    const posted = await call('POST', '/calendar', {
+    const posted = await call('POST', '/api/v1/calendar', {
       title: 'Ganztag POST', all_day: true,
       start_datetime: '2026-09-21T00:00:00Z', end_datetime: '2026-09-22T00:00:00Z',
     });
@@ -298,22 +301,22 @@ test('PUT /calendar/:id: ganztaegig mit `T00:00Z` bleibt westlich von UTC am ges
       { start_datetime: '2026-09-21', end_datetime: '2026-09-22', all_day: 1 });
 
     // Ueber PUT: der Body nennt `all_day` gar nicht, der Termin ist es schon.
-    const created = await call('POST', '/calendar', { title: 'Ganztag PUT', all_day: true, start_datetime: '2026-09-10' });
-    const put = await call('PUT', `/calendar/${created.body.data.id}`, { start_datetime: '2026-09-21T00:00:00Z' });
+    const created = await call('POST', '/api/v1/calendar', { title: 'Ganztag PUT', all_day: true, start_datetime: '2026-09-10' });
+    const put = await call('PUT', `/api/v1/calendar/${created.body.data.id}`, { start_datetime: '2026-09-21T00:00:00Z' });
     assert.equal(put.status, 200);
     assert.equal(eventRow(created.body.data.id).start_datetime, '2026-09-21');
 
     // Gegenrichtung im selben Haushalt: ein Termin mit Uhrzeit wird umgerechnet.
-    const timed = await call('POST', '/calendar', { title: 'Mit Uhrzeit', start_datetime: '2026-09-21T00:00:00Z' });
+    const timed = await call('POST', '/api/v1/calendar', { title: 'Mit Uhrzeit', start_datetime: '2026-09-21T00:00:00Z' });
     assert.equal(eventRow(timed.body.data.id).start_datetime, '2026-09-20T20:00');
   });
 });
 
 test('PUT /calendar/:seriesId/occurrences/:recurrenceId rechnet einen Offset ebenso um', async () => {
-  const series = await call('POST', '/calendar', {
+  const series = await call('POST', '/api/v1/calendar', {
     title: 'Serie mit Ausnahme', start_datetime: '2040-04-10T09:00', recurrence_rule: 'FREQ=DAILY',
   });
-  const res = await call('PUT', `/calendar/${series.body.data.id}/occurrences/2040-04-11`, {
+  const res = await call('PUT', `/api/v1/calendar/${series.body.data.id}/occurrences/2040-04-11`, {
     start_datetime: '2040-04-11T08:15:00Z', end_datetime: '2040-04-11T11:45:00+02:00',
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
@@ -337,7 +340,7 @@ test('MCP create_event laeuft durch denselben Weg wie POST', async () => {
 
 /** Die Vorkommen einer Serie im Fenster als Wanduhrzeit der Haushaltszone. */
 async function seriesWallTimes(id) {
-  const res = await call('GET', '/calendar?from=2026-10-19&to=2026-11-04');
+  const res = await call('GET', '/api/v1/calendar?from=2026-10-19&to=2026-11-04');
   return (res.body?.data || [])
     .filter((e) => e.id === id || e.series_id === id)
     .map((e) => {
@@ -351,25 +354,25 @@ async function seriesWallTimes(id) {
 test('eine Wochenserie ueber die Zeitumstellung (25.10.2026) bleibt auf ihrer Wanduhrzeit', async () => {
   const expected = ['2026-10-20T18:00', '2026-10-27T18:00', '2026-11-03T18:00'];
 
-  const posted = await call('POST', '/calendar', {
+  const posted = await call('POST', '/api/v1/calendar', {
     title: 'Serie per POST', start_datetime: '2026-10-20T16:00:00Z', recurrence_rule: 'FREQ=WEEKLY',
   });
   assert.deepEqual(await seriesWallTimes(posted.body.data.id), expected);
 
   // Der Weg aus dem Bericht: angelegt mit lokalen Ziffern, der Start per PUT mit `Z`.
   // Roh gespeichert wiederholte die Expansion den UTC-Suffix: 18:00, dann 17:00.
-  const created = await call('POST', '/calendar', {
+  const created = await call('POST', '/api/v1/calendar', {
     title: 'Serie per PUT', start_datetime: '2026-10-20T10:00', recurrence_rule: 'FREQ=WEEKLY',
   });
-  const put = await call('PUT', `/calendar/${created.body.data.id}`, { start_datetime: '2026-10-20T16:00:00Z' });
+  const put = await call('PUT', `/api/v1/calendar/${created.body.data.id}`, { start_datetime: '2026-10-20T16:00:00Z' });
   assert.equal(put.status, 200);
   assert.deepEqual(await seriesWallTimes(created.body.data.id), expected);
 });
 
 test('Herbst-Doppelstunde: zwei Zeitpunkte, eine Wanduhrzeit - dokumentiertes Verhalten', async () => {
   // Europe/Berlin, 25.10.2026: 02:30 gibt es zweimal, um 00:30Z (CEST) und 01:30Z (CET).
-  const first = await call('POST', '/calendar', { title: 'Fold 1', start_datetime: '2026-10-25T00:30:00Z' });
-  const second = await call('POST', '/calendar', { title: 'Fold 2', start_datetime: '2026-10-25T01:30:00Z' });
+  const first = await call('POST', '/api/v1/calendar', { title: 'Fold 1', start_datetime: '2026-10-25T00:30:00Z' });
+  const second = await call('POST', '/api/v1/calendar', { title: 'Fold 2', start_datetime: '2026-10-25T01:30:00Z' });
   assert.equal(eventRow(first.body.data.id).start_datetime, '2026-10-25T02:30');
   assert.equal(eventRow(second.body.data.id).start_datetime, '2026-10-25T02:30');
   // Die gespeicherte Wanduhrzeit kann die beiden nicht unterscheiden. Beide
@@ -381,8 +384,8 @@ test('Herbst-Doppelstunde: zwei Zeitpunkte, eine Wanduhrzeit - dokumentiertes Ve
   // Westlich von UTC faellt die Wahl andersherum: America/New_York, 01.11.2026,
   // 01:30 um 05:30Z (EDT) und 06:30Z (EST) - zurueck kommt die FRUEHERE Lage.
   await inZone('America/New_York', async () => {
-    const a = await call('POST', '/calendar', { title: 'Fold NY 1', start_datetime: '2026-11-01T05:30:00Z' });
-    const b = await call('POST', '/calendar', { title: 'Fold NY 2', start_datetime: '2026-11-01T06:30:00Z' });
+    const a = await call('POST', '/api/v1/calendar', { title: 'Fold NY 1', start_datetime: '2026-11-01T05:30:00Z' });
+    const b = await call('POST', '/api/v1/calendar', { title: 'Fold NY 2', start_datetime: '2026-11-01T06:30:00Z' });
     assert.equal(eventRow(a.body.data.id).start_datetime, '2026-11-01T01:30');
     assert.equal(eventRow(b.body.data.id).start_datetime, '2026-11-01T01:30');
   });
@@ -395,7 +398,7 @@ test('POST /calendar folgt der eingestellten Haushaltszone, nicht der Maschine',
   const stored = {};
   for (const zone of ['Europe/Berlin', 'America/New_York', 'Pacific/Kiritimati']) {
     await inZone(zone, async () => {
-      const res = await call('POST', '/calendar', { title: `Zone ${zone}`, start_datetime: '2026-09-21T16:00:00Z' });
+      const res = await call('POST', '/api/v1/calendar', { title: `Zone ${zone}`, start_datetime: '2026-09-21T16:00:00Z' });
       stored[zone] = eventRow(res.body.data.id).start_datetime;
     });
   }

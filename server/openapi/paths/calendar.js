@@ -1,8 +1,36 @@
-import { op, jsonBody, idParam, stringPathParam, withCaseReasons } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
+import { VALID_SOURCES } from '../../services/calendar-fields.js';
 
 const apiError = (description) => ({
   description,
   content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+});
+
+// The answers of an operation validateRequest() checks (#2810): its own ones,
+// the 400 of the check, 401 and 500.
+const BAD_REQUEST = { $ref: '#/components/responses/BadRequest' };
+const FORBIDDEN = { $ref: '#/components/responses/Forbidden' };
+/** @param {Record<string | number, unknown>} own */
+const answers = (own) => ({
+  ...own,
+  400: own[400] ?? BAD_REQUEST,
+  401: { $ref: '#/components/responses/Unauthorized' },
+  500: { $ref: '#/components/responses/InternalServerError' },
+});
+const OK = { 200: { description: 'Successful response' } };
+const SUBSCRIPTION_NOT_FOUND = apiError('Subscription not found (reason `calendar_subscription_not_found`).');
+const SUBSCRIPTION_NOT_YOURS = apiError('The subscription belongs to another member: only its creator or an admin may change it.');
+const CALENDAR_NOT_FOUND = apiError('Local calendar not found (reason `calendar_calendar_not_found`).');
+const EVENT_NOT_FOUND = apiError('Calendar event not found (reason `calendar_event_not_found`).');
+
+/**
+ * A day as `YYYY-MM-DD`, checked as a calendar day (`2026-02-30` is a 400).
+ * @param {string} name
+ * @param {string} description
+ * @param {boolean} [required]
+ */
+const dayParam = (name, description, required = false) => ({
+  name, in: 'query', required, schema: { type: 'string', format: 'date' }, description,
 });
 
 /**
@@ -55,10 +83,12 @@ const DEFAULT_ASSIGNEES_INPUT = 'Optional `default_assignee_user_ids`: household
 
 /** Filter von `GET /calendar` (routes/calendar/read.js). */
 const EVENT_LIST_PARAMS = [
-  { name: 'from', in: 'query', required: false, schema: { type: 'string', format: 'date' }, description: '`YYYY-MM-DD`, first day of the range. Defaults to the first day of the current month in the household.' },
-  { name: 'to', in: 'query', required: false, schema: { type: 'string', format: 'date' }, description: '`YYYY-MM-DD`, last day of the range. Defaults to the last day of the current month in the household.' },
-  { name: 'assigned_to', in: 'query', required: false, schema: { type: 'integer' }, description: 'Only events this member is assigned to.' },
-  { name: 'source', in: 'query', required: false, schema: { type: 'string', enum: ['local', 'google', 'apple', 'ics'] }, description: 'Only events with this `external_source`. Any other value is ignored, `caldav` included.' },
+  dayParam('from', '`YYYY-MM-DD`, first day of the range. Defaults to the first day of the current month in the household.'),
+  dayParam('to', '`YYYY-MM-DD`, last day of the range. Defaults to the last day of the current month in the household.'),
+  { name: 'assigned_to', in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, description: 'Only events this member is assigned to.' },
+  // No `enum` (#2810): the description promises that another value is
+  // ignored, and validateRequest() would turn it into a 400.
+  { name: 'source', in: 'query', required: false, schema: { type: 'string' }, description: `Only events with this \`external_source\`: ${VALID_SOURCES.map((s) => `\`${s}\``).join(', ')}. Any other value is ignored, \`caldav\` included.` },
 ];
 
 const EVENT_LIST_SHAPE = ' A series comes as one row per occurrence in the range, all with the `id` of the series; `series_id` and `recurrence_id` tell them apart.';
@@ -107,19 +137,36 @@ export function calendarPaths() {
         operationId: 'listUpcomingCalendarEvents',
         tag: 'Calendar',
         description: 'The next events from now on, looking 90 days ahead, oldest first.' + EVENT_LIST_SHAPE + ' Without `from` and `to`, unlike `GET /calendar`, and without `creator_name`.',
-        params: [{ name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 20, default: 5 }, description: 'At most 20; a larger value is cut to 20 without an error.' }],
-        responses: {
+        // No `maximum` (#2810): a larger value is cut to 20, as the
+        // description promises, not refused.
+        params: [{ name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, default: 5 }, description: 'How many events, 5 by default. At most 20; a larger value is cut to 20 without an error.' }],
+        responses: answers({
           200: {
             description: 'Upcoming calendar events',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarEventsResponse' } } },
           },
-          401: { $ref: '#/components/responses/Unauthorized' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
+        }),
       }),
     },
-    '/api/v1/calendar/search': { get: op({ summary: 'Search events by title, location, or notes', tag: 'Calendar', description: 'Diacritic-insensitive full-text search across all family-visible calendar events (`q`, min 2 chars). Returns `{ data: Event[], total }` sorted chronologically; recurring matches resolve to their next occurrence. Backs the calendar toolbar search (#471).' }) },
-    '/api/v1/calendar/holidays': { get: op({ summary: 'List public & school holidays in a date range', tag: 'Calendar', description: 'Reads cached OpenHolidays entries that overlap `from`/`to` (both `YYYY-MM-DD`, required). Returns `{ data: [{ id, type (`public`|`school`), start_date, end_date, name, color }] }`. Empty when no holiday country is configured.' }) },
+    '/api/v1/calendar/search': {
+      get: withValidationRefusal(op({
+        summary: 'Search events by title, location, or notes',
+        tag: 'Calendar',
+        description: 'Diacritic-insensitive full-text search across all family-visible calendar events. Returns `{ data: Event[], total }` sorted chronologically, at most 100; recurring matches resolve to their next occurrence. Backs the calendar toolbar search (#471).',
+        params: [{ name: 'q', in: 'query', required: false, schema: { type: 'string' }, description: 'The search words. Fewer than two characters, or nothing to search for, answers an empty list (`{ data: [], total: 0 }`), not an error.' }],
+      })),
+    },
+    '/api/v1/calendar/holidays': {
+      get: withValidationRefusal(op({
+        summary: 'List public & school holidays in a date range',
+        tag: 'Calendar',
+        description: 'Reads cached OpenHolidays entries that overlap `from`/`to`. Returns `{ data: [{ id, type (`public`|`school`), start_date, end_date, name, color }] }`. Empty when no holiday country is configured, and when `from` lies after `to`.',
+        params: [
+          dayParam('from', 'First day, `YYYY-MM-DD`.', true),
+          dayParam('to', 'Last day, `YYYY-MM-DD`.', true),
+        ],
+      })),
+    },
     '/api/v1/calendar/google/auth': { get: op({ summary: 'Start Google Calendar OAuth', tag: 'Calendar', admin: true }) },
     '/api/v1/calendar/google/callback': { get: op({ summary: 'Google Calendar OAuth callback', tag: 'Calendar' }) },
     '/api/v1/calendar/google/sync': { post: op({ summary: 'Run Google Calendar sync', tag: 'Calendar', admin: true, stateChanging: true, description: 'When Google no longer accepts the stored sign-in (`invalid_grant`), the answer is `409` with reason `google_reauth_required`, and syncing pauses until the account is connected again (#2019).' }) },
@@ -138,14 +185,21 @@ export function calendarPaths() {
     '/api/v1/calendar/apple/mirrored-events': { delete: op({ summary: 'Delete locally mirrored Apple events', tag: 'Calendar', admin: true, stateChanging: true }) },
     '/api/v1/calendar/subscriptions': {
       get: op({ summary: 'List ICS subscriptions', tag: 'Calendar' }),
-      post: op({ summary: 'Create ICS subscription', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null), description: DEFAULT_ASSIGNEES_INPUT + ' The subscription is created even when its first fetch fails: the answer is still `201`, with `syncError` (the error text for a named case, otherwise a fixed sentence), `syncReason` (the case, for example `calendar_ics_http_status`, or `null` when the app cannot name it) and, where a number matters, `syncParams` (#2566).' }),
+      post: op({ summary: 'Create ICS subscription', tag: 'Calendar', stateChanging: true, requestBody: jsonBody('#/components/schemas/IcsSubscriptionCreateInput'), responses: answers({ 201: { description: 'Subscription created' } }), description: DEFAULT_ASSIGNEES_INPUT + ' The subscription is created even when its first fetch fails: the answer is still `201`, with `syncError` (the error text for a named case, otherwise a fixed sentence), `syncReason` (the case, for example `calendar_ics_http_status`, or `null` when the app cannot name it) and, where a number matters, `syncParams` (#2566).' }),
     },
     '/api/v1/calendar/subscriptions/{id}': {
-      patch: op({ summary: 'Update ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: DEFAULT_ASSIGNEES_INPUT }),
-      delete: op({ summary: 'Delete ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true }),
+      patch: op({
+        summary: 'Update ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true,
+        requestBody: jsonBody('#/components/schemas/IcsSubscriptionUpdateInput'), description: DEFAULT_ASSIGNEES_INPUT,
+        responses: answers({ ...OK, 403: SUBSCRIPTION_NOT_YOURS, 404: SUBSCRIPTION_NOT_FOUND }),
+      }),
+      delete: op({
+        summary: 'Delete ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true,
+        responses: answers({ 204: { description: 'Subscription deleted' }, 403: SUBSCRIPTION_NOT_YOURS, 404: SUBSCRIPTION_NOT_FOUND }),
+      }),
     },
     '/api/v1/calendar/subscriptions/{id}/sync': {
-      post: op({ summary: 'Sync ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true, description: 'A feed that does not deliver answers `400` with its `reason` (`calendar_ics_http_status`, `calendar_ics_too_large`, `calendar_ics_private_address`, ...) instead of `200` (#2566). Scheduled runs keep skipping such a feed silently.' }),
+      post: op({ summary: 'Sync ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true, responses: answers({ ...OK, 403: SUBSCRIPTION_NOT_YOURS, 404: SUBSCRIPTION_NOT_FOUND }), description: 'A feed that does not deliver answers `400` with its `reason` (`calendar_ics_http_status`, `calendar_ics_too_large`, `calendar_ics_private_address`, ...) instead of `200` (#2566). Scheduled runs keep skipping such a feed silently.' }),
     },
     '/api/v1/calendar/import': {
       post: op({
@@ -154,11 +208,15 @@ export function calendarPaths() {
         stateChanging: true,
         description: 'Response: { data: { imported, skipped, assigned, total } }. `assigned` (#1940) counts events that already existed and got at least one of the chosen people added; they are also counted in `skipped`.',
         requestBody: jsonBody('#/components/schemas/CalendarImportInput'),
+        responses: answers({
+          201: { description: 'Imported' },
+          502: apiError('The feed could not be fetched; the class of the failure in `reason` and `detail`.'),
+        }),
       }),
     },
     '/api/v1/calendar/feed': {
       get: op({ summary: 'Get personal ICS export feed status', tag: 'Calendar' }),
-      put: op({ summary: 'Set personal ICS export feed options (showAssignees, includeBirthdays)', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null, 'At least one boolean: showAssignees or includeBirthdays. Birthday inclusion defaults to true and affects only this member’s calendar feed.') }),
+      put: withValidationRefusal(op({ summary: 'Set personal ICS export feed options (showAssignees, includeBirthdays)', tag: 'Calendar', stateChanging: true, requestBody: jsonBody('#/components/schemas/CalendarFeedOptionsInput', 'At least one boolean: showAssignees or includeBirthdays. Birthday inclusion defaults to true and affects only this member’s calendar feed.') })),
       delete: op({ summary: 'Disable personal ICS export feed', tag: 'Calendar', stateChanging: true }),
     },
     '/api/v1/calendar/feed/regenerate': {
@@ -223,6 +281,7 @@ export function calendarPaths() {
         description: 'Requires calendar write access. Supply every current calendar ID exactly once in `order`; all sort_order values are updated atomically to consecutive values starting at zero. An incomplete, duplicate or stale list returns 400 without changes; a list of distinct IDs that no longer matches the current calendars carries `reason: calendar_order_changed`.',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/LocalCalendarReorderInput'),
+        responses: answers({ ...OK, 403: FORBIDDEN }),
       }),
     },
     '/api/v1/calendar/calendars/{id}': {
@@ -259,10 +318,10 @@ export function calendarPaths() {
       }),
     },
     '/api/v1/calendar/calendars/{id}/feed/regenerate': {
-      post: op({ summary: 'Regenerate local-calendar ICS export token', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
+      post: op({ summary: 'Regenerate local-calendar ICS export token', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, responses: answers({ ...OK, 404: CALENDAR_NOT_FOUND }) }),
     },
     '/api/v1/calendar/calendars/{id}/feed': {
-      delete: op({ summary: 'Disable local-calendar ICS export', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
+      delete: op({ summary: 'Disable local-calendar ICS export', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, responses: answers({ ...OK, 404: CALENDAR_NOT_FOUND }) }),
     },
     '/api/v1/calendar/sync-targets': {
       get: op({
@@ -460,6 +519,7 @@ export function calendarPaths() {
             description: 'Calendar event',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarEventResponse' } } },
           },
+          400: BAD_REQUEST,
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { description: 'Calendar event not found' },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -498,7 +558,7 @@ export function calendarPaths() {
         description: 'An event mirrored to Google Calendar is deleted there as well. The remote call runs after the response; if it fails, the next sync run retries it.',
         responses: {
           204: { description: 'Calendar event deleted' },
-          400: apiError('A linked occurrence of a series; it goes through the occurrence routes (reason `calendar_occurrence_route_required`).'),
+          400: apiError('A linked occurrence of a series; it goes through the occurrence routes (reason `calendar_occurrence_route_required`), or a path id that is not plain digits (reason `validation`).'),
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: apiError('Calendar event not found'),
@@ -507,10 +567,10 @@ export function calendarPaths() {
       }),
     },
     '/api/v1/calendar/{id}/reset': {
-      post: op({ summary: 'Reset external calendar event to source state', tag: 'Calendar', params: [idParam()], stateChanging: true, description: 'Response: { data: { reset: true, restored } }. `restored` is true when the event was put back from the feed values kept at the last sync (offline, at once). It is false for an event synced before those values were kept: the edit mark is cleared, and the original text comes with the next sync (D#2330).' }),
+      post: op({ summary: 'Reset external calendar event to source state', tag: 'Calendar', params: [idParam()], stateChanging: true, responses: answers({ ...OK, 403: apiError('Only its creator, the owner of its subscription or an admin may reset the event.'), 404: EVENT_NOT_FOUND }), description: 'Response: { data: { reset: true, restored } }. `restored` is true when the event was put back from the feed values kept at the last sync (offline, at once). It is false for an event synced before those values were kept: the edit mark is cleared, and the original text comes with the next sync (D#2330).' }),
     },
     '/api/v1/calendar/{id}/exceptions': {
-      post: op({ summary: 'Exclude a single occurrence of a recurring event (EXDATE)', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { recurrence_id } - the occurrence as the calendar reads return it (see the `recurrenceId` path parameter of the occurrence routes for the three forms). The former body { date: `YYYY-MM-DD` } is still accepted with its earlier meaning. The exact key of the matched occurrence is stored and returned as `exception_date` and `recurrence_id`. A key that names no occurrence of the series answers 400 with reason `invalid_recurrence_id`; a date that matches two occurrences (the night of a clock change) answers 409 with reason `ambiguous_recurrence_id`. Up to v2.78.0 any well-formed date was stored unchecked.' }),
+      post: op({ summary: 'Exclude a single occurrence of a recurring event (EXDATE)', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/CalendarExceptionInput'), responses: answers({ 201: { description: 'Occurrence excluded' }, 403: FORBIDDEN, 404: EVENT_NOT_FOUND, 409: AMBIGUOUS_RECURRENCE_ID }), description: 'Body: { recurrence_id } - the occurrence as the calendar reads return it (see the `recurrenceId` path parameter of the occurrence routes for the three forms). The former body { date: `YYYY-MM-DD` } is still accepted with its earlier meaning. The exact key of the matched occurrence is stored and returned as `exception_date` and `recurrence_id`. A key that names no occurrence of the series answers 400 with reason `invalid_recurrence_id`; a date that matches two occurrences (the night of a clock change) answers 409 with reason `ambiguous_recurrence_id`. Up to v2.78.0 any well-formed date was stored unchecked.' }),
     },
     '/api/v1/calendar/external-calendars': {
       patch: op({ summary: 'Set the default assignees of an external calendar', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { source, external_id, default_assignee_user_ids } - or the earlier form `default_assignee_user_id` with one person or null. Response: { data: { source, external_id, default_assignee_user_ids, default_assignee_user_id } }, the single field carrying the first person. Events arriving from that calendar are assigned to these members (#1897), the first one primary. An event moved to another calendar of the same account follows to that calendar\'s people while its assignment is still exactly the people of the calendar it came from. Without it the first batch of a newly enabled calendar came in unassigned and had to be filled in by hand (#730). The sync only refreshes name and colour on conflict, so the assignment set here stays.' }),

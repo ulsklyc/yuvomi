@@ -25,14 +25,12 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'disabled-module-mixed-answers-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: birthdaysRouter } = await import('../server/routes/birthdays.js');
 const { buildFeed } = await import('../server/services/ics-export.js');
 const { getCountdowns } = await import('../server/services/countdowns.js');
@@ -75,19 +73,19 @@ const ADMIN = db.prepare(`
   VALUES ('admin', 'Admin', 'hash', '#007AFF', 'admin', 'parent')
 `).run().lastInsertRowid;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = ADMIN;
-  req.authRole = 'admin';
-  req.session = { userId: ADMIN, role: 'admin' };
-  req.sessionModuleAccess = null;
-  req.authScopes = null;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  auth: (req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    req.sessionModuleAccess = null;
+    req.authScopes = null;
+    next();
+  },
+  after: [['/api/v1/birthdays', birthdaysRouter]],
 });
-app.use('/api/v1/dashboard', dashboardRouter);
-app.use('/api/v1/calendar', calendarRouter);
-app.use('/api/v1/birthdays', birthdaysRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1`;

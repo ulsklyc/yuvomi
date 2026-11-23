@@ -109,7 +109,7 @@ app.use((req, _res, next) => {
   req.authScopes = tokenScopes;
   next();
 });
-app.use('/dashboard', dashboardRouter);
+app.use('/api/v1/dashboard', dashboardRouter);
 // Der echte Praefix: validateRequest() liest die Operation aus `req.baseUrl` (#2810).
 app.use('/api/v1/split-expenses', splitRouter);
 app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
@@ -151,7 +151,7 @@ const settle = (groupId, payerId, payeeId, amount, currency = 'EUR') => postJson
 });
 
 async function splitBalanceOf(userId) {
-  return as(userId, async () => (await getJson('/dashboard/')).splitBalance);
+  return as(userId, async () => (await getJson('/api/v1/dashboard/')).splitBalance);
 }
 
 /**

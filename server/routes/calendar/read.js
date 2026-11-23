@@ -7,6 +7,7 @@ import { localCalendarColorSql, localCalendarIdSql } from '../../services/local-
 
 import { createLogger } from '../../logger.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import { DATE_RE } from '../../middleware/validate.js';
 import {
@@ -36,7 +37,7 @@ const router = express.Router();
 //        &source=local|google|apple  (optional Filter)
 // Response: { data: Event[], from, to }
 // --------------------------------------------------------
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const today = todayKey(db.get());
     const year  = today.slice(0, 4);
@@ -145,7 +146,7 @@ router.get('/', (req, res) => {
 // Query: ?limit=5
 // Response: { data: Event[] }
 // --------------------------------------------------------
-router.get('/upcoming', (req, res) => {
+router.get('/upcoming', validateRequest(), (req, res) => {
   try {
     const limit    = Math.min(parseInt(req.query.limit, 10) || 5, 20);
     const database = db.get();
@@ -177,7 +178,7 @@ router.get('/upcoming', (req, res) => {
 // alle Familientermine, ICS nur aus geteilten/eigenen Abos. Vor /:id registriert.
 // Response: { data: Event[] }
 // --------------------------------------------------------
-router.get('/search', (req, res) => {
+router.get('/search', validateRequest(), (req, res) => {
   try {
     // Mit der Verbindung, damit Wortteile tragen wie in der globalen Suche
     // ("zahn" findet die "Kinderzahnarzt"-Kontrolle) - beide Suchen sollen fuers
