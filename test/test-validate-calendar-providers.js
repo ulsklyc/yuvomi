@@ -34,7 +34,9 @@
  *              in the handler, the schema carries type and shape only;
  *            - ONE SOURCE: the value lists of the schemas are the constants of
  *              server/services/calendar-fields.js, which the handlers read,
- *              and equal the CHECK constraints of their columns.
+ *              and equal the CHECK constraints of their columns;
+ *            - ONLY GUARD (step b): what the handlers no longer check
+ *              themselves is pinned as values of the built document.
  *          No network: no Google, Microsoft, iCloud or CalDAV server is asked.
  *          Every request either stops at the check, at a handler check before
  *          the service, or reaches a service path that only reads and writes
@@ -441,4 +443,68 @@ test('the document: 38 provider operations, each with its answers', () => {
   assert.match(spec.paths['/api/v1/calendar/external-calendars'].patch.description, /Omitting both clears the set/);
   assert.equal(spec.paths['/api/v1/calendar/external-calendars'].patch.requestBody.required, true);
   assert.deepEqual(spec.components.schemas.ExternalCalendarAssigneesInput.required, ['source', 'external_id'], 'no new duty (decision 17)');
+});
+
+// Since group 10b step (b) the schema is the only guard for these: the
+// provider handlers dropped their own check (#2810). So the types, lists,
+// bounds and patterns are pinned here as literal values - a looser type, a
+// lost `required`, a value added to a list (also to the constant in
+// server/services/calendar-fields.js the list is read from), a lost minimum or
+// a wider pattern turns this red.
+test('only guard: the types, lists and bounds the provider handlers no longer check are the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schemas = spec.components.schemas;
+  const BOOL = { type: 'boolean' };
+  // PATCH /google/calendars: `enabled must be a boolean.`
+  assert.deepEqual(schemas.GoogleCalendarSelectionInput.required, ['calendarId', 'enabled']);
+  assert.deepEqual(schemas.GoogleCalendarSelectionInput.properties.enabled, BOOL);
+  // PUT /google/readonly: `readonly must be a boolean.`
+  assert.deepEqual(schemas.GoogleReadonlyInput.required, ['readonly']);
+  assert.equal(schemas.GoogleReadonlyInput.properties.readonly.type, 'boolean');
+  // POST .../default-assignee-backfill: `expected_count is missing or invalid.`, `expected_token is invalid.`
+  const backfill = schemas.DefaultAssigneeBackfillInput;
+  assert.deepEqual(backfill.required, ['expected_count']);
+  assert.deepEqual(backfill.properties.expected_count, { type: 'integer', minimum: 0 });
+  assert.deepEqual(backfill.properties.expected_token.type, ['string', 'null']);
+  assert.equal(backfill.properties.expected_token.pattern, '^[0-9a-f]{64}$');
+  // PATCH /caldav/accounts/{id}/calendars: the `enabled` half of `Missing calendarUrl or enabled field.` and `deleteEvents must be a boolean.`
+  const caldav = schemas.CaldavCalendarSelectionInput;
+  assert.deepEqual(caldav.required, ['calendarUrl', 'enabled']);
+  assert.deepEqual(caldav.properties.enabled, BOOL);
+  assert.equal(caldav.properties.deleteEvents.type, 'boolean');
+  // PATCH /outlook/accounts/{id}/calendars: the type half of `calendarId is missing or invalid.` and `enabled must be a boolean.`
+  const outlook = schemas.OutlookCalendarSelectionInput;
+  assert.deepEqual(outlook.required, ['calendarId', 'enabled']);
+  assert.deepEqual(outlook.properties.enabled, BOOL);
+  assert.equal(outlook.properties.calendarId.type, 'string');
+  // The value lists: the constants, and the constants as they stand.
+  assert.deepEqual(schemas.CaldavReminderListUpdateInput.properties.targetModule, { type: 'string', enum: ['tasks', 'shopping'] });
+  assert.deepEqual([...fields.REMINDER_LIST_TARGETS], ['tasks', 'shopping']);
+  assert.deepEqual(schemas.ExternalCalendarAssigneesInput.properties.source, { type: 'string', enum: ['google', 'apple', 'caldav'] });
+  assert.deepEqual([...fields.EXTERNAL_CALENDAR_SOURCES], ['google', 'apple', 'caldav']);
+  // The query switches the handlers read as `=== 'true'`.
+  const SWITCH = { type: 'string', enum: ['true', 'false'] };
+  for (const [path, method, name] of [
+    ['/api/v1/calendar/google/disconnect', 'delete', 'deleteEvents'],
+    ['/api/v1/calendar/apple/disconnect', 'delete', 'deleteEvents'],
+    ['/api/v1/calendar/caldav/accounts/{id}', 'delete', 'deleteEvents'],
+    ['/api/v1/calendar/caldav/accounts/{id}/calendars', 'get', 'refresh'],
+    ['/api/v1/calendar/caldav/accounts/{id}/reminder-lists', 'get', 'refresh'],
+    ['/api/v1/calendar/outlook/accounts/{id}/calendars', 'get', 'refresh'],
+  ]) {
+    const param = spec.paths[path][method].parameters.find((/** @type {any} */ p) => p.name === name && p.in === 'query');
+    assert.deepEqual(param.schema, SWITCH, `${method} ${path} ${name}`);
+  }
+  // The path ids pathId() reads with Number() (it was parseInt): whole numbers only.
+  const ID = { type: 'integer', maximum: 9007199254740991 };
+  for (const [path, method] of [
+    ['/api/v1/calendar/caldav/accounts/{id}', 'put'], ['/api/v1/calendar/caldav/accounts/{id}', 'delete'],
+    ['/api/v1/calendar/caldav/accounts/{id}/calendars', 'get'], ['/api/v1/calendar/caldav/accounts/{id}/calendars', 'patch'],
+    ['/api/v1/calendar/caldav/accounts/{id}/reminder-lists', 'get'], ['/api/v1/calendar/caldav/accounts/{id}/reminder-lists', 'patch'],
+    ['/api/v1/calendar/outlook/accounts/{id}', 'put'], ['/api/v1/calendar/outlook/accounts/{id}', 'delete'],
+    ['/api/v1/calendar/outlook/accounts/{id}/calendars', 'get'], ['/api/v1/calendar/outlook/accounts/{id}/calendars', 'patch'],
+  ]) {
+    const param = spec.paths[path][method].parameters.find((/** @type {any} */ p) => p.name === 'id' && p.in === 'path');
+    assert.deepEqual(param.schema, ID, `${method} ${path} id`);
+  }
 });

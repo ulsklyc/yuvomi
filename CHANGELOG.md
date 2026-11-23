@@ -89,6 +89,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `{ "error": "Internal server error.", "code": 500 }`, as the other calendar routes already did.
   The status stays 500, and the app shows its own message for it as before. Every other answer
   is unchanged.
+- **The Google, Apple, CalDAV and Outlook settings routes answer an unexpected failure with the
+  same sentence as the rest of the API.** On a server-side failure they said a sentence of their
+  own (`"Failed to update calendar selection."`, `"Failed to update reminder selection."`,
+  `"Failed to update Outlook account."`, `"Failed to fetch calendars."`, `"CalDAV sync failed."`,
+  `"Connecting the Apple calendar failed."`, `"The read-only mode could not be saved."` and the
+  like); they now answer `{ "error": "Internal server error.", "code": 500 }`. Today this is
+  reachable with a CalDAV calendar or reminder list, or an Outlook calendar, that the account does
+  not have, and with an Outlook account change the account refuses (an empty name, an owner who is
+  no user, nothing to change); the settings page shows its own message there as before. The
+  status stays 500. Where a server-side failure hit connecting a CalDAV or Apple account, an Apple
+  sync or refreshing the CalDAV calendars or reminder lists, the page framed the server's sentence
+  ("Connection failed: Failed to fetch calendars."); it now shows its general error message, as
+  for every other 500. A refusal of the foreign server keeps its class ("Connection failed: HTTP
+  401"). Every other answer is unchanged.
 
 ## [2.94.0] - 2026-11-22
 
