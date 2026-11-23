@@ -15,6 +15,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 
@@ -227,12 +228,6 @@ const sentMails = [];
 let actor = ADM;
 let mailConfigured = true;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.session = { csrfToken: CSRF, ...(actor ? { userId: actor.id, role: actor.role } : {}) };
-  next();
-});
 const inviteRouter = express.Router();
 buildInviteRoutes(inviteRouter, {
   database: routeDb,
@@ -244,10 +239,18 @@ buildInviteRoutes(inviteRouter, {
   baseUrl: 'https://yuvomi.test',
   limiter: (_req, _res, next) => next(), // Rate-Limit im Test überbrücken
 });
-app.use('/auth', inviteRouter);
+// At the real prefix (test/auth-app.js); the paths below say `/auth/...`, the
+// base carries `/api/v1`.
+const app = await createAuthApp({
+  auth: (req, _res, next) => {
+    req.session = { csrfToken: CSRF, ...(actor ? { userId: actor.id, role: actor.role } : {}) };
+    next();
+  },
+  routers: [inviteRouter],
+});
 const server = app.listen(0, '127.0.0.1');
 const routeBase = await new Promise((r) =>
-  server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+  server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1`)));
 
 async function call(method, path, { actor: a, body, csrf = CSRF } = {}) {
   if (a !== undefined) actor = a;

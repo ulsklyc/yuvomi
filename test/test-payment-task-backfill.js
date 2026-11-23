@@ -24,7 +24,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import express from 'express';
+import { createAuthApp } from './auth-app.js';
 
 const dbmod = await import('../server/db.js');
 const { requireAuth } = await import('../server/auth.js');
@@ -161,11 +161,11 @@ function mintToken(subjectId) {
   return value;
 }
 
-const app = express();
-app.use(express.json());
-app.use('/api/v1/housekeeping', requireAuth, housekeepingRouter);
-app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/permissions', requireAuth, permissionsRouter);
+const app = await createAuthApp({
+  before: [['/api/v1/housekeeping', requireAuth, housekeepingRouter]],
+  routers: [authRouter],
+  after: [['/api/v1/permissions', requireAuth, permissionsRouter]],
+});
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

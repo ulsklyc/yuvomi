@@ -15,6 +15,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
@@ -30,16 +31,16 @@ const KID = db.prepare("INSERT INTO users (username, display_name, password_hash
 const storedColor = (id) => db.prepare('SELECT avatar_color FROM users WHERE id = ?').get(id).avatar_color;
 
 const actor = { userId: 0, role: 'member' };
-const authApp = express();
-authApp.use(express.json());
-authApp.use(sessionMiddleware);
-authApp.use((req, _res, next) => {
-  if (actor.userId) { req.session.userId = actor.userId; req.session.role = actor.role; }
-  next();
+const authApp = await createAuthApp({
+  session: sessionMiddleware,
+  auth: (req, _res, next) => {
+    if (actor.userId) { req.session.userId = actor.userId; req.session.role = actor.role; }
+    next();
+  },
+  routers: [authRouter],
 });
-authApp.use('/', authRouter);
 const authServer = authApp.listen(0, '127.0.0.1');
-const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}`)));
+const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}${AUTH_PREFIX}`)));
 test.after(() => authServer.close());
 
 async function signIn(userId, role) {

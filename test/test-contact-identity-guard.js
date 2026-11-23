@@ -17,6 +17,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import { createServer } from 'node:http';
 import { startTestServer, cookieHeader } from './server-ready.js';
 
@@ -111,8 +112,6 @@ async function tokenFor(subjectUserId, scopes) {
 async function withResetRoutes(fn) {
   const sent = [];
   const pending = [];
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   buildResetRoutes(router, {
     database: db,
@@ -124,10 +123,10 @@ async function withResetRoutes(fn) {
     // danach verlaesslich zaehlt statt vom Zufall der Ereignisschleife.
     defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const base = `http://127.0.0.1:${server.address().port}/auth`;
+  const base = `http://127.0.0.1:${server.address().port}/api/v1/auth`;
   const post = (path, body) => fetch(`${base}${path}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(async (r) => {
