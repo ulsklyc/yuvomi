@@ -780,6 +780,9 @@ const STEPS = [
   ['2fa require on token', 'PUT', '/2fa/require', { required: true }, { as: 'admintoken' }],
   ['2fa require omitted', 'PUT', '/2fa/require', {}, { as: 'admin' }],
   ['2fa require no body', 'PUT', '/2fa/require', NO_BODY, { as: 'admin' }],
+  // Both rows above switched the requirement off before step (c) and leave it
+  // on now; the rows after them run with it off, as before.
+  ['2fa require off again', 'PUT', '/2fa/require', { required: false }, { as: 'admin' }],
 
   // ── POST /users/{id}/devices/sign-out ─────────────────────────────────────
   async () => { await signIn('opa', 'gopa', 'longenough1'); },

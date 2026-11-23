@@ -3249,7 +3249,8 @@ router.get('/2fa/overview', requireAuth, requireAdmin, validateRequest(), (_req,
 
 /**
  * PUT /api/v1/auth/2fa/require
- * Body: { required: boolean }
+ * Body: { required: boolean } - Rumpf und Feld sind Pflicht (das Schema ist
+ * der Riegel): ein fehlendes Feld darf die Pflicht nie still abschalten.
  * Schaltet die haushaltsweite Pflicht ein oder aus.
  *
  * Bewusst eine eigene Route mit `requireAdmin` als MIDDLEWARE und kein Feld an
@@ -3267,7 +3268,7 @@ router.get('/2fa/overview', requireAuth, requireAdmin, validateRequest(), (_req,
  * Admin nicht.
  */
 router.put('/2fa/require', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
-  const required = req.body?.required === true;
+  const required = req.body.required === true;
   twoFactor.setRequiredForHousehold(db.get(), required);
   log.info('Household two-factor requirement changed', { userId: req.authUserId, required });
   res.json({ data: { required: twoFactor.isRequiredForHousehold(db.get()) } });

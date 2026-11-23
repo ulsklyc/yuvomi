@@ -2836,10 +2836,10 @@ export const schemas = {
           properties: {
             required: {
               type: 'boolean',
-              description: 'true requires two-factor authentication household-wide, false lifts it. '
-                + 'Omitting `required` switches the requirement off.',
+              description: 'Required. true requires two-factor authentication household-wide, false lifts it.',
             },
           },
+          required: ['required'],
         },
         TwoFactorCodeRequest: {
           type: 'object',
