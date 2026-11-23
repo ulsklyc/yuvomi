@@ -372,8 +372,14 @@ test('GET /invites liefert nie token oder token_hash', async () => {
 });
 
 test('GET /invites/preview: Unsinn-Token liefert valid false statt 500', async () => {
+  // Ohne `token` weist seit #2810 (Gruppe 12a) das Dokument ab (der Parameter ist Pflicht).
   for (const query of ['?token=quatsch', '?token=', '']) {
     const res = await call('GET', `/auth/invites/preview${query}`, { actor: null });
+    if (query === '') {
+      assert.equal(res.status, 400);
+      assert.deepEqual(res.body.fields, [{ path: 'query/token', rule: 'required' }]);
+      continue;
+    }
     assert.equal(res.status, 200);
     assert.equal(res.body.data.valid, false);
   }

@@ -504,14 +504,20 @@ test('reset-password/check antwortet fuer unbekannt, abgelaufen, eingeloest und 
     answers.push({ status, json });
   };
   await ask({ token: 'f'.repeat(64) });                        // unbekannt
-  await ask({});                                                // fehlend
-  await ask({ token: 42 });                                     // kein Text
   db.prepare('UPDATE password_resets SET expires_at = 1').run();
   await ask({ token });                                         // abgelaufen
   db.prepare('UPDATE password_resets SET expires_at = ?').run(Date.now() + 3_600_000);
   assert.equal((await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' })).status, 200);
   await ask({ token });                                         // eingeloest
   for (const a of answers) assert.deepEqual(a, { status: 200, json: { data: { valid: false } } });
+  // Fehlend und kein Text weist seit #2810 (Gruppe 12a) das Dokument ab, vor jedem
+  // Token: 400 mit dem Feld, fuer jeden Aufrufer gleich.
+  for (const [body, rule] of [[{}, 'required'], [{ token: 42 }, 'type']]) {
+    const { status, json } = await callJson(app, 'POST', '/auth/reset-password/check', body);
+    assert.equal(status, 400, JSON.stringify(body));
+    assert.equal(json.reason, 'validation');
+    assert.deepEqual(json.fields, [{ path: 'body/token', rule }]);
+  }
 });
 
 test('reset-password/check: ein Konto, das keinen Reset mehr annimmt, gilt als toter Link - der Token bleibt', async () => {

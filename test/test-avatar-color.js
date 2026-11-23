@@ -84,18 +84,24 @@ test('PATCH /me/profile: ein Mitglied setzt sich keine CSS-Deklaration als Farbe
   const session = await signIn(KID, 'member');
   const r = await authCall('PATCH', '/me/profile', session, { avatar_color: INJECTION });
   assert.equal(r.status, 400, JSON.stringify(r.body));
-  assert.match(r.body.error, /avatar_color/);
+  // Seit #2810 (Gruppe 12a) weist das Dokument ab (`COLOR_PATTERN`), vor dem Handler.
+  assert.deepEqual(r.body.fields, [{ path: 'body/avatar_color', rule: 'pattern' }]);
   assert.equal(storedColor(KID), '#34C759', 'Farbe unveraendert');
 });
 
-test('PATCH /me/profile: HEX geht durch, leer faellt auf den Standard', async () => {
+test('PATCH /me/profile: HEX geht durch, leer und null sind keine Farbe', async () => {
   const session = await signIn(KID, 'member');
   const ok = await authCall('PATCH', '/me/profile', session, { avatar_color: '#ff9500' });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(storedColor(KID), '#ff9500');
-  const empty = await authCall('PATCH', '/me/profile', session, { avatar_color: '' });
-  assert.equal(empty.status, 200, JSON.stringify(empty.body));
-  assert.equal(storedColor(KID), '#007AFF');
+  // Bis #2810 (Gruppe 12a) fielen '' und null still auf den Standard #007AFF; die
+  // Seite schickt immer die gewaehlte Farbe. Jetzt 400, die Farbe bleibt.
+  for (const [avatarColor, rule] of /** @type {const} */ ([['', 'pattern'], [null, 'type']])) {
+    const empty = await authCall('PATCH', '/me/profile', session, { avatar_color: avatarColor });
+    assert.equal(empty.status, 400, JSON.stringify(empty.body));
+    assert.deepEqual(empty.body.fields, [{ path: 'body/avatar_color', rule }]);
+    assert.equal(storedColor(KID), '#ff9500');
+  }
 });
 
 test('POST /users und PATCH /users/:id lehnen eine Nicht-HEX-Farbe ab', async () => {
@@ -108,7 +114,7 @@ test('POST /users und PATCH /users/:id lehnen eine Nicht-HEX-Farbe ab', async ()
 
   const patched = await authCall('PATCH', `/users/${KID}`, session, { avatar_color: 'url(x)' });
   assert.equal(patched.status, 400, JSON.stringify(patched.body));
-  assert.equal(storedColor(KID), '#007AFF');
+  assert.equal(storedColor(KID), '#ff9500', 'Farbe unveraendert');
 });
 
 test('POST /worker lehnt eine Nicht-HEX-Farbe ab', async () => {

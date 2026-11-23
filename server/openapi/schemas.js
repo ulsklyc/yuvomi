@@ -1,7 +1,8 @@
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '../../public/utils/note-category-name.js';
 import { MAX_QUICK_LINK_URL_LENGTH } from '../../public/utils/quick-link-url.js';
 import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { DATETIME_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
+import { COLOR_PATTERN, DATETIME_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
+import { MAX_AVATAR_DATA_LENGTH } from '../utils/avatar-limits.js';
 import { ORIGIN_MODULE } from '../services/reminder-origins.js';
 import { wasteInputSchemas } from './waste-inputs.js';
 import {
@@ -15,6 +16,10 @@ import {
   MAX_BULK_TASKS, MAX_ROTATION_POOL, ROTATION_MODES, TASK_MAX_POINTS, TASK_PRIORITIES, TASK_REAL_STATUSES, TASK_STATUSES,
   TASK_VISIBILITY,
 } from '../services/task-fields.js';
+import {
+  CODE_MAX, DEVICE_ID_PATTERN, DEVICE_NAME_MAX, DEVICE_PLATFORM_PATTERN, DISPLAY_NAME_MAX, FAMILY_ROLES, LOGIN_USERNAME_MAX,
+  PASSWORD_MAX,
+} from '../services/auth-fields.js';
 
 /**
  * A reminder time as the handlers accept it (`datetime()` in
@@ -2272,7 +2277,7 @@ export const schemas = {
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
             role: { type: 'string', enum: ['admin', 'member'] },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             access_scope: {
               type: 'string',
               description: 'What kind of account this is, for example `family`, `split_guest` or `display`.',
@@ -2327,7 +2332,7 @@ export const schemas = {
             display_name: { type: 'string' },
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
@@ -2407,8 +2412,12 @@ export const schemas = {
         LoginRequest: {
           type: 'object',
           properties: {
-            username: { type: 'string' },
-            password: { type: 'string' },
+            username: { type: 'string', maxLength: LOGIN_USERNAME_MAX },
+            password: {
+              type: 'string',
+              maxLength: PASSWORD_MAX,
+              description: 'An empty username or password is refused with 400 as well.',
+            },
           },
           required: ['username', 'password'],
         },
@@ -2449,10 +2458,12 @@ export const schemas = {
         },
         SetupRequest: {
           type: 'object',
+          description: 'Sent as JSON or form-encoded (`application/x-www-form-urlencoded`, as the YunoHost package does); '
+            + 'the fields are the same. Unknown fields are ignored.',
           properties: {
-            username: { type: 'string' },
-            display_name: { type: 'string' },
-            password: { type: 'string' },
+            username: { type: 'string', description: '3-64 letters, numbers, dots, hyphens or underscores, surrounding whitespace removed.' },
+            display_name: { type: 'string', description: `At most ${DISPLAY_NAME_MAX} characters, surrounding whitespace removed.` },
+            password: { type: 'string', maxLength: PASSWORD_MAX, description: 'At least 8 characters after Unicode normalization (NFC).' },
             language: {
               type: ['string', 'null'],
               description: 'Optional. Language code of a supported app locale (e.g. `de`, `pt`, `fil`). '
@@ -2471,10 +2482,10 @@ export const schemas = {
         PasswordChangeRequest: {
           type: 'object',
           properties: {
-            currentPassword: { type: 'string' },
-            newPassword: { type: 'string' },
+            current_password: { type: 'string' },
+            new_password: { type: 'string', maxLength: PASSWORD_MAX, description: 'At least 8 characters after Unicode normalization (NFC).' },
           },
-          required: ['currentPassword', 'newPassword'],
+          required: ['current_password', 'new_password'],
         },
         UserCreateRequest: {
           type: 'object',
@@ -2490,7 +2501,7 @@ export const schemas = {
             },
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             system_admin: { type: 'boolean' },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
@@ -2513,7 +2524,7 @@ export const schemas = {
             },
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL. Use null to remove.' },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             system_admin: { type: 'boolean' },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
@@ -2523,10 +2534,24 @@ export const schemas = {
         },
         ProfileUpdateRequest: {
           type: 'object',
+          description: 'Every field is optional; a field left out stays as it is. Unknown fields, among them `role`, '
+            + '`family_role` and `username`, are ignored: an account does not set them on itself.',
           properties: {
-            display_name: { type: 'string' },
-            avatar_color: { type: 'string' },
-            avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL. Use null to remove.' },
+            display_name: { type: 'string', description: `Not empty, at most ${DISPLAY_NAME_MAX} characters, surrounding whitespace removed.` },
+            avatar_color: { type: 'string', pattern: COLOR_PATTERN, description: 'A HEX color `#RRGGBB`.' },
+            avatar_data: {
+              type: ['string', 'null'],
+              minLength: 1,
+              maxLength: MAX_AVATAR_DATA_LENGTH,
+              description: 'PNG, JPEG, or WebP data URL. Use null to remove.',
+            },
+            phone: { type: ['string', 'null'], description: 'At most 100 characters; null or empty removes it.' },
+            email: {
+              type: ['string', 'null'],
+              description: 'At most 200 characters; null or empty removes it. An address of another account is refused with 409 (`email_in_use`) unless the caller is an admin.',
+            },
+            birth_date: { type: ['string', 'null'], format: 'date', description: 'The birthday as `YYYY-MM-DD`; null removes it.' },
+            birth_year_unknown: { type: 'boolean', description: 'Only day and month of `birth_date` are known (#2095); the server then stores the placeholder year 2000 whatever year is sent. Without it, the stored flag only goes when a different date arrives.' },
           },
         },
         Invite: {
@@ -2538,7 +2563,7 @@ export const schemas = {
             username: { type: ['string', 'null'], description: 'Pre-assigned username. When null, the invited person picks one.' },
             display_name: { type: ['string', 'null'] },
             role: { type: 'string', enum: ['admin', 'member'] },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             created_by: { type: ['integer', 'null'] },
             expires_at: { type: 'integer', description: 'Unix epoch milliseconds. Invitations are valid for 7 days.' },
             accepted_at: { type: ['string', 'null'], format: 'date-time' },
@@ -2554,7 +2579,7 @@ export const schemas = {
             username: { type: 'string', description: 'Optional. When set, the invited person cannot choose a different one.' },
             display_name: { type: 'string' },
             email: { type: 'string', description: 'Required when send_email is true.' },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             system_admin: { type: 'boolean', description: 'Only true grants the admin role; the value is taken from the invitation, never from the accept request.' },
             send_email: { type: 'boolean', description: 'Send the invitation by email. Requires SMTP and BASE_URL; check email_sent in the response.' },
           },
@@ -2614,11 +2639,17 @@ export const schemas = {
           type: 'object',
           properties: {
             token: { type: 'string' },
-            password: { type: 'string', minLength: 8 },
+            password: {
+              type: 'string',
+              maxLength: PASSWORD_MAX,
+              description: 'At least 8 characters after Unicode normalization (NFC). Required while password sign-in is on; '
+                + 'with password sign-in turned off (SSO only) the account is created without one and a password sent is ignored '
+                + '(`password_required` of GET /invites/preview says which).',
+            },
             username: { type: 'string', description: 'Ignored when the invitation already carries one.' },
             display_name: { type: 'string', description: 'Ignored when the invitation already carries one.' },
           },
-          required: ['token', 'password'],
+          required: ['token'],
         },
         ApiToken: {
           type: 'object',
@@ -2687,11 +2718,11 @@ export const schemas = {
         SignedInDeviceCreateRequest: {
           type: 'object',
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 100 },
-            platform: { type: 'string', pattern: '^[a-z][a-z0-9-]{1,19}$' },
+            name: { type: 'string', minLength: 1, maxLength: DEVICE_NAME_MAX },
+            platform: { type: 'string', pattern: DEVICE_PLATFORM_PATTERN },
             device_id: {
               type: 'string',
-              pattern: '^[A-Za-z0-9._-]{8,128}$',
+              pattern: DEVICE_ID_PATTERN,
               description: 'Chosen by the client and stable per installation. Sending the same value again replaces the earlier credential.',
             },
           },
@@ -2770,9 +2801,30 @@ export const schemas = {
         TwoFactorVerifyRequest: {
           type: 'object',
           properties: {
-            code: { type: 'string', maxLength: 64, description: 'The six-digit TOTP code or a recovery code.' },
+            code: { type: 'string', maxLength: CODE_MAX, description: 'The six-digit TOTP code or a recovery code.' },
           },
           required: ['code'],
+        },
+        TwoFactorCodeRequest: {
+          type: 'object',
+          description: 'A second factor that confirms a change of the caller\'s own two-factor authentication.',
+          properties: {
+            code: {
+              type: 'string',
+              maxLength: CODE_MAX,
+              description: 'A code from the authenticator app; to turn it off or to replace the recovery codes, a recovery code as well.',
+            },
+          },
+          required: ['code'],
+        },
+        ChangelogSeenRequest: {
+          type: 'object',
+          properties: {
+            latest: {
+              type: ['string', 'null'],
+              description: 'The last published version the client knows, at most 64 characters after trimming. Left out, null or empty keeps the stored value.',
+            },
+          },
         },
         TwoFactorVerifyResponse: {
           type: 'object',
@@ -3381,11 +3433,11 @@ export const schemas = {
           type: 'object',
           properties: {
             code: { type: 'string', description: 'Case, spaces and hyphens do not matter.' },
-            name: { type: 'string', minLength: 1, maxLength: 100 },
-            platform: { type: 'string', pattern: '^[a-z][a-z0-9-]{1,19}$' },
+            name: { type: 'string', minLength: 1, maxLength: DEVICE_NAME_MAX },
+            platform: { type: 'string', pattern: DEVICE_PLATFORM_PATTERN },
             device_id: {
               type: 'string',
-              pattern: '^[A-Za-z0-9._-]{8,128}$',
+              pattern: DEVICE_ID_PATTERN,
               description: 'Chosen by the client and stable per installation. Sending the same value again replaces the earlier credential.',
             },
           },

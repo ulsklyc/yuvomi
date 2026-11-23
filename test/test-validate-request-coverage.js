@@ -30,6 +30,17 @@
  *          dashboard) and 10b (the provider routes under
  *          server/routes/calendar/: google, apple, caldav, outlook) and 11a
  *          (tasks) and 11b (preferences, push).
+ *
+ *          Beside server/routes the guard reads server/auth.js (EXTRA_FILES):
+ *          the auth router, with the routes its builders (buildResetRoutes,
+ *          buildInviteRoutes, buildGravatarRoute) put on it. Group 12a
+ *          migrated its 34 routes of sign-in, session and own account; the 13
+ *          administration routes (`requireAdmin`) follow in 12b (a). They
+ *          stand by name on PARTIAL, which only shrinks: a listed route that
+ *          carries validateRequest() turns the guard red, so the entry goes in
+ *          the PR that migrates it, and every other route of the file must
+ *          carry it. The whole PARTIAL entry falls with 12b (a), and
+ *          server/auth.js joins MIGRATED.
  * Run: npm run test:validate-request-coverage
  */
 
@@ -44,6 +55,34 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ROUTES = join(ROOT, 'server', 'routes');
+
+/** Files outside server/routes whose exported routers the guard reads as well. */
+const EXTRA_FILES = [join(ROOT, 'server', 'auth.js')];
+
+/**
+ * Files migrated in part: per file the routes (`<export> <METHOD> <path>`)
+ * that may still lack validateRequest(). Only shrinks; every other route of
+ * the file must carry it. server/auth.js: the 13 administration routes of
+ * group 12b (#2810), which fall with 12b (a).
+ * @type {Record<string, string[]>}
+ */
+const PARTIAL = {
+  'server/auth.js': [
+    'router POST /invites',
+    'router GET /invites',
+    'router DELETE /invites/:id',
+    'router GET /2fa/overview',
+    'router PUT /2fa/require',
+    'router POST /users/:id/devices/sign-out',
+    'router GET /api-tokens',
+    'router POST /api-tokens',
+    'router DELETE /api-tokens/:id',
+    'router POST /api-tokens/:id/remove',
+    'router POST /users',
+    'router PATCH /users/:id',
+    'router DELETE /users/:id',
+  ],
+};
 
 /**
  * The route files that do not carry validateRequest() on every route yet.
@@ -104,7 +143,7 @@ function sourceFiles(dir) {
  * @type {Map<string, Array<{ route: string, validated: boolean }>>}
  */
 const files = new Map();
-for (const path of sourceFiles(ROUTES).sort()) {
+for (const path of [...sourceFiles(ROUTES).sort(), ...EXTRA_FILES]) {
   const mod = await import(pathToFileURL(path).href);
   const routes = [];
   for (const [name, value] of Object.entries(mod)) {
@@ -131,7 +170,8 @@ test('every route of a migrated route file carries validateRequest()', () => {
   const missing = [];
   for (const [file, routes] of files) {
     if (NOT_MIGRATED.includes(file)) continue;
-    for (const { route, validated } of routes) if (!validated) missing.push(`${file}: ${route}`);
+    const allowed = PARTIAL[file] ?? [];
+    for (const { route, validated } of routes) if (!validated && !allowed.includes(route)) missing.push(`${file}: ${route}`);
   }
   assert.deepEqual(missing, [], 'add validateRequest() to these routes, or (only for a file not migrated yet) keep the file on NOT_MIGRATED');
 });
@@ -154,6 +194,27 @@ test('NOT_MIGRATED only shrinks: every entry exists and still has a route withou
     assert.ok(routes, `${file} on NOT_MIGRATED does not exist (any more): take it off the list`);
     assert.ok(routes.length > 0, `${file} on NOT_MIGRATED has no route of its own: take it off the list`);
     assert.ok(routes.some((r) => !r.validated), `${file} is complete now: take it off NOT_MIGRATED`);
+  }
+});
+
+test('server/auth.js: the 34 routes of group 12a carry validateRequest(), the 13 on PARTIAL do not yet', () => {
+  const routes = files.get('server/auth.js') ?? [];
+  const validated = routes.filter((r) => r.validated).map((r) => r.route);
+  assert.equal(routes.length, 47, 'the auth router and its builders register 47 routes');
+  assert.equal(validated.length, 34, `${validated.length} routes of server/auth.js carry validateRequest()`);
+  assert.ok(!NOT_MIGRATED.includes('server/auth.js') && !MIGRATED.includes('server/auth.js'), 'server/auth.js is on PARTIAL only');
+});
+
+test('PARTIAL only shrinks: every listed route exists and still lacks validateRequest()', () => {
+  for (const [file, listed] of Object.entries(PARTIAL)) {
+    const routes = files.get(file);
+    assert.ok(routes, `${file} on PARTIAL does not exist (any more)`);
+    assert.equal(new Set(listed).size, listed.length, `${file}: no entry twice`);
+    for (const route of listed) {
+      const found = routes.find((r) => r.route === route);
+      assert.ok(found, `${file}: ${route} on PARTIAL has no route (any more): take it off the list`);
+      assert.ok(!found.validated, `${file}: ${route} carries validateRequest() now: take it off PARTIAL`);
+    }
   }
 });
 

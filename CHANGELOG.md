@@ -142,6 +142,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gets 403 `admin_required`, also for an invalid value, every field keeps its own 400 sentence,
   and unknown keys are still ignored. The check that a push endpoint is a public https address
   stays with the route. `POST /push/test` still takes no body.
+- **Sign-in, setup, the session and your own account check every request against the published
+  API description.** This is about your own API clients; the app, the iOS app and the YunoHost
+  package send nothing that is refused now. The description itself is corrected where it
+  refused the app: the password change (`PATCH /auth/me/password`) is documented with the
+  `current_password` and `new_password` the settings page sends (it said `currentPassword`),
+  the profile with the phone, email and birthday fields the page sends, and accepting an
+  invitation no longer requires a password where password sign-in is turned off. Under
+  `/api/v1/auth` (sign-in, setup, password reset, invitation preview and accept, second factor,
+  signed-in devices and pairing, profile, own password, Gravatar, the changelog mark) input that
+  used to be quietly accepted or read as something else is now refused with a 400:
+  - a sign-in whose `username` or `password` is a list, a number or an object (a list with one
+    known username signed in);
+  - a password that is not text or longer than 1024 characters at setup, reset, accepting an
+    invitation and changing your own password (a number was stored as the password; a password
+    over 1024 characters could be set but never typed at the sign-in);
+  - a username longer than 64 characters at the sign-in;
+  - a reset or invitation token or a second-factor code that is not text (a number was checked
+    as text);
+  - `GET /auth/invites/preview` without `token` or with it twice (answered `valid: false`),
+    `POST /auth/forgot-password` and `/auth/reset-password/check` with an `identifier` or
+    `token` that is not text (answered 200);
+  - a profile `display_name`, `phone` or `email` that is not text (`5` was stored as `"5"`), an
+    `avatar_color` that is empty, `null` or not `#RRGGBB` (fell back to blue), an empty
+    `avatar_data`, a `birth_date` that is empty or no calendar date, a `birth_year_unknown` that
+    is not `true` or `false`;
+  - a changelog mark whose `latest` is not text (`5` was stored as `"5"`);
+  - a signed-in device id with decimals such as `1.0` in the path.
+
+  A token that is not text at `POST /auth/reset-password` and `/auth/invites/accept`, and a
+  sign-in or setup whose username is a list or an object, answered 500 and are now a 400.
+  Malformed input that was refused already (a sign-in over 64 or 1024 characters, a
+  second-factor code over 64 characters, a device field or a pairing `server` that is not text,
+  a request without a body) is still a 400, now with `reason: validation` and the field instead
+  of the route's own sentence. The answer depends on the shape of the request only, never on whether an account exists; a 400
+  counts against the sign-in, reset, second-factor and pairing rate limits like any other failed
+  attempt. Two things still come before the shape of the body: once an account exists,
+  `POST /auth/setup` answers 403 (404 in production) whatever is sent, and an API token gets 403
+  at `POST /auth/devices`, `/auth/devices/pair` and `/auth/logout-others` whatever is sent. A
+  missing second-factor code, or one that is not text, is now a 400 before the route says that
+  no sign-in is waiting or that two-factor authentication is off; the shape is public, the 400
+  says nothing about the account. The checks of length after trimming, the username format,
+  the shortest password (counted after Unicode normalization), the time zone, the language, the
+  pairing code and every second factor stay with the routes, with their own sentences and
+  reasons. Unknown fields are still ignored everywhere, at the setup above all.
 - **The budget and the subscriptions answer an unexpected failure with the same sentence as the
   rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
   and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,
