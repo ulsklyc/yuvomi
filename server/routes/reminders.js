@@ -202,9 +202,12 @@ const MAX_REMINDERS_PER_ENTITY = 5;
 // `remind_at` als Zeitpunkt, nie als Text der Spalte (#1364).
 const REMIND_AT_KEY = remindAtUtcSql('r.remind_at');
 
-// Eine lokal geplante Benachrichtigung feuert, auch wenn niemand mehr nachfragt.
-// Wer eine Aufgabe erledigt oder ablegt, soll vom Telefon nichts mehr dazu hoeren.
-// Uebersprungen, nicht geloescht: Wiederoeffnen bringt die Erinnerung zurueck.
+// Eine erledigte oder abgelegte Aufgabe erinnert nicht mehr: nicht im Toast und in
+// der Glocke (`/pending`), nicht in der lokal geplanten Benachrichtigung, die auch
+// feuert, wenn niemand mehr nachfragt (`/upcoming`), und nicht in der Zustellung.
+// Uebersprungen, nicht geloescht: wird die Aufgabe VOR der Faelligkeit wieder
+// geoeffnet, kommt die Erinnerung zurueck. Eine, die faellig wurde, waehrend die
+// Aufgabe zu war, gilt als verpasst (services/notifications.js raeumt sie ab).
 const OPEN_TASK_REMINDER_SQL = `
       AND (
         r.entity_type != 'task'
@@ -230,13 +233,11 @@ const OPEN_TASK_REMINDER_SQL = `
  * @param {Set<string>|null} [query.types]  Herkuenfte einengen, nie erweitern
  * @param {string} [query.columns]  Weitere Spalten, mit fuehrendem Komma
  * @param {string} [query.orderBy]  Sortierung als SQL - nie Nutzereingabe
- * @param {boolean} [query.openTasksOnly]  Erledigte und abgelegte Aufgaben auslassen
  * @param {number} [query.limit]
  * @returns {object[]}
  */
 function callerReminders(req, {
   window, types = null, columns = '', orderBy = 'r.remind_at ASC', limit = Infinity,
-  openTasksOnly = false,
 }) {
   if (asksHouseholdAudience(req.query)) return [];
   const userId = req.authUserId || req.session.userId;
@@ -333,7 +334,7 @@ function callerReminders(req, {
         r.entity_type != 'event'
         OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id)
       )
-      ${openTasksOnly ? OPEN_TASK_REMINDER_SQL : ''}
+      ${OPEN_TASK_REMINDER_SQL}
     ORDER BY ${orderBy}
   `).all(userId, ...window.params, ...origins);
 
@@ -480,7 +481,6 @@ router.get('/upcoming', validateRequest(), (req, res) => {
       columns: `, substr(${REMIND_AT_KEY}, 1, 19) || 'Z' AS fires_at`,
       orderBy: `${REMIND_AT_KEY} ASC, r.id ASC`,
       limit: UPCOMING_MAX_ROWS,
-      openTasksOnly: true,
     }),
   });
 });
