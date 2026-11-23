@@ -15,7 +15,7 @@ import { refuseWhileRestoring } from './middleware/restore-gate.js';
 import { restoreInProgressError } from './utils/restore-messages.js';
 import { runExternalJob } from './utils/restore-state.js';
 import { SESSION_MAX_AGE_MS, sessionCookieRefreshDue } from './utils/session-lifetime.js';
-import { collectErrors, color as validateColor, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
+import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { GravatarError, fetchGravatar, gravatarEnabled, gravatarHost } from './services/gravatar.js';
@@ -57,7 +57,7 @@ import { isValidTimeZone } from './utils/timezone.js';
 import { accountIdsByEmail, emailMatchKey } from './utils/email-match.js';
 import {
   clientPermissions,
-  invitePresetPermissions, isValidInvitePreset, writeSubjectPermissions,
+  invitePresetPermissions, writeSubjectPermissions,
   applyChildStartPermissions, INVITE_PRESET_DEFAULT,
   userForRequest,
 } from './authorize/index.ts';
@@ -70,7 +70,7 @@ import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js'
 import { MAX_AVATAR_DATA_LENGTH } from './utils/avatar-limits.js';
 import { validateRequest } from './api/validate-request.ts';
 import {
-  API_TOKEN_NAME_MAX, CODE_MAX, DEVICE_ID_PATTERN, DEVICE_NAME_MAX, DEVICE_PLATFORM_PATTERN, DISPLAY_NAME_MAX, FAMILY_ROLES,
+  API_TOKEN_NAME_MAX, CODE_MAX, DEVICE_ID_PATTERN, DEVICE_NAME_MAX, DEVICE_PLATFORM_PATTERN, DISPLAY_NAME_MAX,
   LATEST_MAX,
 } from './services/auth-fields.js';
 
@@ -2211,126 +2211,110 @@ export function buildInviteRoutes(targetRouter, {
 } = {}) {
   const getDb = () => (database || db.get());
 
+  // The schema of the operation holds `family_role` to FAMILY_ROLES and
+  // `permission_preset` to INVITE_PRESETS (`enum`, #2810 group 12b): neither
+  // is checked here again. They are the only rule for both - `invites` has no
+  // CHECK on `family_role`, and a preset this route did not know would invite
+  // with the full rights of the role (`invitePresetPermissions()` answers
+  // null). test:validate-auth-admin binds both lists at the built document.
   targetRouter.post('/invites', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), async (req, res) => {
-    try {
-      const body = req.body || {};
-      const username = String(body.username || '').trim();
-      const displayName = String(body.display_name || '').trim();
-      const email = String(body.email || '').trim();
-      const familyRole = String(body.family_role || 'other').trim();
-      const sendEmail = body.send_email === true;
-      const role = body.system_admin === true ? 'admin' : 'member';
-      // Startrechte (#869). Fehlt das Feld, gilt die enge Vorlage - ein
-      // Client, der sie nicht kennt, laedt damit nicht versehentlich mit
-      // vollem Zugriff ein. Das ist die einzige Stelle, an der die Umkehr
-      // wirkt: der gespeicherte Standard in `access_permissions` bleibt, was
-      // er seit v74 ist.
-      const preset = body.permission_preset === undefined
-        ? INVITE_PRESET_DEFAULT
-        : String(body.permission_preset || '').trim();
+    const body = req.body || {};
+    const username = String(body.username || '').trim();
+    const displayName = String(body.display_name || '').trim();
+    const email = String(body.email || '').trim();
+    const familyRole = String(body.family_role || 'other').trim();
+    const sendEmail = body.send_email === true;
+    const role = body.system_admin === true ? 'admin' : 'member';
+    // Startrechte (#869). Fehlt das Feld, gilt die enge Vorlage - ein
+    // Client, der sie nicht kennt, laedt damit nicht versehentlich mit
+    // vollem Zugriff ein. Das ist die einzige Stelle, an der die Umkehr
+    // wirkt: der gespeicherte Standard in `access_permissions` bleibt, was
+    // er seit v74 ist.
+    const preset = body.permission_preset === undefined
+      ? INVITE_PRESET_DEFAULT
+      : String(body.permission_preset || '').trim();
 
-      if (username && !/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
-        return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
-      }
-      if (displayName.length > DISPLAY_NAME_MAX) {
-        return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
-      }
-      if (!FAMILY_ROLES.includes(familyRole)) {
-        return res.status(400).json({ error: 'Invalid family role.', code: 400 });
-      }
-      if (!isValidInvitePreset(preset)) {
-        return res.status(400).json({ error: 'Invalid permission preset.', code: 400 });
-      }
-      // Bewusst grob: eine selbstgehostete Instanz verschickt auch an Adressen
-      // ohne Punkt in der Domain (user@nas). Der Versand meldet den Rest.
-      if (email && !/^[^\s@]+@[^\s@]+$/.test(email)) {
-        return res.status(400).json({ error: 'Invalid email address.', code: 400 });
-      }
-      if (sendEmail && !email) {
-        return res.status(400).json({ error: 'An email address is required to send the invitation.', code: 400 });
-      }
-      if (username && getDb().prepare('SELECT 1 FROM users WHERE username = ?').get(username)) {
-        return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
-      }
+    if (username && !/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
+      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
+    }
+    if (displayName.length > DISPLAY_NAME_MAX) {
+      return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
+    }
+    // Bewusst grob: eine selbstgehostete Instanz verschickt auch an Adressen
+    // ohne Punkt in der Domain (user@nas). Der Versand meldet den Rest.
+    if (email && !/^[^\s@]+@[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email address.', code: 400 });
+    }
+    if (sendEmail && !email) {
+      return res.status(400).json({ error: 'An email address is required to send the invitation.', code: 400 });
+    }
+    if (username && getDb().prepare('SELECT 1 FROM users WHERE username = ?').get(username)) {
+      return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
+    }
 
-      // Aufgeloest gespeichert, nicht als Name der Vorlage: massgeblich ist,
-      // was der Admin beim Einladen gesehen hat - auch wenn das Rollenprofil
-      // sich bis zur Annahme aendert.
-      const presetPermissions = invitePresetPermissions(preset);
-      const { token } = inviteService.createInvite({
-        email: email || null,
-        username: username || null,
-        displayName: displayName || null,
-        role,
-        familyRole,
-        permissions: presetPermissions ? JSON.stringify(presetPermissions) : null,
-        createdBy: req.authUserId,
-      });
-      // Die frisch angelegte Zeile ohne token_hash - gleiche Form wie GET /invites.
-      const invite = inviteService.verifyToken(token);
+    // Aufgeloest gespeichert, nicht als Name der Vorlage: massgeblich ist,
+    // was der Admin beim Einladen gesehen hat - auch wenn das Rollenprofil
+    // sich bis zur Annahme aendert.
+    const presetPermissions = invitePresetPermissions(preset);
+    const { token } = inviteService.createInvite({
+      email: email || null,
+      username: username || null,
+      displayName: displayName || null,
+      role,
+      familyRole,
+      permissions: presetPermissions ? JSON.stringify(presetPermissions) : null,
+      createdBy: req.authUserId,
+    });
+    // Die frisch angelegte Zeile ohne token_hash - gleiche Form wie GET /invites.
+    const invite = inviteService.verifyToken(token);
 
-      let emailSent = false;
-      if (sendEmail) {
-        // Hier formuliert der Server die Zieladresse, also gilt BASE_URL und
-        // nicht der Host-Header. Den Link fürs Weitergeben von Hand baut das
-        // Admin-UI dagegen selbst aus location.origin.
-        const origin = String(baseUrl || '').trim().replace(/\/$/, '');
-        if (!origin) {
-          log.warn('BASE_URL not configured; invite mail not sent.');
-        } else if (!emailService.isConfigured()) {
-          log.warn('Email not configured; invite mail not sent.');
-        } else {
-          const link = `${origin}/join?token=${token}`;
-          try {
-            await emailService.sendMail({
-              to: email,
-              subject: 'You have been invited to Yuvomi',
-              text: `Open this link to set up your account (valid for 7 days): ${link}`,
-              html: '<p>Open this link to set up your account (valid for 7 days):</p>'
-                + `<p><a href="${link}">${link}</a></p>`,
-            });
-            emailSent = true;
-          } catch (mailErr) {
-            // email_sent muss ehrlich bleiben: meldet das UI einen Versand, den
-            // es nie gab, gibt der Admin den Link nicht selbst weiter.
-            log.error('Invite mail failed:', mailErr.message);
-          }
+    let emailSent = false;
+    if (sendEmail) {
+      // Hier formuliert der Server die Zieladresse, also gilt BASE_URL und
+      // nicht der Host-Header. Den Link fürs Weitergeben von Hand baut das
+      // Admin-UI dagegen selbst aus location.origin.
+      const origin = String(baseUrl || '').trim().replace(/\/$/, '');
+      if (!origin) {
+        log.warn('BASE_URL not configured; invite mail not sent.');
+      } else if (!emailService.isConfigured()) {
+        log.warn('Email not configured; invite mail not sent.');
+      } else {
+        const link = `${origin}/join?token=${token}`;
+        try {
+          await emailService.sendMail({
+            to: email,
+            subject: 'You have been invited to Yuvomi',
+            text: `Open this link to set up your account (valid for 7 days): ${link}`,
+            html: '<p>Open this link to set up your account (valid for 7 days):</p>'
+              + `<p><a href="${link}">${link}</a></p>`,
+          });
+          emailSent = true;
+        } catch (mailErr) {
+          // email_sent muss ehrlich bleiben: meldet das UI einen Versand, den
+          // es nie gab, gibt der Admin den Link nicht selbst weiter. Die
+          // Einladung steht schon; ein 500 hier verschwiege ihren Link.
+          log.error('Invite mail failed:', mailErr.message);
         }
       }
-
-      // Aus der Datenbank ist der Klartext-Token danach nie wieder zu holen: dort
-      // liegt nur sein Hash. Diese Antwort ist die einzige Stelle, die ihn dem
-      // Admin zeigt (der Mailversand oben hat ihn ggf. zusätzlich verschickt).
-      res.status(201).json({ data: { invite, token, email_sent: emailSent } });
-    } catch (err) {
-      log.error('Invite creation error:', err.message);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
     }
+
+    // Aus der Datenbank ist der Klartext-Token danach nie wieder zu holen: dort
+    // liegt nur sein Hash. Diese Antwort ist die einzige Stelle, die ihn dem
+    // Admin zeigt (der Mailversand oben hat ihn ggf. zusätzlich verschickt).
+    res.status(201).json({ data: { invite, token, email_sent: emailSent } });
   });
 
   targetRouter.get('/invites', requireAuth, requireAdmin, validateRequest(), (_req, res) => {
-    try {
-      res.json({ data: { invites: inviteService.listOpen() } });
-    } catch (err) {
-      log.error('Invite list error:', err.message);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
-    }
+    res.json({ data: { invites: inviteService.listOpen() } });
   });
 
+  // `idParam()` lets only decimal digits through, each a finite number: the
+  // id is a number here without a check of its own.
   targetRouter.delete('/invites/:id', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isFinite(id)) {
-        return res.status(400).json({ error: 'Invalid invite ID.', code: 400 });
-      }
-      if (inviteService.revoke(id) === 0) {
-        return res.status(404).json({ error: 'Invite not found.', code: 404 });
-      }
-      res.json({ data: { ok: true } });
-    } catch (err) {
-      log.error('Invite revocation error:', err.message);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (inviteService.revoke(Number(req.params.id)) === 0) {
+      return res.status(404).json({ error: 'Invite not found.', code: 404 });
     }
+    res.json({ data: { ok: true } });
   });
 
   targetRouter.get('/invites/preview', limiter, validateRequest(), (req, res) => {
@@ -3260,12 +3244,7 @@ router.post('/2fa/recovery-codes', requireAuth, csrfMiddleware, twoFactorLimiter
  * jedes Mitglied, und wer welchen Schutz hat, ist keine Angabe fuer alle.
  */
 router.get('/2fa/overview', requireAuth, requireAdmin, validateRequest(), (_req, res) => {
-  try {
-    res.json({ data: twoFactor.householdOverview(db.get(), memberOrderSql('u')), required: twoFactor.isRequiredForHousehold(db.get()) });
-  } catch (err) {
-    log.error('2FA overview error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: twoFactor.householdOverview(db.get(), memberOrderSql('u')), required: twoFactor.isRequiredForHousehold(db.get()) });
 });
 
 /**
@@ -3288,15 +3267,10 @@ router.get('/2fa/overview', requireAuth, requireAdmin, validateRequest(), (_req,
  * Admin nicht.
  */
 router.put('/2fa/require', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
-  try {
-    const required = req.body?.required === true;
-    twoFactor.setRequiredForHousehold(db.get(), required);
-    log.info('Household two-factor requirement changed', { userId: req.authUserId, required });
-    res.json({ data: { required: twoFactor.isRequiredForHousehold(db.get()) } });
-  } catch (err) {
-    log.error('2FA requirement error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const required = req.body?.required === true;
+  twoFactor.setRequiredForHousehold(db.get(), required);
+  log.info('Household two-factor requirement changed', { userId: req.authUserId, required });
+  res.json({ data: { required: twoFactor.isRequiredForHousehold(db.get()) } });
 });
 
 /**
@@ -3509,7 +3483,11 @@ router.delete('/devices/current', requireAuth, csrfMiddleware, validateRequest()
  * Auskunft, die diese Route nicht gibt.
  */
 router.delete('/devices/:id', requireAuth, refuseIntegrationToken, csrfMiddleware, validateRequest(), (req, res) => {
-  const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
+  // `idParam()` lets only decimal digits with an optional minus through, up
+  // to MAX_PATH_ID and without a lower bound (#2810 group 12b): `-1`, `0` and
+  // `-0` meet no device and answer 404. A negative id beyond the safe range
+  // (`-99999999999999999999`) passes it and stays this 400.
+  const id = Number(req.params.id);
   if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid device ID.', code: 400 });
   if (revokeOwnDevice(req.authUserId, id) === 0) {
     return res.status(404).json({ error: 'Device not found.', code: 404 });
@@ -3528,18 +3506,15 @@ router.delete('/devices/:id', requireAuth, refuseIntegrationToken, csrfMiddlewar
  * meint.
  */
 router.post('/users/:id/devices/sign-out', requireAuth, requireAdmin, csrfMiddleware, sessionRevokeLimiter, requireBrowserSession('signOutMember'), validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
-    if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(id)) {
-      return res.status(404).json({ error: 'User not found.', code: 404 });
-    }
-    invalidateUserSessions(id, id === req.authUserId ? req.sessionID : null);
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('Sign out member error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // `idParam()` has no lower bound: `-99999999999999999999` reaches this line
+  // and is not a safe integer.
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
+  if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(id)) {
+    return res.status(404).json({ error: 'User not found.', code: 404 });
   }
+  invalidateUserSessions(id, id === req.authUserId ? req.sessionID : null);
+  res.json({ ok: true });
 });
 
 router.get('/users', requireAuth, validateRequest(), (req, res) => {
@@ -3596,156 +3571,140 @@ router.get('/users', requireAuth, validateRequest(), (req, res) => {
 });
 
 router.get('/api-tokens', requireAuth, requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const rows = db.get().prepare(`
-      SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
-        creator.display_name AS creator_name,
-        subject.id AS effective_subject_user_id,
-        subject.display_name AS subject_name
-      FROM api_tokens t
-      LEFT JOIN users creator ON creator.id = t.created_by
-      LEFT JOIN users subject ON subject.id = COALESCE(t.subject_user_id, t.created_by)
-      WHERE t.kind = 'integration'
-      ORDER BY t.created_at DESC
-    `).all();
-    // KONTEN, keine Mitgliederliste (#1207): ein Admin stellt ein Token fuer
-    // ein Konto aus, auch fuer das einer Haushaltshilfe. Nur Gaeste fehlen,
-    // weil POST /api-tokens sie als Subjekt abweist - dieselbe Grenze ueber
-    // access_scope. Die Liste steht deshalb in der Allowlist des Guards.
-    const subjects = db.get().prepare(`
-      SELECT u.id, u.username, u.display_name
-      FROM users u
-      WHERE ${accessScopeSql('u')} = 'family'
-        -- Kein Token fuer einen Ehemaligen (#1381): POST weist ihn ebenfalls ab.
-        AND ${activeAccountSql('u')}
-      ORDER BY ${memberOrderSql('u')}
-    `).all();
-    res.json({ data: rows.map(publicApiToken), subjects });
-  } catch (err) {
-    log.error('API token list error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const rows = db.get().prepare(`
+    SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
+      creator.display_name AS creator_name,
+      subject.id AS effective_subject_user_id,
+      subject.display_name AS subject_name
+    FROM api_tokens t
+    LEFT JOIN users creator ON creator.id = t.created_by
+    LEFT JOIN users subject ON subject.id = COALESCE(t.subject_user_id, t.created_by)
+    WHERE t.kind = 'integration'
+    ORDER BY t.created_at DESC
+  `).all();
+  // KONTEN, keine Mitgliederliste (#1207): ein Admin stellt ein Token fuer
+  // ein Konto aus, auch fuer das einer Haushaltshilfe. Nur Gaeste fehlen,
+  // weil POST /api-tokens sie als Subjekt abweist - dieselbe Grenze ueber
+  // access_scope. Die Liste steht deshalb in der Allowlist des Guards.
+  const subjects = db.get().prepare(`
+    SELECT u.id, u.username, u.display_name
+    FROM users u
+    WHERE ${accessScopeSql('u')} = 'family'
+      -- Kein Token fuer einen Ehemaligen (#1381): POST weist ihn ebenfalls ab.
+      AND ${activeAccountSql('u')}
+    ORDER BY ${memberOrderSql('u')}
+  `).all();
+  res.json({ data: rows.map(publicApiToken), subjects });
 });
 
 router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
-  try {
-    const name = String(req.body.name || '').trim();
-    const expiresAt = req.body.expires_at ? String(req.body.expires_at).trim() : null;
+  const name = String(req.body.name || '').trim();
+  const expiresAt = req.body.expires_at ? String(req.body.expires_at).trim() : null;
 
-    if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400, reason: 'api_tokens_name_required' });
-    if (name.length > API_TOKEN_NAME_MAX) {
-      return res.status(400).json({
-        error: 'Token name may be at most 100 characters long.', code: 400, reason: 'api_tokens_name_too_long',
-      });
-    }
-    if (expiresAt && Number.isNaN(Date.parse(expiresAt))) {
-      return res.status(400).json({ error: 'expires_at must be a valid ISO date/time.', code: 400 });
-    }
-    if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
-      return res.status(400).json({ error: 'Expiration date must be in the future.', code: 400, reason: 'api_tokens_expiry_past' });
-    }
-
-    // scopes: fehlend/null → uneingeschränktes Token (Voll-Zugriff, Default wie bisher).
-    // Explizit gesetzt → Least-Privilege-Allowlist; muss mind. einen gültigen Scope
-    // enthalten, ungültige/unbekannte Einträge werden abgewiesen (kein stilles Verwerfen).
-    let serializedScopes = null;
-    if (req.body.scopes !== undefined && req.body.scopes !== null) {
-      if (!Array.isArray(req.body.scopes)) {
-        return res.status(400).json({ error: 'scopes must be an array of "module:read"/"module:write" strings.', code: 400 });
-      }
-      const normalized = normalizeScopes(req.body.scopes);
-      if (normalized.length !== req.body.scopes.length) {
-        return res.status(400).json({ error: 'scopes contains unknown or duplicate entries.', code: 400 });
-      }
-      if (normalized.length === 0) {
-        return res.status(400).json({ error: 'Provide at least one scope, or omit scopes for full access.', code: 400 });
-      }
-      serializedScopes = serializeScopes(normalized);
-    }
-
-    const token = API_TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
-    const tokenHash = hashApiToken(token);
-    const tokenPrefix = token.slice(0, 12);
-    const normalizedExpiresAt = expiresAt ? new Date(expiresAt).toISOString() : null;
-    let subjectUserId = req.authUserId;
-    if (req.body.subject_user_id !== undefined && req.body.subject_user_id !== null) {
-      subjectUserId = Number(req.body.subject_user_id);
-      if (!Number.isSafeInteger(subjectUserId) || subjectUserId < 1) {
-        return res.status(400).json({ error: 'subject_user_id must be a valid user ID.', code: 400 });
-      }
-    }
-    const subject = db.get().prepare(`
-      SELECT u.id,
-        EXISTS(SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id) AS is_split_guest
-      FROM users u WHERE u.id = ?
-    `).get(subjectUserId);
-    if (!subject) {
-      return res.status(400).json({ error: 'Token subject user was not found.', code: 400, reason: 'api_tokens_subject_unknown' });
-    }
-    if (subject.is_split_guest) {
-      return res.status(400).json({ error: 'A split-expense guest cannot be an API token subject.', code: 400 });
-    }
-    // EIN DISPLAY IST NUR UEBER SEIN GERAET ERREICHBAR - auch hier (#1208).
-    //
-    // Ohne diese Zeile waere der Weg drumherum offen: ein Administrator traegt
-    // die Display-Id als `subject_user_id` ein und bekommt ein API-Token auf
-    // dieses Konto. Der Token-Zweig in `requireAuth` loest Rechte OHNE
-    // `isDisplay` auf - die feste Leseliste aus display-scopes.js greift also
-    // nicht, und ein ungescoptes Token haette die vollen Schreibrechte eines
-    // gewoehnlichen Mitglieds unter dem Namen des Wandtabletts. Ein Konto, das
-    // sich nicht anmelden kann, darf auch kein Credential neben seinem Geraet
-    // bekommen; dieselbe Erwaegung wie beim Ausgaben-Gast eine Zeile darueber.
-    if (isDisplayAccount(subjectUserId, { db: db.get() })) {
-      return res.status(400).json({ error: 'A display cannot be an API token subject.', code: 400 });
-    }
-    // Und ein Ehemaliger handelt nicht mehr (#1381): die Anmeldung wiese das
-    // Token ohnehin ab, also entsteht es gar nicht erst.
-    if (!isActiveAccount(subjectUserId, { db: db.get() })) {
-      return res.status(400).json({
-        error: 'A deactivated account cannot be an API token subject.', code: 400, reason: 'account_deactivated',
-      });
-    }
-
-    const result = db.get().prepare(`
-      INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id, expires_at, scopes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(name, tokenHash, tokenPrefix, req.authUserId, subjectUserId, normalizedExpiresAt, serializedScopes);
-
-    const row = db.get().prepare(`
-      SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
-        creator.display_name AS creator_name,
-        subject.id AS effective_subject_user_id,
-        subject.display_name AS subject_name
-      FROM api_tokens t
-      LEFT JOIN users creator ON creator.id = t.created_by
-      LEFT JOIN users subject ON subject.id = COALESCE(t.subject_user_id, t.created_by)
-      WHERE t.id = ?
-    `).get(result.lastInsertRowid);
-
-    res.status(201).json({ data: publicApiToken(row), token });
-  } catch (err) {
-    log.error('API token creation error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400, reason: 'api_tokens_name_required' });
+  if (name.length > API_TOKEN_NAME_MAX) {
+    return res.status(400).json({
+      error: 'Token name may be at most 100 characters long.', code: 400, reason: 'api_tokens_name_too_long',
+    });
   }
+  if (expiresAt && Number.isNaN(Date.parse(expiresAt))) {
+    return res.status(400).json({ error: 'expires_at must be a valid ISO date/time.', code: 400 });
+  }
+  if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
+    return res.status(400).json({ error: 'Expiration date must be in the future.', code: 400, reason: 'api_tokens_expiry_past' });
+  }
+
+  // scopes: fehlend/null → uneingeschränktes Token (Voll-Zugriff, Default wie bisher).
+  // Explizit gesetzt → Least-Privilege-Allowlist; muss mind. einen gültigen Scope
+  // enthalten, ungültige/unbekannte Einträge werden abgewiesen (kein stilles Verwerfen).
+  let serializedScopes = null;
+  if (req.body.scopes !== undefined && req.body.scopes !== null) {
+    if (!Array.isArray(req.body.scopes)) {
+      return res.status(400).json({ error: 'scopes must be an array of "module:read"/"module:write" strings.', code: 400 });
+    }
+    const normalized = normalizeScopes(req.body.scopes);
+    if (normalized.length !== req.body.scopes.length) {
+      return res.status(400).json({ error: 'scopes contains unknown or duplicate entries.', code: 400 });
+    }
+    if (normalized.length === 0) {
+      return res.status(400).json({ error: 'Provide at least one scope, or omit scopes for full access.', code: 400 });
+    }
+    serializedScopes = serializeScopes(normalized);
+  }
+
+  const token = API_TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
+  const tokenHash = hashApiToken(token);
+  const tokenPrefix = token.slice(0, 12);
+  const normalizedExpiresAt = expiresAt ? new Date(expiresAt).toISOString() : null;
+  let subjectUserId = req.authUserId;
+  if (req.body.subject_user_id !== undefined && req.body.subject_user_id !== null) {
+    subjectUserId = Number(req.body.subject_user_id);
+    if (!Number.isSafeInteger(subjectUserId) || subjectUserId < 1) {
+      return res.status(400).json({ error: 'subject_user_id must be a valid user ID.', code: 400 });
+    }
+  }
+  const subject = db.get().prepare(`
+    SELECT u.id,
+      EXISTS(SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id) AS is_split_guest
+    FROM users u WHERE u.id = ?
+  `).get(subjectUserId);
+  if (!subject) {
+    return res.status(400).json({ error: 'Token subject user was not found.', code: 400, reason: 'api_tokens_subject_unknown' });
+  }
+  if (subject.is_split_guest) {
+    return res.status(400).json({ error: 'A split-expense guest cannot be an API token subject.', code: 400 });
+  }
+  // EIN DISPLAY IST NUR UEBER SEIN GERAET ERREICHBAR - auch hier (#1208).
+  //
+  // Ohne diese Zeile waere der Weg drumherum offen: ein Administrator traegt
+  // die Display-Id als `subject_user_id` ein und bekommt ein API-Token auf
+  // dieses Konto. Der Token-Zweig in `requireAuth` loest Rechte OHNE
+  // `isDisplay` auf - die feste Leseliste aus display-scopes.js greift also
+  // nicht, und ein ungescoptes Token haette die vollen Schreibrechte eines
+  // gewoehnlichen Mitglieds unter dem Namen des Wandtabletts. Ein Konto, das
+  // sich nicht anmelden kann, darf auch kein Credential neben seinem Geraet
+  // bekommen; dieselbe Erwaegung wie beim Ausgaben-Gast eine Zeile darueber.
+  if (isDisplayAccount(subjectUserId, { db: db.get() })) {
+    return res.status(400).json({ error: 'A display cannot be an API token subject.', code: 400 });
+  }
+  // Und ein Ehemaliger handelt nicht mehr (#1381): die Anmeldung wiese das
+  // Token ohnehin ab, also entsteht es gar nicht erst.
+  if (!isActiveAccount(subjectUserId, { db: db.get() })) {
+    return res.status(400).json({
+      error: 'A deactivated account cannot be an API token subject.', code: 400, reason: 'account_deactivated',
+    });
+  }
+
+  const result = db.get().prepare(`
+    INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id, expires_at, scopes)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(name, tokenHash, tokenPrefix, req.authUserId, subjectUserId, normalizedExpiresAt, serializedScopes);
+
+  const row = db.get().prepare(`
+    SELECT t.*, ${apiTokenUsableSql('t')} AS usable,
+      creator.display_name AS creator_name,
+      subject.id AS effective_subject_user_id,
+      subject.display_name AS subject_name
+    FROM api_tokens t
+    LEFT JOIN users creator ON creator.id = t.created_by
+    LEFT JOIN users subject ON subject.id = COALESCE(t.subject_user_id, t.created_by)
+    WHERE t.id = ?
+  `).get(result.lastInsertRowid);
+
+  res.status(201).json({ data: publicApiToken(row), token });
 });
 
 router.delete('/api-tokens/:id', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid token ID.', code: 400 });
+  // `idParam()` lets only decimal digits through, each a finite number.
+  const id = Number(req.params.id);
+  const result = db.get().prepare(`
+    UPDATE api_tokens
+    SET revoked_at = COALESCE(revoked_at, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    WHERE id = ? AND kind = 'integration'
+  `).run(id);
 
-    const result = db.get().prepare(`
-      UPDATE api_tokens
-      SET revoked_at = COALESCE(revoked_at, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-      WHERE id = ? AND kind = 'integration'
-    `).run(id);
-
-    if (result.changes === 0) return res.status(404).json({ error: 'API token not found.', code: 404 });
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('API token revocation error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  if (result.changes === 0) return res.status(404).json({ error: 'API token not found.', code: 404 });
+  res.json({ ok: true });
 });
 
 /**
@@ -3765,28 +3724,25 @@ router.delete('/api-tokens/:id', requireAuth, requireAdmin, csrfMiddleware, vali
  * Response: { ok: true }
  */
 router.post('/api-tokens/:id/remove', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), (req, res) => {
-  try {
-    // `12abc` ist keine Id: das Dokument laesst nur Ziffern durch (idParam()).
-    // Eine Route, die endgueltig loescht, raet nicht, welche Zeile gemeint war.
-    const id = Number(req.params.id);
-    if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid token ID.', code: 400 });
+  // `12abc` ist keine Id: das Dokument laesst nur Ziffern durch (idParam()).
+  // Eine Route, die endgueltig loescht, raet nicht, welche Zeile gemeint war.
+  // Die Pruefung bleibt: idParam() hat keine Untergrenze, und
+  // `-99999999999999999999` ist keine sichere Ganzzahl.
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid token ID.', code: 400 });
 
-    const result = db.get().prepare(`
-      DELETE FROM api_tokens WHERE id = ? AND kind = 'integration' AND NOT ${apiTokenUsableSql('api_tokens')}
-    `).run(id);
-    if (result.changes > 0) return res.json({ ok: true });
+  const result = db.get().prepare(`
+    DELETE FROM api_tokens WHERE id = ? AND kind = 'integration' AND NOT ${apiTokenUsableSql('api_tokens')}
+  `).run(id);
+  if (result.changes > 0) return res.json({ ok: true });
 
-    const exists = db.get().prepare("SELECT 1 FROM api_tokens WHERE id = ? AND kind = 'integration'").get(id);
-    if (!exists) return res.status(404).json({ error: 'API token not found.', code: 404 });
-    return res.status(409).json({
-      error: 'An active API token cannot be removed. Revoke it first.',
-      code: 409,
-      reason: 'api_token_active',
-    });
-  } catch (err) {
-    log.error('API token removal error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const exists = db.get().prepare("SELECT 1 FROM api_tokens WHERE id = ? AND kind = 'integration'").get(id);
+  if (!exists) return res.status(404).json({ error: 'API token not found.', code: 404 });
+  return res.status(409).json({
+    error: 'An active API token cannot be removed. Revoke it first.',
+    code: 409,
+    reason: 'api_token_active',
+  });
 });
 
 /**
@@ -3934,12 +3890,11 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
     }
 
-    if (!FAMILY_ROLES.includes(family_role)) {
-      return res.status(400).json({ error: 'Invalid family role.', code: 400 });
-    }
-    const colorError = validateColor(avatar_color, 'avatar_color').error;
-    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
-
+    // `family_role` (`enum` FAMILY_ROLES, and the CHECK of `users.family_role`)
+    // and a sent `avatar_color` (`pattern` COLOR_PATTERN) are the schema's
+    // rules (#2810 group 12b); the default colour comes from `avatarColors`.
+    // The colour stands in a style attribute: the pattern is its only rule,
+    // test:validate-auth-admin binds it at the built document.
     const normalizedAvatarData = normalizeAvatarData(avatar_data);
     if (normalizedAvatarData?.error) {
       return res.status(400).json({ error: normalizedAvatarData.error, code: 400 });
@@ -3989,8 +3944,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest
     if (err.message && err.message.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
     }
-    log.error('User creation error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
@@ -4008,8 +3962,9 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest
  */
 router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, validateRequest(), async (req, res) => {
   try {
+    // `idParam()` lets only decimal digits through, each a finite number; an
+    // id that is no account (`-1`, `-99999999999999999999`) is the 404 below.
     const userId = Number(req.params.id);
-    if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
 
     // HASH FIRST, THEN NOTHING ELSE AWAITS (#2612). `hashPassword` is the only
     // `await` in this handler. It used to sit between the last-admin check and
@@ -4059,11 +4014,11 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, validateRe
     if (displayName.length > DISPLAY_NAME_MAX) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
     }
-    if (!FAMILY_ROLES.includes(familyRole)) {
-      return res.status(400).json({ error: 'Invalid family role.', code: 400 });
-    }
-    const colorError = validateColor(avatarColor, 'avatar_color').error;
-    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
+    // A sent `family_role` and `avatar_color` are the schema's rules (`enum`
+    // FAMILY_ROLES, `pattern` COLOR_PATTERN; #2810 group 12b); the stored role
+    // is held by the CHECK of `users.family_role`. The stored colour is not
+    // this request's: a row from before the pattern (`red`) no longer turns
+    // every change of the member into a 400.
     if (avatarData?.error) {
       return res.status(400).json({ error: avatarData.error, code: 400 });
     }
@@ -4178,8 +4133,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, validateRe
     if (err.message && err.message.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
     }
-    log.error('User update error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
@@ -4203,9 +4157,11 @@ router.patch('/me/profile', requireAuth, csrfMiddleware, validateRequest(), (req
     return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
   }
   // Die Farbe steht bei allen Mitgliedern in einem style-Attribut: nur #RRGGBB,
-  // sonst setzt sich ein Konto eine CSS-Deklaration in fremde Ansichten.
-  const colorError = validateColor(avatarColor, 'avatar_color').error;
-  if (colorError) return res.status(400).json({ error: colorError, code: 400 });
+  // sonst setzt sich ein Konto eine CSS-Deklaration in fremde Ansichten. Eine
+  // GESENDETE Farbe haelt das Schema (`pattern` COLOR_PATTERN, gebunden in
+  // test:validate-auth; #2810 Gruppe 12b). Die gespeicherte ist nicht die
+  // dieses Aufrufs: eine Altzeile (`red`) machte sonst jede Profilaenderung
+  // zu einem 400, das mit dem Rumpf nichts zu tun hat.
   if (avatarData?.error) {
     return res.status(400).json({ error: avatarData.error, code: 400 });
   }
@@ -4507,8 +4463,7 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, validateR
         ? res.status(400).json({ error: err.message, code: 400, reason: 'last_sso_admin' })
         : res.status(400).json({ error: err.message, code: 400, reason: 'last_admin' });
     }
-    log.error('User deletion error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 

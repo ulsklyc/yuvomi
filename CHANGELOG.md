@@ -287,6 +287,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   link of the task the caller could see, with a 200 and no message. `document_ids` is required
   now (a 400 with `reason: "validation"`, before the 404 of an unknown task and the 403 of a
   locked one); `document_ids: []` still removes the links.
+- **Signing out a device by a negative id answers 404.** This is about your own API clients; the
+  app signs out only devices from its list. `DELETE /auth/devices/-1` and `/auth/devices/-0`
+  answered 400 `"Invalid device ID."`; like `0` and an id that is no device of yours they now
+  answer 404 `"Device not found."`. A path id that is not plain digits stays a 400.
 
 ### Removed
 - **`role: "admin"` no longer makes an administrator at `POST /auth/users`.** This is about your
@@ -295,6 +299,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   any other and is ignored: without `system_admin: true` the new account is a member.
 
 ### Fixed
+- **A member whose stored colour is not `#RRGGBB` can change their profile again.** A colour
+  stored before the colour rule (an older installation, an import, a hand edit of the database)
+  such as `red` turned every change of the profile (`PATCH /auth/me/profile`) and every change an
+  administrator made to that member (`PATCH /auth/users/{id}`), the name included, into a 400
+  `"avatar_color must be a valid HEX color (#RRGGBB)."`, whatever the request said. Only a colour
+  that is sent is checked now, and it still has to be `#RRGGBB`; the stored one stays until it is
+  replaced.
 - **Refreshing the calendars of an Outlook account answers an expired sign-in with 409
   `outlook_reauth_required` and a refusal of Microsoft with 502 and its class, instead of a 500.**
 

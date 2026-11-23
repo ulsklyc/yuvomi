@@ -561,3 +561,33 @@ test('DELETE /users/{id}: `5abc` no longer deletes account 5, a plain id does; `
   assert.equal(userRow(id), undefined);
   assert.equal((await call('DELETE', '/users/999999', { session: admin })).status, 404);
 });
+
+test('only guard: the rules the administration handlers no longer check themselves stand in the document (group 12b, step b)', async () => {
+  // Since 12b (b) no handler of these routes checks the family role, the
+  // invitation preset, a sent colour or that a path id is a finite number:
+  // only these schema rules do. The colour lands in a style attribute, the
+  // preset decides the start rights of an invitation (an unknown one would
+  // invite with the full rights of the role), and `invites.family_role` has
+  // no CHECK.
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const { FAMILY_ROLES, INVITE_PRESETS } = await import('../server/services/auth-fields.js');
+  const { COLOR_PATTERN } = await import('../server/utils/datetime-pattern.js');
+  const spec = /** @type {any} */ (buildOpenApiSpec());
+  /** @param {any} schema */
+  const resolved = (schema) => (schema?.$ref ? spec.components.schemas[schema.$ref.split('/').pop()] : schema);
+  /** @param {string} path @param {string} method */
+  const bodyOf = (path, method) => resolved(spec.paths[`${AUTH_PREFIX}${path}`][method].requestBody.content['application/json'].schema);
+
+  const invite = bodyOf('/invites', 'post');
+  assert.deepEqual([invite.properties.family_role.type, invite.properties.family_role.enum], ['string', [...FAMILY_ROLES]]);
+  assert.deepEqual([invite.properties.permission_preset.type, invite.properties.permission_preset.enum], ['string', [...INVITE_PRESETS]]);
+  for (const [path, method] of [['/users', 'post'], ['/users/{id}', 'patch']]) {
+    const body = bodyOf(path, method);
+    assert.deepEqual([body.properties.family_role.type, body.properties.family_role.enum], ['string', [...FAMILY_ROLES]], `${method} ${path}`);
+    assert.deepEqual([body.properties.avatar_color.type, body.properties.avatar_color.pattern], ['string', COLOR_PATTERN], `${method} ${path}`);
+  }
+  for (const [path, method] of [['/invites/{id}', 'delete'], ['/api-tokens/{id}', 'delete'], ['/users/{id}', 'patch']]) {
+    const id = spec.paths[`${AUTH_PREFIX}${path}`][method].parameters.find((/** @type {any} */ p) => p.in === 'path' && p.name === 'id');
+    assert.deepEqual(id.schema, { type: 'integer', maximum: Number.MAX_SAFE_INTEGER }, `${method} ${path}`);
+  }
+});
