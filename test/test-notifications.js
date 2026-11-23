@@ -65,7 +65,7 @@ function makeDb({ withNotificationTables = true } = {}) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      visibility TEXT NOT NULL DEFAULT 'all'
+      visibility TEXT NOT NULL DEFAULT 'all', status TEXT NOT NULL DEFAULT 'open', archived_at TEXT
     );
     CREATE TABLE task_assignments (task_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
     CREATE TABLE calendar_events (

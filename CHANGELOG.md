@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A done or archived task no longer reminds.** Ticking a task off or archiving it did not stop
+  its reminders: the toast and the bell in the app (`GET /reminders/pending`) and the push
+  notification and channel delivery still sent them, while the notifications the apps schedule
+  ahead of time (`GET /reminders/upcoming`) already left such tasks out. All three now do. A
+  reminder that came due while the task was done or archived counts as missed: reopening the task
+  later does not send it. A reminder that is not due yet comes back when the task is reopened
+  before its time.
+
 ### Changed
 - **The budget and the subscriptions answer an unexpected failure with the same sentence as the
   rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,

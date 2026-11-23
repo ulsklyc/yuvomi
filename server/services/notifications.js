@@ -491,6 +491,25 @@ export async function processDueNotifications({
     log.error('Prevention reminder sync failed:', err?.message || err);
   }
 
+  // EINE ERLEDIGTE ODER ABGELEGTE AUFGABE ERINNERT NICHT. Eine Erinnerung, die
+  // faellig wurde, waehrend die Aufgabe zu war, gilt als verpasst: sie wird hier
+  // verworfen (`dismissed`, wie vom Aufrufer per Hand), nicht nur uebersprungen.
+  // Eine uebersprungene Zeile behielte `pushed_at = NULL` und ginge beim
+  // Wiederoeffnen der Aufgabe sofort raus - und `/pending` zeigte sie als Toast.
+  // Eine Erinnerung, die noch nicht faellig ist, bleibt unberuehrt: wird die
+  // Aufgabe vor der Faelligkeit wieder geoeffnet, kommt sie zur Faelligkeit.
+  // `routes/reminders.js#OPEN_TASK_REMINDER_SQL` haelt dieselbe Bedingung fuer
+  // die Lesewege.
+  activeDb.prepare(`
+    UPDATE reminders SET dismissed = 1
+    WHERE dismissed = 0 AND pushed_at IS NULL AND entity_type = 'task'
+      AND ${remindAtUtcSql('remind_at')} <= ?
+      AND EXISTS (
+        SELECT 1 FROM tasks
+        WHERE id = reminders.entity_id AND (status = 'done' OR archived_at IS NOT NULL)
+      )
+  `).run(remindAtCompareKey(nowIso));
+
   const dueRows = activeDb.prepare(`
     SELECT r.id, r.created_by, r.entity_type, r.entity_id, r.remind_at, r.assigned_from,
       -- Sieht JEDER das Ziel dieser Zeile? Davon haengt ab, ob sie in einen
