@@ -145,17 +145,12 @@ const MOUNTS = [
 
 /**
  * Routes of a migrated-in-part file that do not carry validateRequest() yet
- * (test/test-validate-request-coverage.js, PARTIAL): they are not asked. The
- * administration routes of server/auth.js with an id fall with 12b (a).
+ * (test/test-validate-request-coverage.js, PARTIAL): they are not asked.
+ * Empty since group 12b (a) gave the administration routes of server/auth.js
+ * with an id their check (#2810).
+ * @type {string[]}
  */
-const NOT_YET_VALIDATED = [
-  '../auth.js DELETE /invites/:id',
-  '../auth.js POST /users/:id/devices/sign-out',
-  '../auth.js DELETE /api-tokens/:id',
-  '../auth.js POST /api-tokens/:id/remove',
-  '../auth.js PATCH /users/:id',
-  '../auth.js DELETE /users/:id',
-];
+const NOT_YET_VALIDATED = [];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
 const WITHOUT_INTEGER_PATH_ID = [
@@ -180,6 +175,8 @@ app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void}
   req.authUserId = ADMIN;
   req.authRole = 'admin';
   req.authMethod = 'session';
+  // POST /auth/users/:id/devices/sign-out asks for a browser session in front of its check.
+  req.sessionID = 'path-id-bound';
   req.session = { userId: ADMIN, role: 'admin', csrfToken: CSRF, destroy: (/** @type {(err?: unknown) => void} */ done) => done() };
   next();
 });

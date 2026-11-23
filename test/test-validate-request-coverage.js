@@ -34,13 +34,15 @@
  *          Beside server/routes the guard reads server/auth.js (EXTRA_FILES):
  *          the auth router, with the routes its builders (buildResetRoutes,
  *          buildInviteRoutes, buildGravatarRoute) put on it. Group 12a
- *          migrated its 34 routes of sign-in, session and own account; the 13
- *          administration routes (`requireAdmin`) follow in 12b (a). They
- *          stand by name on PARTIAL, which only shrinks: a listed route that
- *          carries validateRequest() turns the guard red, so the entry goes in
- *          the PR that migrates it, and every other route of the file must
- *          carry it. The whole PARTIAL entry falls with 12b (a), and
- *          server/auth.js joins MIGRATED.
+ *          migrated its 34 routes of sign-in, session and own account, 12b
+ *          (a) the 13 administration routes (`requireAdmin`): all 47 carry
+ *          validateRequest(), and server/auth.js is on MIGRATED.
+ *
+ *          A file migrated in part could stand on PARTIAL by route
+ *          (`<export> <METHOD> <path>`), which only shrinks: a listed route
+ *          that carries validateRequest() turns the guard red, and every
+ *          other route of the file must carry it. The list is empty since 12b
+ *          (a) (server/auth.js was its only entry).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -62,27 +64,11 @@ const EXTRA_FILES = [join(ROOT, 'server', 'auth.js')];
 /**
  * Files migrated in part: per file the routes (`<export> <METHOD> <path>`)
  * that may still lack validateRequest(). Only shrinks; every other route of
- * the file must carry it. server/auth.js: the 13 administration routes of
- * group 12b (#2810), which fall with 12b (a).
+ * the file must carry it. Empty since group 12b (a) (#2810) migrated the 13
+ * administration routes of server/auth.js, its only entry.
  * @type {Record<string, string[]>}
  */
-const PARTIAL = {
-  'server/auth.js': [
-    'router POST /invites',
-    'router GET /invites',
-    'router DELETE /invites/:id',
-    'router GET /2fa/overview',
-    'router PUT /2fa/require',
-    'router POST /users/:id/devices/sign-out',
-    'router GET /api-tokens',
-    'router POST /api-tokens',
-    'router DELETE /api-tokens/:id',
-    'router POST /api-tokens/:id/remove',
-    'router POST /users',
-    'router PATCH /users/:id',
-    'router DELETE /users/:id',
-  ],
-};
+const PARTIAL = {};
 
 /**
  * The route files that do not carry validateRequest() on every route yet.
@@ -126,6 +112,7 @@ const MIGRATED = [
   'server/routes/calendar/outlook.js',
   'server/routes/tasks.js',
   'server/routes/preferences.js', 'server/routes/push.js',
+  'server/auth.js',
 ];
 
 /** @param {string} dir @returns {string[]} */
@@ -197,12 +184,12 @@ test('NOT_MIGRATED only shrinks: every entry exists and still has a route withou
   }
 });
 
-test('server/auth.js: the 34 routes of group 12a carry validateRequest(), the 13 on PARTIAL do not yet', () => {
+test('server/auth.js: all 47 routes of groups 12a and 12b carry validateRequest()', () => {
   const routes = files.get('server/auth.js') ?? [];
   const validated = routes.filter((r) => r.validated).map((r) => r.route);
   assert.equal(routes.length, 47, 'the auth router and its builders register 47 routes');
-  assert.equal(validated.length, 34, `${validated.length} routes of server/auth.js carry validateRequest()`);
-  assert.ok(!NOT_MIGRATED.includes('server/auth.js') && !MIGRATED.includes('server/auth.js'), 'server/auth.js is on PARTIAL only');
+  assert.equal(validated.length, 47, `${validated.length} routes of server/auth.js carry validateRequest()`);
+  assert.ok(MIGRATED.includes('server/auth.js') && !NOT_MIGRATED.includes('server/auth.js') && !('server/auth.js' in PARTIAL), 'server/auth.js is on MIGRATED only');
 });
 
 test('PARTIAL only shrinks: every listed route exists and still lacks validateRequest()', () => {

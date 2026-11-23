@@ -3,8 +3,8 @@
  *       (#2810, phase 2 section E, group 12a)
  * Purpose: server/auth.js checks 34 of its 47 routes against the schema of
  *          their operation in the OpenAPI document (`validateRequest()`)
- *          before the handler runs; the 13 administration routes follow in
- *          12b. Held here against the real router at its real prefix
+ *          before the handler runs; the 13 administration routes (12b) are
+ *          held in test:validate-auth-admin. Held here against the real router at its real prefix
  *          (test/auth-app.js) with the real session:
  *            - THE OWN CALLERS PASS: the bodies the pages send (login, setup,
  *              join, reset, profile, password card, two-factor, signed-in

@@ -186,6 +186,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the shortest password (counted after Unicode normalization), the time zone, the language, the
   pairing code and every second factor stay with the routes, with their own sentences and
   reasons. Unknown fields are still ignored everywhere, at the setup above all.
+- **Account administration checks every request against the published API description.** This
+  is about your own API clients; the settings pages send nothing that is refused now. With this,
+  every route under `/api/v1/auth` does. The description itself is corrected where it fell
+  short of the app: an invitation documents the `permission_preset` the invitation dialog sends,
+  an invitation and a member change may be sent without a body (they answered 201 and 200 that
+  way, the description required one), and `PUT /auth/2fa/require` documents its body. Under
+  `/api/v1/auth` (invitations, the household two-factor requirement and overview, signing a
+  member out of every device, API tokens, member accounts) input that used to be quietly
+  accepted or read as something else is now refused with a 400:
+  - a switch that is not `true`/`false`: `system_admin: "true"` made an administrator at
+    `POST /auth/users` and `POST /auth/invites`, `system_admin` as `null`, `1` or `"x"` at
+    `PATCH /auth/users/{id}` demoted an administrator to member, `sso_only`, `send_email` and
+    `birth_year_unknown` as `1`, `"true"` or `null`; `PUT /auth/2fa/require` with
+    `required: "1"` turned the requirement on, `"true"`, `1`, `null` or `[true]` turned it off;
+  - a text field that is not text: a `display_name`, `name` of an API token, `phone` or `email`
+    of `5` was stored as `"5"`, an object as `"[object Object]"`, a `username` or password as a
+    list or a number was taken as text;
+  - a password longer than 1024 characters at `POST /auth/users` and `PATCH /auth/users/{id}`
+    (it could be set but never typed at the sign-in);
+  - `subject_user_id` of an API token as text, `true` or a list (`"2"` and `[2]` picked account
+    2, `true` account 1), or below 1;
+  - `expires_at` of an API token as a plain date such as `2999-01-01` (the description has
+    always said date and time, as the settings page sends it);
+  - a member's `avatar_color` that is empty, `null` or not `#RRGGBB` (fell back to blue, and
+    `null` answered 500 when creating a member), an empty `avatar_data`, a `birth_date` that is
+    empty or no calendar date, an unknown `permission_preset` or `family_role` (refused already,
+    now with `reason: validation`);
+  - a path id that is not plain digits: `DELETE /auth/users/5abc` deleted account 5,
+    `PATCH /auth/users/1.5` changed account 1, `DELETE /auth/invites/1.0` revoked invitation 1,
+    `DELETE /auth/api-tokens/1.0` revoked token 1; `DELETE /auth/users/abc` answered 404.
+
+  The check runs after the administrator check: anyone else still gets 401 or 403 whatever is
+  sent, and an API token still gets 403 `browser_session_required` at
+  `POST /auth/users/{id}/devices/sign-out` whatever the id. It runs before the account,
+  invitation or token is looked up, so a malformed request is a 400, not the 404 of an unknown
+  member or the 409 of a taken username; a valid one meets those as before. Leaving out
+  `required` at `PUT /auth/2fa/require` still switches the requirement off, as the description now
+  says. The shortest password (counted after Unicode normalization), the username format, the
+  length of names after trimming, the email checks for accounts without a password, the expiry in
+  the future and the known scopes stay with the routes, with their own sentences and reasons.
+  Unknown fields are still ignored.
 - **The budget and the subscriptions answer an unexpected failure with the same sentence as the
   rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
   and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,
@@ -246,6 +287,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   link of the task the caller could see, with a 200 and no message. `document_ids` is required
   now (a 400 with `reason: "validation"`, before the 404 of an unknown task and the 403 of a
   locked one); `document_ids: []` still removes the links.
+
+### Removed
+- **`role: "admin"` no longer makes an administrator at `POST /auth/users`.** This is about your
+  own API clients; the settings page sends `system_admin`. Next to `system_admin: true` an
+  undocumented `role: "admin"` created an administrator too. `role` is now an unknown field like
+  any other and is ignored: without `system_admin: true` the new account is a member.
 
 ### Fixed
 - **Refreshing the calendars of an Outlook account answers an expired sign-in with 409
