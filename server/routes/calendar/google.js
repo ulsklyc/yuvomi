@@ -227,6 +227,7 @@ function knownCalendarName(source, externalId) {
  *
  * Body: { source: 'google'|'apple'|'caldav', external_id: string,
  *         default_assignee_user_ids?: number[], default_assignee_user_id?: number|null }
+ *       eines der beiden Personenfelder ist Pflicht (Schema, #2810).
  * Response: { data: { source, external_id, default_assignee_user_ids, default_assignee_user_id } }
  */
 router.patch('/external-calendars', requireAdmin, validateRequest(), (req, res) => {
@@ -243,8 +244,9 @@ router.patch('/external-calendars', requireAdmin, validateRequest(), (req, res) 
   const stored = row ? readDefaultAssignees(d, 'calendar', row.id) : [];
   const checked = validateAssigneeIds(d, req.body, { stored });
   if (checked.error) return res.status(400).json({ error: checked.error, code: 400, reason: checked.reason });
-  // Ein Body ohne eines der Felder leert die Menge, wie frueher ein fehlendes Feld.
-  const ids = checked.present ? checked.ids : [];
+  // Das Schema verlangt eines der beiden Felder (#2810 Gruppe 10b c): ohne sie
+  // leerte der Body die gespeicherte Menge still. `[]` oder `null` leeren bewusst.
+  const ids = checked.ids;
 
   let calendarId = row?.id;
   if (!calendarId) {

@@ -36,7 +36,11 @@
  *              server/services/calendar-fields.js, which the handlers read,
  *              and equal the CHECK constraints of their columns;
  *            - ONLY GUARD (step b): what the handlers no longer check
- *              themselves is pinned as values of the built document.
+ *              themselves is pinned as values of the built document;
+ *            - FULL REPRESENTATION (step c): `PATCH /external-calendars`
+ *              requires `default_assignee_user_ids` or
+ *              `default_assignee_user_id` (left out, the stored set was
+ *              emptied); the PATCH of sync-calendar.js sends the list.
  *          No network: no Google, Microsoft, iCloud or CalDAV server is asked.
  *          Every request either stops at the check, at a handler check before
  *          the service, or reaches a service path that only reads and writes
@@ -55,6 +59,7 @@ for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import rateLimit from 'express-rate-limit';
 import { createCalendarApp } from './calendar-app.js';
 
@@ -64,6 +69,12 @@ const fields = await import('../server/services/calendar-fields.js');
 const db = dbmod.get();
 
 const SENTENCE = 'The request does not match the documented schema.';
+/** The `fields` of a PATCH /external-calendars without either assignee field (measured). */
+const MISSING_ASSIGNEES = [
+  { path: 'body/default_assignee_user_ids', rule: 'required' },
+  { path: 'body/default_assignee_user_id', rule: 'required' },
+  { path: 'body', rule: 'anyOf' },
+];
 
 /** @param {string} username @param {string} role @param {string} familyRole */
 function user(username, role, familyRole) {
@@ -244,8 +255,8 @@ test('refused: garbage per field is a 400 of the schema', async () => {
     ['PATCH', '/calendar/google/calendars', { enabled: true }, 'body/calendarId'],
     ['PUT', '/calendar/google/readonly', { readonly: 1 }, 'body/readonly'],
     ['PUT', '/calendar/google/readonly', undefined, 'body'],
-    ['PATCH', '/calendar/external-calendars', { source: 'outlook', external_id: 'x' }, 'body/source'],
-    ['PATCH', '/calendar/external-calendars', { source: 'google', external_id: 5 }, 'body/external_id'],
+    ['PATCH', '/calendar/external-calendars', { source: 'outlook', external_id: 'x', default_assignee_user_ids: [] }, 'body/source'],
+    ['PATCH', '/calendar/external-calendars', { source: 'google', external_id: 5, default_assignee_user_ids: [] }, 'body/external_id'],
     ['PATCH', '/calendar/external-calendars', { source: 'google', external_id: 'g-1', default_assignee_user_ids: ['2'] }, 'body/default_assignee_user_ids/0'],
     ['POST', '/calendar/external-calendars/default-assignee-backfill', { expected_count: '0' }, 'body/expected_count'],
     ['POST', '/calendar/external-calendars/default-assignee-backfill', { expected_count: 0, expected_token: 'abc' }, 'body/expected_token'],
@@ -425,6 +436,114 @@ test('one source: the value lists of the schemas are those of calendar-fields.js
   }
 });
 
+// --------------------------------------------------------------------------
+// Full representation (group 10b c)
+// --------------------------------------------------------------------------
+
+/** A synced Google calendar with stored default assignees. @param {string} externalId @param {number[]} ids */
+function assignedCalendar(externalId, ids) {
+  const id = Number(db.prepare("INSERT INTO external_calendars (source, external_id, name, color) VALUES ('google', ?, 'Assigned', NULL)")
+    .run(externalId).lastInsertRowid);
+  db.prepare('DELETE FROM external_calendar_assignees WHERE calendar_id = ?').run(id);
+  const ins = db.prepare('INSERT INTO external_calendar_assignees (calendar_id, user_id, position) VALUES (?, ?, ?)');
+  ids.forEach((uid, position) => ins.run(id, uid, position));
+  return id;
+}
+/** The stored set, in order. @param {number} id */
+function storedAssignees(id) {
+  return db.prepare('SELECT user_id FROM external_calendar_assignees WHERE calendar_id = ? ORDER BY position, user_id')
+    .all(id).map((/** @type {any} */ r) => r.user_id);
+}
+
+test('full representation: PATCH /external-calendars requires one of the two assignee fields', async () => {
+  // Left out, the route wrote an empty set: `[2,3]` became `[]` with a 200.
+  const cal = assignedCalendar('full-1', [ADMIN, MEM]);
+  const target = { source: 'google', external_id: 'full-1' };
+  const without = await call('PATCH', '/calendar/external-calendars', { json: target });
+  assert.equal(without.status, 400, JSON.stringify(without.body));
+  assert.equal(without.body.error, SENTENCE);
+  assert.equal(without.body.reason, 'validation');
+  assert.deepEqual(without.body.fields, MISSING_ASSIGNEES);
+  assert.deepEqual(storedAssignees(cal), [ADMIN, MEM], 'refused: the stored set stays');
+  // Before the 404 of a calendar that is neither synced nor offered.
+  const unknown = await call('PATCH', '/calendar/external-calendars', { json: { source: 'google', external_id: 'never-synced' } });
+  assert.equal(unknown.status, 400, JSON.stringify(unknown.body));
+  assert.deepEqual(unknown.body.fields, MISSING_ASSIGNEES);
+
+  // The list replaces the set.
+  const list = await call('PATCH', '/calendar/external-calendars', { json: { ...target, default_assignee_user_ids: [MEM] } });
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  assert.deepEqual(storedAssignees(cal), [MEM]);
+  // `[]` clears it on purpose.
+  const emptied = await call('PATCH', '/calendar/external-calendars', { json: { ...target, default_assignee_user_ids: [] } });
+  assert.equal(emptied.status, 200, JSON.stringify(emptied.body));
+  assert.deepEqual(emptied.body.data.default_assignee_user_ids, []);
+  assert.deepEqual(storedAssignees(cal), []);
+  // The earlier single form: one person, or `null` to clear.
+  const single = await call('PATCH', '/calendar/external-calendars', { json: { ...target, default_assignee_user_id: ADMIN } });
+  assert.equal(single.status, 200, JSON.stringify(single.body));
+  assert.deepEqual(storedAssignees(cal), [ADMIN]);
+  const cleared = await call('PATCH', '/calendar/external-calendars', { json: { ...target, default_assignee_user_id: null } });
+  assert.equal(cleared.status, 200, JSON.stringify(cleared.body));
+  assert.equal(cleared.body.data.default_assignee_user_id, null);
+  assert.deepEqual(storedAssignees(cal), []);
+});
+
+test('the own caller: the body sync-calendar.js builds sets exactly the people it sends', async () => {
+  const cal = assignedCalendar('full-2', [ADMIN, MEM]);
+  // buildCalendarAssigneeMenu(): { source, external_id, default_assignee_user_ids } after one tick.
+  const res = await call('PATCH', '/calendar/external-calendars', { json: { source: 'google', external_id: 'full-2', default_assignee_user_ids: [ADMIN] } });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.data.default_assignee_user_ids, [ADMIN]);
+  assert.deepEqual(storedAssignees(cal), [ADMIN]);
+});
+
+/**
+ * The top-level keys of every `api.patch('/calendar/external-calendars', {...})`
+ * of the page.
+ * @param {string} source public/settings/pages/sync-calendar.js
+ * @returns {string[][]}
+ */
+function externalCalendarPatches(source) {
+  const found = [];
+  for (const match of source.matchAll(/api\.patch\(\s*'\/calendar\/external-calendars'\s*,\s*\{/g)) {
+    const open = /** @type {number} */ (match.index) + match[0].length - 1;
+    let depth = 0;
+    let end = open;
+    for (let i = open; i < source.length; i++) {
+      if ('({['.includes(source[i])) depth++;
+      else if (')}]'.includes(source[i]) && --depth === 0) { end = i; break; }
+    }
+    const text = source.slice(open, end + 1).replace(/^\s*\/\/.*$/gm, '');
+    const keys = [];
+    depth = 0;
+    for (let j = 0; j < text.length; j++) {
+      const c = text[j];
+      if ('({['.includes(c)) depth++;
+      else if (')}]'.includes(c)) depth--;
+      if (depth === 1 && (c === '{' || c === ',')) {
+        const m = /^\s*([A-Za-z_$][\w$]*)\s*[:,}]/.exec(text.slice(j + 1));
+        if (m) keys.push(m[1]);
+      }
+    }
+    found.push(keys);
+  }
+  return found;
+}
+
+test('the own caller: the PATCH of sync-calendar.js sends a field of every anyOf branch it needs', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schema = spec.components.schemas.ExternalCalendarAssigneesInput;
+  assert.deepEqual(schema.anyOf.map((/** @type {any} */ b) => b.required), [['default_assignee_user_ids'], ['default_assignee_user_id']]);
+  const calls = externalCalendarPatches(readFileSync(new URL('../public/settings/pages/sync-calendar.js', import.meta.url), 'utf8'));
+  assert.equal(calls.length, 1, `the PATCHes found ${JSON.stringify(calls)}`);
+  for (const keys of calls) {
+    for (const key of schema.required) assert.ok(keys.includes(key), `sends ${key}: ${JSON.stringify(keys)}`);
+    assert.ok(schema.anyOf.some((/** @type {any} */ branch) => branch.required.every((/** @type {string} */ k) => keys.includes(k))),
+      `sends one anyOf branch: ${JSON.stringify(keys)}`);
+  }
+});
+
 test('the document: 38 provider operations, each with its answers', () => {
   const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
   const ops = Object.entries(/** @type {Record<string, any>} */ (spec.paths))
@@ -440,9 +559,15 @@ test('the document: 38 provider operations, each with its answers', () => {
     }
   }
   assert.ok(spec.paths['/api/v1/calendar/apple/disconnect'].delete.responses[204], 'apple disconnect 204');
-  assert.match(spec.paths['/api/v1/calendar/external-calendars'].patch.description, /Omitting both clears the set/);
+  assert.match(spec.paths['/api/v1/calendar/external-calendars'].patch.description, /One of the two is required/);
+  assert.doesNotMatch(spec.paths['/api/v1/calendar/external-calendars'].patch.description, /Omitting both clears the set/);
   assert.equal(spec.paths['/api/v1/calendar/external-calendars'].patch.requestBody.required, true);
-  assert.deepEqual(spec.components.schemas.ExternalCalendarAssigneesInput.required, ['source', 'external_id'], 'no new duty (decision 17)');
+  // Step (c) of decision 17: one of the two assignee fields, the rest as before.
+  assert.deepEqual(spec.components.schemas.ExternalCalendarAssigneesInput.required, ['source', 'external_id']);
+  assert.deepEqual(spec.components.schemas.ExternalCalendarAssigneesInput.anyOf, [
+    { properties: { default_assignee_user_ids: { type: 'array' } }, required: ['default_assignee_user_ids'] },
+    { properties: { default_assignee_user_id: { type: ['integer', 'null'] } }, required: ['default_assignee_user_id'] },
+  ]);
 });
 
 // Since group 10b step (b) the schema is the only guard for these: the

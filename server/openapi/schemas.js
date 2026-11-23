@@ -529,7 +529,15 @@ export const schemas = {
         ExternalCalendarAssigneesInput: {
           type: 'object',
           required: ['source', 'external_id'],
-          description: 'The calendar by provider and its id there, and its default assignees: `default_assignee_user_ids` replaces the set, the earlier form `default_assignee_user_id` sets it to one person or none. Omitting both clears the set. An `external_id` that is blank after trimming answers 400 from the route; a calendar that is neither synced nor offered by its account answers 404.',
+          // One of the two is required (#2810 group 10b c): the route always
+          // writes the set, and a body without either emptied it silently.
+          // Each branch names its property (Ajv strictRequired); the full
+          // schema of both stays under `properties`.
+          anyOf: [
+            { properties: { default_assignee_user_ids: { type: 'array' } }, required: ['default_assignee_user_ids'] },
+            { properties: { default_assignee_user_id: { type: ['integer', 'null'] } }, required: ['default_assignee_user_id'] },
+          ],
+          description: 'The calendar by provider and its id there, and its default assignees: `default_assignee_user_ids` replaces the set, the earlier form `default_assignee_user_id` sets it to one person or none. One of the two is required; `[]` or `null` clears the set. An `external_id` that is blank after trimming answers 400 from the route; a calendar that is neither synced nor offered by its account answers 404.',
           properties: {
             source: { type: 'string', enum: [...EXTERNAL_CALENDAR_SOURCES] },
             external_id: { type: 'string', description: 'Google calendar id, CalDAV calendar URL or Apple calendar id.' },
