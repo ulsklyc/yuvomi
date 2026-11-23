@@ -537,8 +537,8 @@ test('Sync-Routen: Nicht-Admin erhält 403 (requireAdmin-Gate)', async () => {
 // ════════════════════════════════════════════════════════════════════════════════
 
 test('PATCH /external-calendars — Validierung + 404 (nicht synchronisiert)', async () => {
-  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'x', external_id: 'a' } })).status, 400);
-  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: '' } })).status, 400);
+  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'x', external_id: 'a', default_assignee_user_ids: [] } })).status, 400);
+  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: '', default_assignee_user_ids: [] } })).status, 400);
   assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'c1', default_assignee_user_id: 'abc' } })).status, 400);
   assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'c1', default_assignee_user_id: 999 } })).status, 400);
   const notSynced = await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'never-synced', default_assignee_user_id: 2 } });

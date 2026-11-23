@@ -411,13 +411,15 @@ const STEPS = [
   // ══ DEFAULT ASSIGNEES OF A CALENDAR (google.js PATCH /external-calendars) ═══
   ['ext set synced', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com', default_assignee_user_ids: [MEM, ADMIN] }],
   ['ext set offered', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'offered@group.calendar.google.com', default_assignee_user_id: MEM }],
-  ['ext clear', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com' }],
+  // Full representation (group 10b c): left out, both assignee fields emptied the set (200, `default_assignee_user_ids: []`).
+  ['ext without assignees', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com' }],
+  ['ext clear', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com', default_assignee_user_ids: [] }],
   ['ext set single null', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com', default_assignee_user_id: null }],
-  ['ext unknown', 'PATCH', `${C}/external-calendars`, { source: 'caldav', external_id: 'https://nowhere.invalid/cal/' }],
-  ['ext apple unknown', 'PATCH', `${C}/external-calendars`, { source: 'apple', external_id: 'apple-1' }],
-  ['ext source bad', 'PATCH', `${C}/external-calendars`, { source: 'outlook', external_id: 'x' }],
-  ['ext id spaces', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: '   ' }],
-  ['ext id number', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 5 }],
+  ['ext unknown', 'PATCH', `${C}/external-calendars`, { source: 'caldav', external_id: 'https://nowhere.invalid/cal/', default_assignee_user_ids: [] }],
+  ['ext apple unknown', 'PATCH', `${C}/external-calendars`, { source: 'apple', external_id: 'apple-1', default_assignee_user_ids: [] }],
+  ['ext source bad', 'PATCH', `${C}/external-calendars`, { source: 'outlook', external_id: 'x', default_assignee_user_ids: [] }],
+  ['ext id spaces', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: '   ', default_assignee_user_ids: [] }],
+  ['ext id number', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 5, default_assignee_user_ids: [] }],
   ['ext ids text', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com', default_assignee_user_ids: ['2'] }],
   ['ext ids guest', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com', default_assignee_user_ids: [GUEST] }],
   ['ext ids unknown', 'PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com', default_assignee_user_ids: [999] }],
@@ -883,7 +885,7 @@ test('an unexpected error in each Google route that answered its own 500 is a 50
   logged.error.length = 0;
   await assertAllCentral([
     ['GET', `${C}/google/status`, NO_BODY, `${C_}/google/status`],
-    ['PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com' }, `${C_}/external-calendars`],
+    ['PATCH', `${C}/external-calendars`, { source: 'google', external_id: 'synced@group.calendar.google.com', default_assignee_user_ids: [] }, `${C_}/external-calendars`],
     ['GET', `${C}/external-calendars/default-assignee-backfill`, NO_BODY, `${C_}/external-calendars/default-assignee-backfill`],
     ['POST', `${C}/external-calendars/default-assignee-backfill`, { expected_count: 0 }, `${C_}/external-calendars/default-assignee-backfill`],
     ['DELETE', `${C}/google/disconnect`, NO_BODY, `${C_}/google/disconnect`],

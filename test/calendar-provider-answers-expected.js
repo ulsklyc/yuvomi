@@ -74,6 +74,7 @@ export const EXPECTED = {
   "g calendars restore": {"status":503,"body":{"error":"A backup is being restored right now. This change was not saved - try again in a minute.","code":503,"reason":"restore_in_progress"}},
   "ext set synced": {"status":200,"body":{"data":{"source":"google","external_id":"synced@group.calendar.google.com","default_assignee_user_ids":[2,1],"default_assignee_user_id":2}}},
   "ext set offered": {"status":404,"body":{"error":"This calendar has not been synced yet.","code":404}},
+  "ext without assignees": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/default_assignee_user_ids","rule":"required"},{"path":"body/default_assignee_user_id","rule":"required"},{"path":"body","rule":"anyOf"}]}},
   "ext clear": {"status":200,"body":{"data":{"source":"google","external_id":"synced@group.calendar.google.com","default_assignee_user_ids":[],"default_assignee_user_id":null}}},
   "ext set single null": {"status":200,"body":{"data":{"source":"google","external_id":"synced@group.calendar.google.com","default_assignee_user_ids":[],"default_assignee_user_id":null}}},
   "ext unknown": {"status":404,"body":{"error":"This calendar has not been synced yet.","code":404}},
