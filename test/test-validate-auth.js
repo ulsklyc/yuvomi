@@ -477,6 +477,16 @@ test('POST /me/avatar/gravatar: the page\'s `{ email }` and no body reach the sw
   refused(await call('POST', '/me/avatar/gravatar', { session, json: { email: 5 } }), 'body/email', 'type', '404 before');
 });
 
+test('only guard: the Gravatar route no longer checks the type of `email` itself, the document does (group 12a, step b)', async () => {
+  // The handler compares `email` with the stored address only when it was
+  // sent (`!== undefined`); that it is text, only this schema says.
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const operation = /** @type {any} */ (buildOpenApiSpec()).paths[`${AUTH_PREFIX}/me/avatar/gravatar`].post;
+  const schema = operation.requestBody.content['application/json'].schema;
+  assert.equal(schema.type, 'object');
+  assert.equal(schema.properties.email.type, 'string');
+});
+
 test('the routes without input stay as they were: me, users, 2fa, devices, oidc, logout, onboarding', async () => {
   const session = await signIn('vmem');
   assert.equal((await call('GET', '/me?x=1', { session })).status, 200);

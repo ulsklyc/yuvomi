@@ -225,6 +225,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `{ "error": "Internal server error.", "code": 500 }`. The status stays 500. The notification
   settings still show their own message when switching push on or off or sending a test push
   fails, as before. Every other answer of the push and preferences routes is unchanged.
+- **Signing out and starting the SSO sign-in answer an unexpected failure with the same sentence
+  as the rest of the API.** `POST /auth/logout` said `"Logout failed."` when the session could not
+  be ended, `GET /auth/oidc/start` and `POST /auth/oidc/link/start` said
+  `"OIDC initialization failed."` when the identity provider could not be reached or the start
+  failed otherwise; they now answer `{ "error": "Internal server error.", "code": 500 }`. The
+  status stays 500, and the server log still names the provider's error at the SSO start. The app
+  signs out locally and goes to the sign-in page as before, and the account settings show their
+  own message when linking SSO fails; the SSO button of the sign-in page opens the start address
+  directly, so a browser shows the new sentence there. Every other answer of the sign-in, session
+  and own-account routes is unchanged.
 - **Setting the default assignees of a synced calendar takes the people.** This is about your
   own API clients; the app sends them already. `PATCH /calendar/external-calendars` without
   `default_assignee_user_ids` and without `default_assignee_user_id` emptied the calendar's default

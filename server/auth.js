@@ -1890,90 +1890,80 @@ function requireBrowserSession(route) {
  * Response: { user: { id, username, display_name, avatar_color, role, family_role } }
  */
 router.post('/login', loginLimiter, validateRequest(), async (req, res) => {
-  try {
-    const { username, password } = req.body;
+  const { username, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required.', code: 400 });
-    }
-
-    const user = db.get().prepare('SELECT * FROM users WHERE username = ?').get(username);
-
-    if (!user) {
-      // Timing-Attack-Schutz: trotzdem bcrypt ausführen. Bewusst über
-      // verifyPassword, damit ein Fehlversuch dieselbe Anzahl bcrypt-Läufe
-      // kostet wie bei einem existierenden Konto.
-      await verifyPassword(password, DUMMY_PASSWORD_HASH);
-      log.warn('Login failed', { ip: req.ip, username, reason: 'user_not_found' });
-      return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
-    }
-
-    const { valid, needsRehash } = await verifyPassword(password, user.password_hash);
-    if (!valid) {
-      log.warn('Login failed', { ip: req.ip, username, reason: 'invalid_password' });
-      return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
-    }
-
-    // Der Hash stammt aus einer nicht-normalisierten Eingabe (Issue #608):
-    // still auf NFC migrieren, damit künftig jeder Browser passt.
-    if (needsRehash) {
-      try {
-        const migrated = await hashPassword(password);
-        db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(migrated, user.id);
-        log.info('Password hash migrated to NFC', { userId: user.id });
-      } catch (rehashErr) {
-        log.error('Password hash migration failed:', rehashErr.message);
-      }
-    }
-
-    if (!canSignIn(db.get(), user.id)) {
-      log.warn('Login blocked: this account cannot sign in', { ip: req.ip, username });
-      return res.status(403).json({ error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
-    }
-
-    // Wer die eingebaute Anmeldung abgeschaltet hat, hat sie auch fuer alles
-    // abgeschaltet, was das Formular umgeht (#847) - eine Regel, die nur die
-    // Anmeldeseite kennt, ist keine Regel, sondern eine Bitte.
-    //
-    // Der Schalter gilt aber dem HAUSHALT, und ein Gast aus den geteilten
-    // Ausgaben ist keiner: er ist eine externe Person, die der Admin mit einem
-    // vergebenen Passwort anlegt und die im Identitaetsanbieter des Haushalts
-    // nichts zu suchen hat. Ein globaler Riegel haette diese Konten stumm
-    // unbrauchbar gemacht, samt der bereits bestehenden.
-    //
-    // Steht hier und nicht am Anfang der Route, weil die Entscheidung das Konto
-    // kennen muss - und weil eine Ablehnung VOR der Passwortpruefung verraten
-    // haette, welche Benutzernamen es gibt. Dieselbe Reihenfolge wie beim
-    // Ausschluss darueber: erst die Zugangsdaten, dann die Berechtigung.
-    if (!isPasswordLoginEnabled() && !isSplitExpenseGuest(user.id)) {
-      log.warn('Login rejected: password login is disabled', { ip: req.ip, username });
-      return res.status(403).json({ error: 'Password login is disabled.', code: 403, reason: 'password_login_disabled' });
-    }
-
-    // Zweiter Faktor (#672): das Passwort stimmt, die Sitzung entsteht aber
-    // noch nicht. Der Wartezustand traegt bewusst einen ANDEREN Schluessel als
-    // `userId` - `requireAuth` prueft genau den und ist damit blind fuer einen
-    // halb angemeldeten Zustand. Ein neuer Schluessel kann hier nichts
-    // aufschliessen, was der alte nicht schon aufgeschlossen haette.
-    if (twoFactor.isEnabled(db.get(), user.id)) {
-      req.session.pendingTwoFactor = { userId: user.id, expiresAt: Date.now() + TWO_FACTOR_WINDOW_MS };
-      return res.json({
-        twoFactorRequired: true,
-        recoveryAvailable: twoFactor.getStatus(db.get(), user.id).recovery_remaining > 0,
-      });
-    }
-
-    try {
-      await setupAuthSession(req, res, user);
-      res.json(loginPayload(req, user));
-    } catch (sessionErr) {
-      log.error('Session regeneration failed:', sessionErr);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
-    }
-  } catch (err) {
-    log.error('Login error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.', code: 400 });
   }
+
+  const user = db.get().prepare('SELECT * FROM users WHERE username = ?').get(username);
+
+  if (!user) {
+    // Timing-Attack-Schutz: trotzdem bcrypt ausführen. Bewusst über
+    // verifyPassword, damit ein Fehlversuch dieselbe Anzahl bcrypt-Läufe
+    // kostet wie bei einem existierenden Konto.
+    await verifyPassword(password, DUMMY_PASSWORD_HASH);
+    log.warn('Login failed', { ip: req.ip, username, reason: 'user_not_found' });
+    return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
+  }
+
+  const { valid, needsRehash } = await verifyPassword(password, user.password_hash);
+  if (!valid) {
+    log.warn('Login failed', { ip: req.ip, username, reason: 'invalid_password' });
+    return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
+  }
+
+  // Der Hash stammt aus einer nicht-normalisierten Eingabe (Issue #608):
+  // still auf NFC migrieren, damit künftig jeder Browser passt.
+  if (needsRehash) {
+    try {
+      const migrated = await hashPassword(password);
+      db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(migrated, user.id);
+      log.info('Password hash migrated to NFC', { userId: user.id });
+    } catch (rehashErr) {
+      log.error('Password hash migration failed:', rehashErr.message);
+    }
+  }
+
+  if (!canSignIn(db.get(), user.id)) {
+    log.warn('Login blocked: this account cannot sign in', { ip: req.ip, username });
+    return res.status(403).json({ error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
+  }
+
+  // Wer die eingebaute Anmeldung abgeschaltet hat, hat sie auch fuer alles
+  // abgeschaltet, was das Formular umgeht (#847) - eine Regel, die nur die
+  // Anmeldeseite kennt, ist keine Regel, sondern eine Bitte.
+  //
+  // Der Schalter gilt aber dem HAUSHALT, und ein Gast aus den geteilten
+  // Ausgaben ist keiner: er ist eine externe Person, die der Admin mit einem
+  // vergebenen Passwort anlegt und die im Identitaetsanbieter des Haushalts
+  // nichts zu suchen hat. Ein globaler Riegel haette diese Konten stumm
+  // unbrauchbar gemacht, samt der bereits bestehenden.
+  //
+  // Steht hier und nicht am Anfang der Route, weil die Entscheidung das Konto
+  // kennen muss - und weil eine Ablehnung VOR der Passwortpruefung verraten
+  // haette, welche Benutzernamen es gibt. Dieselbe Reihenfolge wie beim
+  // Ausschluss darueber: erst die Zugangsdaten, dann die Berechtigung.
+  if (!isPasswordLoginEnabled() && !isSplitExpenseGuest(user.id)) {
+    log.warn('Login rejected: password login is disabled', { ip: req.ip, username });
+    return res.status(403).json({ error: 'Password login is disabled.', code: 403, reason: 'password_login_disabled' });
+  }
+
+  // Zweiter Faktor (#672): das Passwort stimmt, die Sitzung entsteht aber
+  // noch nicht. Der Wartezustand traegt bewusst einen ANDEREN Schluessel als
+  // `userId` - `requireAuth` prueft genau den und ist damit blind fuer einen
+  // halb angemeldeten Zustand. Ein neuer Schluessel kann hier nichts
+  // aufschliessen, was der alte nicht schon aufgeschlossen haette.
+  if (twoFactor.isEnabled(db.get(), user.id)) {
+    req.session.pendingTwoFactor = { userId: user.id, expiresAt: Date.now() + TWO_FACTOR_WINDOW_MS };
+    return res.json({
+      twoFactorRequired: true,
+      recoveryAvailable: twoFactor.getStatus(db.get(), user.id).recovery_remaining > 0,
+    });
+  }
+
+  await setupAuthSession(req, res, user);
+  res.json(loginPayload(req, user));
 });
 
 /**
@@ -2164,46 +2154,36 @@ export function buildResetRoutes(targetRouter, {
    *   Zugriffslogs oder einem Cache landet.
    */
   targetRouter.post('/reset-password/check', limiter, validateRequest(), (req, res) => {
-    try {
-      const { token } = req.body || {};
-      const userId = typeof token === 'string' && token ? resetService.verifyToken(token) : null;
-      res.json({ data: { valid: !!userId && accountAcceptsReset(userId) } });
-    } catch (err) {
-      log.error('reset-password check error:', err.message);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
-    }
+    const { token } = req.body || {};
+    const userId = typeof token === 'string' && token ? resetService.verifyToken(token) : null;
+    res.json({ data: { valid: !!userId && accountAcceptsReset(userId) } });
   });
 
   targetRouter.post('/reset-password', limiter, validateRequest(), async (req, res) => {
-    try {
-      const { token, password } = req.body || {};
-      if (!token || !password) {
-        return res.status(400).json({ error: 'Token and password are required.', code: 400 });
-      }
-      if (normalizePassword(password).length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
-      }
-      const userId = resetService.verifyToken(token);
-      if (!userId) {
-        return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
-      }
-      // Bewusst dieselbe Meldung wie ein ungueltiger Token: der Unterschied
-      // ginge sonst an jemanden, der das Konto nicht besitzt.
-      if (!accountAcceptsReset(userId)) {
-        resetService.consumeToken(token);
-        return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
-      }
-      const hash = await hashPassword(password);
-      getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
-      resetService.consumeToken(token);
-      // Best-effort: invalidate existing sessions for this user.
-      try { invalidateUserSessions(userId, null, getDb()); }
-      catch { /* sessions table may not exist in tests */ }
-      res.json({ data: { ok: true } });
-    } catch (err) {
-      log.error('reset-password error:', err.message);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
+    const { token, password } = req.body || {};
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token and password are required.', code: 400 });
     }
+    if (normalizePassword(password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
+    }
+    const userId = resetService.verifyToken(token);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
+    }
+    // Bewusst dieselbe Meldung wie ein ungueltiger Token: der Unterschied
+    // ginge sonst an jemanden, der das Konto nicht besitzt.
+    if (!accountAcceptsReset(userId)) {
+      resetService.consumeToken(token);
+      return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
+    }
+    const hash = await hashPassword(password);
+    getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+    resetService.consumeToken(token);
+    // Best-effort: invalidate existing sessions for this user.
+    try { invalidateUserSessions(userId, null, getDb()); }
+    catch { /* sessions table may not exist in tests */ }
+    res.json({ data: { ok: true } });
   });
 }
 
@@ -2352,33 +2332,28 @@ export function buildInviteRoutes(targetRouter, {
   });
 
   targetRouter.get('/invites/preview', limiter, validateRequest(), (req, res) => {
-    try {
-      const invite = inviteService.verifyToken(String(req.query.token || ''));
-      if (!invite) return res.json({ data: { valid: false } });
-      // WER EINLAEDT, STEHT AUF DER SEITE (Critique R24, G6-Zugang-P3-1): die
-      // Seite sagte nur "Du wurdest zu Yuvomi eingeladen" - ohne Haushalt, ohne
-      // Person. Der Anzeigename der einladenden Person ist alles, was der
-      // Inhaber eines gueltigen Links dafuer braucht, und nichts darueber hinaus
-      // (kein Benutzername, keine Rolle). Ein geloeschtes Konto nennt niemanden.
-      const inviter = invite.created_by == null ? null
-        : getDb().prepare('SELECT display_name FROM users WHERE id = ?').get(invite.created_by);
-      res.json({
-        // `password_required` sagt der /join-Seite, ob sie ueberhaupt nach einem
-        // Passwort fragen soll (#847). Ohne die Angabe zeigte sie zwei
-        // Pflichtfelder, deren Inhalt der Server verwirft - und der Eingeladene
-        // haette sich ein Passwort ausgedacht, mit dem er sich nie anmeldet.
-        data: {
-          valid: true,
-          display_name: invite.display_name,
-          username: invite.username,
-          invited_by: inviter?.display_name || null,
-          password_required: isPasswordLoginEnabled(getDb()),
-        },
-      });
-    } catch (err) {
-      log.error('Invite preview error:', err.message);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
-    }
+    const invite = inviteService.verifyToken(String(req.query.token || ''));
+    if (!invite) return res.json({ data: { valid: false } });
+    // WER EINLAEDT, STEHT AUF DER SEITE (Critique R24, G6-Zugang-P3-1): die
+    // Seite sagte nur "Du wurdest zu Yuvomi eingeladen" - ohne Haushalt, ohne
+    // Person. Der Anzeigename der einladenden Person ist alles, was der
+    // Inhaber eines gueltigen Links dafuer braucht, und nichts darueber hinaus
+    // (kein Benutzername, keine Rolle). Ein geloeschtes Konto nennt niemanden.
+    const inviter = invite.created_by == null ? null
+      : getDb().prepare('SELECT display_name FROM users WHERE id = ?').get(invite.created_by);
+    res.json({
+      // `password_required` sagt der /join-Seite, ob sie ueberhaupt nach einem
+      // Passwort fragen soll (#847). Ohne die Angabe zeigte sie zwei
+      // Pflichtfelder, deren Inhalt der Server verwirft - und der Eingeladene
+      // haette sich ein Passwort ausgedacht, mit dem er sich nie anmeldet.
+      data: {
+        valid: true,
+        display_name: invite.display_name,
+        username: invite.username,
+        invited_by: inviter?.display_name || null,
+        password_required: isPasswordLoginEnabled(getDb()),
+      },
+    });
   });
 
   targetRouter.post('/invites/accept', limiter, validateRequest(), async (req, res) => {
@@ -2500,8 +2475,7 @@ export function buildInviteRoutes(targetRouter, {
       if (err.message?.includes('UNIQUE constraint')) {
         return res.status(409).json({ error: 'Username is already taken.', code: 409 });
       }
-      log.error('Invite accept error:', err.message);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
+      throw err;
     }
   });
 }
@@ -2512,7 +2486,7 @@ buildInviteRoutes(router);
  * POST /api/v1/auth/logout
  * Response: { ok: true }
  */
-router.post('/logout', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
+router.post('/logout', requireAuth, csrfMiddleware, validateRequest(), (req, res, /** @type {(err?: unknown) => void} */ next) => {
   if (req.authMethod === 'api_token') {
     return res.json({ ok: true });
   }
@@ -2520,10 +2494,10 @@ router.post('/logout', requireAuth, csrfMiddleware, validateRequest(), (req, res
   // Abmelden noch bis zu fuenf Minuten ein Weg in dieses Konto.
   endDevicePairingCodes(db.get(), req.authUserId);
   req.session.destroy((err) => {
-    if (err) {
-      log.error('Logout error:', err);
-      return res.status(500).json({ error: 'Logout failed.', code: 500 });
-    }
+    // Ein Fehler aus dem Callback erreicht den zentralen Fehlerhandler nur ueber
+    // next(): Express 5 reicht abgelehnte Promises und synchrone Wuerfe weiter,
+    // einen Wurf hier im Callback aber nicht - die Anfrage bliebe haengen.
+    if (err) return next(err);
     res.clearCookie(SESSION_COOKIE);
     res.clearCookie(LEGACY_SESSION_COOKIE); // best effort: verwaistes Legacy-Cookie räumen
     res.json({ ok: true });
@@ -2541,13 +2515,8 @@ router.post('/logout', requireAuth, csrfMiddleware, validateRequest(), (req, res
  * Response: { ok: true, ended: number }
  */
 router.post('/logout-others', requireAuth, csrfMiddleware, sessionRevokeLimiter, requireBrowserSession('logoutOthers'), validateRequest(), (req, res) => {
-  try {
-    const ended = invalidateUserSessions(req.authUserId, req.sessionID);
-    res.json({ ok: true, ended });
-  } catch (err) {
-    log.error('Sign out other sessions error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const ended = invalidateUserSessions(req.authUserId, req.sessionID);
+  res.json({ ok: true, ended });
 });
 
 /**
@@ -2626,8 +2595,11 @@ router.get('/oidc/start', refuseWhileRestoring, validateRequest(), async (req, r
     }
     res.redirect(await beginOidcFlow(req, config));
   } catch (err) {
+    // Nur die Diagnose bleibt hier: describeOidcError() nennt, was der
+    // zentrale Handler nicht kennt (Code des TLS- oder Netzfehlers unter der
+    // Discovery, error/error_description des Anbieters). Die Antwort gibt er.
     log.error('OIDC start error:', describeOidcError(err));
-    res.status(500).json({ error: 'OIDC initialization failed.', code: 500 });
+    throw err;
   }
 });
 
@@ -2675,8 +2647,9 @@ router.post('/oidc/link/start', requireAuth, csrfMiddleware, validateRequest(), 
 
     res.json({ url: await beginOidcFlow(req, config, { linkUserId: req.authUserId }) });
   } catch (err) {
+    // Wie bei /oidc/start: hier nur die Diagnose, die Antwort gibt der zentrale Handler.
     log.error('OIDC link start error:', describeOidcError(err));
-    res.status(500).json({ error: 'OIDC initialization failed.', code: 500 });
+    throw err;
   }
 });
 
@@ -2950,8 +2923,7 @@ router.post('/setup', loginLimiter, requireSetupOpen, validateRequest(), async (
     if (err.message?.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'Username is already taken.', code: 409 });
     }
-    log.error('Setup error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
@@ -2975,89 +2947,84 @@ function sessionExpiresAtFor(req) {
  * Response: { user: { id, username, display_name, avatar_color, role } }
  */
 router.get('/me', requireAuth, validateRequest(), (req, res) => {
-  try {
-    // `sso_only` sagt dem EIGENEN Konto, ob es ohne Passwort gefuehrt wird
-    // (#1703): das Konto-Blatt laesst dann die Karte "Passwort aendern" weg,
-    // deren Pflichtfeld "Aktuelles Passwort" es fuer dieses Konto nicht gibt.
-    // Eine Zeile fuer beide Zweige darunter, Session und API-Token.
-    const user = db.get()
-      .prepare(`SELECT ${USER_PUBLIC_COLUMNS}, (password_hash = ?) AS sso_only FROM users WHERE id = ?`)
-      .get(OIDC_PASSWORD_SENTINEL, req.authUserId);
+  // `sso_only` sagt dem EIGENEN Konto, ob es ohne Passwort gefuehrt wird
+  // (#1703): das Konto-Blatt laesst dann die Karte "Passwort aendern" weg,
+  // deren Pflichtfeld "Aktuelles Passwort" es fuer dieses Konto nicht gibt.
+  // Eine Zeile fuer beide Zweige darunter, Session und API-Token.
+  const user = db.get()
+    .prepare(`SELECT ${USER_PUBLIC_COLUMNS}, (password_hash = ?) AS sso_only FROM users WHERE id = ?`)
+    .get(OIDC_PASSWORD_SENTINEL, req.authUserId);
 
-    if (!user) {
-      if (req.authMethod === 'session' && typeof req.session.destroy === 'function') {
-        req.session.destroy(() => {});
-      }
-      return res.status(401).json({ error: 'User not found.', code: 401 });
+  if (!user) {
+    if (req.authMethod === 'session' && typeof req.session.destroy === 'function') {
+      req.session.destroy(() => {});
     }
+    return res.status(401).json({ error: 'User not found.', code: 401 });
+  }
 
-    if (req.authMethod === 'api_token') {
-      return res.json({
-        user: publicUser(user),
-        permissions: clientPermissions(db.get(), userForRequest(req, user)),
-        householdSize: householdSize(db.get()),
-        initialsRoster: initialsRoster(db.get(), user.id),
-        othersCanRead: othersCanRead(db.get(), user.id),
-        ...gravatarClientState(user.id),
-      });
-    }
-
-    // CSRF-Token erneuern falls vorhanden (wichtig fuer iOS-PWA-Resume:
-    // iOS kann den CSRF-Cookie verwerfen waehrend die Session-Cookie erhalten bleibt.
-    // /me ist der erste API-Call nach App-Resume, also hier den Cookie wiederherstellen.)
-    if (!req.session.csrfToken) {
-      req.session.csrfToken = generateToken();
-    }
-    // `=== 'true'` UND NICHT `!== 'false'`, wie es hier stand.
-    //
-    // DIE UMGEDREHTE BEDINGUNG HAT GENAU DEN FALL KAPUTT GEMACHT, DEN DER BLOCK
-    // DARUEBER HEILEN SOLL. `SESSION_SECURE` ist standardmaessig NICHT gesetzt
-    // (in `.env.example` auskommentiert), und `undefined !== 'false'` ist wahr:
-    // eine Instanz auf reinem HTTP setzte das CSRF-Cookie als `Secure`, und der
-    // Browser verwirft ein solches Cookie auf einer unverschluesselten
-    // Verbindung stillschweigend. Die Stelle, die nach dem App-Resume das
-    // Cookie wiederherstellen soll, loeschte es also effektiv.
-    //
-    // Sichtbar war es kaum, weil `public/api.js` den Token zusaetzlich im
-    // Speicher haelt und ihn aus dem Antwortkopf nachliest, mit einem
-    // 403-Selbstheilungsversuch daneben - das Symptom war ein sporadisches 403
-    // beim Schreiben, nicht ein fehlendes Cookie. Alle sechs anderen Stellen im
-    // Haus schreiben `=== 'true'` (server/index.js, die drei weiteren hier,
-    // middleware/csrf.js, services/display-accounts.js); diese eine war die
-    // Ausnahme, und sie war keine Absicht.
-    res.cookie('csrf-token', req.session.csrfToken, {
-      httpOnly: false,
-      sameSite: 'lax',
-      secure: process.env.SESSION_SECURE === 'true',
-      maxAge: SESSION_MAX_AGE_MS,
-    });
-
-    res.json({
+  if (req.authMethod === 'api_token') {
+    return res.json({
       user: publicUser(user),
-      // Hier und nur hier kann das Subjekt ein Wandtablett sein: die beiden
-      // anderen Aufrufer sind Anmeldewege, und ein Display meldet sich nicht an
-      // (`canSignIn()` weist es ab). Sie bleiben deshalb beim Standard `false`.
-      permissions: clientPermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
+      permissions: clientPermissions(db.get(), userForRequest(req, user)),
       householdSize: householdSize(db.get()),
       initialsRoster: initialsRoster(db.get(), user.id),
       othersCanRead: othersCanRead(db.get(), user.id),
       ...gravatarClientState(user.id),
-      csrfToken: req.session.csrfToken,
-      // Wann diese Sitzung ohne weitere Benutzung endet: der Ablauf, den der
-      // Browser fuer sein Session-Cookie zuletzt bekommen hat (bei der Anmeldung
-      // oder von refreshSessionCookieIfDue). Der Service Worker haelt den
-      // Offline-Abzug samt Listen nicht laenger (#2293, public/sw.js); ohne
-      // diesen Wert legt er keinen an. Ein Wanddisplay laeuft auf seinem
-      // eigenen Cookie, und das `req.session` daneben ist eine leere Huelle:
-      // es bekommt stattdessen seine gleitende Offline-Frist, jetzt + 72 h
-      // (`DISPLAY_OFFLINE_GRACE_MS`, gesetzt in `requireAuth`). Einen
-      // Sitzungsabzug legt der Worker fuer ein Display trotzdem nicht an.
-      sessionExpiresAt: sessionExpiresAtFor(req),
     });
-  } catch (err) {
-    log.error('/me error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
+
+  // CSRF-Token erneuern falls vorhanden (wichtig fuer iOS-PWA-Resume:
+  // iOS kann den CSRF-Cookie verwerfen waehrend die Session-Cookie erhalten bleibt.
+  // /me ist der erste API-Call nach App-Resume, also hier den Cookie wiederherstellen.)
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = generateToken();
+  }
+  // `=== 'true'` UND NICHT `!== 'false'`, wie es hier stand.
+  //
+  // DIE UMGEDREHTE BEDINGUNG HAT GENAU DEN FALL KAPUTT GEMACHT, DEN DER BLOCK
+  // DARUEBER HEILEN SOLL. `SESSION_SECURE` ist standardmaessig NICHT gesetzt
+  // (in `.env.example` auskommentiert), und `undefined !== 'false'` ist wahr:
+  // eine Instanz auf reinem HTTP setzte das CSRF-Cookie als `Secure`, und der
+  // Browser verwirft ein solches Cookie auf einer unverschluesselten
+  // Verbindung stillschweigend. Die Stelle, die nach dem App-Resume das
+  // Cookie wiederherstellen soll, loeschte es also effektiv.
+  //
+  // Sichtbar war es kaum, weil `public/api.js` den Token zusaetzlich im
+  // Speicher haelt und ihn aus dem Antwortkopf nachliest, mit einem
+  // 403-Selbstheilungsversuch daneben - das Symptom war ein sporadisches 403
+  // beim Schreiben, nicht ein fehlendes Cookie. Alle sechs anderen Stellen im
+  // Haus schreiben `=== 'true'` (server/index.js, die drei weiteren hier,
+  // middleware/csrf.js, services/display-accounts.js); diese eine war die
+  // Ausnahme, und sie war keine Absicht.
+  res.cookie('csrf-token', req.session.csrfToken, {
+    httpOnly: false,
+    sameSite: 'lax',
+    secure: process.env.SESSION_SECURE === 'true',
+    maxAge: SESSION_MAX_AGE_MS,
+  });
+
+  res.json({
+    user: publicUser(user),
+    // Hier und nur hier kann das Subjekt ein Wandtablett sein: die beiden
+    // anderen Aufrufer sind Anmeldewege, und ein Display meldet sich nicht an
+    // (`canSignIn()` weist es ab). Sie bleiben deshalb beim Standard `false`.
+    permissions: clientPermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
+    householdSize: householdSize(db.get()),
+    initialsRoster: initialsRoster(db.get(), user.id),
+    othersCanRead: othersCanRead(db.get(), user.id),
+    ...gravatarClientState(user.id),
+    csrfToken: req.session.csrfToken,
+    // Wann diese Sitzung ohne weitere Benutzung endet: der Ablauf, den der
+    // Browser fuer sein Session-Cookie zuletzt bekommen hat (bei der Anmeldung
+    // oder von refreshSessionCookieIfDue). Der Service Worker haelt den
+    // Offline-Abzug samt Listen nicht laenger (#2293, public/sw.js); ohne
+    // diesen Wert legt er keinen an. Ein Wanddisplay laeuft auf seinem
+    // eigenen Cookie, und das `req.session` daneben ist eine leere Huelle:
+    // es bekommt stattdessen seine gleitende Offline-Frist, jetzt + 72 h
+    // (`DISPLAY_OFFLINE_GRACE_MS`, gesetzt in `requireAuth`). Einen
+    // Sitzungsabzug legt der Worker fuer ein Display trotzdem nicht an.
+    sessionExpiresAt: sessionExpiresAtFor(req),
+  });
 });
 
 /**
@@ -3067,14 +3034,9 @@ router.get('/me', requireAuth, validateRequest(), (req, res) => {
  * privaten Fenster nicht erneut erscheint.
  */
 router.post('/onboarding-seen', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
-  try {
-    db.get().prepare('UPDATE users SET onboarding_version = ? WHERE id = ?')
-      .run(CURRENT_ONBOARDING_VERSION, req.authUserId);
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('/onboarding-seen error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  db.get().prepare('UPDATE users SET onboarding_version = ? WHERE id = ?')
+    .run(CURRENT_ONBOARDING_VERSION, req.authUserId);
+  res.json({ ok: true });
 });
 
 /**
@@ -3090,22 +3052,17 @@ router.post('/onboarding-seen', requireAuth, csrfMiddleware, validateRequest(), 
  * der bisherige Wert stehen, statt ihn mit null zu ueberschreiben.
  */
 router.post('/changelog-seen', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
-  try {
-    const latest = String(req.body?.latest || '').trim();
-    if (latest && latest.length > LATEST_MAX) {
-      return res.status(400).json({ error: 'Invalid version.', code: 400 });
-    }
-    db.get().prepare(`
-      UPDATE users
-         SET changelog_seen_version = ?,
-             changelog_seen_latest  = COALESCE(NULLIF(?, ''), changelog_seen_latest)
-       WHERE id = ?
-    `).run(APP_VERSION, latest, req.authUserId);
-    res.json({ data: { version: APP_VERSION, latest: latest || null } });
-  } catch (err) {
-    log.error('/changelog-seen error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const latest = String(req.body?.latest || '').trim();
+  if (latest && latest.length > LATEST_MAX) {
+    return res.status(400).json({ error: 'Invalid version.', code: 400 });
   }
+  db.get().prepare(`
+    UPDATE users
+       SET changelog_seen_version = ?,
+           changelog_seen_latest  = COALESCE(NULLIF(?, ''), changelog_seen_latest)
+     WHERE id = ?
+  `).run(APP_VERSION, latest, req.authUserId);
+  res.json({ data: { version: APP_VERSION, latest: latest || null } });
 });
 
 // --------------------------------------------------------
@@ -3136,55 +3093,50 @@ function consumePendingTwoFactor(req) {
  * Codes hinweisen kann.
  */
 router.post('/2fa/verify', twoFactorLimiter, validateRequest(), async (req, res) => {
-  try {
-    const pending = consumePendingTwoFactor(req);
-    if (!pending) {
-      // Der Grund trennt den abgelaufenen Wartezustand vom falschen Code (#1909):
-      // die Anmeldeseite schickt dann zurueck an den Anfang statt zum Code.
-      return res.status(401).json({ error: 'No pending sign-in.', code: 401, reason: 'two_factor_no_pending_sign_in' });
-    }
-
-    // Zwischen Passwort und Code kann das Konto deaktiviert worden sein
-    // (#1381). `setupAuthSession` wiese es ohnehin ab - aber erst NACH der
-    // Pruefung, die einen Wiederherstellungscode verbraucht, und als 500.
-    // Hier ist es dieselbe Absage wie beim Passwort, vor jedem Verbrauch.
-    if (!canSignIn(db.get(), pending.userId)) {
-      delete req.session.pendingTwoFactor;
-      return res.status(403).json({ error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
-    }
-
-    const code = String(req.body?.code || '');
-    if (code.length > CODE_MAX) {
-      return res.status(400).json({ error: 'Input is too long.', code: 400 });
-    }
-
-    const result = twoFactor.verifySecondFactor(db.get(), pending.userId, code);
-    if (!result.valid) {
-      log.warn('Second factor failed', { ip: req.ip, userId: pending.userId });
-      return res.status(401).json({ error: 'Invalid code.', code: 401 });
-    }
-
-    const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(pending.userId);
-    if (!user) {
-      delete req.session.pendingTwoFactor;
-      return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
-    }
-
-    // `regenerate` legt eine neue, leere Session an - der Wartezustand ist
-    // danach von selbst fort, und ein vor der Anmeldung untergeschobener
-    // Sitzungsschlüssel taugt nichts mehr.
-    await setupAuthSession(req, res, user);
-    log.info('Second factor accepted', { userId: user.id, method: result.method });
-
-    res.json({
-      ...loginPayload(req, user),
-      twoFactorMethod: result.method,
-      recoveryRemaining: result.recovery_remaining,
-    });
-  } catch (err) {
-    log.error('Second factor error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const pending = consumePendingTwoFactor(req);
+  if (!pending) {
+    // Der Grund trennt den abgelaufenen Wartezustand vom falschen Code (#1909):
+    // die Anmeldeseite schickt dann zurueck an den Anfang statt zum Code.
+    return res.status(401).json({ error: 'No pending sign-in.', code: 401, reason: 'two_factor_no_pending_sign_in' });
   }
+
+  // Zwischen Passwort und Code kann das Konto deaktiviert worden sein
+  // (#1381). `setupAuthSession` wiese es ohnehin ab - aber erst NACH der
+  // Pruefung, die einen Wiederherstellungscode verbraucht, und als 500.
+  // Hier ist es dieselbe Absage wie beim Passwort, vor jedem Verbrauch.
+  if (!canSignIn(db.get(), pending.userId)) {
+    delete req.session.pendingTwoFactor;
+    return res.status(403).json({ error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
+  }
+
+  const code = String(req.body?.code || '');
+  if (code.length > CODE_MAX) {
+    return res.status(400).json({ error: 'Input is too long.', code: 400 });
+  }
+
+  const result = twoFactor.verifySecondFactor(db.get(), pending.userId, code);
+  if (!result.valid) {
+    log.warn('Second factor failed', { ip: req.ip, userId: pending.userId });
+    return res.status(401).json({ error: 'Invalid code.', code: 401 });
+  }
+
+  const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(pending.userId);
+  if (!user) {
+    delete req.session.pendingTwoFactor;
+    return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
+  }
+
+  // `regenerate` legt eine neue, leere Session an - der Wartezustand ist
+  // danach von selbst fort, und ein vor der Anmeldung untergeschobener
+  // Sitzungsschlüssel taugt nichts mehr.
+  await setupAuthSession(req, res, user);
+  log.info('Second factor accepted', { userId: user.id, method: result.method });
+
+  res.json({
+    ...loginPayload(req, user),
+    twoFactorMethod: result.method,
+    recoveryRemaining: result.recovery_remaining,
+  });
 });
 
 /**
@@ -3192,12 +3144,7 @@ router.post('/2fa/verify', twoFactorLimiter, validateRequest(), async (req, res)
  * Zustand für die eigene Einstellungsseite.
  */
 router.get('/2fa', requireAuth, validateRequest(), (req, res) => {
-  try {
-    res.json({ data: twoFactor.getStatus(db.get(), req.authUserId) });
-  } catch (err) {
-    log.error('2FA status error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: twoFactor.getStatus(db.get(), req.authUserId) });
 });
 
 /**
@@ -3216,8 +3163,7 @@ router.post('/2fa/setup', requireAuth, csrfMiddleware, validateRequest(), (req, 
     if (err.code === 'already_enabled') {
       return res.status(409).json({ error: err.message, code: 409, reason: 'already_enabled' });
     }
-    log.error('2FA setup error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
@@ -3246,8 +3192,7 @@ router.post('/2fa/enable', requireAuth, csrfMiddleware, twoFactorLimiter, valida
     if (err.code === 'no_pending_setup' || err.code === 'already_enabled') {
       return res.status(409).json({ error: err.message, code: 409, reason: err.code });
     }
-    log.error('2FA enable error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
@@ -3263,29 +3208,24 @@ router.post('/2fa/enable', requireAuth, csrfMiddleware, twoFactorLimiter, valida
  * Verlangt der Haushalt die Zwei-Faktor-Anmeldung, ist Abschalten gesperrt.
  */
 router.post('/2fa/disable', requireAuth, csrfMiddleware, twoFactorLimiter, validateRequest(), (req, res) => {
-  try {
-    if (!twoFactor.isEnabled(db.get(), req.authUserId)) {
-      return res.status(409).json({ error: 'Two-factor authentication is not enabled.', code: 409, reason: 'not_enabled' });
-    }
-    if (twoFactor.isRequiredForHousehold(db.get())) {
-      return res.status(403).json({ error: 'Two-factor authentication is required for this household.', code: 403, reason: 'required' });
-    }
-
-    const code = String(req.body?.code || '');
-    if (code.length > CODE_MAX) return res.status(400).json({ error: 'Input is too long.', code: 400 });
-
-    const result = twoFactor.verifySecondFactor(db.get(), req.authUserId, code);
-    if (!result.valid) {
-      log.warn('2FA disable rejected', { ip: req.ip, userId: req.authUserId });
-      return res.status(400).json({ error: 'Invalid code.', code: 400, reason: 'invalid_code' });
-    }
-
-    twoFactor.disable(db.get(), req.authUserId);
-    res.json({ data: twoFactor.getStatus(db.get(), req.authUserId) });
-  } catch (err) {
-    log.error('2FA disable error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (!twoFactor.isEnabled(db.get(), req.authUserId)) {
+    return res.status(409).json({ error: 'Two-factor authentication is not enabled.', code: 409, reason: 'not_enabled' });
   }
+  if (twoFactor.isRequiredForHousehold(db.get())) {
+    return res.status(403).json({ error: 'Two-factor authentication is required for this household.', code: 403, reason: 'required' });
+  }
+
+  const code = String(req.body?.code || '');
+  if (code.length > CODE_MAX) return res.status(400).json({ error: 'Input is too long.', code: 400 });
+
+  const result = twoFactor.verifySecondFactor(db.get(), req.authUserId, code);
+  if (!result.valid) {
+    log.warn('2FA disable rejected', { ip: req.ip, userId: req.authUserId });
+    return res.status(400).json({ error: 'Invalid code.', code: 400, reason: 'invalid_code' });
+  }
+
+  twoFactor.disable(db.get(), req.authUserId);
+  res.json({ data: twoFactor.getStatus(db.get(), req.authUserId) });
 });
 
 /**
@@ -3295,24 +3235,19 @@ router.post('/2fa/disable', requireAuth, csrfMiddleware, twoFactorLimiter, valid
  * Satz. Auch das verlangt den zweiten Faktor.
  */
 router.post('/2fa/recovery-codes', requireAuth, csrfMiddleware, twoFactorLimiter, validateRequest(), (req, res) => {
-  try {
-    if (!twoFactor.isEnabled(db.get(), req.authUserId)) {
-      return res.status(409).json({ error: 'Two-factor authentication is not enabled.', code: 409, reason: 'not_enabled' });
-    }
-    const code = String(req.body?.code || '');
-    if (code.length > CODE_MAX) return res.status(400).json({ error: 'Input is too long.', code: 400 });
-
-    const result = twoFactor.verifySecondFactor(db.get(), req.authUserId, code);
-    if (!result.valid) {
-      return res.status(400).json({ error: 'Invalid code.', code: 400, reason: 'invalid_code' });
-    }
-
-    const { recovery_codes: codes } = twoFactor.regenerateRecoveryCodes(db.get(), req.authUserId);
-    res.json({ data: { recovery_codes: codes } });
-  } catch (err) {
-    log.error('2FA recovery codes error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (!twoFactor.isEnabled(db.get(), req.authUserId)) {
+    return res.status(409).json({ error: 'Two-factor authentication is not enabled.', code: 409, reason: 'not_enabled' });
   }
+  const code = String(req.body?.code || '');
+  if (code.length > CODE_MAX) return res.status(400).json({ error: 'Input is too long.', code: 400 });
+
+  const result = twoFactor.verifySecondFactor(db.get(), req.authUserId, code);
+  if (!result.valid) {
+    return res.status(400).json({ error: 'Invalid code.', code: 400, reason: 'invalid_code' });
+  }
+
+  const { recovery_codes: codes } = twoFactor.regenerateRecoveryCodes(db.get(), req.authUserId);
+  res.json({ data: { recovery_codes: codes } });
 });
 
 /**
@@ -3454,29 +3389,24 @@ function issueDeviceCredential(userId, { name, platform, deviceId }) {
  * kein zweites gueltiges Credential zurueck.
  */
 router.post('/devices', requireAuth, csrfMiddleware, requireSignInSession('device'), validateRequest(), (req, res) => {
-  try {
-    const fields = readDeviceFields(req.body);
-    if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
-    // Ein Ausgaben-Gast meldet sich an, bekommt aber aus demselben Grund wie beim
-    // API-Token kein Credential.
-    if (!mayHaveDevice(req.authUserId)) {
-      return res.status(403).json({
-        error: 'Only household members can add a signed-in device.', code: 403, reason: 'not_a_household_member',
-      });
-    }
-
-    let issued = null;
-    db.transaction(() => {
-      issued = issueDeviceCredential(req.authUserId, fields);
+  const fields = readDeviceFields(req.body);
+  if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
+  // Ein Ausgaben-Gast meldet sich an, bekommt aber aus demselben Grund wie beim
+  // API-Token kein Credential.
+  if (!mayHaveDevice(req.authUserId)) {
+    return res.status(403).json({
+      error: 'Only household members can add a signed-in device.', code: 403, reason: 'not_a_household_member',
     });
-
-    const { id, credential } = issued;
-    const row = db.get().prepare('SELECT * FROM api_tokens WHERE id = ?').get(id);
-    res.status(201).json({ data: publicDevice(row), credential });
-  } catch (err) {
-    log.error('Signed-in device creation error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
+
+  let issued = null;
+  db.transaction(() => {
+    issued = issueDeviceCredential(req.authUserId, fields);
+  });
+
+  const { id, credential } = issued;
+  const row = db.get().prepare('SELECT * FROM api_tokens WHERE id = ?').get(id);
+  res.status(201).json({ data: publicDevice(row), credential });
 });
 
 /**
@@ -3489,25 +3419,20 @@ router.post('/devices', requireAuth, csrfMiddleware, requireSignInSession('devic
  * NUR AUS EINER SITZUNG, wie `POST /devices`: Ein Geraet stellt kein weiteres aus.
  */
 router.post('/devices/pair', requireAuth, csrfMiddleware, requireSignInSession('pairing'), validateRequest(), (req, res) => {
-  try {
-    const server = req.body?.server;
-    if (!isInstanceOrigin(server)) {
-      return res.status(400).json({ error: 'server must be the http(s) origin of this page.', code: 400 });
-    }
-    if (!mayHaveDevice(req.authUserId)) {
-      return res.status(403).json({
-        error: 'Only household members can add a signed-in device.', code: 403, reason: 'not_a_household_member',
-      });
-    }
-    const { code, expiresAt } = issueDevicePairingCode(db.get(), req.authUserId);
-    const link = devicePairingLink(server, code);
-    res.status(201).json({
-      data: { code, expires_at: expiresAt, link, qr: qrToDataUrl(link, { moduleSize: 6 }) },
-    });
-  } catch (err) {
-    log.error('Device pairing code error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const server = req.body?.server;
+  if (!isInstanceOrigin(server)) {
+    return res.status(400).json({ error: 'server must be the http(s) origin of this page.', code: 400 });
   }
+  if (!mayHaveDevice(req.authUserId)) {
+    return res.status(403).json({
+      error: 'Only household members can add a signed-in device.', code: 403, reason: 'not_a_household_member',
+    });
+  }
+  const { code, expiresAt } = issueDevicePairingCode(db.get(), req.authUserId);
+  const link = devicePairingLink(server, code);
+  res.status(201).json({
+    data: { code, expires_at: expiresAt, link, qr: qrToDataUrl(link, { moduleSize: 6 }) },
+  });
 });
 
 /**
@@ -3521,28 +3446,23 @@ router.post('/devices/pair', requireAuth, csrfMiddleware, requireSignInSession('
  * darf, klingt die Absage wie bei einem falschen Code.
  */
 router.post('/devices/pair/redeem', devicePairingLimiter, validateRequest(), (req, res) => {
-  try {
-    const fields = readDeviceFields(req.body);
-    if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
+  const fields = readDeviceFields(req.body);
+  if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
 
-    let issued = null;
-    db.transaction(() => {
-      const userId = spendDevicePairingCode(db.get(), req.body?.code);
-      if (userId == null || !mayHaveDevice(userId)) return;
-      issued = issueDeviceCredential(userId, fields);
+  let issued = null;
+  db.transaction(() => {
+    const userId = spendDevicePairingCode(db.get(), req.body?.code);
+    if (userId == null || !mayHaveDevice(userId)) return;
+    issued = issueDeviceCredential(userId, fields);
+  });
+  if (!issued) {
+    return res.status(400).json({
+      error: 'This pairing code is not valid.', code: 400, reason: 'invalid_pairing_code',
     });
-    if (!issued) {
-      return res.status(400).json({
-        error: 'This pairing code is not valid.', code: 400, reason: 'invalid_pairing_code',
-      });
-    }
-
-    const row = db.get().prepare('SELECT * FROM api_tokens WHERE id = ?').get(issued.id);
-    res.status(201).json({ data: publicDevice(row), credential: issued.credential });
-  } catch (err) {
-    log.error('Device pairing redemption error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
+
+  const row = db.get().prepare('SELECT * FROM api_tokens WHERE id = ?').get(issued.id);
+  res.status(201).json({ data: publicDevice(row), credential: issued.credential });
 });
 
 /**
@@ -3551,17 +3471,12 @@ router.post('/devices/pair/redeem', devicePairingLimiter, validateRequest(), (re
  * welches Telefon benutzt, geht auch den Admin nichts an (DECISIONS Eintrag 1).
  */
 router.get('/devices', requireAuth, refuseIntegrationToken, validateRequest(), (req, res) => {
-  try {
-    const rows = db.get().prepare(`
-      SELECT t.* FROM api_tokens t
-      WHERE t.kind = 'device' AND t.subject_user_id = ? AND ${apiTokenUsableSql('t')}
-      ORDER BY COALESCE(t.last_used_at, t.created_at) DESC
-    `).all(req.authUserId);
-    res.json({ data: rows.map((row) => publicDevice(row, req.authDeviceId ?? null)) });
-  } catch (err) {
-    log.error('Signed-in device list error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const rows = db.get().prepare(`
+    SELECT t.* FROM api_tokens t
+    WHERE t.kind = 'device' AND t.subject_user_id = ? AND ${apiTokenUsableSql('t')}
+    ORDER BY COALESCE(t.last_used_at, t.created_at) DESC
+  `).all(req.authUserId);
+  res.json({ data: rows.map((row) => publicDevice(row, req.authDeviceId ?? null)) });
 });
 
 /** Setzt `revoked_at` auf einem eigenen, noch gueltigen Geraet. */
@@ -3582,13 +3497,8 @@ router.delete('/devices/current', requireAuth, csrfMiddleware, validateRequest()
       error: 'Only a signed-in device can sign itself out here.', code: 403, reason: 'device_credential_required',
     });
   }
-  try {
-    revokeOwnDevice(req.authUserId, req.authDeviceId);
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('Signed-in device sign-out error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  revokeOwnDevice(req.authUserId, req.authDeviceId);
+  res.json({ ok: true });
 });
 
 /**
@@ -3597,17 +3507,12 @@ router.delete('/devices/current', requireAuth, csrfMiddleware, validateRequest()
  * Auskunft, die diese Route nicht gibt.
  */
 router.delete('/devices/:id', requireAuth, refuseIntegrationToken, csrfMiddleware, validateRequest(), (req, res) => {
-  try {
-    const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
-    if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid device ID.', code: 400 });
-    if (revokeOwnDevice(req.authUserId, id) === 0) {
-      return res.status(404).json({ error: 'Device not found.', code: 404 });
-    }
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('Signed-in device revocation error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
+  if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid device ID.', code: 400 });
+  if (revokeOwnDevice(req.authUserId, id) === 0) {
+    return res.status(404).json({ error: 'Device not found.', code: 404 });
   }
+  res.json({ ok: true });
 });
 
 /**
@@ -3641,61 +3546,56 @@ router.post('/users/:id/devices/sign-out', requireAuth, requireAdmin, csrfMiddle
 });
 
 router.get('/users', requireAuth, validateRequest(), (req, res) => {
-  try {
-    // is_worker markiert Konten der Haushaltshilfe (housekeeping_workers),
-    // damit die Familien-Verwaltung sie nicht als Familienmitglied labelt
-    // (Audit A2-25e). Muster wie der Worker-Ausschluss in routes/family.js.
-    // Der Anmeldeweg eines fremden Kontos geht nur Administratoren etwas an -
-    // siehe den Kommentar in publicUser (#847). Der Platzhalter wird gebunden
-    // und nicht in die Query geschrieben, damit hier keine zusammengesetzte SQL
-    // steht, der man erst ansehen muss, dass ihre Bestandteile konstant sind.
-    //
-    // Die geltende Rolle des Requests und NICHT `req.session.role`: `requireAuth`
-    // bedient beide Anmeldearten und legt die geltende Rolle in `authRole` ab,
-    // und `isAdminRequest()` fragt damit die eine Admin-Regel in
-    // server/authorize/. Ein Admin-API-Token hat gar keine Session und verloere
-    // das Feld; ein Mitglieds-Token neben einem Admin-Cookie bekaeme es umgekehrt
-    // zu Unrecht.
-    const isAdmin = isAdminRequest(req);
-    // WANDTABLETTS STEHEN HIER NICHT (#1208). Diese Liste ist die
-    // Kontenverwaltung, und die Familien-Seite rendert jede Zeile daraus als
-    // bearbeitbares Familienmitglied - samt Familienrolle, Loeschknopf und,
-    // beim Speichern, `syncFamilyMemberArtifacts`, das dem Geraet einen Kontakt
-    // und einen Geburtstag anlegen wuerde. Ein Display ist kein Konto, das man
-    // hier verwaltet: es hat seine eigene Seite, auf der es angelegt, gekoppelt
-    // und widerrufen wird.
-    // EHEMALIGE STEHEN WEITER HIER, ANS ENDE SORTIERT UND MIT `deactivated_at`
-    // (#1381). Diese Liste benennt Personen, die ein Datensatz schon speichert
-    // - den Zustaendigen einer alten Aufgabe, den Ersteller eines Termins -,
-    // und die Verwaltung muss sehen, wen sie deaktiviert hat. Auswaehlen laesst
-    // sich ein Ehemaliger nirgends: jede Auswahl liest `/family/members`.
-    //
-    // INNERHALB DER AKTIVEN GILT DIE HAUSHALTSREIHENFOLGE (#1644). Stundenplan,
-    // Uebersicht und Kalender lesen ihre Personen aus dieser Liste; sortierte
-    // sie nach dem Namen, stuenden dieselben fuenf Menschen dort anders als in
-    // jeder Auswahl. Personal und Gaeste haben keine Position und stehen mit
-    // den unplatzierten Mitgliedern im Alphabet.
-    const users = isAdmin
-      ? db.get().prepare(`
-          SELECT ${USER_PUBLIC_COLUMNS},
-                 EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker,
-                 (password_hash = ?) AS sso_only
-          FROM users
-          WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
-          ORDER BY ${activeAccountSql('users')} DESC, ${memberOrderSql('users')}
-        `).all(OIDC_PASSWORD_SENTINEL)
-      : db.get().prepare(`
-          SELECT ${USER_PUBLIC_COLUMNS},
-                 EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker
-          FROM users
-          WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
-          ORDER BY ${activeAccountSql('users')} DESC, ${memberOrderSql('users')}
-        `).all();
-    res.json({ data: users.map(publicUser) });
-  } catch (err) {
-    log.error('Users error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  // is_worker markiert Konten der Haushaltshilfe (housekeeping_workers),
+  // damit die Familien-Verwaltung sie nicht als Familienmitglied labelt
+  // (Audit A2-25e). Muster wie der Worker-Ausschluss in routes/family.js.
+  // Der Anmeldeweg eines fremden Kontos geht nur Administratoren etwas an -
+  // siehe den Kommentar in publicUser (#847). Der Platzhalter wird gebunden
+  // und nicht in die Query geschrieben, damit hier keine zusammengesetzte SQL
+  // steht, der man erst ansehen muss, dass ihre Bestandteile konstant sind.
+  //
+  // Die geltende Rolle des Requests und NICHT `req.session.role`: `requireAuth`
+  // bedient beide Anmeldearten und legt die geltende Rolle in `authRole` ab,
+  // und `isAdminRequest()` fragt damit die eine Admin-Regel in
+  // server/authorize/. Ein Admin-API-Token hat gar keine Session und verloere
+  // das Feld; ein Mitglieds-Token neben einem Admin-Cookie bekaeme es umgekehrt
+  // zu Unrecht.
+  const isAdmin = isAdminRequest(req);
+  // WANDTABLETTS STEHEN HIER NICHT (#1208). Diese Liste ist die
+  // Kontenverwaltung, und die Familien-Seite rendert jede Zeile daraus als
+  // bearbeitbares Familienmitglied - samt Familienrolle, Loeschknopf und,
+  // beim Speichern, `syncFamilyMemberArtifacts`, das dem Geraet einen Kontakt
+  // und einen Geburtstag anlegen wuerde. Ein Display ist kein Konto, das man
+  // hier verwaltet: es hat seine eigene Seite, auf der es angelegt, gekoppelt
+  // und widerrufen wird.
+  // EHEMALIGE STEHEN WEITER HIER, ANS ENDE SORTIERT UND MIT `deactivated_at`
+  // (#1381). Diese Liste benennt Personen, die ein Datensatz schon speichert
+  // - den Zustaendigen einer alten Aufgabe, den Ersteller eines Termins -,
+  // und die Verwaltung muss sehen, wen sie deaktiviert hat. Auswaehlen laesst
+  // sich ein Ehemaliger nirgends: jede Auswahl liest `/family/members`.
+  //
+  // INNERHALB DER AKTIVEN GILT DIE HAUSHALTSREIHENFOLGE (#1644). Stundenplan,
+  // Uebersicht und Kalender lesen ihre Personen aus dieser Liste; sortierte
+  // sie nach dem Namen, stuenden dieselben fuenf Menschen dort anders als in
+  // jeder Auswahl. Personal und Gaeste haben keine Position und stehen mit
+  // den unplatzierten Mitgliedern im Alphabet.
+  const users = isAdmin
+    ? db.get().prepare(`
+        SELECT ${USER_PUBLIC_COLUMNS},
+               EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker,
+               (password_hash = ?) AS sso_only
+        FROM users
+        WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
+        ORDER BY ${activeAccountSql('users')} DESC, ${memberOrderSql('users')}
+      `).all(OIDC_PASSWORD_SENTINEL)
+    : db.get().prepare(`
+        SELECT ${USER_PUBLIC_COLUMNS},
+               EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker
+        FROM users
+        WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
+        ORDER BY ${activeAccountSql('users')} DESC, ${memberOrderSql('users')}
+      `).all();
+  res.json({ data: users.map(publicUser) });
 });
 
 router.get('/api-tokens', requireAuth, requireAdmin, (req, res) => {
@@ -4288,71 +4188,66 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
  * Updates the current user's profile picture and basic profile fields.
  */
 router.patch('/me/profile', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
-  try {
-    const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(req.authUserId);
-    if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
+  const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(req.authUserId);
+  if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
 
-    const displayName = req.body.display_name !== undefined ? String(req.body.display_name || '').trim() : existing.display_name;
-    const avatarColor = req.body.avatar_color !== undefined ? String(req.body.avatar_color || '').trim() : existing.avatar_color;
-    const avatarData = req.body.avatar_data !== undefined
-      ? normalizeAvatarData(req.body.avatar_data)
-      : existing.avatar_data;
-    const memberFields = validateMemberProfileFields(req.body);
+  const displayName = req.body.display_name !== undefined ? String(req.body.display_name || '').trim() : existing.display_name;
+  const avatarColor = req.body.avatar_color !== undefined ? String(req.body.avatar_color || '').trim() : existing.avatar_color;
+  const avatarData = req.body.avatar_data !== undefined
+    ? normalizeAvatarData(req.body.avatar_data)
+    : existing.avatar_data;
+  const memberFields = validateMemberProfileFields(req.body);
 
-    if (!displayName) return res.status(400).json({ error: 'Display name is required.', code: 400 });
-    if (displayName.length > DISPLAY_NAME_MAX) {
-      return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
-    }
-    // Die Farbe steht bei allen Mitgliedern in einem style-Attribut: nur #RRGGBB,
-    // sonst setzt sich ein Konto eine CSS-Deklaration in fremde Ansichten.
-    const colorError = validateColor(avatarColor, 'avatar_color').error;
-    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
-    if (avatarData?.error) {
-      return res.status(400).json({ error: avatarData.error, code: 400 });
-    }
-    if (memberFields.errors.length) {
-      return res.status(400).json({ error: memberFields.errors.join(' '), code: 400 });
-    }
-
-    // Eine Adresse, die schon ein anderes Konto traegt, setzt sich ein
-    // Mitglied nicht selbst (GHSA-6pmj-w42g-g6qv): sonst stellte es die
-    // Mehrdeutigkeit her, an der SSO-Verknuepfung und Passwort-Reset des
-    // anderen scheitern. Ein Admin darf das bewusst (Familienpostfach).
-    // Synchron bis zum Schreiben: kein await zwischen Pruefung und UPDATE.
-    if (memberFields.values.email !== undefined && !isAdminRequest(req)) {
-      const taken = emailsTakenByOtherAccounts(db.get(), {
-        userId: req.authUserId,
-        before: storedAccountEmails(db.get(), req.authUserId),
-        after: [memberFields.values.email],
-      });
-      if (taken.length) {
-        return res.status(409).json({ error: EMAIL_IN_USE_MESSAGE, code: 409, reason: 'email_in_use' });
-      }
-    }
-
-    db.transaction(() => {
-      db.get().prepare(`
-        UPDATE users
-        SET display_name = ?, avatar_color = ?, avatar_data = ?
-        WHERE id = ?
-      `).run(displayName, avatarColor || '#007AFF', avatarData ?? null, req.authUserId);
-      syncFamilyMemberArtifacts(db.get(), req.authUserId, {
-        displayName,
-        phone: memberFields.values.phone,
-        email: memberFields.values.email,
-        birthDate: memberFields.values.birth_date,
-        birthYearUnknown: memberFields.values.birth_year_unknown,
-        avatarData: avatarData ?? null,
-        actorUserId: req.authUserId,
-      });
-    });
-
-    const updated = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(req.authUserId);
-    res.json({ user: publicUser(updated) });
-  } catch (err) {
-    log.error('Profile update error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (!displayName) return res.status(400).json({ error: 'Display name is required.', code: 400 });
+  if (displayName.length > DISPLAY_NAME_MAX) {
+    return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
   }
+  // Die Farbe steht bei allen Mitgliedern in einem style-Attribut: nur #RRGGBB,
+  // sonst setzt sich ein Konto eine CSS-Deklaration in fremde Ansichten.
+  const colorError = validateColor(avatarColor, 'avatar_color').error;
+  if (colorError) return res.status(400).json({ error: colorError, code: 400 });
+  if (avatarData?.error) {
+    return res.status(400).json({ error: avatarData.error, code: 400 });
+  }
+  if (memberFields.errors.length) {
+    return res.status(400).json({ error: memberFields.errors.join(' '), code: 400 });
+  }
+
+  // Eine Adresse, die schon ein anderes Konto traegt, setzt sich ein
+  // Mitglied nicht selbst (GHSA-6pmj-w42g-g6qv): sonst stellte es die
+  // Mehrdeutigkeit her, an der SSO-Verknuepfung und Passwort-Reset des
+  // anderen scheitern. Ein Admin darf das bewusst (Familienpostfach).
+  // Synchron bis zum Schreiben: kein await zwischen Pruefung und UPDATE.
+  if (memberFields.values.email !== undefined && !isAdminRequest(req)) {
+    const taken = emailsTakenByOtherAccounts(db.get(), {
+      userId: req.authUserId,
+      before: storedAccountEmails(db.get(), req.authUserId),
+      after: [memberFields.values.email],
+    });
+    if (taken.length) {
+      return res.status(409).json({ error: EMAIL_IN_USE_MESSAGE, code: 409, reason: 'email_in_use' });
+    }
+  }
+
+  db.transaction(() => {
+    db.get().prepare(`
+      UPDATE users
+      SET display_name = ?, avatar_color = ?, avatar_data = ?
+      WHERE id = ?
+    `).run(displayName, avatarColor || '#007AFF', avatarData ?? null, req.authUserId);
+    syncFamilyMemberArtifacts(db.get(), req.authUserId, {
+      displayName,
+      phone: memberFields.values.phone,
+      email: memberFields.values.email,
+      birthDate: memberFields.values.birth_date,
+      birthYearUnknown: memberFields.values.birth_year_unknown,
+      avatarData: avatarData ?? null,
+      actorUserId: req.authUserId,
+    });
+  });
+
+  const updated = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(req.authUserId);
+  res.json({ user: publicUser(updated) });
 });
 
 // Status je Grund aus services/gravatar.js. Ein Grund, der hier fehlt, ist ein
@@ -4426,97 +4321,93 @@ function gravatarClientState(userId) {
  */
 export function buildGravatarRoute(targetRouter, { fetch = fetchGravatar, limiter = gravatarLimiter } = {}) {
   targetRouter.post('/me/avatar/gravatar', requireAuth, csrfMiddleware, limiter, validateRequest(), async (req, res) => {
-    try {
-      if (!gravatarEnabled()) {
-        return res.status(404).json({ error: 'Gravatar import is switched off on this server.', code: 404, reason: 'gravatar_disabled' });
-      }
-      const userId = req.authUserId;
-      const existing = db.get().prepare('SELECT id, avatar_data FROM users WHERE id = ?').get(userId);
-      if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
-      if (!isHouseholdMember(userId, { db: db.get() })) {
-        return res.status(403).json({ error: 'Only household members can fetch a Gravatar.', code: 403, reason: 'not_a_household_member' });
-      }
-
-      // Der Schnappschuss, gegen den die Transaktion unten prueft.
-      const avatarBefore = existing.avatar_data ?? null;
-      const email = memberEmail(userId);
-      const keyBefore = emailMatchKey(email);
-      // Die Seite schickt die Adresse mit, die ihr Hinweis nennt. Hat ein
-      // anderes Mitglied den Kontakt seitdem geaendert, wird nicht das Bild
-      // einer Adresse geholt, die das Mitglied nie gesehen hat - Absage VOR dem
-      // Abruf. Ohne das Feld (API-Aufrufer) gilt die gespeicherte Adresse. Ist keine gespeichert,
-      // bleibt es beim 400 no_email unten.
-      if (keyBefore && typeof req.body?.email === 'string' && emailMatchKey(req.body.email) !== keyBefore) {
-        log.info('Gravatar import refused: the page showed another address', { userId });
-        return res.status(409).json({
-          error: 'Your email address changed since the page was loaded. Reload and try again.',
-          code: 409,
-          reason: 'gravatar_stale',
-        });
-      }
-      let fetched;
-      try {
-        fetched = await fetch(email);
-      } catch (err) {
-        if (!(err instanceof GravatarError)) throw err;
-        const status = GRAVATAR_STATUS[err.reason] ?? 500;
-        // Ohne Hash und ohne URL: das Log soll sagen, WAS schiefging, nicht WER
-        // gefragt wurde. Von der `cause` nur der Code (ENOTFOUND, ECONNRESET),
-        // nicht die Meldung - die traegt bei einem DNS-Fehler den Host der
-        // Basis-URL. Ein Betreiberfehler (500) bekommt nach aussen einen
-        // neutralen Satz; der genaue steht im Log, wo der Betreiber liest.
-        // Genau die 500, nicht "ab 500": ein 502 gravatar_unreachable ist kein
-        // Betreiberfehler, und sein Satz nennt den Dienst, der nicht antwortete.
-        const operatorError = status === 500;
-        log.info('Gravatar import refused', { userId, reason: err.reason, cause: err.cause?.code ?? err.cause?.name, detail: operatorError ? err.message : undefined });
-        const error = operatorError ? 'Gravatar import is misconfigured on this server.' : err.message;
-        return res.status(status).json({ error, code: status, reason: err.reason });
-      }
-      if (!fetched) {
-        log.info('Gravatar import: no picture', { userId });
-        return res.status(404).json({ error: `${gravatarHost()} has no picture for your email address.`, code: 404, reason: 'gravatar_not_found' });
-      }
-
-      // Derselbe Filter wie beim Upload. Er kann hier nur noch an der Laenge
-      // scheitern, und auch das nicht, solange MAX_GRAVATAR_BYTES in Base64
-      // unter MAX_AVATAR_DATA_LENGTH bleibt - geprueft wird trotzdem, damit die
-      // Zusicherung an der Stelle steht, an der sie gilt.
-      const avatarData = normalizeAvatarData(fetched.dataUrl);
-      if (avatarData?.error) {
-        return res.status(415).json({ error: avatarData.error, code: 415, reason: 'gravatar_not_image' });
-      }
-
-      // Synchron: zwischen dem zweiten Blick und dem Schreiben liegt kein await.
-      // Der Adressvergleich laeuft ueber emailMatchKey() - eine Aenderung nur
-      // der Grossschreibung ergibt denselben Hash und ist kein Grund zur Absage.
-      const stored = db.transaction(() => {
-        const now = db.get().prepare('SELECT avatar_data FROM users WHERE id = ?').get(userId);
-        if (!now
-          || !isHouseholdMember(userId, { db: db.get() })
-          || emailMatchKey(memberEmail(userId)) !== keyBefore
-          || (now.avatar_data ?? null) !== avatarBefore) {
-          return false;
-        }
-        db.get().prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(avatarData, userId);
-        syncFamilyMemberArtifacts(db.get(), userId, { avatarData, actorUserId: userId });
-        return true;
-      });
-      if (!stored) {
-        log.info('Gravatar import discarded: account changed during the fetch', { userId });
-        return res.status(409).json({
-          error: 'Your picture, address or account changed while the picture was being fetched. Nothing was stored.',
-          code: 409,
-          reason: 'gravatar_stale',
-        });
-      }
-
-      log.info('Gravatar imported', { userId, contentType: fetched.contentType, bytes: fetched.bytes });
-      const updated = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
-      res.json({ data: publicUser(updated) });
-    } catch (err) {
-      log.error('Gravatar import error:', err);
-      res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (!gravatarEnabled()) {
+      return res.status(404).json({ error: 'Gravatar import is switched off on this server.', code: 404, reason: 'gravatar_disabled' });
     }
+    const userId = req.authUserId;
+    const existing = db.get().prepare('SELECT id, avatar_data FROM users WHERE id = ?').get(userId);
+    if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
+    if (!isHouseholdMember(userId, { db: db.get() })) {
+      return res.status(403).json({ error: 'Only household members can fetch a Gravatar.', code: 403, reason: 'not_a_household_member' });
+    }
+
+    // Der Schnappschuss, gegen den die Transaktion unten prueft.
+    const avatarBefore = existing.avatar_data ?? null;
+    const email = memberEmail(userId);
+    const keyBefore = emailMatchKey(email);
+    // Die Seite schickt die Adresse mit, die ihr Hinweis nennt. Hat ein
+    // anderes Mitglied den Kontakt seitdem geaendert, wird nicht das Bild
+    // einer Adresse geholt, die das Mitglied nie gesehen hat - Absage VOR dem
+    // Abruf. Ohne das Feld (API-Aufrufer) gilt die gespeicherte Adresse. Ist keine gespeichert,
+    // bleibt es beim 400 no_email unten. Dass `email` Text ist, prueft das
+    // Schema der Operation vor dem Handler (validateRequest()).
+    if (keyBefore && req.body?.email !== undefined && emailMatchKey(req.body.email) !== keyBefore) {
+      log.info('Gravatar import refused: the page showed another address', { userId });
+      return res.status(409).json({
+        error: 'Your email address changed since the page was loaded. Reload and try again.',
+        code: 409,
+        reason: 'gravatar_stale',
+      });
+    }
+    let fetched;
+    try {
+      fetched = await fetch(email);
+    } catch (err) {
+      if (!(err instanceof GravatarError)) throw err;
+      const status = GRAVATAR_STATUS[err.reason] ?? 500;
+      // Ohne Hash und ohne URL: das Log soll sagen, WAS schiefging, nicht WER
+      // gefragt wurde. Von der `cause` nur der Code (ENOTFOUND, ECONNRESET),
+      // nicht die Meldung - die traegt bei einem DNS-Fehler den Host der
+      // Basis-URL. Ein Betreiberfehler (500) bekommt nach aussen einen
+      // neutralen Satz; der genaue steht im Log, wo der Betreiber liest.
+      // Genau die 500, nicht "ab 500": ein 502 gravatar_unreachable ist kein
+      // Betreiberfehler, und sein Satz nennt den Dienst, der nicht antwortete.
+      const operatorError = status === 500;
+      log.info('Gravatar import refused', { userId, reason: err.reason, cause: err.cause?.code ?? err.cause?.name, detail: operatorError ? err.message : undefined });
+      const error = operatorError ? 'Gravatar import is misconfigured on this server.' : err.message;
+      return res.status(status).json({ error, code: status, reason: err.reason });
+    }
+    if (!fetched) {
+      log.info('Gravatar import: no picture', { userId });
+      return res.status(404).json({ error: `${gravatarHost()} has no picture for your email address.`, code: 404, reason: 'gravatar_not_found' });
+    }
+
+    // Derselbe Filter wie beim Upload. Er kann hier nur noch an der Laenge
+    // scheitern, und auch das nicht, solange MAX_GRAVATAR_BYTES in Base64
+    // unter MAX_AVATAR_DATA_LENGTH bleibt - geprueft wird trotzdem, damit die
+    // Zusicherung an der Stelle steht, an der sie gilt.
+    const avatarData = normalizeAvatarData(fetched.dataUrl);
+    if (avatarData?.error) {
+      return res.status(415).json({ error: avatarData.error, code: 415, reason: 'gravatar_not_image' });
+    }
+
+    // Synchron: zwischen dem zweiten Blick und dem Schreiben liegt kein await.
+    // Der Adressvergleich laeuft ueber emailMatchKey() - eine Aenderung nur
+    // der Grossschreibung ergibt denselben Hash und ist kein Grund zur Absage.
+    const stored = db.transaction(() => {
+      const now = db.get().prepare('SELECT avatar_data FROM users WHERE id = ?').get(userId);
+      if (!now
+        || !isHouseholdMember(userId, { db: db.get() })
+        || emailMatchKey(memberEmail(userId)) !== keyBefore
+        || (now.avatar_data ?? null) !== avatarBefore) {
+        return false;
+      }
+      db.get().prepare('UPDATE users SET avatar_data = ? WHERE id = ?').run(avatarData, userId);
+      syncFamilyMemberArtifacts(db.get(), userId, { avatarData, actorUserId: userId });
+      return true;
+    });
+    if (!stored) {
+      log.info('Gravatar import discarded: account changed during the fetch', { userId });
+      return res.status(409).json({
+        error: 'Your picture, address or account changed while the picture was being fetched. Nothing was stored.',
+        code: 409,
+        reason: 'gravatar_stale',
+      });
+    }
+
+    log.info('Gravatar imported', { userId, contentType: fetched.contentType, bytes: fetched.bytes });
+    const updated = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
+    res.json({ data: publicUser(updated) });
   });
 }
 buildGravatarRoute(router);
@@ -4528,37 +4419,32 @@ buildGravatarRoute(router);
  * Response: { ok: true }
  */
 router.patch('/me/password', requireAuth, csrfMiddleware, validateRequest(), async (req, res) => {
-  try {
-    const { current_password, new_password } = req.body;
+  const { current_password, new_password } = req.body;
 
-    if (!current_password || !new_password) {
-      return res.status(400).json({ error: 'Current and new password are required.', code: 400 });
-    }
-    if (normalizePassword(new_password).length < 8) {
-      return res.status(400).json({ error: 'New password must be at least 8 characters long.', code: 400 });
-    }
-
-    const user = db.get().prepare('SELECT password_hash FROM users WHERE id = ?').get(req.authUserId);
-    if (!user) return res.status(404).json({ error: 'User not found.', code: 404 });
-
-    const { valid } = await verifyPassword(current_password, user.password_hash);
-    // 400 mit Grund, nicht 401 (Re-Critique 2026-10-17): ein 401 heisst in
-    // dieser App "Sitzung weg" - api.js loeste darauf auth:expired aus, und wer
-    // sich beim alten Passwort vertippte, landete ohne Meldung auf der
-    // Anmeldung, die Eingaben verloren, obwohl die Sitzung gueltig war.
-    // Dieselbe Form wie ein falscher Code beim zweiten Faktor (invalid_code).
-    if (!valid) return res.status(400).json({ error: 'Current password is incorrect.', code: 400, reason: 'wrong_password' });
-
-    const hash = await hashPassword(new_password);
-    db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.authUserId);
-
-    invalidateUserSessions(req.authUserId, req.sessionID);
-
-    res.json({ ok: true });
-  } catch (err) {
-    log.error('Password change error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (!current_password || !new_password) {
+    return res.status(400).json({ error: 'Current and new password are required.', code: 400 });
   }
+  if (normalizePassword(new_password).length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters long.', code: 400 });
+  }
+
+  const user = db.get().prepare('SELECT password_hash FROM users WHERE id = ?').get(req.authUserId);
+  if (!user) return res.status(404).json({ error: 'User not found.', code: 404 });
+
+  const { valid } = await verifyPassword(current_password, user.password_hash);
+  // 400 mit Grund, nicht 401 (Re-Critique 2026-10-17): ein 401 heisst in
+  // dieser App "Sitzung weg" - api.js loeste darauf auth:expired aus, und wer
+  // sich beim alten Passwort vertippte, landete ohne Meldung auf der
+  // Anmeldung, die Eingaben verloren, obwohl die Sitzung gueltig war.
+  // Dieselbe Form wie ein falscher Code beim zweiten Faktor (invalid_code).
+  if (!valid) return res.status(400).json({ error: 'Current password is incorrect.', code: 400, reason: 'wrong_password' });
+
+  const hash = await hashPassword(new_password);
+  db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.authUserId);
+
+  invalidateUserSessions(req.authUserId, req.sessionID);
+
+  res.json({ ok: true });
 });
 
 /**
