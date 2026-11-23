@@ -6,6 +6,11 @@
  *        (Phase 2, C3); diese Route haelt die Transaktion, die Abbildung einer
  *        Absage auf HTTP, die Display-Allowlist, die Sichten mit Dienstbezug und
  *        die Feiertags-Unterrouten.
+ *        Jede Route prueft die Anfrage vor dem Handler gegen ihre Operation im
+ *        OpenAPI-Dokument (`validateRequest()`, #2810 Gruppe 11b). Den Rumpf
+ *        von PUT / prueft das Dokument nur als Objekt: Form, Bereich und
+ *        Schreibrecht jedes Felds bleiben im Register, damit ein Mitglied auf
+ *        ein Admin-Feld weiter 403 bekommt und keine zweite Regelkopie entsteht.
  * Abhängigkeiten: express, server/db.js, server/settings/registry.ts
  */
 
@@ -27,6 +32,7 @@ import { rekeyForHouseholdZoneChange } from '../services/calendar-occurrence-ove
 import { readSetting, readSettings, writeSettings } from '../settings/registry.ts';
 import { COUNTRY_ISO_RE, SUBDIVISION_RE } from '../settings/values.ts';
 import { remoteFailure } from '../utils/http.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Preferences');
 
@@ -131,7 +137,7 @@ function sendRefusal(req, res, refusal) {
 // Alle Praeferenzen lesen (Haushalt und eigene).
 // --------------------------------------------------------
 
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   try {
     const data = settingsAnswer(db.get(), req.authUserId, { withWeatherSource: true });
     // A derived flag (#1766): true when Immich is configured and, for a
@@ -172,7 +178,7 @@ router.get('/', (req, res) => {
 // `await`; kaeme eines dazu, laege die offene Transaktion ueber fremden Requests.
 // --------------------------------------------------------
 
-router.put('/', (req, res) => {
+router.put('/', validateRequest(), (req, res) => {
   let database = null;
   try {
     database = db.get();
@@ -236,7 +242,7 @@ router.put('/', (req, res) => {
 });
 
 // GET /api/v1/preferences/holidays/countries
-router.get('/holidays/countries', async (_req, res) => {
+router.get('/holidays/countries', validateRequest(), async (_req, res) => {
   try {
     const countries = await holidays.getCountries();
     res.json({ data: countries });
@@ -249,9 +255,10 @@ router.get('/holidays/countries', async (_req, res) => {
 // GET /api/v1/preferences/holidays/subdivisions/:countryCode?lang=
 // `lang` ist die UI-Sprache des Lesers (#1723). Sie geht durch
 // supportedLocaleFor(), also durch die Liste der Locale-Dateien: alles andere
-// (unbekannter Code, Pfadzeichen, doppelter Parameter) wird zu null und damit
-// zu Englisch - wie bei `lang` der Budget-Kategorien, kein 400.
-router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
+// (unbekannter Code, Pfadzeichen) wird zu null und damit zu Englisch - wie bei
+// `lang` der Budget-Kategorien, kein 400. Nur ein doppelter Parameter ist kein
+// Text und antwortet seit #2810 (Gruppe 11b) 400 aus validateRequest().
+router.get('/holidays/subdivisions/:countryCode', validateRequest(), async (req, res) => {
   const { countryCode } = req.params;
   if (!COUNTRY_ISO_RE.test(countryCode)) {
     return res.status(400).json({ error: 'Invalid country code.', code: 400 });
@@ -269,7 +276,7 @@ router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
 // Schulferien-Gruppen eines Landes ohne Subdivisionen (Belgien, D#1182). Leere
 // Liste fuer jedes Land, das Subdivisionen fuehrt - dort gehoeren die Gruppen
 // zur Region und kommen ueber die Route darunter.
-router.get('/holidays/groups/:countryCode', async (req, res) => {
+router.get('/holidays/groups/:countryCode', validateRequest(), async (req, res) => {
   const { countryCode } = req.params;
   if (!COUNTRY_ISO_RE.test(countryCode)) {
     return res.status(400).json({ error: 'Invalid country code.', code: 400 });
@@ -286,7 +293,7 @@ router.get('/holidays/groups/:countryCode', async (req, res) => {
 // GET /api/v1/preferences/holidays/groups/:countryCode/:subdivisionCode
 // Schulferien-Gruppen einer Subdivision (mehrsprachige Kantone). Leere Liste,
 // wenn die Subdivision nur ein Ferien-Regime kennt. (#434)
-router.get('/holidays/groups/:countryCode/:subdivisionCode', async (req, res) => {
+router.get('/holidays/groups/:countryCode/:subdivisionCode', validateRequest(), async (req, res) => {
   const { countryCode, subdivisionCode } = req.params;
   if (!COUNTRY_ISO_RE.test(countryCode)) {
     return res.status(400).json({ error: 'Invalid country code.', code: 400 });
@@ -304,7 +311,7 @@ router.get('/holidays/groups/:countryCode/:subdivisionCode', async (req, res) =>
 });
 
 // POST /api/v1/preferences/holidays/sync  (admin only)
-router.post('/holidays/sync', async (req, res) => {
+router.post('/holidays/sync', validateRequest(), async (req, res) => {
   if (!isAdminRequest(req)) {
     return refuseAdmin(req, res);
   }

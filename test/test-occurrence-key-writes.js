@@ -31,7 +31,6 @@ process.env.DB_PATH = ':memory:';
 
 import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const db = (await import('../server/db.js')).get();
 const { expandAndResolveEventRows } = await import('../server/services/calendar-event-reader.js');
@@ -41,7 +40,7 @@ const {
 const { getCountdowns } = await import('../server/services/countdowns.js');
 const { buildFeed } = await import('../server/services/ics-export.js');
 const { createCalendarApp } = await import('./calendar-app.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
+const { createPreferencesApp, PREFERENCES_PREFIX } = await import('./preferences-app.js');
 
 db.prepare("INSERT INTO users (id, username, display_name, password_hash, role) VALUES (1, 'admin', 'Admin', 'x', 'admin')").run();
 
@@ -126,12 +125,13 @@ async function startCalendar() {
   return listen(app, '/api/v1/calendar');
 }
 
-function startApp(router) {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
-  app.use('/', router);
-  return listen(app);
+// createPreferencesApp (test/preferences-app.js): dasselbe fuer die Einstellungen.
+async function startPreferences() {
+  const app = await createPreferencesApp({
+    mount: ['preferences'],
+    auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); },
+  });
+  return listen(app, PREFERENCES_PREFIX);
 }
 
 // Europe/Berlin taeglich 01:30, Start im Sommer 2034. Im Maerz 2035: 01:30 MEZ
@@ -337,7 +337,7 @@ test('Wechsel der Haushaltszone schluesselt eine #1993-Serie mit um (F5)', async
     seriesId: id, recurrenceId: keyShownOn(id, 'America/New_York', '2035-03-26'), actorId: 1, changes: { title: 'Eigener Titel' },
   });
 
-  const { base, close } = await startApp(preferencesRouter);
+  const { base, close } = await startPreferences();
   try {
     const res = await fetch(`${base}/`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timezone: 'America/New_York' }),

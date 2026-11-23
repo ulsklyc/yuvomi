@@ -1562,6 +1562,60 @@ export const schemas = {
             ids: { ...bulkTaskIds('The tasks whose rank is cleared, each once.'), uniqueItems: true },
           },
         },
+        // Group 11b (#2810): the preferences and push bodies.
+        PreferencesUpdateInput: {
+          type: 'object',
+          // No properties here (decision 9): the settings registry
+          // (server/settings/registry.ts) is the one place that knows every
+          // field, its shape, its range and who may write it. A second copy
+          // here would drift, and checking a field before the registry would
+          // answer 400 where the registry answers 403 to a member.
+          additionalProperties: true,
+          description: 'A patch of preferences, validated per field by the settings registry: every key the route knows is checked for shape, range and write right, unknown and read-only keys are ignored, and the first refused field answers 400 or 403 with nothing of the patch written.',
+        },
+        PushSubscribeInput: {
+          type: 'object',
+          required: ['endpoint', 'keys'],
+          // The browser's PushSubscription.toJSON() also carries
+          // `expirationTime`: further fields stay allowed and are ignored.
+          additionalProperties: true,
+          properties: {
+            endpoint: { type: 'string', maxLength: 2048, description: 'The push service URL of the subscription. Must be a public https address (checked by the route, 400 otherwise).' },
+            keys: {
+              type: 'object',
+              required: ['p256dh', 'auth'],
+              additionalProperties: true,
+              properties: {
+                p256dh: { type: 'string', minLength: 1, description: 'The client public key of the subscription.' },
+                auth: { type: 'string', minLength: 1, description: 'The authentication secret of the subscription.' },
+              },
+            },
+          },
+        },
+        PushUnsubscribeInput: {
+          type: 'object',
+          required: ['endpoint'],
+          properties: {
+            endpoint: { type: 'string', description: 'The push service URL of the subscription to remove. Empty answers 400; an unknown or foreign one changes nothing.' },
+          },
+        },
+        PushWallModeInput: {
+          type: 'object',
+          required: ['endpoint', 'active'],
+          properties: {
+            endpoint: { type: 'string', description: 'The push service URL of this device\'s subscription. An unknown or foreign one changes nothing.' },
+            active: { type: 'boolean', description: '`true` pauses delivery to this device while it shows the wall, `false` resumes it.' },
+          },
+        },
+        PushTestInput: {
+          type: 'object',
+          description: 'Every field is optional; without a body the push carries the default title and an empty text.',
+          properties: {
+            title: { type: 'string', description: 'Title of the test push, `Yuvomi` by default.' },
+            body: { type: 'string', description: 'Text of the test push, empty by default.' },
+            endpoint: { type: 'string', description: 'The subscription of the calling device: its wall pause is lifted before sending. Without it every pause stays.' },
+          },
+        },
         TaskArchiveInput: {
           type: 'object',
           description: 'Without a body, or without `archived`, the task is archived.',

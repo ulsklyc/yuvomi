@@ -1246,14 +1246,34 @@
   },
   "array body": {
    "admin": {
-    "status": 200,
+    "status": 400,
     "rows": {},
-    "changed": {}
+    "body": {
+     "error": "The request does not match the documented schema.",
+     "code": 400,
+     "reason": "validation",
+     "fields": [
+      {
+       "path": "body",
+       "rule": "type"
+      }
+     ]
+    }
    },
    "member": {
-    "status": 200,
+    "status": 400,
     "rows": {},
-    "changed": {}
+    "body": {
+     "error": "The request does not match the documented schema.",
+     "code": 400,
+     "reason": "validation",
+     "fields": [
+      {
+       "path": "body",
+       "rule": "type"
+      }
+     ]
+    }
    }
   },
   "schedule_hidden_templates valid": {

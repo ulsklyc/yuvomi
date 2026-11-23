@@ -172,23 +172,25 @@ test('der Leser findet die Saetze ueberhaupt', () => {
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const holidays = await import('../server/services/holidays.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
+const { createPreferencesApp } = await import('./preferences-app.js');
 
 const ADMIN = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run().lastInsertRowid;
 const MEMBER = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('member','Member','x','member')").run().lastInsertRowid;
 
 const actor = { userId: ADMIN, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.userId;
-  req.authRole = actor.role;
-  req.session = { userId: actor.userId };
-  next();
+// The preferences at their real prefix (#2810, test/preferences-app.js): call()
+// reads `/preferences...` under `/api/v1`.
+const app = await createPreferencesApp({
+  mount: ['preferences'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.userId;
+    req.authRole = actor.role;
+    req.session = { userId: actor.userId };
+    next();
+  },
 });
-app.use('/preferences', preferencesRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1`)));
 test.after(() => { server.close(); holidays.__setFetchImpl(null); });
 
 async function call(method, route, body, { userId = ADMIN, role = 'admin' } = {}) {
@@ -782,8 +784,8 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
   const { createTasksApp } = await import('./tasks-app.js');
   const { default: pushRouter } = await import('../server/routes/push.js');
   const { buildRouter: buildWeatherRouter } = await import('../server/routes/weather.js');
-  // The tasks and the shopping list at their real prefixes (#2810, test/tasks-app.js):
-  // call() maps `/tasks...` and `/shopping...` there.
+  // The tasks, the shopping list and push at their real prefixes (#2810,
+  // test/tasks-app.js): call() maps `/tasks...`, `/shopping...` and `/push...` there.
   const gApp = await createTasksApp({
     auth: (req, _res, next) => {
       req.authUserId = ADMIN;
@@ -793,7 +795,7 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
     },
     after: [
       ['/api/v1/shopping', shoppingRouter],
-      ['/push', pushRouter],
+      ['/api/v1/push', pushRouter],
       // The weather router at its real prefix, with the central error handler (#2810).
       ['/api/v1/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) })],
     ],
@@ -806,7 +808,7 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const url = /^\/(shopping|tasks)(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
+      const url = /^\/(shopping|tasks|push)(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
       const res = await fetch(`${gUrl}${url}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }

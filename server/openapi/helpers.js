@@ -171,13 +171,18 @@ function idParam(name = 'id', description = 'Resource ID') {
   };
 }
 
-function stringPathParam(name, description) {
+/**
+ * A path parameter that is text, optionally held to a `pattern` (#2810,
+ * group 11b: the country and region codes of the holiday routes).
+ * @param {string} name @param {string} description @param {string} [pattern]
+ */
+function stringPathParam(name, description, pattern) {
   return {
     name,
     in: 'path',
     required: true,
     description,
-    schema: { type: 'string' },
+    schema: pattern ? { type: 'string', pattern } : { type: 'string' },
   };
 }
 
@@ -208,12 +213,11 @@ function langParam({ fallback = 'default' } = {}) {
     name: 'lang',
     in: 'query',
     required: false,
-    description: `${supported} Defaults to ${DEFAULT_LOCALE}.`,
-    schema: {
-      type: 'string',
-      default: DEFAULT_LOCALE,
-      enum: [...locales],
-    },
+    description: `${supported} Defaults to ${DEFAULT_LOCALE}; a value that is not supported falls back to ${DEFAULT_LOCALE} as well.`,
+    // No `enum` (#2810, group 11b): validateRequest() reads one, and the
+    // holiday route promises English for an unsupported value (#1723), not
+    // a 400.
+    schema: { type: 'string' },
   };
 }
 

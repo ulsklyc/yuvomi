@@ -91,8 +91,11 @@ test('OpenAPI: `lang` nennt genau die App-Sprachen', async () => {
   // the routes take. The geocode search still names the app languages.
   // The budget categories read it the same way (#1859: an unknown code falls
   // back to the household language, group 9 of #2810) and name the languages
-  // in the description.
+  // in the description. The holiday regions read it through
+  // supportedLocaleFor() (#1723: an unknown code answers in English, group 11b
+  // of #2810).
   const LENIENT = new Map([
+    ['GET /api/v1/preferences/holidays/subdivisions/{countryCode}', { namesLocales: true }],
     ['GET /api/v1/weather', { namesLocales: false }],
     ['GET /api/v1/weather/geocode', { namesLocales: true }],
     ['GET /api/v1/budget/categories', { namesLocales: true }],

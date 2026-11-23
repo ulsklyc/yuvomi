@@ -1,20 +1,29 @@
 /**
  * Modul: Push (Web Push)
  * Zweck: REST-API für VAPID-Public-Key, Subscribe/Unsubscribe und Test-Push.
+ *        Jede Route prueft die Anfrage vor dem Handler gegen ihre Operation im
+ *        OpenAPI-Dokument (`validateRequest()`, #2810 Gruppe 11b); ob ein
+ *        Endpoint eine oeffentliche https-Adresse ist, prueft weiter der
+ *        Handler (checkPushEndpoint: Hostliste und Netz, kein Muster).
  * Abhängigkeiten: express, server/db.js, server/services/push.js
  */
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { checkPushEndpoint, pushService as defaultPushService } from '../services/push.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('PushRoutes');
 
+/**
+ * The push router; tests hand in their own push service and database.
+ * @param {{ pushService?: Pick<typeof defaultPushService, 'getPublicKey' | 'sendPushToUser'>, database?: any }} [options]
+ */
 export function buildRouter({ pushService = defaultPushService, database } = {}) {
   const getDb = () => (database || db.get());
   const router = express.Router();
 
-  router.get('/vapid-public-key', (req, res) => {
+  router.get('/vapid-public-key', validateRequest(), (req, res) => {
     try {
       res.json({ data: { key: pushService.getPublicKey() } });
     } catch (err) {
@@ -23,7 +32,7 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
     }
   });
 
-  router.post('/subscribe', (req, res) => {
+  router.post('/subscribe', validateRequest(), (req, res) => {
     try {
       const userId = req.authUserId || req.session.userId;
       const { endpoint, keys } = req.body || {};
@@ -55,7 +64,7 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
     }
   });
 
-  router.post('/unsubscribe', (req, res) => {
+  router.post('/unsubscribe', validateRequest(), (req, res) => {
     try {
       const userId = req.authUserId || req.session.userId;
       const { endpoint } = req.body || {};
@@ -70,7 +79,7 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
     }
   });
 
-  router.put('/wall-mode', (req, res) => {
+  router.put('/wall-mode', validateRequest(), (req, res) => {
     try {
       const userId = req.authUserId || req.session.userId;
       const { endpoint, active } = req.body || {};
@@ -91,7 +100,7 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
     }
   });
 
-  router.post('/test', async (req, res) => {
+  router.post('/test', validateRequest(), async (req, res) => {
     try {
       const userId = req.authUserId || req.session.userId;
       const title = typeof req.body?.title === 'string' ? req.body.title : 'Yuvomi';

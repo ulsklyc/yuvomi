@@ -85,7 +85,7 @@ const app = await createCalendarApp({
     req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
     next();
   },
-  before: [['/preferences', preferencesRouter]],
+  before: [['/api/v1/preferences', preferencesRouter]],
 });
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -101,9 +101,9 @@ const NOW = '2026-10-28T08:00:00Z';
 db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', 'Europe/Berlin')").run();
 
 // `path` ist der Teil hinter dem Praefix (#2810): `/calendar/...` liegt unter
-// /api/v1, `/preferences` bleibt, alles andere fragt die Uebersicht.
+// /api/v1, `/preferences` ebenso, alles andere fragt die Uebersicht.
 function urlOf(path) {
-  if (path.startsWith('/preferences')) return `${base}${path}`;
+  if (path.startsWith('/preferences')) return `${base}/api/v1${path}`;
   if (path.startsWith('/calendar/')) return `${base}/api/v1${path}`;
   return `${base}/api/v1/dashboard${path}`;
 }
@@ -264,7 +264,7 @@ const calendarTile = (options) => [{ id: 'calendar', visible: true, order: 0, si
 test('die Auswahl ueberlebt das Speichern und fuehrt zur gefilterten Antwort', async () => {
   const keys = [`local:${ARBEIT}`, `cal:${SCHULE}`];
   try {
-    const res = await fetch(`${base}/preferences`, {
+    const res = await fetch(`${base}/api/v1/preferences`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dashboard_widgets: calendarTile({ calendars: keys }) }),
     });
