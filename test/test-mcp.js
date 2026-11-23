@@ -25,8 +25,6 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'mcp-test-secret';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-// @ts-expect-error express 5 ships no type declarations (TS7016); new code type-checks clean
-import express from 'express';
 
 // Nach den beiden env-Zeilen: server/db.js liest DB_PATH beim Laden.
 const dbmod = await import('../server/db.js');
@@ -36,11 +34,9 @@ const { callTool, TOOL_DEFINITIONS } = await import('../server/mcp/tools.js');
 const { buildSessionModuleAccess, resolvePermissions } = await import('../server/authorize/index.ts');
 const { csrfMiddleware } = await import('../server/middleware/csrf.js');
 const { default: idempotencyMiddleware } = await import('../server/middleware/idempotency.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
-const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
-const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 const uid = db.prepare(
   `INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -68,26 +64,28 @@ const SESSION_COOKIE = 'yuvomi.sid=mcp-test';
 // Token ziehen, und kein mitgeschickter Wert koennte je passen.
 /** @type {Map<string, any>} */
 const sessions = new Map();
-const app = express();
-app.use(express.json());
-app.use(defaultEmptyBody);
-app.use('/api/v1', (/** @type {any} */ req, /** @type {any} */ _res, /** @type {any} */ next) => {
-  const cookie = String(req.headers.cookie || '');
-  req.authUserId = Number(uid);
-  req.authRole = 'admin';
-  req.authMethod = cookie.includes('yuvomi.sid=') ? 'session' : 'api_token';
-  req.authScopes = null;
-  if (!sessions.has(cookie)) sessions.set(cookie, { userId: Number(uid), role: 'admin' });
-  req.session = sessions.get(cookie);
-  next();
+// The tasks at their real prefix through test/tasks-app.js (#2810); the
+// sign-in stand-in sits under /api/v1 like the gates of server/index.js.
+const app = await createTasksApp({
+  before: [
+    ['/api/v1', (/** @type {any} */ req, /** @type {any} */ _res, /** @type {any} */ next) => {
+      const cookie = String(req.headers.cookie || '');
+      req.authUserId = Number(uid);
+      req.authRole = 'admin';
+      req.authMethod = cookie.includes('yuvomi.sid=') ? 'session' : 'api_token';
+      req.authScopes = null;
+      if (!sessions.has(cookie)) sessions.set(cookie, { userId: Number(uid), role: 'admin' });
+      req.session = sessions.get(cookie);
+      next();
+    }],
+    ['/api/v1', csrfMiddleware],
+    ['/api/v1', idempotencyMiddleware],
+  ],
+  after: [
+    ['/api/v1/shopping', shoppingRouter],
+    ['/api/v1/calendar', calendarRouter],
+  ],
 });
-app.use('/api/v1', csrfMiddleware);
-app.use('/api/v1', idempotencyMiddleware);
-app.use('/api/v1/tasks', tasksRouter);
-app.use('/api/v1/shopping', shoppingRouter);
-app.use('/api/v1/calendar', calendarRouter);
-// The central error handler answers the 400 of validateRequest() as JSON (#2810).
-app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(null)));
 const LOOPBACK = `http://127.0.0.1:${/** @type {any} */ (server.address()).port}`;

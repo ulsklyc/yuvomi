@@ -30,7 +30,6 @@ delete process.env.LOG_LEVEL;
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
 import { startFakeDavServer } from './caldav-fake-server.js';
 
 const dbmod = await import('../server/db.js');
@@ -38,7 +37,7 @@ const db = dbmod.get();
 const remindersSync = await import('../server/services/caldav-reminders-sync.js');
 const todoOutbound  = await import('../server/services/caldav-todo-outbound.js');
 const { unfoldICS } = await import('../server/utils/ics-patch.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 
 const ADMIN = Number(db.prepare(
   "INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')",
@@ -47,14 +46,13 @@ const ADMIN = Number(db.prepare(
 const dav = await startFakeDavServer();
 test.after(() => dav.close());
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = ADMIN;
-  req.session = { userId: ADMIN, role: 'admin' };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  },
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;

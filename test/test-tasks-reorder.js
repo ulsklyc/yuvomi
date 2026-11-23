@@ -13,13 +13,12 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'tasks-reorder-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
@@ -59,15 +58,14 @@ const alice = { id: ALICE, role: 'admin' };
 const bob = { id: BOB, role: 'member' };
 
 let actor = alice;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;

@@ -779,26 +779,25 @@ test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt d
 
 test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortlaut', async () => {
   const { default: shoppingRouter } = await import('../server/routes/shopping.js');
-  const { default: tasksRouter } = await import('../server/routes/tasks.js');
+  const { createTasksApp } = await import('./tasks-app.js');
   const { default: pushRouter } = await import('../server/routes/push.js');
   const { buildRouter: buildWeatherRouter } = await import('../server/routes/weather.js');
-  const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
-  const gApp = express();
-  gApp.use(express.json());
-  gApp.use(defaultEmptyBody);
-  gApp.use((req, _res, next) => {
-    req.authUserId = ADMIN;
-    req.authRole = 'admin';
-    req.session = { userId: ADMIN, role: 'admin' };
-    next();
+  // The tasks and the shopping list at their real prefixes (#2810, test/tasks-app.js):
+  // call() maps `/tasks...` and `/shopping...` there.
+  const gApp = await createTasksApp({
+    auth: (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    },
+    after: [
+      ['/api/v1/shopping', shoppingRouter],
+      ['/push', pushRouter],
+      // The weather router at its real prefix, with the central error handler (#2810).
+      ['/api/v1/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) })],
+    ],
   });
-  // The shopping list at its real prefix (#2810): call() maps `/shopping...` there.
-  gApp.use('/api/v1/shopping', shoppingRouter);
-  gApp.use('/tasks', tasksRouter);
-  gApp.use('/push', pushRouter);
-  // The weather router at its real prefix, with the central error handler (#2810).
-  gApp.use('/api/v1/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) }));
-  gApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const gServer = gApp.listen(0, '127.0.0.1');
   const gUrl = await new Promise((r) => gServer.on('listening', () => r(`http://127.0.0.1:${gServer.address().port}`)));
   try {
@@ -807,7 +806,7 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const url = /^\/shopping(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
+      const url = /^\/(shopping|tasks)(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
       const res = await fetch(`${gUrl}${url}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }

@@ -10,13 +10,12 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'task-documents-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -57,19 +56,18 @@ function seedUser(prefix, role) {
   `).run(`${prefix}-${randomUUID()}`, prefix, role).lastInsertRowid;
 }
 
-function createHarness({ userId = ALICE, role = 'admin', moduleAccess = null, authMethod, authScopes = null } = {}) {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.authUserId = userId;
-    req.authRole = role;
-    req.session = { userId, role };
-    req.sessionModuleAccess = moduleAccess;
-    req.authMethod = authMethod;
-    req.authScopes = authScopes;
-    next();
+async function createHarness({ userId = ALICE, role = 'admin', moduleAccess = null, authMethod, authScopes = null } = {}) {
+  const app = await createTasksApp({
+    auth: (req, _res, next) => {
+      req.authUserId = userId;
+      req.authRole = role;
+      req.session = { userId, role };
+      req.sessionModuleAccess = moduleAccess;
+      req.authMethod = authMethod;
+      req.authScopes = authScopes;
+      next();
+    },
   });
-  app.use('/api/v1/tasks', tasksRouter);
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {
@@ -107,7 +105,7 @@ function seedDocument({ createdBy = ALICE, visibility = 'family', status = 'acti
 }
 
 test('PUT links a family document and GET returns it', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const taskId = seedTask();
     const docId = seedDocument({ visibility: 'family' });
@@ -125,7 +123,7 @@ test('PUT links a family document and GET returns it', async () => {
 });
 
 test('PUT ignores documents the user cannot see (private doc of another user)', async () => {
-  const h = createHarness({ userId: ALICE, role: 'admin' });
+  const h = await createHarness({ userId: ALICE, role: 'admin' });
   try {
     const taskId = seedTask();
     const privateDoc = seedDocument({ createdBy: BOB, visibility: 'private' });
@@ -138,7 +136,7 @@ test('PUT ignores documents the user cannot see (private doc of another user)', 
 });
 
 test('PUT replace-set keeps invisible existing links intact', async () => {
-  const h = createHarness({ userId: ALICE, role: 'admin' });
+  const h = await createHarness({ userId: ALICE, role: 'admin' });
   try {
     const taskId = seedTask();
     const bobPrivate = seedDocument({ createdBy: BOB, visibility: 'private' });
@@ -162,7 +160,7 @@ test('PUT replace-set keeps invisible existing links intact', async () => {
 });
 
 test('PUT with empty document_ids clears the user-visible links', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const taskId = seedTask();
     const docId = seedDocument({ visibility: 'family' });
@@ -176,7 +174,7 @@ test('PUT with empty document_ids clears the user-visible links', async () => {
 });
 
 test('GET/PUT on a task not visible to the user returns 404', async () => {
-  const h = createHarness({ userId: BOB, role: 'member' });
+  const h = await createHarness({ userId: BOB, role: 'member' });
   try {
     const privateTask = seedTask(ALICE, 'private'); // nur Alice sichtbar
     const docId = seedDocument({ visibility: 'family' });
@@ -190,7 +188,7 @@ test('GET/PUT on a task not visible to the user returns 404', async () => {
 });
 
 test('archived documents are excluded from the linked list', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const taskId = seedTask();
     const docId = seedDocument({ visibility: 'family' });
@@ -204,7 +202,7 @@ test('archived documents are excluded from the linked list', async () => {
 });
 
 test('document_count appears in task list and detail', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const taskId = seedTask();
     const d1 = seedDocument({ visibility: 'family' });
@@ -224,7 +222,7 @@ test('document_count appears in task list and detail', async () => {
 });
 
 test('deleting a document cascades and removes the link', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const taskId = seedTask();
     const docId = seedDocument({ visibility: 'family' });
@@ -269,7 +267,7 @@ test('Dokumentenrecht: ohne documents-Lesen nennen Liste, Detail und GET /docume
     ['Token mit documents:read', { userId: BOB, role: 'member', authMethod: 'api_token', authScopes: ['tasks:read', 'documents:read'] }],
   ];
   for (const [label, as] of readable) {
-    const h = createHarness(as);
+    const h = await createHarness(as);
     try {
       const detail = await h.call('GET', `/${taskId}`);
       assert.equal(detail.body.data.document_count, 1, `${label}: Zahl`);
@@ -283,7 +281,7 @@ test('Dokumentenrecht: ohne documents-Lesen nennen Liste, Detail und GET /docume
   }
 
   for (const [label, as] of NO_DOCS) {
-    const h = createHarness(as);
+    const h = await createHarness(as);
     try {
       const detail = await h.call('GET', `/${taskId}`);
       assert.equal(detail.status, 200, `${label}: die Aufgabe selbst bleibt lesbar`);
@@ -312,7 +310,7 @@ test('Dokumentenrecht: ohne documents-Lesen verknuepft PUT nichts, jede ID antwo
   const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
 
   for (const [label, as] of NO_DOCS) {
-    const h = createHarness(as);
+    const h = await createHarness(as);
     try {
       const valid = await h.call('PUT', `/${taskId}/documents`, { document_ids: [other] });
       assert.equal(valid.status, 403, `${label}: PUT mit Dokument ist 403`);
@@ -339,7 +337,7 @@ test('Dokumentenrecht: ohne documents-Lesen verknuepft PUT nichts, jede ID antwo
     } finally { await h.close(); }
   }
 
-  const h = createHarness({ userId: BOB, role: 'member', authMethod: 'api_token', authScopes: ['tasks:write', 'documents:read'] });
+  const h = await createHarness({ userId: BOB, role: 'member', authMethod: 'api_token', authScopes: ['tasks:write', 'documents:read'] });
   try {
     const res = await h.call('PUT', `/${taskId}/documents`, { document_ids: [other] });
     assert.equal(res.status, 200, 'mit documents:read verknuepft das Token');
@@ -348,7 +346,7 @@ test('Dokumentenrecht: ohne documents-Lesen verknuepft PUT nichts, jede ID antwo
 });
 
 test('deleting a task cascades and removes its links', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const taskId = seedTask();
     const docId = seedDocument({ visibility: 'family' });
