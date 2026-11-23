@@ -4387,12 +4387,15 @@ test('PUT / — eine Serie mit eigener Zone wird an ihrem Ortstag geprueft', asy
 // ID, Vorschau- und Download-URL, Name, Typ und Groesse sind `null`, auf jedem
 // Leseweg des Kalenders.
 test('Anhang: ohne Dokumentenrecht oder Sicht aufs Dokument nennt der Termin ihn nicht (#1358)', async () => {
-  // Zehn Tage voraus in der Haushaltszone: im 90-Tage-Fenster von /upcoming.
+  // Morgen um Mitternacht in der Haushaltszone: vor jedem spaeteren Vorkommen der offenen
+  // Serien, die andere Tests dieser Datei anlegen. Zehn Tage voraus fiel der
+  // Termin aus den 20 Plaetzen von /upcoming, sobald das Datum der Serien
+  // (2026-01-15 taeglich und weitere) das Fenster fuellt.
   const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
-  const day = shiftDateKey(todayKey(db), 10);
+  const day = shiftDateKey(todayKey(db), 1);
   const dataUrl = `data:text/plain;base64,${Buffer.from('Geheimer Anhang').toString('base64')}`;
   const created = await call('POST', '/', { actor: ADMIN, body: {
-    title: 'Qzxanhangsrecht', start_datetime: `${day}T09:00`,
+    title: 'Qzxanhangsrecht', start_datetime: `${day}T00:00`,
     attachment_data: dataUrl, attachment_name: 'vertrag.txt',
   } });
   assert.equal(created.status, 201);
