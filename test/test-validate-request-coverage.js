@@ -29,7 +29,7 @@
  *          local-calendars, feed, sync-targets, subscriptions; and the
  *          dashboard) and 10b (the provider routes under
  *          server/routes/calendar/: google, apple, caldav, outlook) and 11a
- *          (tasks).
+ *          (tasks) and 11b (preferences, push).
  * Run: npm run test:validate-request-coverage
  */
 
@@ -51,8 +51,6 @@ const ROUTES = join(ROOT, 'server', 'routes');
  */
 const NOT_MIGRATED = [
   'server/routes/birthday-feed.js',
-  'server/routes/preferences.js',
-  'server/routes/push.js',
 ];
 
 /** The files the groups so far migrated: they must be found complete. */
@@ -88,6 +86,7 @@ const MIGRATED = [
   'server/routes/calendar/google.js', 'server/routes/calendar/apple.js', 'server/routes/calendar/caldav.js',
   'server/routes/calendar/outlook.js',
   'server/routes/tasks.js',
+  'server/routes/preferences.js', 'server/routes/push.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

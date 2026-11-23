@@ -133,6 +133,9 @@ const MOUNTS = [
   { file: 'tasks.js', mount: '/api/v1/tasks' },
   ...['read', 'google', 'apple', 'subscriptions', 'feed', 'local-calendars', 'sync-targets', 'crud', 'caldav', 'outlook']
     .map((name) => ({ file: `calendar/${name}.js`, mount: '/api/v1/calendar' })),
+  // Gruppe 11b: Einstellungen und Push, eigene Praefixe ohne Ueberschneidung.
+  { file: 'preferences.js', mount: '/api/v1/preferences' },
+  { file: 'push.js', mount: '/api/v1/push' },
 ];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
@@ -146,6 +149,7 @@ const WITHOUT_INTEGER_PATH_ID = [
   'document-storage-google-drive.js',
   'dashboard.js', 'calendar/read.js', 'calendar/feed.js', 'calendar/sync-targets.js',
   'calendar/google.js', 'calendar/apple.js',
+  'preferences.js', 'push.js',
 ];
 
 const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));

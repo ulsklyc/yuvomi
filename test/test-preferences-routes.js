@@ -833,9 +833,16 @@ test('GET /holidays/subdivisions/:cc?lang=: Namen in der UI-Sprache, sonst Engli
     // Eine App-Sprache, die die API fuer dieses Land nicht fuehrt.
     assert.deepEqual(await namen('?lang=ja'), englisch);
     // Nichts davon ist eine App-Sprache - und nichts davon erreicht den Service.
-    for (const boese of ['?lang=xx', '?lang=..%2Fde', '?lang=de%26countryIsoCode%3DFR', '?lang=de&lang=fr', '?lang=']) {
+    for (const boese of ['?lang=xx', '?lang=..%2Fde', '?lang=de%26countryIsoCode%3DFR', '?lang=']) {
       assert.deepEqual(await namen(boese), englisch, `${boese} faellt auf Englisch`);
     }
+    // Doppelt gegeben ist `lang` kein Text mehr (#2810, Gruppe 11b): das
+    // Dokument liest den Parameter einmal, validateRequest() antwortet 400,
+    // bevor etwas den Service erreicht. Vorher fiel es auf Englisch.
+    const doppelt = await raw('GET', '/holidays/subdivisions/DE?lang=de&lang=fr');
+    assert.equal(doppelt.status, 400);
+    assert.equal(doppelt.body.reason, 'validation');
+    assert.deepEqual(doppelt.body.fields.map((f) => f.path), ['query/lang']);
     assert.ok(urls.length > 0 && urls.every((url) => url.endsWith('/Subdivisions?countryIsoCode=DE')),
       `lang geht nicht an die Fremd-API: ${[...new Set(urls)].join(', ')}`);
   } finally {

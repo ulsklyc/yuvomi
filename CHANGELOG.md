@@ -118,6 +118,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every visible link, as the description now says. The refusals with a `reason` and the checks of
   length, blank values, categories and the recurrence rule stay with the routes; a body of the
   wrong type now answers `reason: validation` with the field.
+- **The preferences and the push routes check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now.
+  The description itself is corrected where it refused what it promised: `lang` of
+  `/preferences/holidays/subdivisions/{countryCode}` takes any text again, an unsupported code
+  answers in English. Under `/api/v1/preferences` and `/api/v1/push` input that used to be
+  quietly accepted or replaced is now refused with a 400:
+  - `PUT /preferences` without a body or with a list instead of an object (answered 200 and
+    changed nothing);
+  - a push subscription whose `keys.p256dh` or `keys.auth` is not text or empty (`p256dh: 5` was
+    stored), or whose `endpoint` is longer than 2048 characters;
+  - `POST /push/unsubscribe` with an `endpoint` that is not text (`5` answered 204 and did
+    nothing), `POST /push/test` with a `title`, `body` or `endpoint` that is not text (sent the
+    default text instead);
+  - `lang` of the holiday regions given twice (answered in English).
+
+  `POST /push/unsubscribe` with an object as `endpoint` answered 500 and is now a 400.
+  Malformed input that was refused already (a push subscription without keys, `endpoint: 5`, a
+  wall pause without a boolean `active`, a country code `de` or a region code `x` on the holiday
+  lists) is still a 400, now with `reason: validation` and the field instead of the route's own
+  sentence. The settings registry keeps checking `PUT /preferences` field by field: the
+  description checks only that the body is an object, so a member sending an admin field still
+  gets 403 `admin_required`, also for an invalid value, every field keeps its own 400 sentence,
+  and unknown keys are still ignored. The check that a push endpoint is a public https address
+  stays with the route. `POST /push/test` still takes no body.
 - **The budget and the subscriptions answer an unexpected failure with the same sentence as the
   rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
   and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,
