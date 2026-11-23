@@ -30,6 +30,9 @@
  *              rotation service, the MCP tools and the settings read, and
  *              equal the rights' visibility levels and the CHECK constraints
  *              of `tasks`;
+ *            - FULL REPRESENTATION (step c): `PUT /{id}/documents` requires
+ *              `document_ids` (left out, every visible link was removed); the
+ *              PUT of public/pages/tasks.js sends it;
  *            - THE DOCUMENT: 32 operations, each with input answering the 400.
  *          No network: no CalDAV server is asked (no task here has a sync
  *          target).
@@ -41,6 +44,7 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import rateLimit from 'express-rate-limit';
 import { createTasksApp } from './tasks-app.js';
 
@@ -483,6 +487,116 @@ test('one source: the value lists of the schemas are those of task-fields.js, th
   assert.deepEqual(options.body.statuses, [...fields.TASK_STATUSES]);
 });
 
+// --------------------------------------------------------------------------
+// Full representation (group 11a c)
+// --------------------------------------------------------------------------
+
+/** A family document stored by hand. */
+function documentRow() {
+  return Number(db.prepare(`INSERT INTO family_documents
+      (name, original_name, mime_type, file_size, content_data, category, visibility, status, created_by)
+    VALUES ('Zettel', 'file.pdf', 'application/pdf', 5, ?, 'other', 'family', 'active', ?)`)
+    .run(Buffer.from('bytes'), ADMIN).lastInsertRowid);
+}
+/** A task with the given documents linked. @param {number[]} docIds */
+function linkedTask(docIds) {
+  const id = task({ title: 'Mit Anhang' });
+  const ins = db.prepare('INSERT INTO task_documents (task_id, document_id, created_by) VALUES (?, ?, ?)');
+  for (const doc of docIds) ins.run(id, doc, ADMIN);
+  return id;
+}
+/** The stored links of a task, in id order. @param {number} id */
+function linkedIds(id) {
+  return db.prepare('SELECT document_id FROM task_documents WHERE task_id = ? ORDER BY document_id')
+    .all(id).map((/** @type {any} */ r) => r.document_id);
+}
+
+test('full representation: PUT /{id}/documents requires document_ids', async () => {
+  // Left out, the route replaced the visible links with nothing: two linked
+  // documents became none with a 200.
+  const [a, b, c] = [documentRow(), documentRow(), documentRow()];
+  const id = linkedTask([a, b]);
+  const without = await call('PUT', `/${id}/documents`, { json: {} });
+  assert.equal(without.status, 400, JSON.stringify(without.body));
+  assert.equal(without.body.error, SENTENCE);
+  assert.equal(without.body.reason, 'validation');
+  assert.deepEqual(without.body.fields, [{ path: 'body/document_ids', rule: 'required' }]);
+  assert.deepEqual(linkedIds(id), [a, b], 'refused: the links stay');
+  // No body at all: the same refusal, the links stay.
+  assertRefused(await call('PUT', `/${id}/documents`), 'body', 'no body');
+  assert.deepEqual(linkedIds(id), [a, b], 'no body: the links stay');
+  // Before the 404 of an unknown task and the 403 of a locked one.
+  const unknown = await call('PUT', '/987654/documents', { json: {} });
+  assert.equal(unknown.status, 400, JSON.stringify(unknown.body));
+  const locked = task({ locked: 1 });
+  const lockedRes = await call('PUT', `/${locked}/documents`, { json: {}, actor: 'mem' });
+  assert.equal(lockedRes.status, 400, JSON.stringify(lockedRes.body));
+
+  // The list replaces the links.
+  const list = await call('PUT', `/${id}/documents`, { json: { document_ids: [b, c] } });
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  assert.deepEqual(linkedIds(id), [b, c]);
+  // `[]` empties them on purpose.
+  const emptied = await call('PUT', `/${id}/documents`, { json: { document_ids: [] } });
+  assert.equal(emptied.status, 200, JSON.stringify(emptied.body));
+  assert.deepEqual(emptied.body.data, []);
+  assert.deepEqual(linkedIds(id), []);
+});
+
+test('the own caller: the body tasks.js builds links exactly the documents it sends', async () => {
+  const [a, b, c] = [documentRow(), documentRow(), documentRow()];
+  const id = linkedTask([a, b]);
+  // handleFormSubmit(): `{ document_ids: documentIds }`, the ids commit() returns.
+  const res = await call('PUT', `/${id}/documents`, { json: { document_ids: [a, c] } });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.data.map((/** @type {any} */ d) => d.id).sort((/** @type {number} */ x, /** @type {number} */ y) => x - y), [a, c]);
+  assert.deepEqual(linkedIds(id), [a, c]);
+});
+
+/**
+ * The top-level keys of every `api.put(`/tasks/${...}/documents`, {...})` of
+ * the page.
+ * @param {string} source public/pages/tasks.js
+ * @returns {string[][]}
+ */
+function taskDocumentPuts(source) {
+  const found = [];
+  for (const match of source.matchAll(/api\.put\(`\/tasks\/\$\{[^`]*\}\/documents`\s*,\s*\{/g)) {
+    const open = /** @type {number} */ (match.index) + match[0].length - 1;
+    let depth = 0;
+    let end = open;
+    for (let i = open; i < source.length; i++) {
+      if ('({['.includes(source[i])) depth++;
+      else if (')}]'.includes(source[i]) && --depth === 0) { end = i; break; }
+    }
+    const text = source.slice(open, end + 1).replace(/^\s*\/\/.*$/gm, '');
+    const keys = [];
+    depth = 0;
+    for (let j = 0; j < text.length; j++) {
+      const ch = text[j];
+      if ('({['.includes(ch)) depth++;
+      else if (')}]'.includes(ch)) depth--;
+      if (depth === 1 && (ch === '{' || ch === ',')) {
+        const m = /^\s*([A-Za-z_$][\w$]*)\s*[:,}]/.exec(text.slice(j + 1));
+        if (m) keys.push(m[1]);
+      }
+    }
+    found.push(keys);
+  }
+  return found;
+}
+
+test('the own caller: the PUT of tasks.js sends every required field of TaskDocumentsInput', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schema = spec.components.schemas.TaskDocumentsInput;
+  assert.deepEqual(schema.required, ['document_ids']);
+  const calls = taskDocumentPuts(readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8'));
+  assert.equal(calls.length, 1, `the PUTs found ${JSON.stringify(calls)}`);
+  for (const keys of calls) {
+    for (const key of schema.required) assert.ok(keys.includes(key), `sends ${key}: ${JSON.stringify(keys)}`);
+  }
+});
+
 test('the document: 32 task operations, each with input answering the 400', () => {
   const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
   const ops = Object.entries(spec.paths)
@@ -502,7 +616,11 @@ test('the document: 32 task operations, each with input answering the 400', () =
   const affected = spec.paths['/api/v1/tasks/points/affected'].get;
   assert.deepEqual(affected.parameters.find((/** @type {any} */ p) => p.name === 'points').schema,
     { type: 'integer', minimum: 0, maximum: fields.TASK_MAX_POINTS });
-  assert.match(spec.paths['/api/v1/tasks/{id}/documents'].put.description, /Omitting document_ids clears every visible link/);
+  // Step (c): `document_ids` is required, `[]` removes the visible links.
+  assert.match(spec.paths['/api/v1/tasks/{id}/documents'].put.description, /`document_ids` is required; `\[\]` removes every visible link/);
+  assert.doesNotMatch(spec.paths['/api/v1/tasks/{id}/documents'].put.description, /Omitting document_ids/);
+  assert.deepEqual(spec.components.schemas.TaskDocumentsInput.required, ['document_ids']);
+  assert.doesNotMatch(spec.components.schemas.TaskDocumentsInput.properties.document_ids.description, /Omitting/);
   assert.equal(spec.paths['/api/v1/tasks/categories'].post.responses[201] !== undefined, true);
   assert.equal(spec.paths['/api/v1/tasks/categories/{key}'].delete.responses[204] !== undefined, true);
   assert.equal(spec.paths['/api/v1/tasks/{id}/comments'].post.responses[201] !== undefined, true);

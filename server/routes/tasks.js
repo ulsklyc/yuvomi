@@ -2511,7 +2511,9 @@ router.get('/:id/documents', validateRequest(), (req, res) => {
 // PUT /api/v1/tasks/:id/documents  Body: { document_ids: number[] }
 // Replace-Set: setzt die Verknüpfungen neu. Es werden nur für die Person
 // sichtbare Dokumente verknüpft; ebenso werden nur sichtbare Alt-Verknüpfungen
-// ersetzt — unsichtbare (z.B. private Dokumente anderer) bleiben unberührt.
+// ersetzt - unsichtbare (z.B. private Dokumente anderer) bleiben unberührt.
+// `document_ids` verlangt das Schema (TaskDocumentsInput, #2810): ohne das Feld
+// leerte der Weg still jede sichtbare Verknüpfung; `[]` leert sie bewusst.
 router.put('/:id/documents', validateRequest(), (req, res) => {
   try {
     const me = req.authUserId || req.session.userId;

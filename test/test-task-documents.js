@@ -326,14 +326,16 @@ test('Dokumentenrecht: ohne documents-Lesen verknuepft PUT nichts, jede ID antwo
       } finally { unlockDocumentDeletes([stored]); }
       assert.deepEqual(linkedIds(taskId), [stored], `${label}: nichts verknuepft`);
 
-      // Leer oder gar kein Feld: kein Verknuepfen - und mit Recht hiesse jede
-      // der beiden "alle sichtbaren loesen", ohne Recht loest keine etwas.
-      // `null` ist seit #2810 die 400 des Schemas und loest ebenso nichts.
-      const nulled = await h.call('PUT', `/${taskId}/documents`, { document_ids: null });
-      assert.equal(nulled.status, 400, `${label}, null: die 400 des Schemas`);
-      assert.equal(nulled.body.reason, 'validation');
-      assert.deepEqual(linkedIds(taskId), [stored], `${label}, null: und loest nichts`);
-      for (const [form, body] of [['[]', { document_ids: [] }], ['ohne Feld', {}]]) {
+      // Leer: kein Verknuepfen - mit Recht hiesse das "alle sichtbaren
+      // loesen", ohne Recht loest es nichts. `null` und seit #2810 auch das
+      // fehlende Feld sind die 400 des Schemas und loesen ebenso nichts.
+      for (const [form, body] of [['null', { document_ids: null }], ['ohne Feld', {}]]) {
+        const refused = await h.call('PUT', `/${taskId}/documents`, body);
+        assert.equal(refused.status, 400, `${label}, ${form}: die 400 des Schemas`);
+        assert.equal(refused.body.reason, 'validation');
+        assert.deepEqual(linkedIds(taskId), [stored], `${label}, ${form}: und loest nichts`);
+      }
+      for (const [form, body] of [['[]', { document_ids: [] }]]) {
         const kept = await h.call('PUT', `/${taskId}/documents`, body);
         assert.equal(kept.status, 200, `${label}, ${form}: kein Verknuepfen`);
         assert.equal(kept.body.data, null, `${label}, ${form}: und die Antwort nennt nichts`);
