@@ -626,7 +626,7 @@ test('das Display kann nicht als erledigende Person benannt werden (#1205)', asy
 test('das Display meldet sich nicht mit Passwort an - auch nicht mit einem echten', async () => {
   // DER PLATZHALTER ALLEIN IST KEIN BELEG, und der erste Anlauf dieses Tests
   // war genau das: er warf den Platzhalter als Passwort gegen den Login und sah
-  // ihn scheitern - aber das taete jeder Nicht-bcrypt-Wert, auch ohne jede
+  // ihn scheitern - aber das taete jeder Nicht-Hash-Wert, auch ohne jede
   // Sperre (per Mutation gemessen: der Test blieb gruen, nachdem die Regel
   // ausgebaut war). Die Sperre ist erst gezeigt, wenn ein Konto mit einem
   // ECHTEN, passenden Hash trotzdem abgewiesen wird.

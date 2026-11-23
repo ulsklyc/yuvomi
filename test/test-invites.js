@@ -114,7 +114,7 @@ test('markAccepted greift nach Ablauf nicht mehr, auch mit gültig geprüftem To
   const db = makeDb();
   const { token } = svcAt(db, T0).createInvite({ createdBy: 1 });
   // Der Ablauf faellt zwischen verifyToken und markAccepted: beim Einloesen liegt
-  // dazwischen ein bcrypt-Hash von rund 300 ms.
+  // dazwischen ein Passwort-Hash (Argon2id, rund 20 ms).
   assert.notEqual(svcAt(db, T0).verifyToken(token), null);
   assert.equal(svcAt(db, AFTER_TTL).markAccepted(token, 2), 0);
   assert.equal(db.prepare('SELECT accepted_at FROM invites').get().accepted_at, null);

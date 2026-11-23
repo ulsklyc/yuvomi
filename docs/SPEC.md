@@ -15,7 +15,7 @@ Every table: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO
 |--------|------|-----------|
 | username | TEXT | UNIQUE NOT NULL |
 | display_name | TEXT | |
-| password_hash | TEXT | bcrypt (cost 12) of the NFC-normalized password (v1.56.1). Legacy hashes from non-normalized input are still verified and migrated to NFC on the next successful login |
+| password_hash | TEXT | Argon2id (m=19456 KiB, t=2, p=1, 16-byte salt, 32-byte tag) of the NFC-normalized password as a PHC string `$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>` (`server/utils/password.js`). Legacy bcrypt hashes (cost 12, also from non-normalized input before v1.56.1) and Argon2id hashes with weaker parameters are still verified and replaced on the next successful login. `$oidc$` marks an account without a password |
 | avatar_color | TEXT | HEX color code, `#RRGGBB` only (#2351): every member renders it inside a `style` attribute, so `PATCH /me/profile`, `POST/PATCH /users` and `POST /worker` answer 400 for anything else (empty still means the default); migration 269 reset stored values that were not `#RRGGBB` to `#007AFF` |
 | avatar_data | TEXT | Base64 data URL of profile picture (nullable) |
 | avatar_key | TEXT | Nullable (migration v251) - random key of the current profile picture, set and renewed by triggers whenever `avatar_data` changes, `NULL` without a picture. Lists read by a session or a wall display carry `/api/v1/people/{id}/avatar?v=<avatar_key>` instead of the data URL; `GET /api/v1/people/{id}/avatar` serves the picture only with the matching key (otherwise the same 404 as "no picture"), with `Cache-Control: private, no-cache` and an ETag derived from the key. API tokens keep receiving the data URL |

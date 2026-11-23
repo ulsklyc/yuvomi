@@ -89,8 +89,13 @@ const { version: APP_VERSION } = JSON.parse(
 const API_TOKEN_PREFIX = 'yuvomi_';
 // Ein angemeldetes Geraet laeuft ab wie eine Sitzung, dieselbe Zahl.
 const DEVICE_IDLE_DAYS = Math.round(SESSION_MAX_AGE_MS / (24 * 60 * 60 * 1000));
-// Platzhalter-Hash für den Timing-Attack-Schutz beim Login unbekannter Benutzer.
-const DUMMY_PASSWORD_HASH = '$2b$12$invalidhashfortimingprotection000000000000000000000';
+// Platzhalter-Hash für den Timing-Attack-Schutz beim Login unbekannter Benutzer:
+// ein echter Argon2id-Hash eines Zufallswerts, einmal beim Laden des Moduls
+// erzeugt (asynchron, rund 20 ms, lange vor der ersten Anmeldung fertig). Ein
+// Login gegen ihn kostet genau die eine Argon2id-Berechnung, die ein Konto mit
+// Passwort kostet. Scheitert die Erzeugung, bleibt '' - auch das kostet in
+// verifyPassword eine Berechnung mit den aktuellen Parametern.
+const dummyPasswordHash = hashPassword(crypto.randomBytes(32).toString('base64url')).catch(() => '');
 /**
  * WIEVIELE MENSCHEN IM HAUSHALT LEBEN, und warum der Server das sagt.
  *
@@ -1901,10 +1906,10 @@ router.post('/login', loginLimiter, validateRequest(), async (req, res) => {
   const user = db.get().prepare('SELECT * FROM users WHERE username = ?').get(username);
 
   if (!user) {
-    // Timing-Attack-Schutz: trotzdem bcrypt ausführen. Bewusst über
-    // verifyPassword, damit ein Fehlversuch dieselbe Anzahl bcrypt-Läufe
-    // kostet wie bei einem existierenden Konto.
-    await verifyPassword(password, DUMMY_PASSWORD_HASH);
+    // Timing-Attack-Schutz: trotzdem einen Hash pruefen. Bewusst über
+    // verifyPassword gegen einen echten Argon2id-Hash, damit ein Fehlversuch
+    // dieselbe eine Argon2id-Berechnung kostet wie bei einem existierenden Konto.
+    await verifyPassword(password, await dummyPasswordHash);
     log.warn('Login failed', { ip: req.ip, username, reason: 'user_not_found' });
     return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
   }
@@ -1915,13 +1920,21 @@ router.post('/login', loginLimiter, validateRequest(), async (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
   }
 
-  // Der Hash stammt aus einer nicht-normalisierten Eingabe (Issue #608):
-  // still auf NFC migrieren, damit künftig jeder Browser passt.
+  // Der Hash ist ein Legacy-bcrypt-Hash (auch aus einer nicht-normalisierten
+  // Eingabe, #608) oder ein Argon2id-Hash mit schwaecheren Parametern: still
+  // auf Argon2id in den aktuellen Parametern ueber NFC umstellen.
+  //
+  // Das UPDATE schreibt nur, wenn die Zeile noch den eben geprueften Hash
+  // traegt: zwischen Lesen und Schreiben liegt die Hash-Berechnung (ein
+  // await), und ein in diesem Fenster gesetztes neues Passwort darf das alte
+  // nicht ueberschreiben.
   if (needsRehash) {
     try {
       const migrated = await hashPassword(password);
-      db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(migrated, user.id);
-      log.info('Password hash migrated to NFC', { userId: user.id });
+      const info = db.get()
+        .prepare('UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?')
+        .run(migrated, user.id, user.password_hash);
+      if (info.changes === 1) log.info('Password hash migrated to Argon2id', { userId: user.id });
     } catch (rehashErr) {
       log.error('Password hash migration failed:', rehashErr.message);
     }

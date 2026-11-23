@@ -104,7 +104,7 @@ const ADMIN_TOKEN = 'yuvomi_auth_answers_admin_token_0001';
 
 /** @param {string} username @param {string} role @param {string} [familyRole] @param {string} [hash] */
 async function account(username, role, familyRole = 'other', hash) {
-  const passwordHash = hash ?? await hashPassword(PASSWORD, 4);
+  const passwordHash = hash ?? await hashPassword(PASSWORD);
   return Number(database().prepare("INSERT INTO users (username, display_name, password_hash, role, family_role, avatar_color) VALUES (?, ?, ?, ?, ?, '#336699')")
     .run(username, username, passwordHash, role, familyRole).lastInsertRowid);
 }
