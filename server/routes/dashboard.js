@@ -154,7 +154,6 @@ const router = express.Router();
  * }
  */
 router.get('/', validateRequest(), (req, res) => {
-  try {
   const d = db.get();
   const result = {};
   const userId = req.authUserId || req.session.userId;
@@ -494,10 +493,6 @@ router.get('/', validateRequest(), (req, res) => {
   // zeichnet. Hier, hinter jeder Abfrage - ein Block, den jemand oben ergaenzt,
   // erreicht die Wand erst ueber die Allowlist.
   res.json(householdAudience ? householdAudienceAnswer(result, emptyAnswer({ month: currentMonth })) : result);
-  } catch (err) {
-    log.error('Critical error:', err.message);
-    res.status(500).json({ error: 'Dashboard could not be loaded.', code: 500 });
-  }
 });
 
 export default router;

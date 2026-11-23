@@ -300,7 +300,7 @@ function insertAttachmentClone(database, source, staged) {
  * zwar als Erstes, vor jeder Suche, die mit 404 antworten koennte. Der Dialog
  * blendet die Ablage aus demselben Grund aus (`eventAttachmentFieldHtml()`).
  */
-export const ATTACHMENT_UPLOAD_REFUSAL = 'Attaching a file needs write access to documents.';
+const ATTACHMENT_UPLOAD_REFUSAL = 'Attaching a file needs write access to documents.';
 
 /** Bringt der Body einen neuen Anhang mit? Jeder nicht leere Wert zaehlt. */
 function bodyUploadsAttachment(body) {
@@ -310,7 +310,7 @@ function bodyUploadsAttachment(body) {
 }
 
 /** `true`, wenn der Body hochlaedt und der Aufrufer Dokumente nicht schreiben darf. */
-export function attachmentUploadRefused(req) {
+function attachmentUploadRefused(req) {
   return bodyUploadsAttachment(req.body) && !mayWriteModule(req, 'documents');
 }
 
@@ -319,7 +319,7 @@ export function attachmentUploadRefused(req) {
  * Entscheidung 4): sie liest nur, ob `attachment_data` einen Wert traegt, und
  * steht deshalb vor Schema, Suche und Zeilenrecht - die Absage verraet weder,
  * ob es den Termin gibt, noch, ob der Rest des Rumpfs stimmt (DECISIONS.md
- * Eintrag 10). Die Zeile im Handler bleibt bis Schritt (b).
+ * Eintrag 10). Seit Schritt (b) die einzige Stelle: die Zeile im Handler ist weg.
  * @param {any} req
  * @param {any} res
  * @param {() => void} next
