@@ -487,6 +487,21 @@ test('only guard: the Gravatar route no longer checks the type of `email` itself
   assert.equal(schema.properties.email.type, 'string');
 });
 
+test('only guard: a sent profile colour and the device id are the document\'s rules (group 12b, step b)', async () => {
+  // PATCH /me/profile no longer checks the colour itself (the stored one is
+  // not the request's); a sent one lands in a style attribute, and only this
+  // pattern holds it. DELETE /devices/{id} reads Number(): that the id is
+  // plain decimal digits (no `1e1`, ` 5`, `5abc`), only its type says.
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const { COLOR_PATTERN } = await import('../server/utils/datetime-pattern.js');
+  const spec = /** @type {any} */ (buildOpenApiSpec());
+  let schema = spec.paths[`${AUTH_PREFIX}/me/profile`].patch.requestBody.content['application/json'].schema;
+  if (schema.$ref) schema = spec.components.schemas[schema.$ref.split('/').pop()];
+  assert.deepEqual([schema.properties.avatar_color.type, schema.properties.avatar_color.pattern], ['string', COLOR_PATTERN]);
+  const id = spec.paths[`${AUTH_PREFIX}/devices/{id}`].delete.parameters.find((/** @type {any} */ p) => p.in === 'path' && p.name === 'id');
+  assert.deepEqual(id.schema, { type: 'integer', maximum: Number.MAX_SAFE_INTEGER });
+});
+
 test('the routes without input stay as they were: me, users, 2fa, devices, oidc, logout, onboarding', async () => {
   const session = await signIn('vmem');
   assert.equal((await call('GET', '/me?x=1', { session })).status, 200);

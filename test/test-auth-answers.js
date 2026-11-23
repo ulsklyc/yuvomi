@@ -42,6 +42,23 @@
  *          (3) Each handler alone (without `validateRequest()`) keeps the
  *          type checks in front of a string method, a hash or `.trim()` on
  *          the raw value (sink, not route).
+ *
+ *          Group 12b, step (b) adds the 13 administration operations
+ *          (`requireAdmin`: invitations, the household two-factor
+ *          requirement and overview, signing a member out, API tokens,
+ *          member accounts) to the same table, written at c9e9c9500 before
+ *          their refactor: rights (anonymous, member, API token), every
+ *          refusal the handlers keep, the schema's 400 in front of the checks
+ *          that fell (family role, invitation preset, a sent colour, the
+ *          finite path id), and what is stored. The invitation mail goes
+ *          through a stand-in (`mailMode`: no SMTP, a refused mail, a sent
+ *          one), the invitation and token lists get a fixed `created_at` per
+ *          row (they sort by it), and a new member's random colour is pinned
+ *          (crypto.randomInt). Five rows change on purpose (CHANGED): a
+ *          negative device id is a 404, and a stored colour that is not
+ *          `#RRGGBB` no longer refuses a profile or member change. Part (2)
+ *          forces an error into each of the 13 dropped catch blocks, part (3)
+ *          holds the `scopes` list check of `POST /api-tokens` (sink).
  * Run: npm run test:auth-answers
  */
 
@@ -57,7 +74,7 @@ for (const key of [...Object.keys(OIDC_ENV), 'GRAVATAR_BASE_URL', 'AUTH_ALLOW_PA
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createHash } from 'node:crypto';
+import crypto, { createHash } from 'node:crypto';
 // @ts-expect-error express 5 ships no type declarations (TS7016)
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -108,10 +125,16 @@ const gravatarRouter = express.Router();
 auth.buildGravatarRoute(gravatarRouter, { fetch: gravatarFetch, limiter: (/** @type {any} */ _req, /** @type {any} */ _res, /** @type {() => void} */ next) => next() });
 
 let loseAccept = false;
+// The invitation mail: 'off' (no SMTP), 'fail' (the server refuses it), 'ok'.
+let mailMode = 'off';
 const inviteRouter = express.Router();
 auth.buildInviteRoutes(inviteRouter, {
   inviteService: { ...inviteService, markAccepted: (/** @type {string} */ token, /** @type {number} */ userId) => (loseAccept ? 0 : inviteService.markAccepted(token, userId)) },
-  emailService: /** @type {any} */ ({ isConfigured: () => false, sendMail: async () => { throw new Error('no mail in this suite'); } }),
+  emailService: /** @type {any} */ ({
+    isConfigured: () => mailMode !== 'off',
+    sendMail: async () => { if (mailMode !== 'ok') throw new Error('no mail in this suite'); },
+  }),
+  baseUrl: 'https://yuvomi.example.test',
   limiter: (/** @type {any} */ _req, /** @type {any} */ _res, /** @type {() => void} */ next) => next(),
 });
 
@@ -214,7 +237,8 @@ function nextMinute() {
   mock.timers.setTime(Date.now() + 60_000);
 }
 
-const SECRET_KEYS = new Set(['csrfToken', 'credential', 'secret', 'uri', 'qr', 'link']);
+// `token` and `token_prefix`: the plain text of an invitation or an API token.
+const SECRET_KEYS = new Set(['csrfToken', 'credential', 'secret', 'uri', 'qr', 'link', 'token', 'token_prefix']);
 
 /** @param {unknown} value */
 function normalized(value) {
@@ -639,6 +663,11 @@ const STEPS = [
   ['revoke exponent', 'DELETE', '/devices/1e1', NO_BODY, { as: 'mem' }],
   ['revoke text', 'DELETE', '/devices/abc', NO_BODY, { as: 'mem' }],
   ['revoke too big', 'DELETE', '/devices/9007199254740992', NO_BODY, { as: 'mem' }],
+  ['revoke minus zero', 'DELETE', '/devices/-0', NO_BODY, { as: 'mem' }],
+  ['revoke huge negative', 'DELETE', '/devices/-99999999999999999999', NO_BODY, { as: 'mem' }],
+  ['revoke space', 'DELETE', '/devices/%205', NO_BODY, { as: 'mem' }],
+  ['revoke digits and text', 'DELETE', '/devices/5abc', NO_BODY, { as: 'mem' }],
+  ['revoke beyond safe', 'DELETE', '/devices/9007199254740993', NO_BODY, { as: 'mem' }],
   ['revoke token', 'DELETE', () => `/devices/${kept.kidDevice}`, NO_BODY, { as: 'admintoken' }],
   ['revoke trimmed', 'DELETE', () => `/devices/0${kept.trimmedDevice}`, NO_BODY, { as: 'mem' }],
   ['revoke own', 'DELETE', () => `/devices/${kept.kidDevice}`, NO_BODY, { as: 'kid' }],
@@ -663,6 +692,266 @@ const STEPS = [
   ['oidc start fails', 'GET', '/oidc/start', NO_BODY, { fail: 'answer' }],
   ['oidc link start fails', 'POST', '/oidc/link/start', NO_BODY, { as: 'admin', fail: 'answer' }],
   ['oidc after', 'GET', '/oidc/start', NO_BODY],
+
+  // ══ Group 12b: the 13 administration operations (requireAdmin) ════════════
+  // Rights first: anonymous 401, a member 403, whatever the body.
+  ['adm invites anonymous', 'GET', '/invites', NO_BODY],
+  ['adm invites member', 'GET', '/invites', NO_BODY, { as: 'mem' }],
+  ['adm invite anonymous', 'POST', '/invites', { family_role: 'uncle' }],
+  ['adm invite member', 'POST', '/invites', { family_role: 'uncle' }, { as: 'mem' }],
+  ['adm invite revoke anonymous', 'DELETE', '/invites/1.0', NO_BODY],
+  ['adm invite revoke member', 'DELETE', '/invites/1', NO_BODY, { as: 'mem' }],
+  ['adm 2fa overview anonymous', 'GET', '/2fa/overview', NO_BODY],
+  ['adm 2fa overview member', 'GET', '/2fa/overview', NO_BODY, { as: 'mem' }],
+  ['adm 2fa require anonymous', 'PUT', '/2fa/require', { required: '1' }],
+  ['adm 2fa require member', 'PUT', '/2fa/require', { required: true }, { as: 'mem' }],
+  ['adm sign-out anonymous', 'POST', '/users/2/devices/sign-out', NO_BODY],
+  ['adm sign-out member', 'POST', '/users/abc/devices/sign-out', NO_BODY, { as: 'mem' }],
+  ['adm tokens anonymous', 'GET', '/api-tokens', NO_BODY],
+  ['adm tokens member', 'GET', '/api-tokens', NO_BODY, { as: 'mem' }],
+  ['adm token create anonymous', 'POST', '/api-tokens', { name: 5 }],
+  ['adm token create member', 'POST', '/api-tokens', { name: 'x' }, { as: 'mem' }],
+  ['adm token revoke anonymous', 'DELETE', '/api-tokens/1', NO_BODY],
+  ['adm token revoke member', 'DELETE', '/api-tokens/1.0', NO_BODY, { as: 'mem' }],
+  ['adm token remove anonymous', 'POST', '/api-tokens/1/remove', NO_BODY],
+  ['adm token remove member', 'POST', '/api-tokens/1/remove', NO_BODY, { as: 'mem' }],
+  ['adm user create anonymous', 'POST', '/users', { username: 5 }],
+  ['adm user create member', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1' }, { as: 'mem' }],
+  ['adm user update anonymous', 'PATCH', '/users/2', { display_name: 'X' }],
+  ['adm user update member', 'PATCH', '/users/2', { family_role: 'uncle' }, { as: 'mem' }],
+  ['adm user delete anonymous', 'DELETE', '/users/2', NO_BODY],
+  ['adm user delete member', 'DELETE', '/users/abc', NO_BODY, { as: 'mem' }],
+
+  // ── POST/GET/DELETE /invites ──────────────────────────────────────────────
+  ['invite bare', 'POST', '/invites', NO_BODY, { as: 'admin', keep: (body) => { kept.adminInvite = body.data.invite.id; } }],
+  ['invite full', 'POST', '/invites', {
+    username: 'ginvite', display_name: ' Ina ', email: '', family_role: 'mom', permission_preset: 'role', system_admin: false, send_email: false,
+  }, { as: 'admin' }],
+  ['invite token', 'POST', '/invites', { display_name: 'By token' }, { as: 'admintoken' }],
+  ['invite admin', 'POST', '/invites', { display_name: 'Boss', system_admin: true, permission_preset: 'restricted' }, { as: 'admin' }],
+  ['invite username taken', 'POST', '/invites', { username: 'gmem' }, { as: 'admin' }],
+  ['invite username format', 'POST', '/invites', { username: 'g o' }, { as: 'admin' }],
+  ['invite username short', 'POST', '/invites', { username: 'go' }, { as: 'admin' }],
+  ['invite display long', 'POST', '/invites', { display_name: 'x'.repeat(129) }, { as: 'admin' }],
+  ['invite display long trimmed', 'POST', '/invites', { display_name: ` ${'x'.repeat(128)} ` }, { as: 'admin' }],
+  ['invite display number', 'POST', '/invites', { display_name: 5 }, { as: 'admin' }],
+  ['invite family role unknown', 'POST', '/invites', { family_role: 'uncle' }, { as: 'admin' }],
+  ['invite family role empty', 'POST', '/invites', { family_role: '' }, { as: 'admin' }],
+  ['invite family role padded', 'POST', '/invites', { family_role: ' dad ' }, { as: 'admin' }],
+  ['invite family role number', 'POST', '/invites', { family_role: 5 }, { as: 'admin' }],
+  ['invite preset unknown', 'POST', '/invites', { permission_preset: 'all' }, { as: 'admin' }],
+  ['invite preset empty', 'POST', '/invites', { permission_preset: '' }, { as: 'admin' }],
+  ['invite preset padded', 'POST', '/invites', { permission_preset: ' role ' }, { as: 'admin' }],
+  ['invite preset null', 'POST', '/invites', { permission_preset: null }, { as: 'admin' }],
+  ['invite email invalid', 'POST', '/invites', { email: 'nope' }, { as: 'admin' }],
+  ['invite email number', 'POST', '/invites', { email: 5 }, { as: 'admin' }],
+  ['invite send without email', 'POST', '/invites', { send_email: true }, { as: 'admin' }],
+  ['invite send no smtp', 'POST', '/invites', { email: 'ina@example.test', send_email: true }, { as: 'admin' }],
+  () => { mailMode = 'fail'; },
+  ['invite send fails', 'POST', '/invites', { email: 'ina@example.test', send_email: true }, { as: 'admin' }],
+  () => { mailMode = 'ok'; },
+  ['invite send', 'POST', '/invites', { email: 'ina@example.test', send_email: true }, { as: 'admin' }],
+  () => { mailMode = 'off'; },
+  ['invite send number', 'POST', '/invites', { email: 'ina@example.test', send_email: 1 }, { as: 'admin' }],
+  ['invite system admin text', 'POST', '/invites', { system_admin: 'true' }, { as: 'admin' }],
+  ['invites stored', 'PROBE', () => database().prepare('SELECT username, display_name, email, role, family_role, permissions FROM invites WHERE accepted_at IS NULL AND revoked_at IS NULL ORDER BY id').all()],
+  // The lists sort by `created_at`, a stamp of SQLite's own clock: a fixed one
+  // per row keeps their order the same from run to run.
+  () => { database().prepare("UPDATE invites SET created_at = printf('2026-11-23T12:%02d:00Z', id)").run(); },
+  ['invites', 'GET', '/invites', NO_BODY, { as: 'admin' }],
+  ['invites token', 'GET', '/invites', NO_BODY, { as: 'admintoken' }],
+  ['invite revoke', 'DELETE', () => `/invites/${kept.adminInvite}`, NO_BODY, { as: 'admin' }],
+  ['invite revoke again', 'DELETE', () => `/invites/${kept.adminInvite}`, NO_BODY, { as: 'admin' }],
+  ['invite revoke unknown', 'DELETE', '/invites/9999', NO_BODY, { as: 'admin' }],
+  ['invite revoke negative', 'DELETE', '/invites/-1', NO_BODY, { as: 'admin' }],
+  ['invite revoke huge negative', 'DELETE', '/invites/-99999999999999999999', NO_BODY, { as: 'admin' }],
+  ['invite revoke decimal', 'DELETE', '/invites/1.0', NO_BODY, { as: 'admin' }],
+  ['invite revoke text', 'DELETE', '/invites/abc', NO_BODY, { as: 'admin' }],
+  ['invite revoke too big', 'DELETE', '/invites/9007199254740992', NO_BODY, { as: 'admin' }],
+
+  // ── GET /2fa/overview, PUT /2fa/require ───────────────────────────────────
+  ['2fa overview', 'GET', '/2fa/overview', NO_BODY, { as: 'admin' }],
+  ['2fa overview token', 'GET', '/2fa/overview', NO_BODY, { as: 'admintoken' }],
+  ['2fa require on', 'PUT', '/2fa/require', { required: true }, { as: 'admin' }],
+  ['2fa overview required', 'GET', '/2fa/overview', NO_BODY, { as: 'admin' }],
+  ['2fa require text', 'PUT', '/2fa/require', { required: '1' }, { as: 'admin' }],
+  ['2fa require null', 'PUT', '/2fa/require', { required: null }, { as: 'admin' }],
+  ['2fa require off', 'PUT', '/2fa/require', { required: false }, { as: 'admin' }],
+  ['2fa require on token', 'PUT', '/2fa/require', { required: true }, { as: 'admintoken' }],
+  ['2fa require omitted', 'PUT', '/2fa/require', {}, { as: 'admin' }],
+  ['2fa require no body', 'PUT', '/2fa/require', NO_BODY, { as: 'admin' }],
+
+  // ── POST /users/{id}/devices/sign-out ─────────────────────────────────────
+  async () => { await signIn('opa', 'gopa', 'longenough1'); },
+  ['sign-out token', 'POST', () => `/users/${kept.twofa}/devices/sign-out`, NO_BODY, { as: 'admintoken' }],
+  ['sign-out token invalid', 'POST', '/users/abc/devices/sign-out', NO_BODY, { as: 'admintoken' }],
+  ['sign-out unknown', 'POST', '/users/9999/devices/sign-out', NO_BODY, { as: 'admin' }],
+  ['sign-out negative', 'POST', '/users/-1/devices/sign-out', NO_BODY, { as: 'admin' }],
+  ['sign-out huge negative', 'POST', '/users/-99999999999999999999/devices/sign-out', NO_BODY, { as: 'admin' }],
+  ['sign-out decimal', 'POST', '/users/1.0/devices/sign-out', NO_BODY, { as: 'admin' }],
+  ['sign-out text', 'POST', '/users/abc/devices/sign-out', NO_BODY, { as: 'admin' }],
+  ['sign-out', 'POST', '/users/9/devices/sign-out', NO_BODY, { as: 'admin' }],
+  ['sign-out ended', 'GET', '/me', NO_BODY, { as: 'opa' }],
+  ['sign-out self', 'POST', () => `/users/${kept.admin}/devices/sign-out`, NO_BODY, { as: 'admin' }],
+  ['sign-out self kept', 'GET', '/2fa/overview', NO_BODY, { as: 'admin' }],
+
+  // ── API tokens ────────────────────────────────────────────────────────────
+  ['tokens', 'GET', '/api-tokens', NO_BODY, { as: 'admin' }],
+  ['token create', 'POST', '/api-tokens', { name: 'CI' }, { as: 'admin', keep: (body) => { kept.apiToken = body.data.id; } }],
+  ['token create by token', 'POST', '/api-tokens', { name: 'Nested' }, { as: 'admintoken' }],
+  ['token create full', 'POST', '/api-tokens', {
+    name: ' Home ', expires_at: '2030-01-01T00:00:00Z', subject_user_id: 2, scopes: ['tasks:read', 'shopping:write'],
+  }, { as: 'admin', keep: (body) => { kept.apiTokenFull = body.data.id; } }],
+  ['token create name blank', 'POST', '/api-tokens', { name: '   ' }, { as: 'admin' }],
+  ['token create name missing', 'POST', '/api-tokens', {}, { as: 'admin' }],
+  ['token create name number', 'POST', '/api-tokens', { name: 5 }, { as: 'admin' }],
+  ['token create name long', 'POST', '/api-tokens', { name: 'x'.repeat(101) }, { as: 'admin' }],
+  ['token create name long trimmed', 'POST', '/api-tokens', { name: ` ${'x'.repeat(100)} ` }, { as: 'admin' }],
+  ['token create expired', 'POST', '/api-tokens', { name: 'Old', expires_at: '2020-01-01T00:00:00Z' }, { as: 'admin' }],
+  ['token create leap second', 'POST', '/api-tokens', { name: 'Leap', expires_at: '2030-12-31T23:59:60Z' }, { as: 'admin' }],
+  ['token create date only', 'POST', '/api-tokens', { name: 'Day', expires_at: '2030-01-01' }, { as: 'admin' }],
+  ['token create expiry null', 'POST', '/api-tokens', { name: 'Forever', expires_at: null }, { as: 'admin' }],
+  ['token create scopes unknown', 'POST', '/api-tokens', { name: 'S', scopes: ['nothing:read'] }, { as: 'admin' }],
+  ['token create scopes twice', 'POST', '/api-tokens', { name: 'S', scopes: ['tasks:read', 'tasks:read'] }, { as: 'admin' }],
+  ['token create scopes empty', 'POST', '/api-tokens', { name: 'S', scopes: [] }, { as: 'admin' }],
+  ['token create scopes text', 'POST', '/api-tokens', { name: 'S', scopes: 'tasks:read' }, { as: 'admin' }],
+  ['token create scopes numbers', 'POST', '/api-tokens', { name: 'S', scopes: [5] }, { as: 'admin' }],
+  ['token create scopes null', 'POST', '/api-tokens', { name: 'Full', scopes: null }, { as: 'admin' }],
+  ['token create subject unknown', 'POST', '/api-tokens', { name: 'S', subject_user_id: 9999 }, { as: 'admin' }],
+  ['token create subject deactivated', 'POST', '/api-tokens', () => ({ name: 'S', subject_user_id: kept.gone }), { as: 'admin' }],
+  ['token create subject guest', 'POST', '/api-tokens', () => ({ name: 'S', subject_user_id: kept.guest }), { as: 'admin' }],
+  ['token create subject beyond safe', 'POST', '/api-tokens', { name: 'S', subject_user_id: 1e20 }, { as: 'admin' }],
+  ['token create subject text', 'POST', '/api-tokens', { name: 'S', subject_user_id: '2' }, { as: 'admin' }],
+  ['token create subject zero', 'POST', '/api-tokens', { name: 'S', subject_user_id: 0 }, { as: 'admin' }],
+  ['token create subject decimal', 'POST', '/api-tokens', { name: 'S', subject_user_id: 2.5 }, { as: 'admin' }],
+  ['token create no body', 'POST', '/api-tokens', NO_BODY, { as: 'admin' }],
+  ['token revoke', 'DELETE', () => `/api-tokens/${kept.apiToken}`, NO_BODY, { as: 'admin' }],
+  ['token revoke again', 'DELETE', () => `/api-tokens/${kept.apiToken}`, NO_BODY, { as: 'admin' }],
+  ['token revoke unknown', 'DELETE', '/api-tokens/9999', NO_BODY, { as: 'admin' }],
+  ['token revoke negative', 'DELETE', '/api-tokens/-1', NO_BODY, { as: 'admin' }],
+  ['token revoke huge negative', 'DELETE', '/api-tokens/-99999999999999999999', NO_BODY, { as: 'admin' }],
+  ['token revoke decimal', 'DELETE', '/api-tokens/1.0', NO_BODY, { as: 'admin' }],
+  ['token revoke device', 'DELETE', () => `/api-tokens/${kept.device}`, NO_BODY, { as: 'admin' }],
+  ['token remove active', 'POST', () => `/api-tokens/${kept.apiTokenFull}/remove`, NO_BODY, { as: 'admin' }],
+  ['token remove', 'POST', () => `/api-tokens/${kept.apiToken}/remove`, NO_BODY, { as: 'admin' }],
+  ['token remove again', 'POST', () => `/api-tokens/${kept.apiToken}/remove`, NO_BODY, { as: 'admin' }],
+  ['token remove negative', 'POST', '/api-tokens/-1/remove', NO_BODY, { as: 'admin' }],
+  ['token remove huge negative', 'POST', '/api-tokens/-99999999999999999999/remove', NO_BODY, { as: 'admin' }],
+  ['token remove text', 'POST', '/api-tokens/1abc/remove', NO_BODY, { as: 'admin' }],
+  ['tokens stored', 'PROBE', () => database().prepare("SELECT name, created_by, subject_user_id, scopes, expires_at, revoked_at IS NOT NULL AS revoked FROM api_tokens WHERE kind = 'integration' ORDER BY id").all()],
+  () => { database().prepare("UPDATE api_tokens SET created_at = printf('2026-11-23T12:%02d:00Z', id)").run(); },
+  ['tokens after', 'GET', '/api-tokens', NO_BODY, { as: 'admin' }],
+
+  // ── POST /users ───────────────────────────────────────────────────────────
+  ['user create', 'POST', '/users', {
+    username: 'gnew', display_name: 'Neu', password: 'longenough1', avatar_color: '#123456', family_role: 'child',
+    phone: '+49 1', email: 'neu@example.test', birth_date: '2010-03-04', birth_year_unknown: false, system_admin: false,
+  }, { as: 'admin', keep: (body) => { kept.newUser = body.user.id; } }],
+  () => { kept.randomInt = crypto.randomInt; /** @type {any} */ (crypto).randomInt = () => 2; },
+  ['user create default colour', 'POST', '/users', { username: 'gnew2', display_name: 'Neu 2', password: 'longenough1' }, { as: 'admin', keep: (body) => { kept.newUser2 = body.user.id; } }],
+  () => { /** @type {any} */ (crypto).randomInt = kept.randomInt; },
+  ['user create token', 'POST', '/users', { username: 'gnew3', display_name: 'Neu 3', password: 'longenough1', avatar_color: '#654321', system_admin: false }, { as: 'admintoken', keep: (body) => { kept.newAdmin = body.user.id; } }],
+  ['user create username taken', 'POST', '/users', { username: 'gmem', display_name: 'X', password: 'longenough1', avatar_color: '#123456' }, { as: 'admin' }],
+  ['user create username format', 'POST', '/users', { username: 'g o', display_name: 'X', password: 'longenough1', avatar_color: '#123456' }, { as: 'admin' }],
+  ['user create username empty', 'POST', '/users', { username: '', display_name: 'X', password: 'longenough1' }, { as: 'admin' }],
+  ['user create username number', 'POST', '/users', { username: 5, display_name: 'X', password: 'longenough1' }, { as: 'admin' }],
+  ['user create no password', 'POST', '/users', { username: 'gxx', display_name: 'X' }, { as: 'admin' }],
+  ['user create password short', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'short12' }, { as: 'admin' }],
+  ['user create password nfd', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'abcdefé' }, { as: 'admin' }],
+  ['user create password long', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'x'.repeat(1025) }, { as: 'admin' }],
+  ['user create display long', 'POST', '/users', { username: 'gxx', display_name: 'x'.repeat(129), password: 'longenough1' }, { as: 'admin' }],
+  ['user create display padded', 'POST', '/users', { username: 'gxx', display_name: ` ${'x'.repeat(127)} `, password: 'longenough1' }, { as: 'admin' }],
+  ['user create family role unknown', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', family_role: 'uncle' }, { as: 'admin' }],
+  ['user create family role empty', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', family_role: '' }, { as: 'admin' }],
+  ['user create family role list', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', family_role: ['dad'] }, { as: 'admin' }],
+  ['user create colour name', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_color: 'red' }, { as: 'admin' }],
+  ['user create colour short', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_color: '#abc' }, { as: 'admin' }],
+  ['user create colour padded', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_color: ' #abcdef' }, { as: 'admin' }],
+  ['user create colour empty', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_color: '' }, { as: 'admin' }],
+  ['user create colour css', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_color: '#abcdef;x:y' }, { as: 'admin' }],
+  ['user create picture text', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_data: 'not a data url' }, { as: 'admin' }],
+  ['user create picture too long', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_data: `data:image/png;base64,${'A'.repeat(786432)}` }, { as: 'admin' }],
+  ['user create picture emoji', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_data: '\u{1F600}'.repeat(400000) }, { as: 'admin' }],
+  ['user create phone long', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', phone: '1'.repeat(101) }, { as: 'admin' }],
+  // The member routes take any text as an address (validateMemberProfileFields).
+  ['user create email unchecked', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', avatar_color: '#444444', email: 'not-an-address' }, { as: 'admin' }],
+  ['user create birthday invalid', 'POST', '/users', { username: 'gxx', display_name: 'X', password: 'longenough1', birth_date: '2010-02-30' }, { as: 'admin' }],
+  ['user create sso without oidc', 'POST', '/users', { username: 'gxx', display_name: 'X', sso_only: true, email: 'x@example.test' }, { as: 'admin' }],
+  () => { Object.assign(process.env, OIDC_ENV); },
+  ['user create sso with password', 'POST', '/users', { username: 'gxx', display_name: 'X', sso_only: true, password: 'longenough1', email: 'x@example.test' }, { as: 'admin' }],
+  ['user create sso no email', 'POST', '/users', { username: 'gxx', display_name: 'X', sso_only: true }, { as: 'admin' }],
+  ['user create sso email taken', 'POST', '/users', { username: 'gxx', display_name: 'X', sso_only: true, email: 'MIA@example.test' }, { as: 'admin' }],
+  ['user create sso', 'POST', '/users', { username: 'gssonew', display_name: 'SSO', sso_only: true, email: 'sso@example.test', avatar_color: '#222222' }, { as: 'admin' }],
+  () => { for (const key of Object.keys(OIDC_ENV)) delete process.env[key]; },
+  ['user create role alias', 'POST', '/users', { username: 'galias', display_name: 'Alias', password: 'longenough1', avatar_color: '#333333', role: 'admin' }, { as: 'admin', keep: (body) => { kept.alias = body.user.id; } }],
+  ['users created', 'PROBE', () => users()],
+
+  // ── PATCH /users/{id} ─────────────────────────────────────────────────────
+  ['user update', 'PATCH', () => `/users/${kept.newUser}`, {
+    username: 'gnew', display_name: ' Neu Name ', avatar_color: '#0891b2', avatar_data: null, family_role: 'child',
+    system_admin: false, phone: null, email: null, birth_date: null, birth_year_unknown: false,
+  }, { as: 'admin' }],
+  ['user update empty', 'PATCH', () => `/users/${kept.newUser}`, {}, { as: 'admin' }],
+  ['user update no body', 'PATCH', () => `/users/${kept.newUser}`, NO_BODY, { as: 'admin' }],
+  ['user update token', 'PATCH', () => `/users/${kept.newUser}`, { display_name: 'Neu' }, { as: 'admintoken' }],
+  ['user update unknown', 'PATCH', '/users/9999', { display_name: 'X' }, { as: 'admin' }],
+  ['user update negative', 'PATCH', '/users/-1', {}, { as: 'admin' }],
+  ['user update huge negative', 'PATCH', '/users/-99999999999999999999', {}, { as: 'admin' }],
+  ['user update decimal', 'PATCH', '/users/1.5', {}, { as: 'admin' }],
+  ['user update text', 'PATCH', '/users/2abc', {}, { as: 'admin' }],
+  ['user update too big', 'PATCH', '/users/9007199254740992', {}, { as: 'admin' }],
+  ['user update username taken', 'PATCH', () => `/users/${kept.newUser}`, { username: 'gmem' }, { as: 'admin' }],
+  ['user update username format', 'PATCH', () => `/users/${kept.newUser}`, { username: 'g o' }, { as: 'admin' }],
+  ['user update username blank', 'PATCH', () => `/users/${kept.newUser}`, { username: '   ' }, { as: 'admin' }],
+  ['user update display blank', 'PATCH', () => `/users/${kept.newUser}`, { display_name: '' }, { as: 'admin' }],
+  ['user update display long', 'PATCH', () => `/users/${kept.newUser}`, { display_name: 'x'.repeat(129) }, { as: 'admin' }],
+  ['user update display long trimmed', 'PATCH', () => `/users/${kept.newUser}`, { display_name: ` ${'x'.repeat(128)} ` }, { as: 'admin' }],
+  ['user update family role unknown', 'PATCH', () => `/users/${kept.newUser}`, { family_role: 'uncle' }, { as: 'admin' }],
+  ['user update family role empty', 'PATCH', () => `/users/${kept.newUser}`, { family_role: '' }, { as: 'admin' }],
+  ['user update family role padded', 'PATCH', () => `/users/${kept.newUser}`, { family_role: ' dad ' }, { as: 'admin' }],
+  ['user update colour name', 'PATCH', () => `/users/${kept.newUser}`, { avatar_color: 'red' }, { as: 'admin' }],
+  ['user update colour empty', 'PATCH', () => `/users/${kept.newUser}`, { avatar_color: '' }, { as: 'admin' }],
+  ['user update colour padded', 'PATCH', () => `/users/${kept.newUser}`, { avatar_color: '#abcdef ' }, { as: 'admin' }],
+  ['user update picture gif', 'PATCH', () => `/users/${kept.newUser}`, { avatar_data: 'data:image/gif;base64,R0lGOD' }, { as: 'admin' }],
+  ['user update picture', 'PATCH', () => `/users/${kept.newUser}`, { avatar_data: PNG }, { as: 'admin' }],
+  ['user update password short', 'PATCH', () => `/users/${kept.newUser}`, { password: 'short12' }, { as: 'admin' }],
+  ['user update password nfd', 'PATCH', () => `/users/${kept.newUser}`, { password: 'abcdefé' }, { as: 'admin' }],
+  ['user update mail of another', 'PATCH', () => `/users/${kept.newUser}`, { email: 'mia@example.test' }, { as: 'admin' }],
+  ['user update birthday', 'PATCH', () => `/users/${kept.newUser}`, { birth_date: '2010-03-04', birth_year_unknown: true }, { as: 'admin' }],
+  ['user update last admin', 'PATCH', () => `/users/${kept.admin}`, { system_admin: false }, { as: 'admin' }],
+  ['user update deactivated to admin', 'PATCH', () => `/users/${kept.gone}`, { system_admin: true }, { as: 'admin' }],
+  ['user update sso off without password', 'PATCH', () => `/users/${kept.sso}`, { sso_only: false }, { as: 'admin' }],
+  ['user update sso without oidc', 'PATCH', () => `/users/${kept.newUser}`, { sso_only: true }, { as: 'admin' }],
+  async () => { await signIn('newuser', 'gnew', 'longenough1'); },
+  ['user update password', 'PATCH', () => `/users/${kept.newUser}`, { password: 'longenough2' }, { as: 'admin' }],
+  ['user update password ended', 'GET', '/me', NO_BODY, { as: 'newuser' }],
+  ['user update promote', 'PATCH', () => `/users/${kept.newUser2}`, { system_admin: true }, { as: 'admin' }],
+  ['user update demote', 'PATCH', () => `/users/${kept.newUser2}`, { system_admin: false }, { as: 'admin' }],
+  ['users updated', 'PROBE', () => ({ users: users(), contact: contact('gnew'), birthday: birthday('gnew') })],
+  // A colour stored before the pattern (an older installation, an import):
+  // the admin changes only the name, the stored colour is not the request's.
+  () => { database().prepare("UPDATE users SET avatar_color = 'red' WHERE id = ?").run(kept.newUser2); },
+  ['user update stored colour', 'PATCH', () => `/users/${kept.newUser2}`, { display_name: 'Neu Zwei' }, { as: 'admin' }],
+  ['user update stored colour sent', 'PATCH', () => `/users/${kept.newUser2}`, { avatar_color: 'blue' }, { as: 'admin' }],
+  () => { database().prepare("UPDATE users SET avatar_color = 'red' WHERE id = ?").run(kept.mem); },
+  ['profile stored colour', 'PATCH', '/me/profile', { display_name: 'Mia' }, { as: 'mem' }],
+  ['profile stored colour sent', 'PATCH', '/me/profile', { avatar_color: 'blue' }, { as: 'mem' }],
+  ['stored colours', 'PROBE', () => database().prepare("SELECT username, display_name, avatar_color FROM users WHERE username IN ('gmem', 'gnew2') ORDER BY id").all()],
+  () => { database().prepare("UPDATE users SET avatar_color = '#ff9500' WHERE id = ?").run(kept.mem); },
+
+  // ── DELETE /users/{id} ────────────────────────────────────────────────────
+  ['user delete own', 'DELETE', () => `/users/${kept.admin}`, NO_BODY, { as: 'admin' }],
+  ['user delete unknown', 'DELETE', '/users/9999', NO_BODY, { as: 'admin' }],
+  ['user delete negative', 'DELETE', '/users/-1', NO_BODY, { as: 'admin' }],
+  ['user delete huge negative', 'DELETE', '/users/-99999999999999999999', NO_BODY, { as: 'admin' }],
+  ['user delete decimal', 'DELETE', '/users/1.0', NO_BODY, { as: 'admin' }],
+  ['user delete text', 'DELETE', '/users/5abc', NO_BODY, { as: 'admin' }],
+  ['user delete', 'DELETE', () => `/users/${kept.alias}`, NO_BODY, { as: 'admin' }],
+  ['user delete again', 'DELETE', () => `/users/${kept.alias}`, NO_BODY, { as: 'admin' }],
+  () => { database().prepare("INSERT INTO notes (title, content, created_by) VALUES ('Shared', 'x', ?)").run(kept.newUser); },
+  ['user delete with traces', 'DELETE', () => `/users/${kept.newUser}`, NO_BODY, { as: 'admin' }],
+  ['user delete by token', 'DELETE', () => `/users/${kept.newUser2}`, NO_BODY, { as: 'admintoken' }],
+  ['users removed', 'PROBE', () => users()],
 ];
 
 /** @param {Record<string, { status?: number, body?: unknown, location?: string, probe?: unknown }>} answers @param {Record<string, string[]>} logs */
@@ -882,4 +1171,52 @@ test('sink: readDeviceFields reads name, platform and device id only as text (PO
     }
   }
   assert.deepEqual(devices(), before, 'nothing stored');
+});
+
+test('sink: POST /api-tokens reads `scopes` only as a list before it counts them (`.length` on the raw value)', async () => {
+  const count = () => database().prepare("SELECT COUNT(*) AS n FROM api_tokens WHERE kind = 'integration'").get();
+  const before = count();
+  for (const scopes of ['tasks:read', { length: 1 }, 5, { 0: 'tasks:read', length: 1 }]) {
+    assert.deepEqual(await callBare(auth.router, 'post', '/api-tokens', { name: 'Sink', scopes }),
+      { status: 400, body: { error: 'scopes must be an array of "module:read"/"module:write" strings.', code: 400 } }, JSON.stringify(scopes));
+  }
+  assert.deepEqual(count(), before, 'nothing stored');
+});
+
+// ── (2b) Group 12b: the 13 dropped catch blocks of the administration routes ─
+test('group 12b: an unexpected error in each of the 13 administration handlers is a 500 of the central handler, and the routes go on', async () => {
+  await signIn('admin', 'gadmin');
+  const target = await account('gfailpatch', 'member');
+  logged.error.length = 0;
+  /** @type {Array<[string, string, unknown, string]>} [method, path, body, route pattern] */
+  const rows = [
+    // Async handlers: the error comes after their `await` (hashPassword) or
+    // in the answer; it is a rejected promise, which Express 5 hands on.
+    ['POST', '/invites', { display_name: 'Fails' }, '/invites'],
+    ['POST', '/users', { username: 'gfail', display_name: 'Fail', password: 'longenough1', avatar_color: '#123456' }, '/users'],
+    ['PATCH', `/users/${target}`, { password: 'longenough3' }, '/users/:id'],
+    // Synchronous handlers.
+    ['GET', '/invites', NO_BODY, '/invites'],
+    ['DELETE', '/invites/9999', NO_BODY, '/invites/:id'],
+    ['GET', '/2fa/overview', NO_BODY, '/2fa/overview'],
+    ['PUT', '/2fa/require', { required: false }, '/2fa/require'],
+    ['POST', '/users/9999/devices/sign-out', NO_BODY, '/users/:id/devices/sign-out'],
+    ['GET', '/api-tokens', NO_BODY, '/api-tokens'],
+    ['POST', '/api-tokens', { name: ' ' }, '/api-tokens'],
+    ['DELETE', '/api-tokens/9999', NO_BODY, '/api-tokens/:id'],
+    ['POST', '/api-tokens/9999/remove', NO_BODY, '/api-tokens/:id/remove'],
+    ['DELETE', '/users/9999', NO_BODY, '/users/:id'],
+  ];
+  for (const [method, path, body, route] of rows) {
+    assertCentral(await call(method, path, body, { as: 'admin', fail: 'answer' }), method, route);
+  }
+  // What the routes handle themselves keeps its answer: a taken username
+  // (the UNIQUE constraint) at POST and PATCH /users.
+  const taken = await call('POST', '/users', { username: 'gmem', display_name: 'X', password: 'longenough1', avatar_color: '#123456' }, { as: 'admin' });
+  assert.deepEqual({ status: taken.status, body: taken.body }, { status: 409, body: { error: 'Username is already taken.', code: 409, reason: 'members_username_taken' } });
+  const renamed = await call('PATCH', `/users/${target}`, { username: 'gmem' }, { as: 'admin' });
+  assert.deepEqual({ status: renamed.status, body: renamed.body }, { status: 409, body: { error: 'Username is already taken.', code: 409, reason: 'members_username_taken' } });
+  assert.deepEqual(logged.error, [], 'the handled answers did not reach the central handler');
+  assert.equal((await call('GET', '/api-tokens', NO_BODY, { as: 'admin' })).status, 200, 'the routes answer again');
+  assert.equal((await call('DELETE', `/users/${target}`, NO_BODY, { as: 'admin' })).status, 200, 'the routes answer again');
 });
