@@ -17,15 +17,16 @@ const router = express.Router();
 /**
  * The answer once the route's own named cases are handled (Phase 0 section H):
  * a refusal of iCloud or the network as its class (502, `reason` + `detail`
- * such as `HTTP 401`, which the settings page shows the admin), anything local
- * as a fixed sentence. Never the text of iCloud or tsdav.
+ * such as `HTTP 401`, which the settings page shows the admin). Never the text
+ * of iCloud or tsdav. Anything local (a database error, which remoteFailure()
+ * does not take for a refusal) goes on to the central error handler (#2810,
+ * group 10b).
  */
-function sendAppleFailure(res, err, status, sentence) {
+function sendAppleFailure(res, err) {
   const failure = remoteFailure(err);
-  if (failure) {
-    return res.status(502).json({ error: 'iCloud refused the request or could not be reached.', code: 502, ...failure });
-  }
-  return res.status(status).json({ error: sentence, code: status });
+  if (!failure) throw err;
+  log.error('', err);
+  return res.status(502).json({ error: 'iCloud refused the request or could not be reached.', code: 502, ...failure });
 }
 
 // --------------------------------------------------------
@@ -37,19 +38,14 @@ function sendAppleFailure(res, err, status, sentence) {
  * Response: { configured, lastSync }
  */
 router.get('/apple/status', validateRequest(), (req, res) => {
-  try {
-    const status = appleCalendar.getStatus();
-    // DER FEHLERTEXT DES LETZTEN LAUFS IST VERWALTUNGSDATEN. Er kommt vom
-    // Gegenueber und traegt regelmaessig dessen Adresse oder eine Kontokennung
-    // in sich - `calendar:read` reicht bis hierher, weil der Pfad-Guard am
-    // ersten Segment urteilt. Dieselbe Regel wie bei /caldav/status und
-    // /outlook/status, an den Scopes gemessen und nicht am Kontotyp.
-    const { lastError, lastErrorAt, ...rest } = status;
-    res.json(integrationDetailsVisible(req) ? status : rest);
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const status = appleCalendar.getStatus();
+  // DER FEHLERTEXT DES LETZTEN LAUFS IST VERWALTUNGSDATEN. Er kommt vom
+  // Gegenueber und traegt regelmaessig dessen Adresse oder eine Kontokennung
+  // in sich - `calendar:read` reicht bis hierher, weil der Pfad-Guard am
+  // ersten Segment urteilt. Dieselbe Regel wie bei /caldav/status und
+  // /outlook/status, an den Scopes gemessen und nicht am Kontotyp.
+  const { lastError, lastErrorAt, ...rest } = status;
+  res.json(integrationDetailsVisible(req) ? status : rest);
 });
 
 /**
@@ -63,11 +59,11 @@ router.post('/apple/sync', requireAdmin, validateRequest(), async (req, res) => 
     const { lastSync } = appleCalendar.getStatus();
     res.json({ ok: true, lastSync });
   } catch (err) {
-    log.error('', err);
     if (err.code === 'apple_not_configured') {
+      log.error('', err);
       return res.status(409).json({ error: 'No Apple calendar is connected.', code: 409, reason: 'apple_not_configured' });
     }
-    sendAppleFailure(res, err, 500, 'Apple calendar sync failed.');
+    sendAppleFailure(res, err);
   }
 });
 
@@ -98,16 +94,17 @@ router.post('/apple/connect', requireAdmin, validateRequest(), async (req, res) 
     const result = await appleCalendar.testConnection();
     res.json({ ok: true, calendarCount: result.calendarCount });
   } catch (err) {
-    // Bei Fehler: gespeicherte Credentials wieder löschen
+    // Bei Fehler: gespeicherte Credentials wieder löschen - auch vor dem Weg
+    // zum zentralen Fehlerhandler.
     appleCalendar.clearCredentials();
-    log.error('', err);
     // Verbunden, aber ohne Kalender, ist der eine Fall, den die App kennt
     // (#1909); sonst ist es eine Absage von iCloud, deren Klasse die Seite dem
     // Admin zeigt.
     if (err.code === 'apple_no_calendars') {
+      log.error('', err);
       return res.status(400).json({ error: err.message.replace('[Apple] ', ''), code: 400, reason: 'apple_no_calendars' });
     }
-    sendAppleFailure(res, err, 500, 'Connecting the Apple calendar failed.');
+    sendAppleFailure(res, err);
   }
 });
 
@@ -121,15 +118,10 @@ router.post('/apple/connect', requireAdmin, validateRequest(), async (req, res) 
  * Zahl braucht, nimmt DELETE /apple/mirrored-events.
  */
 router.delete('/apple/disconnect', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    appleCalendar.clearCredentials({
-      deleteEvents: req.query.deleteEvents === 'true',
-    });
-    res.status(204).end();
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  appleCalendar.clearCredentials({
+    deleteEvents: req.query.deleteEvents === 'true',
+  });
+  res.status(204).end();
 });
 
 /**
@@ -139,12 +131,7 @@ router.delete('/apple/disconnect', requireAdmin, validateRequest(), (req, res) =
  * Response: { data: { removed: number } }
  */
 router.delete('/apple/mirrored-events', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    res.json({ data: { removed: appleCalendar.clearMirroredEvents() } });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: { removed: appleCalendar.clearMirroredEvents() } });
 });
 
 export default router;

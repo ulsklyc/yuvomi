@@ -36,20 +36,35 @@ function refuseUnknownAccount(res, accountId) {
 /**
  * The answer of a route that may ask Microsoft Graph, once its own named cases
  * are handled (Phase 0 section H): missing configuration and an expired sign-in
- * as own cases, a refusal of Graph as its class (502, `reason` + `detail`),
- * anything local as a fixed 500. Never the text of Graph or of the token
- * endpoint - it names request paths and account details.
+ * as own cases, a refusal of Graph as its class (502, `reason` + `detail`).
+ * Never the text of Graph or of the token endpoint - it names request paths and
+ * account details. Anything local (a database error, which remoteFailure()
+ * does not take for a refusal) goes on to the central error handler (#2810,
+ * group 10b).
  */
-function sendOutlookFailure(res, err, sentence) {
+function sendOutlookFailure(res, err) {
   if (err?.code === 'outlook_not_configured') {
+    log.error('', err);
     return res.status(503).json({ error: 'Outlook is not configured on this server.', code: 503, reason: 'outlook_not_configured' });
   }
   if (err instanceof outlookCalendar.ReauthRequiredError) {
+    log.error('', err);
     return res.status(409).json({ error: 'Outlook sign-in expired - reconnect required.', code: 409, reason: 'outlook_reauth_required' });
   }
   const failure = remoteFailure(err);
-  if (failure) return res.status(502).json({ error: 'Microsoft refused the request or could not be reached.', code: 502, ...failure });
-  return res.status(500).json({ error: sentence, code: 500 });
+  if (!failure) throw err;
+  log.error('', err);
+  return res.status(502).json({ error: 'Microsoft refused the request or could not be reached.', code: 502, ...failure });
+}
+
+/**
+ * The account id in the path: the schema lets plain decimal digits through only
+ * (`idParam()`, #2810).
+ * @param {any} req
+ * @param {string} [name]
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
 }
 
 /**
@@ -112,11 +127,11 @@ router.get('/outlook/accounts', requireAdmin, validateRequest(), (req, res) => {
     outlookCalendar.assertConfigured();
     res.json({ data: outlookCalendar.listAccounts() });
   } catch (err) {
-    log.error('', err);
     if (err?.code === 'outlook_not_configured') {
+      log.error('', err);
       return res.status(503).json({ error: 'Outlook is not configured on this server.', code: 503, reason: 'outlook_not_configured' });
     }
-    res.status(500).json({ error: 'Failed to list Outlook accounts.', code: 500 });
+    throw err;
   }
 });
 
@@ -129,7 +144,7 @@ router.get('/outlook/accounts', requireAdmin, validateRequest(), (req, res) => {
  */
 router.put('/outlook/accounts/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
-    const accountId = parseInt(req.params.id, 10);
+    const accountId = pathId(req);
     const { name, autoSyncCalendarId, ownerUserId } = req.body;
     if (refuseUnknownAccount(res, accountId)) return;
     const result = outlookCalendar.updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId });
@@ -138,8 +153,8 @@ router.put('/outlook/accounts/:id', requireAdmin, validateRequest(), (req, res) 
     if (err.code === 'not_household_member') {
       return res.status(400).json({ error: err.message, code: 400, reason: 'calendar_assignee_not_member' });
     }
-    log.error('Outlook account update failed:', err);
     if (err.code === 'outlook_auto_sync_overrides') {
+      log.error('Outlook account update failed:', err);
       return res.status(409).json({
         error: err.message,
         code: 409,
@@ -148,7 +163,7 @@ router.put('/outlook/accounts/:id', requireAdmin, validateRequest(), (req, res) 
         linked_override_count: err.linkedOverrideCount,
       });
     }
-    res.status(500).json({ error: 'Failed to update Outlook account.', code: 500 });
+    throw err;
   }
 });
 
@@ -158,15 +173,10 @@ router.put('/outlook/accounts/:id', requireAdmin, validateRequest(), (req, res) 
  * in Outlook stehen; lokale Events verlieren ihr Outlook-Ziel.
  */
 router.delete('/outlook/accounts/:id', requireAdmin, validateRequest(), (req, res) => {
-  try {
-    const accountId = parseInt(req.params.id, 10);
-    if (refuseUnknownAccount(res, accountId)) return;
-    const result = outlookCalendar.deleteAccount(accountId);
-    res.json({ data: result });
-  } catch (err) {
-    log.error('Outlook account deletion failed:', err);
-    res.status(500).json({ error: 'Failed to delete Outlook account.', code: 500 });
-  }
+  const accountId = pathId(req);
+  if (refuseUnknownAccount(res, accountId)) return;
+  const result = outlookCalendar.deleteAccount(accountId);
+  res.json({ data: result });
 });
 
 /**
@@ -178,14 +188,13 @@ router.delete('/outlook/accounts/:id', requireAdmin, validateRequest(), (req, re
 router.get('/outlook/accounts/:id/calendars', requireAdmin, refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     outlookCalendar.assertConfigured();
-    const accountId = parseInt(req.params.id, 10);
+    const accountId = pathId(req);
     const refresh = req.query.refresh === 'true';
     if (refuseUnknownAccount(res, accountId)) return;
     const calendars = await outlookCalendar.listCalendars(accountId, { refresh });
     res.json({ data: calendars });
   } catch (err) {
-    log.error('', err);
-    sendOutlookFailure(res, err, 'Failed to fetch calendars.');
+    sendOutlookFailure(res, err);
   }
 });
 
@@ -196,20 +205,19 @@ router.get('/outlook/accounts/:id/calendars', requireAdmin, refuseWhileRestoring
  */
 router.patch('/outlook/accounts/:id/calendars', requireAdmin, validateRequest(), (req, res) => {
   try {
-    const accountId = parseInt(req.params.id, 10);
+    const accountId = pathId(req);
     const { calendarId, enabled } = req.body;
-    if (!calendarId || typeof calendarId !== 'string') {
+    // Text (Pflicht) und `enabled` als Boolean prueft das Schema
+    // (OutlookCalendarSelectionInput); eine leere Kennung kennt es nicht.
+    if (!calendarId) {
       return res.status(400).json({ error: 'calendarId is missing or invalid.', code: 400 });
-    }
-    if (typeof enabled !== 'boolean') {
-      return res.status(400).json({ error: 'enabled must be a boolean.', code: 400 });
     }
     if (refuseUnknownAccount(res, accountId)) return;
     const result = outlookCalendar.setCalendarEnabled(accountId, calendarId, enabled);
     res.json({ data: result });
   } catch (err) {
-    log.error('Outlook calendar selection update failed:', err);
     if (err.code === 'outlook_auto_sync_overrides') {
+      log.error('Outlook calendar selection update failed:', err);
       return res.status(409).json({
         error: err.message,
         code: 409,
@@ -218,7 +226,7 @@ router.patch('/outlook/accounts/:id/calendars', requireAdmin, validateRequest(),
         linked_override_count: err.linkedOverrideCount,
       });
     }
-    res.status(500).json({ error: 'Failed to update calendar selection.', code: 500 });
+    throw err;
   }
 });
 
@@ -233,8 +241,7 @@ router.post('/outlook/sync', requireAdmin, validateRequest(), async (req, res) =
     const result = await outlookCalendar.sync();
     res.json({ data: result });
   } catch (err) {
-    log.error('', err);
-    sendOutlookFailure(res, err, 'Outlook sync failed.');
+    sendOutlookFailure(res, err);
   }
 });
 
@@ -243,21 +250,16 @@ router.post('/outlook/sync', requireAdmin, validateRequest(), async (req, res) =
  * Response: { data: { configured, accounts, totalAccounts } }
  */
 router.get('/outlook/status', validateRequest(), (req, res) => {
-  try {
-    const status = outlookCalendar.getStatus();
-    // Kontomailadresse und letzter Fehlertext sind Verwaltungsdaten - dieselbe
-    // Erwaegung wie bei /caldav/status daneben, dieselbe Regel aus scopes.js.
-    const data = integrationDetailsVisible(req)
-      ? status
-      : {
-        ...status,
-        accounts: (status.accounts || []).map(({ email, lastError, ...rest }) => rest),
-      };
-    res.json({ data });
-  } catch (err) {
-    log.error('Outlook status failed:', err);
-    res.status(500).json({ error: 'Failed to get Outlook status.', code: 500 });
-  }
+  const status = outlookCalendar.getStatus();
+  // Kontomailadresse und letzter Fehlertext sind Verwaltungsdaten - dieselbe
+  // Erwaegung wie bei /caldav/status daneben, dieselbe Regel aus scopes.js.
+  const data = integrationDetailsVisible(req)
+    ? status
+    : {
+      ...status,
+      accounts: (status.accounts || []).map(({ email, lastError, ...rest }) => rest),
+    };
+  res.json({ data });
 });
 
 export default router;
