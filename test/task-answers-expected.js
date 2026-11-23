@@ -12,6 +12,9 @@
  *          500 sentence of the file (`Failed to list sync targets.`) is now
  *          the 500 of the central error handler (its sentence and log line).
  *          `before` is the answer at bdf485f4c, `now` the one after.
+ *          Step (c) changed one row of EXPECTED in place: `link token none`
+ *          (PUT /{id}/documents with `{}`) was a 200 with `data: null` and is
+ *          now the 400 of the schema, since `document_ids` is required.
  * Run: imported by test/test-task-answers.js, no suite of its own.
  */
 
@@ -306,7 +309,7 @@ export const EXPECTED = {
   "link while deleting": {"status":409,"body":{"error":"The document is currently being deleted. Try again when the operation finishes.","code":409,"reason":"DOCUMENT_DELETE_IN_PROGRESS"}},
   "link token": {"status":403,"body":{"error":"Linking a document requires access to documents.","code":403,"reason":"cross_module_access"}},
   "link token empty": {"status":200,"body":{"data":null}},
-  "link token none": {"status":200,"body":{"data":null}},
+  "link token none": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/document_ids","rule":"required"}]}},
   "link unknown": {"status":404,"body":{"error":"Task not found.","code":404,"reason":"tasks_task_not_found"}},
   "link private mem": {"status":404,"body":{"error":"Task not found.","code":404,"reason":"tasks_task_not_found"}},
   "link locked mem": {"status":403,"body":{"error":"This task is locked; only its creator and administrators can change it.","code":403,"reason":"task_locked"}},

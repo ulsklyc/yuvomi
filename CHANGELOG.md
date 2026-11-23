@@ -157,6 +157,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assignees, so every event the sync brought in afterwards arrived unassigned. One of the two is
   required now (a 400 with `reason: "validation"`, before the 404 of an unknown calendar);
   `default_assignee_user_ids: []` or `default_assignee_user_id: null` still clears the set.
+- **Setting the documents of a task takes the list.** This is about your own API clients; the app
+  sends it already. `PUT /tasks/{id}/documents` without `document_ids` removed every document
+  link of the task the caller could see, with a 200 and no message. `document_ids` is required
+  now (a 400 with `reason: "validation"`, before the 404 of an unknown task and the 403 of a
+  locked one); `document_ids: []` still removes the links.
 
 ### Fixed
 - **Refreshing the calendars of an Outlook account answers an expired sign-in with 409

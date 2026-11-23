@@ -1571,11 +1571,14 @@ export const schemas = {
         },
         TaskDocumentsInput: {
           type: 'object',
+          // Required (#2810 group 11a c): the route always replaces the
+          // visible links, and a body without the field emptied them silently.
+          required: ['document_ids'],
           properties: {
             document_ids: {
               type: 'array',
               items: { type: 'integer', minimum: 1 },
-              description: 'The documents to link, replacing the visible links. An empty list removes them; ids the caller cannot see are left out. Omitting `document_ids` clears every visible link as well.',
+              description: 'The documents to link, replacing the visible links. Required; an empty list removes them. Ids the caller cannot see are left out.',
             },
           },
         },
