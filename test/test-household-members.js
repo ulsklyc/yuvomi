@@ -152,14 +152,18 @@ app.use('/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter);
 app.use('/api/v1/schedule', requireAuth, scheduleRouter);
 app.use('/tasks', requireAuth, tasksRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
-app.use('/api/v1/calendar', requireAuth, calendarRouter);
+// In server/index.js the general API limiter stands in front of it, here a
+// generous one does, far above what this suite sends.
+const calendarLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+app.use('/api/v1/calendar', calendarLimiter, requireAuth, calendarRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
 // In server/index.js the general API limiter stands in front of it, here a
 // generous one does, far above what this suite sends.
 const budgetLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
 app.use('/api/v1/budget', budgetLimiter, requireAuth, budgetRouter);
-// At its real prefix (#2810).
-app.use('/api/v1/dashboard', requireAuth, dashboardRouter);
+// At its real prefix (#2810), behind a generous limiter as the calendar above.
+const dashboardLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+app.use('/api/v1/dashboard', dashboardLimiter, requireAuth, dashboardRouter);
 app.use('/api/v1/rewards', requireAuth, rewardsRouter);
 app.use('/api/v1/split-expenses', requireAuth, splitRouter);
 // At its real prefix: validateRequest() finds its operation by the mount (#2810).
