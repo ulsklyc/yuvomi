@@ -146,6 +146,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ("Connection failed: Failed to fetch calendars."); it now shows its general error message, as
   for every other 500. A refusal of the foreign server keeps its class ("Connection failed: HTTP
   401"). Every other answer is unchanged.
+- **The tasks answer an unexpected failure with the same sentence as the rest of the API.**
+  `GET /tasks/sync-targets` said `"Failed to list sync targets."` on a server-side failure; it
+  now answers `{ "error": "Internal server error.", "code": 500 }`, as every other task route
+  already did. The status stays 500. The task dialog still falls back to "local only" and the
+  task settings show their own message there, as before. Every other answer is unchanged.
 - **Setting the default assignees of a synced calendar takes the people.** This is about your
   own API clients; the app sends them already. `PATCH /calendar/external-calendars` without
   `default_assignee_user_ids` and without `default_assignee_user_id` emptied the calendar's default
