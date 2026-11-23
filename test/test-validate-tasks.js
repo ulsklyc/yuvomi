@@ -507,3 +507,93 @@ test('the document: 32 task operations, each with input answering the 400', () =
   assert.equal(spec.paths['/api/v1/tasks/categories/{key}'].delete.responses[204] !== undefined, true);
   assert.equal(spec.paths['/api/v1/tasks/{id}/comments'].post.responses[201] !== undefined, true);
 });
+
+// Since group 11a step (b) the schema is the only guard for these: the task
+// handlers dropped their own check (#2810). So the types, lists, bounds and
+// the pattern are pinned here as literal values - a looser type, a lost
+// `required`, a value added to a list (also to the constant in
+// server/services/task-fields.js the list is read from), a lost bound or a
+// wider pattern turns this red.
+test('only guard: the types, lists and bounds the task handlers no longer check are the document\'s, as values', async () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schemas = spec.components.schemas;
+  const { TIME_PATTERN } = await import('../server/utils/datetime-pattern.js');
+  // The constants as they stand.
+  assert.deepEqual([...fields.TASK_PRIORITIES], ['none', 'low', 'medium', 'high', 'urgent']);
+  assert.deepEqual([...fields.TASK_STATUSES], ['open', 'in_progress', 'done', 'archived']);
+  assert.deepEqual([...fields.ROTATION_MODES], ['round_robin']);
+  assert.equal(fields.MAX_BULK_TASKS, 500);
+  assert.equal(fields.MAX_ROTATION_POOL, 10);
+  assert.equal(fields.TASK_MAX_POINTS, 10000);
+  assert.equal(TIME_PATTERN, '^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+  const TAGS = { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }, { type: 'null' }] };
+  // POST / and PUT /{id}: validateTaskInput() dropped textShape/str of the
+  // description, textShape/oneOf of priority, oneOf of status, time, num and
+  // validateTags.
+  assert.deepEqual(schemas.TaskCreateInput.required, ['title']);
+  for (const name of ['TaskCreateInput', 'TaskUpdateInput']) {
+    const p = schemas[name].properties;
+    assert.deepEqual({ type: p.title.type, minLength: p.title.minLength, maxLength: p.title.maxLength }, { type: 'string', minLength: 1, maxLength: 200 }, `${name}.title`);
+    assert.deepEqual({ type: p.description.type, maxLength: p.description.maxLength }, { type: ['string', 'null'], maxLength: 5000 }, `${name}.description`);
+    assert.deepEqual({ type: p.priority.type, enum: p.priority.enum }, { type: 'string', enum: ['none', 'low', 'medium', 'high', 'urgent', ''] }, `${name}.priority`);
+    assert.equal(p.category.type, 'string', `${name}.category`);
+    assert.deepEqual({ type: p.due_time.type, pattern: p.due_time.pattern }, { type: ['string', 'null'], pattern: TIME_PATTERN }, `${name}.due_time`);
+    for (const day of ['start_date', 'due_date']) assert.deepEqual({ type: p[day].type, format: p[day].format }, { type: ['string', 'null'], format: 'date' }, `${name}.${day}`);
+    assert.deepEqual(p.points.type, ['number', 'null'], `${name}.points`);
+    assert.deepEqual({ oneOf: p.tags.oneOf }, TAGS, `${name}.tags`);
+    assert.deepEqual({ type: p.rotation_mode.type, enum: p.rotation_mode.enum }, { type: ['string', 'null'], enum: ['round_robin', null] }, `${name}.rotation_mode`);
+    assert.deepEqual({ type: p.rotation_pool.type, maxItems: p.rotation_pool.maxItems, items: p.rotation_pool.items }, { type: 'array', maxItems: 10, items: { type: 'integer', minimum: 1 } }, `${name}.rotation_pool`);
+  }
+  assert.deepEqual(schemas.TaskCreateInput.properties.status.enum, ['open', 'in_progress', 'done', 'archived', null]);
+  assert.deepEqual({ type: schemas.TaskUpdateInput.properties.status.type, enum: schemas.TaskUpdateInput.properties.status.enum }, { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] });
+  // PATCH /{id}/status: `Invalid status. Allowed: ...` and `Invalid done_by_user_id.`
+  assert.deepEqual(schemas.TaskStatusInput.required, ['status']);
+  assert.deepEqual(schemas.TaskStatusInput.properties.status, { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] });
+  const doneBy = schemas.TaskStatusInput.properties.done_by_user_id;
+  assert.deepEqual({ type: doneBy.type, minimum: doneBy.minimum }, { type: ['integer', 'null'], minimum: 1 });
+  // PATCH /{id}/archive: `archived must be a boolean.`
+  assert.equal(schemas.TaskArchiveInput.properties.archived.type, 'boolean');
+  // PATCH /{id}/check: `Invalid line number.`, `Invalid state.`, `Invalid line check.`
+  const check = schemas.TaskCheckInput;
+  assert.deepEqual(check.required, ['line', 'checked']);
+  assert.deepEqual({ type: check.properties.line.type, minimum: check.properties.line.minimum }, { type: 'integer', minimum: 0 });
+  assert.deepEqual(check.properties.checked, { type: 'boolean' });
+  assert.deepEqual(check.properties.expect.type, ['string', 'null']);
+  // POST /tags/apply and POST /archive: `ids must be a non-empty array of task IDs.`,
+  // `At most 500 tasks at a time.`, `tags must be an array or a comma-separated string.`
+  const BULK = { type: 'array', minItems: 1, maxItems: 500, items: { type: 'integer', minimum: 1 } };
+  const bulk = (/** @type {any} */ s) => ({ type: s.type, minItems: s.minItems, maxItems: s.maxItems, items: s.items });
+  for (const name of ['TaskTagsApplyInput', 'TaskArchiveManyInput']) {
+    assert.deepEqual(schemas[name].required, ['ids'], name);
+    assert.deepEqual(bulk(schemas[name].properties.ids), BULK, `${name}.ids`);
+  }
+  assert.deepEqual(schemas.TaskTagsApplyInput.properties.add, TAGS);
+  assert.deepEqual(schemas.TaskTagsApplyInput.properties.remove, TAGS);
+  // PATCH /reorder and POST /reorder/reset: the bound, the integers, the duplicates of parseReorderIds().
+  for (const [name, key] of [['TaskReorderInput', 'order'], ['TaskReorderResetInput', 'ids']]) {
+    assert.deepEqual(schemas[name].required, [key], name);
+    assert.deepEqual(bulk(schemas[name].properties[key]), BULK, `${name}.${key}`);
+    assert.equal(schemas[name].properties[key].uniqueItems, true, `${name}.${key} uniqueItems`);
+  }
+  // GET /points/affected and POST /points/rebase: their range sentences and `from must be greater than 0.`
+  const affected = spec.paths['/api/v1/tasks/points/affected'].get.parameters.find((/** @type {any} */ p) => p.name === 'points');
+  assert.equal(affected.required, true);
+  assert.deepEqual(affected.schema, { type: 'integer', minimum: 0, maximum: 10000 });
+  const rebase = schemas.TaskPointsRebaseInput;
+  assert.deepEqual(rebase.required, ['from', 'to']);
+  assert.deepEqual({ type: rebase.properties.from.type, minimum: rebase.properties.from.minimum, maximum: rebase.properties.from.maximum }, { type: 'integer', minimum: 1, maximum: 10000 });
+  assert.deepEqual({ type: rebase.properties.to.type, minimum: rebase.properties.to.minimum, maximum: rebase.properties.to.maximum }, { type: 'integer', minimum: 0, maximum: 10000 });
+  // The path ids pathId() reads with Number(): whole numbers only, no lower bound (0 and below answer 404).
+  const ID = { type: 'integer', maximum: 9007199254740991 };
+  let ids = 0;
+  for (const [path, item] of Object.entries(spec.paths)) {
+    if (!path.startsWith('/api/v1/tasks/{id}')) continue;
+    for (const [method, op] of Object.entries(/** @type {Record<string, any>} */ (item))) {
+      for (const p of op.parameters.filter((/** @type {any} */ q) => q.in === 'path')) {
+        assert.deepEqual(p.schema, ID, `${method} ${path} ${p.name}`);
+        ids++;
+      }
+    }
+  }
+  assert.equal(ids, 15, 'the 13 {id} operations, two of them with a commentId');
+});

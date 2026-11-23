@@ -219,7 +219,6 @@
  "server/routes/subscriptions.js\toxlint/no-restricted-syntax/RIGHTS-SQL": 2,
  "server/routes/subscriptions.js\toxlint/no-unused-vars": 1,
  "server/routes/tasks.js\toxlint/max-lines": 1,
- "server/routes/tasks.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 32,
  "server/routes/tasks.js\toxlint/no-restricted-syntax/UTC-DAY-KEY": 1,
  "server/routes/waste/helpers.js\toxlint/no-restricted-syntax/ERROR-TEXT": 2,
  "server/routes/waste/helpers.js\toxlint/no-unused-vars": 4,
