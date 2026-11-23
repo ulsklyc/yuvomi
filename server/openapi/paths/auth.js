@@ -140,9 +140,9 @@ export function authPaths() {
           + 'page without one. Deliberately does not reject existing sessions: in a household where '
           + 'nobody has set it up yet, that would lock everyone out, including the admin. '
           + 'A separate route rather than a field on PUT /preferences, so the admin gate is middleware '
-          + 'rather than a branch inside the handler. `required` must be a boolean; '
-          + 'omitting `required` switches the requirement off.',
-        requestBody: { ...jsonBody('#/components/schemas/TwoFactorRequirementRequest'), required: false },
+          + 'rather than a branch inside the handler. `required` is required and a boolean: '
+          + 'true requires two-factor authentication household-wide, false lifts the requirement.',
+        requestBody: { ...jsonBody('#/components/schemas/TwoFactorRequirementRequest'), required: true },
         responses: {
           200: { description: 'The requirement as it now stands' },
           400: { $ref: '#/components/responses/BadRequest' },

@@ -376,8 +376,7 @@ export const EXPECTED = {
   "2fa require null": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/required","rule":"type"}]}},
   "2fa require off": {"status":200,"body":{"data":{"required":false}}},
   "2fa require on token": {"status":200,"body":{"data":{"required":true}}},
-  "2fa require omitted": {"status":200,"body":{"data":{"required":false}}},
-  "2fa require no body": {"status":200,"body":{"data":{"required":false}}},
+  "2fa require off again": {"status":200,"body":{"data":{"required":false}}},
   "sign-out token": {"status":403,"body":{"error":"Only a signed-in browser session can sign out a member.","code":403,"reason":"browser_session_required"}},
   "sign-out token invalid": {"status":403,"body":{"error":"Only a signed-in browser session can sign out a member.","code":403,"reason":"browser_session_required"}},
   "sign-out unknown": {"status":404,"body":{"error":"User not found.","code":404}},
@@ -556,5 +555,15 @@ export const CHANGED = {
   "stored colours": {
     before: {"probe":[{"username":"gmem","display_name":"Mia","avatar_color":"red"},{"username":"gnew2","display_name":"Neu 2","avatar_color":"red"}]},
     now: {"probe":[{"username":"gmem","display_name":"Mia","avatar_color":"red"},{"username":"gnew2","display_name":"Neu Zwei","avatar_color":"red"}]},
+  },
+  // Group 12 (step c), changed on purpose: `PUT /2fa/require` requires its
+  // body and `required`; leaving it out used to switch the requirement off.
+  "2fa require omitted": {
+    before: {"status":200,"body":{"data":{"required":false}}},
+    now: {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/required","rule":"required"}]}},
+  },
+  "2fa require no body": {
+    before: {"status":200,"body":{"data":{"required":false}}},
+    now: {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body","rule":"required"}]}},
   },
 };

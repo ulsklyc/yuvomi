@@ -291,6 +291,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   app signs out only devices from its list. `DELETE /auth/devices/-1` and `/auth/devices/-0`
   answered 400 `"Invalid device ID."`; like `0` and an id that is no device of yours they now
   answer 404 `"Device not found."`. A path id that is not plain digits stays a 400.
+- **Setting the household two-factor requirement takes the switch.** This is about your own API
+  clients; the settings page always sends it. `PUT /auth/2fa/require` requires `required`: a
+  request without it used to switch the household's two-factor requirement off, now it is a 400
+  with `reason: "validation"` and nothing changes. The check still runs after the administrator
+  and CSRF checks.
 
 ### Removed
 - **`role: "admin"` no longer makes an administrator at `POST /auth/users`.** This is about your

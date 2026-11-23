@@ -20,6 +20,9 @@
  *              turned the household requirement on; text fields are text:
  *              a number was stored as `"5"`; `subject_user_id` is a number:
  *              `"2"` and `true` picked an account;
+ *            - REQUIRED (group 12, step c): `PUT /2fa/require` without a body
+ *              or without `required` switched the household requirement off;
+ *              now it is a 400 and the requirement stays as it was;
  *            - PATH IDS: `DELETE /users/5abc` deleted account 5, `DELETE
  *              /invites/1.0` revoked invitation 1; both are a 400 now;
  *            - 500 NOW 400: a new member with `avatar_color: null`;
@@ -295,13 +298,50 @@ test('PUT /2fa/require: the switch of the page turns it on and off; "1", "true",
   // "1" turned it on before (the only text that did).
   refused(await call('PUT', '/2fa/require', { session: admin, json: { required: '1' } }), 'body/required', 'type');
   assert.equal(twoFactor.isRequiredForHousehold(db), false);
-  // Documented for now (the field becomes required in a later step): omitting `required` switches the requirement off.
-  await call('PUT', '/2fa/require', { session: admin, json: { required: true } });
-  const omitted = await call('PUT', '/2fa/require', { session: admin, json: {} });
-  assert.deepEqual([omitted.status, omitted.body], [200, { data: { required: false } }]);
-  await call('PUT', '/2fa/require', { session: admin, json: { required: true } });
-  const noBody = await call('PUT', '/2fa/require', { session: admin });
-  assert.deepEqual([noBody.status, noBody.body], [200, { data: { required: false } }]);
+});
+
+test('PUT /2fa/require: a body without `required` is a 400 and changes nothing (it used to switch the requirement off)', async () => {
+  const admin = sessions.aadmin;
+  // admin-family.js sends { required: next } with next a boolean; both pass.
+  for (const required of [true, false, true]) {
+    const res = await call('PUT', '/2fa/require', { session: admin, json: { required } });
+    assert.deepEqual([res.status, res.body], [200, { data: { required } }]);
+    assert.equal(twoFactor.isRequiredForHousehold(db), required);
+  }
+  // On now. Each of these switched it off before.
+  for (const json of [{}, { other: true }]) {
+    refused(await call('PUT', '/2fa/require', { session: admin, json }), 'body/required', 'required', JSON.stringify(json));
+    assert.equal(twoFactor.isRequiredForHousehold(db), true, `${JSON.stringify(json)} switched the requirement off`);
+  }
+  refused(await call('PUT', '/2fa/require', { session: admin }), 'body', 'required', 'no body');
+  assert.equal(twoFactor.isRequiredForHousehold(db), true, 'no body switched the requirement off');
+  // Rights before shape: anonymous 401, a member 403, a missing CSRF token 403, before the 400.
+  assert.equal((await call('PUT', '/2fa/require')).status, 401);
+  assert.equal((await call('PUT', '/2fa/require', { json: {} })).status, 401);
+  for (const json of [undefined, {}]) {
+    const member = await call('PUT', '/2fa/require', { session: sessions.amem, json });
+    assert.deepEqual([member.status, member.body?.reason], [403, 'admin_required'], JSON.stringify(member.body));
+    const noCsrf = await call('PUT', '/2fa/require', { session: { cookie: admin.cookie, csrf: '' }, json });
+    assert.equal(noCsrf.status, 403, JSON.stringify(noCsrf.body));
+    assert.notEqual(noCsrf.body?.reason, 'validation');
+  }
+  assert.equal(twoFactor.isRequiredForHousehold(db), true);
+  const off = await call('PUT', '/2fa/require', { session: admin, json: { required: false } });
+  assert.deepEqual([off.status, off.body], [200, { data: { required: false } }]);
+});
+
+test('PUT /2fa/require: the document requires the body and its field `required`', async () => {
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const spec = /** @type {any} */ (buildOpenApiSpec());
+  const op = spec.paths[`${AUTH_PREFIX}/2fa/require`].put;
+  assert.equal(op.requestBody.required, true);
+  const ref = op.requestBody.content['application/json'].schema.$ref;
+  const body = spec.components.schemas[ref.split('/').pop()];
+  assert.deepEqual(body.required, ['required']);
+  assert.equal(body.properties.required.type, 'boolean');
+  for (const text of [op.description, body.properties.required.description]) {
+    assert.doesNotMatch(text, /omitting/i);
+  }
 });
 
 // --------------------------------------------------------------------------
