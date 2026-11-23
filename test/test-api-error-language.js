@@ -331,8 +331,8 @@ test('keine Absage der Kalender-Konten (Google, Outlook) traegt deutschen Wortla
     await run('google-calendar-id', 'PATCH', '/calendar/google/calendars', {});
     await run('google-enabled', 'PATCH', '/calendar/google/calendars', { calendarId: 'c', enabled: 'yes' });
     await run('google-readonly', 'PUT', '/calendar/google/readonly', { readonly: 'yes' });
-    await run('ext-source', 'PATCH', ext, { ...ok, source: 'nope' });
-    await run('ext-id', 'PATCH', ext, { ...ok, external_id: ' ' });
+    await run('ext-source', 'PATCH', ext, { ...ok, source: 'nope', default_assignee_user_ids: [] });
+    await run('ext-id', 'PATCH', ext, { ...ok, external_id: ' ', default_assignee_user_ids: [] });
     await run('ext-assignee', 'PATCH', ext, { ...ok, default_assignee_user_id: 'abc' });
     await run('ext-assignee-unknown', 'PATCH', ext, { ...ok, default_assignee_user_id: 987654 });
     await run('ext-not-synced', 'PATCH', ext, { ...ok, default_assignee_user_id: null });

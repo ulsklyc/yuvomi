@@ -103,6 +103,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ("Connection failed: Failed to fetch calendars."); it now shows its general error message, as
   for every other 500. A refusal of the foreign server keeps its class ("Connection failed: HTTP
   401"). Every other answer is unchanged.
+- **Setting the default assignees of a synced calendar takes the people.** This is about your
+  own API clients; the app sends them already. `PATCH /calendar/external-calendars` without
+  `default_assignee_user_ids` and without `default_assignee_user_id` emptied the calendar's default
+  assignees, so every event the sync brought in afterwards arrived unassigned. One of the two is
+  required now (a 400 with `reason: "validation"`, before the 404 of an unknown calendar);
+  `default_assignee_user_ids: []` or `default_assignee_user_id: null` still clears the set.
 
 ## [2.94.0] - 2026-11-22
 
