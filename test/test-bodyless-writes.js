@@ -52,9 +52,10 @@ async function bodiless(method, path) {
 
 // Stichprobe aus zehn Modulen. Jede dieser Routen destrukturierte `req.body`
 // oder las ein Feld daraus ohne `?.` - gegen main antworteten sie 500.
-// PUT /preferences ist ein Teil-Update: ohne Felder aendert es nichts und
-// antwortet mit den Einstellungen - das ist seine eigene Antwort, kein Fehler.
-const ACCEPTS_EMPTY = new Set(['PUT /api/v1/preferences']);
+// PUT /preferences antwortete ohne Rumpf frueher 200 mit den Einstellungen;
+// seit #2810 (Gruppe 11b, Entscheidung 15) verlangt das Dokument einen Rumpf,
+// und die Route antwortet 400 wie die anderen. Ein leeres Objekt `{}` bleibt 200.
+const ACCEPTS_EMPTY = new Set();
 const ROUTES = [
   ['POST', '/api/v1/meals'],
   ['POST', '/api/v1/tasks'],
