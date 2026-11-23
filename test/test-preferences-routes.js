@@ -26,26 +26,25 @@ process.env.TZ = 'UTC';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
+import { createPreferencesApp, PREFERENCES_PREFIX } from './preferences-app.js';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const holidays = await import('../server/services/holidays.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 
 // Modulweiter Akteur; die Middleware liest ihn zur Request-Zeit.
 const actor = { userId: 1, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.userId;
-  req.authRole = actor.role;
-  next();
+const app = await createPreferencesApp({
+  mount: ['preferences'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.userId;
+    req.authRole = actor.role;
+    next();
+  },
 });
-app.use('/', preferencesRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
+const base = `http://127.0.0.1:${server.address().port}${PREFERENCES_PREFIX}`;
 
 test.after(() => { server.close(); holidays.__setFetchImpl(null); });
 // Deterministisch nach JEDEM Test zuruecksetzen, damit ein Fehlschlag (z. B. in

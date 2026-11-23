@@ -7,8 +7,8 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import express from 'express';
 import { buildRouter } from '../server/routes/push.js';
+import { createPreferencesApp, PUSH_PREFIX } from './preferences-app.js';
 import { processDuePushes } from '../server/services/push-scheduler.js';
 import { MIGRATIONS } from '../server/db.js';
 import { fetchRetry } from './fetch-retry.js';
@@ -384,17 +384,20 @@ test('PUT /wall-mode aendert nur das eigene Abo - nicht das eines anderen Nutzer
  * laeuft direkt danach - auch nach einer geworfenen Assertion.
  */
 async function startApp(db, webpush, userId = 1, { viaSession = false } = {}) {
-  const app = express();
-  app.use(express.json());
-  // Token requests carry `authUserId`, browser requests only the session.
-  app.use((req, _res, next) => {
-    if (viaSession) req.session = { userId };
-    else req.authUserId = userId;
-    next();
-  });
   const { createPushService } = await import('../server/services/push.js');
   const pushService = createPushService({ db, webpush });
-  app.use('/', buildRouter({ pushService, database: db }));
+  // The push router at its real prefix (#2810, test/preferences-app.js), built
+  // through its factory with this suite's push service and database.
+  const app = await createPreferencesApp({
+    mount: [],
+    // Token requests carry `authUserId`, browser requests only the session.
+    auth: (req, _res, next) => {
+      if (viaSession) req.session = { userId };
+      else req.authUserId = userId;
+      next();
+    },
+    after: [[PUSH_PREFIX, buildRouter({ pushService, database: db })]],
+  });
   const server = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
 
   after(async () => {
@@ -404,7 +407,7 @@ async function startApp(db, webpush, userId = 1, { viaSession = false } = {}) {
     await new Promise((r) => server.close(r));
   });
 
-  return { baseUrl: `http://127.0.0.1:${server.address().port}` };
+  return { baseUrl: `http://127.0.0.1:${server.address().port}${PUSH_PREFIX}` };
 }
 
 test('GET /vapid-public-key returns the key', async () => {

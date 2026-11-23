@@ -93,7 +93,7 @@ const app = await createCalendarApp({
     req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
     next();
   },
-  before: [['/preferences', preferencesRouter]],
+  before: [['/api/v1/preferences', preferencesRouter]],
 });
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -239,9 +239,9 @@ test('OpenAPI nennt den Parameter mit genau den Stufen der Route', () => {
 // 2. Die Ablage: Form statt Bedeutung, je Person, mit Haushaltsvorgabe
 // --------------------------------------------------------------------------
 
-const readPrefs = async () => (await getJson('/preferences')).data;
+const readPrefs = async () => (await getJson('/api/v1/preferences')).data;
 async function writePrefs(body) {
-  const res = await fetch(`${base}/preferences`, {
+  const res = await fetch(`${base}/api/v1/preferences`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   return res.status;

@@ -94,7 +94,7 @@ const app = await createCalendarApp({
     if (displayScopes) { req.authMethod = 'display'; req.authScopes = displayScopes; }
     next();
   },
-  before: [['/preferences', preferencesRouter]],
+  before: [['/api/v1/preferences', preferencesRouter]],
 });
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -108,7 +108,7 @@ test.after(async () => {
 // Die Uebersicht steht unter ihrem echten Praefix (#2810); `path` bleibt der
 // Teil dahinter, wie ihn `query()` und `dashboardQuery()` bauen.
 async function getJson(path) {
-  const prefix = path.startsWith('/preferences') ? '' : '/api/v1/dashboard';
+  const prefix = path.startsWith('/preferences') ? '/api/v1' : '/api/v1/dashboard';
   const res = await fetch(`${base}${prefix}${path}`);
   assert.equal(res.status, 200, `${path}: ${res.status}`);
   return res.json();
@@ -325,7 +325,7 @@ test('OpenAPI beschreibt den Parameter', () => {
 
 const readPrefs = async () => (await getJson('/preferences')).data;
 async function writePrefs(body) {
-  const res = await fetch(`${base}/preferences`, {
+  const res = await fetch(`${base}/api/v1/preferences`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   return res.status;

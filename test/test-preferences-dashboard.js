@@ -16,11 +16,10 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createPreferencesApp, PREFERENCES_PREFIX } from './preferences-app.js';
 import test from 'node:test';
 
 const { get } = await import('../server/db.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 // Die Id wird gebaut statt getippt: der Test prueft die ZUSAGE aus MODULES.md,
 // nicht eine Zeichenkette, die zufaellig heute passt (#1013).
 const { fullWidgetId } = await import('../server/services/module-capabilities.js');
@@ -54,19 +53,19 @@ function householdValue(key) {
   return get().prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value ?? null;
 }
 
-function startApp() {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.authUserId = currentUserId;
-    req.authRole = currentRole;
-    next();
+async function startApp() {
+  const app = await createPreferencesApp({
+    mount: ['preferences'],
+    auth: (req, _res, next) => {
+      req.authUserId = currentUserId;
+      req.authRole = currentRole;
+      next();
+    },
   });
-  app.use('/', preferencesRouter);
 
   return new Promise((resolve) => {
     const server = app.listen(0, '127.0.0.1', () => resolve({
-      baseUrl: `http://127.0.0.1:${server.address().port}`,
+      baseUrl: `http://127.0.0.1:${server.address().port}${PREFERENCES_PREFIX}`,
       close: () => new Promise((done) => server.close(done)),
     }));
   });
