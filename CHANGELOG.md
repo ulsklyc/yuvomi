@@ -52,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"Subscription could not be created."` and the like); they now answer
   `{ "error": "Internal server error.", "code": 500 }`. The status stays 500, and the app shows
   its own message for it as before. Every other answer is unchanged.
+- **The calendar and the overview answer an unexpected failure with the same sentence as the
+  rest of the API.** The event routes under `/api/v1/calendar` said `"Internal error."` on such a
+  500 (for example with an assignee id that is no user, or an attachment that is no valid file),
+  `GET /calendar/sync-targets` said `"Failed to list sync targets."` and `GET /dashboard`
+  `"Dashboard could not be loaded."`; they now answer
+  `{ "error": "Internal server error.", "code": 500 }`, as the other calendar routes already did.
+  The status stays 500, and the app shows its own message for it as before. Every other answer
+  is unchanged.
 
 ## [2.94.0] - 2026-11-22
 

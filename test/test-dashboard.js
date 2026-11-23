@@ -2000,7 +2000,8 @@ test('Dashboard-Endpoint: fehlender Auth-Kontext führt zu 500 (kritischer Fehle
   const { createCalendarApp } = await import('./calendar-app.js');
 
   // Middleware setzt weder authUserId noch session → der Handler wirft beim Lesen von
-  // req.session.userId und der äußere try/catch liefert die 500-Antwort.
+  // req.session.userId, und der zentrale Fehlerhandler liefert die 500-Antwort
+  // (seit #2810 Gruppe 10a Schritt b; vorher ein eigener Satz der Route).
   const app = await createCalendarApp({
     mount: ['dashboard'],
     auth: (req, _res, next) => { next(); },
@@ -2012,7 +2013,7 @@ test('Dashboard-Endpoint: fehlender Auth-Kontext führt zu 500 (kritischer Fehle
     nodeAssert.equal(response.status, 500);
     const body = await response.json();
     nodeAssert.equal(body.code, 500);
-    nodeAssert.equal(body.error, 'Dashboard could not be loaded.');
+    nodeAssert.equal(body.error, 'Internal server error.');
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

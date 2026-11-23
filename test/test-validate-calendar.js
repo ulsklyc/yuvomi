@@ -470,3 +470,76 @@ test('the value lists of the schemas are the constants the handlers read', () =>
     assert.equal(schemas[name].properties.name.minLength, undefined, name);
   }
 });
+
+// Since group 10a step (b) the schema is the only guard for these: the
+// handlers dropped their own check (#2810). So the types, lists, bounds and
+// patterns are pinned here as literal values - a looser type, a value added to
+// a list (also to the constant in server/services/calendar-fields.js the list
+// is read from), a lost minimum or a wider pattern turns this red.
+test('only guard: the types, lists and bounds the handlers no longer check are the document\'s, as values', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schemas = spec.components.schemas;
+  const TEXT_OR_NULL = { type: ['string', 'null'] };
+  const BOOL = { type: 'boolean' };
+  const COUNT = { type: 'integer', minimum: 0 };
+  const COLOR = { type: ['string', 'null'], pattern: '^#[0-9A-Fa-f]{6}$' };
+  const pick = (/** @type {any} */ schema, /** @type {string[]} */ keys) => Object.fromEntries(keys.filter((k) => k in schema).map((k) => [k, schema[k]]));
+
+  // POST /calendar: title as text, description and location as text or null (the textShape() checks).
+  const create = schemas.CalendarEventCreateInput;
+  assert.deepEqual(create.required, ['title', 'start_datetime']);
+  assert.deepEqual(pick(create.properties.title, ['type', 'maxLength']), { type: 'string', maxLength: 200 });
+  for (const field of ['description', 'location']) {
+    assert.deepEqual(pick(create.properties[field], ['type']), TEXT_OR_NULL, `create ${field}`);
+  }
+  // PUT /calendar/{id}: description and location, the orphan count, the removal switch.
+  const update = schemas.CalendarEventUpdateInput.properties;
+  for (const field of ['description', 'location']) {
+    assert.deepEqual(pick(update[field], ['type']), TEXT_OR_NULL, `update ${field}`);
+  }
+  assert.deepEqual(pick(update.confirmed_orphan_count, ['type', 'minimum']), COUNT, 'update confirmed_orphan_count');
+  assert.deepEqual(pick(update.remove_attachment, ['type']), BOOL, 'update remove_attachment');
+  // The occurrence and the successor (validateOccurrenceMutationBody serves both).
+  for (const name of ['CalendarOccurrenceOnlyMutation', 'CalendarOccurrenceFollowingMutation']) {
+    const props = schemas[name].properties;
+    assert.deepEqual(pick(props.title, ['type', 'maxLength']), { type: 'string', maxLength: 200 }, `${name} title`);
+    assert.deepEqual(pick(props.description, ['type', 'maxLength']), { type: ['string', 'null'], maxLength: 5000 }, `${name} description`);
+    assert.deepEqual(pick(props.location, ['type', 'maxLength']), { type: ['string', 'null'], maxLength: 200 }, `${name} location`);
+    assert.deepEqual(props.color, COLOR, `${name} color`);
+    assert.deepEqual(props.all_day, BOOL, `${name} all_day`);
+    assert.deepEqual(props.countdown, BOOL, `${name} countdown`);
+    assert.deepEqual(props.visibility, { type: 'string', enum: ['all', 'assignees', 'private'] }, `${name} visibility`);
+    assert.deepEqual(props.remove_attachment, BOOL, `${name} remove_attachment`);
+    assert.deepEqual(props.reminder_offsets, { type: 'array', maxItems: 5, uniqueItems: true, items: { type: 'integer', minimum: 0 } }, `${name} reminder_offsets`);
+  }
+  const following = schemas.CalendarOccurrenceFollowingMutation.properties;
+  assert.deepEqual(following.recurrence_rule, { type: ['string', 'null'], maxLength: 300 }, 'following recurrence_rule');
+  assert.deepEqual(following.confirmed_orphan_count, COUNT, 'following confirmed_orphan_count');
+  // PUT /calendar/calendars/{id}: the order of a local calendar.
+  assert.deepEqual(schemas.LocalCalendarUpdateInput.properties.sort_order, COUNT, 'local calendar sort_order');
+  // PUT /calendar/feed: at least one of the two switches, each a boolean.
+  const feed = schemas.CalendarFeedOptionsInput;
+  assert.deepEqual(pick(feed.properties.showAssignees, ['type']), BOOL);
+  assert.deepEqual(pick(feed.properties.includeBirthdays, ['type']), BOOL);
+  assert.deepEqual(feed.anyOf, [
+    { properties: { showAssignees: BOOL }, required: ['showAssignees'] },
+    { properties: { includeBirthdays: BOOL }, required: ['includeBirthdays'] },
+  ]);
+  // The path ids pathId() reads with Number(): whole numbers only, no 'Invalid ID.' behind them.
+  const ID = { type: 'integer', maximum: 9007199254740991 };
+  for (const [path, method, name] of [
+    ['/api/v1/calendar/{id}', 'get', 'id'], ['/api/v1/calendar/{id}', 'put', 'id'], ['/api/v1/calendar/{id}', 'delete', 'id'],
+    ['/api/v1/calendar/{id}/reset', 'post', 'id'], ['/api/v1/calendar/{id}/exceptions', 'post', 'id'],
+    ['/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}', 'put', 'seriesId'],
+    ['/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}', 'delete', 'seriesId'],
+    ['/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}/following', 'put', 'seriesId'],
+    ['/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}/following', 'delete', 'seriesId'],
+    ['/api/v1/calendar/calendars/{id}', 'put', 'id'], ['/api/v1/calendar/calendars/{id}', 'delete', 'id'],
+    ['/api/v1/calendar/calendars/{id}/feed/regenerate', 'post', 'id'], ['/api/v1/calendar/calendars/{id}/feed', 'delete', 'id'],
+    ['/api/v1/calendar/subscriptions/{id}', 'patch', 'id'], ['/api/v1/calendar/subscriptions/{id}', 'delete', 'id'],
+    ['/api/v1/calendar/subscriptions/{id}/sync', 'post', 'id'],
+  ]) {
+    const param = spec.paths[path][method].parameters.find((/** @type {any} */ p) => p.name === name && p.in === 'path');
+    assert.deepEqual(param.schema, ID, `${method} ${path} ${name}`);
+  }
+});

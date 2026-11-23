@@ -22,6 +22,15 @@ const router = express.Router();
 const NAME_INVALID = { reason: 'calendar_subscription_name_invalid' };
 
 /**
+ * Die Kennung im Pfad: das Schema laesst nur Dezimalziffern durch (#2810).
+ * @param {any} req
+ * @param {string} [name]
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
+
+/**
  * Der Fall eines gescheiterten Feed-Abrufs (#1909), den die Seite in ihrer
  * Sprache sagt - oder null. Der Text des Fehlers bleibt in `error`; ein Status
  * oder eine Grenze reist als Zahl in `params`, nie als Satz.
@@ -41,25 +50,20 @@ function icsFetchCase(err) {
 // --------------------------------------------------------
 
 router.get('/subscriptions', validateRequest(), (req, res) => {
-  try {
-    const subs = icsSubscription.getAll(getUserId(req));
-    // DIE QUELL-URL IST EIN ZUGANGSDATUM, KEIN ANZEIGEFELD. Private
-    // Kalenderfeeds tragen ihr Geheimnis regelmaessig IM Pfad; wer die URL
-    // liest, hat den Kalender dauerhaft - auch nachdem sein eigener Zugang
-    // entzogen wurde. Sie gehoert deshalb dem, der das Abo VERWALTET, und nicht
-    // jedem, der Kalender lesen darf.
-    //
-    // Gemessen an den Scopes, nicht an der Anmeldeart: das trifft das
-    // Wandtablett (#1208) und ebenso ein gescoptes API-Token mit
-    // `calendar:read` - dort lag die Luecke schon vor diesem Ticket. Eine
-    // Sitzung traegt `authScopes === null` und sieht die URL wie bisher, sonst
-    // liesse sich ein Abo nicht mehr bearbeiten.
-    const data = req.authScopes == null ? subs : subs.map(({ url, ...rest }) => rest);
-    res.json({ data });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const subs = icsSubscription.getAll(getUserId(req));
+  // DIE QUELL-URL IST EIN ZUGANGSDATUM, KEIN ANZEIGEFELD. Private
+  // Kalenderfeeds tragen ihr Geheimnis regelmaessig IM Pfad; wer die URL
+  // liest, hat den Kalender dauerhaft - auch nachdem sein eigener Zugang
+  // entzogen wurde. Sie gehoert deshalb dem, der das Abo VERWALTET, und nicht
+  // jedem, der Kalender lesen darf.
+  //
+  // Gemessen an den Scopes, nicht an der Anmeldeart: das trifft das
+  // Wandtablett (#1208) und ebenso ein gescoptes API-Token mit
+  // `calendar:read` - dort lag die Luecke schon vor diesem Ticket. Eine
+  // Sitzung traegt `authScopes === null` und sieht die URL wie bisher, sonst
+  // liesse sich ein Abo nicht mehr bearbeiten.
+  const data = req.authScopes == null ? subs : subs.map(({ url, ...rest }) => rest);
+  res.json({ data });
 });
 
 router.post('/subscriptions', validateRequest(), async (req, res) => {
@@ -112,17 +116,15 @@ router.post('/subscriptions', validateRequest(), async (req, res) => {
       ...(syncCase?.params ? { syncParams: syncCase.params } : {}),
     });
   } catch (err) {
-    log.error('', err);
     const fetchCase = icsFetchCase(err);
     if (fetchCase) return res.status(400).json({ error: err.message, code: 400, ...fetchCase });
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 router.patch('/subscriptions/:id', validateRequest(), (req, res) => {
   try {
-    const subId   = parseInt(req.params.id, 10);
-    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+    const subId   = pathId(req);
     const isAdmin = isAdminRequest(req);
     const fields  = {};
     if (req.body.name  !== undefined) {
@@ -150,15 +152,13 @@ router.patch('/subscriptions/:id', validateRequest(), (req, res) => {
     // icsSubscription wirft 'Not authorized.' (englisch) — ohne diese Angleichung
     // schlägt der Vergleich fehl und ein Nicht-Owner erhielte 500 statt 403.
     if (err.message === 'Not authorized.') return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 router.delete('/subscriptions/:id', validateRequest(), (req, res) => {
   try {
-    const subId   = parseInt(req.params.id, 10);
-    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+    const subId   = pathId(req);
     const isAdmin = isAdminRequest(req);
     const ok      = icsSubscription.remove(getUserId(req), subId, isAdmin);
     if (!ok) return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'calendar_subscription_not_found' });
@@ -167,15 +167,13 @@ router.delete('/subscriptions/:id', validateRequest(), (req, res) => {
     // icsSubscription wirft 'Not authorized.' (englisch) — Angleichung wie oben,
     // sonst 500 statt 403 für Nicht-Owner.
     if (err.message === 'Not authorized.') return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
 router.post('/subscriptions/:id/sync', validateRequest(), async (req, res) => {
   try {
-    const subId   = parseInt(req.params.id, 10);
-    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
+    const subId   = pathId(req);
     const isAdmin = isAdminRequest(req);
     const sub     = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
     if (!sub) return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'calendar_subscription_not_found' });
@@ -188,8 +186,7 @@ router.post('/subscriptions/:id/sync', validateRequest(), async (req, res) => {
   } catch (err) {
     const fetchCase = icsFetchCase(err);
     if (fetchCase) return res.status(400).json({ error: err.message, code: 400, ...fetchCase });
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
@@ -237,13 +234,16 @@ router.post('/import', validateRequest(), async (req, res) => {
     // Größenlimit) direkt zurückgeben, mit ihrem Fall (#1909).
     const fetchCase = icsFetchCase(err);
     if (fetchCase) return res.status(400).json({ error: err.message, code: 400, ...fetchCase });
-    log.error('POST /import:', err);
     // Phase 0 section H: a feed that could not be fetched (DNS, refused
     // connection, timeout) goes out as its class - its text names host and
-    // port. Before, a pattern on the message let that text through as a 400.
+    // port, so it stays in the log. Before, a pattern on the message let that
+    // text through as a 400.
     const failure = typeof req.body?.url === 'string' && req.body.url.trim() ? remoteFailure(err) : null;
-    if (failure) return res.status(502).json({ error: 'The feed could not be fetched.', code: 502, ...failure });
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    if (failure) {
+      log.warn('POST /import: feed not fetched:', err);
+      return res.status(502).json({ error: 'The feed could not be fetched.', code: 502, ...failure });
+    }
+    throw err;
   }
 });
 
