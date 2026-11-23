@@ -1,0 +1,444 @@
+/**
+ * Test: request validation in the calendar provider routes (#2810, phase 2
+ *       section E, group 10b)
+ * Purpose: the four provider route files under server/routes/calendar/
+ *          (google 12, apple 5, caldav 12, outlook 9) check every request
+ *          against the schema of its operation in the OpenAPI document
+ *          (`validateRequest()` in every route, 38) before the handler runs.
+ *          Held here against the real routers at their real prefix, in the
+ *          order of server/index.js (test/calendar-app.js):
+ *            - THE OWN CALLERS: the requests public/settings/pages/
+ *              sync-calendar.js and sync-reminders.js send pass - booleans
+ *              for the switches, numbers for people, `null` where the
+ *              Outlook controls clear a field, `deleteEvents=true|false`;
+ *            - REFUSED: garbage per field is a 400 with `reason: 'validation'`
+ *              and `fields`: a switch as text (`enabled: "false"` switched a
+ *              CalDAV calendar ON), a path id that is not plain digits
+ *              (`PUT /caldav/accounts/1abc` changed account 1), a query
+ *              switch outside `true|false`, a missing body at a PUT;
+ *            - ORDER: `requireAdmin` stands in front of the check (a member
+ *              with a malformed body meets the 403), the check in front of
+ *              the account lookup (400 before 404);
+ *            - UNKNOWN ACCOUNT (decision 11): a CalDAV or Outlook account in
+ *              the path that does not exist is a 404 with its reason, looked
+ *              up before the service, whose plain Error answered 500 or a
+ *              502 `remote_failed` as if the server had refused;
+ *            - THE OAUTH CALLBACKS (decision 12) declare no query: whatever
+ *              the provider sends goes on to the redirect, never a 400 of the
+ *              check;
+ *            - SINKS: a value of the wrong type reached the service raw
+ *              (`targetModule: "x"` and `calendarUrl: 5` answered 500,
+ *              `name: 5` was stored as the name of a CalDAV account);
+ *            - REASONS STAY: the checks with an answer of their own
+ *              (`apple_url_invalid`, a password too long, a blank id) stay
+ *              in the handler, the schema carries type and shape only;
+ *            - ONE SOURCE: the value lists of the schemas are the constants of
+ *              server/services/calendar-fields.js, which the handlers read,
+ *              and equal the CHECK constraints of their columns.
+ *          No network: no Google, Microsoft, iCloud or CalDAV server is asked.
+ *          Every request either stops at the check, at a handler check before
+ *          the service, or reaches a service path that only reads and writes
+ *          the database (an unconnected Google answers 409 before any call).
+ * Run: npm run test:validate-calendar-providers
+ */
+
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+process.env.DB_PATH = ':memory:';
+// Outlook counts as configured, so the account routes reach the lookup; no
+// request to Microsoft is made by the routes asked here.
+process.env.MS_CLIENT_ID = 'test-client';
+process.env.MS_CLIENT_SECRET = 'test-secret-value';
+process.env.MS_REDIRECT_URI = 'http://127.0.0.1/api/v1/calendar/outlook/callback';
+for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI']) delete process.env[key];
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import rateLimit from 'express-rate-limit';
+import { createCalendarApp } from './calendar-app.js';
+
+const dbmod = await import('../server/db.js');
+const { buildOpenApiSpec } = await import('../server/openapi.js');
+const fields = await import('../server/services/calendar-fields.js');
+const db = dbmod.get();
+
+const SENTENCE = 'The request does not match the documented schema.';
+
+/** @param {string} username @param {string} role @param {string} familyRole */
+function user(username, role, familyRole) {
+  return Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role, family_role) VALUES (?, ?, 'x', ?, ?)")
+    .run(username, username, role, familyRole).lastInsertRowid);
+}
+const ADMIN = user('admin10b', 'admin', 'mom');
+const MEM = user('mem10b', 'member', 'dad');
+
+/** @type {Record<string, { id: number, role: string }>} */
+const ACTORS = {
+  admin: { id: ADMIN, role: 'admin' },
+  mem: { id: MEM, role: 'member' },
+};
+
+const app = await createCalendarApp({
+  auth: (/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => {
+    const actor = ACTORS[req.get('x-actor') ?? 'admin'];
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.authMethod = 'session';
+    req.session = { userId: actor.id, role: actor.role };
+    req.sessionModuleAccess = null;
+    req.authScopes = null;
+    next();
+  },
+  // server/index.js puts the general API limiter in front; a generous one here.
+  before: [['/api/v1', rateLimit({ windowMs: 60_000, limit: 100_000, standardHeaders: false, legacyHeaders: false })]],
+  mount: ['calendar'],
+});
+const server = app.listen(0, '127.0.0.1');
+/** @type {string} */
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${/** @type {any} */ (server.address()).port}/api/v1`)));
+test.after(() => { server.close(); });
+
+/**
+ * @param {string} method
+ * @param {string} route under /api/v1
+ * @param {{ json?: unknown, actor?: string }} [options] json left out: no body
+ */
+async function call(method, route, { json, actor } = {}) {
+  /** @type {Record<string, string>} */
+  const headers = {};
+  if (actor !== undefined) headers['x-actor'] = actor;
+  /** @type {any} */
+  let payload;
+  if (json !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    payload = JSON.stringify(json);
+  }
+  const res = await fetch(`${baseUrl}${route}`, { method, headers, body: payload, redirect: 'manual' });
+  const text = await res.text();
+  /** @type {any} */
+  let body = null;
+  try { body = JSON.parse(text); } catch { /* no JSON body */ }
+  return { status: res.status, body, location: res.headers.get('location') };
+}
+
+/**
+ * The 400 of the schema, naming the field.
+ * @param {{ status: number, body: any }} res
+ * @param {string} path the expected `fields[].path`
+ * @param {string} label
+ */
+function assertRefused(res, path, label) {
+  assert.equal(res.status, 400, `${label}: ${res.status} ${JSON.stringify(res.body)}`);
+  assert.equal(res.body?.error, SENTENCE, label);
+  assert.equal(res.body?.reason, 'validation', label);
+  assert.ok(res.body.fields.some((/** @type {any} */ f) => f.path === path), `${label}: ${JSON.stringify(res.body.fields)}`);
+}
+
+/**
+ * Not the refusal of the schema: the request reached the handler.
+ * @param {{ status: number, body: any }} res
+ * @param {string} label
+ */
+function assertPassed(res, label) {
+  assert.notEqual(res.body?.error, SENTENCE, `${label}: ${res.status} ${JSON.stringify(res.body)}`);
+  assert.notEqual(res.status, 500, `${label}: ${res.status} ${JSON.stringify(res.body)}`);
+}
+
+// A CalDAV account with one calendar and one reminder list, stored by hand:
+// no server is asked for them.
+function caldavAccount(name = 'Fake') {
+  const id = Number(db.prepare("INSERT INTO caldav_accounts (name, caldav_url, username, password, reminders_discovered_at) VALUES (?, 'https://dav.invalid/', ?, 'p', '2035-01-01T00:00:00Z')")
+    .run(name, `u-${name}`).lastInsertRowid);
+  db.prepare("INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled) VALUES (?, 'https://dav.invalid/cal/', 'Cal', '#336699', 1)").run(id);
+  db.prepare("INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled) VALUES (?, 'https://dav.invalid/list/', 'List', 'tasks', 0)").run(id);
+  return id;
+}
+function outlookAccount(name = 'Papa') {
+  const id = Number(db.prepare(`INSERT INTO outlook_accounts (name, ms_user_id, email, access_token, refresh_token, token_expiry)
+    VALUES (?, ?, 'p@example.invalid', 'tok', 'ref', '2099-01-01T00:00:00Z')`).run(name, `ms-${name}`).lastInsertRowid);
+  db.prepare("INSERT INTO outlook_calendar_selection (account_id, calendar_id, calendar_name, can_edit, enabled) VALUES (?, 'cal-A', 'Kalender A', 1, 0)").run(id);
+  return id;
+}
+
+test('the own callers: every request of the settings pages reaches the handler', async () => {
+  const cd = caldavAccount('Own');
+  const ol = outlookAccount('Own');
+  db.prepare("INSERT INTO external_calendars (source, external_id, name, color) VALUES ('google', 'g-1', 'Google', NULL)").run();
+
+  // Google (sync-calendar.js).
+  assertPassed(await call('POST', '/calendar/google/sync', { json: {} }), 'POST google/sync {}');
+  assertPassed(await call('GET', '/calendar/google/status'), 'GET google/status');
+  const toggle = await call('PATCH', '/calendar/google/calendars', { json: { calendarId: 'g-1', enabled: true } });
+  assertPassed(toggle, 'PATCH google/calendars');
+  assert.equal(toggle.status, 409, 'unconnected: google_not_configured, no call to Google');
+  assert.equal((await call('PUT', '/calendar/google/readonly', { json: { readonly: true } })).status, 200);
+  assert.equal((await call('PATCH', '/calendar/external-calendars', { json: { source: 'google', external_id: 'g-1', default_assignee_user_ids: [MEM] } })).status, 200);
+  assert.equal((await call('GET', '/calendar/external-calendars/default-assignee-backfill')).status, 200);
+  const backfill = await call('POST', '/calendar/external-calendars/default-assignee-backfill', { json: { expected_count: 0, expected_token: null, moves: [] } });
+  assert.ok([200, 409].includes(backfill.status), JSON.stringify(backfill.body));
+  for (const v of ['true', 'false']) {
+    assert.equal((await call('DELETE', `/calendar/google/disconnect?deleteEvents=${v}`)).status, 200, `google deleteEvents=${v}`);
+  }
+  assert.equal((await call('DELETE', '/calendar/google/mirrored-events')).status, 200);
+
+  // Apple: the form sends three strings; a url without http(s) is the
+  // handler's own answer, so nothing is sent to iCloud.
+  const apple = await call('POST', '/calendar/apple/connect', { json: { url: 'ftp://caldav.invalid', username: 'me@example.invalid', password: 'app-pass' } });
+  assert.equal(apple.status, 400);
+  assert.equal(apple.body.reason, 'apple_url_invalid');
+  assertPassed(await call('GET', '/calendar/apple/status'), 'GET apple/status');
+  for (const v of ['true', 'false']) {
+    assert.equal((await call('DELETE', `/calendar/apple/disconnect?deleteEvents=${v}`)).status, 204, `apple deleteEvents=${v}`);
+  }
+
+  // CalDAV: the add form sends four strings; a password above 4096
+  // characters is the handler's answer, before any connection.
+  const add = await call('POST', '/calendar/caldav/accounts', { json: { name: 'N', caldavUrl: 'https://dav.invalid/', username: 'u', password: 'x'.repeat(4097) } });
+  assert.equal(add.status, 400);
+  assert.notEqual(add.body.error, SENTENCE);
+  assert.equal((await call('GET', '/calendar/caldav/accounts')).status, 200);
+  assert.equal((await call('GET', `/calendar/caldav/accounts/${cd}/calendars`)).status, 200);
+  for (const deleteEvents of [false, true]) {
+    const res = await call('PATCH', `/calendar/caldav/accounts/${cd}/calendars`, { json: { calendarUrl: 'https://dav.invalid/cal/', enabled: false, deleteEvents } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+  }
+  assert.equal((await call('PUT', `/calendar/caldav/accounts/${cd}`, { json: { name: 'Renamed' } })).status, 200);
+  assert.equal((await call('GET', `/calendar/caldav/accounts/${cd}/reminder-lists`)).status, 200);
+  for (const json of [
+    { listUrl: 'https://dav.invalid/list/', defaultAssigneeUserIds: [MEM] },
+    { listUrl: 'https://dav.invalid/list/', targetModule: 'tasks' },
+    { listUrl: 'https://dav.invalid/list/', enabled: true, targetModule: 'tasks' },
+  ]) {
+    const res = await call('PATCH', `/calendar/caldav/accounts/${cd}/reminder-lists`, { json });
+    assert.equal(res.status, 200, `${JSON.stringify(json)}: ${JSON.stringify(res.body)}`);
+  }
+  assertPassed(await call('GET', '/calendar/caldav/status'), 'GET caldav/status');
+  assertPassed(await call('GET', '/calendar/caldav/reminders/status'), 'GET caldav/reminders/status');
+  const gone = caldavAccount('Gone');
+  for (const v of ['false', 'true']) {
+    const id = v === 'false' ? gone : caldavAccount('Gone2');
+    assert.equal((await call('DELETE', `/calendar/caldav/accounts/${id}?deleteEvents=${v}`)).status, 200, `caldav deleteEvents=${v}`);
+  }
+
+  // Outlook: the auto-sync controls send a calendar id or null, a number or null.
+  assert.equal((await call('GET', '/calendar/outlook/accounts')).status, 200);
+  for (const json of [{ autoSyncCalendarId: null }, { ownerUserId: MEM }, { ownerUserId: null }]) {
+    const res = await call('PUT', `/calendar/outlook/accounts/${ol}`, { json });
+    assert.equal(res.status, 200, `${JSON.stringify(json)}: ${JSON.stringify(res.body)}`);
+  }
+  assert.equal((await call('GET', `/calendar/outlook/accounts/${ol}/calendars`)).status, 200);
+  assert.equal((await call('PATCH', `/calendar/outlook/accounts/${ol}/calendars`, { json: { calendarId: 'cal-A', enabled: true } })).status, 200);
+  assertPassed(await call('GET', '/calendar/outlook/status'), 'GET outlook/status');
+  assert.equal((await call('DELETE', `/calendar/outlook/accounts/${outlookAccount('Gone')}`)).status, 200);
+});
+
+test('refused: garbage per field is a 400 of the schema', async () => {
+  const cd = caldavAccount('Garbage');
+  const ol = outlookAccount('Garbage');
+  /** @type {Array<[string, string, unknown, string]>} */
+  const cases = [
+    // Google
+    ['PATCH', '/calendar/google/calendars', { calendarId: 'g-1', enabled: 'false' }, 'body/enabled'],
+    ['PATCH', '/calendar/google/calendars', { calendarId: 5, enabled: true }, 'body/calendarId'],
+    ['PATCH', '/calendar/google/calendars', { enabled: true }, 'body/calendarId'],
+    ['PUT', '/calendar/google/readonly', { readonly: 1 }, 'body/readonly'],
+    ['PUT', '/calendar/google/readonly', undefined, 'body'],
+    ['PATCH', '/calendar/external-calendars', { source: 'outlook', external_id: 'x' }, 'body/source'],
+    ['PATCH', '/calendar/external-calendars', { source: 'google', external_id: 5 }, 'body/external_id'],
+    ['PATCH', '/calendar/external-calendars', { source: 'google', external_id: 'g-1', default_assignee_user_ids: ['2'] }, 'body/default_assignee_user_ids/0'],
+    ['POST', '/calendar/external-calendars/default-assignee-backfill', { expected_count: '0' }, 'body/expected_count'],
+    ['POST', '/calendar/external-calendars/default-assignee-backfill', { expected_count: 0, expected_token: 'abc' }, 'body/expected_token'],
+    ['POST', '/calendar/external-calendars/default-assignee-backfill', { expected_count: 0, moves: [{ event_id: '1', from_user_ids: [1], to_user_ids: [2] }] }, 'body/moves/0/event_id'],
+    ['DELETE', '/calendar/google/disconnect?deleteEvents=yes', undefined, 'query/deleteEvents'],
+    ['GET', '/calendar/external-calendars/default-assignee-backfill?moved_after=a&moved_after=b', undefined, 'query/moved_after'],
+    // Apple
+    ['POST', '/calendar/apple/connect', { url: 'https://caldav.invalid', username: 5, password: 'p' }, 'body/username'],
+    ['POST', '/calendar/apple/connect', { url: 5, username: 'u', password: 'p' }, 'body/url'],
+    ['POST', '/calendar/apple/connect', { url: 'https://caldav.invalid', username: 'u' }, 'body/password'],
+    ['DELETE', '/calendar/apple/disconnect?deleteEvents=1', undefined, 'query/deleteEvents'],
+    // CalDAV
+    ['POST', '/calendar/caldav/accounts', { name: 5, caldavUrl: 'https://dav.invalid/', username: 'u', password: 'p' }, 'body/name'],
+    ['PUT', `/calendar/caldav/accounts/${cd}`, { name: 5 }, 'body/name'],
+    ['PUT', `/calendar/caldav/accounts/${cd}`, undefined, 'body'],
+    ['PUT', '/calendar/caldav/accounts/1abc', { name: 'x' }, 'path/id'],
+    ['DELETE', `/calendar/caldav/accounts/${cd}.0`, undefined, 'path/id'],
+    ['DELETE', `/calendar/caldav/accounts/${cd}?deleteEvents=TRUE`, undefined, 'query/deleteEvents'],
+    ['GET', `/calendar/caldav/accounts/${cd}/calendars?refresh=1`, undefined, 'query/refresh'],
+    ['PATCH', `/calendar/caldav/accounts/${cd}/calendars`, { calendarUrl: 'https://dav.invalid/cal/', enabled: 'false' }, 'body/enabled'],
+    ['PATCH', `/calendar/caldav/accounts/${cd}/calendars`, { calendarUrl: 5, enabled: true }, 'body/calendarUrl'],
+    ['GET', `/calendar/caldav/accounts/${cd}/reminder-lists?refresh=yes`, undefined, 'query/refresh'],
+    ['PATCH', `/calendar/caldav/accounts/${cd}/reminder-lists`, { listUrl: 'https://dav.invalid/list/', targetModule: 'x' }, 'body/targetModule'],
+    ['PATCH', `/calendar/caldav/accounts/${cd}/reminder-lists`, { listUrl: 'https://dav.invalid/list/', enabled: 0 }, 'body/enabled'],
+    ['PATCH', `/calendar/caldav/accounts/${cd}/reminder-lists`, { listUrl: 'https://dav.invalid/list/', defaultAssigneeUserIds: [0] }, 'body/defaultAssigneeUserIds/0'],
+    // Outlook
+    ['PUT', `/calendar/outlook/accounts/${ol}`, { ownerUserId: '2' }, 'body/ownerUserId'],
+    ['PUT', `/calendar/outlook/accounts/${ol}`, { name: 5 }, 'body/name'],
+    ['PUT', `/calendar/outlook/accounts/${ol}`, undefined, 'body'],
+    ['DELETE', `/calendar/outlook/accounts/${ol}abc`, undefined, 'path/id'],
+    ['GET', `/calendar/outlook/accounts/${ol}/calendars?refresh=1`, undefined, 'query/refresh'],
+    ['PATCH', `/calendar/outlook/accounts/${ol}/calendars`, { calendarId: 'cal-A', enabled: 'true' }, 'body/enabled'],
+  ];
+  for (const [method, route, json, path] of cases) {
+    assertRefused(await call(method, route, { json }), path, `${method} ${route} ${JSON.stringify(json)}`);
+  }
+  // Nothing of it was written: the account keeps its name, the calendar its state.
+  assert.equal(db.prepare('SELECT name FROM caldav_accounts WHERE id = ?').get(cd).name, 'Garbage');
+  assert.equal(db.prepare('SELECT enabled FROM caldav_calendar_selection WHERE account_id = ?').get(cd).enabled, 1);
+});
+
+test('enabled: "false" no longer switches a CalDAV calendar on', async () => {
+  const cd = caldavAccount('Switch');
+  db.prepare('UPDATE caldav_calendar_selection SET enabled = 0 WHERE account_id = ?').run(cd);
+  const res = await call('PATCH', `/calendar/caldav/accounts/${cd}/calendars`, { json: { calendarUrl: 'https://dav.invalid/cal/', enabled: 'false' } });
+  assertRefused(res, 'body/enabled', 'enabled: "false"');
+  assert.equal(db.prepare('SELECT enabled FROM caldav_calendar_selection WHERE account_id = ?').get(cd).enabled, 0);
+});
+
+test('a path id that is not plain digits changes no account', async () => {
+  const cd = caldavAccount('Tail');
+  const res = await call('PUT', `/calendar/caldav/accounts/${cd}abc`, { json: { name: 'Hijacked' } });
+  assertRefused(res, 'path/id', `PUT /caldav/accounts/${cd}abc`);
+  assert.equal(db.prepare('SELECT name FROM caldav_accounts WHERE id = ?').get(cd).name, 'Tail');
+  const ol = outlookAccount('Tail');
+  assertRefused(await call('DELETE', `/calendar/outlook/accounts/${ol}.0`), 'path/id', 'DELETE outlook 1.0');
+  assert.ok(db.prepare('SELECT 1 FROM outlook_accounts WHERE id = ?').get(ol), 'the Outlook account is still there');
+});
+
+test('unknown account: 404 with its reason, before the service (decision 11)', async () => {
+  const UNKNOWN = 999999;
+  /** @type {Array<[string, string, unknown, string]>} */
+  const cases = [
+    ['PUT', `/calendar/caldav/accounts/${UNKNOWN}`, { name: 'x' }, 'caldav_account_not_found'],
+    ['DELETE', `/calendar/caldav/accounts/${UNKNOWN}?deleteEvents=false`, undefined, 'caldav_account_not_found'],
+    ['GET', `/calendar/caldav/accounts/${UNKNOWN}/calendars`, undefined, 'caldav_account_not_found'],
+    ['GET', `/calendar/caldav/accounts/${UNKNOWN}/calendars?refresh=true`, undefined, 'caldav_account_not_found'],
+    ['PATCH', `/calendar/caldav/accounts/${UNKNOWN}/calendars`, { calendarUrl: 'https://dav.invalid/cal/', enabled: true }, 'caldav_account_not_found'],
+    ['GET', `/calendar/caldav/accounts/${UNKNOWN}/reminder-lists?refresh=true`, undefined, 'caldav_account_not_found'],
+    ['PATCH', `/calendar/caldav/accounts/${UNKNOWN}/reminder-lists`, { listUrl: 'https://dav.invalid/list/', enabled: true }, 'caldav_account_not_found'],
+    ['PUT', `/calendar/outlook/accounts/${UNKNOWN}`, { name: 'x' }, 'outlook_account_not_found'],
+    ['DELETE', `/calendar/outlook/accounts/${UNKNOWN}`, undefined, 'outlook_account_not_found'],
+    ['GET', `/calendar/outlook/accounts/${UNKNOWN}/calendars?refresh=true`, undefined, 'outlook_account_not_found'],
+    ['PATCH', `/calendar/outlook/accounts/${UNKNOWN}/calendars`, { calendarId: 'cal-A', enabled: true }, 'outlook_account_not_found'],
+  ];
+  for (const [method, route, json, reason] of cases) {
+    const res = await call(method, route, { json });
+    assert.equal(res.status, 404, `${method} ${route}: ${res.status} ${JSON.stringify(res.body)}`);
+    assert.equal(res.body.reason, reason, `${method} ${route}`);
+  }
+  // A path id 0 or -1 passes the check (plain digits) and meets the same 404.
+  for (const id of ['0', '-1']) {
+    assert.equal((await call('DELETE', `/calendar/caldav/accounts/${id}`)).status, 404, `caldav ${id}`);
+    assert.equal((await call('DELETE', `/calendar/outlook/accounts/${id}`)).status, 404, `outlook ${id}`);
+  }
+});
+
+test('order: admin before the check, the check before the account lookup', async () => {
+  // A member with a malformed request meets the 403 of requireAdmin.
+  for (const [method, route, json] of /** @type {Array<[string, string, unknown]>} */ ([
+    ['PATCH', '/calendar/google/calendars', { enabled: 'x' }],
+    ['PUT', '/calendar/caldav/accounts/1abc', { name: 5 }],
+    ['PATCH', '/calendar/external-calendars', { source: 5 }],
+    ['DELETE', '/calendar/apple/disconnect?deleteEvents=yes', undefined],
+    ['PUT', '/calendar/outlook/accounts/1', undefined],
+  ])) {
+    const res = await call(method, route, { json, actor: 'mem' });
+    assert.equal(res.status, 403, `${method} ${route}: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  // A malformed request to an unknown account is the 400, not the 404.
+  assertRefused(await call('PUT', '/calendar/caldav/accounts/999999', { json: { name: 5 } }), 'body/name', 'caldav 400 before 404');
+  assertRefused(await call('PATCH', '/calendar/outlook/accounts/999999/calendars', { json: { calendarId: 'c', enabled: 'x' } }), 'body/enabled', 'outlook 400 before 404');
+});
+
+test('the OAuth callbacks declare no query: what the provider sends goes on to the redirect', async () => {
+  for (const provider of ['google', 'outlook']) {
+    for (const query of ['error=access_denied&scope=x&prompt=consent', 'code=a&code=b&state=s', 'code=a&state=s&authuser=0']) {
+      const res = await call('GET', `/calendar/${provider}/callback?${query}`);
+      assert.equal(res.status, 302, `${provider} ?${query}: ${res.status} ${JSON.stringify(res.body)}`);
+      assert.equal(res.location, `/settings?sync_error=${provider}`, `${provider} ?${query}`);
+    }
+    // Without `code` and `error` the handler keeps its own JSON answer.
+    const none = await call('GET', `/calendar/${provider}/callback?state=s`);
+    assert.equal(none.status, 400);
+    assert.equal(none.body.error, 'No authorization code received.');
+  }
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  for (const provider of ['google', 'outlook']) {
+    const operation = spec.paths[`/api/v1/calendar/${provider}/callback`].get;
+    assert.equal((operation.parameters ?? []).filter((/** @type {any} */ p) => p.in === 'query').length, 0, `${provider} callback declares no query`);
+    assert.ok(operation.responses[302] && operation.responses[400], `${provider} callback documents 302 and 400`);
+  }
+});
+
+test('sinks: a value of the wrong type no longer reaches the service', async () => {
+  const cd = caldavAccount('Sink');
+  // `targetModule: "x"` threw a plain Error in the service (500).
+  assertRefused(await call('PATCH', `/calendar/caldav/accounts/${cd}/reminder-lists`, { json: { listUrl: 'https://dav.invalid/list/', targetModule: 'x' } }), 'body/targetModule', 'targetModule x');
+  // `calendarUrl: 5` found no selection (500).
+  assertRefused(await call('PATCH', `/calendar/caldav/accounts/${cd}/calendars`, { json: { calendarUrl: 5, enabled: true } }), 'body/calendarUrl', 'calendarUrl 5');
+  // `name: 5` was stored as the name.
+  assertRefused(await call('PUT', `/calendar/caldav/accounts/${cd}`, { json: { name: 5 } }), 'body/name', 'name 5');
+  assert.equal(db.prepare('SELECT name FROM caldav_accounts WHERE id = ?').get(cd).name, 'Sink');
+});
+
+test('reasons stay with the handler: the schema carries type and shape only', async () => {
+  const apple = await call('POST', '/calendar/apple/connect', { json: { url: 'caldav.invalid', username: 'u', password: 'p' } });
+  assert.equal(apple.status, 400);
+  assert.equal(apple.body.reason, 'apple_url_invalid');
+  const blank = await call('PATCH', '/calendar/google/calendars', { json: { calendarId: '   ', enabled: true } });
+  assert.equal(blank.status, 400);
+  assert.equal(blank.body.error, 'calendarId is missing or invalid.');
+  const missing = await call('PATCH', `/calendar/caldav/accounts/${caldavAccount('Reason')}/reminder-lists`, { json: { listUrl: 'https://dav.invalid/list/' } });
+  assert.equal(missing.status, 400);
+  assert.equal(missing.body.error, 'Missing listUrl or update fields.');
+  // No x-reason in the provider schemas (decision 14).
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const names = ['GoogleCalendarSelectionInput', 'GoogleReadonlyInput', 'ExternalCalendarAssigneesInput', 'DefaultAssigneeBackfillInput',
+    'AppleConnectInput', 'CaldavAccountCreateInput', 'CaldavAccountUpdateInput', 'CaldavCalendarSelectionInput',
+    'CaldavReminderListUpdateInput', 'OutlookAccountUpdateInput', 'OutlookCalendarSelectionInput'];
+  for (const name of names) {
+    assert.ok(spec.components.schemas[name], name);
+    assert.ok(!JSON.stringify(spec.components.schemas[name]).includes('x-reason'), `${name} carries no x-reason`);
+    assert.ok(!('additionalProperties' in spec.components.schemas[name]), `${name} leaves unknown fields alone`);
+  }
+  // Passwords are write-only.
+  for (const name of ['AppleConnectInput', 'CaldavAccountCreateInput', 'CaldavAccountUpdateInput']) {
+    assert.equal(spec.components.schemas[name].properties.password.writeOnly, true, `${name}.password`);
+  }
+});
+
+test('one source: the value lists of the schemas are those of calendar-fields.js and of the columns', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const schemas = spec.components.schemas;
+  assert.deepEqual(schemas.ExternalCalendarAssigneesInput.properties.source.enum, [...fields.EXTERNAL_CALENDAR_SOURCES]);
+  assert.deepEqual(schemas.CaldavReminderListUpdateInput.properties.targetModule.enum, [...fields.REMINDER_LIST_TARGETS]);
+  // The CHECK constraints of the columns take exactly these values.
+  const cd = caldavAccount('Check');
+  const tryInsert = (/** @type {() => void} */ fn) => { try { fn(); return true; } catch { return false; } };
+  for (const source of [...fields.EXTERNAL_CALENDAR_SOURCES, 'outlook', 'ics', 'local']) {
+    const ok = tryInsert(() => db.prepare("INSERT INTO external_calendars (source, external_id, name) VALUES (?, ?, 'n')").run(source, `check-${source}`));
+    assert.equal(ok, fields.EXTERNAL_CALENDAR_SOURCES.includes(source), `external_calendars.source ${source}`);
+  }
+  for (const module of [...fields.REMINDER_LIST_TARGETS, 'notes', 'calendar']) {
+    const ok = tryInsert(() => db.prepare("INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module) VALUES (?, ?, 'n', ?)").run(cd, `https://dav.invalid/${module}/`, module));
+    assert.equal(ok, fields.REMINDER_LIST_TARGETS.includes(module), `caldav_reminder_selection.target_module ${module}`);
+  }
+});
+
+test('the document: 38 provider operations, each with its answers', () => {
+  const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
+  const ops = Object.entries(/** @type {Record<string, any>} */ (spec.paths))
+    .filter(([path]) => /^\/api\/v1\/calendar\/(google|apple|caldav|outlook|external-calendars)(\/|$)/.test(path))
+    .flatMap(([path, item]) => Object.entries(item).map(([method, op]) => ({ path, method, op: /** @type {any} */ (op) })));
+  assert.equal(ops.length, 38);
+  for (const { path, method, op } of ops) {
+    const input = (op.parameters ?? []).some((/** @type {any} */ p) => p.in === 'path' || p.in === 'query') || op.requestBody;
+    if (input) assert.ok(op.responses[400], `${method} ${path} documents the 400 of the check`);
+    if (op.requestBody) assert.ok(op.requestBody.content['application/json'].schema.$ref, `${method} ${path} has a body schema`);
+    if ((op.parameters ?? []).some((/** @type {any} */ p) => p.in === 'path' && p.name === 'id') && /caldav|outlook/.test(path)) {
+      assert.ok(op.responses[404], `${method} ${path} documents the 404 of an unknown account`);
+    }
+  }
+  assert.ok(spec.paths['/api/v1/calendar/apple/disconnect'].delete.responses[204], 'apple disconnect 204');
+  assert.match(spec.paths['/api/v1/calendar/external-calendars'].patch.description, /Omitting both clears the set/);
+  assert.equal(spec.paths['/api/v1/calendar/external-calendars'].patch.requestBody.required, true);
+  assert.deepEqual(spec.components.schemas.ExternalCalendarAssigneesInput.required, ['source', 'external_id'], 'no new duty (decision 17)');
+});

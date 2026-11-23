@@ -23,6 +23,40 @@ const SUBSCRIPTION_NOT_YOURS = apiError('The subscription belongs to another mem
 const CALENDAR_NOT_FOUND = apiError('Local calendar not found (reason `calendar_calendar_not_found`).');
 const EVENT_NOT_FOUND = apiError('Calendar event not found (reason `calendar_event_not_found`).');
 
+// The provider routes (#2810, group 10b). An operation without path, query or
+// body keeps its answers without the 400 of the check.
+/** @param {Record<string | number, unknown>} own */
+const plain = (own) => ({
+  ...own,
+  401: { $ref: '#/components/responses/Unauthorized' },
+  500: { $ref: '#/components/responses/InternalServerError' },
+});
+const REDIRECT_TO_PROVIDER = { 302: { description: 'Redirect to the sign-in page of the provider.' } };
+const CALLBACK_REDIRECT = { 302: { description: 'Redirect back to the settings: `/settings?sync_ok=<provider>`, or `/settings?sync_error=<provider>` when the provider reports an error, the state does not match or the exchange fails.' } };
+const NO_AUTHORIZATION_CODE = apiError('Neither `error` nor `code` in the query: `No authorization code received.`');
+const RESTORING = apiError('A backup is being restored; retry afterwards.');
+const REMOTE_REFUSED = apiError('The foreign server refused the request or could not be reached; the class in `reason` and `detail`.');
+const CALDAV_ACCOUNT_NOT_FOUND = apiError('CalDAV account not found (reason `caldav_account_not_found`).');
+const OUTLOOK_ACCOUNT_NOT_FOUND = apiError('Outlook account not found (reason `outlook_account_not_found`).');
+const PROVIDER_CONFLICT = apiError('The sign-in expired or the provider is not connected; the case in `reason`.');
+const OUTLOOK_NOT_SET_UP = apiError('Outlook is not configured on this server (reason `outlook_not_configured`).');
+// The OAuth callbacks declare no query (decision 12): the provider sends what
+// it wants (`code`, `state`, `error`, `scope`, ...), and a 400 of the check
+// would put a JSON page where the browser expects the way back.
+const CALLBACK_QUERY = ' Query: `code`, `state` and `error` as the provider sends them; they are read by the route and not declared, so the check never refuses the way back.';
+
+/**
+ * A query switch the route reads as `'true'`; `'false'` is the other value
+ * the settings page sends (#2810: anything else is a 400).
+ * @param {string} name
+ * @param {string} description
+ */
+const switchParam = (name, description) => ({
+  name, in: 'query', required: false, schema: { type: 'string', enum: ['true', 'false'] }, description,
+});
+const DELETE_EVENTS_PARAM = switchParam('deleteEvents', '`true` also deletes the events already taken over; `false` (the default) keeps them.');
+const REFRESH_PARAM = switchParam('refresh', '`true` reads the list from the server again and stores it; `false` (the default) answers from the database.');
+
 /**
  * A day as `YYYY-MM-DD`, checked as a calendar day (`2026-02-30` is a 400).
  * @param {string} name
@@ -167,21 +201,21 @@ export function calendarPaths() {
         ],
       })),
     },
-    '/api/v1/calendar/google/auth': { get: op({ summary: 'Start Google Calendar OAuth', tag: 'Calendar', admin: true }) },
-    '/api/v1/calendar/google/callback': { get: op({ summary: 'Google Calendar OAuth callback', tag: 'Calendar' }) },
-    '/api/v1/calendar/google/sync': { post: op({ summary: 'Run Google Calendar sync', tag: 'Calendar', admin: true, stateChanging: true, description: 'When Google no longer accepts the stored sign-in (`invalid_grant`), the answer is `409` with reason `google_reauth_required`, and syncing pauses until the account is connected again (#2019).' }) },
+    '/api/v1/calendar/google/auth': { get: op({ summary: 'Start Google Calendar OAuth', tag: 'Calendar', admin: true, responses: plain({ ...REDIRECT_TO_PROVIDER, 503: apiError('Google Calendar is not configured, a backup is being restored, or the sign-in could not be started.') }) }) },
+    '/api/v1/calendar/google/callback': { get: op({ summary: 'Google Calendar OAuth callback', tag: 'Calendar', description: 'Where Google sends the browser back after the consent screen.' + CALLBACK_QUERY, responses: plain({ ...CALLBACK_REDIRECT, 400: NO_AUTHORIZATION_CODE, 503: RESTORING }) }) },
+    '/api/v1/calendar/google/sync': { post: op({ summary: 'Run Google Calendar sync', tag: 'Calendar', admin: true, stateChanging: true, description: 'When Google no longer accepts the stored sign-in (`invalid_grant`), the answer is `409` with reason `google_reauth_required`, and syncing pauses until the account is connected again (#2019).', responses: plain({ ...OK, 409: PROVIDER_CONFLICT, 502: REMOTE_REFUSED }) }) },
     '/api/v1/calendar/google/status': { get: op({ summary: 'Get Google Calendar status', tag: 'Calendar' }) },
     '/api/v1/calendar/google/calendars': {
-      get: op({ summary: 'List available Google calendars', tag: 'Calendar', admin: true, description: 'Calendars of the connected Google account. When Google no longer accepts the stored sign-in (`invalid_grant`), the answer is `409` with reason `google_reauth_required` instead of a list, and nothing is sent to Google until the account is connected again (#2019).' }),
-      patch: op({ summary: 'Enable/disable a Google calendar to sync', tag: 'Calendar', admin: true, stateChanging: true }),
+      get: op({ summary: 'List available Google calendars', tag: 'Calendar', admin: true, description: 'Calendars of the connected Google account. When Google no longer accepts the stored sign-in (`invalid_grant`), the answer is `409` with reason `google_reauth_required` instead of a list, and nothing is sent to Google until the account is connected again (#2019).', responses: plain({ ...OK, 409: PROVIDER_CONFLICT, 502: REMOTE_REFUSED, 503: RESTORING }) }),
+      patch: op({ summary: 'Enable/disable a Google calendar to sync', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody('#/components/schemas/GoogleCalendarSelectionInput'), description: 'Response: { ok: true, lastSync }.', responses: answers({ ...OK, 409: PROVIDER_CONFLICT, 502: REMOTE_REFUSED }) }),
     },
-    '/api/v1/calendar/google/disconnect': { delete: op({ summary: 'Disconnect Google Calendar', tag: 'Calendar', admin: true, stateChanging: true }) },
+    '/api/v1/calendar/google/disconnect': { delete: op({ summary: 'Disconnect Google Calendar', tag: 'Calendar', admin: true, stateChanging: true, params: [DELETE_EVENTS_PARAM], description: 'Response: { ok: true, removed } - the number of mirrored events deleted with `deleteEvents=true`.', responses: answers(OK) }) },
     '/api/v1/calendar/google/mirrored-events': { delete: op({ summary: 'Delete locally mirrored Google events', tag: 'Calendar', admin: true, stateChanging: true }) },
-    '/api/v1/calendar/google/readonly': { put: op({ summary: 'Set Google Calendar read-only mode', tag: 'Calendar', admin: true, stateChanging: true }) },
+    '/api/v1/calendar/google/readonly': { put: op({ summary: 'Set Google Calendar read-only mode', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody('#/components/schemas/GoogleReadonlyInput'), description: 'Response: { data: { readonly } }.', responses: answers(OK) }) },
     '/api/v1/calendar/apple/status': { get: op({ summary: 'Get Apple Calendar status', tag: 'Calendar' }) },
-    '/api/v1/calendar/apple/sync': { post: op({ summary: 'Run Apple Calendar sync', tag: 'Calendar', admin: true, stateChanging: true }) },
-    '/api/v1/calendar/apple/connect': { post: op({ summary: 'Connect Apple Calendar', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null) }) },
-    '/api/v1/calendar/apple/disconnect': { delete: op({ summary: 'Disconnect Apple Calendar', tag: 'Calendar', admin: true, stateChanging: true }) },
+    '/api/v1/calendar/apple/sync': { post: op({ summary: 'Run Apple Calendar sync', tag: 'Calendar', admin: true, stateChanging: true, responses: plain({ ...OK, 409: apiError('No Apple calendar is connected (reason `apple_not_configured`).'), 502: REMOTE_REFUSED }) }) },
+    '/api/v1/calendar/apple/connect': { post: op({ summary: 'Connect Apple Calendar', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody('#/components/schemas/AppleConnectInput'), description: 'Response: { ok: true, calendarCount }. The access is saved, tested, and removed again when the test fails.', responses: answers({ ...OK, 502: REMOTE_REFUSED }) }) },
+    '/api/v1/calendar/apple/disconnect': { delete: op({ summary: 'Disconnect Apple Calendar', tag: 'Calendar', admin: true, stateChanging: true, params: [DELETE_EVENTS_PARAM], description: 'Answers 204 without a body (promised since v2.7.1); the number of deleted events comes from `DELETE /calendar/apple/mirrored-events`.', responses: answers({ 204: { description: 'Apple Calendar disconnected' } }) }) },
     '/api/v1/calendar/apple/mirrored-events': { delete: op({ summary: 'Delete locally mirrored Apple events', tag: 'Calendar', admin: true, stateChanging: true }) },
     '/api/v1/calendar/subscriptions': {
       get: op({ summary: 'List ICS subscriptions', tag: 'Calendar' }),
@@ -332,7 +366,7 @@ export function calendarPaths() {
     },
     '/api/v1/calendar/caldav/accounts': {
       get: op({ summary: 'List CalDAV accounts', tag: 'Calendar', admin: true }),
-      post: op({ summary: 'Create CalDAV account', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create CalDAV account', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody('#/components/schemas/CaldavAccountCreateInput'), description: 'Response: { data: { accountId, calendars } }.', responses: answers({ ...OK, 409: apiError('An account with this URL and username is already connected (reason `caldav_account_exists`).'), 502: REMOTE_REFUSED }) }),
     },
     '/api/v1/calendar/caldav/accounts/{id}': {
       put: op({
@@ -342,9 +376,10 @@ export function calendarPaths() {
         description: 'An omitted or empty `password` keeps the stored one, but only while the server (scheme, host and port) and the `username` stay the same. A different server or username without a new password is refused with 400 and `errorCode: password_required` before any connection is made, and nothing is saved. A different path on the same server needs no password.',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/CaldavAccountUpdateInput'),
+        responses: answers({ ...OK, 404: CALDAV_ACCOUNT_NOT_FOUND, 502: REMOTE_REFUSED }),
       }),
-      delete: op({ summary: 'Delete CalDAV account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
+      delete: op({ summary: 'Delete CalDAV account', tag: 'Calendar', admin: true, params: [idParam(), DELETE_EVENTS_PARAM], stateChanging: true, responses: answers({ ...OK, 404: CALDAV_ACCOUNT_NOT_FOUND }) }),
     },
     '/api/v1/calendar/caldav/accounts/{id}/calendars': {
       get: op({
@@ -352,9 +387,10 @@ export function calendarPaths() {
         tag: 'Calendar',
         admin: true,
         description: 'Each calendar carries `writable` (#1840): true when it takes new events, false when it is shared read-only, null when the server does not say (treated as writable). The value is read from `current-user-privilege-set` on every listing and sync run. A read-only calendar can still be enabled for reading; it is not offered as a target, and nothing is uploaded to it. `waitingUploads` counts the local events that name the calendar as their target and have not been uploaded yet - for a read-only calendar these never arrive until they get another calendar. With `?refresh=true` the answer comes from the server and carries `writable` but no `waitingUploads`.',
-        params: [idParam()],
+        params: [idParam(), REFRESH_PARAM],
+        responses: answers({ ...OK, 404: CALDAV_ACCOUNT_NOT_FOUND, 502: REMOTE_REFUSED, 503: RESTORING }),
       }),
-      patch: op({ summary: 'Enable or disable a CalDAV calendar', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({ summary: 'Enable or disable a CalDAV calendar', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/CaldavCalendarSelectionInput'), description: 'Response: { data: { success, removed } }.', responses: answers({ ...OK, 404: CALDAV_ACCOUNT_NOT_FOUND }) }),
     },
     '/api/v1/calendar/caldav/sync': {
       post: op({ summary: 'Run CalDAV event sync', tag: 'Calendar', admin: true, stateChanging: true }),
@@ -368,9 +404,10 @@ export function calendarPaths() {
         tag: 'Calendar',
         admin: true,
         description: 'Each list carries `writable` (#1840, same meaning as on the calendars of the account) and, when read from the database, `waitingUploads`: for a list mapped to tasks the local tasks that name it as their target, for a list mapped to shopping the local items of its shopping list. A read-only list is still read, is not offered in `GET /tasks/sync-targets`, and nothing is uploaded to it.',
-        params: [idParam()],
+        params: [idParam(), REFRESH_PARAM],
+        responses: answers({ ...OK, 404: CALDAV_ACCOUNT_NOT_FOUND, 502: REMOTE_REFUSED, 503: RESTORING }),
       }),
-      patch: op({ summary: 'Enable/disable a CalDAV reminder list, set its target module and default assignees', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { listUrl, enabled?, targetModule?, defaultAssigneeUserIds? }. `defaultAssigneeUserIds` (#1221): household members a task gets when the sync first imports it from this list (the first one primary); an existing task keeps its assignment, including an empty one, and nothing goes back to the server. Only for a list mapped to tasks. `GET` returns them per list as `defaultAssigneeUserIds`.' }),
+      patch: op({ summary: 'Enable/disable a CalDAV reminder list, set its target module and default assignees', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/CaldavReminderListUpdateInput'), responses: answers({ ...OK, 404: CALDAV_ACCOUNT_NOT_FOUND }), description: 'Body: { listUrl, enabled?, targetModule?, defaultAssigneeUserIds? }. `defaultAssigneeUserIds` (#1221): household members a task gets when the sync first imports it from this list (the first one primary); an existing task keeps its assignment, including an empty one, and nothing goes back to the server. Only for a list mapped to tasks. `GET` returns them per list as `defaultAssigneeUserIds`.' }),
     },
     '/api/v1/calendar/caldav/reminders/sync': {
       post: op({ summary: 'Run CalDAV reminders sync', tag: 'Calendar', admin: true, stateChanging: true }),
@@ -378,10 +415,10 @@ export function calendarPaths() {
     '/api/v1/calendar/caldav/reminders/status': {
       get: op({ summary: 'Get CalDAV reminders sync status', tag: 'Calendar' }),
     },
-    '/api/v1/calendar/outlook/auth': { get: op({ summary: 'Start Outlook (Microsoft) OAuth', tag: 'Calendar', admin: true }) },
-    '/api/v1/calendar/outlook/callback': { get: op({ summary: 'Outlook OAuth callback', tag: 'Calendar' }) },
+    '/api/v1/calendar/outlook/auth': { get: op({ summary: 'Start Outlook (Microsoft) OAuth', tag: 'Calendar', admin: true, responses: plain({ ...REDIRECT_TO_PROVIDER, 503: apiError('Outlook is not configured (reason `outlook_not_configured`), a backup is being restored, or the sign-in could not be started.') }) }) },
+    '/api/v1/calendar/outlook/callback': { get: op({ summary: 'Outlook OAuth callback', tag: 'Calendar', description: 'Where Microsoft sends the browser back after the consent screen.' + CALLBACK_QUERY, responses: plain({ ...CALLBACK_REDIRECT, 400: NO_AUTHORIZATION_CODE, 503: RESTORING }) }) },
     '/api/v1/calendar/outlook/accounts': {
-      get: op({ summary: 'List connected Outlook accounts', tag: 'Calendar', admin: true }),
+      get: op({ summary: 'List connected Outlook accounts', tag: 'Calendar', admin: true, responses: plain({ ...OK, 503: OUTLOOK_NOT_SET_UP }) }),
     },
     '/api/v1/calendar/outlook/accounts/{id}': {
       put: op({
@@ -390,25 +427,24 @@ export function calendarPaths() {
         admin: true,
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody(null),
-        responses: {
+        requestBody: jsonBody('#/components/schemas/OutlookAccountUpdateInput'),
+        responses: answers({
           200: { description: 'Outlook account updated' },
-          401: { $ref: '#/components/responses/Unauthorized' },
+          404: OUTLOOK_ACCOUNT_NOT_FOUND,
           409: {
             description: 'Auto-sync activation conflicts with recurring series that have linked occurrence overrides',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/OutlookAutoSyncOverrideConflict' } } },
           },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
+        }),
       }),
-      delete: op({ summary: 'Disconnect and delete Outlook account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true }),
+      delete: op({ summary: 'Disconnect and delete Outlook account', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, responses: answers({ ...OK, 404: OUTLOOK_ACCOUNT_NOT_FOUND }) }),
     },
     '/api/v1/calendar/outlook/accounts/{id}/calendars': {
-      get: op({ summary: 'List calendars for an Outlook account', tag: 'Calendar', admin: true, params: [idParam()] }),
-      patch: op({ summary: 'Enable or disable an Outlook calendar as push target', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'List calendars for an Outlook account', tag: 'Calendar', admin: true, params: [idParam(), REFRESH_PARAM], responses: answers({ ...OK, 404: OUTLOOK_ACCOUNT_NOT_FOUND, 409: PROVIDER_CONFLICT, 502: REMOTE_REFUSED, 503: apiError('Outlook is not configured (reason `outlook_not_configured`, also before the account is looked up), or a backup is being restored.') }) }),
+      patch: op({ summary: 'Enable or disable an Outlook calendar as push target', tag: 'Calendar', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/OutlookCalendarSelectionInput'), responses: answers({ ...OK, 404: OUTLOOK_ACCOUNT_NOT_FOUND, 409: apiError('Series with linked exceptions cannot sync to Outlook (reason `outlook_auto_sync_overrides`).') }) }),
     },
     '/api/v1/calendar/outlook/sync': {
-      post: op({ summary: 'Run Outlook one-way push', tag: 'Calendar', admin: true, stateChanging: true }),
+      post: op({ summary: 'Run Outlook one-way push', tag: 'Calendar', admin: true, stateChanging: true, responses: plain({ ...OK, 409: PROVIDER_CONFLICT, 502: REMOTE_REFUSED, 503: OUTLOOK_NOT_SET_UP }) }),
     },
     '/api/v1/calendar/outlook/status': {
       get: op({ summary: 'Get Outlook push status', tag: 'Calendar' }),
@@ -573,11 +609,11 @@ export function calendarPaths() {
       post: op({ summary: 'Exclude a single occurrence of a recurring event (EXDATE)', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/CalendarExceptionInput'), responses: answers({ 201: { description: 'Occurrence excluded' }, 403: FORBIDDEN, 404: EVENT_NOT_FOUND, 409: AMBIGUOUS_RECURRENCE_ID }), description: 'Body: { recurrence_id } - the occurrence as the calendar reads return it (see the `recurrenceId` path parameter of the occurrence routes for the three forms). The former body { date: `YYYY-MM-DD` } is still accepted with its earlier meaning. The exact key of the matched occurrence is stored and returned as `exception_date` and `recurrence_id`. A key that names no occurrence of the series answers 400 with reason `invalid_recurrence_id`; a date that matches two occurrences (the night of a clock change) answers 409 with reason `ambiguous_recurrence_id`. Up to v2.78.0 any well-formed date was stored unchecked.' }),
     },
     '/api/v1/calendar/external-calendars': {
-      patch: op({ summary: 'Set the default assignees of an external calendar', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { source, external_id, default_assignee_user_ids } - or the earlier form `default_assignee_user_id` with one person or null. Response: { data: { source, external_id, default_assignee_user_ids, default_assignee_user_id } }, the single field carrying the first person. Events arriving from that calendar are assigned to these members (#1897), the first one primary. An event moved to another calendar of the same account follows to that calendar\'s people while its assignment is still exactly the people of the calendar it came from. Without it the first batch of a newly enabled calendar came in unassigned and had to be filled in by hand (#730). The sync only refreshes name and colour on conflict, so the assignment set here stays.' }),
+      patch: op({ summary: 'Set the default assignees of an external calendar', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody('#/components/schemas/ExternalCalendarAssigneesInput'), responses: answers({ ...OK, 404: apiError('The calendar is neither synced nor offered by its account: `This calendar has not been synced yet.`') }), description: 'Body: { source, external_id, default_assignee_user_ids } - or the earlier form `default_assignee_user_id` with one person or null. Omitting both clears the set. Response: { data: { source, external_id, default_assignee_user_ids, default_assignee_user_id } }, the single field carrying the first person. Events arriving from that calendar are assigned to these members (#1897), the first one primary. An event moved to another calendar of the same account follows to that calendar\'s people while its assignment is still exactly the people of the calendar it came from. Without it the first batch of a newly enabled calendar came in unassigned and had to be filled in by hand (#730). The sync only refreshes name and colour on conflict, so the assignment set here stays.' }),
     },
     '/api/v1/calendar/external-calendars/default-assignee-backfill': {
-      get: op({ summary: 'Count imported events a default-assignee backfill would fill', tag: 'Calendar', admin: true, description: 'Query: `moved_after` (optional) - the `moved_next` of the previous page. Response: { data: { count, token, moved, moved_total, moved_offset, moved_next } }. `count` counts already imported events from calendars of every account that carry a default assignee and are not assigned to anyone yet (#1154). `token` fingerprints exactly that set - which events, and which person each would get - and is meant to be sent back as `expected_token` (#1171). `moved` lists, one entry per event, events whose assignees are still exactly the untouched default assignees of another calendar of the same account (same provider; for CalDAV the same account), in a calendar with different default assignees, never edited in Yuvomi and not pushed out (#1307): { event_id, title, start_datetime, all_day, calendar_name, from_user_ids, from_names, to_user_ids, to_names, from_user_id, from_name, to_user_id, to_name } - the single fields carry the first person and all names joined (#1897). Only events the requesting admin may see under the calendar visibility rule are listed, counted or changed (no admin bypass, as everywhere in the calendar); `count` and `token` only count and name no event, as before. The list comes in pages of at most 5000 entries, oldest start first: `moved_total` counts all, `moved_offset` those before this page, and `moved_next` is the cursor for the next page (null on the last), so a page left entirely unticked does not hide the ones after it. Such an event may have been moved between calendars before the move started carrying the assignment along, or it may sit in a calendar whose default assignee was changed later; the data cannot tell the two apart, so these events are not part of `count` and change only when picked one by one.' }),
-      post: op({ summary: 'Apply default assignees to already imported events', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { expected_count, expected_token?, moves? } - the count and the token the confirmation was based on; when the candidate set changed since, the call answers 409 with { data: { count, token, moved, moved_total, moved_offset, moved_next } } (the first page) and changes nothing. With `expected_token` a change of the same size is caught as well (an event assigned by hand while a new import takes its place, or a calendar switched to another person); without it only the count is compared (#1171). `moves` is the list of `moved` entries the admin picked, each as { event_id, from_user_ids, to_user_ids } exactly as listed (the earlier form { event_id, from_user_id, to_user_id } still works for one person), each event at most once and at most 5000 entries, as many as the preview lists; a longer list answers 400 with a message naming the limit (#1307); each entry is checked on its own against the same rule and visibility as the preview, without loading the list and without needing a page, and an entry that does not match that way also answers 409. Without `moves` no existing assignment is changed. Only the confirmed candidate list and the picked moves are processed, each event re-checked when written, so `assigned` can be lower than expected if events changed in the meantime. Response: { data: { assigned } }. Runs in batches so a long history does not block other requests; inherited reminders whose time has passed are marked dismissed. A default assignee only reaches events imported after it was set. This one-off action assigns it to the events already imported from that calendar, across all accounts, but only where an event is not assigned to anyone yet: an assignment made by hand is left alone (#1154). It cannot tell a never-assigned event from one whose assignment was removed by hand. ICS subscriptions are not included.' }),
+      get: op({ summary: 'Count imported events a default-assignee backfill would fill', tag: 'Calendar', admin: true, params: [{ name: 'moved_after', in: 'query', required: false, schema: { type: 'string' }, description: 'The `moved_next` of the previous page. A value that is no such cursor answers 400 from the route.' }], responses: answers(OK), description: 'Query: `moved_after` (optional) - the `moved_next` of the previous page. Response: { data: { count, token, moved, moved_total, moved_offset, moved_next } }. `count` counts already imported events from calendars of every account that carry a default assignee and are not assigned to anyone yet (#1154). `token` fingerprints exactly that set - which events, and which person each would get - and is meant to be sent back as `expected_token` (#1171). `moved` lists, one entry per event, events whose assignees are still exactly the untouched default assignees of another calendar of the same account (same provider; for CalDAV the same account), in a calendar with different default assignees, never edited in Yuvomi and not pushed out (#1307): { event_id, title, start_datetime, all_day, calendar_name, from_user_ids, from_names, to_user_ids, to_names, from_user_id, from_name, to_user_id, to_name } - the single fields carry the first person and all names joined (#1897). Only events the requesting admin may see under the calendar visibility rule are listed, counted or changed (no admin bypass, as everywhere in the calendar); `count` and `token` only count and name no event, as before. The list comes in pages of at most 5000 entries, oldest start first: `moved_total` counts all, `moved_offset` those before this page, and `moved_next` is the cursor for the next page (null on the last), so a page left entirely unticked does not hide the ones after it. Such an event may have been moved between calendars before the move started carrying the assignment along, or it may sit in a calendar whose default assignee was changed later; the data cannot tell the two apart, so these events are not part of `count` and change only when picked one by one.' }),
+      post: op({ summary: 'Apply default assignees to already imported events', tag: 'Calendar', admin: true, stateChanging: true, requestBody: jsonBody('#/components/schemas/DefaultAssigneeBackfillInput'), responses: answers({ ...OK, 409: apiError('The candidates changed since they were counted; `data` carries the new count, token and first page.') }), description: 'Body: { expected_count, expected_token?, moves? } - the count and the token the confirmation was based on; when the candidate set changed since, the call answers 409 with { data: { count, token, moved, moved_total, moved_offset, moved_next } } (the first page) and changes nothing. With `expected_token` a change of the same size is caught as well (an event assigned by hand while a new import takes its place, or a calendar switched to another person); without it only the count is compared (#1171). `moves` is the list of `moved` entries the admin picked, each as { event_id, from_user_ids, to_user_ids } exactly as listed (the earlier form { event_id, from_user_id, to_user_id } still works for one person), each event at most once and at most 5000 entries, as many as the preview lists; a longer list answers 400 with a message naming the limit (#1307); each entry is checked on its own against the same rule and visibility as the preview, without loading the list and without needing a page, and an entry that does not match that way also answers 409. Without `moves` no existing assignment is changed. Only the confirmed candidate list and the picked moves are processed, each event re-checked when written, so `assigned` can be lower than expected if events changed in the meantime. Response: { data: { assigned } }. Runs in batches so a long history does not block other requests; inherited reminders whose time has passed are marked dismissed. A default assignee only reaches events imported after it was set. This one-off action assigns it to the events already imported from that calendar, across all accounts, but only where an event is not assigned to anyone yet: an assignment made by hand is left alone (#1154). It cannot tell a never-assigned event from one whose assignment was removed by hand. ICS subscriptions are not included.' }),
     },
   });
 }
@@ -601,6 +637,10 @@ const OUTLOOK_NOT_CONFIGURED = '`outlook_not_configured` (503, MS_CLIENT_ID, MS_
 const OUTLOOK_REAUTH = '`outlook_reauth_required` (409, Microsoft no longer accepts the stored sign-in)';
 const GOOGLE_NOT_CONNECTED = '`google_not_configured` (409, Google Calendar is not set up or not connected)';
 const OUTLOOK_OVERRIDES = '`outlook_auto_sync_overrides` (409, series with linked exceptions cannot sync to Outlook)';
+// An account in the path that does not exist (#2810, decision 11): looked up
+// before the service, which answered 500 or a 502 `remote_failed` for it.
+const CALDAV_ACCOUNT_GONE = '`caldav_account_not_found` (404, no CalDAV account with this id)';
+const OUTLOOK_ACCOUNT_GONE = '`outlook_account_not_found` (404, no Outlook account with this id)';
 
 // Kalender-Sync und Kalender-Abos (#1909): was die Seiten beim Verbinden und
 // Abonnieren selbst sagen. Jede andere Absage beim Verbinden ist die Antwort des
@@ -642,11 +682,20 @@ const CASE_REASONS = {
   },
   '/api/v1/calendar/subscriptions/{id}/sync': { post: SUBSCRIPTION_GONE },
   '/api/v1/calendar/outlook/accounts/{id}': {
-    put: `${OUTLOOK_OVERRIDES}, \`calendar_assignee_not_member\` (400, the owner is not a household member)`,
+    put: `${OUTLOOK_ACCOUNT_GONE}, ${OUTLOOK_OVERRIDES}, \`calendar_assignee_not_member\` (400, the owner is not a household member)`,
+    delete: OUTLOOK_ACCOUNT_GONE,
   },
   '/api/v1/calendar/outlook/accounts/{id}/calendars': {
-    patch: OUTLOOK_OVERRIDES,
-    get: `${OUTLOOK_NOT_CONFIGURED}, ${OUTLOOK_REAUTH}; ${REMOTE_FAILURE}`,
+    patch: `${OUTLOOK_ACCOUNT_GONE}, ${OUTLOOK_OVERRIDES}`,
+    get: `${OUTLOOK_NOT_CONFIGURED}, ${OUTLOOK_ACCOUNT_GONE}, ${OUTLOOK_REAUTH}; ${REMOTE_FAILURE}`,
+  },
+  '/api/v1/calendar/caldav/accounts/{id}': {
+    put: `${CALDAV_ACCOUNT_GONE}; ${REMOTE_FAILURE}`,
+    delete: CALDAV_ACCOUNT_GONE,
+  },
+  '/api/v1/calendar/caldav/accounts/{id}/calendars': {
+    get: `${CALDAV_ACCOUNT_GONE}; ${REMOTE_FAILURE}`,
+    patch: CALDAV_ACCOUNT_GONE,
   },
   '/api/v1/calendar/outlook/auth': { get: OUTLOOK_NOT_CONFIGURED },
   '/api/v1/calendar/outlook/accounts': { get: OUTLOOK_NOT_CONFIGURED },
@@ -658,7 +707,8 @@ const CASE_REASONS = {
   },
   '/api/v1/calendar/import': { post: `${ASSIGNEE_REASONS}, ${SELECTED_CALENDAR_GONE}, ${ICS_URL}, ${ICS_FETCH}; a feed that cannot be fetched otherwise: ${REMOTE_FAILURE}` },
   '/api/v1/calendar/caldav/accounts/{id}/reminder-lists': {
-    patch: `${ASSIGNEE_REASONS}, \`reminder_list_assignee_not_tasks\` (400, default assignees for a list mapped to shopping)`,
+    get: `${CALDAV_ACCOUNT_GONE}; ${REMOTE_FAILURE}`,
+    patch: `${ASSIGNEE_REASONS}, \`reminder_list_assignee_not_tasks\` (400, default assignees for a list mapped to shopping), ${CALDAV_ACCOUNT_GONE}`,
   },
   '/api/v1/calendar': { post: `${SELECTED_CALENDAR_GONE}, ${SERIES_CASES}` },
   '/api/v1/calendar/{id}': {

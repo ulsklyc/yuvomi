@@ -429,7 +429,9 @@ describe('Routen', () => {
 
   it('PATCH /external-calendars refuses a non-member, an unknown id and a non-number with a reason', async () => {
     calendar('cal-1', 'Eins', [], 'google');
-    for (const [ids, reason] of [[[ANNA, STAFF], 'calendar_assignee_not_member'], [[987654], 'calendar_assignee_unknown'], [['abc'], 'calendar_assignee_invalid']]) {
+    // A non-number is the schema's 400 since #2810 group 10b (`reason: validation`),
+    // the route's own `calendar_assignee_invalid` before.
+    for (const [ids, reason] of [[[ANNA, STAFF], 'calendar_assignee_not_member'], [[987654], 'calendar_assignee_unknown'], [['abc'], 'validation']]) {
       const res = await call('PATCH', '/external-calendars', { source: 'google', external_id: 'cal-1', default_assignee_user_ids: ids });
       assert.equal(res.status, 400);
       assert.equal(res.body.reason, reason);

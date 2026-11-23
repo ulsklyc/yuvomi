@@ -8,7 +8,8 @@ import {
   DMS_PROVIDERS, DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_UPLOAD_BACKENDS, DOCUMENT_VISIBILITIES,
 } from '../services/document-fields.js';
 import {
-  CALENDAR_NAME_MAX, EVENT_VISIBILITY, ICS_SUBSCRIPTION_NAME_MAX, MAX_REMINDER_OFFSETS,
+  CALENDAR_NAME_MAX, EVENT_VISIBILITY, EXTERNAL_CALENDAR_SOURCES, ICS_SUBSCRIPTION_NAME_MAX, MAX_REMINDER_OFFSETS,
+  REMINDER_LIST_TARGETS,
 } from '../services/calendar-fields.js';
 
 /**
@@ -508,6 +509,125 @@ export const schemas = {
             { properties: { showAssignees: { type: 'boolean' } }, required: ['showAssignees'] },
             { properties: { includeBirthdays: { type: 'boolean' } }, required: ['includeBirthdays'] },
           ],
+        },
+        GoogleCalendarSelectionInput: {
+          type: 'object',
+          required: ['calendarId', 'enabled'],
+          description: 'One calendar of the connected Google account switched on or off; a sync runs right after. An id that is blank after trimming answers 400 from the route.',
+          properties: {
+            calendarId: { type: 'string', description: 'The `id` from `GET /calendar/google/calendars`.' },
+            enabled: { type: 'boolean' },
+          },
+        },
+        GoogleReadonlyInput: {
+          type: 'object',
+          required: ['readonly'],
+          properties: {
+            readonly: { type: 'boolean', description: 'true: nothing is written to Google, events are only read.' },
+          },
+        },
+        ExternalCalendarAssigneesInput: {
+          type: 'object',
+          required: ['source', 'external_id'],
+          description: 'The calendar by provider and its id there, and its default assignees: `default_assignee_user_ids` replaces the set, the earlier form `default_assignee_user_id` sets it to one person or none. Omitting both clears the set. An `external_id` that is blank after trimming answers 400 from the route; a calendar that is neither synced nor offered by its account answers 404.',
+          properties: {
+            source: { type: 'string', enum: [...EXTERNAL_CALENDAR_SOURCES] },
+            external_id: { type: 'string', description: 'Google calendar id, CalDAV calendar URL or Apple calendar id.' },
+            default_assignee_user_ids: { type: 'array', items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
+          },
+        },
+        DefaultAssigneeBackfillInput: {
+          type: 'object',
+          required: ['expected_count'],
+          description: 'The count and token the confirmation was based on, and the picked moves. Each move names its event and both sets of people as the preview listed them (`from_user_ids`, `to_user_ids`) or, the earlier form, one person each (`from_user_id`, `to_user_id`); a move with neither form, an event listed twice or more entries than the preview shows answer 400 from the route.',
+          properties: {
+            expected_count: { type: 'integer', minimum: 0 },
+            expected_token: { type: ['string', 'null'], pattern: '^[0-9a-f]{64}$', description: 'The `token` of the count. Without it only the count is compared.' },
+            moves: {
+              type: ['array', 'null'],
+              items: {
+                type: 'object',
+                required: ['event_id'],
+                properties: {
+                  event_id: { type: 'integer', minimum: 1 },
+                  from_user_ids: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'integer', minimum: 1 } },
+                  to_user_ids: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'integer', minimum: 1 } },
+                  from_user_id: { type: 'integer', minimum: 1 },
+                  to_user_id: { type: 'integer', minimum: 1 },
+                },
+              },
+            },
+          },
+        },
+        AppleConnectInput: {
+          type: 'object',
+          required: ['url', 'username', 'password'],
+          description: 'The iCloud CalDAV access; nothing of it is ever returned. A `url` that does not start with http(s) answers 400 with `reason: apple_url_invalid`; an empty or too long username or password answers 400 from the route.',
+          properties: {
+            url: { type: 'string', description: 'The CalDAV address, e.g. `https://caldav.icloud.com`.' },
+            username: { type: 'string', description: 'The Apple ID, at most 254 characters.' },
+            password: { type: 'string', writeOnly: true, description: 'An app-specific password, at most 4096 characters, not trimmed.' },
+          },
+        },
+        CaldavAccountCreateInput: {
+          type: 'object',
+          required: ['name', 'caldavUrl', 'username', 'password'],
+          description: 'A new CalDAV account; the connection is tested before it is saved. An empty field answers 400 from the route.',
+          properties: {
+            name: { type: 'string' },
+            caldavUrl: { type: 'string' },
+            username: { type: 'string' },
+            password: { type: 'string', writeOnly: true, description: 'At most 4096 characters, not trimmed.' },
+          },
+        },
+        CaldavAccountUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional; an omitted or empty `password` keeps the stored one (see the operation).',
+          properties: {
+            name: { type: 'string' },
+            caldavUrl: { type: 'string' },
+            username: { type: 'string' },
+            password: { type: 'string', writeOnly: true, description: 'At most 4096 characters, not trimmed.' },
+          },
+        },
+        CaldavCalendarSelectionInput: {
+          type: 'object',
+          required: ['calendarUrl', 'enabled'],
+          properties: {
+            calendarUrl: { type: 'string', description: 'The `calendarUrl` from `GET /calendar/caldav/accounts/{id}/calendars`.' },
+            enabled: { type: 'boolean' },
+            deleteEvents: { type: 'boolean', description: 'With `enabled: false`, also delete the events already taken over from this calendar. Default false.' },
+          },
+        },
+        CaldavReminderListUpdateInput: {
+          type: 'object',
+          required: ['listUrl'],
+          description: 'The list by its URL and at least one change: `enabled`, `targetModule` or the default assignees (otherwise 400 from the route). What is left out stays as stored.',
+          properties: {
+            listUrl: { type: 'string', description: 'The `listUrl` from `GET /calendar/caldav/accounts/{id}/reminder-lists`.' },
+            enabled: { type: 'boolean' },
+            targetModule: { type: 'string', enum: [...REMINDER_LIST_TARGETS] },
+            defaultAssigneeUserIds: { type: 'array', items: { type: 'integer', minimum: 1 } },
+            defaultAssigneeUserId: { type: ['integer', 'null'], minimum: 1 },
+          },
+        },
+        OutlookAccountUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional; what is left out stays as stored. Auto-sync is on once both the calendar and the owner are set.',
+          properties: {
+            name: { type: 'string' },
+            autoSyncCalendarId: { type: ['string', 'null'], description: 'A writable calendar of the account; `null` or `""` switches auto-sync off.' },
+            ownerUserId: { type: ['integer', 'null'], minimum: 1, description: 'The household member whose visible events are pushed; `null` clears it.' },
+          },
+        },
+        OutlookCalendarSelectionInput: {
+          type: 'object',
+          required: ['calendarId', 'enabled'],
+          properties: {
+            calendarId: { type: 'string', description: 'The `calendarId` from `GET /calendar/outlook/accounts/{id}/calendars`.' },
+            enabled: { type: 'boolean' },
+          },
         },
         CalendarExceptionInput: {
           type: 'object',

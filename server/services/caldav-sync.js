@@ -377,6 +377,18 @@ function getAllAccounts() {
   return db.get().prepare('SELECT * FROM caldav_accounts').all();
 }
 
+/**
+ * Whether the account exists (#2810, group 10b): the routes with an account in
+ * the path ask this before the service, so an unknown account is a 404 of its
+ * own instead of the plain Error the service throws for it (500, or 502
+ * `remote_failed` as if the server had refused).
+ * @param {number} accountId
+ * @returns {boolean}
+ */
+function accountExists(accountId) {
+  return db.get().prepare('SELECT 1 FROM caldav_accounts WHERE id = ?').get(accountId) !== undefined;
+}
+
 // --------------------------------------------------------
 // Connection Testing
 // --------------------------------------------------------
@@ -1857,6 +1869,7 @@ function getStatus() {
 // --------------------------------------------------------
 
 export {
+  accountExists,
   addAccount,
   listAccounts,
   updateAccount,

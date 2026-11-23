@@ -5,6 +5,7 @@
 import { createLogger } from '../../logger.js';
 import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as caldavSync from '../../services/caldav-sync.js';
 import * as caldavReminders from '../../services/caldav-reminders-sync.js';
 import { requireAdmin } from '../../auth.js';
@@ -30,6 +31,20 @@ function sendCaldavFailure(res, err, sentence) {
   }
   return res.status(500).json({ error: sentence, code: 500 });
 }
+
+/**
+ * An account in the path that does not exist (#2810, group 10b, decision 11):
+ * asked before the service, whose plain Error for it answered 500 or a 502
+ * `remote_failed` - a refusal of the CalDAV server that never happened.
+ * @param {{ status: (code: number) => { json: (body: unknown) => unknown } }} res
+ * @param {number} accountId
+ * @returns {boolean} true when the answer is sent
+ */
+function refuseUnknownAccount(res, accountId) {
+  if (caldavSync.accountExists(accountId)) return false;
+  res.status(404).json({ error: 'CalDAV account not found.', code: 404, reason: 'caldav_account_not_found' });
+  return true;
+}
 const router = express.Router();
 
 // --------------------------------------------------------
@@ -38,7 +53,7 @@ const router = express.Router();
 
 // Account Management
 
-router.post('/caldav/accounts', requireAdmin, async (req, res) => {
+router.post('/caldav/accounts', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const { name, caldavUrl, username, password } = req.body;
 
@@ -65,7 +80,7 @@ router.post('/caldav/accounts', requireAdmin, async (req, res) => {
   }
 });
 
-router.get('/caldav/accounts', requireAdmin, (req, res) => {
+router.get('/caldav/accounts', requireAdmin, validateRequest(), (req, res) => {
   try {
     const accounts = caldavSync.listAccounts();
     res.json({ data: accounts });
@@ -75,13 +90,14 @@ router.get('/caldav/accounts', requireAdmin, (req, res) => {
   }
 });
 
-router.put('/caldav/accounts/:id', requireAdmin, async (req, res) => {
+router.put('/caldav/accounts/:id', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const { name, caldavUrl, username, password } = req.body;
     // Leer heisst "bestehendes behalten" (siehe updateAccount).
     const vPassword = secret(password, 'Password', { required: false });
     if (vPassword.error) return res.status(400).json({ error: vPassword.error, code: 400 });
+    if (refuseUnknownAccount(res, accountId)) return;
 
     const result = await caldavSync.updateAccount(accountId, { name, caldavUrl, username, password });
     res.json({ data: result });
@@ -96,12 +112,13 @@ router.put('/caldav/accounts/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/caldav/accounts/:id', requireAdmin, (req, res) => {
+router.delete('/caldav/accounts/:id', requireAdmin, validateRequest(), (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     // Query statt Body: DELETE-Requests tragen in dieser App keinen Body, und
     // der Client soll die Wahl ausdruecklich mitschicken (#732).
     const deleteEvents = req.query.deleteEvents === 'true';
+    if (refuseUnknownAccount(res, accountId)) return;
     const result = caldavSync.deleteAccount(accountId, { deleteEvents });
     res.json({ data: result });
   } catch (err) {
@@ -114,10 +131,11 @@ router.delete('/caldav/accounts/:id', requireAdmin, (req, res) => {
 
 // `?refresh=true` schreibt die Kalenderliste nach dem Abruf neu: waehrend eines
 // Restores 503, sonst festgehalten wie eine schreibende Anfrage (#1551).
-router.get('/caldav/accounts/:id/calendars', requireAdmin, refuseWhileRestoring, async (req, res) => {
+router.get('/caldav/accounts/:id/calendars', requireAdmin, refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const refresh = req.query.refresh === 'true';
+    if (refuseUnknownAccount(res, accountId)) return;
 
     const calendars = await caldavSync.getCalendars(accountId, { refresh });
     res.json({ data: calendars });
@@ -127,7 +145,7 @@ router.get('/caldav/accounts/:id/calendars', requireAdmin, refuseWhileRestoring,
   }
 });
 
-router.patch('/caldav/accounts/:id/calendars', requireAdmin, (req, res) => {
+router.patch('/caldav/accounts/:id/calendars', requireAdmin, validateRequest(), (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const { calendarUrl, enabled, deleteEvents } = req.body;
@@ -138,6 +156,7 @@ router.patch('/caldav/accounts/:id/calendars', requireAdmin, (req, res) => {
     if (deleteEvents !== undefined && typeof deleteEvents !== 'boolean') {
       return res.status(400).json({ error: 'deleteEvents must be a boolean.', code: 400 });
     }
+    if (refuseUnknownAccount(res, accountId)) return;
 
     const result = caldavSync.updateCalendarSelection(accountId, calendarUrl, enabled, {
       deleteEvents: deleteEvents === true,
@@ -151,7 +170,7 @@ router.patch('/caldav/accounts/:id/calendars', requireAdmin, (req, res) => {
 
 // Sync & Status
 
-router.post('/caldav/sync', requireAdmin, async (req, res) => {
+router.post('/caldav/sync', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const result = await caldavSync.sync();
     res.json({ data: result });
@@ -161,7 +180,7 @@ router.post('/caldav/sync', requireAdmin, async (req, res) => {
   }
 });
 
-router.get('/caldav/status', (req, res) => {
+router.get('/caldav/status', validateRequest(), (req, res) => {
   try {
     const status = caldavSync.getStatus();
     // SERVER-ADRESSE UND BENUTZERNAME SIND VERWALTUNGSDATEN, keine Kalenderdaten.
@@ -190,10 +209,11 @@ router.get('/caldav/status', (req, res) => {
 // Reminder-list discovery & selection
 
 // Der erste Aufruf und `?refresh=true` schreiben die Listen nach dem Abruf (#1551).
-router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileRestoring, async (req, res) => {
+router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const refresh = req.query.refresh === 'true';
+    if (refuseUnknownAccount(res, accountId)) return;
 
     const lists = await caldavReminders.getReminderLists(accountId, { refresh });
     res.json({ data: lists });
@@ -206,7 +226,7 @@ router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileResto
 // `defaultAssigneeUserIds` (#1221): die Personen, die eine neu eingelesene
 // Aufgabe aus dieser Liste bekommt. Nur Haushaltsmitglieder, nur fuer eine
 // Liste, die auf Aufgaben zeigt.
-router.patch('/caldav/accounts/:id/reminder-lists', requireAdmin, (req, res) => {
+router.patch('/caldav/accounts/:id/reminder-lists', requireAdmin, validateRequest(), (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const { listUrl, enabled, targetModule } = req.body;
@@ -228,6 +248,7 @@ router.patch('/caldav/accounts/:id/reminder-lists', requireAdmin, (req, res) => 
       if (checked.error) return res.status(400).json({ error: checked.error, code: 400, reason: checked.reason });
       defaultAssigneeUserIds = checked.ids;
     }
+    if (refuseUnknownAccount(res, accountId)) return;
 
     const result = caldavReminders.updateReminderSelection(accountId, listUrl, { enabled, targetModule, defaultAssigneeUserIds });
     res.json({ data: result });
@@ -242,7 +263,7 @@ router.patch('/caldav/accounts/:id/reminder-lists', requireAdmin, (req, res) => 
 
 // Sync & Status
 
-router.post('/caldav/reminders/sync', requireAdmin, async (req, res) => {
+router.post('/caldav/reminders/sync', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const result = await caldavReminders.sync();
     res.json({ data: result });
@@ -252,7 +273,7 @@ router.post('/caldav/reminders/sync', requireAdmin, async (req, res) => {
   }
 });
 
-router.get('/caldav/reminders/status', (req, res) => {
+router.get('/caldav/reminders/status', validateRequest(), (req, res) => {
   try {
     const status = caldavReminders.getStatus();
     res.json({ data: status });

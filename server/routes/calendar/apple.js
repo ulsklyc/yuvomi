@@ -5,6 +5,7 @@
 import { createLogger } from '../../logger.js';
 import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as appleCalendar from '../../services/apple-calendar.js';
 import { requireAdmin } from '../../auth.js';
 import { secret } from '../../middleware/validate.js';
@@ -35,7 +36,7 @@ function sendAppleFailure(res, err, status, sentence) {
  * GET /api/v1/calendar/apple/status
  * Response: { configured, lastSync }
  */
-router.get('/apple/status', (req, res) => {
+router.get('/apple/status', validateRequest(), (req, res) => {
   try {
     const status = appleCalendar.getStatus();
     // DER FEHLERTEXT DES LETZTEN LAUFS IST VERWALTUNGSDATEN. Er kommt vom
@@ -56,7 +57,7 @@ router.get('/apple/status', (req, res) => {
  * Manueller Sync-Trigger.
  * Response: { ok: true, lastSync: string }
  */
-router.post('/apple/sync', requireAdmin, async (req, res) => {
+router.post('/apple/sync', requireAdmin, validateRequest(), async (req, res) => {
   try {
     await appleCalendar.sync();
     const { lastSync } = appleCalendar.getStatus();
@@ -76,7 +77,7 @@ router.post('/apple/sync', requireAdmin, async (req, res) => {
  * Body: { url, username, password }
  * Response: { ok: true, calendarCount: number }
  */
-router.post('/apple/connect', requireAdmin, async (req, res) => {
+router.post('/apple/connect', requireAdmin, validateRequest(), async (req, res) => {
   const { url, username, password } = req.body;
   if (!url || typeof url !== 'string' || !url.startsWith('http')) {
     return res.status(400).json({ error: 'url must be a valid HTTP(S) URL.', code: 400, reason: 'apple_url_invalid' });
@@ -119,7 +120,7 @@ router.post('/apple/connect', requireAdmin, async (req, res) => {
  * und ein 204 → 200 wäre für Bestandsclients ein Bruch ohne Gegenwert. Wer die
  * Zahl braucht, nimmt DELETE /apple/mirrored-events.
  */
-router.delete('/apple/disconnect', requireAdmin, (req, res) => {
+router.delete('/apple/disconnect', requireAdmin, validateRequest(), (req, res) => {
   try {
     appleCalendar.clearCredentials({
       deleteEvents: req.query.deleteEvents === 'true',
@@ -137,7 +138,7 @@ router.delete('/apple/disconnect', requireAdmin, (req, res) => {
  * anzufassen (#820). Der iCloud-Kalender bleibt unberührt.
  * Response: { data: { removed: number } }
  */
-router.delete('/apple/mirrored-events', requireAdmin, (req, res) => {
+router.delete('/apple/mirrored-events', requireAdmin, validateRequest(), (req, res) => {
   try {
     res.json({ data: { removed: appleCalendar.clearMirroredEvents() } });
   } catch (err) {
