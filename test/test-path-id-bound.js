@@ -128,6 +128,9 @@ const MOUNTS = [
   // Einsegment-Pfaden, CalDAV und Outlook mit ihren Mehrsegment-Pfaden
   // danach). Ein unbekanntes Konto antwortet dort 404 (#2810, Entscheidung 11).
   { file: 'dashboard.js', mount: '/api/v1/dashboard' },
+  // Die Aufgaben (Gruppe 11a) stehen in server/index.js gleich hinter der
+  // Uebersicht; die festen Pfade vor `/:id`.
+  { file: 'tasks.js', mount: '/api/v1/tasks' },
   ...['read', 'google', 'apple', 'subscriptions', 'feed', 'local-calendars', 'sync-targets', 'crud', 'caldav', 'outlook']
     .map((name) => ({ file: `calendar/${name}.js`, mount: '/api/v1/calendar' })),
 ];

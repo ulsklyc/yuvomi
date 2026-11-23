@@ -1,7 +1,7 @@
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '../../public/utils/note-category-name.js';
 import { MAX_QUICK_LINK_URL_LENGTH } from '../../public/utils/quick-link-url.js';
 import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { DATETIME_PATTERN } from '../utils/datetime-pattern.js';
+import { DATETIME_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
 import { ORIGIN_MODULE } from '../services/reminder-origins.js';
 import { wasteInputSchemas } from './waste-inputs.js';
 import {
@@ -11,6 +11,10 @@ import {
   CALENDAR_NAME_MAX, EVENT_VISIBILITY, EXTERNAL_CALENDAR_SOURCES, ICS_SUBSCRIPTION_NAME_MAX, MAX_REMINDER_OFFSETS,
   REMINDER_LIST_TARGETS,
 } from '../services/calendar-fields.js';
+import {
+  MAX_BULK_TASKS, MAX_ROTATION_POOL, ROTATION_MODES, TASK_MAX_POINTS, TASK_PRIORITIES, TASK_REAL_STATUSES, TASK_STATUSES,
+  TASK_VISIBILITY,
+} from '../services/task-fields.js';
 
 /**
  * A reminder time as the handlers accept it (`datetime()` in
@@ -304,8 +308,10 @@ const utcStamp = (description) => ({ type: 'string', format: 'date-time', descri
 const flag = (description) => ({ type: 'integer', enum: [0, 1], description });
 const SYNC_BOOKKEEPING = 'Bookkeeping of the sync; says nothing a client acts on.';
 
-const taskPriority = { type: 'string', enum: ['none', 'low', 'medium', 'high', 'urgent'] };
-const taskVisibility = { type: 'string', enum: ['all', 'assignees', 'private'] };
+// The value lists of a task come from server/services/task-fields.js, which
+// the task routes read too (#2810, group 11a).
+const taskPriority = { type: 'string', enum: [...TASK_PRIORITIES] };
+const taskVisibility = { type: 'string', enum: [...TASK_VISIBILITY] };
 
 const avatarField = (description) => ({
   type: ['string', 'null'],
@@ -323,7 +329,7 @@ const taskProperties = {
   priority: taskPriority,
   status: {
     type: 'string',
-    enum: ['open', 'in_progress', 'done'],
+    enum: [...TASK_REAL_STATUSES],
     description: 'The state of the task. `archived` is not a status here: filing away is the separate axis `archived_at`.',
   },
   start_date: isoDay('`YYYY-MM-DD`, a plain calendar day without a time zone.'),
@@ -337,7 +343,7 @@ const taskProperties = {
   recurrence_from_completion: flag('1 when the next occurrence counts from the day of completion instead of the due date.'),
   recurrence_origin_id: { type: ['integer', 'null'], description: 'The task this one followed in its series.' },
   recurrence_series_id: { type: ['integer', 'null'] },
-  points: { type: 'integer', minimum: 0, maximum: 10000 },
+  points: { type: 'integer', minimum: 0, maximum: TASK_MAX_POINTS },
   visibility: taskVisibility,
   countdown: flag('1 when the task shows as a countdown.'),
   locked: flag('1 when the definition of the task is closed to everyone but its creator and administrators (#830).'),
@@ -360,7 +366,7 @@ const taskProperties = {
   assigned_avatar: avatarField('Picture of `assigned_to`.'),
   assigned_users: { type: 'array', items: { $ref: '#/components/schemas/AssignedPerson' } },
   tags: { type: 'array', items: { type: 'string' }, description: 'Free-form labels, distinct from the single `category`.' },
-  rotation_mode: { type: ['string', 'null'], enum: ['round_robin', null], description: 'Rotation of a recurring series (#1763): `round_robin` hands every follow-up instance to the next member of `rotation_pool` in a fixed order, null without rotation.' },
+  rotation_mode: { type: ['string', 'null'], enum: [...ROTATION_MODES, null], description: 'Rotation of a recurring series (#1763): `round_robin` hands every follow-up instance to the next member of `rotation_pool` in a fixed order, null without rotation.' },
   rotation_last_user: { type: ['integer', 'null'], description: 'Informational: the member the pointer names. The order reads `rotation_last_position`, never this field.' },
   rotation_last_position: { type: ['integer', 'null'], minimum: 0, description: 'The pointer: the pool position that received the last occurrence, null before the first hand-over.' },
   rotation_pool: { type: ['array', 'null'], items: { type: 'integer' }, description: 'Member ids in delivery order, deactivated members included, null when the task does not rotate.' },
@@ -389,16 +395,27 @@ const DOCUMENT_COUNT_FIELD = {
   description: 'Linked documents the caller may see. Null without access to the Documents module: not told, which is not the same as 0.',
 };
 
+/**
+ * A switch of a task as the handlers read it (#2810, group 11a): `true`/`false`
+ * or `1`/`0` - the task form sends the numbers. Anything else (`null`,
+ * `"false"`, `5`) answers 400; a stored task reads back with 0 or 1.
+ * @param {string} description
+ */
+const taskFlag = (description) => ({
+  anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }],
+  description: `${description} \`true\`/\`false\` or \`1\`/\`0\` (the app sends the numbers).`,
+});
+
 const taskInputProperties = {
   title: { type: 'string', minLength: 1, maxLength: 200 },
   description: { type: ['string', 'null'], maxLength: 5000, description: 'Stored without leading and trailing whitespace; an empty or whitespace-only value is stored as `null`.' },
   category: { type: 'string', description: 'Key of a category of the household, see `GET /tasks/meta/options`; anything else answers 400. An empty string counts as not given. Defaults to `misc` on create.' },
-  priority: { ...taskPriority, description: 'An empty string counts as not given. Defaults to `none` on create.' },
-  start_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day.'),
-  due_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day.'),
-  due_time: { type: ['string', 'null'], pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: '`HH:MM` wall-clock time of the household.' },
+  priority: { type: 'string', enum: [...TASK_PRIORITIES, ''], description: 'An empty string counts as not given. Defaults to `none` on create.' },
+  start_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day. Null for none; an empty string answers 400.'),
+  due_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day. Null for none; an empty string answers 400.'),
+  due_time: { type: ['string', 'null'], pattern: TIME_PATTERN, description: '`HH:MM` wall-clock time of the household. Null for none; an empty string answers 400.' },
   assigned_to: {
-    description: 'One user id, a list with the primary assignee first, or null for nobody. New assignees have to be household members (400 otherwise).',
+    description: 'One user id, a list with the primary assignee first, or null for nobody. New assignees have to be household members, and an id without an account is refused the same way (400).',
     ...calendarOccurrenceMutationProperties.assigned_to,
   },
   tags: {
@@ -409,28 +426,44 @@ const taskInputProperties = {
       { type: 'null' },
     ],
   },
-  is_recurring: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  is_recurring: taskFlag('Whether the task repeats.'),
   recurrence_rule: {
     type: ['string', 'null'],
     maxLength: 300,
     description: 'RRULE without the `RRULE:` prefix: `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY`, optional `INTERVAL`, `BYDAY`, for MONTHLY `BYMONTHDAY=-1`, and either `UNTIL` or `COUNT`. A value equal to the stored rule is accepted unchecked on update.',
   },
-  recurrence_from_completion: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  recurrence_from_completion: taskFlag('Whether the next occurrence counts from the day of completion.'),
   points: {
-    type: ['integer', 'null'],
-    minimum: 0,
-    maximum: 10000,
-    description: 'Cut to a whole number from 0 to 10000 rather than refused. Omitted on create, a top-level task takes the default of the household (`default_points`), a subtask 0.',
+    type: ['number', 'null'],
+    description: `Cut to a whole number from 0 to ${TASK_MAX_POINTS} rather than refused; null is 0. A text, a boolean or an empty string answers 400. Omitted on create, a top-level task takes the default of the household (\`default_points\`), a subtask 0.`,
   },
-  visibility: { ...taskVisibility, description: 'An unknown value falls back to `all` on create and keeps the stored one on update, without an error.' },
-  countdown: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
-  locked: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
-  rotation_mode: { type: ['string', 'null'], enum: ['round_robin', null], description: 'Requires a recurring task and a pool of at least 2 household members (400 otherwise). Null clears mode, pool and pointer. Omitted on update, the rotation stays.' },
-  rotation_pool: { type: 'array', maxItems: 10, items: { type: 'integer', minimum: 1 }, description: 'Member ids, the list order is the delivery order. On update it is merged with the stored pool: a deactivated member left out keeps its place.' },
+  visibility: { ...taskVisibility, description: 'Who sees the task. Any other value answers 400.' },
+  countdown: taskFlag('Whether the task shows as a countdown.'),
+  locked: taskFlag('Whether the definition is closed to everyone but the creator and administrators (#830).'),
+  rotation_mode: { type: ['string', 'null'], enum: [...ROTATION_MODES, null], description: 'Requires a recurring task and a pool of at least 2 household members (400 otherwise). Null clears mode, pool and pointer. Omitted on update, the rotation stays.' },
+  rotation_pool: { type: 'array', maxItems: MAX_ROTATION_POOL, items: { type: 'integer', minimum: 1 }, description: 'Member ids, the list order is the delivery order. On update it is merged with the stored pool: a deactivated member left out keeps its place.' },
   sync_target: {
     type: ['string', 'null'],
     description: '`caldav:<accountId>|<listUrl>` from `GET /tasks/sync-targets`, or null or empty for local only. Ignored on a subtask, and on update once the task is on the server.',
   },
+};
+
+/** A list of task ids in a bulk request: at least one, at most MAX_BULK_TASKS. @param {string} description */
+const bulkTaskIds = (description) => ({
+  type: 'array',
+  minItems: 1,
+  maxItems: MAX_BULK_TASKS,
+  items: { type: 'integer', minimum: 1 },
+  description,
+});
+
+/** Tags to add or remove in one go: a list, or one string with the tags separated by commas. */
+const tagChange = {
+  oneOf: [
+    { type: 'array', items: { type: 'string' } },
+    { type: 'string' },
+    { type: 'null' },
+  ],
 };
 
 export const schemas = {
@@ -1408,7 +1441,7 @@ export const schemas = {
             statuses: {
               type: 'array',
               description: 'What the `status` filter and input take. `archived` stands for the archive here; a task never reads back with it.',
-              items: { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] },
+              items: { type: 'string', enum: [...TASK_STATUSES] },
             },
             categories: { type: 'array', items: { $ref: '#/components/schemas/TaskCategory' } },
             tags: {
@@ -1423,7 +1456,7 @@ export const schemas = {
                 },
               },
             },
-            default_points: { type: 'integer', minimum: 0, maximum: 10000, description: 'Points a new top-level task takes when the request names none. 0 means no default.' },
+            default_points: { type: 'integer', minimum: 0, maximum: TASK_MAX_POINTS, description: 'Points a new top-level task takes when the request names none. 0 means no default.' },
           },
         },
         TaskCreateInput: {
@@ -1433,8 +1466,8 @@ export const schemas = {
             ...taskInputProperties,
             status: {
               type: ['string', 'null'],
-              enum: ['open', 'in_progress', 'done', 'archived', null],
-              description: 'Defaults to `open`. `archived` and null fall back to `open`, see the operation.',
+              enum: [...TASK_STATUSES, null],
+              description: 'Defaults to `open`. `archived` and null fall back to `open`, see the operation; an empty string answers 400.',
             },
             parent_task_id: { type: ['integer', 'null'], minimum: 1, description: 'Creates a subtask. Its parent must be a top-level task the caller can see.' },
           },
@@ -1446,8 +1479,8 @@ export const schemas = {
             ...taskInputProperties,
             status: {
               type: 'string',
-              enum: ['open', 'in_progress', 'done', 'archived'],
-              description: '`archived` files the task away and leaves the status as it is.',
+              enum: [...TASK_STATUSES],
+              description: '`archived` files the task away and leaves the status as it is. Null or an empty string answers 400.',
             },
           },
         },
@@ -1455,7 +1488,7 @@ export const schemas = {
           type: 'object',
           required: ['status'],
           properties: {
-            status: { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] },
+            status: { type: 'string', enum: [...TASK_STATUSES] },
             done_by_user_id: {
               type: ['integer', 'null'],
               minimum: 1,
@@ -1470,6 +1503,95 @@ export const schemas = {
             line: { type: 'integer', minimum: 0, description: 'Line of the description, counted from 0.' },
             checked: { type: 'boolean' },
             expect: { type: ['string', 'null'], description: 'The line as the caller saw it, including `- [ ]`. A different line answers 409 with reason `stale`.' },
+          },
+        },
+        // The bodies of the other task routes (#2810, group 11a). Fields the
+        // schema does not name stay ignored, as before.
+        TaskTagsApplyInput: {
+          type: 'object',
+          required: ['ids'],
+          properties: {
+            ids: bulkTaskIds('The tasks to change. Ids the caller cannot see are skipped silently, locked ones are skipped and counted.'),
+            add: tagChange,
+            remove: tagChange,
+          },
+        },
+        TaskArchiveManyInput: {
+          type: 'object',
+          required: ['ids'],
+          properties: {
+            ids: bulkTaskIds('The tasks to archive. An id may repeat; it counts once.'),
+          },
+        },
+        TaskTagRenameInput: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string', description: 'The new tag, one tag even with a comma in it. Empty after trimming answers 400.' },
+          },
+        },
+        TaskCategoryNameInput: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string', description: 'Trimmed; empty or longer than 100 characters answers 400, a name in use (ignoring case) 409 `category_exists`.' },
+          },
+        },
+        TaskCategoryReorderInput: {
+          type: 'object',
+          required: ['order'],
+          properties: {
+            order: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Category keys in the wanted order. An unknown key changes nothing; an empty list leaves the order as it is.',
+            },
+          },
+        },
+        TaskReorderInput: {
+          type: 'object',
+          required: ['order'],
+          properties: {
+            order: { ...bulkTaskIds('Task ids in the wanted order, each once.'), uniqueItems: true },
+          },
+        },
+        TaskReorderResetInput: {
+          type: 'object',
+          required: ['ids'],
+          properties: {
+            ids: { ...bulkTaskIds('The tasks whose rank is cleared, each once.'), uniqueItems: true },
+          },
+        },
+        TaskArchiveInput: {
+          type: 'object',
+          description: 'Without a body, or without `archived`, the task is archived.',
+          properties: {
+            archived: { type: 'boolean', description: '`false` brings the task back, `true` (the default) archives it.' },
+          },
+        },
+        TaskDocumentsInput: {
+          type: 'object',
+          properties: {
+            document_ids: {
+              type: 'array',
+              items: { type: 'integer', minimum: 1 },
+              description: 'The documents to link, replacing the visible links. An empty list removes them; ids the caller cannot see are left out. Omitting `document_ids` clears every visible link as well.',
+            },
+          },
+        },
+        TaskCommentInput: {
+          type: 'object',
+          required: ['comment'],
+          properties: {
+            comment: { type: 'string', description: 'Trimmed; empty or longer than 5000 characters answers 400. `@Name` mentions notify the members named.' },
+          },
+        },
+        TaskPointsRebaseInput: {
+          type: 'object',
+          required: ['from', 'to'],
+          properties: {
+            from: { type: 'integer', minimum: 1, maximum: TASK_MAX_POINTS, description: 'The previous default. 0 would take every task without points.' },
+            to: { type: 'integer', minimum: 0, maximum: TASK_MAX_POINTS, description: 'The new default.' },
           },
         },
         CalendarEventCreateInput: {

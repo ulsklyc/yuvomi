@@ -75,6 +75,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lead back to the settings. The refusals with a `reason` the app shows (`apple_url_invalid`,
   `password_required`, the default assignees) and the checks of length and blank values stay
   with the routes; a body of the wrong type now answers `reason: validation` with the field.
+- **The tasks check every request against the published API description.** This is about
+  your own API clients; the app sends nothing that is refused now. The description itself is
+  corrected where it refused what the app sends: the switches `is_recurring`,
+  `recurrence_from_completion`, `countdown` and `locked` take `true`/`false` and `1`/`0`,
+  `points` takes any number and is still cut to 0-10000, `priority` and `category` take `""`
+  (not given), and the filters `status`, `priority`, `assigned_to` and `category` of
+  `GET /tasks` may be repeated (`?status=open&status=done`), as the app sends them; an unknown
+  status or priority there is still a filter without a hit. Under `/api/v1/tasks` input that used
+  to be quietly accepted or replaced is now refused with a 400:
+  - a path id that is not plain digits: `DELETE /tasks/1.0`, `1e0` or ` 1` deleted task 1, and
+    the same reached it on every other task route, the comment id included;
+  - a switch that is neither `true`/`false` nor `1`/`0`: `"false"`, `5` or `{}` counted as on,
+    `null` on an update as off;
+  - `points` as text, `true` or `""` (read as 5, 1 or 0), an unknown `visibility` (silently
+    `all` or the stored one), `""` as `start_date`, `due_date`, `due_time` (stored as no date)
+    or as `status` of a new task (became `open`);
+  - an id that is not a whole number of at least 1: `assigned_to` as `"2"`, `true`, `"abc"`,
+    `[0]` or twice the same person, `done_by_user_id: true` (named user 1), `ids` of the bulk
+    actions and `rotation_pool` as text, `parent_task_id: "1"` or `-1` (a 404);
+  - a text field that is not text: `comment: 5` and a category `name: 5` were stored as "5", a
+    tag `name: 5` or `["x"]` became a tag, a tag `[5]` in `tags`;
+  - `PATCH /tasks/categories/reorder` without a list of keys (answered 200 and did nothing),
+    `PATCH /tasks/{id}/archive` with `archived: 0` or `null`, `POST /tasks/points/rebase` with
+    `to: null`, `""` or `true` (set every task on the old default to 0 points);
+  - query garbage: `limit` of `/tasks/completions` outside 1-200 or `/tasks/{id}/completions`
+    outside 1-100 (cut silently), `user_id=abc`, `before_id=x`, `assigned_to=abc` (ignored), a
+    query value given twice where it is not repeatable;
+  - a PUT or POST without a body (`PUT /tasks/{id}` answered 200 and changed nothing; only
+    `PATCH /tasks/{id}/archive` still archives without one).
+
+  These answered 500 and are now a 400: `parent_task_id: 0` or `true`, `sync_target: 5`,
+  `status: null` or `""` on `PUT /tasks/{id}`, `/tasks/completions?limit=1.5` and
+  `order: [5, {}]` on the category order. An assignee id without an account (`assigned_to: [999]`)
+  also answered 500; it is now the 400 of a non-member ("Only household members can be chosen
+  here - user 999 is not a household member."). The check runs before the task, the comment, the
+  category or the tag is looked up, so a bad request is a 400, not a 404 or the 403 of a locked
+  task or of someone else's comment; a valid one meets those as before. Two refusals stay in
+  front of it: the default-points preview and rebase answer a member 403 `admin_required`, and
+  the hand order answers 403 `reorder_not_allowed` without the right to change it, also with a
+  malformed request. Leaving out `document_ids` on `PUT /tasks/{id}/documents` still removes
+  every visible link, as the description now says. The refusals with a `reason` and the checks of
+  length, blank values, categories and the recurrence rule stay with the routes; a body of the
+  wrong type now answers `reason: validation` with the field.
 - **The budget and the subscriptions answer an unexpected failure with the same sentence as the
   rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
   and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,

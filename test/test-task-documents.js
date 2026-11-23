@@ -326,9 +326,14 @@ test('Dokumentenrecht: ohne documents-Lesen verknuepft PUT nichts, jede ID antwo
       } finally { unlockDocumentDeletes([stored]); }
       assert.deepEqual(linkedIds(taskId), [stored], `${label}: nichts verknuepft`);
 
-      // Leer, `null` oder gar kein Feld: kein Verknuepfen - und mit Recht hiesse
-      // jede der drei "alle sichtbaren loesen", ohne Recht loest keine etwas.
-      for (const [form, body] of [['[]', { document_ids: [] }], ['null', { document_ids: null }], ['ohne Feld', {}]]) {
+      // Leer oder gar kein Feld: kein Verknuepfen - und mit Recht hiesse jede
+      // der beiden "alle sichtbaren loesen", ohne Recht loest keine etwas.
+      // `null` ist seit #2810 die 400 des Schemas und loest ebenso nichts.
+      const nulled = await h.call('PUT', `/${taskId}/documents`, { document_ids: null });
+      assert.equal(nulled.status, 400, `${label}, null: die 400 des Schemas`);
+      assert.equal(nulled.body.reason, 'validation');
+      assert.deepEqual(linkedIds(taskId), [stored], `${label}, null: und loest nichts`);
+      for (const [form, body] of [['[]', { document_ids: [] }], ['ohne Feld', {}]]) {
         const kept = await h.call('PUT', `/${taskId}/documents`, body);
         assert.equal(kept.status, 200, `${label}, ${form}: kein Verknuepfen`);
         assert.equal(kept.body.data, null, `${label}, ${form}: und die Antwort nennt nichts`);

@@ -36,16 +36,17 @@ import { todayKey } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { loadTagsFor, normalizeTags, tagKey } from '../utils/task-tags.js';
+import { TASK_PRIORITIES } from '../services/task-fields.js';
 import { readBindAddress, selfCallHost } from '../utils/bind-address.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('MCP');
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
-// Spiegelt server/routes/tasks.js. Diese Liste ist dort ebenfalls fest
-// verdrahtet; die Kategorien stehen dagegen in der Datenbank und werden
-// deshalb nicht mehr hier aufgezählt (#2616).
-const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'];
+// Dieselbe Liste wie die Route und das OpenAPI-Dokument (task-fields.js,
+// #2810); die Kategorien stehen dagegen in der Datenbank und werden deshalb
+// nicht hier aufgezählt (#2616).
+const VALID_PRIORITIES = TASK_PRIORITIES;
 
 /**
  * Fehler mit für den aufrufenden Client (LLM) sichtbarer Nachricht.
@@ -225,6 +226,11 @@ function idempotencyHeader(args) {
 }
 
 async function createTask(ctx, args) {
+  // A missing or empty title is said here, in the route's own words (#2810):
+  // the route checks the form of the body first, and there a missing title is
+  // the schema's 400, whose message the tool answer carries without the
+  // field. The sentence tells the model what to fix.
+  if (args.title == null || args.title === '') throw new ToolError('title is required.');
   const data = await internalApiRequest(ctx, 'POST', '/api/v1/tasks', {
     // Validation, the category check and the fallbacks all belong to the route
     // (#2616): the fixed list here refused a household's own category and still

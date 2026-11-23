@@ -384,13 +384,15 @@ test('tools/call create_event: Zahlen in Titel, Beschreibung und Ort werden Text
 test('tools/call create_task: eine Zahl als Kategorie bleibt abgewiesen', async () => {
   const res = await toolCall('create_task', { title: 'Zahl als Kategorie', category: 5 });
   assert.equal(res.result.isError, true);
-  assert.match(res.result.content[0].text, /category/);
+  // Since #2810 the route's schema refuses it before the handler, with its reason.
+  assert.match(res.result.content[0].text, /\[reason: validation\]/);
 });
 
 test('tools/call create_task: ungültige Priorität → isError', async () => {
   const res = await toolCall('create_task', { title: 'X', priority: 'sofort' });
   assert.equal(res.result.isError, true);
-  assert.match(res.result.content[0].text, /priority/i);
+  // Since #2810 the route's schema refuses it before the handler, with its reason.
+  assert.match(res.result.content[0].text, /\[reason: validation\]/);
 });
 
 // ── #2616: dasselbe Verhalten wie die App, weil es DIESELBE Route ist ────────

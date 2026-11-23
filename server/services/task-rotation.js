@@ -45,8 +45,9 @@
  * Abhängigkeiten: account-state.js (reine SQL-Texte, keine Verbindung)
  */
 import { activeAccountSql } from './account-state.js';
-
-const MODES = ['round_robin'];
+// Die Modi stehen mit den anderen Wertelisten der Aufgabe in task-fields.js,
+// dieselbe Liste liest das OpenAPI-Dokument (#2810).
+import { ROTATION_MODES as MODES } from './task-fields.js';
 
 export function isRotationMode(value) {
   return value === null || value === undefined || MODES.includes(value);

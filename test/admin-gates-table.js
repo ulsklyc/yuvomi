@@ -306,9 +306,10 @@ export const ROWS = [
     path: (s) => `/api/v1/tasks/${s.ids.settledTask}`, body: { status: 'open' }, expect: ADMIN_REQUIRED },
   { form: 'inline', file: 'server/routes/tasks.js', key: 'PATCH /:id/status', method: 'PATCH',
     path: (s) => `/api/v1/tasks/${s.ids.settledTask}/status`, body: { status: 'open' }, expect: ADMIN_REQUIRED },
-  { form: 'inline', file: 'server/routes/tasks.js', key: 'GET /points/affected', method: 'GET',
+  // In front of validateRequest() (#2810): the invalid input meets the 403 first.
+  { form: 'requireAdmin', file: 'server/routes/tasks.js', key: 'GET /points/affected', method: 'GET',
     path: '/api/v1/tasks/points/affected?points=x', expect: ADMIN_REQUIRED },
-  { form: 'inline', file: 'server/routes/tasks.js', key: 'POST /points/rebase', method: 'POST',
+  { form: 'requireAdmin', file: 'server/routes/tasks.js', key: 'POST /points/rebase', method: 'POST',
     path: '/api/v1/tasks/points/rebase', body: { from: 'x', to: 'x' }, expect: ADMIN_REQUIRED },
   // A pending reward redemption of the member: fulfilling is for an admin.
   { form: 'inline', file: 'server/routes/rewards.js', key: 'PATCH /redemptions/:id', method: 'PATCH',
