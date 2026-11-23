@@ -83,14 +83,13 @@ test('cleanupExpired deletes only stale rows', () => {
 
 // --- Routes (forgot/reset) ------------------------------------------------
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import bcrypt from 'bcrypt';
 
 function makeAuthApp(db, { baseUrl = 'https://oikos.test', sendMail = null } = {}) {
   // Lazy import so the route module reads our injected services.
-  return import('../server/auth.js').then(({ buildResetRoutes }) => {
+  return import('../server/auth.js').then(async ({ buildResetRoutes }) => {
     const sent = [];
-    const app = express();
-    app.use(express.json());
     const router = express.Router();
     const pending = [];
     buildResetRoutes(router, {
@@ -103,7 +102,7 @@ function makeAuthApp(db, { baseUrl = 'https://oikos.test', sendMail = null } = {
       // `drain` wartet darauf, damit die Tests danach zaehlen koennen.
       defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
     });
-    app.use('/auth', router);
+    const app = await createAuthApp({ routers: [router] });
     app.locals.drain = () => Promise.all(pending.splice(0));
     return { app, sent };
   });
@@ -114,7 +113,7 @@ async function callJson(app, method, path, body) {
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const { port } = server.address();
-  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/v1${path}`, {
     method, headers: { 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -167,8 +166,6 @@ test('forgot-password runs the rate limiter on every request (counts 200 respons
   seedContactsAndEmail(db);
   let calls = 0;
   const { buildResetRoutes } = await import('../server/auth.js');
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   buildResetRoutes(router, {
     database: db,
@@ -177,7 +174,7 @@ test('forgot-password runs the rate limiter on every request (counts 200 respons
     baseUrl: 'https://oikos.test',
     limiter: (_req, _res, next) => { calls += 1; next(); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   // Two known-user requests both return 200 — the limiter must still count both.
   await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
   await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
@@ -275,7 +272,7 @@ test('forgot-password antwortet, bevor der Versand fertig ist, und in jedem Fall
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 1500);
     try {
-      const res = await fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+      const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/auth/forgot-password`, {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ identifier }), signal: ctrl.signal,
       });
@@ -338,7 +335,7 @@ test('forgot-password: zwei schnelle Anfragen fuer dasselbe Konto - die zuletzt 
   const { createServer } = await import('node:http');
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/api/v1/auth/forgot-password`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ identifier: 'alice' }),
   }).then((r) => r.text());
@@ -389,7 +386,7 @@ test('forgot-password: drei schnelle Anfragen ergeben hoechstens zwei Versande, 
   const { createServer } = await import('node:http');
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/api/v1/auth/forgot-password`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ identifier: 'alice' }),
   }).then((r) => r.text());
@@ -507,14 +504,20 @@ test('reset-password/check antwortet fuer unbekannt, abgelaufen, eingeloest und 
     answers.push({ status, json });
   };
   await ask({ token: 'f'.repeat(64) });                        // unbekannt
-  await ask({});                                                // fehlend
-  await ask({ token: 42 });                                     // kein Text
   db.prepare('UPDATE password_resets SET expires_at = 1').run();
   await ask({ token });                                         // abgelaufen
   db.prepare('UPDATE password_resets SET expires_at = ?').run(Date.now() + 3_600_000);
   assert.equal((await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' })).status, 200);
   await ask({ token });                                         // eingeloest
   for (const a of answers) assert.deepEqual(a, { status: 200, json: { data: { valid: false } } });
+  // Fehlend und kein Text weist seit #2810 (Gruppe 12a) das Dokument ab, vor jedem
+  // Token: 400 mit dem Feld, fuer jeden Aufrufer gleich.
+  for (const [body, rule] of [[{}, 'required'], [{ token: 42 }, 'type']]) {
+    const { status, json } = await callJson(app, 'POST', '/auth/reset-password/check', body);
+    assert.equal(status, 400, JSON.stringify(body));
+    assert.equal(json.reason, 'validation');
+    assert.deepEqual(json.fields, [{ path: 'body/token', rule }]);
+  }
 });
 
 test('reset-password/check: ein Konto, das keinen Reset mehr annimmt, gilt als toter Link - der Token bleibt', async () => {
@@ -539,8 +542,6 @@ test('reset-password/check zaehlt im selben Limiter wie das Einloesen', async ()
   seedContactsAndEmail(db);
   const seen = [];
   const { buildResetRoutes } = await import('../server/auth.js');
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   buildResetRoutes(router, {
     database: db,
@@ -549,7 +550,7 @@ test('reset-password/check zaehlt im selben Limiter wie das Einloesen', async ()
     baseUrl: 'https://oikos.test',
     limiter: (req, _res, next) => { seen.push(req.path); next(); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   await callJson(app, 'POST', '/auth/reset-password/check', { token: 'x' });
   await callJson(app, 'POST', '/auth/reset-password', { token: 'x', password: 'longenough' });
   assert.deepEqual(seen, ['/reset-password/check', '/reset-password']);

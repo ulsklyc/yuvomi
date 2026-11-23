@@ -81,7 +81,7 @@ test('language of the wrong type or form: 400', async () => {
 });
 
 test('unknown time zone: 400, nothing created', async () => {
-  for (const timezone of ['Mars/Olympus', 42, '   ']) {
+  for (const timezone of ['Mars/Olympus', '   ']) {
     const res = await setup({ language: 'de', timezone });
     assert.equal(res.status, 400, `timezone ${JSON.stringify(timezone)} must be rejected`);
     const body = await res.json();
@@ -91,6 +91,13 @@ test('unknown time zone: 400, nothing created', async () => {
     // festmacht - additiv, `error` und `code` bleiben wie sie waren.
     assert.equal(body.reason, 'invalid_timezone');
   }
+  // Eine Zone, die kein Text ist, weist seit #2810 (Gruppe 12a) das Dokument ab:
+  // 400 mit dem Feld, ohne `invalid_timezone` (keine Seite schickt eine Zahl).
+  const notText = await setup({ language: 'de', timezone: 42 });
+  assert.equal(notText.status, 400);
+  const refused = await notText.json();
+  assert.equal(refused.reason, 'validation');
+  assert.deepEqual(refused.fields, [{ path: 'body/timezone', rule: 'type' }]);
   assert.equal(userCount(), 0);
   assert.equal(cfg('language'), null);
   assert.equal(cfg('household_timezone'), null);

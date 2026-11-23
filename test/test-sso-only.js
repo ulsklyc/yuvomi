@@ -12,6 +12,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import { DatabaseSync } from 'node:sqlite';
 import { createPasswordResetService } from '../server/services/password-reset.js';
 import {
@@ -211,8 +212,6 @@ function makeDb() {
 async function makeAuthApp(db) {
   const { buildResetRoutes } = await import('../server/auth.js');
   const sent = [];
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   const pending = [];
   buildResetRoutes(router, {
@@ -224,7 +223,7 @@ async function makeAuthApp(db) {
     // Der Versand laeuft nach der Antwort; `drain` wartet auf ihn.
     defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   app.locals.drain = () => Promise.all(pending.splice(0));
   return { app, sent };
 }
@@ -234,7 +233,7 @@ async function callJson(app, method, path, body) {
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const { port } = server.address();
-  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/v1${path}`, {
     method, headers: { 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -651,8 +650,7 @@ async function configFor(db) {
   ]);
   _setTestDatabase(db);
   try {
-    const app = express();
-    app.use('/auth', router);
+    const app = await createAuthApp({ routers: [router] });
     const { json } = await callJson(app, 'GET', '/auth/oidc/config');
     return json;
   } finally {

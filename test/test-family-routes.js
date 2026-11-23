@@ -16,6 +16,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
 
 const dbmod = await import('../server/db.js');
 const { default: familyRouter } = await import('../server/routes/family.js');
@@ -106,16 +107,16 @@ test('GET /members — Shape enthält family_role, avatar_color, id', async () =
 // --------------------------------------------------------------------------
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
 const authActor = { userId: 0 };
-const authApp = express();
-authApp.use(express.json());
-authApp.use(sessionMiddleware);
-authApp.use((req, _res, next) => {
-  if (authActor.userId) { req.session.userId = authActor.userId; req.session.role = 'member'; }
-  next();
+const authApp = await createAuthApp({
+  session: sessionMiddleware,
+  auth: (req, _res, next) => {
+    if (authActor.userId) { req.session.userId = authActor.userId; req.session.role = 'member'; }
+    next();
+  },
+  routers: [authRouter],
 });
-authApp.use('/', authRouter);
 const authServer = authApp.listen(0, '127.0.0.1');
-const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}`)));
+const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}${AUTH_PREFIX}`)));
 test.after(() => authServer.close());
 
 async function signIn(userId) {

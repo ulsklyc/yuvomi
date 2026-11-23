@@ -1,4 +1,8 @@
 import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { PASSWORD_MAX } from '../../services/auth-fields.js';
+
+const TOO_MANY = { description: 'Too many attempts' };
+const SCHEMA_REFUSAL = 'or the request does not match the documented schema (`reason: "validation"` with the fields)';
 
 export function authPaths() {
   return withCaseReasons('auth', CASE_REASONS, {
@@ -47,7 +51,7 @@ export function authPaths() {
             description: 'Authenticated user and CSRF token',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/TwoFactorVerifyResponse' } } },
           },
-          400: { description: 'The code is longer than 64 characters' },
+          400: { description: 'The body does not match the documented schema, for example a code that is not text or longer than 64 characters (`reason: "validation"`)' },
           401: { description: 'Invalid code, or no pending sign-in' },
           403: { description: 'The account may no longer sign in, for example because it was deactivated in the meantime (`reason: "account_cannot_sign_in"`). No recovery code is spent.' },
           429: { description: 'Too many attempts' },
@@ -82,10 +86,12 @@ export function authPaths() {
         stateChanging: true,
         description: 'Confirms the pending setup with a code from the authenticator app and returns the '
           + 'recovery codes in plain text - the only time they are readable. All other sessions of this user are ended.',
+        requestBody: jsonBody('#/components/schemas/TwoFactorCodeRequest'),
         responses: {
           200: { description: 'Recovery codes' },
-          400: { description: 'Invalid code' },
+          400: { description: `Invalid code, ${SCHEMA_REFUSAL}` },
           409: { description: 'No pending setup, or already enabled' },
+          429: TOO_MANY,
         },
       }),
     },
@@ -96,10 +102,13 @@ export function authPaths() {
         stateChanging: true,
         description: 'Requires a valid second factor (TOTP or recovery code), not the password: '
           + 'OIDC accounts have none, and against a hijacked session only the factor itself helps. '
-          + 'Blocked with 403 while the household requires two-factor authentication.',
+          + 'Blocked with 403 while the household requires two-factor authentication. '
+          + 'A body that does not match the documented schema is refused with 400 before that state is looked at.',
+        requestBody: jsonBody('#/components/schemas/TwoFactorCodeRequest'),
         responses: {
           200: { description: 'New two-factor state' },
-          400: { description: 'Invalid code' },
+          400: { description: `Invalid code, ${SCHEMA_REFUSAL}` },
+          429: TOO_MANY,
           403: { description: 'The household requires two-factor authentication' },
           409: { description: 'Two-factor authentication is not enabled' },
         },
@@ -112,9 +121,11 @@ export function authPaths() {
         stateChanging: true,
         description: 'Discards every existing recovery code, used or not, and returns a fresh set. '
           + 'Requires a valid second factor.',
+        requestBody: jsonBody('#/components/schemas/TwoFactorCodeRequest'),
         responses: {
           200: { description: 'New recovery codes' },
-          400: { description: 'Invalid code' },
+          400: { description: `Invalid code, ${SCHEMA_REFUSAL}` },
+          429: TOO_MANY,
           409: { description: 'Two-factor authentication is not enabled' },
         },
       }),
@@ -226,7 +237,11 @@ export function authPaths() {
         tag: 'Auth',
         stateChanging: true,
         responses: {
+          200: { description: 'The link is removed' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'The account no longer exists' },
           409: { description: 'Not linked, or the account has no password and would lose its only way in' },
+          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
@@ -251,12 +266,16 @@ export function authPaths() {
         requestBody: jsonBody('#/components/schemas/SetupRequest'),
         description: 'Unknown body fields are ignored. `language` and `timezone` are optional; servers before they were added ignore them as well. '
           + 'A rejected `timezone` answers 400 with `reason: "invalid_timezone"`, so a client can retry without the field; other validation errors carry no `reason`. '
-          + 'Every failed request counts against the login rate limit.',
+          + 'Every failed request counts against the login rate limit. '
+          + 'Once an account exists the route answers 403 (`reason: "setup_completed"`), or 404 when NODE_ENV is production, whatever the body - also before the body is checked.',
         responses: {
           201: { description: 'Admin user created' },
           400: { $ref: '#/components/responses/BadRequest' },
           403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'Setup has already been completed (NODE_ENV production)' },
           409: { description: 'Username already taken' },
+          429: TOO_MANY,
+          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
@@ -283,6 +302,8 @@ export function authPaths() {
         },
         responses: {
           200: { description: 'Generic acknowledgement (sent regardless of whether the account exists).' },
+          400: { description: 'The body does not match the documented schema (`reason: "validation"`): `identifier` missing or not text. The answer depends on the shape of the request only, never on an account.' },
+          429: TOO_MANY,
         },
       }),
     },
@@ -300,7 +321,7 @@ export function authPaths() {
                 required: ['token', 'password'],
                 properties: {
                   token: { type: 'string' },
-                  password: { type: 'string', minLength: 8 },
+                  password: { type: 'string', maxLength: PASSWORD_MAX, description: 'At least 8 characters after Unicode normalization (NFC).' },
                 },
               },
             },
@@ -309,6 +330,8 @@ export function authPaths() {
         responses: {
           200: { description: 'Password updated.' },
           400: { $ref: '#/components/responses/BadRequest' },
+          429: TOO_MANY,
+          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
@@ -347,6 +370,8 @@ export function authPaths() {
               },
             },
           },
+          400: { description: 'The body does not match the documented schema (`reason: "validation"`): `token` missing or not text. The answer depends on the shape of the request only, never on a token or an account.' },
+          429: TOO_MANY,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -420,6 +445,8 @@ export function authPaths() {
             description: 'Invitation state plus the names it pre-assigns.',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/InvitePreviewResponse' } } },
           },
+          400: { description: '`token` is missing, given twice or not text (`reason: "validation"`). The answer depends on the shape of the request only, never on an invitation.' },
+          429: TOO_MANY,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -435,6 +462,7 @@ export function authPaths() {
           201: { description: 'Account created.' },
           400: { $ref: '#/components/responses/BadRequest' },
           409: { description: 'Username already taken' },
+          429: TOO_MANY,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -469,7 +497,7 @@ export function authPaths() {
         summary: 'Mark the changelog as seen by the calling account',
         tag: 'Auth',
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: { ...jsonBody('#/components/schemas/ChangelogSeenRequest'), required: false },
         description: 'Records two marks on the calling account: the INSTALLED version, taken from '
           + 'the server rather than the body because a client could claim the wrong one, and the '
           + 'last known PUBLISHED version from the optional `{ latest }` body. They answer different '
@@ -485,6 +513,12 @@ export function authPaths() {
         description: 'A wrong `current_password` is answered with 400 and `reason: wrong_password`, not 401: the session stays valid, and a 401 from this API always means that it is not.',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/PasswordChangeRequest'),
+        responses: {
+          200: { description: 'Password changed; the other sessions and signed-in devices of the account are ended, the calling one stays.' },
+          400: { description: `A wrong \`current_password\` (\`reason: "wrong_password"\`), a new password shorter than 8 characters, ${SCHEMA_REFUSAL}` },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/auth/me/profile': {
@@ -493,7 +527,7 @@ export function authPaths() {
         tag: 'Auth',
         description: 'An address that already belongs to another account (primary or additional address, compared without surrounding whitespace and ASCII letter case; guests of shared expenses do not count) is refused with 409 and `reason: "email_in_use"` when the caller is not an admin. Only newly introduced addresses are checked, so saving an unchanged address stays possible.',
         stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/ProfileUpdateRequest'),
+        requestBody: { ...jsonBody('#/components/schemas/ProfileUpdateRequest'), required: false },
         responses: {
           200: { description: 'Successful response' },
           400: { $ref: '#/components/responses/BadRequest' },
@@ -548,7 +582,7 @@ export function authPaths() {
               },
             },
           },
-          400: { description: 'The account has no single stored email address (`reason: "no_email"`)' },
+          400: { description: `The account has no single stored email address (\`reason: "no_email"\`), ${SCHEMA_REFUSAL}: an \`email\` that is not text is refused before the import is looked at` },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { description: 'The account is not a household member, e.g. a split-expense guest (`reason: "not_a_household_member"`); nothing is fetched. A paired wall display gets `reason: "display_account"`' },
           404: { description: 'The feature is not configured: `GRAVATAR_BASE_URL` is unset or empty (`reason: "gravatar_disabled"`), or the service has no picture for the address (`reason: "gravatar_not_found"`)' },
@@ -674,7 +708,7 @@ export function authPaths() {
       post: op({
         summary: 'Add a signed-in device',
         operationId: 'addSignedInDevice',
-        description: 'Exchanges a sign-in for a device credential, the bearer a native client uses from then on. A device acts as the person, with less reach than a browser session: an administrator is an ordinary member on it, and of `/api/v1/auth` it reaches only `GET /me`, `GET /users`, `GET /oidc/config`, `POST /logout`, `GET /devices` and `DELETE /devices/{id}`; anything else answers 403 with `reason: device_credential`. It ends after 90 days without use, and with everything that ends a session. The same `device_id` replaces the earlier credential.',
+        description: 'Exchanges a sign-in for a device credential, the bearer a native client uses from then on. A device acts as the person, with less reach than a browser session: an administrator is an ordinary member on it, and of `/api/v1/auth` it reaches only `GET /me`, `GET /users`, `GET /oidc/config`, `POST /logout`, `GET /devices` and `DELETE /devices/{id}`; anything else answers 403 with `reason: device_credential`. It ends after 90 days without use, and with everything that ends a session. The same `device_id` replaces the earlier credential. Only from a sign-in: an API token gets 403 (`reason: session_required`) whatever the body.',
         tag: 'Auth',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/SignedInDeviceCreateRequest'),
@@ -692,7 +726,7 @@ export function authPaths() {
     '/api/v1/auth/devices/pair': {
       post: op({
         summary: 'Create a pairing code',
-        description: 'Creates a short code that signs a device in as the caller, for a household without passwords or a person who prefers not to type one. The code holds for five minutes and once, and a new code ends the previous one. The same code comes back three ways: plain to type, as a `yuvomi://pair` link for this device and as a QR code of that link for a second device. Only from a browser session.',
+        description: 'Creates a short code that signs a device in as the caller, for a household without passwords or a person who prefers not to type one. The code holds for five minutes and once, and a new code ends the previous one. The same code comes back three ways: plain to type, as a `yuvomi://pair` link for this device and as a QR code of that link for a second device. Only from a browser session: an API token gets 403 (`reason: session_required`) whatever the body.',
         tag: 'Auth',
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/DevicePairingRequest'),
@@ -702,6 +736,7 @@ export function authPaths() {
             content: { 'application/json': { schema: { $ref: '#/components/schemas/DevicePairingResponse' } } },
           },
           400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },

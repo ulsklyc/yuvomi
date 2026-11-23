@@ -68,6 +68,11 @@ import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails }
 import * as twoFactor from './services/two-factor.js';
 import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
 import { MAX_AVATAR_DATA_LENGTH } from './utils/avatar-limits.js';
+import { validateRequest } from './api/validate-request.ts';
+import {
+  API_TOKEN_NAME_MAX, CODE_MAX, DEVICE_ID_PATTERN, DEVICE_NAME_MAX, DEVICE_PLATFORM_PATTERN, DISPLAY_NAME_MAX, FAMILY_ROLES,
+  LATEST_MAX,
+} from './services/auth-fields.js';
 
 const log = createLogger('Auth');
 const router = express.Router();
@@ -84,7 +89,6 @@ const { version: APP_VERSION } = JSON.parse(
 const API_TOKEN_PREFIX = 'yuvomi_';
 // Ein angemeldetes Geraet laeuft ab wie eine Sitzung, dieselbe Zahl.
 const DEVICE_IDLE_DAYS = Math.round(SESSION_MAX_AGE_MS / (24 * 60 * 60 * 1000));
-const FAMILY_ROLES = ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'];
 // Platzhalter-Hash für den Timing-Attack-Schutz beim Login unbekannter Benutzer.
 const DUMMY_PASSWORD_HASH = '$2b$12$invalidhashfortimingprotection000000000000000000000';
 /**
@@ -1812,21 +1816,85 @@ export function hasSplitExpenseGuests(database = null) {
   }
 }
 
+// --------------------------------------------------------
+// Pruefung gegen das OpenAPI-Dokument (#2810, Gruppe 12a)
+// --------------------------------------------------------
+//
+// Jede Route der Anmeldung, der Sitzung und des eigenen Kontos prueft die
+// Anfrage vor dem Handler gegen ihre Operation (`validateRequest()`), HINTER
+// jedem Limiter, `requireAuth` und `csrfMiddleware`: ein 400 zaehlt am Limiter
+// wie jeder andere Fehlversuch, und wer nicht angemeldet ist, erfaehrt nichts
+// ueber die Form. Was keinen Bezug auf eine Zeile des Rumpfs hat, steht als
+// Middleware DAVOR, damit seine Absage nicht vom Rumpf abhaengt:
+// die abgeschlossene Einrichtung und die Anmeldeart. Saetze und `reason`
+// bleiben dieselben wie vorher im Handler.
+
+/**
+ * POST /setup nur, solange es kein Konto gibt. Danach antwortet die Route
+ * unabhaengig vom Rumpf wie vorher: in production 404 (eine eingerichtete
+ * Instanz verraet die Route nicht), sonst 403 `setup_completed`. Die
+ * Transaktion im Handler zaehlt noch einmal (zwei gleichzeitige Einrichtungen).
+ * @param {unknown} _req @param {any} res @param {() => void} next
+ */
+function requireSetupOpen(_req, res, next) {
+  const { count } = db.get().prepare('SELECT COUNT(*) as count FROM users').get();
+  if (count > 0) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Not found.', code: 404 });
+    }
+    return res.status(403).json({ error: 'Setup has already been completed.', code: 403, reason: 'setup_completed' });
+  }
+  next();
+}
+
+// Die Absagen der Nur-Sitzung-Middlewares, je Route ein Satz. Als Literale mit
+// ihrem Grund (test:api liest Satz und `reason` zusammen).
+const SIGN_IN_SESSION_REFUSALS = {
+  device: { error: 'A signed-in device can only be added from a sign-in.', code: 403, reason: 'session_required' },
+  pairing: { error: 'A pairing code can only be created from a sign-in.', code: 403, reason: 'session_required' },
+};
+const BROWSER_SESSION_REFUSALS = {
+  logoutOthers: { error: 'Only a signed-in browser session can sign out other sessions.', code: 403, reason: 'browser_session_required' },
+};
+
+/**
+ * Nur aus einer Anmeldung (Browser oder App), nicht mit einem API-Token: ein
+ * Geraet und ein Kopplungscode entstehen nur dort, wo Rate-Limit, zweiter
+ * Faktor und `canSignIn` schon gelaufen sind.
+ * @param {keyof typeof SIGN_IN_SESSION_REFUSALS} route
+ */
+function requireSignInSession(route) {
+  /** @param {any} req @param {any} res @param {() => void} next */
+  return function requireSignInSessionMiddleware(req, res, next) {
+    if (req.authMethod !== 'session') return res.status(403).json(SIGN_IN_SESSION_REFUSALS[route]);
+    next();
+  };
+}
+
+/**
+ * Nur aus einer Browser-Sitzung: ein API-Token oder ein Wandtablett hat keine
+ * "aktuelle" Sitzung, die es ausnehmen koennte.
+ * @param {keyof typeof BROWSER_SESSION_REFUSALS} route
+ */
+function requireBrowserSession(route) {
+  /** @param {any} req @param {any} res @param {() => void} next */
+  return function requireBrowserSessionMiddleware(req, res, next) {
+    if (req.authMethod !== 'session' || !req.sessionID) return res.status(403).json(BROWSER_SESSION_REFUSALS[route]);
+    next();
+  };
+}
+
 /**
  * POST /api/v1/auth/login
  * Body: { username: string, password: string }
  * Response: { user: { id, username, display_name, avatar_color, role, family_role } }
  */
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginLimiter, validateRequest(), async (req, res) => {
   try {
     const { username, password } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required.', code: 400 });
-    }
-
-    if (username.length > 64 || password.length > 1024) {
-      return res.status(400).json({ error: 'Input is too long.', code: 400 });
     }
 
     const user = db.get().prepare('SELECT * FROM users WHERE username = ?').get(username);
@@ -2041,7 +2109,7 @@ export function buildResetRoutes(targetRouter, {
     }
   }
 
-  targetRouter.post('/forgot-password', limiter, (req, res) => {
+  targetRouter.post('/forgot-password', limiter, validateRequest(), (req, res) => {
     try {
       const { identifier } = req.body || {};
       // Erst antworten, dann arbeiten: dieselbe Antwort, dieselbe Zeit, fuer ein
@@ -2095,7 +2163,7 @@ export function buildResetRoutes(targetRouter, {
    * - POST statt GET: der Token steht im Koerper, nicht in einer URL, die in
    *   Zugriffslogs oder einem Cache landet.
    */
-  targetRouter.post('/reset-password/check', limiter, (req, res) => {
+  targetRouter.post('/reset-password/check', limiter, validateRequest(), (req, res) => {
     try {
       const { token } = req.body || {};
       const userId = typeof token === 'string' && token ? resetService.verifyToken(token) : null;
@@ -2106,7 +2174,7 @@ export function buildResetRoutes(targetRouter, {
     }
   });
 
-  targetRouter.post('/reset-password', limiter, async (req, res) => {
+  targetRouter.post('/reset-password', limiter, validateRequest(), async (req, res) => {
     try {
       const { token, password } = req.body || {};
       if (!token || !password) {
@@ -2182,7 +2250,7 @@ export function buildInviteRoutes(targetRouter, {
       if (username && !/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
         return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
       }
-      if (displayName.length > 128) {
+      if (displayName.length > DISPLAY_NAME_MAX) {
         return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
       }
       if (!FAMILY_ROLES.includes(familyRole)) {
@@ -2283,7 +2351,7 @@ export function buildInviteRoutes(targetRouter, {
     }
   });
 
-  targetRouter.get('/invites/preview', limiter, (req, res) => {
+  targetRouter.get('/invites/preview', limiter, validateRequest(), (req, res) => {
     try {
       const invite = inviteService.verifyToken(String(req.query.token || ''));
       if (!invite) return res.json({ data: { valid: false } });
@@ -2313,7 +2381,7 @@ export function buildInviteRoutes(targetRouter, {
     }
   });
 
-  targetRouter.post('/invites/accept', limiter, async (req, res) => {
+  targetRouter.post('/invites/accept', limiter, validateRequest(), async (req, res) => {
     try {
       const { token, password } = req.body || {};
       if (!token) {
@@ -2368,7 +2436,7 @@ export function buildInviteRoutes(targetRouter, {
       if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
         return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
       }
-      if (displayName.length > 128) {
+      if (displayName.length > DISPLAY_NAME_MAX) {
         return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
       }
 
@@ -2444,7 +2512,7 @@ buildInviteRoutes(router);
  * POST /api/v1/auth/logout
  * Response: { ok: true }
  */
-router.post('/logout', requireAuth, csrfMiddleware, (req, res) => {
+router.post('/logout', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
   if (req.authMethod === 'api_token') {
     return res.json({ ok: true });
   }
@@ -2472,10 +2540,7 @@ router.post('/logout', requireAuth, csrfMiddleware, (req, res) => {
  * bleiben gueltig; sie werden unter API-Tokens bzw. Displays widerrufen.
  * Response: { ok: true, ended: number }
  */
-router.post('/logout-others', requireAuth, csrfMiddleware, sessionRevokeLimiter, (req, res) => {
-  if (req.authMethod !== 'session' || !req.sessionID) {
-    return res.status(403).json({ error: 'Only a signed-in browser session can sign out other sessions.', code: 403, reason: 'browser_session_required' });
-  }
+router.post('/logout-others', requireAuth, csrfMiddleware, sessionRevokeLimiter, requireBrowserSession('logoutOthers'), validateRequest(), (req, res) => {
   try {
     const ended = invalidateUserSessions(req.authUserId, req.sessionID);
     res.json({ ok: true, ended });
@@ -2504,7 +2569,7 @@ router.post('/logout-others', requireAuth, csrfMiddleware, sessionRevokeLimiter,
  * Normalkonfiguration nichts, was er nicht ohnehin sagt, und in der
  * SSO-only-Konfiguration genau das eine Bit, das die Anzeige braucht.
  */
-router.get('/oidc/config', (_req, res) => {
+router.get('/oidc/config', validateRequest(), (_req, res) => {
   const passwordLoginEnabled = isPasswordLoginEnabled();
   res.json({
     enabled: isOidcEnabled(),
@@ -2553,7 +2618,7 @@ async function beginOidcFlow(req, config, extra = {}) {
   }).href;
 }
 
-router.get('/oidc/start', refuseWhileRestoring, async (req, res) => {
+router.get('/oidc/start', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const config = await getOidcConfig();
     if (!config) {
@@ -2571,7 +2636,7 @@ router.get('/oidc/start', refuseWhileRestoring, async (req, res) => {
  * Verknüpfungsstand des eigenen Kontos (#832).
  * Response: { enabled, linked, provider, can_unlink }
  */
-router.get('/oidc/link', requireAuth, refuseWhileRestoring, (req, res) => {
+router.get('/oidc/link', requireAuth, refuseWhileRestoring, validateRequest(), (req, res) => {
   const user = db.get()
     .prepare('SELECT oidc_sub, oidc_provider, password_hash FROM users WHERE id = ?')
     .get(req.authUserId);
@@ -2598,7 +2663,7 @@ router.get('/oidc/link', requireAuth, refuseWhileRestoring, (req, res) => {
  *
  * Response: { url: string }
  */
-router.post('/oidc/link/start', requireAuth, csrfMiddleware, async (req, res) => {
+router.post('/oidc/link/start', requireAuth, csrfMiddleware, validateRequest(), async (req, res) => {
   try {
     const config = await getOidcConfig();
     if (!config) return res.status(404).json({ error: 'OIDC is not configured.', code: 404, reason: 'oidc_not_configured' });
@@ -2620,7 +2685,7 @@ router.post('/oidc/link/start', requireAuth, csrfMiddleware, async (req, res) =>
  * Löst die Verknüpfung des eigenen Kontos (#832).
  * Response: { ok: true }
  */
-router.delete('/oidc/link', requireAuth, csrfMiddleware, (req, res) => {
+router.delete('/oidc/link', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
   const result = unlinkOidcAccount(db.get(), req.authUserId);
   if (result.ok) return res.json({ ok: true });
 
@@ -2647,7 +2712,7 @@ router.delete('/oidc/link', requireAuth, csrfMiddleware, (req, res) => {
  * prüft Signatur, iss, aud, exp, nonce), ermittelt/erstellt den User über den
  * validierten sub und richtet die Session ein.
  */
-router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
+router.get('/oidc/callback', refuseWhileRestoring, validateRequest(), async (req, res) => {
   try {
     const config = await getOidcConfig();
     if (!config) return res.redirect('/login?error=oidc_not_configured');
@@ -2811,16 +2876,8 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
  * die das entscheiden koennte. `timezone` schreibt `household_timezone`, mit
  * derselben Pruefung wie PUT /preferences.
  */
-router.post('/setup', loginLimiter, async (req, res) => {
+router.post('/setup', loginLimiter, requireSetupOpen, validateRequest(), async (req, res) => {
   try {
-    const { count } = db.get().prepare('SELECT COUNT(*) as count FROM users').get();
-    if (count > 0) {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(404).json({ error: 'Not found.', code: 404 });
-      }
-      return res.status(403).json({ error: 'Setup has already been completed.', code: 403, reason: 'setup_completed' });
-    }
-
     const username = (req.body.username || '').trim();
     const display_name = (req.body.display_name || '').trim();
     const { password } = req.body;
@@ -2831,7 +2888,7 @@ router.post('/setup', loginLimiter, async (req, res) => {
     if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
       return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
     }
-    if (display_name.length > 128) {
+    if (display_name.length > DISPLAY_NAME_MAX) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
     }
     if (normalizePassword(password).length < 8) {
@@ -2917,7 +2974,7 @@ function sessionExpiresAtFor(req) {
  * GET /api/v1/auth/me
  * Response: { user: { id, username, display_name, avatar_color, role } }
  */
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireAuth, validateRequest(), (req, res) => {
   try {
     // `sso_only` sagt dem EIGENEN Konto, ob es ohne Passwort gefuehrt wird
     // (#1703): das Konto-Blatt laesst dann die Karte "Passwort aendern" weg,
@@ -3009,7 +3066,7 @@ router.get('/me', requireAuth, (req, res) => {
  * am Konto, nicht am Geraet, damit er auf einem neuen Geraet oder in einem
  * privaten Fenster nicht erneut erscheint.
  */
-router.post('/onboarding-seen', requireAuth, csrfMiddleware, (req, res) => {
+router.post('/onboarding-seen', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
   try {
     db.get().prepare('UPDATE users SET onboarding_version = ? WHERE id = ?')
       .run(CURRENT_ONBOARDING_VERSION, req.authUserId);
@@ -3032,10 +3089,10 @@ router.post('/onboarding-seen', requireAuth, csrfMiddleware, (req, res) => {
  * aus der GitHub-Abfrage, die der Client ohnehin schon hat - fehlt sie, bleibt
  * der bisherige Wert stehen, statt ihn mit null zu ueberschreiben.
  */
-router.post('/changelog-seen', requireAuth, csrfMiddleware, (req, res) => {
+router.post('/changelog-seen', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
   try {
     const latest = String(req.body?.latest || '').trim();
-    if (latest && latest.length > 64) {
+    if (latest && latest.length > LATEST_MAX) {
       return res.status(400).json({ error: 'Invalid version.', code: 400 });
     }
     db.get().prepare(`
@@ -3078,7 +3135,7 @@ function consumePendingTwoFactor(req) {
  * es war, steht in der Antwort, damit die Oberfläche auf zur Neige gehende
  * Codes hinweisen kann.
  */
-router.post('/2fa/verify', twoFactorLimiter, async (req, res) => {
+router.post('/2fa/verify', twoFactorLimiter, validateRequest(), async (req, res) => {
   try {
     const pending = consumePendingTwoFactor(req);
     if (!pending) {
@@ -3097,7 +3154,7 @@ router.post('/2fa/verify', twoFactorLimiter, async (req, res) => {
     }
 
     const code = String(req.body?.code || '');
-    if (code.length > 64) {
+    if (code.length > CODE_MAX) {
       return res.status(400).json({ error: 'Input is too long.', code: 400 });
     }
 
@@ -3134,7 +3191,7 @@ router.post('/2fa/verify', twoFactorLimiter, async (req, res) => {
  * GET /api/v1/auth/2fa
  * Zustand für die eigene Einstellungsseite.
  */
-router.get('/2fa', requireAuth, (req, res) => {
+router.get('/2fa', requireAuth, validateRequest(), (req, res) => {
   try {
     res.json({ data: twoFactor.getStatus(db.get(), req.authUserId) });
   } catch (err) {
@@ -3148,7 +3205,7 @@ router.get('/2fa', requireAuth, (req, res) => {
  * Erzeugt ein Geheimnis und liefert QR-Bild plus Klartext. Noch nicht scharf -
  * das wird es erst mit /2fa/enable.
  */
-router.post('/2fa/setup', requireAuth, csrfMiddleware, (req, res) => {
+router.post('/2fa/setup', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
   try {
     const user = db.get().prepare('SELECT id, username FROM users WHERE id = ?').get(req.authUserId);
     if (!user) return res.status(401).json({ error: 'User not found.', code: 401 });
@@ -3170,10 +3227,10 @@ router.post('/2fa/setup', requireAuth, csrfMiddleware, (req, res) => {
  * Bestätigt die Einrichtung und liefert die Wiederherstellungscodes - einmalig,
  * im Klartext. Danach stehen sie nur noch als Hash in der Datenbank.
  */
-router.post('/2fa/enable', requireAuth, csrfMiddleware, twoFactorLimiter, (req, res) => {
+router.post('/2fa/enable', requireAuth, csrfMiddleware, twoFactorLimiter, validateRequest(), (req, res) => {
   try {
     const code = String(req.body?.code || '');
-    if (code.length > 64) return res.status(400).json({ error: 'Input is too long.', code: 400 });
+    if (code.length > CODE_MAX) return res.status(400).json({ error: 'Input is too long.', code: 400 });
 
     const { recovery_codes: codes } = twoFactor.confirmSetup(db.get(), req.authUserId, code);
 
@@ -3205,7 +3262,7 @@ router.post('/2fa/enable', requireAuth, csrfMiddleware, twoFactorLimiter, (req, 
  *
  * Verlangt der Haushalt die Zwei-Faktor-Anmeldung, ist Abschalten gesperrt.
  */
-router.post('/2fa/disable', requireAuth, csrfMiddleware, twoFactorLimiter, (req, res) => {
+router.post('/2fa/disable', requireAuth, csrfMiddleware, twoFactorLimiter, validateRequest(), (req, res) => {
   try {
     if (!twoFactor.isEnabled(db.get(), req.authUserId)) {
       return res.status(409).json({ error: 'Two-factor authentication is not enabled.', code: 409, reason: 'not_enabled' });
@@ -3215,7 +3272,7 @@ router.post('/2fa/disable', requireAuth, csrfMiddleware, twoFactorLimiter, (req,
     }
 
     const code = String(req.body?.code || '');
-    if (code.length > 64) return res.status(400).json({ error: 'Input is too long.', code: 400 });
+    if (code.length > CODE_MAX) return res.status(400).json({ error: 'Input is too long.', code: 400 });
 
     const result = twoFactor.verifySecondFactor(db.get(), req.authUserId, code);
     if (!result.valid) {
@@ -3237,13 +3294,13 @@ router.post('/2fa/disable', requireAuth, csrfMiddleware, twoFactorLimiter, (req,
  * Wirft alle bisherigen Wiederherstellungscodes weg und liefert einen neuen
  * Satz. Auch das verlangt den zweiten Faktor.
  */
-router.post('/2fa/recovery-codes', requireAuth, csrfMiddleware, twoFactorLimiter, (req, res) => {
+router.post('/2fa/recovery-codes', requireAuth, csrfMiddleware, twoFactorLimiter, validateRequest(), (req, res) => {
   try {
     if (!twoFactor.isEnabled(db.get(), req.authUserId)) {
       return res.status(409).json({ error: 'Two-factor authentication is not enabled.', code: 409, reason: 'not_enabled' });
     }
     const code = String(req.body?.code || '');
-    if (code.length > 64) return res.status(400).json({ error: 'Input is too long.', code: 400 });
+    if (code.length > CODE_MAX) return res.status(400).json({ error: 'Input is too long.', code: 400 });
 
     const result = twoFactor.verifySecondFactor(db.get(), req.authUserId, code);
     if (!result.valid) {
@@ -3341,15 +3398,18 @@ function publicDevice(row, currentId = null) {
  * Die Angaben eines Geraets, fuer die Anmeldung und fuer die Kopplung.
  * @returns {{ name: string, platform: string, deviceId: string }|{ error: string }}
  */
+const DEVICE_PLATFORM_RE = new RegExp(DEVICE_PLATFORM_PATTERN);
+const DEVICE_ID_RE = new RegExp(DEVICE_ID_PATTERN);
+
 function readDeviceFields(body) {
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   const platform = body?.platform;
   const deviceId = body?.device_id;
-  if (!name || name.length > 100) return { error: 'name must be between 1 and 100 characters.' };
-  if (typeof platform !== 'string' || !/^[a-z][a-z0-9-]{1,19}$/.test(platform)) {
+  if (!name || name.length > DEVICE_NAME_MAX) return { error: 'name must be between 1 and 100 characters.' };
+  if (typeof platform !== 'string' || !DEVICE_PLATFORM_RE.test(platform)) {
     return { error: 'platform must be a short lowercase name.' };
   }
-  if (typeof deviceId !== 'string' || !/^[A-Za-z0-9._-]{8,128}$/.test(deviceId)) {
+  if (typeof deviceId !== 'string' || !DEVICE_ID_RE.test(deviceId)) {
     return { error: 'device_id must be between 8 and 128 plain characters.' };
   }
   return { name, platform, deviceId };
@@ -3393,12 +3453,7 @@ function issueDeviceCredential(userId, { name, platform, deviceId }) {
  * DIESELBE `device_id` ERSETZT. Eine Neuanmeldung auf demselben Telefon laesst
  * kein zweites gueltiges Credential zurueck.
  */
-router.post('/devices', requireAuth, csrfMiddleware, (req, res) => {
-  if (req.authMethod !== 'session') {
-    return res.status(403).json({
-      error: 'A signed-in device can only be added from a sign-in.', code: 403, reason: 'session_required',
-    });
-  }
+router.post('/devices', requireAuth, csrfMiddleware, requireSignInSession('device'), validateRequest(), (req, res) => {
   try {
     const fields = readDeviceFields(req.body);
     if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
@@ -3433,12 +3488,7 @@ router.post('/devices', requireAuth, csrfMiddleware, (req, res) => {
  *
  * NUR AUS EINER SITZUNG, wie `POST /devices`: Ein Geraet stellt kein weiteres aus.
  */
-router.post('/devices/pair', requireAuth, csrfMiddleware, (req, res) => {
-  if (req.authMethod !== 'session') {
-    return res.status(403).json({
-      error: 'A pairing code can only be created from a sign-in.', code: 403, reason: 'session_required',
-    });
-  }
+router.post('/devices/pair', requireAuth, csrfMiddleware, requireSignInSession('pairing'), validateRequest(), (req, res) => {
   try {
     const server = req.body?.server;
     if (!isInstanceOrigin(server)) {
@@ -3470,7 +3520,7 @@ router.post('/devices/pair', requireAuth, csrfMiddleware, (req, res) => {
  * nicht. Ist der Code gut, gehoert er aber jemandem, der kein Geraet mehr haben
  * darf, klingt die Absage wie bei einem falschen Code.
  */
-router.post('/devices/pair/redeem', devicePairingLimiter, (req, res) => {
+router.post('/devices/pair/redeem', devicePairingLimiter, validateRequest(), (req, res) => {
   try {
     const fields = readDeviceFields(req.body);
     if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
@@ -3500,7 +3550,7 @@ router.post('/devices/pair/redeem', devicePairingLimiter, (req, res) => {
  * Die eigenen angemeldeten Geraete, nie die einer anderen Person: wann jemand
  * welches Telefon benutzt, geht auch den Admin nichts an (DECISIONS Eintrag 1).
  */
-router.get('/devices', requireAuth, refuseIntegrationToken, (req, res) => {
+router.get('/devices', requireAuth, refuseIntegrationToken, validateRequest(), (req, res) => {
   try {
     const rows = db.get().prepare(`
       SELECT t.* FROM api_tokens t
@@ -3526,7 +3576,7 @@ function revokeOwnDevice(userId, id) {
  * DELETE /api/v1/auth/devices/current
  * Das Abmelden in der App. Steht vor `/:id`, sonst waere `current` eine Id.
  */
-router.delete('/devices/current', requireAuth, csrfMiddleware, (req, res) => {
+router.delete('/devices/current', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
   if (req.authDeviceId == null) {
     return res.status(403).json({
       error: 'Only a signed-in device can sign itself out here.', code: 403, reason: 'device_credential_required',
@@ -3546,7 +3596,7 @@ router.delete('/devices/current', requireAuth, csrfMiddleware, (req, res) => {
  * 404 fuer "gibt es nicht" und "gehoert dir nicht": der Unterschied waere die
  * Auskunft, die diese Route nicht gibt.
  */
-router.delete('/devices/:id', requireAuth, refuseIntegrationToken, csrfMiddleware, (req, res) => {
+router.delete('/devices/:id', requireAuth, refuseIntegrationToken, csrfMiddleware, validateRequest(), (req, res) => {
   try {
     const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
     if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid device ID.', code: 400 });
@@ -3590,7 +3640,7 @@ router.post('/users/:id/devices/sign-out', requireAuth, requireAdmin, csrfMiddle
   }
 });
 
-router.get('/users', requireAuth, (req, res) => {
+router.get('/users', requireAuth, validateRequest(), (req, res) => {
   try {
     // is_worker markiert Konten der Haushaltshilfe (housekeeping_workers),
     // damit die Familien-Verwaltung sie nicht als Familienmitglied labelt
@@ -3686,7 +3736,7 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     const expiresAt = req.body.expires_at ? String(req.body.expires_at).trim() : null;
 
     if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400, reason: 'api_tokens_name_required' });
-    if (name.length > 100) {
+    if (name.length > API_TOKEN_NAME_MAX) {
       return res.status(400).json({
         error: 'Token name may be at most 100 characters long.', code: 400, reason: 'api_tokens_name_too_long',
       });
@@ -3980,7 +4030,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
       return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
     }
 
-    if (display_name.length > 128) {
+    if (display_name.length > DISPLAY_NAME_MAX) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
     }
 
@@ -4106,7 +4156,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
       return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
     }
-    if (displayName.length > 128) {
+    if (displayName.length > DISPLAY_NAME_MAX) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
     }
     if (!FAMILY_ROLES.includes(familyRole)) {
@@ -4237,7 +4287,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
  * PATCH /api/v1/auth/me/profile
  * Updates the current user's profile picture and basic profile fields.
  */
-router.patch('/me/profile', requireAuth, csrfMiddleware, (req, res) => {
+router.patch('/me/profile', requireAuth, csrfMiddleware, validateRequest(), (req, res) => {
   try {
     const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(req.authUserId);
     if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
@@ -4250,7 +4300,7 @@ router.patch('/me/profile', requireAuth, csrfMiddleware, (req, res) => {
     const memberFields = validateMemberProfileFields(req.body);
 
     if (!displayName) return res.status(400).json({ error: 'Display name is required.', code: 400 });
-    if (displayName.length > 128) {
+    if (displayName.length > DISPLAY_NAME_MAX) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
     }
     // Die Farbe steht bei allen Mitgliedern in einem style-Attribut: nur #RRGGBB,
@@ -4375,7 +4425,7 @@ function gravatarClientState(userId) {
  * den echten Handler.
  */
 export function buildGravatarRoute(targetRouter, { fetch = fetchGravatar, limiter = gravatarLimiter } = {}) {
-  targetRouter.post('/me/avatar/gravatar', requireAuth, csrfMiddleware, limiter, async (req, res) => {
+  targetRouter.post('/me/avatar/gravatar', requireAuth, csrfMiddleware, limiter, validateRequest(), async (req, res) => {
     try {
       if (!gravatarEnabled()) {
         return res.status(404).json({ error: 'Gravatar import is switched off on this server.', code: 404, reason: 'gravatar_disabled' });
@@ -4477,7 +4527,7 @@ buildGravatarRoute(router);
  * Body: { current_password: string, new_password: string }
  * Response: { ok: true }
  */
-router.patch('/me/password', requireAuth, csrfMiddleware, async (req, res) => {
+router.patch('/me/password', requireAuth, csrfMiddleware, validateRequest(), async (req, res) => {
   try {
     const { current_password, new_password } = req.body;
 

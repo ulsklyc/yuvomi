@@ -154,7 +154,7 @@ const app = await createTasksApp({
     },
   ],
   before: [
-    ['/auth', authRouter],
+    ['/api/v1/auth', authRouter],
     ['/api/v1/family', requireAuth, familyRouter],
     ['/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter],
     ['/api/v1/schedule', requireAuth, scheduleRouter],
@@ -236,7 +236,7 @@ test('accounts: the 2FA overview lists every account', async () => {
   // Der zweite Faktor schuetzt Konten, nicht Mitgliedschaft (Entscheidung
   // vom 15.09.2026, #1207): die Admin-Uebersicht listet deshalb jedes Konto.
   assert.deepEqual(idsOf(householdOverview(db, memberOrderSql('u')), 'user_id'), EVERYONE);
-  const r = await call('GET', '/auth/2fa/overview');
+  const r = await call('GET', '/api/v1/auth/2fa/overview');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data, 'user_id'), EVERYONE);
 });
@@ -286,7 +286,7 @@ test('members only: reward balances, participant count and the participant list'
 });
 
 test('members only: householdSize at /auth/me counts neither staff nor guests', async () => {
-  const r = await call('GET', '/auth/me');
+  const r = await call('GET', '/api/v1/auth/me');
   assert.equal(r.status, 200);
   assert.equal(r.body.householdSize, MEMBERS.length);
 });
@@ -309,7 +309,7 @@ test('split member candidates: members plus the guests of this group, not of ano
 // --------------------------------------------------------------------------
 
 test('accounts: API token subjects are every account except guests, as before', async () => {
-  const r = await call('GET', '/auth/api-tokens');
+  const r = await call('GET', '/api/v1/auth/api-tokens');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.subjects), ACCOUNTS_WITHOUT_GUESTS);
 });
@@ -318,11 +318,11 @@ const SCOPES = { [ANNA]: 'family', [BEN]: 'family', [CLARA]: 'family', [DORA]: '
 const scopesOf = (rows) => Object.fromEntries(rows.map((row) => [row.id, row.access_scope]));
 
 test('accounts: GET /auth/users lists everyone and marks staff and guests', async () => {
-  const r = await call('GET', '/auth/users');
+  const r = await call('GET', '/api/v1/auth/users');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data), EVERYONE);
   assert.deepEqual(scopesOf(r.body.data), SCOPES);
-  const asMember = await call('GET', '/auth/users', { as: BEN });
+  const asMember = await call('GET', '/api/v1/auth/users', { as: BEN });
   assert.equal(asMember.status, 200);
   assert.deepEqual(idsOf(asMember.body.data), EVERYONE);
   assert.deepEqual(scopesOf(asMember.body.data), SCOPES);
@@ -337,7 +337,7 @@ test('accounts: GET /permissions/catalog lists everyone with access_scope', asyn
 
 test('access_scope: /auth/me and the login answer name a guest a split_guest', async () => {
   for (const id of [BEN, DORA]) {
-    const me = await call('GET', '/auth/me', { as: id });
+    const me = await call('GET', '/api/v1/auth/me', { as: id });
     assert.equal(me.status, 200);
     assert.equal(me.body.user.access_scope, SCOPES[id]);
   }
@@ -346,7 +346,7 @@ test('access_scope: /auth/me and the login answer name a guest a split_guest', a
   const anonymous = await fetch(`${base}/auth/me`);
   const cookies = anonymous.headers.getSetCookie().map((raw) => raw.split(';')[0]).join('; ');
   for (const [id, username] of [[BEN, 'ben'], [DORA, 'dora']]) {
-    const res = await fetch(`${base}/auth/login`, {
+    const res = await fetch(`${base}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookies },
       body: JSON.stringify({ username, password: PASSWORD }),
@@ -367,14 +367,14 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   const ALL_NAMES = ['Anna', 'Ben', 'Clara', 'Dora', 'Emil'];
   const sorted = (names) => [...names].sort();
 
-  const me = await call('GET', '/auth/me', { as: ANNA });
+  const me = await call('GET', '/api/v1/auth/me', { as: ANNA });
   assert.equal(me.status, 200);
   assert.deepEqual(sorted(me.body.initialsRoster), ALL_NAMES, 'members, staff and guests - every account /auth/users lists');
-  const staff = await call('GET', '/auth/me', { as: CLARA });
+  const staff = await call('GET', '/api/v1/auth/me', { as: CLARA });
   assert.deepEqual(sorted(staff.body.initialsRoster), ALL_NAMES, 'staff sees the same discs as a member');
   // Ein Gast erreicht nur die geteilten Ausgaben; die Namen des Haushalts
   // gehen ihn nichts an.
-  const guest = await call('GET', '/auth/me', { as: DORA });
+  const guest = await call('GET', '/api/v1/auth/me', { as: DORA });
   assert.equal(guest.status, 200);
   assert.deepEqual(guest.body.initialsRoster, [], 'a split guest gets no names');
 
@@ -384,10 +384,10 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   const display = addUser('wall', 'Wand', 'member', 'other');
   db.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').run(display, ANNA);
   try {
-    const after = await call('GET', '/auth/me', { as: ANNA });
+    const after = await call('GET', '/api/v1/auth/me', { as: ANNA });
     assert.equal(after.status, 200);
     assert.deepEqual(sorted(after.body.initialsRoster), ALL_NAMES, 'Ben is deactivated and still listed; the display is not');
-    const listed = await call('GET', '/auth/users', { as: ANNA });
+    const listed = await call('GET', '/api/v1/auth/users', { as: ANNA });
     assert.deepEqual(sorted(listed.body.data.map((row) => row.display_name)), ALL_NAMES, 'the same accounts as /auth/users');
     assert.ok(listed.body.data.find((row) => row.id === BEN).deactivated_at, 'control: Ben really is deactivated');
   } finally {
@@ -398,7 +398,7 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   actor = null;
   const anonymous = await fetch(`${base}/auth/me`);
   const cookies = anonymous.headers.getSetCookie().map((raw) => raw.split(';')[0]).join('; ');
-  const res = await fetch(`${base}/auth/login`, {
+  const res = await fetch(`${base}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookies },
     body: JSON.stringify({ username: 'ben', password: PASSWORD }),
@@ -871,7 +871,7 @@ test('auth: othersCanRead names the modules another account can read, staff incl
     ON CONFLICT(subject_type, subject_id, resource_type, resource_key) DO UPDATE SET access = excluded.access
   `).run(String(userId), key, access);
   const readers = async () => {
-    const me = await call('GET', '/auth/me', { as: ANNA });
+    const me = await call('GET', '/api/v1/auth/me', { as: ANNA });
     assert.equal(me.status, 200);
     return me.body.othersCanRead;
   };
@@ -962,7 +962,7 @@ function othersCanReadByAuthorize(viewerId) {
 
 test('B9: othersCanRead per kind of other account and level - production, literal, authorize agree', async () => {
   const readersAs = async (/** @type {number} */ viewer) => {
-    const me = await call('GET', '/auth/me', { as: viewer });
+    const me = await call('GET', '/api/v1/auth/me', { as: viewer });
     assert.equal(me.status, 200);
     return me.body.othersCanRead;
   };

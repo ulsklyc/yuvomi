@@ -24,6 +24,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import { get } from '../server/db.js';
 import scheduleRouter from '../server/routes/schedule.js';
 
@@ -161,13 +162,13 @@ test('schedule_custom_field_values rejects an empty or overlong value at the sch
 const { router: authRouter } = await import('../server/auth.js');
 let deleteActor = ADMIN;
 const CSRF = 'a'.repeat(64);
-const authApp = express();
-authApp.use(express.json());
-authApp.use((req, _res, next) => {
-  req.session = { userId: deleteActor.id, role: deleteActor.role, csrfToken: CSRF };
-  next();
+const authApp = await createAuthApp({
+  auth: (req, _res, next) => {
+    req.session = { userId: deleteActor.id, role: deleteActor.role, csrfToken: CSRF };
+    next();
+  },
+  routers: [authRouter],
 });
-authApp.use('/auth', authRouter);
 const authServer = authApp.listen(0, '127.0.0.1');
 const authBaseUrl = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}`)));
 test.after(() => authServer.close());
@@ -196,7 +197,7 @@ test('deleting a user cleans up schedule_custom_field_values left behind by thei
     'sanity: all three per-occurrence values exist before deletion');
 
   deleteActor = ADMIN;
-  const res = await fetch(`${authBaseUrl}/auth/users/${doomed}`, { method: 'DELETE', headers: { 'X-CSRF-Token': CSRF } });
+  const res = await fetch(`${authBaseUrl}/api/v1/auth/users/${doomed}`, { method: 'DELETE', headers: { 'X-CSRF-Token': CSRF } });
   assert.equal(res.status, 200, JSON.stringify(await res.json().catch(() => null)));
 
   assert.equal(database.prepare('SELECT 1 FROM users WHERE id = ?').get(doomed), undefined, 'the user itself is gone');
