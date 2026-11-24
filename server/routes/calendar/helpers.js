@@ -12,7 +12,7 @@ import {
   filterVisible,
 } from '../../authorize/index.ts';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
-import { contentMatchesMime } from '../../utils/file-signature.js';
+import { readDataUrlFile } from '../../utils/data-url-file.js';
 import {
   buildRecurrenceCapabilityMap, isLinkedOccurrence,
   parseOverrideFields, recurrenceIdFor, seriesIdFor,
@@ -80,36 +80,40 @@ export function eventIcon(value) {
   return VALID_EVENT_ICONS.has(icon) ? icon : null;
 }
 
-const ATTACHMENT_DATA_URL = /^data:([^;,]+);base64,([A-Za-z0-9+/=\s]+)$/;
+/** Der Satz je Befund von readDataUrlFile; Teil der Antwort, deshalb fest. */
+const ATTACHMENT_REFUSALS = Object.freeze({
+  shape: 'attachment_data must be a base64 data URL.',
+  type: 'attachment_data: this file type is not allowed.',
+  empty: 'attachment_data: the file is empty.',
+  size: `attachment_data: the file may be at most ${MAX_UPLOAD_MB} MB.`,
+  content: 'attachment_data: the content does not match the declared file type.',
+});
 
 /**
- * Ein Anhang, den `parseAttachment` gar nicht erst lesen kann (#2810): Text,
- * der keine base64-Data-URL ist. POST und PUT /calendar antworten damit 400
- * statt den Wurf von `parseAttachment` als 500 enden zu lassen. Leer oder kein
- * Text ist kein Anhang und hier kein Fehler.
- * @param {unknown} dataUrl
- * @returns {{ value: null, error: string | null }}
+ * Ein gelesener Anhang, oder keiner (leer oder nicht gesendet).
+ * @typedef {{ mime: null, size: null, buffer: null } | { mime: string, size: number, buffer: Buffer }} Attachment
  */
-export function attachmentShape(dataUrl) {
-  const raw = typeof dataUrl === 'string' ? dataUrl.trim() : '';
-  const error = raw && !ATTACHMENT_DATA_URL.test(raw) ? 'attachment_data must be a base64 data URL.' : null;
-  return { value: null, error };
-}
 
+/** @type {Attachment} */
+const NO_ATTACHMENT = Object.freeze({ mime: null, size: null, buffer: null });
+
+/**
+ * Den Anhang eines Termins lesen, im Stil der formats.ts-Helfer (#2810): ein
+ * Anhang, den die Route nicht nehmen kann (keine base64-Data-URL, Typ nicht
+ * auf der Liste, leer, über der Upload-Grenze, Inhalt passt nicht zum Typ),
+ * ist ein Befund für die `checks` der Route und damit eine 400, bevor etwas
+ * geschrieben oder hochgeladen wird. Bis #2810 warf diese Funktion, und die
+ * Routen antworteten 500. Leer oder kein Text ist kein Anhang und kein Fehler.
+ * @param {unknown} dataUrl
+ * @returns {{ value: Attachment, error: null } | { value: null, error: string }}
+ */
 export function parseAttachment(dataUrl) {
   const raw = typeof dataUrl === 'string' ? dataUrl.trim() : '';
-  if (!raw) return { mime: null, size: null, buffer: null };
-  const match = raw.match(ATTACHMENT_DATA_URL);
-  if (!match) throw new Error('attachment_data: ungültiges Dateiformat.');
-  const mime = match[1].toLowerCase();
-  if (!ATTACHMENT_MIME.has(mime)) throw new Error('attachment_data: Dateityp nicht erlaubt.');
-  const base64 = match[2].replace(/\s/g, '');
-  const buffer = Buffer.from(base64, 'base64');
-  if (!buffer.length) throw new Error('attachment_data: Datei ist leer.');
-  if (buffer.length > MAX_ATTACHMENT_BYTES) throw new Error(`attachment_data: Datei darf höchstens ${MAX_UPLOAD_MB} MB groß sein.`);
-  // Bis hier war nur geprueft, was der Absender BEHAUPTET (#937).
-  if (!contentMatchesMime(buffer, mime)) throw new Error('attachment_data: Inhalt passt nicht zum angegebenen Dateityp.');
-  return { mime, size: buffer.length, buffer };
+  if (!raw) return { value: NO_ATTACHMENT, error: null };
+  const read = readDataUrlFile(raw, { allowed: ATTACHMENT_MIME, maxBytes: MAX_ATTACHMENT_BYTES });
+  if (read.fault !== null) return { value: null, error: ATTACHMENT_REFUSALS[read.fault] };
+  const { mime, size, buffer } = read.file;
+  return { value: { mime, size, buffer }, error: null };
 }
 
 // CalDAV-Ziel eines Events validieren (Issue #241). Liefert {value, error}

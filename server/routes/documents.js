@@ -57,7 +57,7 @@ import {
   verifyExistingWebdavDocument,
 } from '../services/document-storage.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../utils/upload-limit.js';
-import { contentMatchesMime } from '../utils/file-signature.js';
+import { readDataUrlFile } from '../utils/data-url-file.js';
 import { todayKey } from '../utils/timezone.js';
 import { remoteFailure } from '../utils/http.js';
 
@@ -306,27 +306,24 @@ function parseMemberIds(value) {
   return [...new Set(value.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
 }
 
+// Der Satz und Grund je Befund von readDataUrlFile (#1909); der Ablauf selbst
+// ist mit dem Termin-Anhang geteilt (server/utils/data-url-file.js, #2810).
+const DATA_URL_REFUSALS = {
+  shape: { error: 'File content must be a valid base64 data URL.' },
+  type: { error: 'File type is not allowed.', reason: 'documents_file_type_not_allowed' },
+  empty: { error: 'File content is empty.', reason: 'documents_file_empty' },
+  size: { error: `File may be at most ${MAX_UPLOAD_MB} MB.` },
+  content: { error: 'File content does not match its declared type.', reason: 'documents_file_content_mismatch' },
+};
+
+/**
+ * @param {unknown} dataUrl
+ * @returns {{ file: import('../utils/data-url-file.js').DataUrlFile, error?: undefined, reason?: undefined }
+ *   | { file?: undefined, error: string, reason?: string }}
+ */
 function parseDataUrl(dataUrl) {
-  const raw = String(dataUrl || '');
-  // Der Inhalt darf leer sein: eine leere Datei liest der Browser als
-  // `data:<typ>;base64,` - das ist der Fall "Datei ist leer" (#1909), keine
-  // kaputte Data-URL.
-  const match = raw.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=\s]*)$/);
-  if (!match) return { error: 'File content must be a valid base64 data URL.' };
-  const mime = match[1].toLowerCase();
-  if (!ALLOWED_MIME.has(mime)) return { error: 'File type is not allowed.', reason: 'documents_file_type_not_allowed' };
-  const base64 = match[2].replace(/\s/g, '');
-  const buffer = Buffer.from(base64, 'base64');
-  if (!buffer.length) return { error: 'File content is empty.', reason: 'documents_file_empty' };
-  if (buffer.length > MAX_FILE_BYTES) return { error: `File may be at most ${MAX_UPLOAD_MB} MB.` };
-  // Bis hier war nur GEPRUEFT, was der Absender BEHAUPTET: der Typ steht im
-  // data-URL-Praefix und kommt aus seinem Browser. Ein Dokument, das sich als
-  // PDF ausgibt und keins ist, faellt sonst erst auf, wenn es jemand braucht
-  // (#937). Typen ohne Signatur - text/plain, text/csv - passieren weiter.
-  if (!contentMatchesMime(buffer, mime)) {
-    return { error: 'File content does not match its declared type.', reason: 'documents_file_content_mismatch' };
-  }
-  return { mime, base64, size: buffer.length, buffer };
+  const read = readDataUrlFile(String(dataUrl || ''), { allowed: ALLOWED_MIME, maxBytes: MAX_FILE_BYTES });
+  return read.fault === null ? { file: read.file } : DATA_URL_REFUSALS[read.fault];
 }
 
 function documentSelect() {
@@ -1301,17 +1298,18 @@ router.post('/', validateRequest(), async (req, res) => {
     }
     if (selectedFolderMissing(selectedFolderId)) return selectedFolderGone(res);
     const parsed = parseDataUrl(req.body.content_data);
-    if (parsed.error) {
+    if (!parsed.file) {
       return res.status(400).json({ error: parsed.error, code: 400, ...(parsed.reason ? { reason: parsed.reason } : {}) });
     }
+    const upload = parsed.file;
 
     const allowedIds = visibility === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
     // Freigeben laesst sich ein neues Dokument nur Haushaltsmitgliedern (#1207).
     const strangers = accessStrangers(allowedIds);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     stagedUpload = await stageUpload({
-      buffer: parsed.buffer,
-      mime: parsed.mime,
+      buffer: upload.buffer,
+      mime: upload.mime,
       category,
       originalName: vOriginalName.value,
     });
@@ -1338,8 +1336,8 @@ router.post('/', validateRequest(), async (req, res) => {
         visibility,
         folderId,
         vOriginalName.value,
-        parsed.mime,
-        parsed.size,
+        upload.mime,
+        upload.size,
         stagedUpload.content_data,
         stagedUpload.storage_provider,
         stagedUpload.storage_backend,

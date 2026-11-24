@@ -322,6 +322,50 @@ test('the sink: an attachment that is no base64 data URL is a 400 and writes not
   assert.deepEqual({ ...stored }, { title: 'Ohne Anhang', attachment_document_id: null }, 'the event stays');
 });
 
+test('the sink: every attachment parseAttachment cannot take is a 400 at all four routes and writes nothing', async () => {
+  // Before: parseAttachment() threw a plain Error for a type off the list, an
+  // empty file, one above the upload limit and bytes that do not match the
+  // type, and all four routes answered 500; the occurrence routes also for
+  // text that is no data URL.
+  const { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } = await import('../server/utils/upload-limit.js');
+  const b64 = (/** @type {string | Buffer} */ bytes) => Buffer.from(bytes).toString('base64');
+  /** @type {Array<[string, string, string]>} */
+  const cases = [
+    ['shape', 'xyz', 'attachment_data must be a base64 data URL.'],
+    ['type', `data:image/svg+xml;base64,${b64('<svg/>')}`, 'attachment_data: this file type is not allowed.'],
+    ['empty', 'data:text/plain;base64,====', 'attachment_data: the file is empty.'],
+    ['too large', `data:text/plain;base64,${b64(Buffer.alloc(MAX_UPLOAD_BYTES + 1, 0x61))}`, `attachment_data: the file may be at most ${MAX_UPLOAD_MB} MB.`],
+    ['content', `data:application/pdf;base64,${b64('not a pdf')}`, 'attachment_data: the content does not match the declared file type.'],
+  ];
+  const count = (/** @type {string} */ table) => Number(/** @type {any} */ (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()).n);
+  const event = await createEvent({ title: 'Ohne Anhang' });
+  const { id, key } = await createSeries();
+  const events = count('calendar_events');
+  const documents = count('family_documents');
+  // The whole table at once: a red run shows every route and case.
+  const answers = [];
+  const expected = [];
+  for (const [label, data, error] of cases) {
+    for (const [name, method, route, json] of /** @type {Array<[string, string, string, Record<string, unknown>]>} */ ([
+      ['create', 'POST', '/calendar', { ...UI_EVENT, title: 'Kaputt' }],
+      ['update', 'PUT', `/calendar/${event.id}`, { title: 'Geaendert' }],
+      ['occurrence', 'PUT', `/calendar/${id}/occurrences/${key}`, { title: 'Ersatz' }],
+      ['following', 'PUT', `/calendar/${id}/occurrences/${key}/following`, { title: 'Ab hier' }],
+    ])) {
+      const res = await call(method, route, { json: { ...json, attachment_data: data, attachment_name: 'a.bin' } });
+      answers.push(`${name} ${label}: ${res.status} ${JSON.stringify(res.body)}`);
+      expected.push(`${name} ${label}: 400 ${JSON.stringify({ error, code: 400 })}`);
+    }
+  }
+  assert.deepEqual(answers, expected);
+  assert.equal(count('calendar_events'), events, 'no event, replacement or successor written');
+  assert.equal(count('family_documents'), documents, 'no document written');
+  const stored = /** @type {any} */ (db.prepare('SELECT title, attachment_document_id FROM calendar_events WHERE id = ?').get(event.id));
+  assert.deepEqual({ ...stored }, { title: 'Ohne Anhang', attachment_document_id: null }, 'the event stays');
+  const series = /** @type {any} */ (db.prepare('SELECT title, recurrence_rule FROM calendar_events WHERE id = ?').get(id));
+  assert.deepEqual({ ...series }, { title: 'Serie', recurrence_rule: 'FREQ=DAILY;COUNT=5' }, 'the series stays');
+});
+
 test('a path id that is not plain digits is a 400 and deletes nothing', async () => {
   const event = await createEvent({ title: 'Bleibt' });
   // parseInt read `1abc` as 1: the event was deleted (204).

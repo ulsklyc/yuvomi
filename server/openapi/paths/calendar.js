@@ -97,9 +97,14 @@ const ATTACHMENT_RIGHTS = ' A new attachment creates a document in the Documents
 // Ein Serienende vor dem Start (#1607). Steht an POST und PUT, weil beide es
 // abweisen - und PUT nur dann, wenn die Anfrage die Serie anfasst.
 // Both answered 500 until #2810: the foreign key of `event_assignments` and
-// the throw of parseAttachment().
-const UNREADABLE_INPUT = ' An assignee id without an account is rejected with 400 (`An assigned person no longer exists.`), and so is '
-  + '`attachment_data` that is no base64 data URL (`attachment_data must be a base64 data URL.`); nothing is written.';
+// the throw of parseAttachment(). The sentences are ATTACHMENT_REFUSALS in
+// server/routes/calendar/helpers.js. Stands at all four writes of an event.
+const UNREADABLE_INPUT = ' An assignee id without an account is rejected with 400 (`An assigned person no longer exists.`). '
+  + 'So is an `attachment_data` the route cannot take, with one sentence per case: text that is no base64 data URL '
+  + '(`attachment_data must be a base64 data URL.`), a type off the list (`attachment_data: this file type is not allowed.`), '
+  + 'no bytes (`attachment_data: the file is empty.`), more than the upload limit (`attachment_data: the file may be at most 5 MB.`, '
+  + 'the number follows `MAX_UPLOAD_MB`) and bytes that do not match the type '
+  + '(`attachment_data: the content does not match the declared file type.`). Nothing is written or uploaded.';
 const SERIES_END_INPUT = ' A `recurrence_rule` whose `UNTIL` day lies before the start day is rejected with 400 '
   + '(`recurrence_rule: the series ends before the start date.`, `reason: calendar_series_ends_before_start`); an `UNTIL` on the start day is a series with one '
   + 'occurrence and is accepted. PUT checks this only when the request changes the rule or the start day, so an '
@@ -462,7 +467,7 @@ export function calendarPaths() {
           stringPathParam('recurrenceId', RECURRENCE_ID_PARAM),
         ],
         stateChanging: true,
-        description: 'Creates or updates a linked replacement for one original slot of an eligible local-only series. Scalar fields, assignments, attachments, and `reminder_offsets` are compared with the expanded series defaults. Saving no actual difference restores the normal series occurrence only when a linked replacement existed for that slot; a slot excluded by a deletion or detached replacement remains excluded.' + ATTACHMENT_RIGHTS,
+        description: 'Creates or updates a linked replacement for one original slot of an eligible local-only series. Scalar fields, assignments, attachments, and `reminder_offsets` are compared with the expanded series defaults. Saving no actual difference restores the normal series occurrence only when a linked replacement existed for that slot; a slot excluded by a deletion or detached replacement remains excluded.' + ATTACHMENT_RIGHTS + UNREADABLE_INPUT,
         requestBody: jsonBody('#/components/schemas/CalendarOccurrenceOnlyMutation'),
         responses: {
           200: {
@@ -506,7 +511,7 @@ export function calendarPaths() {
           stringPathParam('recurrenceId', RECURRENCE_ID_PARAM),
         ],
         stateChanging: true,
-        description: 'Truncates the original series before the selected original slot, creates a successor series, transfers every later exclusion except the selected slot, and reparents later linked replacements atomically.' + ATTACHMENT_RIGHTS,
+        description: 'Truncates the original series before the selected original slot, creates a successor series, transfers every later exclusion except the selected slot, and reparents later linked replacements atomically.' + ATTACHMENT_RIGHTS + UNREADABLE_INPUT,
         requestBody: jsonBody('#/components/schemas/CalendarOccurrenceFollowingMutation'),
         responses: {
           200: {

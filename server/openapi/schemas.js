@@ -271,7 +271,7 @@ const calendarOccurrenceMutationProperties = {
   attachment_name: { type: ['string', 'null'] },
   attachment_data: {
     type: ['string', 'null'],
-    description: 'A base64 data URL for a replacement attachment, or null to remove it.',
+    description: 'A base64 data URL for a replacement attachment, or null to remove it. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files up to the upload limit; the bytes have to match the type. Any other value answers 400 with the sentence of its case and nothing is written.',
   },
   remove_attachment: { type: 'boolean' },
   document_folder_name: { type: 'string' },
@@ -309,7 +309,7 @@ const { reminder_offsets: _occurrenceOnly, ...calendarEventMutationProperties } 
   attachment_name: { type: ['string', 'null'], description: 'File name for a new attachment; falls back to `Attachment`. MIME type and size are read from `attachment_data`.' },
   attachment_data: {
     type: ['string', 'null'],
-    description: 'A base64 data URL (`data:<mime>;base64,<bytes>`) for a new attachment. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files; the bytes have to match the type. Text that is no base64 data URL answers 400 `attachment_data must be a base64 data URL.` and nothing is written.',
+    description: 'A base64 data URL (`data:<mime>;base64,<bytes>`) for a new attachment. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files; the bytes have to match the type, and the file has to be non-empty and within the upload limit. Text that is no base64 data URL answers 400 `attachment_data must be a base64 data URL.`, every other case its own 400 sentence, and nothing is written.',
   },
   recurrence_rule: {
     type: ['string', 'null'],
