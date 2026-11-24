@@ -2,6 +2,7 @@ import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.
 import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
 import { PANTRY_UNITS } from '../../../public/utils/pantry-units.js';
+import { MAX_ORDER_ROWS, MAX_SHOPPING_ITEMS } from '../array-limits.js';
 
 /**
  * `min_quantity` on a pantry item since #1448, step 3: the product's value,
@@ -131,7 +132,7 @@ export function pantryPaths() {
           properties: {
             order: {
               type: 'array',
-              minItems: 1,
+              minItems: 1, maxItems: MAX_ORDER_ROWS,
               items: { anyOf: [{ type: 'integer' }, { type: 'string', pattern: '^[0-9]+$' }] },
               description: 'Location ids as whole numbers. Digit text is accepted as a legacy form (older app versions send it).',
             },
@@ -191,7 +192,7 @@ export function pantryPaths() {
           properties: {
             list_id: { type: 'integer', description: 'The shopping list the checked items come from.' },
             items: {
-              type: 'array',
+              type: 'array', maxItems: MAX_SHOPPING_ITEMS,
               items: {
                 type: 'object',
                 properties: {
@@ -225,7 +226,7 @@ export function pantryPaths() {
           required: ['changes'],
           properties: {
             changes: {
-              type: 'array',
+              type: 'array', maxItems: MAX_SHOPPING_ITEMS,
               items: {
                 type: 'object',
                 required: ['pantry_item_id', 'kind'],

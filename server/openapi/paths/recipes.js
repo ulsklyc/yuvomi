@@ -1,5 +1,6 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
+import { MAX_INGREDIENTS, MAX_KEYS } from '../array-limits.js';
 
 // Dieselbe Form wie in paths/family.js.
 const apiError = (description) => ({
@@ -63,7 +64,7 @@ function recipeInput({ replace }) {
             // Strict mode refuses a union type with `items`: one branch per shape.
             meal_types: {
               anyOf: [
-                { type: 'array', items: { type: 'string' } },
+                { type: 'array', maxItems: MAX_KEYS, items: { type: 'string' } },
                 { type: 'string' },
                 { type: 'null' },
               ],
@@ -83,6 +84,7 @@ function recipeInput({ replace }) {
             },
             ingredients: {
               type: 'array',
+              maxItems: MAX_INGREDIENTS,
               items: {
                 type: 'object',
                 properties: {
@@ -148,11 +150,13 @@ export function recipesPaths() {
                   listId: { type: 'integer', description: 'The shopping list to add to.' },
                   quantities: {
                     type: 'array',
+                    maxItems: MAX_INGREDIENTS,
                     items: { type: ['string', 'null'], maxLength: MAX_SHORT },
                     description: `One text (at most ${MAX_SHORT} characters) or \`null\` per ingredient, in the order of \`ingredientIds\`.`,
                   },
                   ingredientIds: {
                     type: 'array',
+                    maxItems: MAX_INGREDIENTS,
                     items: { type: 'integer', minimum: 1 },
                     description: 'The ingredient row ids the quantities belong to; required with `quantities`, ignored without.',
                   },

@@ -1,5 +1,6 @@
 import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 import { DATE_PATTERN } from '../../utils/datetime-pattern.js';
+import { MAX_ORDER_ROWS, MAX_SHOPPING_ITEMS } from '../array-limits.js';
 
 const schema = (name) => ({ 'application/json': { schema: { $ref: `#/components/schemas/${name}` } } });
 const apiError = (description) => ({ description, content: schema('ApiError') });
@@ -116,6 +117,7 @@ export function shoppingPaths() {
           order: {
             type: 'array',
             minItems: 1,
+            maxItems: MAX_ORDER_ROWS,
             items: { anyOf: [ROW_ID, { type: 'string', pattern: '^0*[1-9][0-9]*$' }] },
             description: 'Category ids: positive integers. A string of decimal digits is read as the same id (the older form the app sent until v2.93).',
           },
@@ -194,8 +196,8 @@ export function shoppingPaths() {
         tag: 'Shopping',
         stateChanging: true,
         requestBody: body({
-          ids: { type: 'array', items: ROW_ID, description: 'The `added_ids` of the transfer. Without it, or empty, nothing is removed.' },
-          ingredient_ids: { type: 'array', items: ROW_ID, description: 'The `ingredient_ids` of the transfer.' },
+          ids: { type: 'array', maxItems: MAX_SHOPPING_ITEMS, items: ROW_ID, description: 'The `added_ids` of the transfer. Without it, or empty, nothing is removed.' },
+          ingredient_ids: { type: 'array', maxItems: MAX_SHOPPING_ITEMS, items: ROW_ID, description: 'The `ingredient_ids` of the transfer.' },
         }),
         responses: answers({ 200: { description: 'Successful response' }, 403: { $ref: '#/components/responses/Forbidden' } }),
       }),
@@ -272,6 +274,7 @@ export function shoppingPaths() {
         requestBody: body({
           items: {
             type: 'array',
+            maxItems: MAX_SHOPPING_ITEMS,
             description: 'The entries to add; an empty list adds nothing. An entry whose batch or product does not exist counts in `skipped`.',
             items: {
               type: 'object',
@@ -344,7 +347,7 @@ export function shoppingPaths() {
         summary: 'Reorder the items of one category', tag: 'Shopping', stateChanging: true, params: [listId()],
         requestBody: body({
           category: { type: 'string', description: 'The name of an existing category.' },
-          order: { type: 'array', minItems: 1, items: ROW_ID, description: 'Every item id of the category, in the new order.' },
+          order: { type: 'array', minItems: 1, maxItems: MAX_SHOPPING_ITEMS, items: ROW_ID, description: 'Every item id of the category, in the new order.' },
         }, ['order']),
         responses: answers({ 200: { description: 'Successful response' }, 404: LIST_NOT_FOUND }),
         description: 'Per category rather than across the whole list: the category order is already its own handle and models the route through the shop; a second, list-wide rank beside it would make two statements about the same order. The request must name EVERY item of the category - a subset would let the ranks of the omitted ones collide with the newly assigned ones, and creation time would decide again.' }),

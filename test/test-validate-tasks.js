@@ -47,6 +47,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import rateLimit from 'express-rate-limit';
 import { createTasksApp } from './tasks-app.js';
+import { assertArrayLimit } from './array-limit-cases.js';
+import { MAX_ATTACHMENTS, MAX_MEMBER_IDS, MAX_RAW_ENTRIES } from '../server/openapi/array-limits.js';
 
 const dbmod = await import('../server/db.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
@@ -644,7 +646,7 @@ test('only guard: the types, lists and bounds the task handlers no longer check 
   assert.equal(fields.MAX_ROTATION_POOL, 10);
   assert.equal(fields.TASK_MAX_POINTS, 10000);
   assert.equal(TIME_PATTERN, '^(?:[01]\\d|2[0-3]):[0-5]\\d$');
-  const TAGS = { oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }, { type: 'null' }] };
+  const TAGS = { oneOf: [{ type: 'array', maxItems: MAX_RAW_ENTRIES, items: { type: 'string' } }, { type: 'string' }, { type: 'null' }] };
   // POST / and PUT /{id}: validateTaskInput() dropped textShape/str of the
   // description, textShape/oneOf of priority, oneOf of status, time, num and
   // validateTags.
@@ -714,4 +716,17 @@ test('only guard: the types, lists and bounds the task handlers no longer check 
     }
   }
   assert.equal(ids, 15, 'the 13 {id} operations, two of them with a commentId');
+});
+
+test('array limits: assignees, tags and linked documents, at the limit and one above (#2810)', async () => {
+  const seq = (/** @type {number} */ n, /** @type {number} */ from) => Array.from({ length: n }, (_, i) => from + i);
+  await assertArrayLimit((body) => call('POST', '', { json: body }),
+    (n) => ({ title: 'Viele', assigned_to: seq(n, 900000) }), MAX_MEMBER_IDS, 'body/assigned_to');
+  const tagged = await assertArrayLimit((body) => call('POST', '', { json: body }),
+    (n) => ({ title: 'Etiketten', tags: seq(n, 0).map((i) => `t${i}`) }), MAX_RAW_ENTRIES, 'body/tags');
+  assert.equal(tagged.status, 201, 'the route keeps its own cap of distinct tags');
+  const id = task();
+  const linked = await assertArrayLimit((body) => call('PUT', `/${id}/documents`, { json: body }),
+    (n) => ({ document_ids: seq(n, 900000) }), MAX_ATTACHMENTS, 'body/document_ids');
+  assert.ok(linked.status < 500);
 });

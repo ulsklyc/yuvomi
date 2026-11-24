@@ -1,6 +1,7 @@
 import { op, idParam, stringPathParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 import { OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
 import { CONTACT_CATEGORY_COLORS } from '../../services/contacts-fields.js';
+import { MAX_CONTACT_ENTRIES, MAX_ORDER_ROWS } from '../array-limits.js';
 
 // ---------------------------------------------------------------------------
 // Bausteine der Anfrage-Schemata (#2810, Gruppe 7). Das Schema traegt Typ und
@@ -99,11 +100,16 @@ const ADDRESS_ENTRY = {
  * A multi-value field: a list of entries. The answer to a value that is not a
  * list carries the field's own `*_entry_invalid` - the reason the route gives
  * for it as well. An entry out of shape is a 400 with `reason: "validation"`.
+ * The reason names `type` alone: more than MAX_CONTACT_ENTRIES entries is a
+ * 400 with `reason: "validation"` too (#2810). The route's own cap of 20 per
+ * kind, with its `*_too_many` reason and `params.limit`, answers below that.
  * @param {string} reason
  * @param {Record<string, unknown>} entry
  * @param {string} description
  */
-const multi = (reason, entry, description) => ({ type: 'array', 'x-reason': reason, items: entry, description });
+const multi = (reason, entry, description) => ({
+  type: 'array', maxItems: MAX_CONTACT_ENTRIES, 'x-reason': { type: reason }, items: entry, description,
+});
 
 /** The fields of a contact; create and update take the same ones. */
 const CONTACT_PROPERTIES = {
@@ -177,7 +183,7 @@ export function contactsPaths() {
         tag: 'Contacts',
         description: '`order` lists category keys in the wanted order; a key that does not exist is skipped, a category left out keeps its place. A body without `order`, or an `order` that is not a list of text, is refused with 400; until #2810 it was taken as an empty list (200, nothing changed), and an entry that was an object or a truth value answered 500.',
         stateChanging: true,
-        requestBody: body({ required: ['order'], properties: { order: { type: 'array', items: { type: 'string' } } } }),
+        requestBody: body({ required: ['order'], properties: { order: { type: 'array', maxItems: MAX_ORDER_ROWS, items: { type: 'string' } } } }),
       })),
     },
     '/api/v1/contacts/categories/{key}': {

@@ -3630,6 +3630,15 @@ function updateCheckedActions(container, { userChecked = false } = {}) {
 }
 
 /**
+ * Hoechstens so viele Ids je DELETE der abgehakten Artikel: `maxItems` von
+ * `ShoppingCheckedDeleteInput.ids` (MAX_SHOPPING_ITEMS in
+ * server/openapi/array-limits.js, #2810). 1000 Ids bleiben auch als groesste
+ * JSON-sichere Zahlen bei rund 17 KB, unter den 64 KiB, die ein Browser
+ * `keepalive`-Ruempfen zugesteht. `test:shopping-ux` haelt beide Zahlen gleich.
+ */
+const CHECKED_DELETE_BATCH = 1000;
+
+/**
  * Abgehakte löschen, mit Undo-Fenster. Stand bis Etappe 5 als Zweig im
  * delegierten Klick-Handler von `container`; die Pille lebt seitdem in der
  * Shell und ist von dort aus nicht mehr erreichbar - sie ruft direkt.
@@ -3662,17 +3671,27 @@ function clearCheckedUndoable(container, { message = null, onUndo = null } = {})
     // EIN Rueckgaengig fuer Liste und Vorrat.
     message: message ?? t('shopping.itemsRemovedToast', { count }),
     commit: async ({ keepalive }) => {
-      let response;
+      let responses;
       try {
         // GENAU DIE ARTIKEL, DIE DIE SEITE ENTFERNT HAT - nicht, was beim
         // Eintreffen abgehakt ist. Hat jemand anderes im Undo-Fenster einen
         // weiteren Artikel abgehakt (und eine Auffrischung ihn hergebracht),
         // naehme die Route ohne Liste ihn mit, und das Zuruecknehmen braechte
         // nur den eigenen Schnappschuss zurueck.
-        response = await api.delete(`/shopping/${listId}/items/checked`, {
+        //
+        // In Happen zu CHECKED_DELETE_BATCH (die Grenze des Schemas, #2810),
+        // alle im selben Takt abgeschickt: beim Verlassen der Seite
+        // (`keepalive`) laeuft nach dem ersten `await` nichts mehr, ein
+        // zweiter Happen danach ginge nie raus.
+        const ids = checked.map((item) => item.id);
+        const batches = [];
+        for (let start = 0; start < ids.length; start += CHECKED_DELETE_BATCH) {
+          batches.push(ids.slice(start, start + CHECKED_DELETE_BATCH));
+        }
+        responses = await Promise.all(batches.map((batch) => api.delete(`/shopping/${listId}/items/checked`, {
           keepalive,
-          body: JSON.stringify({ ids: checked.map((item) => item.id) }),
-        });
+          body: JSON.stringify({ ids: batch }),
+        })));
       } catch (err) {
         // Sofort raeumen: `restore` bringt die Zeilen zurueck, und jede Antwort
         // darf sie wieder tragen.
@@ -3685,8 +3704,15 @@ function clearCheckedUndoable(container, { message = null, onUndo = null } = {})
       // keine Abfrage nach - die Zeile fehlte, bis die Liste sich das naechste
       // Mal bewegt. Also gilt sie nur, wenn der Server genau so viele entfernt
       // hat, wie die Seite entfernt hat - sonst sieht die naechste Abfrage die
-      // Bewegung und holt die Zeile her.
-      if (response?.deleted === count) acknowledgeOwnChange(response);
+      // Bewegung und holt die Zeile her. Bei mehreren Happen zaehlt die Summe;
+      // quittiert wird dann jeder, in der Reihenfolge seiner Laufnummer, damit
+      // jede Quittung an die vorige anschliesst.
+      const deleted = responses.reduce((sum, response) => sum + (response?.deleted ?? 0), 0);
+      if (deleted === count) {
+        [...responses]
+          .sort((a, b) => (a?.list_change?.before ?? 0) - (b?.list_change?.before ?? 0))
+          .forEach(acknowledgeOwnChange);
+      }
       confirmRemovals(checked.map((item) => item.id));
     },
     restore: (err) => {
@@ -5206,6 +5232,7 @@ export const __test = {
   loadPageData, firstListStorageKey, drawItemIcons, ICON_ROWS_NOW,
   deleteItemUndoable,
   clearCheckedUndoable,
+  CHECKED_DELETE_BATCH,
   // Der Dialog rendert ueber den Modal-Stub des Loaders; die Tests greifen
   // sein onSave ab und loesen das Speichern nach einer Auffrischung aus.
   openItemDetails,

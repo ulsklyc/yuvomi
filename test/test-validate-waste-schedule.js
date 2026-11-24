@@ -56,6 +56,10 @@ import http from 'node:http';
 import { readFileSync } from 'node:fs';
 // @ts-expect-error express 5 ships no type declarations (TS7016)
 import express from 'express';
+import { assertArrayLimit } from './array-limit-cases.js';
+import {
+  MAX_KEYS, MAX_SHIFT_FIELDS, MAX_WASTE_EVENT_KEYS, MAX_WASTE_MAPPINGS, MAX_WASTE_TYPES,
+} from '../server/openapi/array-limits.js';
 
 const dbmod = await import('../server/db.js');
 const { default: wasteRouter } = await import('../server/routes/waste/index.js');
@@ -841,4 +845,23 @@ test('only guard: the bounds and types the handlers no longer check are the docu
 test('one source: the export writes the profile version the document accepts', async () => {
   const exported = (await call('GET', `/waste/sources/${fileSource.id}/mapping-profile/export`)).body.data;
   assert.equal(exported.version, wf.MAPPING_PROFILE_VERSION);
+});
+
+test('array limits: weekdays, waste types, import mappings and keys, shift fields, at the limit and one above (#2810)', async () => {
+  const { MAX_DISTINCT_LABELS, MAX_CANDIDATE_INSTANCES } = await import('../server/services/waste-import.js');
+  assert.equal(MAX_WASTE_MAPPINGS, MAX_DISTINCT_LABELS, 'one mapping per distinct label of an import');
+  assert.equal(MAX_WASTE_EVENT_KEYS, MAX_CANDIDATE_INSTANCES, 'one key per candidate pickup of an import');
+  const seq = (/** @type {number} */ n, /** @type {(i: number) => unknown} */ f) => Array.from({ length: n }, (_, i) => f(i));
+  const weekly = await assertArrayLimit((json) => call('POST', '/waste/schedules', { json }),
+    (n) => ({ ...weeklyBody, weekdays: seq(n, (i) => ['MO', 'TH'][i % 2]) }), MAX_KEYS, 'body/weekdays');
+  assert.equal(weekly.status, 201, 'doubles are tolerated');
+  await assertArrayLimit((json) => call('PUT', '/waste/feed/types', { json }),
+    (n) => ({ type_ids: seq(n, (i) => 900000 + i) }), MAX_WASTE_TYPES, 'body/type_ids');
+  const commit = (/** @type {Record<string, unknown>} */ over) => ({ mappings: [], skip_event_keys: [], preview_digest: null, ics: ics('2027-08-01'), name: 'Grenze', ...over });
+  await assertArrayLimit((json) => call('POST', '/waste/import/commit', { json }),
+    (n) => commit({ mappings: seq(n, (i) => ({ normalized_label: `l${i}`, type_ids: [type.id] })) }), MAX_WASTE_MAPPINGS, 'body/mappings');
+  await assertArrayLimit((json) => call('POST', '/waste/import/commit', { json }),
+    (n) => commit({ skip_event_keys: seq(n, (i) => `k${i}`) }), MAX_WASTE_EVENT_KEYS, 'body/skip_event_keys');
+  await assertArrayLimit((json) => call('PUT', `/schedule/shift-types/${shiftType.id}/fields`, { json }),
+    (n) => ({ fields: seq(n, (i) => ({ custom_field_id: 900000 + i, position: i, show_in_overlay: false })) }), MAX_SHIFT_FIELDS, 'body/fields');
 });

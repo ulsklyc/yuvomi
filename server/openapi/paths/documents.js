@@ -4,6 +4,7 @@ import { MODULE_FOLDER_KEYS } from '../../services/document-folders.js';
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_VISIBILITIES,
 } from '../../services/document-fields.js';
+import { MAX_MEMBER_IDS } from '../array-limits.js';
 
 // ---------------------------------------------------------------------------
 // Bausteine der Anfrage-Schemata (#2810, Gruppe 8). Das Schema traegt Typ und
@@ -56,6 +57,7 @@ const EXPIRY_REMINDER_DAYS = {
 };
 const ALLOWED_MEMBER_IDS = {
   type: 'array',
+  maxItems: MAX_MEMBER_IDS,
   items: { type: 'integer', minimum: 1 },
   description: 'The household members who may see a `restricted` document; read only for `restricted`. An id without an account or of someone who is not a household member is the route\'s 400.',
 };

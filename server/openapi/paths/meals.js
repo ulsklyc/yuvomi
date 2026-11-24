@@ -1,6 +1,7 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 import { OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
 import { MEAL_DELETE_SCOPES, MEAL_TYPES, MEAL_UPDATE_SCOPES } from '../../services/meals-fields.js';
+import { MAX_INGREDIENTS, MAX_MEAL_ASSIGNMENTS } from '../array-limits.js';
 
 // ---------------------------------------------------------------------------
 // Bausteine der Anfrage-Schemata (#2810, Gruppe 7). Die Wertelisten kommen aus
@@ -68,7 +69,7 @@ const ingredient = ({ nameRequired = false } = {}) => ({
     id: { anyOf: [{ type: 'integer' }, { type: 'string' }, { type: 'null' }], description: 'Ignored.' },
   },
 });
-const INGREDIENTS = { type: 'array', items: ingredient() };
+const INGREDIENTS = { type: 'array', maxItems: MAX_INGREDIENTS, items: ingredient() };
 
 // Anlegen und Bearbeiten nehmen dieselben Felder; nur was Pflicht ist und was
 // die Serie betrifft, unterscheidet sie. `repeat_weekly` gibt es nur beim
@@ -237,6 +238,7 @@ export function mealsPaths() {
             assignments: {
               type: 'array',
               minItems: 1,
+              maxItems: MAX_MEAL_ASSIGNMENTS,
               items: {
                 type: 'object',
                 additionalProperties: true,

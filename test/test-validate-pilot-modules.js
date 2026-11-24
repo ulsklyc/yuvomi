@@ -184,6 +184,14 @@ test('ids written as text are a 400: category_ids, contact_id; non-numbers in co
   }
 });
 
+test('array limits: a quick-link order, at the limit and one above (#2810)', async () => {
+  const { assertArrayLimit } = await import('./array-limit-cases.js');
+  const { MAX_QUICK_LINK_ORDER } = await import('../server/openapi/array-limits.js');
+  const at = await assertArrayLimit((body) => call('PUT', '/quick-links/order', body),
+    (n) => ({ ids: Array.from({ length: n }, (_, i) => 900000 + i) }), MAX_QUICK_LINK_ORDER, 'body/ids');
+  assert.equal(at.status, 200, 'ids the caller cannot see are ignored');
+});
+
 test('order of a category reorder takes ids and digit text, nothing else (the category manager sends text)', async () => {
   for (const bad of ['x', '', 1.5, null, '3 ', '0', 0, '03']) {
     assertRefused(await call('PATCH', '/notes/categories/reorder', { order: [bad] }), 'body/order/0');

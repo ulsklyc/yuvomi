@@ -123,7 +123,7 @@ export const EXPECTED = {
   "bf confirm move people empty": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/moves/0/to_user_ids","rule":"minItems"}]}},
   "bf confirm move people text": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/moves/0/to_user_ids/0","rule":"type"}]}},
   "bf confirm move people many": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/moves/0/to_user_ids","rule":"maxItems"}]}},
-  "bf confirm moves too many": {"status":400,"body":{"error":"moves takes at most 5000 events per confirmation.","code":400}},
+  "bf confirm moves too many": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/moves","rule":"maxItems"}]}},
   "bf confirm mem": {"status":403,"body":{"error":"Admin access required.","code":403,"reason":"admin_required"}},
   "bf confirm mem bad": {"status":403,"body":{"error":"Admin access required.","code":403,"reason":"admin_required"}},
   "g status configured": {"status":200,"body":{"configured":true,"connected":false,"lastSync":null,"missingEnv":[],"redirectUri":"http://127.0.0.1/api/v1/calendar/google/callback","needsReauth":false,"selectedCount":0,"readonly":false,"mirroredEvents":0,"lastError":null,"lastErrorAt":null}},
