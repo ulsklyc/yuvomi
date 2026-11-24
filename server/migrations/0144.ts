@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 144,
     description: 'add per-user read-only inventory deadlines feed token',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 278,
     description: 'Wall displays: centrally managed night hours and screensaver options (#2436)',

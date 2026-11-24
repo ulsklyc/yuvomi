@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 160,
     description: 'Quick links: household links as a tile row on the overview (#469)',

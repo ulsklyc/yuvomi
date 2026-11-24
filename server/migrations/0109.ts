@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 109,
     description: 'Pantry: keep household stock when the member who entered it is deleted (#596 follow-up)',

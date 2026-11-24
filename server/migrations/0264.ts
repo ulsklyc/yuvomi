@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 264,
     description: 'subscriptions: an account as the default for every payment it books (#1277)',

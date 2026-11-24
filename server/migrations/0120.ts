@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 120,
     description: 'Mealie integration: store recipe slug and image flag for link rebuild and thumbnails',

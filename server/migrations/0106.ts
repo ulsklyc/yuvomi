@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 106,
     description: 'Calendar: remember the CalDAV object URL so edits and deletes can reach the server (#593)',

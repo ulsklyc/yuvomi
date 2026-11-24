@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 279,
     description: 'tasks: external_rrule keeps the recurrence rule another app owns',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 205,
     description: 'Waste collection: revocable read-only ICS feed (#1063 Phase 10)',

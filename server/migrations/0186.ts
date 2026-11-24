@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 186,
     description: 'Schedule: extra shifts, additive to the primary pattern/override slot (on-call alongside a regular shift)',

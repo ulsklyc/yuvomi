@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 131,
     description: 'Budget: issuing bank and credit limit on credit-card accounts (#541)',

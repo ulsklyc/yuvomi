@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 276,
     description: 'Pantry: the minimum moves to the product, low and out are read over its total (#1448)',

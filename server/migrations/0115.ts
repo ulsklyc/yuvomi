@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 115,
     description: 'Tasks: free-form tags, mirrored from VTODO CATEGORIES (#586)',

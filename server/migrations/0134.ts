@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 134,
     description: 'Recipe provider mirrors: generalize Mealie-only schema for multiple providers (#530)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 75,
     description: 'planned/estimated budget: per-category monthly caps + monthly savings goal (#468)',

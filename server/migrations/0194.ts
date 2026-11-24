@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 194,
     description: 'Calendar: linked overrides for local recurring occurrences (#975)',

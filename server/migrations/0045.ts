@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 45,
     description: 'CalDAV reminder (VTODO) sync: list selection + external linkage on tasks and shopping_items',

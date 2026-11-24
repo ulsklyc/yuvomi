@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 218,
     description: 'Documents: optional expiry date + reminder lead, widen reminders for document_expiry',

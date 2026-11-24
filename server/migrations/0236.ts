@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 236,
     description: 'Rewards: pocket money - a unit per ledger row, money requests and a credit plan (#1734)',

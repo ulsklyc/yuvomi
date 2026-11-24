@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 96,
     description: 'Add default_visibility to cycle_settings so new cycle entries can default to family-visible',

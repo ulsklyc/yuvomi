@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 113,
     description: 'CalDAV VTODO: push local changes and deletions back to the server (#617)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 170,
     description: 'Subscriptions: seed categories and payment methods carry a label key, so they speak the reader language (#950)',

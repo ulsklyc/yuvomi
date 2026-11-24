@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 180,
     description: 'Health: per-user read-only predicted-cycle ICS feed token',

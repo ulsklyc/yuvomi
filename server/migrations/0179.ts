@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 179,
     description: 'Health: optional basal body temperature per day log, for temperature-shift ovulation confirmation',

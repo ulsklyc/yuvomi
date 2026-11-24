@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 126,
     description: 'Budget loans: lending direction (lent vs. borrowed) and an optional account for the installments (#638)',

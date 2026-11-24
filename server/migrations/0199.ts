@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 199,
     description: 'Waste collection: ICS import sources with health tracking (#1063 Phase 3)',

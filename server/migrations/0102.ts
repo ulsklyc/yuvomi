@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 102,
     description: 'Loans: own currency per loan with a fixed conversion rate (#582)',

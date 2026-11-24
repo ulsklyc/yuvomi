@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 88,
     description: 'Budget personal/shared: owner_id + visibility on entries, loans, subscriptions (#476/#505)',

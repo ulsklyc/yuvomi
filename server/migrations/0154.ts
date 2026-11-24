@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 154,
     description: 'Outlook (Microsoft Graph) one-way push: accounts, calendar selection, event links, event target columns',

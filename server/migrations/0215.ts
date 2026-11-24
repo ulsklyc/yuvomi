@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 215,
     description: 'Display accounts: a non-member users row that only a paired device can use (#1208)',

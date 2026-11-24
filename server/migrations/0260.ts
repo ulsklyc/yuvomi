@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 260,
     description: 'Shopping: tell whoever moved a mirrored item when the move was taken back (#1912)',

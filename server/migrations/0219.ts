@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 219,
     description: 'Health: preventive care & vaccinations log (household type registry + per-person records)',

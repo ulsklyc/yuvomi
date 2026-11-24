@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 122,
     description: 'Tasks: link a recurring follow-up instance to the completion that created it (#650)',

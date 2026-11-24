@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 262,
     description: 'notes: a visibility of their own and a lock on a single note (#1514, #1602)',

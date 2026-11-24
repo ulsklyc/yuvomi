@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 266,
     description: 'sync: a mirrored row is marked once a sync run has seen its object (#1839)',

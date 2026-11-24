@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 68,
     description: 'Shopping items: optionale notes/url-Attribute; notes im FTS-Suchindex',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 138,
     description: 'Inventory: link items to documents from the Documents module (Stage 2)',

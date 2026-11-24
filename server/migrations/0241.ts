@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 241,
     description: 'CalDAV: an upload is noted before it is sent, so a lost answer leaves a trace (#1882)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 70,
     description: 'Reward-System: Teilnehmer, Prämien-Katalog, Einlösungen, Punkte-Ledger',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 223,
     description: 'Health: daily nutrition target per person and a logged intake (#1326)',

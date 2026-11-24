@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 265,
     description: 'sync: several default assignees per calendar, subscription and reminder list (#1897, #1221)',

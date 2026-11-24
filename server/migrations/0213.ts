@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 213,
     description: 'Health: widen cycle_reminder_anchors.kind to add partner_period',

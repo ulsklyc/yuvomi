@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 71,
     description: 'add menstrual cycle tracking to health module: periods, day logs, per-user settings',

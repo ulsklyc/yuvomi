@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 182,
     description: 'Schedule: an optional icon alongside a shift type\'s color (#786 follow-up)',

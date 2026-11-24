@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 93,
     description: 'Attach CardDAV sync errors to the failing address book, not just the account (#534)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 89,
     description: 'CardDAV contact origin: distinguish remotely imported from locally adopted contacts',

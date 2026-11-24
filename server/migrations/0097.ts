@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 97,
     description: 'Add tzid to calendar_events for DST-correct recurrence expansion (#549)',

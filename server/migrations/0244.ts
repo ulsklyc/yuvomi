@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 244,
     description: 'Displays: the photo screensaver is switched on per display by an administrator (#1766)',

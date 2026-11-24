@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 128,
     description: 'Budget: recurrence as unit + count, weekly included, skips keyed by day (#636)',

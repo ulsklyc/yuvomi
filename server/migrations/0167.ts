@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 167,
     description: 'Calendar: color_modified tells a local recolour apart from any other edit (#899)',

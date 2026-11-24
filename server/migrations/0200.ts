@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 200,
     description: 'Waste collection: ICS source label-to-type mappings (#1063 Phase 3)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 163,
     description: 'Quick links: a built-in symbol as a third face, next to image and monogram (#873)',

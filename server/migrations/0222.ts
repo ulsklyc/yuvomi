@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 222,
     description: 'Recipes: the household can confirm which stock row an ingredient means (#1314)',

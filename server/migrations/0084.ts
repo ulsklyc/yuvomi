@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 84,
     description: 'Contact categories as a customizable, sortable table with icons (#357)',

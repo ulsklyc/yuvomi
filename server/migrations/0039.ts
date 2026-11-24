@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 39,
     description: 'Split expense groups, immutable ledger, settlements, recurring expenses, and activity',

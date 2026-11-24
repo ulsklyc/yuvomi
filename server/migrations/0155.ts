@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 155,
     description: 'Tasks: locked flag - a locked task keeps its definition closed to everyone but its creator and admins (#830)',

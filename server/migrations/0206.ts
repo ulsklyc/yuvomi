@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 206,
     description: 'Waste collection: index waste types in the global FTS5 search_index (#1063 Phase 10)',

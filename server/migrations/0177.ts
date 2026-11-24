@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 177,
     description: 'Health: cycle reminders - widen reminders for cycle_period/cycle_log_nudge, add an anchor table',

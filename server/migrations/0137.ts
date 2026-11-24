@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 137,
     description: 'Inventory: locations, categories, items (Stage 1 of the full design)',

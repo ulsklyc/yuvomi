@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 187,
     description: 'Reminders: widen for schedule_extra_entry, extra shifts get their own independent reminders',

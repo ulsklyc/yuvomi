@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 136,
     description: 'Outbound target for locally created tasks (CalDAV reminder list, #695)',

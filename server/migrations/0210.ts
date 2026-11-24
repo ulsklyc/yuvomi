@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 210,
     description: 'Health: cervical mucus, LH/pregnancy test results and intimacy as optional day-log scalars',

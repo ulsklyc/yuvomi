@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 283,
     description: 'tasks: restore the updated_at trigger lost to the table rebuilds',

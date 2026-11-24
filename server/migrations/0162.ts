@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 162,
     description: 'Pantry: widen reminders for pantry_item so a best-before date can notify (#811)',

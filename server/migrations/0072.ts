@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 72,
     description: 'add per-scope permissions to api_tokens (module:read/module:write allow-list)',

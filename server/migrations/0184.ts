@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 184,
     description: 'Schedule: shift-start reminders - widen reminders for schedule_entry, add an anchor table for pattern days',

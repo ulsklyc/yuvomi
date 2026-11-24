@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 172,
     description: 'Personal default visibility per health area, so new entries follow a choice instead of a fixed value (#958)',

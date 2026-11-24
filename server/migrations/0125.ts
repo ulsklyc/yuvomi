@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 125,
     description: 'CalDAV: remember that a reminder-list discovery ran, even when it found nothing (#617)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 44,
     description: 'FTS5 full-text search index across tasks, calendar events, notes, contacts, and shopping items',

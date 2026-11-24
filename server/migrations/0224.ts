@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 224,
     description: 'Inventory: recurring tracked dates, a service log, and a manual odometer',

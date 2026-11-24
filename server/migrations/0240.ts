@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 240,
     description: 'Calendar: a pending deletion can carry the ETag of the entry it was queued for (#1883)',

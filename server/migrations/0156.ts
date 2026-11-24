@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 156,
     description: 'Budget: third visibility shared_amount - the amount counts towards balances while title, category and notes stay private (#659)',

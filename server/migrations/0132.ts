@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 132,
     description: 'Tasks: archive as its own axis instead of a status value (#688)',

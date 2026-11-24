@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 65,
     description: 'add health module: vitals, medications, schedules, logs, lab reports/results, activities',

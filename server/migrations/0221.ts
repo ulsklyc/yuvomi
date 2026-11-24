@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 221,
     description: 'rewards: per-reward quantity for the household plus a machine-readable rejection reason',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 101,
     description: 'Loans: allow a purely variable interest rate (#569 follow-up)',

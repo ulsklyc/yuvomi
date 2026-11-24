@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 169,
     description: 'Reminders: a reminder on a shared event reaches its assignees, not only its author (#921)',

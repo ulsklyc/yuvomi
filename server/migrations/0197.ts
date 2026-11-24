@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 197,
     description: 'Waste collection: types, manual schedules, per-occurrence overrides, and one-off pickups (#1063)',

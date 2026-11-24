@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 78,
     description: 'Sichtbarkeit pro Aufgabe/Termin: all | assignees | private (#474)',

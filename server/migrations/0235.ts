@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 235,
     description: 'Meal plan: one member as the cook of a meal and of a series (#1679)',

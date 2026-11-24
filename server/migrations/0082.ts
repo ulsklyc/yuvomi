@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 82,
     description: 'Schwangerschafts-Modus im Zyklus-Tab: pausiert Vorhersagen, optionaler Entbindungstermin (#450)',

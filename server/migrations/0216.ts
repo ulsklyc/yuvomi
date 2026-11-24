@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 216,
     description: 'Display devices remember when their cookie was last re-dated, separate from last seen (#1208)',

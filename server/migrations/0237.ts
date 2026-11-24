@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 237,
     description: 'Subscriptions: optional payment reminder (#1708, from D#1226)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 181,
     description: 'Budget: materialisierte Serien-Instanzen erben das Konto ihrer Serie nach (#973)',

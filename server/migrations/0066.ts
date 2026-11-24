@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 66,
     description: 'index medications and health activities in the FTS5 search_index (visibility scoping applied at query time)',

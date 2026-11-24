@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 46,
     description: 'Budget recurring entries: interval (monthly/half_year/yearly) + virtual (smoothed) budgeting',

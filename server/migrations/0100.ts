@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 100,
     description: 'Loans: optional interest phases (fixed rate + forecast follow-up rate, #569)',

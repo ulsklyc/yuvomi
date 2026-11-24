@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 252,
     description: 'task_completions: source, so a completion taken over by the CalDAV sync is told apart (#1836)',

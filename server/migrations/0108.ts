@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 108,
     description: 'Pantry: food inventory with quantity, storage location and expiry date (#596)',

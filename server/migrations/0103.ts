@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 103,
     description: 'Calendar: tombstones for events deleted locally but still remote (#593)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 189,
     description: 'Schedule: custom field registry, per-shift-type assignment, and per-occurrence values',

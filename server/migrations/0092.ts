@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 92,
     description: 'Surface CardDAV sync errors in the UI instead of only the server log (#534)',

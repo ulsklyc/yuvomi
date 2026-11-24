@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 263,
     description: 'split expenses: a recurring expense remembers when it started failing (#1746)',

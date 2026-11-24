@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 195,
     description: 'heal contacts auto-created for family/guest members with the legacy Sonstiges category (#1140)',

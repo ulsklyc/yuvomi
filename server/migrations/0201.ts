@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 201,
     description: 'Waste collection: committed imported pickups (#1063 Phase 3)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 140,
     description: 'Allow inventory_item entities in the existing reminder center (Stage 4)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 104,
     description: 'Calendar: mark locally edited mirrored events for outbound push (#593)',

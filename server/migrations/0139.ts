@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 139,
     description: 'Inventory: link items to budget entries with a role (Stage 3)',

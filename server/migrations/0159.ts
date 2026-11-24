@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 159,
     description: 'Two-factor authentication: TOTP secrets and recovery codes per user (#672)',

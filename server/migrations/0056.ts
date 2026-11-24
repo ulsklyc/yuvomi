@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 56,
     description: 'Budget subscription tracker with categories, payment methods, settings, and exchange-rate cache',

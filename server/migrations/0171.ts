@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 171,
     description: 'Invites carry the starting permissions the admin chose, applied at first login (#869)',

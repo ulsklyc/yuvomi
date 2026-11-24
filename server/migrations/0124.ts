@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 124,
     description: 'Split guests stay confined when their group is deleted (group_id ON DELETE SET NULL)',

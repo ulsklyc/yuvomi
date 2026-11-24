@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 185,
     description: 'Schedule: a personal weekly-hours target for the overtime flag',

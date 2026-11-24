@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 239,
     description: 'Calendar: the search index update trigger fires only on the indexed columns (#1860)',

@@ -1,5 +1,3 @@
-// @ts-nocheck - eingefrorene Migration (append-only): Typen nachziehen hiesse den Text aendern.
-
 export default {
     version: 63,
     description: 'Remove existing family members incorrectly added to split_expense_guest_users',
