@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **An empty push `endpoint` is refused by the API description.** This is about your own API
+  clients; the app always sends the endpoint of the browser's subscription. `POST
+  /push/subscribe` and `POST /push/unsubscribe` with `endpoint: ""` still answer 400, now with
+  `reason: validation` and `fields` (`body/endpoint`, `minLength`) instead of their own sentence;
+  `PUT /push/wall-mode` with `endpoint: ""` answered 204 and changed nothing, and is now the same
+  400.
 - **The calendar subscription feeds and the API description download are checked like every
   other route.** This is about your own scripts; the app sends nothing that is refused now.
   `?download=` at `/openapi.json` and `/api/v1/openapi.json` takes only `1`: `download=0`,

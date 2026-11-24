@@ -13,7 +13,7 @@
  *          `PUT /preferences`: 400 with its own sentence, 403
  *          `admin_required` for a member or a child, also with an invalid
  *          value; `checkPushEndpoint` for http, a private or local host,
- *          credentials, no URL; `unsubscribe` with `endpoint: ''`; a foreign
+ *          credentials, no URL; a foreign
  *          or unknown endpoint at `unsubscribe` and `wall-mode` changing
  *          nothing; `POST /holidays/sync` for a member, a child and a display;
  *          the holiday lists with a failing service (502) and the local GB
@@ -44,6 +44,11 @@
  *          (3) `PUT /preferences` keeps its transaction: an error after the
  *          first field was written is the central handler's 500, nothing of
  *          the patch is stored, and the birthday retitle runs all the same.
+ *
+ *          An empty `endpoint` at `subscribe`, `unsubscribe` and `wall-mode`
+ *          is refused by the schema since the follow-up to #2810 (minLength
+ *          1): the two own sentences and the 204 of `wall-mode` stand in
+ *          CHANGED with the schema's 400.
  *
  *          (4) Each handler alone (without `validateRequest()`) keeps the type
  *          checks in front of a string method, `new URL()` or `.length` on the
