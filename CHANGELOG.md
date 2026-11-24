@@ -354,6 +354,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   any other and is ignored: without `system_admin: true` the new account is a member.
 
 ### Fixed
+- **Large shopping lists, calendars and task lists change quickly again.** Every change to a
+  searchable entry read the whole search index, so renaming or clearing 4000 shopping items took
+  seconds and a CalDAV sync of a large calendar slowed down with every event; each entry is now
+  found in the index directly (migration 284, the index is rebuilt once on update).
 - **Very long id lists no longer fail with an internal error.** A list of more than 32 765 ids
   in one request, such as `DELETE /shopping/{listId}/items/checked` with `{ ids }`, answered 500
   because SQLite takes at most 32 766 values per statement; the server now hands every such list
