@@ -249,7 +249,7 @@ test('only guard: the document holds the push shapes the handlers no longer chec
   const schemas = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test')).components.schemas;
   const subscribe = schemas.PushSubscribeInput;
   assert.deepEqual(subscribe.required, ['endpoint', 'keys']);
-  assert.deepEqual(subscribe.properties.endpoint, { ...subscribe.properties.endpoint, type: 'string', maxLength: 2048 });
+  assert.deepEqual(subscribe.properties.endpoint, { ...subscribe.properties.endpoint, type: 'string', minLength: 1, maxLength: 2048 });
   assert.equal(subscribe.properties.keys.type, 'object');
   assert.deepEqual(subscribe.properties.keys.required, ['p256dh', 'auth']);
   for (const key of ['p256dh', 'auth']) {
@@ -258,8 +258,10 @@ test('only guard: the document holds the push shapes the handlers no longer chec
   }
   assert.deepEqual(schemas.PushUnsubscribeInput.required, ['endpoint']);
   assert.equal(schemas.PushUnsubscribeInput.properties.endpoint.type, 'string');
+  assert.equal(schemas.PushUnsubscribeInput.properties.endpoint.minLength, 1);
   assert.deepEqual(schemas.PushWallModeInput.required, ['endpoint', 'active']);
   assert.equal(schemas.PushWallModeInput.properties.endpoint.type, 'string');
+  assert.equal(schemas.PushWallModeInput.properties.endpoint.minLength, 1);
   assert.equal(schemas.PushWallModeInput.properties.active.type, 'boolean');
   for (const field of ['title', 'body', 'endpoint']) {
     assert.equal(schemas.PushTestInput.properties[field].type, 'string', `test push ${field}`);
@@ -348,6 +350,23 @@ test('PUT /push/wall-mode and POST /push/test: garbage per field is 400', async 
   assertRefused(await call('POST', `${PUSH_PREFIX}/test`, { json: { body: ['x'] } }), 'body/body', 'body list');
   assertRefused(await call('POST', `${PUSH_PREFIX}/test`, { json: { endpoint: 5 } }), 'body/endpoint', 'endpoint 5');
   assert.equal(sentPushes.length, 0, 'a refused test push sends nothing');
+});
+
+test('push: an empty endpoint is refused by the schema at subscribe, unsubscribe and wall-mode', async () => {
+  const count = () => db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').get().n;
+  const before = count();
+  /** @type {Array<[string, string, Record<string, unknown>]>} */
+  const cases = [
+    ['POST', `${PUSH_PREFIX}/subscribe`, { ...SUBSCRIPTION, endpoint: '' }],
+    ['POST', `${PUSH_PREFIX}/unsubscribe`, { endpoint: '' }],
+    ['PUT', `${PUSH_PREFIX}/wall-mode`, { endpoint: '', active: true }],
+  ];
+  for (const [method, path, json] of cases) {
+    const res = await call(method, path, { json });
+    assertRefused(res, 'body/endpoint', `${method} ${path}`);
+    assert.ok(res.body.fields.some((/** @type {any} */ f) => f.path === 'body/endpoint' && f.rule === 'minLength'), `${path}: ${JSON.stringify(res.body.fields)}`);
+  }
+  assert.equal(count(), before, 'nothing stored');
 });
 
 // ── The document ────────────────────────────────────────────────────────────

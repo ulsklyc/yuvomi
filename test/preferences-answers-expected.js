@@ -108,7 +108,6 @@ export const EXPECTED = {
   "subscribe extra fields": {"status":201,"body":{"data":{"id":4}}},
   "subscribe 2048": {"status":201,"body":{"data":{"id":5}}},
   "subscribed": {"probe":[{"user_id":1,"endpoint":"https://fcm.googleapis.com/fcm/send/device-admin","p256dh":"BNewKey","auth":"NewSecret","paused":0},{"user_id":2,"endpoint":"https://updates.push.services.mozilla.com/wpush/v2/device-mem","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0},{"user_id":1,"endpoint":"https://web.push.apple.com/device-extra","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0},{"user_id":1,"endpoint":"<2048 characters>","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0}]},
-  "subscribe empty endpoint": {"status":400,"body":{"error":"endpoint and keys (p256dh, auth) are required.","code":400}},
   "subscribe http": {"status":400,"body":{"error":"endpoint must be a public https address.","code":400}},
   "subscribe loopback": {"status":400,"body":{"error":"endpoint must be a public https address.","code":400}},
   "subscribe localhost": {"status":400,"body":{"error":"endpoint must be a public https address.","code":400}},
@@ -141,7 +140,6 @@ export const EXPECTED = {
   "wall paused": {"probe":[{"user_id":1,"endpoint":"https://fcm.googleapis.com/fcm/send/device-admin","p256dh":"BNewKey","auth":"NewSecret","paused":1},{"user_id":2,"endpoint":"https://updates.push.services.mozilla.com/wpush/v2/device-mem","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":1},{"user_id":1,"endpoint":"https://web.push.apple.com/device-extra","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0},{"user_id":1,"endpoint":"<2048 characters>","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0}]},
   "wall resume foreign": {"status":204,"body":null},
   "wall unknown": {"status":204,"body":null},
-  "wall empty endpoint": {"status":204,"body":null},
   "wall unchanged": {"probe":[{"user_id":1,"endpoint":"https://fcm.googleapis.com/fcm/send/device-admin","p256dh":"BNewKey","auth":"NewSecret","paused":1},{"user_id":2,"endpoint":"https://updates.push.services.mozilla.com/wpush/v2/device-mem","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":1},{"user_id":1,"endpoint":"https://web.push.apple.com/device-extra","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0},{"user_id":1,"endpoint":"<2048 characters>","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0}]},
   "wall active text": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/active","rule":"type"}]}},
   "wall active number": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/active","rule":"type"}]}},
@@ -169,7 +167,6 @@ export const EXPECTED = {
   "test push endpoint number": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/endpoint","rule":"type"}]}},
   "test push list": {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body","rule":"type"}]}},
   "nothing sent": {"probe":[]},
-  "unsubscribe empty endpoint": {"status":400,"body":{"error":"endpoint is required.","code":400}},
   "unsubscribe unknown": {"status":204,"body":null},
   "unsubscribe foreign": {"status":204,"body":null},
   "foreign stays": {"probe":[{"user_id":1,"endpoint":"https://fcm.googleapis.com/fcm/send/device-admin","p256dh":"BNewKey","auth":"NewSecret","paused":0},{"user_id":2,"endpoint":"https://updates.push.services.mozilla.com/wpush/v2/device-mem","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":1},{"user_id":1,"endpoint":"https://web.push.apple.com/device-extra","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0},{"user_id":1,"endpoint":"<2048 characters>","p256dh":"BPublicKeyOfTheDevice","auth":"AuthSecret","paused":0}]},
@@ -191,10 +188,27 @@ export const EXPECTED = {
 /**
  * The rows that change on purpose: the push routes answered an unexpected
  * error with `Internal error.` of their own; the central error handler
- * answers `Internal server error.` and logs the route.
+ * answers `Internal server error.` and logs the route. An empty `endpoint`
+ * at subscribe, unsubscribe and wall-mode is the schema's 400 (minLength 1)
+ * instead of two own sentences and a 204; no log line.
  * @type {Record<string, { before: unknown, now: unknown, log: string | null }>}
  */
 export const CHANGED = {
+  "subscribe empty endpoint": {
+    before: {"status":400,"body":{"error":"endpoint and keys (p256dh, auth) are required.","code":400}},
+    now: {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/endpoint","rule":"minLength"}]}},
+    log: null,
+  },
+  "wall empty endpoint": {
+    before: {"status":204,"body":null},
+    now: {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/endpoint","rule":"minLength"}]}},
+    log: null,
+  },
+  "unsubscribe empty endpoint": {
+    before: {"status":400,"body":{"error":"endpoint is required.","code":400}},
+    now: {"status":400,"body":{"error":"The request does not match the documented schema.","code":400,"reason":"validation","fields":[{"path":"body/endpoint","rule":"minLength"}]}},
+    log: null,
+  },
   "vapid key failing answer": {
     before: {"status":500,"body":{"error":"Internal error.","code":500}},
     now: {"status":500,"body":{"error":"Internal server error.","code":500}},

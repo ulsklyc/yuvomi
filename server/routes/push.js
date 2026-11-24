@@ -5,8 +5,8 @@
  *        OpenAPI-Dokument (`validateRequest()`, #2810 Gruppe 11b): Form und
  *        Typ der Felder prueft allein das Dokument (Schritt b). Ob ein
  *        Endpoint eine oeffentliche https-Adresse ist, prueft weiter der
- *        Handler (checkPushEndpoint: Hostliste und Netz, kein Muster), ebenso
- *        einen leeren Endpoint. Ein unerwarteter Fehler geht an den zentralen
+ *        Handler (checkPushEndpoint: Hostliste und Netz, kein Muster); einen
+ *        leeren Endpoint lehnt das Dokument ab (minLength). Ein unerwarteter Fehler geht an den zentralen
  *        Fehlerhandler (server/middleware/error-handler.js).
  * Abhängigkeiten: express, server/db.js, server/services/push.js
  */
@@ -30,12 +30,8 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
   router.post('/subscribe', validateRequest(), (req, res) => {
     const userId = req.authUserId || req.session.userId;
     // `keys` mit `p256dh` und `auth` (Text, nicht leer) und `endpoint` als
-    // Text bis 2048 Zeichen prueft das Dokument (PushSubscribeInput). Ein
-    // leerer Endpoint kommt dort durch und behaelt hier seinen Satz.
+    // Text von 1 bis 2048 Zeichen prueft das Dokument (PushSubscribeInput).
     const { endpoint, keys } = req.body || {};
-    if (!endpoint) {
-      return res.status(400).json({ error: 'endpoint and keys (p256dh, auth) are required.', code: 400 });
-    }
     // Ein Endpoint ist ein Ziel, an das der Server spaeter selbst sendet:
     // nur oeffentliche https-Adressen, wie sie jeder Push-Dienst vergibt.
     // Der Versand prueft erneut (Bestandszeilen, DNS beim Verbindungsaufbau).
@@ -61,20 +57,17 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
 
   router.post('/unsubscribe', validateRequest(), (req, res) => {
     const userId = req.authUserId || req.session.userId;
-    // `endpoint` als Text prueft das Dokument; leer ist er dort erlaubt und
-    // antwortet hier mit seinem eigenen Satz.
+    // `endpoint` als nicht leeren Text prueft das Dokument
+    // (PushUnsubscribeInput).
     const { endpoint } = req.body || {};
-    if (!endpoint) {
-      return res.status(400).json({ error: 'endpoint is required.', code: 400 });
-    }
     getDb().prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?').run(endpoint, userId);
     res.status(204).end();
   });
 
   router.put('/wall-mode', validateRequest(), (req, res) => {
     const userId = req.authUserId || req.session.userId;
-    // `endpoint` als Text und `active` als Wahrheitswert prueft das Dokument
-    // (PushWallModeInput, beide Pflicht).
+    // `endpoint` als nicht leeren Text und `active` als Wahrheitswert prueft
+    // das Dokument (PushWallModeInput, beide Pflicht).
     const { endpoint, active } = req.body || {};
     // active=true: Pause setzen (jetzt); active=false: Pause loeschen.
     // Der Zeitstempel laeuft nach WALL_PAUSE_MAX_AGE_HOURS ab - eine Erneuerung

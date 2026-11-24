@@ -1585,7 +1585,7 @@ export const schemas = {
           // `expirationTime`: further fields stay allowed and are ignored.
           additionalProperties: true,
           properties: {
-            endpoint: { type: 'string', maxLength: 2048, description: 'The push service URL of the subscription. Must be a public https address (checked by the route, 400 otherwise).' },
+            endpoint: { type: 'string', minLength: 1, maxLength: 2048, description: 'The push service URL of the subscription, not empty. Must be a public https address (checked by the route, 400 otherwise).' },
             keys: {
               type: 'object',
               required: ['p256dh', 'auth'],
@@ -1601,14 +1601,14 @@ export const schemas = {
           type: 'object',
           required: ['endpoint'],
           properties: {
-            endpoint: { type: 'string', description: 'The push service URL of the subscription to remove. Empty answers 400; an unknown or foreign one changes nothing.' },
+            endpoint: { type: 'string', minLength: 1, description: 'The push service URL of the subscription to remove, not empty. An unknown or foreign one changes nothing.' },
           },
         },
         PushWallModeInput: {
           type: 'object',
           required: ['endpoint', 'active'],
           properties: {
-            endpoint: { type: 'string', description: 'The push service URL of this device\'s subscription. An unknown or foreign one changes nothing.' },
+            endpoint: { type: 'string', minLength: 1, description: 'The push service URL of this device\'s subscription, not empty. An unknown or foreign one changes nothing.' },
             active: { type: 'boolean', description: '`true` pauses delivery to this device while it shows the wall, `false` resumes it.' },
           },
         },
