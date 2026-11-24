@@ -609,6 +609,31 @@ test('DELETE /:listId/items/checked: 40 000 ids sind 400 (maxItems), die Hoechst
     'der nicht genannte abgehakte Artikel bleibt');
 });
 
+test('DELETE /:listId/items/checked: 40 000 abgehakte Artikel in Happen, mit allen Suchindex-Triggern', async () => {
+  // Bis Migration 284 loeschten die Suchindex-Trigger per entity_id in der FTS5-Tabelle,
+  // ein Scan ueber den ganzen Index je Zeile: 40 000 Zeilen anlegen und loeschen dauerte
+  // Minuten, und ein frueherer Test schaltete die Trigger dafuer ab. Seit 284 geht jede
+  // Zeile ueber ihr rowid; nichts ist abgeschaltet. Die Seite teilt in Happen zu
+  // MAX_SHOPPING_ITEMS (test:shopping-ux), genau so laeuft es hier.
+  const { MAX_SHOPPING_ITEMS } = await import('../server/openapi/array-limits.js');
+  const list = await newList('Checked-40k');
+  const insert = db.prepare("INSERT INTO shopping_items (list_id, name, is_checked, sort_order) VALUES (?, ?, 1, ?)");
+  const ids = db.transaction(() => Array.from({ length: 40000 }, (_v, i) => Number(insert.run(list, `Posten ${i}`, i + 1).lastInsertRowid)))();
+  const indexed = db.prepare("SELECT COUNT(*) c FROM search_index WHERE entity = 'item' AND entity_id IN (SELECT id FROM shopping_items WHERE list_id = ?)");
+  assert.equal(indexed.get(list).c, 40000, 'Vorbedingung: jeder Artikel steht im Index');
+  let deleted = 0;
+  for (let i = 0; i < ids.length; i += MAX_SHOPPING_ITEMS) {
+    const r = await call('DELETE', `/${list}/items/checked`, { ids: ids.slice(i, i + MAX_SHOPPING_ITEMS) });
+    assert.equal(r.status, 200);
+    deleted += r.body.deleted;
+  }
+  assert.equal(deleted, 40000);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(list).c, 0);
+  const rowids = ids.map((/** @type {number} */ id) => 5 * 2 ** 40 + id);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM search_index WHERE rowid IN (SELECT value FROM json_each(?))').get(JSON.stringify(rowids)).c, 0,
+    'keine Index-Zeile bleibt zurueck');
+});
+
 test('DELETE /:listId/items/checked: ein leeres oder unbrauchbares ids ist 400, kein "dann eben alle"', async () => {
   const list = await newList('Checked-400');
   const a = (await call('POST', `/${list}/items`, { name: 'A' })).body.data;

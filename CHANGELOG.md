@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Large shopping lists, calendars and task lists change quickly again.** Every change to a
+  searchable entry read the whole search index, so renaming or clearing 4000 shopping items took
+  seconds and a CalDAV sync of a large calendar slowed down with every event; each entry is now
+  found in the index directly (migration 284, the index is rebuilt once on update).
+
 ## [2.95.0] - 2026-11-24
 
 ### Changed
