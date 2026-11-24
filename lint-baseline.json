@@ -362,7 +362,6 @@
  "server/utils/ics-patch.js\tknip/exports": 1,
  "server/utils/instance-lock.js\tknip/exports": 1,
  "server/utils/instance-lock.js\toxlint/no-restricted-syntax/TX-MANUAL": 1,
- "server/utils/password.js\tknip/exports": 1,
  "server/utils/restore-state.js\tknip/exports": 3,
  "server/utils/session-lifetime.js\tknip/exports": 1,
  "server/utils/ssrf.js\tknip/exports": 2,

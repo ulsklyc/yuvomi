@@ -7312,7 +7312,7 @@
         "removeConfirm": "Usunąć ten klucz dostępu i wylogować inne urządzenia? To urządzenie pozostanie zalogowane.",
         "signIn": "Zaloguj się kluczem dostępu",
         "reauthTitle": "Potwierdź swoją tożsamość",
-        "reauthLead": "Potwierdź hasłem lub istniejącym kluczem dostępu. Jeśli używasz hasła z uwierzytelnianiem dwuskładnikowym, podaj też kod.",
+        "reauthLead": "Potwierdź hasłem lub istniejącym kluczem dostępu, aby kontynuować tutaj. Jeśli uwierzytelnianie dwuskładnikowe jest włączone, wpisz także jego kod.",
         "reauthFailed": "Potwierdzenie nie powiodło się. Sprawdź hasło lub klucz dostępu oraz wymagany kod drugiego składnika.",
         "confirmWithPasskey": "Potwierdź kluczem dostępu",
         "passwordChangeWarning": "Zmiana hasła usuwa wszystkie Twoje klucze dostępu. Dodaj je ponownie po zmianie.",

@@ -150,7 +150,7 @@ export async function beginRegistration(database, user, sessionId) {
  * @param {number} userId
  * @param {string} sessionId
  * @param {import("@simplewebauthn/server").RegistrationResponseJSON} response
- * @param {unknown} name
+ * @param {string} name
  * @param {() => boolean} [isAllowed]
  */
 export async function finishRegistration(database, userId, sessionId, response, name, isAllowed = () => true) {
@@ -158,7 +158,7 @@ export async function finishRegistration(database, userId, sessionId, response, 
   const userHandle = database.prepare('SELECT user_handle FROM user_passkey_handles WHERE user_id = ?').get(userId)?.user_handle;
   const challenge = consume(database, sessionId, 'register', userId);
   if (!userHandle) throw fail();
-  if (typeof name !== 'string' || !name.trim() || name.trim().length > 80) throw fail();
+  if (!name.trim()) throw fail();
   const result = await verifyCredential(verifyRegistrationResponse, {
     response, expectedChallenge: challenge, expectedOrigin: cfg.origin,
     expectedRPID: cfg.rpID, requireUserVerification: true,
@@ -200,7 +200,6 @@ export async function beginAuthentication(database, sessionId, userId = null, cl
 export async function finishAuthentication(database, sessionId, response, userId = null) {
   const cfg = config();
   const challenge = consume(database, sessionId, 'authenticate', userId);
-  if (typeof response?.id !== 'string' || response.id.length > 2048) throw fail();
   const row = database.prepare(`SELECT p.*, h.user_handle FROM user_passkeys p
     JOIN user_passkey_handles h ON h.user_id = p.user_id WHERE p.credential_id = ?`).get(response.id);
   if (!row || (userId !== null && row.user_id !== userId)) throw fail();

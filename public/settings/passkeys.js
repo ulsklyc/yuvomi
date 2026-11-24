@@ -30,7 +30,7 @@ async function reauthenticate(state) {
           </div>
           ${state.second_factor_required ? `<div class="form-group form-field">
             <label class="form-label" for="passkey-reauth-code">${esc(t('settings.twoFactorCodeOrRecoveryLabel'))}${REQUIRED_MARK}</label>
-            <input class="form-input" id="passkey-reauth-code" type="text" autocomplete="one-time-code" maxlength="128" required>
+            <input class="form-input" id="passkey-reauth-code" type="text" autocomplete="one-time-code" maxlength="64" required>
           </div>` : ''}
           <p id="passkey-reauth-status" class="form-hint" role="status" aria-live="polite"></p>
           <div class="modal-panel__footer">
@@ -50,15 +50,13 @@ async function reauthenticate(state) {
           if (busy || finished) return;
           const code = /** @type {HTMLInputElement|null} */ (panel.querySelector('#passkey-reauth-code'));
           password.required = method === 'password';
-          if (code) code.required = method === 'password' && state.second_factor_required;
           const invalid = reportFieldErrors(constraintErrors(form));
           password.required = true;
-          if (code) code.required = state.second_factor_required;
           if (invalid) return;
           busy = true;
           /** @type {{method:"password"|"passkey",code?:string,password?:string,credential?:Awaited<ReturnType<typeof usePasskey>>}} */
           const proof = { method };
-          if (method === 'password' && code) proof.code = code.value.trim();
+          if (code) proof.code = code.value.trim();
           for (const button of buttons) button.disabled = true;
           status.textContent = t('login.twoFactorChecking');
           try {

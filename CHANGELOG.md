@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Household members can sign in with passkeys without an external identity provider.** Add a
+  passkey in account settings and sign in with your device. Accounts with two-factor
+  authentication enabled still ask for a code, including when confirming passkey changes.
+  Changing your password removes your passkeys. Removing a passkey signs out other devices.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation

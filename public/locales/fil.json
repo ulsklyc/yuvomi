@@ -6970,7 +6970,7 @@
         "removeConfirm": "Alisin ang passkey na ito at mag-sign out sa iba mong device? Mananatiling naka-sign in ang device na ito.",
         "signIn": "Mag-sign in gamit ang passkey",
         "reauthTitle": "Kumpirmahin ang iyong pagkakakilanlan",
-        "reauthLead": "Kumpirmahin gamit ang password o kasalukuyang passkey. Kung gumagamit ka ng password na may two-factor authentication, ilagay din ang code nito.",
+        "reauthLead": "Kumpirmahin gamit ang password o kasalukuyang passkey para magpatuloy dito. Kung naka-enable ang two-factor authentication, ilagay din ang code nito.",
         "reauthFailed": "Hindi nakumpirma. Suriin ang password o passkey at, kung kailangan, ang code ng ikalawang hakbang.",
         "confirmWithPasskey": "Kumpirmahin gamit ang passkey",
         "passwordChangeWarning": "Aalisin ng pagpapalit ng password ang lahat ng iyong passkey. Idagdag silang muli pagkatapos.",

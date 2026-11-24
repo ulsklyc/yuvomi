@@ -6970,7 +6970,7 @@
         "removeConfirm": "Fjerne denne passnøkkelen og logge ut de andre enhetene dine? Denne enheten forblir innlogget.",
         "signIn": "Logg inn med en tilgangsnøkkel",
         "reauthTitle": "Bekreft identiteten din",
-        "reauthLead": "Bekreft med passordet eller en eksisterende passnøkkel. Hvis du bruker passord med tofaktorautentisering, oppgir du også koden.",
+        "reauthLead": "Bekreft med passordet ditt eller en eksisterende tilgangsnøkkel for å fortsette her. Hvis tofaktorautentisering er aktivert, oppgir du også koden.",
         "reauthFailed": "Bekreftelsen mislyktes. Sjekk passordet eller tilgangsnøkkelen og om nødvendig koden for den andre faktoren.",
         "confirmWithPasskey": "Bekreft med en tilgangsnøkkel",
         "passwordChangeWarning": "Når du endrer passordet, fjernes alle passnøklene dine. Legg dem til igjen etterpå.",

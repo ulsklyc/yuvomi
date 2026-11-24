@@ -6970,7 +6970,7 @@
         "removeConfirm": "Deze passkey verwijderen en je andere apparaten afmelden? Dit apparaat blijft aangemeld.",
         "signIn": "Aanmelden met een passkey",
         "reauthTitle": "Bevestig je identiteit",
-        "reauthLead": "Bevestig met je wachtwoord of een bestaande passkey. Gebruik je je wachtwoord met tweestapsverificatie, voer dan ook de code in.",
+        "reauthLead": "Bevestig met je wachtwoord of een bestaande toegangssleutel om hier verder te gaan. Voer bij tweestapsverificatie ook de code in.",
         "reauthFailed": "Bevestigen mislukt. Controleer je wachtwoord of toegangssleutel en zo nodig de code voor de tweede factor.",
         "confirmWithPasskey": "Bevestigen met een toegangssleutel",
         "passwordChangeWarning": "Als je je wachtwoord wijzigt, worden al je passkeys verwijderd. Voeg ze daarna opnieuw toe.",

@@ -6970,7 +6970,7 @@
         "removeConfirm": "Supprimer cette clé d’accès et déconnecter tes autres appareils ? Cet appareil reste connecté.",
         "signIn": "Se connecter avec une clé d'accès",
         "reauthTitle": "Confirmer votre identité",
-        "reauthLead": "Confirme avec ton mot de passe ou une clé d’accès existante. Si tu utilises ton mot de passe avec la double authentification, saisis aussi le code.",
+        "reauthLead": "Confirmez avec votre mot de passe ou une clé d’accès existante pour continuer ici. Si la double authentification est activée, saisissez aussi son code.",
         "reauthFailed": "Échec de la confirmation. Vérifiez votre mot de passe ou votre clé d’accès et, si nécessaire, le code du second facteur.",
         "confirmWithPasskey": "Confirmer avec une clé d’accès",
         "passwordChangeWarning": "Changer ton mot de passe supprime toutes tes clés d’accès. Ajoute-les à nouveau ensuite.",

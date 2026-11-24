@@ -6970,7 +6970,7 @@
         "removeConfirm": "Bu geçiş anahtarı kaldırılsın ve diğer cihazlarındaki oturumlar kapatılsın mı? Bu cihazdaki oturum açık kalır.",
         "signIn": "Geçiş anahtarı ile giriş yap",
         "reauthTitle": "Kimliğini doğrula",
-        "reauthLead": "Parolan veya mevcut bir geçiş anahtarınla doğrula. Parolanı iki faktörlü doğrulamayla kullanıyorsan kodu da gir.",
+        "reauthLead": "Burada devam etmek için parolanla veya mevcut bir geçiş anahtarıyla doğrula. İki faktörlü kimlik doğrulama açıksa kodunu da gir.",
         "reauthFailed": "Doğrulama başarısız. Parolanı veya geçiş anahtarını ve gerekiyorsa ikinci faktör kodunu kontrol et.",
         "confirmWithPasskey": "Geçiş anahtarıyla doğrula",
         "passwordChangeWarning": "Parolanı değiştirmek tüm geçiş anahtarlarını kaldırır. Sonrasında bunları yeniden ekle.",

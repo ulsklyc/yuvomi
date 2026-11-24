@@ -453,6 +453,22 @@ test('reset-password updates the hash and consumes the token', async () => {
   assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 0);
 });
 
+test('a failure consuming the reset token rolls back the new password and passkey revocation', async () => {
+  const db = makeDb();
+  const options = { db, now: Date.now };
+  const reset = createPasswordResetService(options);
+  const token = reset.createToken(1).token;
+  db.prepare('INSERT INTO user_passkeys (user_id) VALUES (1)').run();
+  db.exec(`CREATE TRIGGER reject_token_delete BEFORE DELETE ON password_resets
+    BEGIN SELECT RAISE(ABORT, 'Token deletion failed'); END;`);
+  const { app } = await makeAuthApp(db);
+  const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'new-password' });
+  assert.equal(status, 500);
+  assert.equal(db.prepare('SELECT password_hash FROM users WHERE id = 1').get().password_hash, 'x');
+  assert.ok(db.prepare('SELECT 1 FROM user_passkeys WHERE user_id = 1').get());
+  assert.equal(reset.verifyToken(token), 1);
+});
+
 test('reset-password beendet jede Sitzung des Kontos, auch eine abgelaufene Zeile, und nur dessen', async () => {
   const db = makeDb();
   seedContactsAndEmail(db);

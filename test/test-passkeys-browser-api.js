@@ -74,7 +74,7 @@ async function inlineFixture() {
   /** @type {any} */
   let modal;
   browser.__openModal = /** @param {any} options */ options => {
-    const password = node({ required:true }); const code = node(); const modalStatus = node();
+    const password = node({ required:true }); const code = options.content.includes('id="passkey-reauth-code"') ? node({ required:true }) : null; const modalStatus = node();
     const modalForm = node(); const confirm = node(); const passkey = node();
     /** @type {Record<string,any>} */ const fields = { '#passkey-reauth-form':modalForm, '#passkey-reauth-password':password,
       '#passkey-reauth-code':code, '#passkey-reauth-status':modalStatus, '#passkey-reauth-use':passkey };
@@ -142,7 +142,7 @@ test('wrong confirmation stays in the dialog; closing during verification does n
   assert.equal(creations, 0); assert.equal(ui.name.value, 'My Bitwarden key');
 });
 
-test('existing UV passkey confirmation sends its assertion without a second-factor code', async () => {
+test('passkey confirmation submits a second-factor code when enabled', async () => {
   let confirmed = false; /** @type {any} */ let assertionProof = /** @type {any} */ (undefined); let creations = 0;
   testNavigator.credentials.create = async () => { creations++; return credential; };
   testNavigator.credentials.get = async () => credential;
@@ -157,17 +157,17 @@ test('existing UV passkey confirmation sends its assertion without a second-fact
   };
   const ui = await inlineFixture(); const pending = ui.submit(); await ui.settle();
   assert.match(ui.modal.content, /passkeys.confirmWithPasskey/);
-  ui.modal.code.value = '';
+  ui.modal.code.value = '123456';
   browser.__constraintErrors = /** @param {any} form */ form => {
     if (form === ui.modal.form) {
-      assert.equal(ui.modal.code.required, false, 'the TOTP field is optional for UV passkey proof');
+      assert.equal(ui.modal.code.required, true, 'passkey confirmation still requires the code');
       assert.equal(ui.modal.password.required, false);
     }
     return [];
   };
   try { ui.modal.passkey.handlers.click(); await pending; }
   finally { delete browser.__constraintErrors; }
-  assert.equal(assertionProof.method, 'passkey'); assert.equal(assertionProof.code, undefined, 'UV confirmation does not send a TOTP code');
+  assert.equal(assertionProof.method, 'passkey'); assert.equal(assertionProof.code, '123456');
   assert.equal(assertionProof.credential.id, encoded); assert.equal(assertionProof.password, undefined);
   assert.equal(creations, 1);
 });

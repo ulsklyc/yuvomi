@@ -6970,7 +6970,7 @@
         "removeConfirm": "Diesen Passkey entfernen und deine anderen Geräte abmelden? Dieses Gerät bleibt angemeldet.",
         "signIn": "Mit Passkey anmelden",
         "reauthTitle": "Identität bestätigen",
-        "reauthLead": "Bestätige mit deinem Passwort oder einem vorhandenen Passkey. Wenn du dein Passwort mit Zwei-Faktor-Anmeldung nutzt, gib auch den Code ein.",
+        "reauthLead": "Bestätige mit deinem Passwort oder einem vorhandenen Passkey, um hier fortzufahren. Bei aktivierter Zwei-Faktor-Anmeldung gib auch den Code ein.",
         "reauthFailed": "Bestätigung fehlgeschlagen. Prüfe dein Passwort oder deinen Passkey und gegebenenfalls den Code für den zweiten Faktor.",
         "confirmWithPasskey": "Mit Passkey bestätigen",
         "passwordChangeWarning": "Wenn du dein Passwort änderst, werden alle deine Passkeys entfernt. Richte sie danach erneut ein.",

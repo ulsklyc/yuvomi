@@ -6970,7 +6970,7 @@
         "removeConfirm": "Remove this passkey and sign out your other devices? This device stays signed in.",
         "signIn": "Sign in with a passkey",
         "reauthTitle": "Confirm your identity",
-        "reauthLead": "Confirm with your password or an existing passkey. If you use your password with two-factor authentication, enter its code too.",
+        "reauthLead": "Confirm with your password or an existing passkey to continue here. If two-factor authentication is enabled, enter its code too.",
         "reauthFailed": "Confirmation failed. Check your password or passkey and, if required, your second-factor code.",
         "confirmWithPasskey": "Confirm with a passkey",
         "passwordChangeWarning": "Changing your password removes all your passkeys. Add them again afterwards.",

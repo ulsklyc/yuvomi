@@ -7152,7 +7152,7 @@
         "removeConfirm": "Odstranit tento přístupový klíč a odhlásit ostatní zařízení? Toto zařízení zůstane přihlášené.",
         "signIn": "Přihlásit se přístupovým klíčem",
         "reauthTitle": "Potvrď svou totožnost",
-        "reauthLead": "Potvrďte heslem nebo existujícím přístupovým klíčem. Pokud používáte heslo s dvoufaktorovým ověřením, zadejte také kód.",
+        "reauthLead": "Pro pokračování potvrď heslem nebo existujícím přístupovým klíčem. Pokud máš zapnuté dvoufázové ověření, zadej také jeho kód.",
         "reauthFailed": "Potvrzení se nezdařilo. Zkontroluj heslo nebo přístupový klíč a případný kód druhého faktoru.",
         "confirmWithPasskey": "Potvrdit přístupovým klíčem",
         "passwordChangeWarning": "Změna hesla odstraní všechny vaše přístupové klíče. Poté je přidejte znovu.",
