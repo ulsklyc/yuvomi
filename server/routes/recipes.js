@@ -16,6 +16,7 @@ import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { handOverToShoppingList } from '../services/kitchen-handover.js';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -81,13 +82,13 @@ function attachPantryMatches(req, ingredients) {
     return ingredients.map((ing) => ({ ...ing, pantry_item_id: null, pantry_item_name: null }));
   }
   const recipeIds = [...new Set(ingredients.map((i) => i.recipe_id))];
-  const placeholders = recipeIds.map(() => '?').join(',');
+  const recipeList = sqlInList(recipeIds);
   const rows = db.get().prepare(`
     SELECT m.recipe_id, m.ingredient_key, m.pantry_item_id, p.name AS pantry_item_name
     FROM recipe_ingredient_pantry_matches m
     JOIN pantry_items p ON p.id = m.pantry_item_id
-    WHERE m.recipe_id IN (${placeholders})
-  `).all(...recipeIds);
+    WHERE m.recipe_id IN (${recipeList.sql})
+  `).all(recipeList.param);
 
   const byKey = new Map(rows.map((r) => [`${r.recipe_id}\x00${r.ingredient_key}`, r]));
   return ingredients.map((ing) => {
@@ -139,12 +140,12 @@ router.get('/', validateRequest(), (req, res) => {
   let ingredientMap = {};
 
   if (ids.length > 0) {
-    const placeholders = ids.map(() => '?').join(',');
+    const idList = sqlInList(ids);
     const ingredients = attachPantryMatches(req, db.get().prepare(`
       SELECT * FROM recipe_ingredients
-      WHERE recipe_id IN (${placeholders})
+      WHERE recipe_id IN (${idList.sql})
       ORDER BY id ASC
-    `).all(...ids));
+    `).all(idList.param));
 
     for (const ing of ingredients) {
       if (!ingredientMap[ing.recipe_id]) ingredientMap[ing.recipe_id] = [];

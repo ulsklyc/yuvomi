@@ -27,6 +27,7 @@
 import type { Database, RowReader } from '../authorize/index.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL } from './meal-cook.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 type MealRow = Record<string, unknown>;
 
@@ -73,7 +74,7 @@ export function mealsOverviewSlice(
     const visibleTypes = prefRow
       ? prefRow.value.split(',').filter((t) => ALL_MEAL_TYPES.includes(t))
       : ALL_MEAL_TYPES;
-    const placeholders = visibleTypes.map(() => '?').join(', ');
+    const typeList = sqlInList(visibleTypes);
     return db.prepare(`
       SELECT m.*,
              -- Wie im Planer (#1059): ob das verknuepfte Rezept ein Bild hat,
@@ -89,7 +90,7 @@ export function mealsOverviewSlice(
       LEFT JOIN recipes r ON r.id = m.recipe_id
       ${MEAL_COOK_JOIN_SQL}
       WHERE m.date = ?
-        AND m.meal_type IN (${placeholders})
+        AND m.meal_type IN (${typeList.sql})
       ORDER BY
         CASE m.meal_type
           WHEN 'breakfast' THEN 0
@@ -99,7 +100,7 @@ export function mealsOverviewSlice(
         END,
         -- A unique last key: a day may hold several meals of one type.
         m.id ASC
-    `).all(today, ...visibleTypes) as MealRow[];
+    `).all(today, typeList.param) as MealRow[];
   }, MEALS_BLOCK_FAILED.todayMeals);
 
   return { todayMeals };

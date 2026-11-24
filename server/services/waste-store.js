@@ -16,6 +16,7 @@ import {
   resolveOccurrences, nextPerType, expandSchedule, WEEKDAY_CODES, OCCURRENCE_RANGE_MAX_DAYS,
 } from './waste-domain.js';
 import { buildImportPreview, computeDigest, WasteImportError } from './waste-import.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 export class WasteValidationError extends Error {
   /**
@@ -177,8 +178,9 @@ export function deleteType(d, id) {
     // dropAllForUser() already cleans up per-user.
     const anchorIds = d.prepare('SELECT id FROM waste_reminder_entries WHERE type_id = ?').all(id).map((r) => r.id);
     if (anchorIds.length) {
-      d.prepare(`DELETE FROM reminders WHERE entity_type = 'waste_pickup' AND entity_id IN (${anchorIds.map(() => '?').join(',')})`)
-        .run(...anchorIds);
+      const anchorIdList = sqlInList(anchorIds);
+      d.prepare(`DELETE FROM reminders WHERE entity_type = 'waste_pickup' AND entity_id IN (${anchorIdList.sql})`)
+        .run(anchorIdList.param);
     }
     pruneFeedTypeSelections(d, id);
     d.prepare('DELETE FROM waste_types WHERE id = ?').run(id);
@@ -286,10 +288,10 @@ export function listOverrides(d, scheduleId) {
 function loadOverridesBySchedule(d, scheduleIds) {
   const map = new Map();
   if (!scheduleIds.length) return map;
-  const placeholders = scheduleIds.map(() => '?').join(',');
+  const scheduleIdList = sqlInList(scheduleIds);
   const rows = d.prepare(
-    `SELECT * FROM waste_schedule_overrides WHERE schedule_id IN (${placeholders})`
-  ).all(...scheduleIds);
+    `SELECT * FROM waste_schedule_overrides WHERE schedule_id IN (${scheduleIdList.sql})`
+  ).all(scheduleIdList.param);
   for (const row of rows) {
     if (!map.has(row.schedule_id)) map.set(row.schedule_id, []);
     map.get(row.schedule_id).push(row);

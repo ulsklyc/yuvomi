@@ -24,6 +24,7 @@ import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { activeAccountSql } from './account-state.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log = createLogger('PantryReminders');
 
@@ -393,8 +394,8 @@ export function syncAllPantryExpiryReminders(database, now = new Date()) {
   // Als AUFZÄHLUNG DER BERECHTIGTEN, nicht der Gesperrten: damit deckt dieselbe
   // Bedingung auch eine `created_by`, zu der es gar keinen Nutzer (mehr) gibt -
   // eine Denylist liesse sie durch und der INSERT scheiterte am Fremdschlüssel.
-  const allowedList = [...allowed];
-  const IS_ALLOWED = `AND created_by IN (${allowedList.map(() => '?').join(', ')})`;
+  const allowedList = sqlInList(allowed);
+  const IS_ALLOWED = `AND created_by IN (${allowedList.sql})`;
 
   // `date(x) = x` ist die kalendarische Prüfung in SQL: SQLite normalisiert ein
   // '2027-02-30' zu '2027-03-02' und liefert für '2026-13-01' NULL, beides
@@ -421,7 +422,7 @@ export function syncAllPantryExpiryReminders(database, now = new Date()) {
     AND quantity > 0
     ${IS_ALLOWED}
   `;
-  const QUALIFIES_PARAMS = [today, ...allowedList];
+  const QUALIFIES_PARAMS = [today, allowedList.param];
 
   // GEGENSTANDSLOSES ZUERST: der Artikel ist weg, verbraucht oder hat sein
   // Datum verloren. Auch eine schon zugestellte Meldung geht dann - sie zeigt

@@ -23,6 +23,7 @@ import { notCancelledEventSql } from './reminder-deleted-occurrence.js';
 import {
   householdTimeZone, localToUTC, shiftDateKey, storedToInstantMs, todayKey,
 } from '../utils/timezone.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 // Explicit read projections keep legacy inline attachment bodies out of compact
 // paths. The schema filter keeps focused test fixtures and older upgrade states
@@ -70,7 +71,7 @@ export function eventProjectionSql(database, alias = 'e', columns = RESOLVER_EVE
 
 function loadResolverMasters(database, parentIds) {
   if (parentIds.length === 0) return [];
-  const placeholders = parentIds.map(() => '?').join(',');
+  const parentIdList = sqlInList(parentIds);
   return database.prepare(`
     SELECT ${eventProjectionSql(database)},
            u_assigned.display_name AS assigned_name,
@@ -78,8 +79,8 @@ function loadResolverMasters(database, parentIds) {
            ${ASSIGNED_USERS_SQL}
     FROM calendar_events e
     LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
-    WHERE e.id IN (${placeholders})
-  `).all(...parentIds);
+    WHERE e.id IN (${parentIdList.sql})
+  `).all(parentIdList.param);
 }
 
 /**
@@ -94,11 +95,12 @@ export function hydrateEventAttachmentBodies(database, rows) {
     .filter((id) => Number.isInteger(id) && id > 0))];
   if (ownerIds.length === 0) return rows;
 
+  const ownerIdList = sqlInList(ownerIds);
   const bodies = database.prepare(`
     SELECT id, attachment_data
     FROM calendar_events
-    WHERE id IN (${ownerIds.map(() => '?').join(',')})
-  `).all(...ownerIds);
+    WHERE id IN (${ownerIdList.sql})
+  `).all(ownerIdList.param);
   const bodyByOwner = new Map(bodies.map((row) => [Number(row.id), row.attachment_data]));
   return rows.map((event) => ({
     ...event,

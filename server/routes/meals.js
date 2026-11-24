@@ -13,6 +13,7 @@ import { mayWriteModule } from '../authorize/index.ts';
 import { handOverToShoppingList, mealPlanSource } from '../services/kitchen-handover.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL, cookField, cookForNewOccurrence, cookRefusal } from '../services/meal-cook.js';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 // Ein unerwarteter Fehler geht an den zentralen Fehlerhandler
 // (server/middleware/error-handler.js, 500 `Internal server error.`). Die
@@ -351,12 +352,12 @@ router.get('/', validateRequest(), (req, res) => {
   let ingredientMap = {};
 
   if (mealIds.length > 0) {
-    const placeholders = mealIds.map(() => '?').join(',');
+    const mealList = sqlInList(mealIds);
     const ingredients  = db.get().prepare(`
       SELECT * FROM meal_ingredients
-      WHERE meal_id IN (${placeholders})
+      WHERE meal_id IN (${mealList.sql})
       ORDER BY id ASC
-    `).all(...mealIds);
+    `).all(mealList.param);
 
     for (const ing of ingredients) {
       if (!ingredientMap[ing.meal_id]) ingredientMap[ing.meal_id] = [];
@@ -374,11 +375,12 @@ router.get('/', validateRequest(), (req, res) => {
   const fromRecipe = meals.filter((m) => m.recipe_id && !(ingredientMap[m.id]?.length));
   if (fromRecipe.length > 0) {
     const recipeIds = [...new Set(fromRecipe.map((m) => m.recipe_id))];
+    const recipeList = sqlInList(recipeIds);
     const counts = db.get().prepare(`
       SELECT recipe_id, COUNT(*) AS c FROM recipe_ingredients
-      WHERE recipe_id IN (${recipeIds.map(() => '?').join(',')})
+      WHERE recipe_id IN (${recipeList.sql})
       GROUP BY recipe_id
-    `).all(...recipeIds);
+    `).all(recipeList.param);
     const byRecipe = Object.fromEntries(counts.map((r) => [r.recipe_id, r.c]));
     for (const m of fromRecipe) recipeCountMap[m.id] = byRecipe[m.recipe_id] ?? 0;
   }

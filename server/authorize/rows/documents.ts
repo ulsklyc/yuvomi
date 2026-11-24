@@ -9,6 +9,7 @@
  */
 
 import type { Database } from '../catalog.ts';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 
 /** The audience of an event as eventAudienceChanged() compares it. */
 type EventAudience = { visibility?: string | null; userIds?: readonly unknown[] | null };
@@ -98,11 +99,11 @@ export function filterVisibleIds(
     .filter((id) => Number.isInteger(id) && id > 0))];
   if (!wanted.length) return [];
 
-  const placeholders = wanted.map(() => '?').join(', ');
+  const idList = sqlInList(wanted);
   const rows = new Set((database.prepare(`
     SELECT d.id FROM ${table} d
-    WHERE d.id IN (${placeholders}) AND ${visible}
-  `).all(...wanted, { userId }) as { id: number }[]).map((row) => row.id));
+    WHERE d.id IN (${idList.sql}) AND ${visible}
+  `).all(idList.param, { userId }) as { id: number }[]).map((row) => row.id));
 
   return wanted.filter((id) => rows.has(id));
 }

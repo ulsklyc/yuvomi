@@ -16,6 +16,7 @@ import {
 } from './helpers.js';
 import { careAwareClause, readableClause, writableChild, writableClause } from '../../authorize/index.ts';
 import { validateRequest } from '../../api/validate-request.ts';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 import { MAX_SCHEDULES_ON_CREATE } from '../../services/health-fields.js';
 
 const router = express.Router();
@@ -129,7 +130,7 @@ function attachPlansAndLogs(meds, query) {
   const withLogs = include.has('logs');
   if (!meds.length || (!withSchedules && !withLogs)) return;
   const ids = meds.map((m) => m.id);
-  const marks = ids.map(() => '?').join(',');
+  const idList = sqlInList(ids);
   const byMed = (rows) => {
     const out = new Map(ids.map((id) => [id, []]));
     for (const row of rows) out.get(row.medication_id)?.push(row);
@@ -137,13 +138,13 @@ function attachPlansAndLogs(meds, query) {
   };
   if (withSchedules) {
     const rows = byMed(db.get().prepare(
-      `SELECT * FROM medication_schedules WHERE medication_id IN (${marks}) ORDER BY time_of_day ASC, id ASC`
-    ).all(...ids));
+      `SELECT * FROM medication_schedules WHERE medication_id IN (${idList.sql}) ORDER BY time_of_day ASC, id ASC`
+    ).all(idList.param));
     for (const med of meds) med.schedules = rows.get(med.id);
   }
   if (withLogs) {
-    const params = [...ids];
-    let sql = `SELECT * FROM medication_logs WHERE medication_id IN (${marks})`;
+    const params = [idList.param];
+    let sql = `SELECT * FROM medication_logs WHERE medication_id IN (${idList.sql})`;
     if (query.logs_from) { sql += ` AND substr(${LOG_WHEN}, 1, 16) >= ?`; params.push(String(query.logs_from).slice(0, 16)); }
     if (query.logs_to)   { sql += ` AND substr(${LOG_WHEN}, 1, 16) <= ?`; params.push(String(query.logs_to).slice(0, 16)); }
     sql += ` ORDER BY ${LOG_WHEN} DESC, id DESC`;

@@ -3290,6 +3290,26 @@ describe('parseAndMergeContact scalar + category wiring (#531 DB integration)', 
     assert.strictEqual(c.category, 'misc');
   });
 
+  it('stores a vCard with more values than SQLite takes host parameters per statement (Refs #2810)', async () => {
+    // One multi-row VALUES list per table broke at 32766 parameters: 7000 phones x 5,
+    // 9000 e-mails x 4, 4200 addresses x 8 each cross it. One statement per row does not.
+    const { get } = await import('../server/db.js');
+    const { parseAndMergeContact: merge } = await import('../server/services/cardav-sync.js');
+    const conn = get();
+    const account = conn.prepare("SELECT id FROM carddav_accounts WHERE name = 't'").get().id;
+    const card = ['BEGIN:VCARD', 'VERSION:3.0', 'UID:int-many', 'FN:Many Values',
+      ...Array.from({ length: 7000 }, (_v, i) => `TEL;TYPE=CELL:+49 30 ${String(i).padStart(6, '0')}`),
+      ...Array.from({ length: 9000 }, (_v, i) => `EMAIL;TYPE=HOME:p${i}@example.com`),
+      ...Array.from({ length: 4200 }, (_v, i) => `ADR;TYPE=HOME:;;Weg ${i};Berlin;;10115;DE`),
+      'END:VCARD'].join('\r\n');
+    const id = await merge(card, account, abUrl);
+    const count = (/** @type {string} */ table, extra = '') => conn.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE contact_id = ?${extra}`).get(id).n;
+    assert.deepStrictEqual([count('contact_phones'), count('contact_emails'), count('contact_addresses')], [7000, 9000, 4200]);
+    const primary = ' AND is_primary = 1';
+    assert.deepStrictEqual([count('contact_phones', primary), count('contact_emails', primary), count('contact_addresses', primary)], [1, 1, 1],
+      'the first value of each kind is the primary one, as before');
+  });
+
   it('maps a known category key from CATEGORIES', async () => {
     const id = await parseAndMergeContact(
       vcf('int-2', 'FN:Some Doctor', 'CATEGORIES:doctor'), accountId, abUrl

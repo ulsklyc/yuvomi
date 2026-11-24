@@ -13,6 +13,7 @@ import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
 import { collectErrors, color, date, datetime, num, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 import { MAX_WORKER_NAME, MAX_WORKER_USERNAME } from '../services/housekeeping-fields.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
 import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
@@ -819,10 +820,11 @@ function receiptAccess(req) {
     // geladen, und ein nicht geladenes Dokument ist fuer `visible()` unsichtbar.
     if (hidden || !wanted.length) return;
     for (const id of wanted) names.set(id, undefined);
+    const idList = sqlInList(wanted);
     const rows = db.get().prepare(`
       SELECT d.id, d.name FROM family_documents d
-      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${visibleWhere('documents', 'd', '@userId')}
-    `).all(...wanted, { userId: viewer });
+      WHERE d.id IN (${idList.sql}) AND ${visibleWhere('documents', 'd', '@userId')}
+    `).all(idList.param, { userId: viewer });
     for (const row of rows) names.set(row.id, row.name);
   };
   const visible = (id) => {

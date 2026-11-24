@@ -11,6 +11,7 @@ import {
 } from '../utils/timezone.js';
 import { legacyOccurrenceKeyFor } from './legacy-occurrence-key.js';
 import { personAvatarUrlSql } from './person-avatar.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const DEFAULT_EXPANSION_ITERATIONS = 1000;
 export const MAX_EXPANSION_ITERATIONS = 100000;
@@ -134,10 +135,10 @@ export function emptyOccurrenceExceptions() {
 export function loadEventExceptions(d, eventIds) {
   const map = new Map();
   if (!eventIds || eventIds.length === 0) return map;
-  const placeholders = eventIds.map(() => '?').join(',');
+  const eventIdList = sqlInList(eventIds);
   const rows = d.prepare(
-    `SELECT event_id, exception_date FROM calendar_event_exceptions WHERE event_id IN (${placeholders})`
-  ).all(...eventIds);
+    `SELECT event_id, exception_date FROM calendar_event_exceptions WHERE event_id IN (${eventIdList.sql})`
+  ).all(eventIdList.param);
   for (const row of rows) {
     if (!map.has(row.event_id)) map.set(row.event_id, emptyOccurrenceExceptions());
     map.get(row.event_id).add(row.exception_date);

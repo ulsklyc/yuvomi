@@ -1506,45 +1506,45 @@ function insertContactMultiValues(contactId, vcard) {
     'SELECT 1 FROM contact_addresses WHERE contact_id = ? AND is_primary = 1'
   ).get(contactId);
 
-  // Batch insert phones. value_e164 additiv (Phase 2): der rohe value bleibt die
-  // Wahrheit; value_e164 nur wo parsebar, damit der Sync format-unabhängig matcht.
+  // One prepared statement per table, run once per value: a multi-row VALUES list with
+  // one placeholder per value broke at SQLite's host parameter limit on a large vCard
+  // (Refs #2810).
+  // value_e164 additiv (Phase 2): der rohe value bleibt die Wahrheit; value_e164 nur wo
+  // parsebar, damit der Sync format-unabhaengig matcht.
   if (vcard.phones && vcard.phones.length > 0) {
     const defaultCountry = defaultCountryFromConfig(db.get());
-    const placeholders = vcard.phones.map(() => '(?, ?, ?, ?, ?)').join(', ');
-    const values = vcard.phones.flatMap((phone, i) => [
+    const insertPhone = db.get().prepare(`
+      INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    vcard.phones.forEach((phone, i) => insertPhone.run(
       contactId,
       phone.label || null,
       phone.value,
       (!hasPrimaryPhone && i === 0) ? 1 : 0,
       toE164(phone.value, defaultCountry)
-    ]);
-
-    db.get().prepare(`
-      INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
-      VALUES ${placeholders}
-    `).run(...values);
+    ));
   }
 
-  // Batch insert emails
   if (vcard.emails && vcard.emails.length > 0) {
-    const placeholders = vcard.emails.map(() => '(?, ?, ?, ?)').join(', ');
-    const values = vcard.emails.flatMap((email, i) => [
+    const insertEmail = db.get().prepare(`
+      INSERT INTO contact_emails (contact_id, label, value, is_primary)
+      VALUES (?, ?, ?, ?)
+    `);
+    vcard.emails.forEach((email, i) => insertEmail.run(
       contactId,
       email.label || null,
       email.value,
       (!hasPrimaryEmail && i === 0) ? 1 : 0
-    ]);
-
-    db.get().prepare(`
-      INSERT INTO contact_emails (contact_id, label, value, is_primary)
-      VALUES ${placeholders}
-    `).run(...values);
+    ));
   }
 
-  // Batch insert addresses
   if (vcard.addresses && vcard.addresses.length > 0) {
-    const placeholders = vcard.addresses.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
-    const values = vcard.addresses.flatMap((addr, i) => [
+    const insertAddress = db.get().prepare(`
+      INSERT INTO contact_addresses (contact_id, label, street, city, state, postal_code, country, is_primary)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    vcard.addresses.forEach((addr, i) => insertAddress.run(
       contactId,
       addr.label || null,
       addr.street,
@@ -1553,12 +1553,7 @@ function insertContactMultiValues(contactId, vcard) {
       addr.postalCode,
       addr.country,
       (!hasPrimaryAddress && i === 0) ? 1 : 0
-    ]);
-
-    db.get().prepare(`
-      INSERT INTO contact_addresses (contact_id, label, street, city, state, postal_code, country, is_primary)
-      VALUES ${placeholders}
-    `).run(...values);
+    ));
   }
 }
 

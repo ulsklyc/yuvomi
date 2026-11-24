@@ -24,6 +24,7 @@ import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log = createLogger('Shopping');
 
@@ -1505,8 +1506,11 @@ router.delete('/:listId/items/checked', validateRequest(), (req, res) => {
     if (ids.some((id) => !Number.isInteger(id) || id <= 0))
       return res.status(400).json({ error: 'ids may only contain item ids.', code: 400 });
   }
-  const scope = ids
-    ? { where: `list_id = ? AND is_checked = 1 AND id IN (${ids.map(() => '?').join(',')})`, params: [listId, ...ids] }
+  // The ids go in as one JSON parameter (Refs #2810): one placeholder per id broke at
+  // SQLite's 32766 host parameters with a 500.
+  const idList = ids ? sqlInList(ids) : null;
+  const scope = idList
+    ? { where: `list_id = ? AND is_checked = 1 AND id IN (${idList.sql})`, params: [listId, idList.param] }
     : { where: 'list_id = ? AND is_checked = 1', params: [listId] };
 
   const queued = queueTodoDeletions('shopping', mirroredItems(scope.where, ...scope.params));

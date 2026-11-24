@@ -23,6 +23,7 @@
 import { SOURCE_CALENDAR_JOIN } from './calendar-events.js';
 import { localCalendarIdSql } from './local-calendars.js';
 import { personReader, readerVisibleWhere } from '../authorize/index.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const KEY_RE = /^(local|cal|sub):([1-9]\d{0,14})$/;
 const MAX_SELECTION = 50;
@@ -113,9 +114,10 @@ export function resolveCalendarSelection(d, raw, viewerId) {
 export function calendarSelectionSql(keys) {
   if (!Array.isArray(keys) || !keys.length) return { sql: '', params: [] };
   const key = `COALESCE('sub:' || e.subscription_id, 'cal:' || src.id, 'local:' || ${localCalendarIdSql('e')})`;
+  const keyList = sqlInList(keys);
   return {
     sql: `
-    AND (${key} IS NULL OR ${key} IN (${keys.map(() => '?').join(', ')}))`,
-    params: [...keys],
+    AND (${key} IS NULL OR ${key} IN (${keyList.sql}))`,
+    params: [keyList.param],
   };
 }

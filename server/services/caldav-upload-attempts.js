@@ -35,6 +35,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { inspectObjectAt } from '../utils/own-uid.js';
 import { isAccountWideRefusal } from '../utils/caldav-client.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log = createLogger('CalDAV-Upload-Notes');
 
@@ -125,15 +126,16 @@ export function dropUploadAttempt(id) {
  * @param {string}   [q.uid]
  */
 export function uploadAttemptsOf({ source, accountId = null, kinds, rowId = null, uid = null }) {
+  const kindsList = sqlInList(kinds);
   return db.get().prepare(`
     SELECT id, source, account_id, kind, row_id, collection_url, uid, object_url, created_at
     FROM caldav_upload_attempts
     WHERE source = ? AND account_id IS ?
-      AND kind IN (${kinds.map(() => '?').join(',')})
+      AND kind IN (${kindsList.sql})
       AND (? IS NULL OR row_id = ?)
       AND (? IS NULL OR uid = ?)
     ORDER BY id
-  `).all(source, accountId, ...kinds, rowId, rowId, uid, uid);
+  `).all(source, accountId, kindsList.param, rowId, rowId, uid, uid);
 }
 
 /**

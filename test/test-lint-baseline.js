@@ -26,7 +26,9 @@
  *          replaced, phase 1b section E, and the spellings a probe against that reader
  *          found) and nothing for the lines it must leave alone. A
  *          baseline key of that rule needs a reason in lint-baseline-reasons.json, and a
- *          reason needs its key.
+ *          reason needs its key. The fixture test/fixtures/lint/sql-in-list/ (Refs #2810) must
+ *          give exactly its thirteen SQL-IN-LIST lines (one SQL placeholder per value, one line
+ *          per spelling) and nothing in server/db.js; a SQL-IN-LIST key needs a reason.
  * Run:     npm run test:lint-baseline
  */
 
@@ -493,36 +495,45 @@ function serverSelectors() {
 /** @param {string} tag @returns {(s: Selector) => boolean} */
 const tagged = (tag) => (s) => s.message.startsWith(`${tag}:`);
 
-const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW'];
+const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW', 'SQL-IN-LIST'];
 /** @param {Selector} s */
 const serverOnly = (s) => SERVER_ONLY.some((tag) => tagged(tag)(s));
 
-test('server/ gets the whole base rule plus the sender and rights selectors, nothing else', () => {
+test('server/ gets the whole base rule plus the sender, rights and SQL list selectors, nothing else', () => {
   const [severity, ...base] = CONFIG.rules[RESTRICTED];
   const [serverSeverity, ...server] = serverSelectors();
   assert.equal(serverSeverity, severity);
   assert.deepEqual(server.slice(0, base.length), base);
   const extra = server.slice(base.length);
-  assert.ok(extra.every(serverOnly), 'only sender and rights selectors are added');
+  assert.ok(extra.every(serverOnly), 'only sender, rights and SQL list selectors are added');
   for (const tag of SERVER_ONLY) assert.ok(extra.some(tagged(tag)), `server/** carries no ${tag} selector`);
   // Test files may stub a sender or seed a visibility value; the rules are for server/ only.
   assert.ok(!base.some(serverOnly), 'a server-only selector in the base rule');
 });
 
-// Where the rights rules are the rule itself (phase 2, B5, B8c): the permission module, the
-// schema and its test mirror (migrations write visibility values and compare a row's level
-// while they move data), the API documentation.
+// Where the rights rules are the rule itself (phase 2, B5, B8c): the permission module and
+// the API documentation; the schema and its test mirror (migrations write visibility values,
+// compare a row's level while they move data, and keep their SQL as it was applied) have an
+// exception of their own that drops the rights and the SQL list selectors (Refs #2810).
 const RIGHTS_TAGS = ['RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW'];
-const RIGHTS_HOME = ['server/authorize/**', 'server/db.js', 'server/db-schema-test.js', 'server/openapi/**'];
+const RIGHTS_HOME = ['server/authorize/**', 'server/openapi/**'];
+const SCHEMA_HOME = ['server/db.js', 'server/db-schema-test.js'];
 
-test('the rights exception covers exactly the permission module, the schema and the API docs, and drops only the rights selectors', () => {
+test('the rights exception covers exactly the permission module and the API docs, and drops only the rights selectors', () => {
   const [severity, ...selectors] = serverSelectors();
   const override = CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes('server/authorize/**'));
   assert.ok(override, 'no override for server/authorize/**');
   assert.deepEqual(override.files, RIGHTS_HOME);
   assert.deepEqual(override.rules[RESTRICTED], [severity, ...selectors.filter((s) => !RIGHTS_TAGS.some((tag) => tagged(tag)(s)))]);
-  // Every other server override keeps every rights tag.
+  const schema = CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes('server/db.js'));
+  assert.ok(schema, 'no override for server/db.js');
+  assert.deepEqual(schema.files, SCHEMA_HOME);
+  assert.deepEqual(schema.rules[RESTRICTED], [severity, ...selectors.filter((s) => ![...RIGHTS_TAGS, 'SQL-IN-LIST'].some((tag) => tagged(tag)(s)))]);
+  // Every other server override keeps every rights tag and the SQL list tag.
   for (const other of /** @type {Override[]} */ (CONFIG.overrides)) {
+    if (other === schema) continue;
+    const [, ...kept] = other.rules[RESTRICTED];
+    if (other.files.some((f) => f.startsWith('server/'))) assert.ok(kept.some(tagged('SQL-IN-LIST')), `${other.files.join(', ')} loses SQL-IN-LIST`);
     if (other === override || !other.files.some((f) => f.startsWith('server/'))) continue;
     for (const tag of RIGHTS_TAGS) {
       const [, ...list] = other.rules[RESTRICTED];
@@ -791,6 +802,46 @@ test('the ratchet holds RIGHTS-MODULE and the import rule as hard, and asks a re
   } finally { rmSync(sql, { recursive: true, force: true }); }
 });
 
+const SQL_LIST_FIXTURE = join(FIXTURE, 'sql-in-list');
+
+test('the SQL-IN-LIST fixture gives exactly its thirteen marked lines, and nothing in the schema file', () => {
+  const dir = tempDir('yuvomi-sql-in-list-fixture-');
+  try {
+    cpSync(SQL_LIST_FIXTURE, dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    // The fixture marks every line that must be reported with `sql-N`.
+    const marked = ['server/routes/lists.js', 'server/authorize/rows.ts'].flatMap((file) => readFileSync(join(dir, file), 'utf8').split('\n')
+      .flatMap((line, i) => (/\/\/ sql-\d+$/.test(line) ? [`${file}:${i + 1} SQL-IN-LIST`] : [])));
+    assert.equal(marked.length, 13, 'the fixture marks thirteen spellings');
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    // Silent: the function `silent` (one json_each parameter, two columns, a single '?',
+    // maps that build something else) and server/db.js (migrations).
+    assert.deepEqual(found, [...marked].sort());
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a SQL-IN-LIST key stands only with a reason (a fixed column list), never as a hard rule', () => {
+  const dir = project("export const f = (db, cols) => db.prepare(`INSERT INTO t (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`);\n");
+  try {
+    const init = run(dir, '--init');
+    assert.equal(init.code, 1, init.out);
+    assert.match(init.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/SQL-IN-LIST\s+no reason/);
+    assert.doesNotMatch(init.out, /Hard rules have no baseline/);
+    assert.deepEqual(baselineOf(dir), { 'server/x.js\toxlint/no-restricted-syntax/SQL-IN-LIST': 1 });
+    writeReasons(dir, { 'server/x.js\toxlint/no-restricted-syntax/SQL-IN-LIST': 'a fixed column list of the table, not a list of values' });
+    const ok = run(dir);
+    assert.equal(ok.code, 0, ok.out);
+    // A second list in the same file raises the count: red, and --update never takes it in.
+    writeFileSync(join(dir, 'server', 'x.js'), "export const f = (db, cols) => db.prepare(`INSERT INTO t (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`);\nexport const g = (db, ids) => db.prepare(`SELECT * FROM t WHERE id IN (${ids.map(() => '?').join(',')})`);\n");
+    const more = run(dir);
+    assert.equal(more.code, 1, more.out);
+    assert.match(more.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/SQL-IN-LIST\s+1 -> 2/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 const ROW = 'server/x.js\toxlint/no-restricted-syntax/RIGHTS-ROW';
 const ROW_FILTER = "export const f = (task, set) => { if (task.visibility === 'all') set(task); if (task.visibility !== 'private') set(task); };\n";
 
@@ -987,4 +1038,6 @@ test('the real lint-baseline-reasons.json is sorted and explains every error-tex
   const rightsRow = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/RIGHTS-ROW'));
   assert.ok(rightsRow.length > 0, 'the baseline carries no rights-row key');
   assert.deepEqual(rightsRow.filter((key) => !(key in reasons)), [], 'rights-row keys without a reason');
+  const sqlList = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/SQL-IN-LIST'));
+  assert.deepEqual(sqlList.filter((key) => !(key in reasons)), [], 'sql-in-list keys without a reason');
 });
