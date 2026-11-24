@@ -296,6 +296,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request without it used to switch the household's two-factor requirement off, now it is a 400
   with `reason: "validation"` and nothing changes. The check still runs after the administrator
   and CSRF checks.
+- **The MCP tool `call_api_operation` names the refused fields.** When the API refuses a request
+  for its content, the tool's error now ends with the path and rule of each refused field, for
+  example `[fields: type at body/title]` - at most ten, then "and N more". Values are never
+  named. Errors without such fields read as before.
 
 ### Removed
 - **`role: "admin"` no longer makes an administrator at `POST /auth/users`.** This is about your
