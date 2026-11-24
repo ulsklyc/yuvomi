@@ -18,6 +18,7 @@ import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js'
 import {
   MAX_CUSTOM_FIELD_NAME, MAX_CYCLE_LENGTH, MAX_FIELD_VALUE_LENGTH, MAX_SCHEDULE_NOTE, MAX_SHORT_CODE, MIN_CYCLE_LENGTH,
 } from '../services/schedule-fields.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 // Seit #2810 prueft validateRequest() jede Anfrage gegen das Schema ihrer
 // Operation (server/openapi/paths/schedule.js), bevor ein Handler laeuft. Was
@@ -471,7 +472,10 @@ router.delete('/patterns/:id', validateRequest(), (req, res) => {
   // weg, dann das Muster (das die Tage mitreisst), alles in einer Transaktion.
   db.get().transaction(() => {
     const dayIds = db.get().prepare('SELECT id FROM schedule_pattern_days WHERE pattern_id=?').all(old.id).map((row) => row.id);
-    if (dayIds.length) db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${dayIds.map(() => '?').join(',')})`).run(...dayIds);
+    if (dayIds.length) {
+      const dayList = sqlInList(dayIds);
+      db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${dayList.sql})`).run(dayList.param);
+    }
     db.get().prepare('DELETE FROM schedule_patterns WHERE id=?').run(old.id);
   })();
   return res.status(204).end();
@@ -518,7 +522,10 @@ router.put('/patterns/:id/days', validateRequest(), (req, res) => {
   // die frischen Ids rein.
   db.get().transaction(() => {
     const oldIds = db.get().prepare('SELECT id FROM schedule_pattern_days WHERE pattern_id=?').all(old.id).map((row) => row.id);
-    if (oldIds.length) db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${oldIds.map(() => '?').join(',')})`).run(...oldIds);
+    if (oldIds.length) {
+      const oldList = sqlInList(oldIds);
+      db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${oldList.sql})`).run(oldList.param);
+    }
     db.get().prepare('DELETE FROM schedule_pattern_days WHERE pattern_id=?').run(old.id);
     const add = db.get().prepare('INSERT INTO schedule_pattern_days (pattern_id,position,shift_type_id) VALUES (?,?,?)');
     for (const day of days) {

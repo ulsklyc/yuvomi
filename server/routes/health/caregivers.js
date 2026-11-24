@@ -16,6 +16,7 @@ import { allCareGrants, caredForIds, caregiversOf, replaceCaregivers } from '../
 import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
 import { isActiveAccount } from '../../services/household-members.js';
 import { validateRequest } from '../../api/validate-request.ts';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 
 const router = express.Router();
 
@@ -68,10 +69,10 @@ router.put('/caregivers/:subjectId', requireAdmin, validateRequest(), (req, res)
     .filter((id) => id !== subjectId);
 
   if (ids.length) {
-    const placeholders = ids.map(() => '?').join(', ');
+    const idList = sqlInList(ids);
     const found = db.get().prepare(
-      `SELECT id FROM users WHERE id IN (${placeholders})`
-    ).all(...ids);
+      `SELECT id FROM users WHERE id IN (${idList.sql})`
+    ).all(idList.param);
     if (found.length !== ids.length) {
       return res.status(400).json({ error: 'caregiver_ids contains an unknown user.', code: 400 });
     }

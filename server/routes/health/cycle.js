@@ -43,6 +43,7 @@ import {
   exportFilename, sendCsv, exportRange,
 } from './helpers.js';
 import { visibilityClause } from '../../authorize/index.ts';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
@@ -103,10 +104,10 @@ function symptomsForLog(database, dayLogId) {
 function symptomsForLogs(database, dayLogIds) {
   const byLog = new Map(dayLogIds.map((id) => [id, []]));
   if (dayLogIds.length === 0) return byLog;
-  const placeholders = dayLogIds.map(() => '?').join(', ');
+  const logList = sqlInList(dayLogIds);
   const rows = database.prepare(
-    `SELECT day_log_id, symptom_key AS key, intensity FROM cycle_day_log_symptoms WHERE day_log_id IN (${placeholders}) ORDER BY id`
-  ).all(...dayLogIds);
+    `SELECT day_log_id, symptom_key AS key, intensity FROM cycle_day_log_symptoms WHERE day_log_id IN (${logList.sql}) ORDER BY id`
+  ).all(logList.param);
   for (const { day_log_id, key, intensity } of rows) byLog.get(day_log_id).push({ key, intensity });
   return byLog;
 }
@@ -167,10 +168,10 @@ function feelingsForLog(database, dayLogId) {
 function feelingsForLogs(database, dayLogIds) {
   const byLog = new Map(dayLogIds.map((id) => [id, []]));
   if (dayLogIds.length === 0) return byLog;
-  const placeholders = dayLogIds.map(() => '?').join(', ');
+  const logList = sqlInList(dayLogIds);
   const rows = database.prepare(
-    `SELECT day_log_id, feeling_key FROM cycle_day_log_feelings WHERE day_log_id IN (${placeholders}) ORDER BY id`
-  ).all(...dayLogIds);
+    `SELECT day_log_id, feeling_key FROM cycle_day_log_feelings WHERE day_log_id IN (${logList.sql}) ORDER BY id`
+  ).all(logList.param);
   for (const { day_log_id, feeling_key } of rows) byLog.get(day_log_id).push(feeling_key);
   return byLog;
 }

@@ -25,6 +25,7 @@ import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { listTypes, getOccurrences } from './waste-store.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log = createLogger('Waste');
 
@@ -73,7 +74,8 @@ function dropAllForUser(database, userId) {
   const anchors = database.prepare('SELECT id FROM waste_reminder_entries WHERE user_id = ?').all(userId);
   if (anchors.length) {
     const ids = anchors.map((a) => a.id);
-    database.prepare(`DELETE FROM reminders WHERE entity_type = 'waste_pickup' AND entity_id IN (${ids.map(() => '?').join(',')})`).run(...ids);
+    const idList = sqlInList(ids);
+    database.prepare(`DELETE FROM reminders WHERE entity_type = 'waste_pickup' AND entity_id IN (${idList.sql})`).run(idList.param);
   }
   database.prepare('DELETE FROM waste_reminder_entries WHERE user_id = ?').run(userId);
 }

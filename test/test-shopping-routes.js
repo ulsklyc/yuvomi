@@ -17,6 +17,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createShoppingDocumentsApp } from './shopping-documents-app.js';
+import { BODY_LIMIT } from '../server/utils/upload-limit.js';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
@@ -27,6 +28,8 @@ let actor = { id: U, role: 'member' };
 // At its real prefix with the central error handler (#2810): call() puts the prefix in front.
 const app = await createShoppingDocumentsApp({
   mount: ['shopping'],
+  // The body limit of server/index.js: a request with 40 000 ids must reach the route.
+  jsonLimit: BODY_LIMIT,
   auth: (req, _res, next) => {
     req.authUserId = actor.id;
     req.authRole = actor.role;
@@ -580,6 +583,34 @@ test('DELETE /:listId/items/checked mit { ids }: nur die genannten, davon nur ab
   const names = (listId) => db.prepare('SELECT name FROM shopping_items WHERE list_id = ? ORDER BY name').all(listId).map((row) => row.name);
   assert.deepEqual(names(list), ['B', 'C']);
   assert.deepEqual(names(other), ['X'], 'eine fremde ID loescht nichts in der anderen Liste');
+});
+
+test('DELETE /:listId/items/checked mit 40 000 ids: 200, genau diese geloescht (eine SQL-Variable, nicht eine je ID)', async () => {
+  // SQLite nimmt hoechstens 32766 Host-Parameter je Anweisung; ein IN (?,?,...) je ID
+  // brach ab 32766 IDs mit 500 "too many SQL variables" ab. Die Liste geht jetzt als ein
+  // JSON-Parameter an json_each.
+  const list = await newList('Checked-Many');
+  const keep = (await call('POST', `/${list}/items`, { name: 'Behalten' })).body.data;
+  await call('PATCH', `/items/${keep.id}`, { is_checked: true });
+  // Die Suchindex-Trigger loeschen per entity_id in der FTS5-Tabelle (ein Scan je Zeile):
+  // 40 000 Zeilen anlegen und loeschen dauerte damit Minuten. Sie sind hier nicht Gegenstand
+  // und kommen danach unveraendert zurueck.
+  const searchTriggers = db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name IN ('trg_search_items_ai', 'trg_search_items_ad')").all();
+  assert.equal(searchTriggers.length, 2);
+  for (const { name } of searchTriggers) db.exec(`DROP TRIGGER ${name}`);
+  // Mit eigenem Rang: der Rang-Trigger sucht sonst je Zeile das MAX der Kategorie.
+  const insert = db.prepare("INSERT INTO shopping_items (list_id, name, is_checked, sort_order) VALUES (?, ?, 1, ?)");
+  const ids = db.transaction(() => Array.from({ length: 40000 }, (_v, i) => Number(insert.run(list, `Artikel ${i}`, i + 1).lastInsertRowid)))();
+  let r;
+  try {
+    r = await call('DELETE', `/${list}/items/checked`, { ids });
+  } finally {
+    for (const { sql } of searchTriggers) db.exec(sql);
+  }
+  assert.equal(r.status, 200);
+  assert.equal(r.body.deleted, 40000);
+  assert.deepEqual(db.prepare('SELECT id FROM shopping_items WHERE list_id = ?').all(list).map((/** @type {{ id: number }} */ row) => row.id), [keep.id],
+    'der nicht genannte abgehakte Artikel bleibt');
 });
 
 test('DELETE /:listId/items/checked: ein leeres oder unbrauchbares ids ist 400, kein "dann eben alle"', async () => {

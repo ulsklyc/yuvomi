@@ -91,12 +91,15 @@ const HARD = new Set([
 // RIGHTS-SQL (phase 2, B5): a visibility literal in SQL outside server/authorize/ stands
 // only as a write, never a read. RIGHTS-ROW (phase 2, B8c): a visibility level compared in
 // JavaScript there stands only as a write filter or data upkeep, never a read rule.
-// A new key of either is red like any new key, and --update never takes one in (it only
+// SQL-IN-LIST (Refs #2810): a fixed column list built with one placeholder per column
+// stands only with its reason; a list of values goes through sqlInList().
+// A new key of any of them is red like any new key, and --update never takes one in (it only
 // lowers), so the list grows only by hand, with its reason.
 const REASONED = new Set([
   'oxlint/no-restricted-syntax/ERROR-TEXT',
   'oxlint/no-restricted-syntax/RIGHTS-SQL',
   'oxlint/no-restricted-syntax/RIGHTS-ROW',
+  'oxlint/no-restricted-syntax/SQL-IN-LIST',
 ]);
 const MIN_REASON = 20;
 

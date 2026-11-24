@@ -29,6 +29,7 @@ import type { Database, RowReader } from '../authorize/index.ts';
 import type { OverviewContext, SliceGuard } from './tasks-slices.ts';
 import type { IndexSearchQuery, SearchActor, SearchRow } from './search-text.ts';
 import { SEARCH_LIMIT, withExcerpt } from './search-text.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 /** Query options of the overview that act on the shopping blocks. */
 export type ShoppingOverviewOptions = Readonly<{
@@ -100,13 +101,13 @@ export function shoppingOverviewSlice(
   // is gone drops out, and if none is left the request counts as unfiltered.
   const shoppingSelection = guard('shopping selection', () => {
     if (!wanted.length) return null;
+    const wantedList = sqlInList(wanted);
     const existing = (db.prepare(
-      `SELECT id FROM shopping_lists WHERE id IN (${wanted.map(() => '?').join(', ')})`,
-    ).all(...wanted) as { id: number }[]).map((row) => row.id);
+      `SELECT id FROM shopping_lists WHERE id IN (${wantedList.sql})`,
+    ).all(wantedList.param) as { id: number }[]).map((row) => row.id);
     return existing.length ? existing : null;
   }, null);
-  const shoppingMarks = shoppingSelection ? shoppingSelection.map(() => '?').join(', ') : '';
-  const shoppingBinds = shoppingSelection ?? [];
+  const shoppingList = sqlInList(shoppingSelection ?? []);
 
   const openCounts = guard('shoppingOpenCount', () => {
     const row = db.prepare(`
@@ -157,16 +158,16 @@ export function shoppingOverviewSlice(
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id AND si.is_checked = 0) AS open_count,
         (SELECT COUNT(*) FROM shopping_items si WHERE si.list_id = sl.id) AS total_count
       FROM shopping_lists sl
-      WHERE sl.id IN (${shoppingMarks})
+      WHERE sl.id IN (${shoppingList.sql})
       -- A unique last key: SQL leaves ties open, and the LIMIT picks from them.
       ORDER BY (open_count > 0) DESC, sl.updated_at DESC, sl.id DESC
       LIMIT 3
-    `).all(...shoppingBinds) as ShoppingList[];
+    `).all(shoppingList.param) as ShoppingList[];
       for (const list of lists) list.items = shoppingItemsOf(list.id);
       const openCount = (db.prepare(`
       SELECT COUNT(*) AS items FROM shopping_items si
-      WHERE si.is_checked = 0 AND si.list_id IN (${shoppingMarks})
-    `).get(...shoppingBinds) as { items: number }).items;
+      WHERE si.is_checked = 0 AND si.list_id IN (${shoppingList.sql})
+    `).get(shoppingList.param) as { items: number }).items;
       return { lists, openCount, listCount: shoppingSelection.length };
     }, null)
     : null;

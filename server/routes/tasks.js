@@ -23,7 +23,8 @@ import {
 } from '../services/task-rotation.js';
 import { activeAccountSql } from '../services/account-state.js';
 import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/task-completions.js';
-import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
+import { categoryParam, normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 import {
   flushOutbound, markTodoOutbound, queueTodoDeletion, recurrenceFollowupTarget,
   continuesForeignSeries, handOverForeignSeries, takeBackForeignSeries,
@@ -287,14 +288,14 @@ function attachTags(tasks) {
  */
 function attachRotation(tasks) {
   if (!tasks.length) return tasks;
-  const ids = tasks.map((t) => t.id);
+  const idList = sqlInList(tasks.map((t) => t.id));
   const rows = db.get().prepare(`
     SELECT p.task_id, p.user_id, p.position, ${activeAccountSql('u')} AS active
     FROM task_rotation_pool p
     JOIN users u ON u.id = p.user_id
-    WHERE p.task_id IN (${ids.map(() => '?').join(',')})
+    WHERE p.task_id IN (${idList.sql})
     ORDER BY p.task_id, p.position ASC
-  `).all(...ids);
+  `).all(idList.param);
   const byTask = new Map();
   for (const r of rows) {
     if (!byTask.has(r.task_id)) byTask.set(r.task_id, []);
@@ -510,9 +511,10 @@ function completesForeignSeries(task, nextStatus) {
  */
 function editableTaskIds(ids, req) {
   if (!ids.length) return ids;
+  const idList = sqlInList(ids);
   const rows = db.get().prepare(
-    `SELECT id, locked, created_by, parent_task_id FROM tasks WHERE id IN (${ids.map(() => '?').join(',')})`
-  ).all(...ids);
+    `SELECT id, locked, created_by, parent_task_id FROM tasks WHERE id IN (${idList.sql})`
+  ).all(idList.param);
   const byId = new Map(rows.map((r) => [r.id, r]));
   return ids.filter((id) => {
     const row = byId.get(id);
@@ -718,9 +720,10 @@ router.get('/tags', validateRequest(), (req, res) => {
  */
 function pushTagChanges(changed, what) {
   if (!changed.length) return;
+  const idList = sqlInList(changed.map((c) => c.id));
   const rows = db.get().prepare(
-    `SELECT * FROM tasks WHERE id IN (${changed.map(() => '?').join(',')})`
-  ).all(...changed.map((c) => c.id));
+    `SELECT * FROM tasks WHERE id IN (${idList.sql})`
+  ).all(idList.param);
   const byId = new Map(rows.map((r) => [r.id, r]));
 
   let pending = 0;
@@ -737,12 +740,12 @@ function pushTagChanges(changed, what) {
 /** Aus einer Liste von IDs die, die `me` sehen darf. */
 function visibleTaskIds(ids, me) {
   if (!ids.length) return [];
-  const placeholders = ids.map(() => '?').join(',');
+  const idList = sqlInList(ids);
   return db.get().prepare(`
     SELECT t.id AS id FROM tasks t
-    WHERE t.id IN (${placeholders})
+    WHERE t.id IN (${idList.sql})
       AND ${visibleWhere('tasks', 't', '@me')}
-  `).all(...ids, { me }).map((r) => r.id);
+  `).all(idList.param, { me }).map((r) => r.id);
 }
 
 // Obergrenze für eine Bulk-Vergabe (MAX_BULK_TASKS, task-fields.js). Die
@@ -926,9 +929,10 @@ function parseReorderIds(req, res, list) {
   }
   const me = req.authUserId || req.session.userId;
   const visible = new Set(visibleTaskIds(list, me));
+  const listParam = sqlInList(list);
   const topLevel = new Set(db.get().prepare(
-    `SELECT id FROM tasks WHERE parent_task_id IS NULL AND id IN (${list.map(() => '?').join(',')})`
-  ).all(...list).map((r) => r.id));
+    `SELECT id FROM tasks WHERE parent_task_id IS NULL AND id IN (${listParam.sql})`
+  ).all(listParam.param).map((r) => r.id));
   if (list.some((id) => !visible.has(id) || !topLevel.has(id))) {
     res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     return null;
@@ -959,7 +963,7 @@ router.patch('/reorder', requireTasksReorderFamily, validateRequest(), (req, res
   const ids = parseReorderIds(req, res, req.body?.order);
   if (!ids) return;
 
-  const placeholders = ids.map(() => '?').join(',');
+  const idList = sqlInList(ids);
   let ranks;
   db.get().transaction(() => {
     // Jeder gehaltene Rang wird nur EINMAL ausgeteilt. Dieselbe Zahl kann im
@@ -969,8 +973,8 @@ router.patch('/reorder', requireTasksReorderFamily, validateRequest(), (req, res
     // dieselbe Nummer. Die fehlenden Raenge kommen ueber denselben Weg wie bei
     // Aufgaben ohne Rang: hinter dem groessten in Gebrauch.
     const current = [...new Set(db.get()
-      .prepare(`SELECT sort_order FROM tasks WHERE id IN (${placeholders}) AND sort_order IS NOT NULL`)
-      .all(...ids).map((r) => r.sort_order))].sort((a, b) => a - b);
+      .prepare(`SELECT sort_order FROM tasks WHERE id IN (${idList.sql}) AND sort_order IS NOT NULL`)
+      .all(idList.param).map((r) => r.sort_order))].sort((a, b) => a - b);
     const max = db.get().prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM tasks').get().m;
     // Neue Raenge liegen alle ueber dem groessten bestehenden, die Liste
     // bleibt also aufsteigend.
@@ -1101,12 +1105,14 @@ router.get('/', validateRequest(), (req, res) => {
     : (archived === '1' || archived === 'true' ? 'include' : null);
 
   if (statuses.length && statusArchiv) {
-    sql += ` AND (t.status IN (${statuses.map(() => '?').join(', ')}) OR t.archived_at IS NOT NULL)`;
-    params.push(...statuses);
+    const statusList = sqlInList(statuses);
+    sql += ` AND (t.status IN (${statusList.sql}) OR t.archived_at IS NOT NULL)`;
+    params.push(statusList.param);
   } else {
     if (statuses.length) {
-      sql += ` AND t.status IN (${statuses.map(() => '?').join(', ')})`;
-      params.push(...statuses);
+      const statusList = sqlInList(statuses);
+      sql += ` AND t.status IN (${statusList.sql})`;
+      params.push(statusList.param);
     }
     if (statusArchiv || archiveQuery === 'only') sql += ' AND t.archived_at IS NOT NULL';
     else if (!archiveQuery)                      sql += ' AND t.archived_at IS NULL';
@@ -1114,15 +1120,17 @@ router.get('/', validateRequest(), (req, res) => {
 
   const priorities = asList(priority);
   if (priorities.length) {
-    sql += ` AND t.priority IN (${priorities.map(() => '?').join(', ')})`;
-    params.push(...priorities);
+    const priorityList = sqlInList(priorities);
+    sql += ` AND t.priority IN (${priorityList.sql})`;
+    params.push(priorityList.param);
   }
 
   const assignees = asList(assigned_to).map(Number).filter(Number.isInteger);
   if (assignees.length) {
+    const assigneeList = sqlInList(assignees);
     sql += ` AND EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = t.id
-                           AND ta.user_id IN (${assignees.map(() => '?').join(', ')}))`;
-    params.push(...assignees);
+                           AND ta.user_id IN (${assigneeList.sql}))`;
+    params.push(assigneeList.param);
   }
   // MEHRERE KATEGORIEN, ODER-verknüpft - dieselbe Regel wie bei Status,
   // Priorität und Person (#671), und seit #814 dasselbe Fragment wie in der
@@ -1131,7 +1139,7 @@ router.get('/', validateRequest(), (req, res) => {
   // die Abfrage kam gar nicht mehr durch.
   const categories = normalizeCategoryFilter(category);
   const categoryFragment = taskCategoryWhere('t', categories);
-  if (categoryFragment) { sql += ` AND ${categoryFragment}`; params.push(...categories); }
+  if (categoryFragment) { sql += ` AND ${categoryFragment}`; params.push(categoryParam(categories)); }
   // Tag-Filter ohne Rücksicht auf Groß-/Kleinschreibung: die Werte kommen von
   // fremden Servern, dort ist „Garten" und „garten" dasselbe Etikett.
   //

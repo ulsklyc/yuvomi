@@ -4,7 +4,7 @@
  * Purpose: Writes the `overrides` of .oxlintrc.json: `server/**` gets the base
  *          no-restricted-syntax list plus the sender selectors CHANNEL-SEND and PUSH-SEND
  *          and the rights selectors RIGHTS-SQL, RIGHTS-MODULE (phase 2, B5) and RIGHTS-ROW
- *          (phase 2, B8c), and a few
+ *          (phase 2, B8c) and the list rule SQL-IN-LIST (Refs #2810), and a few
  *          files get the same list minus what they are allowed to do.
  * WHY: oxlint replaces the whole option list per override, and the later override wins.
  *      Written by hand, one forgotten selector switches a sender rule off for a file without
@@ -95,9 +95,44 @@ const RIGHTS_SELECTORS = [
   // ['all', 'family'].includes(row.visibility)
   { selector: `CallExpression[callee.type='MemberExpression'][callee.property.name='includes'][callee.object.type='ArrayExpression']${levelAt('callee.object.elements.0')}${visibilityAt('arguments.0')}`, message: RIGHTS_ROW },
 ];
-// Where the rule is the rule itself: the permission module, the schema and its test
-// mirror (migrations and seeds write visibility values), the API documentation.
-const RIGHTS_HOME = ['server/authorize/**', 'server/db.js', 'server/db-schema-test.js', 'server/openapi/**'];
+// Refs #2810 (follow-up 5a): SQL-IN-LIST finds a list built with one SQL placeholder per
+// value: `ids.map(() => '?')`, `() => '(?, ?)'` for multi-row VALUES, `(_v, i) => `@f${i}``
+// for named ones, either branch of a conditional, a `return '?'` in a function passed to
+// map/flatMap/from, `.fill('?')`, `'?, '.repeat(n)` and `.join('?')`. SQLite takes at most
+// 32766 host parameters per statement, so such a list breaks with "too many SQL variables"
+// (a 500) at that length, and every length is a new statement text. A value list goes in as
+// one parameter: sqlInList() from server/utils/sql-in-list.ts (json_each). A fixed column
+// list (`VALUES (${COLUMNS.map(() => '?')})`) is no value list and stands in
+// lint-baseline-reasons.json with its reason. Blind: a placeholder string held in a variable
+// first (`const q = '?'; ids.map(() => q)`), a loop that pushes '?', a function declared
+// elsewhere and passed by name, string concatenation in a reduce; left to review.
+const SQL_LIST = 'SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason.';
+// Only placeholders, commas, blanks and parentheses, at least one `?`: '?', '(?, ?)', '?,'.
+const marks = '/^[\\s(]*\\?[\\s?,()]*$/';
+// A named placeholder in front of the index: `@f${i}`, `:d${i}`, `$${i}`.
+const named = '/^[\\s(]*[@:$][A-Za-z_]*$/';
+const SQL_LIST_SELECTORS = [
+  // ids.map(() => '?'), rows.map(() => '(?, ?, ?)')
+  { selector: `ArrowFunctionExpression[body.type='Literal'][body.value=${marks}]`, message: SQL_LIST },
+  // ids.map(() => `?`)
+  { selector: `ArrowFunctionExpression[body.type='TemplateLiteral'][body.expressions.length=0][body.quasis.0.value.raw=${marks}]`, message: SQL_LIST },
+  // ids.map((_v, i) => `@f${i}`)
+  { selector: `ArrowFunctionExpression[body.type='TemplateLiteral'][body.expressions.length>0][body.quasis.0.value.raw=${named}]`, message: SQL_LIST },
+  // ids.map((_, i) => (named ? `@${named}${i}` : '?'))
+  { selector: `ArrowFunctionExpression[body.type='ConditionalExpression']:matches([body.consequent.value=${marks}], [body.alternate.value=${marks}], [body.consequent.quasis.0.value.raw=${named}], [body.alternate.quasis.0.value.raw=${named}])`, message: SQL_LIST },
+  // ids.map(function () { return '?'; })
+  { selector: `CallExpression[callee.property.name=/^(map|flatMap|from)$/] > FunctionExpression ReturnStatement[argument.value=${marks}]`, message: SQL_LIST },
+  // Array(n).fill('?'), '?, '.repeat(n), Array(n + 1).join('?')
+  { selector: `CallExpression[callee.property.name='fill'][arguments.0.value=${marks}]`, message: SQL_LIST },
+  { selector: `CallExpression[callee.property.name='repeat'][callee.object.value=${marks}]`, message: SQL_LIST },
+  { selector: `CallExpression[callee.property.name='join'][arguments.0.value=${marks}]`, message: SQL_LIST },
+];
+// The schema and its test mirror write migrations, whose SQL is frozen once applied.
+const SCHEMA_HOME = ['server/db.js', 'server/db-schema-test.js'];
+
+// Where the rule is the rule itself: the permission module and the API documentation;
+// the schema and its test mirror (migrations and seeds write visibility values) are SCHEMA_HOME.
+const RIGHTS_HOME = ['server/authorize/**', 'server/openapi/**'];
 
 const isSend = ":matches([callee.property.name='send'], [callee.property.value='send'])";
 const CHANNEL_SELECTORS = [
@@ -140,7 +175,7 @@ export async function pushSenders(root) {
  */
 export function buildOverrides(config, senders) {
   const [severity, ...base] = config.rules[RULE];
-  const server = [...base, ...CHANNEL_SELECTORS, PUSH_SELECTOR, WEBPUSH_SELECTOR, ...RIGHTS_SELECTORS];
+  const server = [...base, ...CHANNEL_SELECTORS, PUSH_SELECTOR, WEBPUSH_SELECTOR, ...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS];
   /** @param {object[]} drop */
   const without = (drop) => [severity, ...server.filter((s) => !drop.includes(s))];
   const utc = base.filter((/** @type {{ message: string }} */ s) => s.message.startsWith('UTC-DAY-KEY:'));
@@ -152,6 +187,7 @@ export function buildOverrides(config, senders) {
     { files: senders, rules: rule(without([PUSH_SELECTOR])) },
     { files: [PUSH_SERVICE], rules: rule(without([PUSH_SELECTOR, WEBPUSH_SELECTOR])) },
     { files: RIGHTS_HOME, rules: rule(without(RIGHTS_SELECTORS)) },
+    { files: SCHEMA_HOME, rules: rule(without([...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS])) },
   ];
   // The later override wins whole: a file under two exceptions would keep only the
   // second one's list and silently regain what the first one dropped.

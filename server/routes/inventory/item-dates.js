@@ -23,6 +23,7 @@
  */
 import * as db from '../../db.js';
 import { str, date, num, collectErrors } from '../../api/formats.ts';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 import { MAX_TRACKED_DATES_PER_ITEM, MAX_LABEL } from './fields.js';
 
 const DEFAULT_REMINDER_OFFSET_DAYS = 30;
@@ -40,14 +41,14 @@ function loadTrackedDates(itemId) {
 function loadTrackedDatesForItems(itemIds) {
   const map = new Map();
   if (!itemIds.length) return map;
-  const placeholders = itemIds.map(() => '?').join(',');
+  const idList = sqlInList(itemIds);
   const rows = db.get().prepare(`
     SELECT id, item_id, label, date, reminder_offset_days, interval_months, interval_distance,
            created_at, updated_at
     FROM inventory_item_dates
-    WHERE item_id IN (${placeholders})
+    WHERE item_id IN (${idList.sql})
     ORDER BY date ASC, id ASC
-  `).all(...itemIds);
+  `).all(idList.param);
   for (const row of rows) {
     if (!map.has(row.item_id)) map.set(row.item_id, []);
     map.get(row.item_id).push(row);

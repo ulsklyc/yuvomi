@@ -18,6 +18,7 @@ import {
 } from './calendar-events.js';
 import { resolveProjectedEventRows } from './calendar-event-reader.js';
 import { householdTimeZone, shiftDateKey, storedToInstantMs, todayKey } from '../utils/timezone.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 type EventRow = Record<string, unknown>;
 
@@ -139,13 +140,13 @@ export function birthdayFieldsByEvent(database: Database, events: readonly Event
   const out = new Map<number, Record<string, unknown>>();
   if (!events.length) return out;
   const ids = events.map((event) => Number(event.id));
-  const marks = ids.map(() => '?').join(', ');
+  const idList = sqlInList(ids);
   const rows = database.prepare(`
     SELECT calendar_event_id, name_day_calendar_event_id, name,
            CASE WHEN year_unknown = 1 THEN NULL ELSE birth_date END AS birth_date
     FROM birthdays
-    WHERE calendar_event_id IN (${marks}) OR name_day_calendar_event_id IN (${marks})
-  `).all(...ids, ...ids) as EventRow[];
+    WHERE calendar_event_id IN (${idList.sql}) OR name_day_calendar_event_id IN (${idList.sql})
+  `).all(idList.param, idList.param) as EventRow[];
   for (const row of rows) {
     if (row.calendar_event_id != null && ids.includes(Number(row.calendar_event_id))) {
       out.set(Number(row.calendar_event_id), {

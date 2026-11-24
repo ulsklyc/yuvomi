@@ -6,6 +6,7 @@
 import { createLogger } from '../../logger.js';
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 import { MAX_REMINDER_OFFSETS } from '../../services/calendar-fields.js';
 import * as db from '../../db.js';
 import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../api/formats.ts';
@@ -270,9 +271,10 @@ function validateOccurrenceAssignments(database, value) {
     return { value: null, error: 'Assignment: choose each person at most once.' };
   }
   if (ids.length > 0) {
+    const idList = sqlInList(ids);
     const found = database.prepare(`
-      SELECT COUNT(*) AS count FROM users WHERE id IN (${ids.map(() => '?').join(',')})
-    `).get(...ids).count;
+      SELECT COUNT(*) AS count FROM users WHERE id IN (${idList.sql})
+    `).get(idList.param).count;
     if (Number(found) !== ids.length) {
       return { value: null, error: 'An assigned person no longer exists.' };
     }
@@ -1996,11 +1998,12 @@ router.delete('/:id', validateRequest(), (req, res) => {
       WHERE id = ? OR recurrence_parent_id = ?
     `).all(id, id).map((row) => Number(row.id));
     if (ownedIds.length) {
+      const ownedList = sqlInList(ownedIds);
       db.get().prepare(`
         DELETE FROM reminders
         WHERE entity_type = 'event'
-          AND entity_id IN (${ownedIds.map(() => '?').join(',')})
-      `).run(...ownedIds);
+          AND entity_id IN (${ownedList.sql})
+      `).run(ownedList.param);
     }
     return db.get().prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
   })();

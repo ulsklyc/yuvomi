@@ -332,6 +332,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   any other and is ignored: without `system_admin: true` the new account is a member.
 
 ### Fixed
+- **Very long id lists no longer fail with an internal error.** A list of more than 32 765 ids
+  in one request, such as `DELETE /shopping/{listId}/items/checked` with `{ ids }`, answered 500
+  because SQLite takes at most 32 766 values per statement; the server now hands every such list
+  to the database as one value. A synced address book entry with that many phone numbers,
+  e-mail addresses or postal addresses is stored as well.
 - **Tasks: `updated_at` moves again when a task is actually changed.** Every database from
   migration v4 on had silently lost the trigger that keeps `tasks.updated_at` current: the table
   rebuilds (v4, v25, v114) dropped the table together with its triggers, and the last rebuild

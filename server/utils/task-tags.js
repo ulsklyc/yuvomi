@@ -20,6 +20,7 @@
  */
 
 import { taskVisibleWhere, visibleWhere } from '../authorize/index.ts';
+import { sqlInList } from './sql-in-list.ts';
 
 // Identisch zu den Grenzen im Parser (server/services/ics-parser.js): was von
 // dort hereinkommt, ist bereits gedeckelt, was aus der Oberfläche kommt, wird es
@@ -136,12 +137,12 @@ function loadFor(database, { table, fk }, ids) {
   const map = new Map();
   if (!ids?.length) return map;
 
-  const placeholders = ids.map(() => '?').join(',');
+  const idList = sqlInList(ids);
   const rows = database.prepare(`
     SELECT ${fk} AS owner_id, tag FROM ${table}
-    WHERE ${fk} IN (${placeholders})
+    WHERE ${fk} IN (${idList.sql})
     ORDER BY tag COLLATE NOCASE ASC
-  `).all(...ids);
+  `).all(idList.param);
 
   for (const { owner_id, tag } of rows) {
     if (!map.has(owner_id)) map.set(owner_id, []);

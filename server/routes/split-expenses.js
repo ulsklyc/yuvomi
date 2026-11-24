@@ -35,6 +35,7 @@ import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts } from '../services/co
 import { todayKey } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 import {
   CATEGORIES, FREQUENCIES, GROUP_ROLES, GROUP_TYPES, MAX_GUEST_EMAIL, MAX_GUEST_NAME, MAX_GUEST_PHONE,
   SPLIT_METHODS,
@@ -535,16 +536,16 @@ function serializeExpense(expense, prefetched, viewer) {
 function serializeExpenseList(expenses, viewer) {
   if (!expenses.length) return [];
   const ids = expenses.map((e) => e.id);
-  const placeholders = ids.map(() => '?').join(', ');
+  const idList = sqlInList(ids);
 
   const splits = new Map();
   for (const row of db.get().prepare(`
     SELECT s.expense_id, s.user_id, s.amount_minor, s.currency, u.display_name
     FROM expense_splits s
     LEFT JOIN users u ON u.id = s.user_id
-    WHERE s.expense_id IN (${placeholders})
+    WHERE s.expense_id IN (${idList.sql})
     ORDER BY ${memberOrderSql('u')}
-  `).all(...ids)) {
+  `).all(idList.param)) {
     const { expense_id, ...rest } = row;
     if (!splits.has(expense_id)) splits.set(expense_id, []);
     splits.get(expense_id).push({ ...rest, amount: minorToDecimal(rest.amount_minor, rest.currency) });
@@ -1617,6 +1618,7 @@ function attachSettlementState(rows, groupId, req) {
     .filter((row) => row.type === 'payment_registered' && row.entity_type === 'settlement' && row.entity_id != null)
     .map((row) => row.entity_id))];
   if (!ids.length) return;
+  const idList = sqlInList(ids);
   const settlements = db.get().prepare(`
     SELECT s.id, s.group_id, s.payer_id, s.payee_id, s.amount_minor, s.currency, s.created_by,
            payer.display_name AS payer_name, payee.display_name AS payee_name,
@@ -1625,8 +1627,8 @@ function attachSettlementState(rows, groupId, req) {
     FROM settlements s
     LEFT JOIN users payer ON payer.id = s.payer_id
     LEFT JOIN users payee ON payee.id = s.payee_id
-    WHERE s.group_id = ? AND s.id IN (${ids.map(() => '?').join(', ')})
-  `).all(groupId, ...ids);
+    WHERE s.group_id = ? AND s.id IN (${idList.sql})
+  `).all(groupId, idList.param);
   const byId = new Map(settlements.map((s) => [s.id, s]));
   const manages = canManageGroup(groupId, req);
   for (const row of rows) {
@@ -1663,11 +1665,12 @@ function attachExpenseState(rows, groupId) {
   const wanted = (row) => EXPENSE_STATE_TYPES.has(row.type) && row.entity_type === 'expense' && row.entity_id != null;
   const ids = [...new Set(rows.filter(wanted).map((row) => row.entity_id))];
   if (!ids.length) return;
+  const idList = sqlInList(ids);
   const expenses = db.get().prepare(`
     SELECT id, status, deleted_at
     FROM expenses
-    WHERE group_id = ? AND id IN (${ids.map(() => '?').join(', ')})
-  `).all(groupId, ...ids);
+    WHERE group_id = ? AND id IN (${idList.sql})
+  `).all(groupId, idList.param);
   const byId = new Map(expenses.map((e) => [e.id, e]));
   for (const row of rows) {
     if (!wanted(row)) continue;

@@ -11,6 +11,7 @@ import { createLogger } from '../logger.js';
 import { str, date as validateDate, num, collectErrors, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_VISIBILITIES,
 } from '../services/document-fields.js';
@@ -677,17 +678,16 @@ function allFolders() {
  * nur Backend und Key.
  */
 function visibleFolderDocuments(req, folderIds) {
-  const folderParams = Object.fromEntries(folderIds.map((value, i) => [`f${i}`, value]));
-  const folderPlaceholders = folderIds.map((_v, i) => `@f${i}`).join(',');
+  const folderList = sqlInList(folderIds, 'folders');
   return db.get()
     .prepare(`
       SELECT d.id, d.name, d.storage_backend, d.storage_key, d.created_by
       FROM family_documents d
-      WHERE d.folder_id IN (${folderPlaceholders})
+      WHERE d.folder_id IN (${folderList.sql})
         AND ${visibleWhere('documents', 'd', '@userId')}
       ORDER BY d.id ASC
     `)
-    .all({ ...folderParams, userId: userId(req) });
+    .all({ folders: folderList.param, userId: userId(req) });
 }
 
 /** Bind a destructive confirmation to exact folder and document identities. */
@@ -726,10 +726,9 @@ function folderDeleteSnapshot(folderIds, documentIds, linkedState) {
  * Die geteilten Ausgaben haengen am Modulrecht `budget` (scopes.js).
  */
 function folderDeleteLinkedState(req, documentIds) {
-  const params = Object.fromEntries(documentIds.map((value, index) => [`d${index}`, value]));
-  const placeholders = documentIds.map((_value, index) => `@d${index}`).join(',');
+  const documentList = sqlInList(documentIds, 'documents');
   const ids = (sql) => (documentIds.length
-    ? db.get().prepare(sql).all({ ...params, userId: userId(req) }).map((row) => row.identity)
+    ? db.get().prepare(sql).all({ documents: documentList.param, userId: userId(req) }).map((row) => row.identity)
     : []);
   const reads = (moduleKey) => mayReadModule(req, moduleKey);
   const groupVisible = (column) => (isAdminRequest(req) ? '1=1' : `EXISTS (
@@ -741,49 +740,49 @@ function folderDeleteLinkedState(req, documentIds) {
   return {
     calendar_events: readsCalendar ? ids(`
       SELECT e.id AS identity FROM calendar_events e
-       WHERE e.attachment_document_id IN (${placeholders})
+       WHERE e.attachment_document_id IN (${documentList.sql})
          AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
          AND ${visibleWhere('events', 'e', '@userId')}
        ORDER BY e.id
     `) : null,
     housekeeping_work_sessions: reads('housekeeping') ? ids(`
       SELECT h.id AS identity FROM housekeeping_work_sessions h
-       WHERE h.receipt_document_id IN (${placeholders})
+       WHERE h.receipt_document_id IN (${documentList.sql})
        ORDER BY h.id
     `) : null,
     expense_groups: readsBudget ? ids(`
       SELECT g.id AS identity FROM expense_groups g
-       WHERE g.avatar_document_id IN (${placeholders}) AND ${groupVisible('g.id')}
+       WHERE g.avatar_document_id IN (${documentList.sql}) AND ${groupVisible('g.id')}
        ORDER BY g.id
     `) : null,
     settlements: readsBudget ? ids(`
       SELECT s.id AS identity FROM settlements s
-       WHERE s.proof_document_id IN (${placeholders}) AND ${groupVisible('s.group_id')}
+       WHERE s.proof_document_id IN (${documentList.sql}) AND ${groupVisible('s.group_id')}
        ORDER BY s.id
     `) : null,
     expense_attachments: readsBudget ? ids(`
       SELECT a.id AS identity FROM expense_attachments a
         JOIN expenses x ON x.id = a.expense_id
-       WHERE a.document_id IN (${placeholders}) AND ${groupVisible('x.group_id')}
+       WHERE a.document_id IN (${documentList.sql}) AND ${groupVisible('x.group_id')}
        ORDER BY a.id
     `) : null,
     task_documents: readsTasks ? ids(`
       SELECT printf('%d:%d', td.task_id, td.document_id) AS identity FROM task_documents td
         JOIN tasks t ON t.id = td.task_id
-       WHERE td.document_id IN (${placeholders})
+       WHERE td.document_id IN (${documentList.sql})
          AND ${visibleWhere('tasks', 't', '@userId')}
        ORDER BY identity
     `) : null,
     budget_entry_attachments: readsBudget ? ids(`
       SELECT a.id AS identity FROM budget_entry_attachments a
         JOIN budget_entries b ON b.id = a.entry_id
-       WHERE a.document_id IN (${placeholders})
+       WHERE a.document_id IN (${documentList.sql})
          AND ${budgetDetailsVisibleWhere('b', '@userId', { mode: resolveBudgetMode(db.get()) })}
        ORDER BY a.id
     `) : null,
     inventory_item_documents: reads('inventory') ? ids(`
       SELECT i.id AS identity FROM inventory_item_documents i
-       WHERE i.document_id IN (${placeholders})
+       WHERE i.document_id IN (${documentList.sql})
        ORDER BY i.id
     `) : null,
   };
@@ -1237,9 +1236,9 @@ router.get('/', validateRequest(), (req, res) => {
   /* Benannte Platzhalter auch fuer die Liste: die uebrige Abfrage laeuft
    * ueber `@userId`/`@status`, und better-sqlite3 nimmt benannte und
    * positionelle Parameter nicht im selben Aufruf. */
-  const folderParams = Object.fromEntries((subtree ?? []).map((value, i) => [`f${i}`, value]));
+  const folderList = sqlInList(subtree ?? [], 'folders');
   const folderClause = subtree
-    ? `AND d.folder_id IN (${subtree.map((_v, i) => `@f${i}`).join(',')})`
+    ? `AND d.folder_id IN (${folderList.sql})`
     : '';
   const params = {
     userId: userId(req), status, category, expiringWithinDays, subjectUserId,
@@ -1249,7 +1248,7 @@ router.get('/', validateRequest(), (req, res) => {
     // task-scope.js hat dieselbe Falle). `todayKey()` bindet stattdessen den
     // Haushalts-Tagesschluessel als Parameter.
     today: todayKey(db.get()),
-    ...folderParams,
+    ...(subtree ? { folders: folderList.param } : {}),
   };
   const expiringClause = expiringWithinDays !== null
     ? "AND d.expires_at IS NOT NULL AND date(d.expires_at) <= date(@today, '+' || @expiringWithinDays || ' days')"
