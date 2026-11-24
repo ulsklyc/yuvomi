@@ -42,7 +42,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import rateLimit from 'express-rate-limit';
 import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
@@ -560,7 +560,10 @@ test('POST /login: with RATE_LIMIT_MAX_ATTEMPTS=5 the sixth schema 400 is a 429'
 // --------------------------------------------------------------------------
 
 test('the family roles and the invitation presets of server/services/auth-fields.js are those of the database and the rights', () => {
-  const src = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
+  // The CHECK stands in the migrations, one file each under server/migrations/.
+  const dir = new URL('../server/migrations/', import.meta.url);
+  const src = readdirSync(dir).filter((f) => /^\d{4}\.ts$/.test(f)).sort()
+    .map((f) => readFileSync(new URL(f, dir), 'utf8')).join('\n');
   const checks = [...src.matchAll(/CHECK\(family_role IN \(([^)]*)\)\)/g)].map((m) => m[1].split(',').map((v) => v.trim().replace(/^'|'$/g, '')));
   assert.ok(checks.length >= 1, 'the CHECK of users.family_role is found');
   for (const values of checks) assert.deepEqual(values, [...fields.FAMILY_ROLES]);

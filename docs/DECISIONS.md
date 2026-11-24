@@ -396,7 +396,7 @@ tasks move into them, and Housekeeping keeps the helper side (#787). The first s
 
 ### Where the rule lives
 
-- **The model:** migration 165 in `server/db.js` - `schedule_patterns` with `anchor_date` and
+- **The model:** migration 165 (`server/migrations/0165.ts`) - `schedule_patterns` with `anchor_date` and
   `cycle_length`, `schedule_pattern_days` for the ordered cycle, `schedule_overrides` for a
   single day. Described under "Schedule" in [SPEC.md](SPEC.md).
 - **The arithmetic, once:** `cyclePosition()` and `resolveEntries()` in
@@ -453,7 +453,7 @@ answer is that Yuvomi may know what *you* said it is.
 
 Not in one function, because it is a rule about which columns get written at all. The visible
 consequences: `recipe_ingredients` keeps a quantity as free text and `pantry_items` keeps a number
-plus a unit, and the comment above `pantry_items.quantity` (`server/db.js`) says why - a stepper and
+plus a unit, and the comment above `pantry_items.quantity` (`server/migrations/0108.ts`) says why - a stepper and
 a minimum need a number. Bridging the two is a household statement, not a computation over a
 catalogue. Since migration 222 (#1335) that statement has a table of its own,
 `recipe_ingredient_pantry_matches`, and it is written on confirmation only:
@@ -529,7 +529,7 @@ dashboard progress, in `health_nutrition_targets` and `health_nutrition_entries`
 are still ahead, so what follows is partly a description of the schema and partly what the rule
 requires of the tickets that remain:
 
-- `recipe_ingredients.quantity` stays TEXT (`server/db.js`, migration 13), and no code path parses
+- `recipe_ingredients.quantity` stays TEXT (`server/migrations/0013.ts`), and no code path parses
   it into a number and a unit. `server/services/recipe-providers/mealie.js`
   (`flattenIngredient()`) deliberately flattens the provider's structured quantity, unit and food
   into that text, and the comment there says so.
@@ -636,7 +636,7 @@ which nothing would bound.
 
 ### Where the rule lives
 
-- The five tables in `server/db.js`: `task_categories` and `contact_categories` (migrations 83 and
+- The five tables in `server/migrations/`: `task_categories` and `contact_categories` (migrations 83 and
   84), `inventory_categories` (143), `subscription_categories` and `subscription_payment_methods`
   (170). A rename clears `label_key` in `server/routes/tasks.js`, `server/routes/contacts.js`,
   `server/routes/inventory/categories.js` and `server/routes/subscriptions.js`, and the pages read

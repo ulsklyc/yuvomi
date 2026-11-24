@@ -124,7 +124,7 @@ const CATEGORY_CONTROL_RE = /value="\$\{(?:esc\((\w+)\.key\)|(\w+)\.id)\}"([\s\S
 const CATEGORY_PAIR_RE = /([\w.]+)\s*\.\s*map\(\((\w+)\)\s*=>\s*(?:\[\s*\2\.(?:id|key)\s*,([^\]]*)\]|\(\{\s*value:\s*\2\.(?:id|key)\s*,\s*label:\s*([^}]*)\}\))/g;
 
 /* WAS EINE KATEGORIE-AUSWAHL IST, WIRD ABGELEITET - aus den Tabellen in
- * server/db.js, die eine `label_key`-Spalte fuehren. Ohne diese Einschraenkung
+ * den Migrationen (server/migrations/), die eine `label_key`-Spalte fuehren. Ohne diese Einschraenkung
  * traefe das erweiterte `.id`-Muster auch die Lagerort-Auswahl im Inventar
  * (`inventory_locations`), deren `name` NOT NULL ist und die gar keinen
  * Schluessel kennt: ein Fehlalarm, der den Guard nur muerbe machen wuerde.
@@ -134,7 +134,10 @@ const CATEGORY_PAIR_RE = /([\w.]+)\s*\.\s*map\(\((\w+)\)\s*=>\s*(?:\[\s*\2\.(?:i
  * `categories`. Ein neues Modul mit lokalisierten Kategorien faellt damit
  * automatisch darunter, statt an einer Allowlist vorbeizulaufen. */
 function labelKeyCollections() {
-  const dbSrc = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
+  // Das Schema steht in den Migrationen, eine Datei je Version unter server/migrations/.
+  const dir = new URL('../server/migrations/', import.meta.url);
+  const dbSrc = readdirSync(dir).filter((f) => /^\d{4}\.ts$/.test(f)).sort()
+    .map((f) => readFileSync(new URL(f, dir), 'utf8')).join('\n');
   const namen = new Set();
   for (const m of dbSrc.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\n\s*\);/g)) {
     if (!/^\s*label_key\s/m.test(m[2])) continue;

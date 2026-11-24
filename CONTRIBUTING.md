@@ -192,7 +192,7 @@ The rights rules keep the visibility rules and the module verdict in `server/aut
 outside it no module imports anything but `server/authorize/index.ts`
 (`rights-only-through-authorize`, tests apart), the permission module never reaches
 `server/db.js` (`authorize-not-to-db`), and no file under `server/` outside `server/authorize/`,
-the schema (`server/db.js`, `server/db-schema-test.js`) and the API docs (`server/openapi/`)
+the schema (`server/db.js`, `server/migrations/`, `server/db-schema-test.js`) and the API docs (`server/openapi/`)
 compares a module level in dot notation (`x.modules.y`) with `'none'` (`RIGHTS-MODULE`), all
 three hard; a visibility literal in SQL there (`RIGHTS-SQL`) and a visibility level compared
 with a string literal in JavaScript (`RIGHTS-ROW`: `row.visibility === 'all'`, also reversed,
@@ -295,7 +295,7 @@ docs/                  # Product spec, screenshots
 - Every API route lives in `server/routes/` and answers JSON; an error it does not expect is not caught there but reaches the central error handler (see [Backend](#backend))
 - Every frontend page is an ES module in `public/pages/` that exports `render()`
 - All design values come from `tokens.css` - never hardcode colors, radii, or shadows
-- Database migrations are appended to the `MIGRATIONS` array in `server/db.js` - never modify existing entries
+- Database migrations are appended as a new file `server/migrations/NNNN.ts` plus its line at the end of `server/migrations/index.ts` - never modify existing entries
 
 ---
 
@@ -389,7 +389,7 @@ own - a fix to an unrelated module, a refactor you needed along the way, a new
 dependency - open that separately and first. It lands in days instead of waiting
 on the review of everything around it.
 
-**On migrations.** Take the next free number in the `MIGRATIONS` array and expect
+**On migrations.** Take the next free number in `server/migrations/` and expect
 it to change. Two open PRs regularly claim the same one. The maintainer renumbers
 yours as it lands, which does not break the append-only rule: that rule protects
 migrations that have shipped, not one that is still in review.
@@ -549,7 +549,7 @@ stops being one.
 - One route file per module in `server/routes/`
 - API responses: `{ data: ... }` on success, `{ error: string, code: number }` on failure
 - Input is checked by the schema, not by the handler. Every route carries `validateRequest()` from `server/api/validate-request.ts` as its first handler (`router.post('/', validateRequest(), handler)`); it checks path, query and JSON body against the route's operation in the OpenAPI document under `server/openapi/paths/` and answers a mismatch with a 400 before the handler runs: `{ error, code: 400, reason, fields: [{ path, rule, reason? }] }`. A new route therefore gets its operation first, a route without one throws. A rule the schema can express belongs in the schema, with `x-reason` on the node where the client already translates a reason of its own; the helpers in `server/api/formats.ts` are for what a schema cannot say (rules across fields, lookups). `npm run test:validate-request-coverage` reads every router at runtime and has no exception list left.
-- Database migrations: append to the `MIGRATIONS` array in `server/db.js` - **never modify existing entries**
+- Database migrations: one file per migration, `server/migrations/NNNN.ts` (`export default { version, description, up }`), appended at the end of `server/migrations/index.ts`; helpers a migration calls live frozen in `server/migrations/helpers.ts` - **never modify existing entries** (`npm run test:migrations-append-only` compares them byte for byte with the base)
 - New entity tables: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO 8601). Key/value and join tables (`sync_config`, `task_tags`, …) deviate deliberately
 - Any server-side fetch of a URL stored from user/admin input (WebDAV targets, ICS feed URLs, subscription logos, recipe provider `base_url`s, ...) goes through `server/utils/ssrf.js` (`isBlockedAddress`/`createGuardedLookup`), not a bare `fetch()`. This is one classifier so DNS-rebinding and private-network edge cases aren't reimplemented per subsystem; `npm run test:ssrf` pins both the classification logic and which known modules actually call it, and runs as part of `npm test`.
 - Errors: a route does not answer an unexpected error itself - it lets the error reach the central error handler (`server/middleware/error-handler.js`), or throws an `HttpError` (`server/utils/http-error.js`) for a 4xx the client may read. The client only ever gets a sentence of our own, in English, plus `reason`, never the `err.message` of a foreign error; the lint rules `ERROR-TEXT` and `LOG-PLUS-500` hold this.

@@ -899,7 +899,8 @@
     {
       "files": [
         "server/db.js",
-        "server/db-schema-test.js"
+        "server/db-schema-test.js",
+        "server/migrations/**"
       ],
       "rules": {
         "eslint-js/no-restricted-syntax": [

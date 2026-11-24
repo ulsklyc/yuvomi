@@ -11,9 +11,11 @@
  *   - no release carries a corpus database;
  *   - the newest release has none although its schema version differs from the
  *     newest corpus database: corpus.yml failed or was not started for it.
- * The schema version of a tag is the highest `version: N,` in its server/db.js,
- * fetched from raw.githubusercontent.com (no token), only when the newest
- * release has no database.
+ * The schema version of a tag is its highest migration, fetched from
+ * raw.githubusercontent.com (no token), only when the newest release has no
+ * database: the highest `./NNNN.ts` that server/migrations/index.ts imports
+ * (one file per migration since phase 2 section F), and for older tags, which
+ * have no such file, the highest `version: N,` in server/db.js.
  *
  * Usage:
  *   node scripts/corpus-assets.mjs <releases.jsonl> --repo <owner/name> --out <file>
@@ -50,6 +52,19 @@ export function compareTags(a, b) {
 export function schemaFromDbSource(source) {
   const versions = [...source.matchAll(/^ {4}version: (\d+),$/gm)].map((m) => Number(m[1]));
   if (versions.length === 0) throw new Error('no migration found in server/db.js');
+  return Math.max(...versions);
+}
+
+/**
+ * Highest migration version in the text of a server/migrations/index.ts: every
+ * migration is imported as `import mNNNN from './NNNN.ts';`, and the file name
+ * is its version (test:migrations-append-only holds both).
+ * @param {string} source
+ */
+export function schemaFromMigrationIndex(source) {
+  const versions = [...source.matchAll(/^import m(\d{4}) from '\.\/(\d{4})\.ts';$/gm)]
+    .filter((m) => m[1] === m[2]).map((m) => Number(m[1]));
+  if (versions.length === 0) throw new Error('no migration found in server/migrations/index.ts');
   return Math.max(...versions);
 }
 
@@ -102,16 +117,31 @@ export async function checkGap(plan, schemaOf) {
 }
 
 /**
+ * Schema version of one tree, in whichever layout it has: server/migrations/index.ts
+ * when the tree has one, otherwise server/db.js.
+ * @param {(path: string) => Promise<string | null>} read  file text, or null when the tree has no such file
+ * @returns {Promise<number>}
+ */
+export async function schemaOfTree(read) {
+  const index = await read('server/migrations/index.ts');
+  if (index !== null) return schemaFromMigrationIndex(index);
+  const db = await read('server/db.js');
+  if (db === null) throw new Error('neither server/migrations/index.ts nor server/db.js in this tree');
+  return schemaFromDbSource(db);
+}
+
+/**
  * @param {string} repo owner/name
  * @returns {(tag: string) => Promise<number>}
  */
 function schemaFromGitHub(repo) {
-  return async (tag) => {
-    const url = `https://raw.githubusercontent.com/${repo}/${tag}/server/db.js`;
+  return (tag) => schemaOfTree(async (path) => {
+    const url = `https://raw.githubusercontent.com/${repo}/${tag}/${path}`;
     const res = await fetch(url);
+    if (res.status === 404) return null;
     if (!res.ok) throw new Error(`${url}: ${res.status}`);
-    return schemaFromDbSource(await res.text());
-  };
+    return res.text();
+  });
 }
 
 async function main() {
