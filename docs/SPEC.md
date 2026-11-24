@@ -6810,6 +6810,19 @@ quick links and recipe providers answer this way too. Status codes and `error` t
 were, except that the German `error` texts of those inventory, notes, contacts and birthdays
 answers are now English.
 
+**The specification is what the server checks (#2810).** Every route validates path, query and
+JSON body against its own operation in this document before the handler runs
+(`validateRequest()` in `server/api/validate-request.ts`, Ajv in strict mode for JSON Schema
+2020-12). A request that does not match is answered with
+`{ error, code: 400, reason, fields: [{ path, rule, reason? }] }`: `path` is the place plus a
+pointer (`body/title`, `query/limit`, `path/id`), `rule` the failing keyword (`type`, `required`,
+`maxLength`). `reason` is `validation`, or the route's own reason where the schema names one, so a
+client that already translates such a reason keeps doing so. Neither a value of the request nor a
+message text of the validator is ever returned. Headers are not checked, and the body is neither
+coerced nor stripped: an unknown field is ignored as before, except in the few schemas that
+forbid one (`additionalProperties: false`). `test:validate-request-coverage` holds
+that no route is left out, `test:openapi-ajv` that every schema of the document compiles.
+
 Authentication options for external integrations:
 - **Session cookie:** standard browser session after login, sliding for 90 days (see [Session lifetime](#session-lifetime-1356)). The session stores the account id only: **role and module permissions are read from `users` on every request (#2611)**, so a demotion or a changed permission applies to every signed-in device at once, including a sign-in or SSO link that was still in flight. The "at least one administrator must remain" check and the demotion happen in one statement (#2612): of two administrators demoting each other at the same moment, one is refused.
 - **Bearer token:** `Authorization: Bearer <token>` - tokens created via Settings → Household → API access (admin only)
