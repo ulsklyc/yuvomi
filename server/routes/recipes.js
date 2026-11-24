@@ -8,7 +8,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import { createHash } from 'node:crypto';
 import * as db from '../db.js';
-import { str, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
+import { str, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../api/formats.ts';
 import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.js';
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { getAdapter } from '../services/recipe-providers/index.js';

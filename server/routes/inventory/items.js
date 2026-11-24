@@ -15,7 +15,7 @@ import * as db from '../../db.js';
 import { mayChangeRecord, requestHasCapability, sendNotOwner } from '../../authorize/index.ts';
 import {
   str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT,
-} from '../../middleware/validate.js';
+} from '../../api/formats.ts';
 import {
   assertDocumentLinkTargetsAvailable, documentLinksFor, documentLinksOf, documentViewer, loadDocumentLinks, replaceDocumentLinks,
   sendDocumentLinkRefusal,

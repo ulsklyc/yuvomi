@@ -8,7 +8,7 @@ import { localCalendarColorSql, localCalendarIdSql } from '../../services/local-
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
-import { DATE_RE } from '../../middleware/validate.js';
+import { DATE_RE } from '../../api/formats.ts';
 import {
   expandAndResolveEventRows, getUpcomingEvents, hydrateEventAttachmentBodies,
 } from '../../services/calendar-event-reader.js';

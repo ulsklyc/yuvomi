@@ -45,7 +45,7 @@ import {
   allTags, applyTagChanges, loadTags, loadTagsFor, normalizeTags,
   removeTagEverywhere, renameTag, setTags, tagKey, tagsKey, taskIdsWithTag,
 } from '../utils/task-tags.js';
-import * as v from '../middleware/validate.js';
+import * as v from '../api/formats.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import {
   TASK_PRIORITIES as VALID_PRIORITIES, ARCHIVE_STATUS, TASK_STATUSES as VALID_STATUSES,

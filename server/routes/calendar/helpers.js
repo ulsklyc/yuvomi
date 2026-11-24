@@ -97,7 +97,7 @@ export function parseAttachment(dataUrl) {
 }
 
 // CalDAV-Ziel eines Events validieren (Issue #241). Liefert {value, error}
-// im Stil der validate.js-Helfer, damit collectErrors 400 statt 500 erzeugt.
+// im Stil der formats.ts-Helfer, damit collectErrors 400 statt 500 erzeugt.
 // Leere/fehlende account_id bedeutet "Lokal" (kein Outbound-Sync).
 export function caldavTarget(body) {
   const rawId  = body.target_caldav_account_id;

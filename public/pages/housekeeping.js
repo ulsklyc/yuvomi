@@ -1089,7 +1089,7 @@ function openTaskCreateModal(content) {
  * Zeitpunkt der VORHERIGEN Erledigung wieder her (`last_completed` zurueck auf
  * den alten Wert, bei einer nie erledigten Aufgabe auf leer). Der Server nimmt
  * beide gespeicherten Formen unveraendert an (Instant mit `Z` bleibt Instant,
- * zonenlose Wanduhrzeit bleibt Wanduhrzeit, validate.js `to: 'instant'`).
+ * zonenlose Wanduhrzeit bleibt Wanduhrzeit, api/formats.ts `to: 'instant'`).
  */
 async function completeTask(task, content, button = null) {
   if (readOnly()) return;

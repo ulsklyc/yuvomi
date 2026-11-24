@@ -26,7 +26,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import * as v from '../../middleware/validate.js';
+import * as v from '../../api/formats.ts';
 import { cycleToCsv } from '../../services/health-export.js';
 import { syncCycleRemindersForUser, isEligibleCyclePartner, eligibleCyclePartners } from '../../services/cycle-reminders.js';
 // Die vier geschlossenen Wertelisten (CERVIX_MUCUS_VALUES/TEST_RESULT_VALUES/

@@ -17,7 +17,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import { str, MAX_SHORT } from '../../middleware/validate.js';
+import { str, MAX_SHORT } from '../../api/formats.ts';
 import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();

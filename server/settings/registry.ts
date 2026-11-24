@@ -10,7 +10,7 @@
  *
  * A LEAF UNDER THE SERVICES. This file imports server/utils/**, the door
  * server/authorize/index.ts, the shared lists from public/utils/ the route
- * imported before, and check helpers without side effects (middleware/validate.js,
+ * imported before, and check helpers without side effects (api/formats.ts,
  * services/module-capabilities.js - a pure id grammar that happens to live under
  * services/). Never a service with a side effect, never a route, never
  * server/db.js: the connection is a parameter. `.dependency-cruiser.mjs` holds
@@ -37,7 +37,7 @@
 
 import { authorize, VISIBILITY_VALUES } from '../authorize/index.ts';
 import type { Actor, Database } from '../authorize/index.ts';
-import { str, MAX_SHORT } from '../middleware/validate.js';
+import { str, MAX_SHORT } from '../api/formats.ts';
 import { isSupportedLocale, resolveHouseholdLocale } from '../utils/i18n.js';
 import { householdTimeZone, isValidTimeZone } from '../utils/timezone.js';
 import {

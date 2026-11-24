@@ -1,5 +1,5 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 
 // Dieselbe Form wie in paths/family.js.
 const apiError = (description) => ({

@@ -1,5 +1,5 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
 import { PANTRY_UNITS } from '../../../public/utils/pantry-units.js';
 

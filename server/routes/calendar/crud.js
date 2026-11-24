@@ -8,7 +8,7 @@ import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import { MAX_REMINDER_OFFSETS } from '../../services/calendar-fields.js';
 import * as db from '../../db.js';
-import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
+import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../api/formats.ts';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';

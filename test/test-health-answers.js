@@ -54,7 +54,7 @@ import { createHealthApp } from './health-app.js';
 import { EXPECTED } from './health-answers-expected.js';
 
 const dbmod = await import('../server/db.js');
-const { MAX_TITLE, MAX_TEXT } = await import('../server/middleware/validate.js');
+const { MAX_TITLE, MAX_TEXT } = await import('../server/api/formats.ts');
 const { MAX_TYPE, MAX_UNIT, MAX_SYMPTOMS_COUNT } = await import('../server/services/health-fields.js');
 const database = () => dbmod.get();
 

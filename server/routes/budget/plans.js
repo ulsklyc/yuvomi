@@ -6,7 +6,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
-import { num, collectErrors } from '../../middleware/validate.js';
+import { num, collectErrors } from '../../api/formats.ts';
 import {
   bookedOnly, cents, thisMonthLocalKey, validExpenseCategoryKeys, budgetFilter, budgetCategoryExpr,
 } from './helpers.js';

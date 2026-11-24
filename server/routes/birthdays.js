@@ -2,7 +2,7 @@ import express from 'express';
 import birthdayFeedRouter from './birthday-feed.js';
 import * as db from '../db.js';
 import { validateRequest } from '../api/validate-request.ts';
-import { collectErrors, date as validateDate, oneOf, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { collectErrors, date as validateDate, oneOf, str, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule } from '../authorize/index.ts';
 import {

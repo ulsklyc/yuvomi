@@ -7,7 +7,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import * as v from '../middleware/validate.js';
+import * as v from '../api/formats.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import { syncAllBirthdayReminders } from '../services/birthdays.js';
 import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-fanout.js';

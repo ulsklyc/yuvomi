@@ -68,7 +68,7 @@ test('buildInventoryDeadlinesFeed escaped Sonderzeichen im Namen', () => {
 test('buildInventoryDeadlinesFeed überspringt unparsbare Kaufdaten statt den Feed zu sprengen', () => {
   db.exec('DELETE FROM inventory_items');
   // Kalendarisch unmögliches Datum - so etwas kam frueher durch die reine
-  // Formatpruefung in server/middleware/validate.js#date. Eine einzige solche
+  // Formatpruefung in server/api/formats.ts#date. Eine einzige solche
   // Zeile darf den Feed nicht fuer alle Abonnenten stilllegen.
   insertItem({ name: 'Kaputtes Datum', purchase_date: '2026-02-30', warranty_months: 12 });
   insertItem({ name: 'Heiles Datum', purchase_date: '2026-01-01', warranty_months: 12 });

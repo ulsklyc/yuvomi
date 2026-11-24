@@ -1,5 +1,5 @@
 import { op, idParam, withValidationRefusal } from '../helpers.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { DATE_PATTERN, DATETIME_PATTERN, OPTIONAL_DATE_PATTERN, OPTIONAL_DATETIME_PATTERN, TIME_PATTERN } from '../../utils/datetime-pattern.js';
 import {
   CYCLE_SETTING_RANGES, LAB_FLAGS, LOG_STATUS, MAX_ICON, MAX_INTERVAL_HOURS, MAX_INTERVAL_MONTHS, MAX_NUTRIENT, MAX_OFFSET_DAYS,

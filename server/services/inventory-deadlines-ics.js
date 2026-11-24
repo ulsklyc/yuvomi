@@ -107,7 +107,7 @@ function buildInventoryDeadlinesFeed(conn, now = new Date()) {
   for (const item of rows) {
     // Ein einzelner unparsbarer Gegenstand darf nicht den ganzen Feed fuer alle
     // Abonnenten stilllegen. Solche Zeilen koennen aus der Zeit stammen, in der
-    // die Datumsvalidierung nur die Form pruefte (server/middleware/validate.js
+    // die Datumsvalidierung nur die Form pruefte (server/api/formats.ts
     // #date liess z. B. 2026-02-30 durch) - der Feed ueberspringt sie und
     // liefert alles andere weiter aus.
     let warrantyEnd;

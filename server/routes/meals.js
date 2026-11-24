@@ -6,7 +6,7 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { str, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../middleware/validate.js';
+import { str, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../api/formats.ts';
 import { addDays, mealWeekday, datesForTemplateInRange } from '../services/meal-recurrence.js';
 import { todayKey } from '../utils/timezone.js';
 import { mayWriteModule } from '../authorize/index.ts';

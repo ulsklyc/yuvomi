@@ -13,7 +13,7 @@ import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
 import { syncWasteRemindersForUser } from '../../services/waste-reminders.js';
-import { id as validateId } from '../../middleware/validate.js';
+import { id as validateId } from '../../api/formats.ts';
 import { wasteErrorResponse, currentUserId } from './helpers.js';
 
 const router = express.Router();

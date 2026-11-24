@@ -6,7 +6,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
-import { str, oneOf, MAX_SHORT } from '../../middleware/validate.js';
+import { str, oneOf, MAX_SHORT } from '../../api/formats.ts';
 import { CATEGORY_TYPES } from '../../services/budget-fields.js';
 import {
   loadBudgetMeta, requestLang, localizedCategory, localizedSubcategory,

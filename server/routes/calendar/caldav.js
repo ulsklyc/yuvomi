@@ -9,7 +9,7 @@ import { validateRequest } from '../../api/validate-request.ts';
 import * as caldavSync from '../../services/caldav-sync.js';
 import * as caldavReminders from '../../services/caldav-reminders-sync.js';
 import { requireAdmin } from '../../auth.js';
-import { secret } from '../../middleware/validate.js';
+import { secret } from '../../api/formats.ts';
 import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 import * as db from '../../db.js';
 import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';

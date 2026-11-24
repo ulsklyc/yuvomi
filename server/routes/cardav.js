@@ -8,7 +8,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import * as CardDAVSync from '../services/cardav-sync.js';
-import { str, secret, collectErrors, MAX_TITLE } from '../middleware/validate.js';
+import { str, secret, collectErrors, MAX_TITLE } from '../api/formats.ts';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { remoteFailure } from '../utils/http.js';
 import { validateRequest } from '../api/validate-request.ts';

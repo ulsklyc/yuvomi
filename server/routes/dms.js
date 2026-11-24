@@ -6,7 +6,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { str, MAX_TITLE } from '../middleware/validate.js';
+import { str, MAX_TITLE } from '../api/formats.ts';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { getAdapter as defaultGetAdapter } from '../services/dms/index.js';

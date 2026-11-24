@@ -18,7 +18,7 @@
 import express from 'express';
 import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
-import { collectErrors, date, id, str } from '../middleware/validate.js';
+import { collectErrors, date, id, str } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';

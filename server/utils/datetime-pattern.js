@@ -2,7 +2,7 @@
  * Module: the date-time and day-key shapes the API accepts as input (#2810)
  * Purpose: ONE source for the text a date-time input field may have, read by
  *          two sides that must never drift apart:
- *            - the hand check `datetime()` in server/middleware/validate.js
+ *            - the hand check `datetime()` in server/api/formats.ts
  *              (as `DATETIME_RE`), which every route with a time input runs;
  *            - the OpenAPI document, where it is the `pattern` of the
  *              reminder times (`remind_at`, `remind_ats[]`, `from`, `to`),
@@ -23,7 +23,7 @@ export const DATETIME_PATTERN = '^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}(:\\d{2}(?:
 
 /**
  * The day key `YYYY-MM-DD` as text, the shape only: whether the day exists is
- * the handler's (calendar). Read by `DATE_RE` in server/middleware/validate.js,
+ * the handler's (calendar). Read by `DATE_RE` in server/api/formats.ts,
  * by the `today` check of server/routes/kitchen.js and, as
  * OPTIONAL_DATE_PATTERN, by the `today` parameter of `GET /kitchen/summary`.
  */
@@ -39,14 +39,13 @@ export const OPTIONAL_DATE_PATTERN = `^(?:${DATE_PATTERN.slice(1, -1)})?$`;
 export const OPTIONAL_DATETIME_PATTERN = `^(?:${DATETIME_PATTERN.slice(1, -1)})?$`;
 
 /**
- * A wall-clock time `HH:MM` (00:00 to 23:59), read by `time()` in
- * server/middleware/validate.js and by the time fields of the OpenAPI
- * document (waste reminder `delivery_time`, shift `start_time`/`end_time`).
+ * A wall-clock time `HH:MM` (00:00 to 23:59), read by the time fields of the
+ * OpenAPI document (waste reminder `delivery_time`, shift `start_time`/`end_time`).
  */
 export const TIME_PATTERN = '^(?:[01]\\d|2[0-3]):[0-5]\\d$';
 
 /**
- * A HEX color `#RRGGBB`, read by `color()` in server/middleware/validate.js
+ * A HEX color `#RRGGBB`, read by `color()` in server/api/formats.ts
  * and by the color fields of the OpenAPI document (#2810).
  */
 export const COLOR_PATTERN = '^#[0-9A-Fa-f]{6}$';

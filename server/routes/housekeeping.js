@@ -10,7 +10,7 @@ import { hashPassword } from '../utils/password.js';
 import * as db from '../db.js';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
-import { collectErrors, color, date, datetime, num, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { collectErrors, color, date, datetime, num, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { MAX_WORKER_NAME, MAX_WORKER_USERNAME } from '../services/housekeeping-fields.js';

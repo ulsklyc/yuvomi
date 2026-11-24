@@ -1,5 +1,5 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
-import { MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_TITLE } from '../../api/formats.ts';
 import { COLOR_PATTERN, DATE_PATTERN, OPTIONAL_DATE_PATTERN, TIME_PATTERN } from '../../utils/datetime-pattern.js';
 import {
   MAX_CUSTOM_FIELD_NAME, MAX_CYCLE_LENGTH, MAX_FIELD_VALUE_LENGTH, MAX_ICON_NAME_LENGTH, MAX_PATTERN_DAY_ROWS,

@@ -3,7 +3,7 @@ import express from 'express';
 import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { color, collectErrors, date, num, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { color, collectErrors, date, num, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import {
   BILLING_CYCLES,
   CURRENCY_RE,

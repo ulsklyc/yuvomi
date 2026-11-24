@@ -20,7 +20,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { validateRequest } from '../api/validate-request.ts';
-import { str, collectErrors, MAX_SHORT } from '../middleware/validate.js';
+import { str, collectErrors, MAX_SHORT } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { normalizeQuickLinkUrl } from '../../public/utils/quick-link-url.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';

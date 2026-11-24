@@ -545,7 +545,7 @@ test('a shift type may be added by anyone but only changed by its creator or an 
 // has to come from THAT and not from any error at all - the branch used to
 // catch everything and blame the same cause, so a broken statement would have
 // told the caller the type was still in use.
-// `color()` in validate.js answers a falsy input with {value: null, error: null},
+// `color()` in api/formats.ts answers a falsy input with {value: null, error: null},
 // so an empty string passes validation and reaches the UPDATE - where the column
 // is NOT NULL. The default does not apply to an explicitly bound NULL, so this
 // used to surface as an unhandled constraint error and a bare 500. The POST
