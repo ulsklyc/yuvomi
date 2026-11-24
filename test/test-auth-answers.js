@@ -83,6 +83,9 @@ import { EXPECTED, CHANGED } from './auth-answers-expected.js';
 
 mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-11-23T12:00:00Z') });
 const FROZEN = '2026-11-23T1';
+// The running version (`package.json`) moves with every release; the table
+// holds `<version>` in its place, or every bump turns this suite red.
+const APP_VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 const dbmod = await import('../server/db.js');
 const auth = await import('../server/auth.js');
@@ -247,6 +250,7 @@ function normalized(value) {
     if (key === 'recovery_codes' && Array.isArray(v)) return `<${v.length} codes>`;
     // The pairing code; an error body's `code` is a number.
     if (key === 'code' && typeof v === 'string' && this && 'expires_at' in this) return '<secret>';
+    if (key === 'version' && v === APP_VERSION) return '<version>';
     // A stamp of SQLite's own clock (the frozen one stays).
     if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(v) && !v.startsWith(FROZEN)) return '<stamp>';
     return v;
