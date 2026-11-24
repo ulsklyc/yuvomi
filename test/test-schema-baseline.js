@@ -70,6 +70,23 @@ function assertSameState(actual, expected) {
   }
 }
 
+/**
+ * Was der Logger waehrend eines Tests als Warnung und als Fehler schreibt
+ * (ausserhalb der Produktion ueber console.warn und console.error). Die drei
+ * Auswege aus der Baseline unterscheiden sich fuer den Betreiber nur hier: ein
+ * schnellerer Prozess und eine belegte Sperre sind Warnungen, eine unbrauchbare
+ * Baseline ist ein Fehler.
+ * @param {import('node:test').TestContext} t
+ * @returns {{ warn: string[], error: string[] }}
+ */
+function logged(t) {
+  /** @type {{ warn: string[], error: string[] }} */
+  const lines = { warn: [], error: [] };
+  t.mock.method(console, 'warn', (/** @type {unknown[]} */ ...args) => { lines.warn.push(args.join(' ')); });
+  t.mock.method(console, 'error', (/** @type {unknown[]} */ ...args) => { lines.error.push(args.join(' ')); });
+  return lines;
+}
+
 /** @param {string} [file] @returns {CipherDatabase} */
 function cipher(file = ':memory:') {
   const database = new Database(file);
@@ -276,11 +293,13 @@ test('eine Baseline mit zwei vertauschten Triggern derselben Tabelle faellt auf'
 // Wann migrate() die Baseline nimmt
 // --------------------------------------------------------
 
-test('migrate() beginnt auf einer leeren Datenbank mit der ausgelieferten Baseline', () => {
+test('migrate() beginnt auf einer leeren Datenbank mit der ausgelieferten Baseline', (t) => {
+  const log = logged(t);
   const database = cipher();
   const replayed = CIPHER.replayFromZero();
   try {
     assert.deepEqual(migrate(database), { baseline: shipped.version });
+    assert.deepEqual(log, { warn: [], error: [] }, 'kein Ersatzweg, kein Neuversuch');
     assertSameState(stateOf(database), stateOf(replayed));
     assert.deepEqual(migrate(database), { baseline: null }, 'ein zweiter Lauf findet nichts zu tun');
   } finally {
@@ -320,7 +339,8 @@ test('migrate() nimmt die Baseline nicht auf einer Datenbank, die schon etwas tr
 // Ersatzweg und Rennen
 // --------------------------------------------------------
 
-test('eine unbrauchbare Baseline: der Start faehrt alle Migrationen und endet im selben Zustand', () => {
+test('eine unbrauchbare Baseline: der Start faehrt alle Migrationen, endet im selben Zustand und meldet einen Fehler', (t) => {
+  const log = logged(t);
   const replayed = CIPHER.replayFromZero();
   /** @type {Record<string, () => Baseline>} */
   const cases = {
@@ -342,8 +362,13 @@ test('eine unbrauchbare Baseline: der Start faehrt alle Migrationen und endet im
     for (const [name, load] of Object.entries(cases)) {
       const database = cipher();
       try {
+        log.warn.length = 0;
+        log.error.length = 0;
         assert.deepEqual(migrate(database, MIGRATIONS, load), { baseline: null }, name);
         assertSameState(stateOf(database), stateOf(replayed));
+        assert.equal(log.error.length, 1, `${name}: genau eine Fehlerzeile`);
+        assert.match(log.error[0], /^\[DB\] Schema baseline .*running every migration instead: /, name);
+        assert.deepEqual(log.warn, [], name);
       } finally {
         database.close();
       }
@@ -353,7 +378,8 @@ test('eine unbrauchbare Baseline: der Start faehrt alle Migrationen und endet im
   }
 });
 
-test('ein anderer Prozess war schneller: der Nachzuegler endet im selben Zustand (#1331)', () => {
+test('ein anderer Prozess war schneller: der Nachzuegler endet im selben Zustand und warnt nur (#1331)', (t) => {
+  const log = logged(t);
   const dir = tempDir('yuvomi-baseline-');
   const file = path.join(dir, 'race.db');
   const first = cipher(file);
@@ -369,6 +395,10 @@ test('ein anderer Prozess war schneller: der Nachzuegler endet im selben Zustand
     };
     assert.deepEqual(migrate(second, MIGRATIONS, loadWhileTheOtherFinishes), { baseline: null });
     assertSameState(stateOf(second), stateOf(replayed));
+    // Kein Fehler: die Baseline ist in Ordnung, nur war die Datei nicht mehr leer.
+    assert.deepEqual(log.error, []);
+    assert.equal(log.warn.length, 1);
+    assert.match(log.warn[0], /no longer empty .* another process was faster \(#1331\)/);
   } finally {
     first.close();
     second.close();
@@ -419,13 +449,17 @@ function contended(file, busyFor) {
   return { database, waiting, holder, attempts: () => attempts };
 }
 
-test('die Schreibsperre ist beim naechsten Versuch frei: die Baseline wird eingespielt', () => {
+test('die Schreibsperre ist beim naechsten Versuch frei: die Baseline wird eingespielt', (t) => {
+  const log = logged(t);
   const dir = tempDir('yuvomi-baseline-');
   const { database, waiting, holder, attempts } = contended(path.join(dir, 'busy.db'), 1);
   const replayed = CIPHER.replayFromZero();
   try {
     assert.deepEqual(migrate(database, MIGRATIONS, () => shipped), { baseline: shipped.version });
     assert.equal(attempts(), 2, 'ein Versuch an der Sperre, einer danach');
+    assert.deepEqual(log.error, []);
+    assert.equal(log.warn.length, 1);
+    assert.match(log.warn[0], /Schreibsperre \(SQLITE_BUSY\w*\), Versuch 2 von/);
     assertSameState(stateOf(waiting), stateOf(replayed));
   } finally {
     waiting.close();
@@ -434,7 +468,8 @@ test('die Schreibsperre ist beim naechsten Versuch frei: die Baseline wird einge
   }
 });
 
-test('eine Schreibsperre, die nie faellt: nach der Obergrenze stirbt der Start mit SQLITE_BUSY und schreibt nichts', () => {
+test('eine Schreibsperre, die nie faellt: nach der Obergrenze stirbt der Start mit SQLITE_BUSY und schreibt nichts', (t) => {
+  const log = logged(t);
   const dir = tempDir('yuvomi-baseline-');
   const { database, waiting, holder, attempts } = contended(path.join(dir, 'busy.db'), Infinity);
   try {
@@ -444,6 +479,8 @@ test('eine Schreibsperre, die nie faellt: nach der Obergrenze stirbt der Start m
     );
     assert.equal(attempts(), MIGRATION_BUSY_ATTEMPTS, 'genau so viele Versuche wie die Obergrenze');
     assert.ok(isPristine(waiting), 'kein Ersatzweg, nichts geschrieben');
+    assert.deepEqual(log.error, [], 'kein Ersatzweg');
+    assert.equal(log.warn.length, MIGRATION_BUSY_ATTEMPTS - 1);
   } finally {
     waiting.close();
     holder.close();
