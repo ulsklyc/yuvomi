@@ -119,7 +119,7 @@ function notSchema(res, what = '') {
  * @returns {Promise<number>}
  */
 async function account(username, role, familyRole = 'other') {
-  const hash = await hashPassword(PASSWORD, 4);
+  const hash = await hashPassword(PASSWORD);
   return Number(db.prepare('INSERT INTO users (username, display_name, password_hash, role, family_role) VALUES (?, ?, ?, ?, ?)')
     .run(username, username, hash, role, familyRole).lastInsertRowid);
 }

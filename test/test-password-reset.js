@@ -84,7 +84,7 @@ test('cleanupExpired deletes only stale rows', () => {
 // --- Routes (forgot/reset) ------------------------------------------------
 import express from 'express';
 import { createAuthApp } from './auth-app.js';
-import bcrypt from 'bcrypt';
+import { verifyPassword } from '../server/utils/password.js';
 
 function makeAuthApp(db, { baseUrl = 'https://oikos.test', sendMail = null } = {}) {
   // Lazy import so the route module reads our injected services.
@@ -444,7 +444,7 @@ test('reset-password updates the hash and consumes the token', async () => {
   const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
   assert.equal(status, 200);
   const hash = db.prepare('SELECT password_hash FROM users WHERE id = 1').get().password_hash;
-  assert.equal(await bcrypt.compare('brandnewpw', hash), true);
+  assert.deepEqual(await verifyPassword('brandnewpw', hash), { valid: true, needsRehash: false });
   assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 0);
 });
 

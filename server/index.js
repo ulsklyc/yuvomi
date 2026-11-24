@@ -423,7 +423,7 @@ app.use('/api/', imageLimiter);
 // API-Routen
 // --------------------------------------------------------
 // Anmeldung, Passwort-Reset und Einladungen schreiben ebenfalls - /auth/login
-// liest den Nutzer, wartet auf bcrypt und schreibt dann die Sitzung. Ein
+// liest den Nutzer, wartet auf den Passwort-Hash und schreibt dann die Sitzung. Ein
 // Restore in dieser Luecke wartet sie ab, statt dass die Sitzung nach dem Tausch
 // in der eingespielten Datenbank landet (#1441). Der Koerper ist hier schon
 // gelesen (express.json oben), eine langsame Anfrage haelt also nichts auf.

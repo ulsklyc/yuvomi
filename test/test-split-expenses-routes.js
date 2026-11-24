@@ -14,7 +14,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import bcrypt from 'bcrypt';
+import crypto from 'node:crypto';
 
 const dbmod = await import('../server/db.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
@@ -763,16 +763,16 @@ test('POST members via contact_id: zwei gleichzeitige Anfragen legen EINEN Gast 
 // Verwalterrecht, Kontakt -, muss NACH ihm noch einmal gelesen werden, in
 // derselben synchronen Transaktion wie das Schreiben. Sonst bleibt ein Gast
 // ohne Gruppe zurueck oder ein entzogenes Recht schreibt trotzdem.
-// Der Eingriff laeuft GENAU beim Start des Hashes: `bcrypt.hash` wird fuer
+// Der Eingriff laeuft GENAU beim Start des Hashes: `crypto.argon2` wird fuer
 // einen Aufruf umhuellt (server/utils/password.js liest die Methode erst beim
 // Aufruf vom geteilten Modulobjekt). Kein Timer - ein langsamer Runner liefe
 // sonst still vor der Vorpruefung in den Eingriff und maesse die Vorpruefung
 // statt der Neupruefung. Dass der Eingriff lief, prueft die Naht selbst.
 async function duringHash(action, request) {
-  const original = bcrypt.hash;
+  const original = crypto.argon2;
   let ran = false;
-  bcrypt.hash = function hashWithIntervention(...args) {
-    bcrypt.hash = original;
+  crypto.argon2 = function hashWithIntervention(...args) {
+    crypto.argon2 = original;
     ran = true;
     action();
     return original.apply(this, args);
@@ -780,7 +780,7 @@ async function duringHash(action, request) {
   try {
     return await request();
   } finally {
-    bcrypt.hash = original;
+    crypto.argon2 = original;
     assert.ok(ran, 'der Eingriff lief waehrend des Hashes');
   }
 }

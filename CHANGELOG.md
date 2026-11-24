@@ -314,6 +314,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Refreshing the calendars of an Outlook account answers an expired sign-in with 409
   `outlook_reauth_required` and a refusal of Microsoft with 502 and its class, instead of a 500.**
 
+### Security
+- **Passwords are hashed with Argon2id, and a password over 72 bytes counts in full.** New and
+  changed passwords are stored as Argon2id (RFC 9106) with the parameters of the OWASP Password
+  Storage Cheat Sheet: 19 MiB of memory (m=19456 KiB), 2 passes, parallelism 1, a 16-byte salt
+  and a 32-byte hash. It comes with Node itself (`node:crypto`), no new dependency. bcrypt read
+  only the first 72 bytes of a password: two passwords that differed only after that (after 18
+  emoji, or 72 Latin letters) were the same password. Existing bcrypt hashes stay valid and are
+  replaced by an Argon2id hash on the next successful sign-in; nobody has to reset a password.
+  A failed sign-in takes as long for an unknown account as for one with an old or a new hash, so
+  the response time does not tell which accounts exist.
+  **After this version you cannot go back to an older one without every account that has signed
+  in, been created or set a password since having to reset its password**: older versions do not
+  know Argon2id and refuse those sign-ins.
+
 ## [2.94.0] - 2026-11-22
 
 ### Changed
