@@ -18,6 +18,8 @@ import http from 'node:http';
 import express from 'express';
 
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 const actor = { userId: 1, role: 'member' };
 const app = express();
@@ -27,14 +29,17 @@ app.use((req, _res, next) => {
   req.authRole = actor.role;
   next();
 });
-app.use('/', preferencesRouter);
+const PREFIX = '/api/v1/preferences';
+app.use(defaultEmptyBody);
+app.use(PREFIX, preferencesRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 test.after(() => server.close());
 
 async function call(method, body) {
-  const res = await fetch(base + '/', {
+  const res = await fetch(base + PREFIX, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
