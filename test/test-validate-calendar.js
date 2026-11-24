@@ -274,6 +274,54 @@ test('the sink: an assignee id that is no whole number never reaches the foreign
   assertRefused(await call('PUT', `/calendar/${event.id}`, { json: { assigned_to: [1.5] } }), 'body/assigned_to', 'PUT assigned_to [1.5]');
 });
 
+test('the sink: an assignee id without an account is a 400 and writes nothing', async () => {
+  // Before: a whole positive id the schema takes, but no account, reached the
+  // foreign key of `event_assignments` and answered 500. Now the existence
+  // check of the occurrence routes answers first, with its sentence.
+  const unknown = 987654;
+  const refusal = { error: 'An assigned person no longer exists.', code: 400 };
+  const count = () => Number(/** @type {any} */ (db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get()).n);
+  const before = count();
+  for (const assigned of [[unknown], [MEM, unknown], unknown]) {
+    const res = await call('POST', '/calendar', { json: { ...UI_EVENT, title: 'Unbekannt', assigned_to: assigned } });
+    assert.equal(res.status, 400, `POST assigned_to ${JSON.stringify(assigned)}: ${JSON.stringify(res.body)}`);
+    assert.deepEqual(res.body, refusal, `POST assigned_to ${JSON.stringify(assigned)}`);
+  }
+  assert.equal(count(), before, 'no event created');
+
+  const event = await createEvent({ title: 'Bleibt zugewiesen' });
+  const res = await call('PUT', `/calendar/${event.id}`, { json: { title: 'Geaendert', assigned_to: [MEM, unknown] } });
+  assert.equal(res.status, 400, `PUT: ${JSON.stringify(res.body)}`);
+  assert.deepEqual(res.body, refusal, 'PUT');
+  const stored = /** @type {any} */ (db.prepare('SELECT title FROM calendar_events WHERE id = ?').get(event.id));
+  assert.equal(stored.title, 'Bleibt zugewiesen', 'the title stays');
+  const assigned = db.prepare('SELECT user_id FROM event_assignments WHERE event_id = ?').all(event.id).map((/** @type {any} */ r) => r.user_id);
+  assert.deepEqual(assigned, [MEM], 'the assignments stay');
+});
+
+test('the sink: an attachment that is no base64 data URL is a 400 and writes nothing', async () => {
+  // Before: parseAttachment() threw a plain Error for text it could not read,
+  // and POST and PUT answered 500.
+  const refusal = { error: 'attachment_data must be a base64 data URL.', code: 400 };
+  const count = () => Number(/** @type {any} */ (db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get()).n);
+  const before = count();
+  for (const data of ['xyz', 'data:image/png;base64,???', 'data:image/png,iVBORw0KGgo=']) {
+    const res = await call('POST', '/calendar', { json: { ...UI_EVENT, title: 'Kaputt', attachment_data: data } });
+    assert.equal(res.status, 400, `POST attachment_data ${data}: ${JSON.stringify(res.body)}`);
+    assert.deepEqual(res.body, refusal, `POST attachment_data ${data}`);
+  }
+  assert.equal(count(), before, 'no event created');
+
+  const event = await createEvent({ title: 'Ohne Anhang' });
+  for (const data of ['xyz', 'data:image/png;base64,???']) {
+    const res = await call('PUT', `/calendar/${event.id}`, { json: { title: 'Geaendert', attachment_data: data } });
+    assert.equal(res.status, 400, `PUT attachment_data ${data}: ${JSON.stringify(res.body)}`);
+    assert.deepEqual(res.body, refusal, `PUT attachment_data ${data}`);
+  }
+  const stored = /** @type {any} */ (db.prepare('SELECT title, attachment_document_id FROM calendar_events WHERE id = ?').get(event.id));
+  assert.deepEqual({ ...stored }, { title: 'Ohne Anhang', attachment_document_id: null }, 'the event stays');
+});
+
 test('a path id that is not plain digits is a 400 and deletes nothing', async () => {
   const event = await createEvent({ title: 'Bleibt' });
   // parseInt read `1abc` as 1: the event was deleted (204).

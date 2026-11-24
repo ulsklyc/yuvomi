@@ -65,6 +65,7 @@ import {
   ASSIGNED_USERS_SQL,
   getUserId,
   eventIcon,
+  attachmentShape,
   parseAttachment,
   refuseUploadWithoutDocumentsWrite, storedAttachmentLocked,
   ATTACHMENT_CHANGE_REFUSAL,
@@ -581,9 +582,14 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
     const vGoogle = googleTarget(req.body);
     const vOutlook = outlookTarget(req.body);
     const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id);
+    // Eine Person ohne Konto lief bis in den Fremdschluessel von
+    // `event_assignments` (500); dieselbe Pruefung wie an den Vorkommen (#2810).
+    const vAssigned = validateOccurrenceAssignments(db.get(), req.body.assigned_to);
+    // Kein lesbarer Anhang: 400 statt des Wurfs aus parseAttachment (#2810).
+    const vAttachment = attachmentShape(req.body.attachment_data);
     // Die Form (Text, bei Beschreibung und Ort auch null) prueft das Schema
     // davor (CalendarEventCreateInput, #2810); `str()` prueft den Inhalt.
-    const checks = [vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar];
+    const checks = [vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar, vAssigned, vAttachment];
     if (collectErrors(checks).length) return sendValidationErrors(res, checks);
     if (req.body.local_calendar_id !== undefined
         && ((req.body.external_source && req.body.external_source !== 'local')
@@ -937,6 +943,9 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
       ? validateCalendarId(db.get(), req.body.local_calendar_id, { required: true })
       : null;
     if (vLocalCalendar) checks.push(vLocalCalendar);
+    // Eine Person ohne Konto und ein unlesbarer Anhang endeten als 500 (#2810).
+    if (req.body.assigned_to !== undefined) checks.push(validateOccurrenceAssignments(db.get(), req.body.assigned_to));
+    checks.push(attachmentShape(req.body.attachment_data));
     if (collectErrors(checks).length) return sendValidationErrors(res, checks);
     const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : event.icon;
     if (!vIcon) return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });

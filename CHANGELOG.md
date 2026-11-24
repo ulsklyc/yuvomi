@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **A calendar event with an assignee who has no account, or with an unreadable attachment, is
+  refused with 400.** This is about your own API clients; the app sends neither. `POST /calendar`
+  and `PUT /calendar/{id}` with an `assigned_to` id that belongs to no account answered 500 and
+  now answer 400 `An assigned person no longer exists.`, the sentence the occurrence routes
+  already use; `attachment_data` that is no base64 data URL (`xyz`, `data:image/png;base64,???`)
+  answered 500 and now answers 400 `attachment_data must be a base64 data URL.`. Nothing is
+  written in either case.
 - **An empty push `endpoint` is refused by the API description.** This is about your own API
   clients; the app always sends the endpoint of the browser's subscription. `POST
   /push/subscribe` and `POST /push/unsubscribe` with `endpoint: ""` still answer 400, now with

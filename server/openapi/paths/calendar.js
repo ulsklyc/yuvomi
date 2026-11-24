@@ -96,6 +96,10 @@ const ATTACHMENT_RIGHTS = ' A new attachment creates a document in the Documents
 
 // Ein Serienende vor dem Start (#1607). Steht an POST und PUT, weil beide es
 // abweisen - und PUT nur dann, wenn die Anfrage die Serie anfasst.
+// Both answered 500 until #2810: the foreign key of `event_assignments` and
+// the throw of parseAttachment().
+const UNREADABLE_INPUT = ' An assignee id without an account is rejected with 400 (`An assigned person no longer exists.`), and so is '
+  + '`attachment_data` that is no base64 data URL (`attachment_data must be a base64 data URL.`); nothing is written.';
 const SERIES_END_INPUT = ' A `recurrence_rule` whose `UNTIL` day lies before the start day is rejected with 400 '
   + '(`recurrence_rule: the series ends before the start date.`, `reason: calendar_series_ends_before_start`); an `UNTIL` on the start day is a series with one '
   + 'occurrence and is accepted. PUT checks this only when the request changes the rule or the start day, so an '
@@ -151,7 +155,7 @@ export function calendarPaths() {
         operationId: 'createCalendarEvent',
         tag: 'Calendar',
         stateChanging: true,
-        description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).' + ATTACHMENT_RIGHTS + DATETIME_INPUT + SERIES_END_INPUT,
+        description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).' + ATTACHMENT_RIGHTS + DATETIME_INPUT + SERIES_END_INPUT + UNREADABLE_INPUT,
         requestBody: jsonBody('#/components/schemas/CalendarEventCreateInput'),
         responses: {
           201: {
@@ -567,7 +571,7 @@ export function calendarPaths() {
         tag: 'Calendar',
         params: [idParam()],
         stateChanging: true,
-        description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails. PUT stores the validated start and end, exactly as POST does; up to v2.68.0 it wrote the raw request value. `start_datetime` may be omitted to keep it, but an empty or null start is rejected with 400; an empty or null `end_datetime` clears the end.' + ATTACHMENT_RIGHTS + DATETIME_INPUT + SERIES_END_INPUT,
+        description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails. PUT stores the validated start and end, exactly as POST does; up to v2.68.0 it wrote the raw request value. `start_datetime` may be omitted to keep it, but an empty or null start is rejected with 400; an empty or null `end_datetime` clears the end.' + ATTACHMENT_RIGHTS + DATETIME_INPUT + SERIES_END_INPUT + UNREADABLE_INPUT,
         requestBody: jsonBody('#/components/schemas/CalendarEventUpdateInput'),
         responses: {
           200: {

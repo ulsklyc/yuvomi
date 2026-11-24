@@ -865,8 +865,9 @@ test('every answer of the table is the one before the refactor (status and whole
     assert.deepEqual(answer, EXPECTED[name], name);
   }
   assert.equal(Object.keys(answers).length, Object.keys(EXPECTED).length + Object.keys(CHANGED).length, 'every expectation has its row');
-  // The rows that changed on purpose are the 500s the central handler answers now.
-  assert.deepEqual(logged.error, Object.values(CHANGED).map((row) => row.log), 'only the changed rows reached the central handler');
+  // The rows that changed on purpose to a 500 are the ones the central handler
+  // answers now; a row that became a 400 (`log: null`) logs nothing.
+  assert.deepEqual(logged.error, Object.values(CHANGED).map((row) => row.log).filter(Boolean), 'only the changed 500 rows reached the central handler');
 });
 
 /**

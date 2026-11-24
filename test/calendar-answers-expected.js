@@ -560,19 +560,22 @@ export const EXPECTED = {
   "lc list end": {"status":200,"body":{"data":[{"id":3,"name":"Verein","color":"#007AFF","is_default":false,"sort_order":0,"feed_token":null,"feed_url":null,"event_count":0,"uploads_to_icloud":false},{"id":1,"name":"Yuvomi","color":"#007AFF","is_default":true,"sort_order":1,"feed_token":null,"feed_url":null,"event_count":21,"uploads_to_icloud":false},{"id":4,"name":"Sport","color":"#445566","is_default":false,"sort_order":3,"feed_token":"<volatile>","feed_url":"<volatile>","event_count":0,"uploads_to_icloud":false},{"id":2,"name":"Büro 2","color":"#AABBCC","is_default":false,"sort_order":7,"feed_token":null,"feed_url":null,"event_count":2,"uploads_to_icloud":false}],"sources":[{"key":"local:3","name":"Verein","color":"#007AFF"},{"key":"local:1","name":"Yuvomi","color":"#007AFF"},{"key":"local:4","name":"Sport","color":"#445566"},{"key":"local:2","name":"Büro 2","color":"#AABBCC"},{"key":"sub:1","name":"Schule Null","color":"#aabbcc"}]}},
 };
 
-/** @type {Record<string, { before: { status: number, body: unknown }, now: { status: number, body: unknown }, log: string }>} */
+/** @type {Record<string, { before: { status: number, body: unknown }, now: { status: number, body: unknown }, log: string | null }>} */
 export const CHANGED = {
-  // An assignee id that is no user fails the foreign key of `event_assignments`.
+  // An assignee id that is no user failed the foreign key of
+  // `event_assignments`; the existence check of the occurrence routes now
+  // answers first (#2810). No log line.
   "ev create assigned unknown": {
     before: {"status":500,"body":{"error":"Internal error.","code":500}},
-    now: {"status":500,"body":{"error":"Internal server error.","code":500}},
-    log: 'Unhandled error: POST /api/v1/calendar/ -> 500',
+    now: {"status":400,"body":{"error":"An assigned person no longer exists.","code":400}},
+    log: null,
   },
-  // parseAttachment() throws for a data URL that does not parse.
+  // parseAttachment() threw for a data URL that does not parse; the route
+  // now refuses the text before it (#2810). No log line.
   "ev create attachment broken": {
     before: {"status":500,"body":{"error":"Internal error.","code":500}},
-    now: {"status":500,"body":{"error":"Internal server error.","code":500}},
-    log: 'Unhandled error: POST /api/v1/calendar/ -> 500',
+    now: {"status":400,"body":{"error":"attachment_data must be a base64 data URL.","code":400}},
+    log: null,
   },
   // parseAttachment() throws for a type it does not take.
   "ev create attachment zip": {
@@ -580,10 +583,11 @@ export const CHANGED = {
     now: {"status":500,"body":{"error":"Internal server error.","code":500}},
     log: 'Unhandled error: POST /api/v1/calendar/ -> 500',
   },
-  // An assignee id that is no user fails the foreign key of `event_assignments`.
+  // An assignee id that is no user failed the foreign key of
+  // `event_assignments`; now the same 400 as on create (#2810). No log line.
   "ev update assigned unknown": {
     before: {"status":500,"body":{"error":"Internal error.","code":500}},
-    now: {"status":500,"body":{"error":"Internal server error.","code":500}},
-    log: 'Unhandled error: PUT /api/v1/calendar/:id -> 500',
+    now: {"status":400,"body":{"error":"An assigned person no longer exists.","code":400}},
+    log: null,
   },
 };
