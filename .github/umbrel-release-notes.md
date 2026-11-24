@@ -1,10 +1,12 @@
-<!-- version: 2.94.0 -->
-This update is mostly about the API. If you use it with your own scripts or integrations: shared expenses, backup, health, contacts, the meal plan, the shopping list, documents and the budget with its subscriptions now check every request against the published API description, like the modules before them. Input that was quietly accepted or reinterpreted before, such as an id like "1abc", a month 13, a number sent as text or an empty amount, is now refused with a 400 that names the field. The app itself sends nothing that is refused.
+<!-- version: 2.95.0 -->
+Passwords are now stored with Argon2id instead of bcrypt. Existing passwords keep working: each account switches over on its next successful sign-in, and nobody has to reset anything. A password longer than 72 bytes now counts in full. Please note: once you are on this version, going back to an older one means every account that has signed in or changed its password since has to reset it, because older versions cannot read the new hashes.
 
-Some requests could change data by accident and are refused now instead. Editing a document without its access list removed everyone it was shared with, saving the cycle settings with a field left out reset it, editing a shared expense with fields left out cleared its exchange rate and split it equally, and renaming a contact with only some name parts dropped the others. These requests now need the whole record.
+A request with broken JSON no longer writes part of its body into the server log. Before, that could put part of a password into the log at sign-in.
 
-In the app, saving a contact keeps its middle name, title and suffix, and shared expenses converted into a currency with other decimal places show and accept the converted amount correctly.
+This update is otherwise mostly about the API. If you use it with your own scripts or integrations: the calendar, the tasks, the preferences and push, sign-in and your own account, account administration and the calendar feeds now check every request against the published API description, like the modules before them. Every list in a request has a maximum length, and calendar events with an unreadable attachment or an assignee without an account are refused with a 400 instead of an internal error. The app itself sends nothing that is refused. An undocumented "role": "admin" no longer creates an administrator; use "system_admin": true.
 
-This update does not change the database. No action is needed from you.
+Editing a task moves its "last changed" time again; this had been frozen since a much older update. A member whose stored colour is in an old format can change their profile again.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.94.0
+This update changes the database once on start to restore the task timestamp. No action is needed from you.
+
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.95.0
