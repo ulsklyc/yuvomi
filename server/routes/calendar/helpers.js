@@ -80,10 +80,26 @@ export function eventIcon(value) {
   return VALID_EVENT_ICONS.has(icon) ? icon : null;
 }
 
+const ATTACHMENT_DATA_URL = /^data:([^;,]+);base64,([A-Za-z0-9+/=\s]+)$/;
+
+/**
+ * Ein Anhang, den `parseAttachment` gar nicht erst lesen kann (#2810): Text,
+ * der keine base64-Data-URL ist. POST und PUT /calendar antworten damit 400
+ * statt den Wurf von `parseAttachment` als 500 enden zu lassen. Leer oder kein
+ * Text ist kein Anhang und hier kein Fehler.
+ * @param {unknown} dataUrl
+ * @returns {{ value: null, error: string | null }}
+ */
+export function attachmentShape(dataUrl) {
+  const raw = typeof dataUrl === 'string' ? dataUrl.trim() : '';
+  const error = raw && !ATTACHMENT_DATA_URL.test(raw) ? 'attachment_data must be a base64 data URL.' : null;
+  return { value: null, error };
+}
+
 export function parseAttachment(dataUrl) {
   const raw = typeof dataUrl === 'string' ? dataUrl.trim() : '';
   if (!raw) return { mime: null, size: null, buffer: null };
-  const match = raw.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  const match = raw.match(ATTACHMENT_DATA_URL);
   if (!match) throw new Error('attachment_data: ungültiges Dateiformat.');
   const mime = match[1].toLowerCase();
   if (!ATTACHMENT_MIME.has(mime)) throw new Error('attachment_data: Dateityp nicht erlaubt.');

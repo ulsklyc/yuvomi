@@ -292,6 +292,10 @@ const calendarProviderTargetProperties = {
 const { reminder_offsets: _occurrenceOnly, ...calendarEventMutationProperties } = {
   ...calendarOccurrenceMutationProperties,
   ...calendarProviderTargetProperties,
+  assigned_to: {
+    description: 'One user id, a list with the primary assignee first, or null for nobody. New assignees have to be household members; an id without an account answers 400 `An assigned person no longer exists.` and nothing is written.',
+    ...calendarOccurrenceMutationProperties.assigned_to,
+  },
   icon: {
     type: 'string',
     description: 'One of the icon names of the event editor; an unknown name answers 400. Omitted, empty or blank means `calendar` on create and leaves it untouched on update.',
@@ -299,7 +303,7 @@ const { reminder_offsets: _occurrenceOnly, ...calendarEventMutationProperties } 
   attachment_name: { type: ['string', 'null'], description: 'File name for a new attachment; falls back to `Attachment`. MIME type and size are read from `attachment_data`.' },
   attachment_data: {
     type: ['string', 'null'],
-    description: 'A base64 data URL (`data:<mime>;base64,<bytes>`) for a new attachment. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files; the bytes have to match the type.',
+    description: 'A base64 data URL (`data:<mime>;base64,<bytes>`) for a new attachment. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files; the bytes have to match the type. Text that is no base64 data URL answers 400 `attachment_data must be a base64 data URL.` and nothing is written.',
   },
   recurrence_rule: {
     type: ['string', 'null'],
