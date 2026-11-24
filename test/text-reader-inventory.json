@@ -274,7 +274,7 @@
   "test-validate-calendar-providers.js": {"class":"V","sBlocks":0,"targets":["public/settings/pages/sync-calendar.js"],"fate":"stays:coupling"},
   "test-validate-contacts-meals.js": {"class":"V","sBlocks":0,"targets":["public/pages/contacts.js"],"fate":"stays:coupling"},
   "test-validate-health.js": {"class":"V","sBlocks":0,"targets":["public/pages/health.js"],"fate":"stays:coupling"},
-  "test-validate-request-coverage.js": {"class":"V","sBlocks":0,"targets":["server/routes/"],"fate":"stays:coupling"},
+  "test-validate-request-coverage.js": {"class":"V","sBlocks":0,"targets":["server/","server/index.js","server/routes/"],"fate":"stays:coupling"},
   "test-validate-request.js": {"class":"V","sBlocks":0,"targets":["server/index.js"],"fate":"stays:coupling"},
   "test-validate-shopping-documents.js": {"class":"V","sBlocks":0,"targets":["public/pages/documents.js"],"fate":"stays:coupling"},
   "test-validate-split-backup-core.js": {"class":"V","sBlocks":0,"targets":["public/pages/split-expenses.js"],"fate":"stays:coupling"},

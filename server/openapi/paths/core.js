@@ -1,4 +1,21 @@
-import { op, jsonBody, stringPathParam } from '../helpers.js';
+import { op, jsonBody, stringPathParam, withValidationRefusal } from '../helpers.js';
+
+/**
+ * `?download=1` at both addresses of the OpenAPI document (#2810, group 13):
+ * only `1` sets the download header, so only `1` is accepted. `0`, `true`, an
+ * empty value or the key twice used to fall back silently to the inline
+ * answer; now they are a 400.
+ */
+const DOWNLOAD_PARAM = {
+  name: 'download',
+  in: 'query',
+  required: false,
+  description: '`1` sends the document with `Content-Disposition: attachment` as `openapi.json`. Without the parameter it is answered inline. Any other value is a 400.',
+  schema: { type: 'string', enum: ['1'] },
+};
+
+/** Too many requests to the feeds: one count of 30 per minute and address for all six. */
+const FEED_RATE_LIMITED = { description: 'More than 30 feed requests per minute from this address, counted across all six feeds.' };
 
 export function corePaths() {
   return {
@@ -66,12 +83,13 @@ export function corePaths() {
       }),
     },
     '/api/v1/openapi.json': {
-      get: op({
+      get: withValidationRefusal(op({
         summary: 'Get OpenAPI specification',
         tag: 'System',
         admin: true,
-        description: 'Use `?download=1` to receive the OpenAPI document as a downloadable file.',
-      }),
+        description: 'Use `?download=1` to receive the OpenAPI document as a downloadable file; `download` takes no other value.',
+        params: [DOWNLOAD_PARAM],
+      })),
     },
     '/api/v1/changelog': {
       get: op({
@@ -81,12 +99,13 @@ export function corePaths() {
       }),
     },
     '/openapi.json': {
-      get: op({
+      get: withValidationRefusal(op({
         summary: 'Get OpenAPI specification',
         tag: 'System',
         admin: true,
-        description: 'Alias for `/api/v1/openapi.json`. Use `?download=1` to download the JSON file.',
-      }),
+        description: 'Alias for `/api/v1/openapi.json`. Use `?download=1` to download the JSON file; `download` takes no other value.',
+        params: [DOWNLOAD_PARAM],
+      })),
     },
     '/docs': {
       get: op({
@@ -113,6 +132,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -134,6 +154,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -155,6 +176,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -176,6 +198,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -197,6 +220,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -218,6 +242,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
