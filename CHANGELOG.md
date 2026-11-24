@@ -322,6 +322,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only the first 72 bytes of a password: two passwords that differed only after that (after 18
   emoji, or 72 Latin letters) were the same password. Existing bcrypt hashes stay valid and are
   replaced by an Argon2id hash on the next successful sign-in; nobody has to reset a password.
+  A failed sign-in takes as long for an unknown account as for one with an old or a new hash, so
+  the response time does not tell which accounts exist.
   **After this version you cannot go back to an older one without every account that has signed
   in, been created or set a password since having to reset its password**: older versions do not
   know Argon2id and refuse those sign-ins.

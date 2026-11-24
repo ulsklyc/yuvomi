@@ -22,6 +22,19 @@
  *        erst bei der naechsten Anmeldung ersetzt. Das ist die Bedingung der
  *        Migration, kein Aufschub (Gruppe 12, Entscheidung 21).
  *
+ *        Gleichstand der Fehlversuche: solange bcrypt-Zeilen existieren, kostet
+ *        JEDER Fehlpfad dasselbe, egal ob das Konto fehlt, `$oidc$` traegt,
+ *        einen bcrypt- oder einen Argon2id-Hash hat - genau eine
+ *        Argon2id-Berechnung (aktuelle Parameter) plus k bcrypt-Vergleiche
+ *        (cost 12), wobei k die Zahl der Kandidatenformen der EINGABE ist
+ *        (NFC, Rohform, NFD; 1 bis 3, nie vom Konto abhaengig). Was das Konto
+ *        nicht selbst rechnet, rechnet ein Platzhalter: ein echter Argon2id-Lauf
+ *        mit frischem Salz und ein echter, beim Laden einmal erzeugter
+ *        bcrypt-Hash. Sonst liessen sich Bestandskonten an der Antwortzeit
+ *        abzaehlen (bcrypt ~270 ms je Vergleich gegen Argon2id ~20 ms). Ein
+ *        Erfolg darf frueh zurueckkehren, er verraet nichts Neues. Der
+ *        bcrypt-Anteil faellt erst mit bcrypt selbst.
+ *
  *        `crypto.argon2` wird erst beim Aufruf vom geteilten Modulobjekt
  *        gelesen (nie `argon2Sync`, nie beim Laden gebunden): Tests haengen
  *        sich dort ein, um Berechnungen zu zaehlen oder anzuhalten.
@@ -106,6 +119,32 @@ export async function hashPassword(password) {
 }
 
 /**
+ * Platzhalter fuer den Zeitausgleich: ein echter bcrypt-Hash (cost 12) eines
+ * Zufallswerts, beim Laden einmal asynchron erzeugt. Ein Vergleich gegen ihn
+ * kostet so viel wie gegen den Hash eines Bestandskontos. Scheitert die
+ * Erzeugung, gilt der frueher feste Platzhalter: bcrypt rechnet auch gegen ihn
+ * die vollen cost 12 (gemessen), er trifft nur nie.
+ */
+const LEGACY_BCRYPT_COST = 12;
+const dummyBcryptHash = bcrypt
+  .hash(crypto.randomBytes(32).toString('base64url'), LEGACY_BCRYPT_COST)
+  .catch(() => '$2b$12$invalidhashfortimingprotection000000000000000000000');
+
+/**
+ * Die Formen einer Eingabe, die gegen einen bcrypt-Hash geprueft werden: NFC,
+ * dann die unveraenderte Eingabe und NFD (Hashes aus der Zeit vor #608), ohne
+ * Doppelte. Ihre Zahl haengt nur von der Eingabe ab.
+ * @param {string} raw @param {string} nfc
+ */
+function bcryptCandidates(raw, nfc) {
+  const candidates = [nfc];
+  for (const variant of [raw, raw.normalize('NFD')]) {
+    if (!candidates.includes(variant)) candidates.push(variant);
+  }
+  return candidates;
+}
+
+/**
  * Ein bcrypt-Vergleich, der an einem kaputten Hash scheitert statt zu werfen.
  * @param {string} candidate @param {string} hash @returns {Promise<boolean>}
  */
@@ -117,6 +156,21 @@ async function bcryptMatches(candidate, hash) {
   }
 }
 
+/** Zeitausgleich: ein Argon2id-Lauf mit aktuellen Parametern, Ergebnis verworfen. @param {string} nfc */
+async function spendArgon2id(nfc) {
+  try {
+    await argon2id(nfc, crypto.randomBytes(SALT_BYTES), ARGON2_PARAMS);
+  } catch {
+    // Nur Zeitausgleich - das Ergebnis zaehlt nicht.
+  }
+}
+
+/** Zeitausgleich: je Kandidat ein bcrypt-Vergleich gegen den Platzhalter. @param {string[]} candidates */
+async function spendBcrypt(candidates) {
+  const dummy = await dummyBcryptHash;
+  for (const candidate of candidates) await bcryptMatches(candidate, dummy);
+}
+
 /**
  * Prüft ein Passwort gegen einen gespeicherten Hash.
  *
@@ -126,57 +180,57 @@ async function bcryptMatches(candidate, hash) {
  *
  * bcrypt (Legacy): zuerst NFC, danach die unveraenderte Eingabe und NFD - die
  * beiden Legacy-Formen decken Hashes aus der Zeit vor #608 ab. Jeder Treffer
- * meldet `needsRehash`, damit die Anmeldung auf Argon2id umstellt. Ein
- * Fehlversuch durchlaeuft immer alle Kandidaten.
+ * meldet `needsRehash`, damit die Anmeldung auf Argon2id umstellt.
  *
- * Jedes andere Format (der SSO-Platzhalter `$oidc$`, leer, null, ein kaputter
- * PHC-String) ist ungueltig und kostet trotzdem eine Argon2id-Berechnung mit
- * den aktuellen Parametern: ein Fehlversuch dauert so lange wie an einem Konto
- * mit Passwort. Geworfen wird nie.
+ * Jedes andere Format (der SSO-Platzhalter `$oidc$`, leer, null fuer ein
+ * unbekanntes Konto, ein kaputter PHC-String) ist ungueltig.
+ *
+ * Jeder Fehlversuch kostet eine Argon2id-Berechnung plus einen bcrypt-Vergleich
+ * je Kandidatenform der Eingabe (Modulkopf); was der Hash nicht selbst
+ * verlangt, rechnen die Platzhalter. Geworfen wird nie.
  *
  * @param {unknown} password
- * @param {unknown} hash gespeicherter `password_hash`
+ * @param {unknown} hash gespeicherter `password_hash`, null fuer ein unbekanntes Konto
  * @returns {Promise<{ valid: boolean, needsRehash: boolean }>}
  */
 export async function verifyPassword(password, hash) {
   const raw = String(password ?? '');
   const nfc = raw.normalize('NFC');
   const stored = typeof hash === 'string' ? hash : '';
+  const candidates = bcryptCandidates(raw, nfc);
+  const refused = { valid: false, needsRehash: false };
 
   if (BCRYPT_PREFIX.test(stored)) {
-    const candidates = [nfc];
-    for (const variant of [raw, raw.normalize('NFD')]) {
-      if (!candidates.includes(variant)) candidates.push(variant);
-    }
     for (const candidate of candidates) {
       if (await bcryptMatches(candidate, stored)) return { valid: true, needsRehash: true };
     }
-    return { valid: false, needsRehash: false };
+    await spendArgon2id(nfc);
+    return refused;
   }
 
   const parsed = stored.startsWith('$argon2id$') ? parseArgon2id(stored) : null;
-  if (!parsed) {
+  /** @type {Buffer | null} */
+  let computed = null;
+  if (parsed) {
     try {
-      await argon2id(nfc, crypto.randomBytes(SALT_BYTES), ARGON2_PARAMS);
+      computed = await argon2id(nfc, parsed.salt, {
+        memory: parsed.memory,
+        passes: parsed.passes,
+        parallelism: parsed.parallelism,
+        tagLength: parsed.tag.length,
+      });
     } catch {
-      // Nur Zeitausgleich - das Ergebnis zaehlt nicht.
+      computed = null;
     }
-    return { valid: false, needsRehash: false };
   }
-
-  let computed;
-  try {
-    computed = await argon2id(nfc, parsed.salt, {
-      memory: parsed.memory,
-      passes: parsed.passes,
-      parallelism: parsed.parallelism,
-      tagLength: parsed.tag.length,
-    });
-  } catch {
-    return { valid: false, needsRehash: false };
+  if (!parsed || !computed) {
+    await spendArgon2id(nfc);
+    await spendBcrypt(candidates);
+    return refused;
   }
   if (computed.length !== parsed.tag.length || !crypto.timingSafeEqual(computed, parsed.tag)) {
-    return { valid: false, needsRehash: false };
+    await spendBcrypt(candidates);
+    return refused;
   }
   const needsRehash = parsed.memory < ARGON2_PARAMS.memory
     || parsed.passes < ARGON2_PARAMS.passes

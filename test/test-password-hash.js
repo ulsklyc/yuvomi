@@ -21,9 +21,11 @@
  *              rewrites nothing; a password set while the migration hashes is
  *              not overwritten; an SSO-only and an unknown account answer as
  *              before;
- *            - TIMING: an unknown account, an SSO-only account and a wrong
- *              password at an Argon2id account cost one Argon2id computation
- *              each (counted by a spy on `crypto.argon2`, no wall clock);
+ *            - TIMING: every failed check costs the same whatever the account
+ *              (unknown, SSO-only, broken hash, bcrypt, Argon2id): one Argon2id
+ *              computation plus one bcrypt comparison per candidate form of
+ *              the INPUT (k = 1 to 3), counted by spies on `crypto.argon2` and
+ *              `bcrypt.compare`, no wall clock; a success may return early;
  *            - NO PROCESS WARNING from `crypto.argon2` (CI runs Node 24 and 26,
  *              the package contract reads the start logs).
  * Run: npm run test:password-hash
@@ -94,13 +96,29 @@ async function countArgon2(action, during) {
     if (calls === 1 && during) during();
     return /** @type {any} */ (original).apply(this, args);
   });
+  const originalCompare = bcrypt.compare;
+  let bcryptCalls = 0;
+  bcrypt.compare = /** @this {any} */ function compareSpy(/** @type {any[]} */ ...args) {
+    bcryptCalls += 1;
+    return originalCompare.apply(this, args);
+  };
   try {
     const result = await action();
-    return { calls, result };
+    return { calls, bcryptCalls, result };
   } finally {
     crypto.argon2 = original;
+    bcrypt.compare = originalCompare;
   }
 }
+
+// Inputs by their number k of candidate forms (NFC, as typed, NFD): the cost
+// of a failure may depend on these, never on the account.
+const BY_FORMS = /** @type {const} */ ([
+  [1, 'wrong-horse-1'],
+  [2, 'Bärenschwach1'.normalize('NFD')],
+  // a composed ä next to a decomposed ö: neither NFC nor NFD
+  [3, `Bär${'ö'.normalize('NFD')}schwach1`],
+]);
 
 // --------------------------------------------------------------------------
 // Node computes Argon2id v19
@@ -244,13 +262,24 @@ test('broken hashes are valid: false and never throw', async () => {
   }
 });
 
-test('timing: a hash that is not one costs one Argon2id computation', async () => {
-  for (const hash of [OIDC_PASSWORD_SENTINEL, '', null, '$argon2id$v=16$m=1,t=1,p=1$AAAA$AAAA']) {
-    const { calls } = await countArgon2(() => verifyPassword('correct-horse-1', /** @type {any} */ (hash)));
-    assert.equal(calls, 1, String(hash));
+test('timing: every failure costs one Argon2id computation and one bcrypt comparison per form of the input', async () => {
+  const bcryptHash = await bcrypt.hash('correct-horse-1', 4);
+  const argonHash = await hashPassword('correct-horse-1');
+  for (const [k, input] of BY_FORMS) {
+    for (const hash of [null, OIDC_PASSWORD_SENTINEL, '', '$argon2id$v=16$m=1,t=1,p=1$AAAA$AAAA', bcryptHash, argonHash]) {
+      const { calls, bcryptCalls, result } = await countArgon2(() => verifyPassword(input, /** @type {any} */ (hash)));
+      assert.deepEqual(result, NOT_VALID);
+      assert.deepEqual({ argon2: calls, bcrypt: bcryptCalls }, { argon2: 1, bcrypt: k }, `k=${k} ${String(hash).slice(0, 12)}`);
+    }
   }
-  const { calls } = await countArgon2(async () => verifyPassword('wrong', await hashPassword('correct-horse-1')));
-  assert.equal(calls, 2, 'one to hash, one to verify');
+});
+
+test('timing: a success may return early', async () => {
+  const bcryptHash = await bcrypt.hash('correct-horse-1', 4);
+  const legacy = await countArgon2(() => verifyPassword('correct-horse-1', bcryptHash));
+  assert.deepEqual({ argon2: legacy.calls, bcrypt: legacy.bcryptCalls }, { argon2: 0, bcrypt: 1 });
+  const current = await countArgon2(async () => verifyPassword('correct-horse-1', await hashPassword('correct-horse-1')));
+  assert.deepEqual({ argon2: current.calls, bcrypt: current.bcryptCalls }, { argon2: 2, bcrypt: 0 }, 'one to hash, one to verify');
 });
 
 // --------------------------------------------------------------------------
@@ -298,9 +327,10 @@ test('login: a bcrypt account signs in and carries an Argon2id hash afterwards; 
   assert.match(migrated, PHC);
   assert.deepEqual(await verifyPassword(pw, migrated), { valid: true, needsRehash: false });
 
-  const { calls, result } = await countArgon2(() => login('legacy', pw.normalize('NFD')));
+  const { calls, bcryptCalls, result } = await countArgon2(() => login('legacy', pw.normalize('NFD')));
   assert.equal(/** @type {any} */ (result).status, 200);
   assert.equal(calls, 1, 'one computation to verify, none to rewrite');
+  assert.equal(bcryptCalls, 0, 'bcrypt is out of the picture');
   assert.equal(hashOf('legacy'), migrated, 'the second sign-in leaves the row alone');
 });
 
@@ -330,11 +360,17 @@ test('login: an SSO-only and an unknown account answer as before, a wrong passwo
   assert.equal(hashOf('sso'), OIDC_PASSWORD_SENTINEL);
 });
 
-test('timing: unknown account, SSO-only account and a wrong password cost one Argon2id computation each', async () => {
-  for (const [username, password] of [['nobody', 'anything-1'], ['sso', 'anything-1'], ['argon', 'wrong-horse-1'], ['argon', 'correct-horse-1']]) {
-    const { calls } = await countArgon2(() => login(username, password));
-    assert.equal(calls, 1, `${username} / ${password}`);
+test('timing: unknown, SSO-only, bcrypt and Argon2id accounts cost the same on a failed sign-in', async () => {
+  account('oldhash', await bcrypt.hash('correct-horse-1', 4));
+  for (const [k, input] of BY_FORMS) {
+    for (const username of ['nobody', 'sso', 'oldhash', 'argon']) {
+      const { calls, bcryptCalls, result } = await countArgon2(() => login(username, input));
+      assert.equal(/** @type {any} */ (result).status, 401, username);
+      assert.deepEqual({ argon2: calls, bcrypt: bcryptCalls }, { argon2: 1, bcrypt: k }, `k=${k} ${username}`);
+    }
   }
+  const { calls, bcryptCalls } = await countArgon2(() => login('argon', 'correct-horse-1'));
+  assert.deepEqual({ argon2: calls, bcrypt: bcryptCalls }, { argon2: 1, bcrypt: 0 }, 'a success returns early');
 });
 
 test('crypto.argon2 emits no process warning', async () => {

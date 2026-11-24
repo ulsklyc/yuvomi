@@ -89,13 +89,6 @@ const { version: APP_VERSION } = JSON.parse(
 const API_TOKEN_PREFIX = 'yuvomi_';
 // Ein angemeldetes Geraet laeuft ab wie eine Sitzung, dieselbe Zahl.
 const DEVICE_IDLE_DAYS = Math.round(SESSION_MAX_AGE_MS / (24 * 60 * 60 * 1000));
-// Platzhalter-Hash für den Timing-Attack-Schutz beim Login unbekannter Benutzer:
-// ein echter Argon2id-Hash eines Zufallswerts, einmal beim Laden des Moduls
-// erzeugt (asynchron, rund 20 ms, lange vor der ersten Anmeldung fertig). Ein
-// Login gegen ihn kostet genau die eine Argon2id-Berechnung, die ein Konto mit
-// Passwort kostet. Scheitert die Erzeugung, bleibt '' - auch das kostet in
-// verifyPassword eine Berechnung mit den aktuellen Parametern.
-const dummyPasswordHash = hashPassword(crypto.randomBytes(32).toString('base64url')).catch(() => '');
 /**
  * WIEVIELE MENSCHEN IM HAUSHALT LEBEN, und warum der Server das sagt.
  *
@@ -1906,10 +1899,10 @@ router.post('/login', loginLimiter, validateRequest(), async (req, res) => {
   const user = db.get().prepare('SELECT * FROM users WHERE username = ?').get(username);
 
   if (!user) {
-    // Timing-Attack-Schutz: trotzdem einen Hash pruefen. Bewusst über
-    // verifyPassword gegen einen echten Argon2id-Hash, damit ein Fehlversuch
-    // dieselbe eine Argon2id-Berechnung kostet wie bei einem existierenden Konto.
-    await verifyPassword(password, await dummyPasswordHash);
+    // Timing-Attack-Schutz: trotzdem pruefen. verifyPassword ohne Hash kostet
+    // genau so viel wie ein Fehlversuch an einem bestehenden Konto, egal mit
+    // welcher Hash-Art (der Ausgleich lebt in server/utils/password.js).
+    await verifyPassword(password, null);
     log.warn('Login failed', { ip: req.ip, username, reason: 'user_not_found' });
     return res.status(401).json({ error: 'Invalid credentials.', code: 401 });
   }
