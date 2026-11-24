@@ -638,7 +638,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | `SESSION_SECURE` | Set to `true` when running behind an HTTPS reverse proxy (Caddy, Nginx, Traefik). Leave unset for direct HTTP access (e.g. TrueNAS, bare Docker). | `false` | No |
 | `RATE_LIMIT_WINDOW_MS` | Time window for rate limiting (ms) | `60000` | No |
 | `RATE_LIMIT_MAX_ATTEMPTS` | Max attempts per window on the credential routes: sign-in, the second factor, and password reset | `5` | No |
-| `ENABLE_API_DOCS` | API documentation (`/docs`, `/openapi.json`) is admin-only and hidden entirely in production. Set to `true` to expose it to signed-in admins in production too. | `false` (hidden) | No |
+| `ENABLE_API_DOCS` | In production the `/docs` page returns `404` unless this is `true`; set to `true` to show it to signed-in admins. The OpenAPI document at `/api/v1/openapi.json` and `/openapi.json` stays available to signed-in admins either way. | `false` (`/docs` hidden) | No |
 | `MCP_INTERNAL_BASE_URL` | Base URL the built-in MCP endpoint (`/mcp`) uses when its `call_api_operation` bridge calls the REST API back over loopback. Only needed when neither default reaches the app. | `BASE_URL`, otherwise `http://<BIND_ADDRESS>:<PORT>` (`127.0.0.1` while `BIND_ADDRESS` is unset) | No |
 
 Generate a secure `SESSION_SECRET`:
