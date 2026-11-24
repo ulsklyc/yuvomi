@@ -25,6 +25,10 @@
  *          feeds; the 31st is 429.
  *          (4) BIRTHDAY FEED ADMINISTRATION: the three routes answer as
  *          before, anonymous 401.
+ *          (4b) BIRTHDAY FEED 500 (#2810, group 13 b): the administration
+ *          router runs in-process too, at its real prefix behind the feeds
+ *          app; per route a database error is the JSON 500 of the central
+ *          handler, whose log line names the route pattern.
  *          (5) DOWNLOAD: `1` sends the file, no parameter answers inline,
  *          `0`, `true`, empty and the key twice are 400 `reason: validation`
  *          with `fields`; anonymous 401 and a member 403 come first.
@@ -34,6 +38,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import rateLimit from 'express-rate-limit';
 
 import { startTestServer } from './server-ready.js';
 import { createFeedsApp } from './feeds-app.js';
@@ -44,13 +49,28 @@ const { baseUrl: SERVER } = await startTestServer({
 });
 const db = (await import('../server/db.js')).get();
 
+/** The prefix server/routes/birthdays.js mounts the feed administration at. */
+const BIRTHDAY_FEED_PREFIX = '/api/v1/birthdays/feed';
+
 /** @type {{ level: string, args: any[] }[]} */
 const logged = [];
 const log = {
   warn: (/** @type {any[]} */ ...args) => logged.push({ level: 'warn', args }),
   error: (/** @type {any[]} */ ...args) => logged.push({ level: 'error', args }),
 };
-const app = await createFeedsApp({ log });
+/** The user the in-process birthday feed administration acts for (set below). */
+let feedAdminUser = 0;
+const { default: birthdayFeedRouter } = await import('../server/routes/birthday-feed.js');
+const app = await createFeedsApp({
+  log,
+  after: [[
+    BIRTHDAY_FEED_PREFIX,
+    // server/index.js puts the general API limiter in front; a generous one here.
+    rateLimit({ windowMs: 60_000, limit: 100_000, standardHeaders: false, legacyHeaders: false }),
+    (/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { req.authUserId = feedAdminUser; next(); },
+    birthdayFeedRouter,
+  ]],
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise((resolve) => server.once('listening', resolve));
 const FEEDS_BASE = `http://127.0.0.1:${/** @type {any} */ (server.address()).port}`;
@@ -254,6 +274,37 @@ test('/api/v1/birthdays/feed: the three routes answer as before, anonymous 401',
     assert.equal(anonymous.text, '{"error":"Not authenticated.","code":401}');
   }
 });
+
+// --------------------------------------------------------------------------
+// 4b. BIRTHDAY FEED ADMINISTRATION 500 (in-process, central error handler)
+// --------------------------------------------------------------------------
+// The handler names the route pattern with its mount; the pattern of the
+// router root is `/`, so the line ends in `feed/`.
+for (const [method, path, logged500] of [
+  ['GET', '', 'GET /api/v1/birthdays/feed/'],
+  ['POST', '/regenerate', 'POST /api/v1/birthdays/feed/regenerate'],
+  ['DELETE', '', 'DELETE /api/v1/birthdays/feed/'],
+]) {
+  test(`${method} ${BIRTHDAY_FEED_PREFIX}${path}: a database error is the JSON 500 of the central handler`, async () => {
+    feedAdminUser = insertUser();
+    db.exec('ALTER TABLE users RENAME COLUMN birthday_feed_token TO birthday_feed_token_broken');
+    const from = logged.length;
+    let res;
+    try {
+      res = await call(FEEDS_BASE, `${BIRTHDAY_FEED_PREFIX}${path}`, { method });
+    } finally {
+      db.exec('ALTER TABLE users RENAME COLUMN birthday_feed_token_broken TO birthday_feed_token');
+    }
+    assert.equal(res.status, 500, `${res.status} ${res.text}`);
+    assert.equal(res.type, 'application/json; charset=utf-8');
+    assert.deepEqual(JSON.parse(res.text), { error: 'Internal server error.', code: 500 });
+    const lines = logged.slice(from);
+    assert.equal(lines.length, 1, 'one log line');
+    assert.equal(lines[0].level, 'error');
+    assert.equal(lines[0].args[0], `Unhandled error: ${logged500} -> 500`);
+    assert.ok(lines[0].args[1] instanceof Error, 'the error goes to the log');
+  });
+}
 
 // --------------------------------------------------------------------------
 // 5. DOWNLOAD (real server)
