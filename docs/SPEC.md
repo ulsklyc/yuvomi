@@ -6778,7 +6778,7 @@ Both install routes and `DELETE` answer `403 module_web_install_disabled` while 
 
 ## API Documentation
 
-An OpenAPI 3.1 specification is served at `/api/v1/openapi.json` and `/openapi.json` to **signed-in admins** (both endpoints require an admin session or API token). Append `?download=1` to download as a file. The spec covers all authenticated endpoints and can be imported into any OpenAPI-compatible client (Insomnia, Postman, etc.). The interactive `/docs` page follows the same admin gate and is hidden entirely in production unless `ENABLE_API_DOCS=true`.
+An OpenAPI 3.1 specification is served at `/api/v1/openapi.json` and `/openapi.json` to **signed-in admins** (both endpoints require an admin session or API token). Append `?download=1` to download as a file. The spec covers all authenticated endpoints and can be imported into any OpenAPI-compatible client (Insomnia, Postman, etc.). The `/docs` page (a plain-text pointer to the spec) follows the same admin gate and returns `404` in production unless `ENABLE_API_DOCS=true`; the two spec endpoints are not affected by that switch.
 
 **"Covers all endpoints" is now a checked claim (v2.52.0).** It had not been one: 40 of 297 routes
 were missing, among them four entire modules that had never had a line of specification — quick
