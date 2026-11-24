@@ -64,7 +64,7 @@ import { formatICSDate } from './ics-parser.js';
 import { anchorZone } from '../utils/ics-datetime.js';
 import { timedSeriesUntil } from '../utils/rrule-until.js';
 import { rruleValue, nextDueAfterCompletion } from './recurrence.js';
-import { RRULE_RE } from '../middleware/validate.js';
+import { RRULE_RE } from '../api/formats.ts';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { noteMoveTakenBack } from './shopping-move-notices.js';

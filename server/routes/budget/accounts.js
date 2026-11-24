@@ -6,7 +6,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
-import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middleware/validate.js';
+import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../api/formats.ts';
 import { resyncSubscriptionBookings } from '../subscriptions.js';
 import { CURRENCY_CODES } from '../../../public/utils/currency-codes.js';
 import {

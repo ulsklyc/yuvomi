@@ -6,7 +6,7 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
+import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../api/formats.ts';
 import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';

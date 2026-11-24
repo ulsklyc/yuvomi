@@ -1,12 +1,25 @@
 /**
- * Modul: Eingabe-Validierung (Validate)
- * Zweck: Wiederverwendbare Validierungs-Helfer für alle API-Routen
- * Abhängigkeiten: server/utils/timezone.js (reine Rechnung, keine Datenbank),
- *                 server/utils/datetime-pattern.js (die Muster von DATE_RE und DATETIME_RE)
+ * Module: the format checks of the API (#2810)
+ * Purpose: the hand checks a handler runs on a value after validateRequest()
+ *          (server/api/validate-request.ts) has checked the request against
+ *          its OpenAPI schema. They do what the schema does not: a calendar
+ *          date that exists, an offset converted into the form of its column,
+ *          a trimmed text, an http(s) URL, a recurrence rule the series code
+ *          reads; and they hand the handler the value it stores. Each returns
+ *          `{ value, error }`; collectErrors() gathers the errors.
+ *          Not a replacement for validateRequest() and no Ajv format of its own.
+ * Dependencies: server/utils/timezone.js (pure arithmetic, no database),
+ *               server/utils/datetime-pattern.js (the patterns of DATE_RE,
+ *               DATETIME_RE and COLOR_RE). Only relative files under server/,
+ *               never a package: server/openapi.js loads this file and has to
+ *               load without node_modules (the packaging contract).
  */
 
 import { isValidTimeZone, utcToWall } from '../utils/timezone.js';
-import { COLOR_PATTERN, DATE_PATTERN, DATETIME_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
+import { COLOR_PATTERN, DATE_PATTERN, DATETIME_PATTERN } from '../utils/datetime-pattern.js';
+
+/** What every check returns: the value to store, or the error that refuses it. */
+type Checked<T> = { value: T | null, error: string | null };
 
 // Globale Längengrenzen
 const MAX_TITLE    = 200;
@@ -22,13 +35,10 @@ const MAX_SECRET   = 4096;
 // Regex-Muster
 // One source with the day-key `pattern` of the OpenAPI document (#2810).
 const DATE_RE     = new RegExp(DATE_PATTERN);
-const TIME_RE     = /^\d{2}:\d{2}$/;
 // One source with the `pattern` of the reminder times in the OpenAPI document (#2810).
 const DATETIME_RE = new RegExp(DATETIME_PATTERN);
 // One source with the `pattern` of the color fields in the OpenAPI document (#2810).
 const COLOR_RE    = new RegExp(COLOR_PATTERN);
-// One source with the `pattern` of the time fields in the OpenAPI document (#2810).
-const TIME_OF_DAY_RE = new RegExp(TIME_PATTERN);
 const MONTH_RE    = /^\d{4}-\d{2}$/;
 // UNTIL und COUNT schließen sich laut RFC 5545 gegenseitig aus (#513).
 // Erlaubt ist AUSSCHLIESSLICH `BYMONTHDAY=-1` ("letzter Tag des Monats", #960),
@@ -59,7 +69,7 @@ const RRULE_RE    = new RegExp(
  * @param {boolean}[opts.required=true]- Ob das Feld Pflicht ist
  * @returns {{ value: string|null, error: string|null }}
  */
-function str(val, field, { max = MAX_TITLE, required = true } = {}) {
+function str(val: unknown, field: string, { max = MAX_TITLE, required = true }: { max?: number, required?: boolean } = {}): Checked<string> {
   if (val === undefined || val === null || val === '') {
     if (required) return { value: null, error: `${field} is required.` };
     return { value: null, error: null };
@@ -81,7 +91,7 @@ function str(val, field, { max = MAX_TITLE, required = true } = {}) {
  * @param {boolean}[opts.required=true]
  * @returns {{ value: string|null, error: string|null }}
  */
-function secret(val, field, { required = true } = {}) {
+function secret(val: unknown, field: string, { required = true }: { required?: boolean } = {}): Checked<string> {
   // Nur Leerzeichen zaehlt als fehlend (Pflicht ueber trim), gespeichert wird
   // aber der ungetrimmte Wert.
   if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) {
@@ -100,11 +110,11 @@ function secret(val, field, { required = true } = {}) {
  * @param {string}   field
  * @returns {{ value: string|null, error: string|null }}
  */
-function oneOf(val, allowed, field) {
+function oneOf(val: unknown, allowed: readonly string[], field: string): Checked<string> {
   if (val === undefined || val === null || val === '') return { value: null, error: null };
-  if (!allowed.includes(val))
+  if (!allowed.includes(val as string))
     return { value: null, error: `${field} must be one of: ${allowed.join(', ')}.` };
-  return { value: val, error: null };
+  return { value: val as string, error: null };
 }
 
 /**
@@ -120,7 +130,7 @@ function oneOf(val, allowed, field) {
  * @param {string} field
  * @param {boolean} required
  */
-function date(val, field, required = false) {
+function date(val: unknown, field: string, required = false): Checked<string> {
   if (!val) {
     if (required) return { value: null, error: `${field} is required.` };
     return { value: null, error: null };
@@ -142,20 +152,9 @@ function date(val, field, required = false) {
 }
 
 /**
- * Validiert ein Zeit-Format HH:MM.
- */
-function time(val, field) {
-  if (!val) return { value: null, error: null };
-  const raw = String(val);
-  if (!TIME_OF_DAY_RE.test(raw))
-    return { value: null, error: `${field} must be a valid HH:MM time.` };
-  return { value: raw, error: null };
-}
-
-/**
  * Validiert eine Zahl (positiv oder negativ).
  */
-function num(val, field, { required = false } = {}) {
+function num(val: unknown, field: string, { required = false }: { required?: boolean } = {}): Checked<number> {
   if (val === undefined || val === null || val === '') {
     if (required) return { value: null, error: `${field} is required.` };
     return { value: null, error: null };
@@ -176,7 +175,7 @@ const SERIES_TOKEN_RE = /^var\(--chart-series-[1-9][0-9]?\)$/;
  * Validiert eine Hex-Farbe (#RRGGBB). Mit `{ allowTokens: true }` werden zusätzlich
  * die theme-aware `var(--chart-series-N)`-Akzent-Tokens akzeptiert (siehe #542).
  */
-function color(val, field, { allowTokens = false } = {}) {
+function color(val: unknown, field: string, { allowTokens = false }: { allowTokens?: boolean } = {}): Checked<string> {
   if (!val) return { value: null, error: null };
   const str = String(val);
   if (COLOR_RE.test(str)) return { value: str, error: null };
@@ -192,13 +191,13 @@ function color(val, field, { allowTokens = false } = {}) {
  * @param {string} field
  * @returns {{ value: string|null, error: string|null }}
  */
-function url(val, field) {
+function url(val: unknown, field: string): Checked<string> {
   if (val === undefined || val === null || val === '') return { value: null, error: null };
   const s = String(val).trim();
   if (!s) return { value: null, error: null };
   if (s.length > MAX_URL)
     return { value: null, error: `${field} may be at most ${MAX_URL} characters long.` };
-  let parsed;
+  let parsed: URL;
   try {
     parsed = new URL(s);
   } catch {
@@ -214,8 +213,8 @@ function url(val, field) {
  * @param {Array<{ error: string|null }>} results
  * @returns {string[]} Fehlerliste
  */
-function collectErrors(results) {
-  return results.map((r) => r.error).filter(Boolean);
+function collectErrors(results: ReadonlyArray<{ error: string | null }>): string[] {
+  return results.map((r) => r.error).filter(Boolean) as string[];
 }
 
 // Ein Wert, der seinen Zeitpunkt selbst traegt: `Z` oder ein numerischer
@@ -232,7 +231,7 @@ const NAIVE_DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\
  * @param {string} raw
  * @returns {number|null}
  */
-function zonedInstantMs(raw) {
+function zonedInstantMs(raw: string): number | null {
   const m = ZONED_DATETIME_RE.exec(raw);
   if (!m) return null;
   const [, y, mo, d, h, mi, s = '0', frac = '', zulu, sign, oh, om] = m;
@@ -295,7 +294,10 @@ function zonedInstantMs(raw) {
  * @param {boolean} [opts.allDay]  ganztaegig: nur das Datum zaehlt
  * @returns {{ value: string|null, error: string|null }}
  */
-function datetime(val, field, required = false, { to, zone, allDay = false } = {}) {
+function datetime(
+  val: unknown, field: string, required = false,
+  { to, zone, allDay = false }: { to?: 'wall' | 'utc' | 'instant', zone?: string, allDay?: boolean } = {},
+): Checked<string> {
   if (!val) {
     if (required) return { value: null, error: `${field} is required.` };
     return { value: null, error: null };
@@ -318,7 +320,8 @@ function datetime(val, field, required = false, { to, zone, allDay = false } = {
     const iso = new Date(ms).toISOString();
     if (to === 'utc') return { value: iso.slice(0, 19), error: null };
     if (to === 'instant') return { value: iso, error: null };
-    const wall = utcToWall(iso, zone);
+    // to === 'wall' here, and isValidTimeZone(zone) held above.
+    const wall = utcToWall(iso, zone as string);
     if (!wall) return { value: null, error: `${field} must be a valid date and time.` };
     return { value: `${wall.date}T${wall.time.slice(0, 5)}`, error: null };
   }
@@ -334,7 +337,7 @@ function datetime(val, field, required = false, { to, zone, allDay = false } = {
 /**
  * Validiert ein Monatsformat YYYY-MM.
  */
-function month(val, field) {
+function month(val: unknown, field: string): Checked<string> {
   if (!val) return { value: null, error: null };
   if (!MONTH_RE.test(String(val)))
     return { value: null, error: `${field} must be in YYYY-MM format.` };
@@ -344,7 +347,7 @@ function month(val, field) {
 /**
  * Validiert eine optionale RRULE.
  */
-function rrule(val, field) {
+function rrule(val: unknown, field: string): Checked<string> {
   if (!val) return { value: null, error: null };
   const s = String(val).trim();
   if (s.length > MAX_RRULE)
@@ -357,26 +360,10 @@ function rrule(val, field) {
 /**
  * Validiert eine ganzzahlige ID (positiv).
  */
-function id(val, field) {
-  const n = parseInt(val, 10);
+function id(val: unknown, field: string): Checked<number> {
+  const n = parseInt(val as string, 10);
   if (!n || n < 1) return { value: null, error: `${field} must be a positive number.` };
   return { value: n, error: null };
-}
-
-/**
- * Validiert einen Boolean-Wert.
- * @param {any}    val
- * @param {string} field
- * @returns {{ value: boolean|null, error: string|null }}
- */
-function bool(val, field) {
-  if (val === undefined || val === null) {
-    return { value: null, error: `${field} is required.` };
-  }
-  if (typeof val !== 'boolean') {
-    return { value: null, error: `${field} must be a boolean.` };
-  }
-  return { value: val, error: null };
 }
 
 /**
@@ -390,14 +377,14 @@ function bool(val, field) {
  * @param {boolean}[opts.nullable=false]
  * @returns {{ value: null, error: string|null }}
  */
-function textShape(val, field, { nullable = false } = {}) {
+function textShape(val: unknown, field: string, { nullable = false }: { nullable?: boolean } = {}): Checked<null> {
   if (val === undefined || typeof val === 'string') return { value: null, error: null };
   if (val === null && nullable) return { value: null, error: null };
   return { value: null, error: `${field} must be text${nullable ? ' or null' : ''}.` };
 }
 
 export {
-  str, secret, oneOf, date, time, datetime, month, num, color, url, rrule, id, bool, textShape, collectErrors,
-  MAX_TITLE, MAX_TEXT, MAX_SHORT, MAX_RRULE, MAX_URL, MAX_SECRET,
-  DATE_RE, TIME_RE, DATETIME_RE, COLOR_RE, MONTH_RE, RRULE_RE,
+  str, secret, oneOf, date, datetime, month, num, color, url, rrule, id, textShape, collectErrors,
+  MAX_TITLE, MAX_TEXT, MAX_SHORT, MAX_URL,
+  DATE_RE, MONTH_RE, RRULE_RE,
 };

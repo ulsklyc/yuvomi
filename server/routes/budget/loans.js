@@ -6,7 +6,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
-import { str, num, date as validateDate, month as validateMonth, MAX_TITLE, MAX_SHORT } from '../../middleware/validate.js';
+import { str, num, date as validateDate, month as validateMonth, MAX_TITLE, MAX_SHORT } from '../../api/formats.ts';
 import { normalizeObjectVisibility } from '../../authorize/index.ts';
 import { computeLoanSchedule, MAX_LOAN_MONTHS } from '../../services/loan-amortization.js';
 import { translate, resolveHouseholdLocale } from '../../utils/i18n.js';

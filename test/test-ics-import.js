@@ -110,7 +110,7 @@ test('toLocalRRule result is compatible with the rrule() validator regex', async
   // and would have gone stale the moment the validator changed - from then on
   // this test would have been checking itself. The same duplicate existed in
   // test-rrule-ui.js and was closed the same way.
-  const { RRULE_RE } = await import('../server/middleware/validate.js');
+  const { RRULE_RE } = await import('../server/api/formats.ts');
   for (const r of [
     'RRULE:FREQ=WEEKLY;BYDAY=MO,WE;INTERVAL=2',
     'FREQ=WEEKLY;COUNT=5',

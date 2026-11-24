@@ -13,7 +13,7 @@
  *        server/openapi.js muss ohne sie ladbar bleiben.
  */
 
-import { MAX_URL } from '../middleware/validate.js';
+import { MAX_URL } from '../api/formats.ts';
 import { COLOR_PATTERN, DATE_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
 import {
   MAPPING_PROFILE_VERSION, MAX_OFFSET_DAYS, MAX_REFRESH_INTERVAL_MINUTES, MIN_OFFSET_DAYS, MIN_REFRESH_INTERVAL_MINUTES,

@@ -15,7 +15,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import * as db from '../db.js';
 import { hashPassword, normalizePassword } from '../utils/password.js';
-import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import {
   documentLinksFor, documentLinksOf, documentRefForViewer, documentViewer, loadDocumentLinks, replaceDocumentLinks,

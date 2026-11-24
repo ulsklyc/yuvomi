@@ -1,6 +1,6 @@
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '../../public/utils/note-category-name.js';
 import { MAX_QUICK_LINK_URL_LENGTH } from '../../public/utils/quick-link-url.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { COLOR_PATTERN, DATETIME_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
 import { MAX_AVATAR_DATA_LENGTH } from '../utils/avatar-limits.js';
 import { ORIGIN_MODULE } from '../services/reminder-origins.js';
@@ -23,7 +23,7 @@ import {
 
 /**
  * A reminder time as the handlers accept it (`datetime()` in
- * server/middleware/validate.js reads the same pattern): no `format:
+ * server/api/formats.ts reads the same pattern): no `format:
  * date-time`, which needs seconds and a zone the app does not send.
  */
 // Create and update of a notification channel share their fields (#2810); the

@@ -164,7 +164,7 @@ const sameColor = (a, b) =>
  * Farbe wechselte also genau beim Bearbeiten, ohne dass jemand sie angefasst
  * hatte (#856).
  */
-// Spiegelt COLOR_RE aus server/middleware/validate.js. Die Route prueft das
+// Spiegelt COLOR_RE aus server/api/formats.ts. Die Route prueft das
 // bereits, aber die Sync-Dienste schreiben ihre Farben direkt in die Tabelle -
 // was von dort kommt, hat diese Pruefung nie gesehen. Und der Wert landet gleich
 // in einem style-Attribut, wo esc() zwar das Ausbrechen verhindert, nicht aber

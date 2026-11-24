@@ -1,5 +1,5 @@
 import { op, idParam, DOCUMENT_LINKS_READ_NOTE, withCaseReasons, withValidationRefusal } from '../helpers.js';
-import { MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { CURRENCY_CODES } from '../../../public/utils/currency-codes.js';
 import {
   CATEGORIES, FAMILY_ROLES, FREQUENCIES, GROUP_ROLES, GROUP_STATUSES, GROUP_TYPES, MAX_CURSOR_TEXT, MAX_GUEST_EMAIL, MAX_GUEST_NAME,

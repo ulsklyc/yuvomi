@@ -10,7 +10,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, url, date, textShape, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../middleware/validate.js';
+import { str, oneOf, url, date, textShape, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../api/formats.ts';
 import { handOverToShoppingList, mealPlanSource, previewHandover } from '../services/kitchen-handover.js';
 import { loadItemTagsFor } from '../utils/task-tags.js';
 import {

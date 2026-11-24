@@ -12,7 +12,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, MAX_TITLE, MAX_URL } from '../middleware/validate.js';
+import { str, MAX_TITLE, MAX_URL } from '../api/formats.ts';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { getAdapter } from '../services/recipe-providers/index.js';

@@ -1,7 +1,7 @@
 /**
  * Modul: Test - Offset-Eingabe an der API-Grenze (#1364)
  * Zweck: Ein Datum mit `Z` oder numerischem Offset ist ein eindeutiger
- *        Zeitpunkt. `datetime()` in server/middleware/validate.js las davon bis
+ *        Zeitpunkt. `datetime()` in server/api/formats.ts las davon bis
  *        v2.68.0 nur die Ziffern, und jede Route speicherte sie als Wanduhrzeit
  *        des Haushalts: `2026-09-21T16:00:00Z` lag in Berlin zwei Stunden zu
  *        frueh, ohne Fehler. Geprueft wird, dass jeder Wert in die Form SEINER
@@ -31,7 +31,7 @@ import assert from 'node:assert/strict';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
-const { datetime } = await import('../server/middleware/validate.js');
+const { datetime } = await import('../server/api/formats.ts');
 const { storedToInstantMs, storedToInstantMsPrecise } = await import('../server/utils/timezone.js');
 const { createCalendarApp } = await import('./calendar-app.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');

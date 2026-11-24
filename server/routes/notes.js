@@ -7,7 +7,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { validateRequest } from '../api/validate-request.ts';
-import { str, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { str, collectErrors, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
 import {

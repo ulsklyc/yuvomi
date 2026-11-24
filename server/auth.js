@@ -15,7 +15,7 @@ import { refuseWhileRestoring } from './middleware/restore-gate.js';
 import { restoreInProgressError } from './utils/restore-messages.js';
 import { runExternalJob } from './utils/restore-state.js';
 import { SESSION_MAX_AGE_MS, sessionCookieRefreshDue } from './utils/session-lifetime.js';
-import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
+import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './api/formats.ts';
 import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { GravatarError, fetchGravatar, gravatarEnabled, gravatarHost } from './services/gravatar.js';

@@ -8,7 +8,7 @@
 
 import { nextOccurrence, matchesRRuleByday } from './recurrence.js';
 import { shiftDateKey } from '../utils/timezone.js';
-import { str, color as validateColorField, collectErrors } from '../middleware/validate.js';
+import { str, color as validateColorField, collectErrors } from '../api/formats.ts';
 
 import { RECURRENCE_KINDS, WEEKDAY_CODES, ORDINAL_WEEKDAY_VALUES, TYPE_NAME_MAX, TYPE_ICON_MAX, NOTE_MAX } from './waste-fields.js';
 

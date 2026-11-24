@@ -31,7 +31,7 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
+import { str, oneOf, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../api/formats.ts';
 import { normalizePantryUnit, normalizePantryQuantity, convertPantryQuantity } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
 import { assignPantryProduct, productKey, writeMinimumThrough } from '../services/pantry-products.js';

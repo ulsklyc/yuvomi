@@ -63,7 +63,7 @@ import { createBudgetApp } from './budget-app.js';
 import { EXPECTED, CHANGED } from './budget-answers-expected.js';
 
 const dbmod = await import('../server/db.js');
-const { MAX_TITLE, MAX_SHORT } = await import('../server/middleware/validate.js');
+const { MAX_TITLE, MAX_SHORT } = await import('../server/api/formats.ts');
 const subscriptionRoutes = await import('../server/routes/subscriptions.js');
 const restoreState = await import('../server/utils/restore-state.js');
 const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');

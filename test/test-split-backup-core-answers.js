@@ -64,7 +64,7 @@ const { default: systemRouter } = await import('../server/routes/system.js');
 const { buildRouter: buildChangelogRouter } = await import('../server/routes/changelog.js');
 const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 const { createErrorHandler } = await import('../server/middleware/error-handler.js');
-const { MAX_TITLE, MAX_TEXT } = await import('../server/middleware/validate.js');
+const { MAX_TITLE, MAX_TEXT } = await import('../server/api/formats.ts');
 const { MAX_GUEST_NAME, MAX_GUEST_PHONE, MAX_GUEST_EMAIL } = await import('../server/services/split-expense-fields.js');
 const database = () => dbmod.get();
 

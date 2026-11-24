@@ -8,7 +8,7 @@ import express from 'express';
 import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { str, date as validateDate, num, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { str, date as validateDate, num, collectErrors, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import {

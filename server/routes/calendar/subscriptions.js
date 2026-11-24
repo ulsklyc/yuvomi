@@ -7,7 +7,7 @@ import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import * as icsSubscription from '../../services/ics-subscription.js';
-import { color } from '../../middleware/validate.js';
+import { color } from '../../api/formats.ts';
 import { ICS_COLOR_RE, getUserId } from './helpers.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
 import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';

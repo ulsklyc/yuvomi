@@ -594,7 +594,7 @@ function allDayEndToExclusive(dateStr) {
 
 /**
  * DB-Datetime → Graph {dateTime, timeZone}. Lokal angelegte Events sind naive
- * "YYYY-MM-DDTHH:MM" (validate.js) → Sekunden ergänzen, TZ Europe/Berlin.
+ * "YYYY-MM-DDTHH:MM" (api/formats.ts) → Sekunden ergänzen, TZ Europe/Berlin.
  * Importierte Events können Z/Offset tragen → nach UTC normalisieren.
  */
 function toGraphDateTime(dt, tz = outlookTimeZone()) {

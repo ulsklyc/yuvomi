@@ -8,7 +8,7 @@ import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as appleCalendar from '../../services/apple-calendar.js';
 import { requireAdmin } from '../../auth.js';
-import { secret } from '../../middleware/validate.js';
+import { secret } from '../../api/formats.ts';
 import { remoteFailure } from '../../utils/http.js';
 
 const log = createLogger('Calendar');

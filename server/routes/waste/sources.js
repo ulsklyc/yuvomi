@@ -17,7 +17,7 @@ import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
-import { id as validateId } from '../../middleware/validate.js';
+import { id as validateId } from '../../api/formats.ts';
 import { wasteErrorResponse, currentUserId, redactSourceForReader } from './helpers.js';
 import { MAX_ICS_BYTES, MAX_ICS_MB } from '../../services/waste-import.js';
 import { createUrlSource, refreshUrlSource, fetchIcsText, minutesFromNow, classifyFetchFailure, emptyFeedAsFetchFailure } from '../../services/waste-url-source.js';

@@ -22,7 +22,7 @@
  * nicht ueber recurrence.js.
  */
 import * as db from '../../db.js';
-import { str, date, num, collectErrors } from '../../middleware/validate.js';
+import { str, date, num, collectErrors } from '../../api/formats.ts';
 import { MAX_TRACKED_DATES_PER_ITEM, MAX_LABEL } from './fields.js';
 
 const DEFAULT_REMINDER_OFFSET_DAYS = 30;

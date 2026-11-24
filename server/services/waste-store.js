@@ -9,7 +9,7 @@
 
 import crypto from 'node:crypto';
 import { todayKey, shiftDateKey, householdTimeZone } from '../utils/timezone.js';
-import { str } from '../middleware/validate.js';
+import { str } from '../api/formats.ts';
 import { SOURCE_NAME_MAX, MAPPING_PROFILE_VERSION } from './waste-fields.js';
 import {
   validateType, validateOneOff, scheduleRecurrenceProblems, overrideProblems, validateRange,

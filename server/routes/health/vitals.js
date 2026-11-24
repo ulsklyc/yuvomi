@@ -5,7 +5,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import * as v from '../../middleware/validate.js';
+import * as v from '../../api/formats.ts';
 import { defaultVisibilityFor, vitalScopeKey } from './visibility-defaults.js';
 import { vitalLimitError, refuseImpossibleVital, vitalUnitError, refuseVitalUnit } from './vital-limits.js';
 import {

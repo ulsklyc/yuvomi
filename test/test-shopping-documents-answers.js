@@ -70,7 +70,7 @@ import { createShoppingDocumentsApp } from './shopping-documents-app.js';
 import { EXPECTED } from './shopping-documents-answers-expected.js';
 
 const dbmod = await import('../server/db.js');
-const { MAX_TITLE, MAX_TEXT, MAX_SHORT } = await import('../server/middleware/validate.js');
+const { MAX_TITLE, MAX_TEXT, MAX_SHORT } = await import('../server/api/formats.ts');
 const driveStorage = await import('../server/services/google-drive-storage.js');
 const { _setAdapterFactory } = await import('../server/routes/dms.js');
 const { _setDmsAdapterFactory, _setStageUploadForTest } = await import('../server/routes/documents.js');

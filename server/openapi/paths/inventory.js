@@ -1,7 +1,7 @@
 import {
   op, idParam, stringPathParam, DOCUMENT_LINKS_READ_NOTE, BUDGET_LINKS_READ_NOTE, withCaseReasons, withValidationRefusal,
 } from '../helpers.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { DATE_PATTERN, OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
 import {
   CONDITIONS, STATUSES, ODOMETER_UNITS, ROLES, MAX_PHOTO_LENGTH, MAX_TRACKED_DATES_PER_ITEM, MAX_LABEL,

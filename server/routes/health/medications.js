@@ -7,7 +7,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import * as v from '../../middleware/validate.js';
+import * as v from '../../api/formats.ts';
 import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
   MAX_UNIT,

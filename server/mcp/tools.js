@@ -16,7 +16,7 @@
  *   (`internalApiRequest`: `fetch` → eigener HTTP-Server) und erben exakt die
  *   Rechte des aufrufenden Tokens; Rollen-, Scope- und CSRF-Prüfung greifen
  *   serverseitig auf `/api/v1/*` wie bei jedem anderen Client.
- * Abhängigkeiten: server/middleware/validate.js, server/openapi.js,
+ * Abhängigkeiten: server/api/formats.ts, server/openapi.js,
  *                  server/scopes.js + server/authorize/ (Rechte-Durchsetzung)
  *
  * Architektur: Jedes Tool ist EIN Eintrag in der Registry (Definition + Handler
@@ -28,7 +28,7 @@
  * dahinter schon (server/middleware/csrf.js nimmt nur `api_token` aus).
  */
 
-import * as v from '../middleware/validate.js';
+import * as v from '../api/formats.ts';
 import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
 import { authorize, visibleWhere } from '../authorize/index.ts';

@@ -62,7 +62,7 @@ import { EXPECTED } from './contacts-meals-answers-expected.js';
 
 const dbmod = await import('../server/db.js');
 const CardDAVSync = await import('../server/services/cardav-sync.js');
-const { MAX_TITLE, MAX_TEXT, MAX_SHORT } = await import('../server/middleware/validate.js');
+const { MAX_TITLE, MAX_TEXT, MAX_SHORT } = await import('../server/api/formats.ts');
 const { CONTACT_CATEGORY_COLORS } = await import('../server/services/contacts-fields.js');
 const database = () => dbmod.get();
 
