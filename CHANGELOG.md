@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **The calendar subscription feeds and the API description download are checked like every
+  other route.** This is about your own scripts; the app sends nothing that is refused now.
+  `?download=` at `/openapi.json` and `/api/v1/openapi.json` takes only `1`: `download=0`,
+  `download=true`, an empty `download=` and the parameter given twice (`download=1&download=1`,
+  `download=1&download=0`) answered the document inline and are now a 400 with
+  `reason: validation`; without the parameter the document is still answered inline, and an
+  account that is not an administrator still gets its 401 or 403 first. The six subscription
+  feeds (`/feed/calendar`, `/birthdays`, `/inventory-deadlines`, `/cycle`, `/schedule`,
+  `/waste`) keep their addresses, their tokens and their answers; only an internal error is now
+  answered as JSON (`{"error":"Internal server error.","code":500}`) instead of the text
+  `Internal error`, and it is logged without the token.
 - **The calendar and the overview check every request against the published API description.**
   This is about your own API clients; the app sends nothing that is refused now (from this
   release on the subscription settings send `shared` as `true`/`false`, they sent `1`/`0`).

@@ -43,6 +43,23 @@
  *          that carries validateRequest() turns the guard red, and every
  *          other route of the file must carry it. The list is empty since 12b
  *          (a) (server/auth.js was its only entry).
+ *
+ *          End state since group 13 (a): the birthday feed administration
+ *          (server/routes/birthday-feed.js) and the six ICS feeds, moved out
+ *          of server/index.js into server/routes/ics-feeds.js, carry it too;
+ *          NOT_MIGRATED is empty and stays as a ratchet for a route file that
+ *          a later PR adds without the check. Two more checks keep a route
+ *          from hiding where the stack walk above does not look:
+ *            - every `Router()` under server/ stands in a file the guard reads
+ *              (server/routes/**, EXTRA_FILES) or on ROUTER_OUTSIDE with a
+ *              reason - only server/mcp/server.js, whose protocol errors must
+ *              stay JSON-RPC;
+ *            - every inline route of server/index.js (`app.get(...)` and the
+ *              other methods, read from the text: importing the file would
+ *              start the server) stands on INLINE_ROUTES with a reason. A new
+ *              inline route turns the guard red; the two addresses of the
+ *              OpenAPI document are listed as "inline, validated" and must
+ *              carry validateRequest() in their registration.
  * Run: npm run test:validate-request-coverage
  */
 
@@ -51,7 +68,7 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -72,11 +89,42 @@ const PARTIAL = {};
 
 /**
  * The route files that do not carry validateRequest() on every route yet.
- * Only shrinks: a file leaves the list in the PR that migrates it.
+ * Only shrinks: a file leaves the list in the PR that migrates it. Empty since
+ * group 13 (a) (#2810) migrated server/routes/birthday-feed.js, its last
+ * entry; it stays as a ratchet - a new route file goes straight to MIGRATED.
+ * @type {string[]}
  */
-const NOT_MIGRATED = [
-  'server/routes/birthday-feed.js',
-];
+const NOT_MIGRATED = [];
+
+/**
+ * Files under server/ with a `Router()` that the guard does not read, each
+ * with its reason. Any other file with a router must be read (server/routes/**
+ * or EXTRA_FILES), or the guard is red.
+ */
+const ROUTER_OUTSIDE = new Map([
+  ['server/mcp/server.js', 'JSON-RPC envelope, protocol errors must stay JSON-RPC (decision 4 of group 13)'],
+]);
+
+/** The value of an INLINE_ROUTES entry for a route that must carry validateRequest(). */
+const INLINE_VALIDATED = 'inline, validated';
+
+/**
+ * The inline routes of server/index.js, by the path argument as written there,
+ * each with its reason for standing outside a route file (decision 1 of group
+ * 13). A new inline route is red until it is listed here or moved to a file
+ * under server/routes.
+ */
+const INLINE_ROUTES = new Map([
+  ["'/readyz'", 'before the sessions, answers the restore without the database; no input'],
+  ["['/docs', '/docs/']", 'an array pattern resolves to no operation; no input'],
+  ["'/sw.js'", 'not in the document (file delivery); no input'],
+  ["'/api/v1/version'", 'no input; iOS contract, stays in front of requireAuth'],
+  ["'/manifest.webmanifest'", 'not in the document (file delivery); no input'],
+  ["'/api/v1/openapi.json'", INLINE_VALIDATED],
+  ["'/openapi.json'", INLINE_VALIDATED],
+  ["'/health'", 'package contract (container healthchecks); must not depend on building the document'],
+  ["'/{*path}'", 'SPA fallback, wildcard, not in the document'],
+]);
 
 /** The files the groups so far migrated: they must be found complete. */
 const MIGRATED = [
@@ -113,6 +161,7 @@ const MIGRATED = [
   'server/routes/tasks.js',
   'server/routes/preferences.js', 'server/routes/push.js',
   'server/auth.js',
+  'server/routes/birthday-feed.js', 'server/routes/ics-feeds.js',
 ];
 
 /** @param {string} dir @returns {string[]} */
@@ -202,6 +251,43 @@ test('PARTIAL only shrinks: every listed route exists and still lacks validateRe
       assert.ok(found, `${file}: ${route} on PARTIAL has no route (any more): take it off the list`);
       assert.ok(!found.validated, `${file}: ${route} carries validateRequest() now: take it off PARTIAL`);
     }
+  }
+});
+
+/** @param {string} path relative to the root, with forward slashes */
+const readSource = (path) => readFileSync(join(ROOT, path), 'utf8');
+
+test('every Router() under server/ stands in a file the guard reads, or on ROUTER_OUTSIDE with its reason', () => {
+  const withRouter = sourceFiles(join(ROOT, 'server'))
+    .map((path) => relative(ROOT, path).split('\\').join('/'))
+    // `express.Router()` or a bare `Router()`; not "Auth-Router (" in a comment.
+    .filter((file) => /(?:^|[^\w-])Router\(/m.test(readSource(file)));
+  assert.ok(withRouter.length >= 90, `${withRouter.length} files with a Router() found`);
+  const unread = withRouter.filter((file) => !files.has(file) && !ROUTER_OUTSIDE.has(file));
+  assert.deepEqual(unread, [], 'a router the guard does not read: put its file under server/routes, on EXTRA_FILES, or on ROUTER_OUTSIDE with a reason');
+  const stale = [...ROUTER_OUTSIDE.keys()].filter((file) => !withRouter.includes(file));
+  assert.deepEqual(stale, [], 'ROUTER_OUTSIDE names a file without a router (any more)');
+  for (const file of ROUTER_OUTSIDE.keys()) assert.ok(!files.has(file), `${file} is read by the guard: take it off ROUTER_OUTSIDE`);
+});
+
+test('every inline route of server/index.js stands on INLINE_ROUTES with its reason', () => {
+  const source = readSource('server/index.js');
+  /** @type {Array<{ path: string, call: string }>} */
+  const inline = [];
+  const register = /\bapp\.(?:get|post|put|patch|delete|all|head|options|route)\(\s*('[^']*'|"[^"]*"|`[^`]*`|\[[^\]]*\])/g;
+  for (const match of source.matchAll(register)) {
+    const end = source.indexOf(');', match.index);
+    inline.push({ path: match[1], call: source.slice(match.index, end === -1 ? undefined : end) });
+  }
+  assert.ok(inline.length >= INLINE_ROUTES.size, `${inline.length} inline routes read`);
+  const unlisted = [...new Set(inline.map((r) => r.path))].filter((path) => !INLINE_ROUTES.has(path));
+  assert.deepEqual(unlisted, [], 'a new inline route in server/index.js: move it into a route file under server/routes with validateRequest(), or list it here with a reason');
+  const stale = [...INLINE_ROUTES.keys()].filter((path) => !inline.some((r) => r.path === path));
+  assert.deepEqual(stale, [], 'INLINE_ROUTES names a route server/index.js does not register (any more)');
+  for (const [path, reason] of INLINE_ROUTES) {
+    if (reason !== INLINE_VALIDATED) continue;
+    const calls = inline.filter((r) => r.path === path);
+    assert.ok(calls.every((r) => r.call.includes('validateRequest()')), `${path} is listed as validated but registers without validateRequest()`);
   }
 });
 

@@ -96,6 +96,12 @@ const dbmod = await import('../server/db.js');
 /**
  * Jeder Layer der App als `{ kind, paths, name }`. Ein Layer ohne
  * mitgeschriebenen Pfad ist selbst ein Befund: dann kam er an `app.use` vorbei.
+ *
+ * Ein Router-Mount, den `needsDatabase()` nicht als Ganzes deckt, zaehlt mit
+ * den Routen seines Routers (Mount plus Routenpfad, `kind: 'mounted'`): die
+ * sechs ICS-Feeds stehen seit #2810 (Gruppe 13) in server/routes/ics-feeds.js
+ * unter `app.use('/feed', ...)`, und `/feed` selbst liefert nichts - gedeckt
+ * sein muss jede Feed-Adresse darunter.
  */
 function topLevelLayers() {
   return app.router.stack.map((layer) => {
@@ -104,6 +110,12 @@ function topLevelLayers() {
       return { kind: 'route', paths, name: layer.name };
     }
     const mountPath = mountPaths.get(layer);
+    /** @type {any[]} */
+    const routes = Array.isArray(layer.handle?.stack) ? layer.handle.stack.filter((/** @type {any} */ l) => l.route) : [];
+    if (typeof mountPath === 'string' && mountPath !== '/' && !needsDatabase(mountPath) && routes.length > 0) {
+      const paths = routes.flatMap((l) => [l.route.path].flat().map((/** @type {string} */ p) => `${mountPath}${p}`));
+      return { kind: 'mounted', paths, name: layer.name };
+    }
     return { kind: 'use', paths: mountPath === undefined ? [] : [mountPath].flat(), name: layer.name };
   });
 }
@@ -145,6 +157,15 @@ test('#1531 jede globale Middleware steht mit Begruendung in der Allowlist', () 
     .map((entry) => entry.name)
     .filter((name) => !GLOBAL_MIDDLEWARE_ALLOWLIST.has(name));
   assert.deepEqual(unknown, [], 'globale Middleware ohne Eintrag (anonyme Funktionen einen Namen geben)');
+});
+
+test('#2810 die ICS-Feeds unter dem Mount /feed werden einzeln gelesen und sind gedeckt', () => {
+  const feeds = topLevelLayers().filter((/** @type {any} */ l) => l.kind === 'mounted').flatMap((/** @type {any} */ l) => l.paths).sort();
+  assert.deepEqual(feeds, [
+    '/feed/birthdays/:token.ics', '/feed/calendar/:token.ics', '/feed/cycle/:token.ics',
+    '/feed/inventory-deadlines/:token.ics', '/feed/schedule/:token.ics', '/feed/waste/:token.ics',
+  ]);
+  assert.ok(feeds.every((/** @type {string} */ path) => needsDatabase(path)), 'jede Feed-Adresse bekommt waehrend eines Restores 503');
 });
 
 test('#1531 jeder Allowlist-Eintrag gibt es in der App noch', () => {
